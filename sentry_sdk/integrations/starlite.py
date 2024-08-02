@@ -81,10 +81,17 @@ def patch_app_init():
     @ensure_integration_enabled(StarliteIntegration, old__init__)
     def injection_wrapper(self, *args, **kwargs):
         # type: (Starlite, *Any, **Any) -> None
-        kwargs["after_exception"] = [
-            exception_handler,
-            *(kwargs.get("after_exception") or []),
-        ]
+        after_exception = kwargs.pop("after_exception", [])
+        kwargs.update(
+            after_exception=[
+                exception_handler,
+                *(
+                    after_exception
+                    if isinstance(after_exception, list)
+                    else [after_exception]
+                ),
+            ]
+        )
 
         SentryStarliteASGIMiddleware.__call__ = SentryStarliteASGIMiddleware._run_asgi3  # type: ignore
         middleware = kwargs.get("middleware") or []
