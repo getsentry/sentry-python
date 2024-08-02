@@ -1,10 +1,8 @@
-import logging
-
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
-from sentry_sdk.utils import package_version
+from sentry_sdk.utils import logger, package_version, qualname_from_function
 
 try:
     import ray  # type: ignore[import-not-found]
@@ -24,7 +22,6 @@ def _check_sentry_initialized():
     if sentry_sdk.get_client().is_active():
         return
 
-    logger = logging.getLogger("sentry_sdk.errors")
     logger.warning(
         "[Tracing] Sentry not initialized in ray cluster worker, performance data will be discarded."
     )
@@ -41,15 +38,13 @@ def _patch_ray_remote():
             # type: (Any, Optional[dict[str, Any]],  Any) -> Any
             _check_sentry_initialized()
 
-            transaction = None
-            if _tracing is not None:
-                transaction = sentry_sdk.continue_trace(
-                    environ_or_headers=_tracing,
-                    op=OP.QUEUE_TASK_RQ,
-                    source=TRANSACTION_SOURCE_TASK,
-                    origin=RayIntegration.origin,
-                    name="Ray worker transaction",
-                )
+            transaction = sentry_sdk.continue_trace(
+                _tracing or {},
+                op=OP.QUEUE_TASK_RAY,
+                name=qualname_from_function(f),
+                origin=RayIntegration.origin,
+                source=TRANSACTION_SOURCE_TASK,
+            )
 
             with sentry_sdk.start_transaction(transaction) as transaction:
                 result = f(*f_args, **f_kwargs)
@@ -63,8 +58,8 @@ def _patch_ray_remote():
             # type: (*Any, **Any) -> Any
             with sentry_sdk.start_span(
                 op=OP.QUEUE_SUBMIT_RAY,
+                description=qualname_from_function(f),
                 origin=RayIntegration.origin,
-                description="Sending task to ray cluster."
             ):
                 tracing = {
                     k: v
@@ -77,7 +72,6 @@ def _patch_ray_remote():
         return rv
 
     ray.remote = new_remote
-    return
 
 
 class RayIntegration(Integration):
