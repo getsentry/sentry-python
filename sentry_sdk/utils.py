@@ -616,7 +616,9 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = frame.f_locals.copy()
+        from sentry_sdk._copy import deepcopy_fallback_repr
+
+        rv["vars"] = deepcopy_fallback_repr(frame.f_locals)
 
     return rv
 
