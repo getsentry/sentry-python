@@ -1,8 +1,15 @@
+import sys
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
-from sentry_sdk.utils import logger, package_version, qualname_from_function
+from sentry_sdk.utils import (
+    event_from_exception,
+    logger,
+    package_version,
+    qualname_from_function,
+    reraise,
+)
 
 try:
     import ray  # type: ignore[import-not-found]
@@ -15,6 +22,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional
+    from sentry_sdk.utils import ExcInfo
 
 
 def _check_sentry_initialized():
@@ -47,8 +55,15 @@ def _patch_ray_remote():
             )
 
             with sentry_sdk.start_transaction(transaction) as transaction:
-                result = f(*f_args, **f_kwargs)
-                transaction.set_status("ok")
+                try:
+                    result = f(*f_args, **f_kwargs)
+                    transaction.set_status(SPANSTATUS.OK)
+                except Exception:
+                    transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+                    exc_info = sys.exc_info()
+                    _capture_exception(exc_info)
+                    reraise(*exc_info)
+
                 return result
 
         rv = old_remote(_f, *args, *kwargs)
@@ -60,18 +75,43 @@ def _patch_ray_remote():
                 op=OP.QUEUE_SUBMIT_RAY,
                 description=qualname_from_function(f),
                 origin=RayIntegration.origin,
-            ):
+            ) as span:
                 tracing = {
                     k: v
                     for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
                 }
-                return old_remote_method(*args, **kwargs, _tracing=tracing)
+                try:
+                    result = old_remote_method(*args, **kwargs, _tracing=tracing)
+                    span.set_status(SPANSTATUS.OK)
+                except Exception:
+                    span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                    exc_info = sys.exc_info()
+                    _capture_exception(exc_info)
+                    reraise(*exc_info)
+
+                return result
 
         rv.remote = _remote_method_with_header_propagation
 
         return rv
 
     ray.remote = new_remote
+
+
+def _capture_exception(exc_info, **kwargs):
+    # type: (ExcInfo, **Any) -> None
+    client = sentry_sdk.get_client()
+
+    event, hint = event_from_exception(
+        exc_info,
+        client_options=client.options,
+        mechanism={
+            "handled": False,
+            "type": RayIntegration.identifier,
+        },
+    )
+
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 class RayIntegration(Integration):

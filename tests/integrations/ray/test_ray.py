@@ -77,8 +77,6 @@ def test_ray_spans():
 
     @ray.remote
     def example_task():
-        ...
-
         return sentry_sdk.get_client().transport.envelopes
 
     ray.init(
