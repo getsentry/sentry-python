@@ -42,8 +42,12 @@ def _patch_ray_remote():
     @functools.wraps(old_remote)
     def new_remote(f, *args, **kwargs):
         # type: (Callable[..., Any], *Any, **Any) -> Callable[..., Any]
+
         def _f(*f_args, _tracing=None, **f_kwargs):
             # type: (Any, Optional[dict[str, Any]],  Any) -> Any
+            """
+            Ray Worker
+            """
             _check_sentry_initialized()
 
             transaction = sentry_sdk.continue_trace(
@@ -71,6 +75,9 @@ def _patch_ray_remote():
 
         def _remote_method_with_header_propagation(*args, **kwargs):
             # type: (*Any, **Any) -> Any
+            """
+            Ray Client
+            """
             with sentry_sdk.start_span(
                 op=OP.QUEUE_SUBMIT_RAY,
                 description=qualname_from_function(f),
@@ -110,7 +117,6 @@ def _capture_exception(exc_info, **kwargs):
             "type": RayIntegration.identifier,
         },
     )
-
     sentry_sdk.capture_event(event, hint=hint)
 
 

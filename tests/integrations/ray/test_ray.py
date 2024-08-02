@@ -1,3 +1,5 @@
+import json
+import os
 import pytest
 
 import ray
@@ -17,10 +19,22 @@ class RayTestTransport(TestTransport):
         self.envelopes.append(envelope)
 
 
-def setup_sentry():
+class RayLoggingTransport(TestTransport):
+    def __init__(self):
+        super().__init__()
+
+    def capture_envelope(self, envelope: Envelope) -> None:
+        print(envelope.serialize().decode("utf-8", "replace"))
+
+
+def setup_sentry_with_logging_transport():
+    setup_sentry(transport=RayLoggingTransport())
+
+
+def setup_sentry(transport=None):
     sentry_sdk.init(
         integrations=[RayIntegration()],
-        transport=RayTestTransport(),
+        transport=RayTestTransport() if transport is None else transport,
         traces_sample_rate=1.0,
     )
 
@@ -29,19 +43,19 @@ def setup_sentry():
 def test_ray_tracing():
     setup_sentry()
 
-    @ray.remote
-    def example_task():
-        with sentry_sdk.start_span(op="task", description="example task step"):
-            ...
-
-        return sentry_sdk.get_client().transport.envelopes
-
     ray.init(
         runtime_env={
             "worker_process_setup_hook": setup_sentry,
             "working_dir": "./",
         }
     )
+
+    @ray.remote
+    def example_task():
+        with sentry_sdk.start_span(op="task", description="example task step"):
+            ...
+
+        return sentry_sdk.get_client().transport.envelopes
 
     with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
         worker_envelopes = ray.get(example_task.remote())
@@ -75,16 +89,16 @@ def test_ray_tracing():
 def test_ray_spans():
     setup_sentry()
 
-    @ray.remote
-    def example_task():
-        return sentry_sdk.get_client().transport.envelopes
-
     ray.init(
         runtime_env={
             "worker_process_setup_hook": setup_sentry,
             "working_dir": "./",
         }
     )
+
+    @ray.remote
+    def example_task():
+        return sentry_sdk.get_client().transport.envelopes
 
     with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
         worker_envelopes = ray.get(example_task.remote())
@@ -101,3 +115,46 @@ def test_ray_spans():
     for span in worker_transaction["spans"]:
         assert span["op"] == "queue.task.ray"
         assert span["origin"] == "auto.queue.ray"
+
+
+@pytest.mark.forked
+def test_ray_errors():
+    setup_sentry_with_logging_transport()
+
+    ray.init(
+        runtime_env={
+            "worker_process_setup_hook": setup_sentry_with_logging_transport,
+            "working_dir": "./",
+        }
+    )
+
+    @ray.remote
+    def example_task():
+        1 / 0
+
+    with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
+        with pytest.raises(ZeroDivisionError):
+            future = example_task.remote()
+            ray.get(future)
+
+    job_id = future.job_id().hex()
+
+    # Read the worker log output containing the error
+    log_dir = "/tmp/ray/session_latest/logs/"
+    log_file = [
+        f
+        for f in os.listdir(log_dir)
+        if "worker" in f and job_id in f and f.endswith(".out")
+    ][0]
+    with open(os.path.join(log_dir, log_file), "r") as file:
+        lines = file.readlines()
+        # parse error object from log line
+        error = json.loads(lines[4][:-1])
+
+    assert error["level"] == "error"
+    assert (
+        error["transaction"]
+        == "tests.integrations.ray.test_ray.test_ray_errors.<locals>.example_task"
+    )  # its in the worker, not the client thus not "ray test transaction"
+    assert error["exception"]["values"][0]["mechanism"]["type"] == "ray"
+    assert not error["exception"]["values"][0]["mechanism"]["handled"]
