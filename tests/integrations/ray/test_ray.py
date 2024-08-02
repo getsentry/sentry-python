@@ -30,7 +30,7 @@ def test_ray():
     def _task():
         with sentry_sdk.start_span(op="task", description="example task step"):
             time.sleep(0.1)
-        return sentry_sdk.Hub.current.client.transport.envelopes
+        return sentry_sdk.get_client().transport.envelopes
 
     ray.init(
         runtime_env=dict(worker_process_setup_hook=_setup_ray_sentry, working_dir="./")
@@ -40,7 +40,7 @@ def test_ray():
         worker_envelopes = ray.get(_task.remote())
 
     _assert_envelopes_are_associated_with_same_trace_id(
-        sentry_sdk.Hub.current.client.transport.envelopes[0], worker_envelopes[0]
+        sentry_sdk.Hub.get_client().transport.envelopes[0], worker_envelopes[0]
     )
 
 
