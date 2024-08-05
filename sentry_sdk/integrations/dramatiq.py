@@ -1,21 +1,27 @@
 import json
-from typing import Any, Callable, Dict, Optional, Union
 
-from dramatiq.broker import Broker
-from dramatiq.message import Message
-from dramatiq.middleware import Middleware, default_middleware
-from dramatiq.errors import Retry
 from sentry_sdk import Hub
 from sentry_sdk.integrations import Integration
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
 )
 
+from dramatiq.broker import Broker  # type: ignore
+from dramatiq.message import Message  # type: ignore
+from dramatiq.middleware import Middleware, default_middleware  # type: ignore
+from dramatiq.errors import Retry  # type: ignore
+
+if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Optional, Union
+    from sentry_sdk._types import Event, Hint
+
 
 class DramatiqIntegration(Integration):
-    """Dramatiq integration for Sentry
+    """
+    Dramatiq integration for Sentry
 
     Please make sure that you call `sentry_sdk.init` *before* initializing
     your broker, as it monkey patches `Broker.__init__`.
@@ -30,9 +36,11 @@ class DramatiqIntegration(Integration):
 
 
 def _patch_dramatiq_broker():
+    # type: () -> None
     original_broker__init__ = Broker.__init__
 
     def sentry_patched_broker__init__(self, *args, **kw):
+        # type: (Broker, *Any, **Any) -> None
         hub = Hub.current
         integration = hub.get_integration(DramatiqIntegration)
 
@@ -68,7 +76,8 @@ def _patch_dramatiq_broker():
 
 
 class SentryMiddleware(Middleware):
-    """A Dramatiq middleware that automatically captures and sends
+    """
+    A Dramatiq middleware that automatically captures and sends
     exceptions to Sentry.
 
     This is automatically added to every instantiated broker via the
@@ -76,6 +85,7 @@ class SentryMiddleware(Middleware):
     """
 
     def before_process_message(self, broker, message):
+        # type: (Broker, Message) -> None
         hub = Hub.current
         integration = hub.get_integration(DramatiqIntegration)
         if integration is None:
@@ -92,6 +102,7 @@ class SentryMiddleware(Middleware):
             )
 
     def after_process_message(self, broker, message, *, result=None, exception=None):
+        # type: (Broker, Message, Optional[Any], Optional[Exception]) -> None
         hub = Hub.current
         integration = hub.get_integration(DramatiqIntegration)
 
@@ -118,10 +129,10 @@ class SentryMiddleware(Middleware):
 
 
 def _make_message_event_processor(message, integration):
-    # type: (Message, DramatiqIntegration) -> Callable
+    # type: (Message, DramatiqIntegration) -> Callable[[Event, Hint], Optional[Event]]
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, Hint) -> Optional[Event]
         with capture_internal_exceptions():
             DramatiqMessageExtractor(message).extract_into_event(event)
 
@@ -140,7 +151,7 @@ class DramatiqMessageExtractor(object):
         return len(json.dumps(self.message_data))
 
     def extract_into_event(self, event):
-        # type: (Dict[str, Any]) -> None
+        # type: (Event) -> None
         client = Hub.current.client
         if client is None:
             return

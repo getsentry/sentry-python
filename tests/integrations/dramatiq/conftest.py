@@ -1,15 +1,16 @@
 import json
 import os
+import pytest
 import subprocess
 
 import dramatiq
-import pytest
-import sentry_sdk
 from dramatiq.brokers.stub import StubBroker
-from sentry_sdk._compat import reraise, string_types
-from sentry_sdk.transport import Transport
 
-from sentry_dramatiq import DramatiqIntegration
+import sentry_sdk
+from sentry_sdk.integrations.dramatiq import DramatiqIntegration
+from sentry_sdk.transport import Transport
+from sentry_sdk.utils import reraise
+
 
 SEMAPHORE = "./semaphore"
 
@@ -41,7 +42,7 @@ def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
     def check_event(event):
         def check_string_keys(map):
             for key, value in map.items():
-                assert isinstance(key, string_types)
+                assert isinstance(key, str)
                 if isinstance(value, dict):
                     check_string_keys(value)
 
