@@ -6,7 +6,7 @@ import pytest
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlite import StarliteIntegration
 
-from typing import Any
+from typing import Any, Dict
 
 from starlite import AbstractMiddleware, LoggingConfig, Starlite, get, Controller
 from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
@@ -23,7 +23,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
             raise Exception("Whoa")
 
     @get("/some_url")
-    async def homepage_handler() -> "dict[str, Any]":
+    async def homepage_handler() -> "Dict[str, Any]":
         1 / 0
         return {"status": "ok"}
 
@@ -32,12 +32,12 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
         raise Exception("Too Hot")
 
     @get("/message")
-    async def message() -> "dict[str, Any]":
+    async def message() -> "Dict[str, Any]":
         capture_message("hi")
         return {"status": "ok"}
 
     @get("/message/{message_id:str}")
-    async def message_with_id() -> "dict[str, Any]":
+    async def message_with_id() -> "Dict[str, Any]":
         capture_message("hi")
         return {"status": "ok"}
 
