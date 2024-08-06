@@ -1367,11 +1367,16 @@ class POTelSpan:
 
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
-        pass
+        if thread_id is not None:
+            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
+
+            if thread_name is not None:
+                self.set_data(SPANDATA.THREAD_NAME, thread_name)
 
     def set_profiler_id(self, profiler_id):
         # type: (Optional[str]) -> None
-        pass
+        if profiler_id is not None:
+            self.set_data(SPANDATA.PROFILER_ID, profiler_id)
 
     def set_http_status(self, http_status):
         # type: (int) -> None
