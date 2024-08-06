@@ -95,9 +95,7 @@ class SentryMiddleware(Middleware):
         scope = sentry_sdk.get_current_scope()
         scope.transaction = message.actor_name
         scope.set_tag("dramatiq_message_id", message.message_id)
-        scope.add_event_processor(
-            _make_message_event_processor(message, integration)
-        )
+        scope.add_event_processor(_make_message_event_processor(message, integration))
 
     def after_process_message(self, broker, message, *, result=None, exception=None):
         # type: (Broker, Message, Any, Optional[Any], Optional[Exception]) -> None
@@ -118,8 +116,8 @@ class SentryMiddleware(Middleware):
                     exception,
                     client_options=sentry_sdk.get_client().options,
                     mechanism={
-                        "type": DramatiqIntegration.identifier, 
-                        "handled": False, 
+                        "type": DramatiqIntegration.identifier,
+                        "handled": False,
                     },
                 )
                 sentry_sdk.capture_event(event, hint=hint)
