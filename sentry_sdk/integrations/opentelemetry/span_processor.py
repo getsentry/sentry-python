@@ -13,7 +13,6 @@ from opentelemetry.trace.span import (
     INVALID_SPAN_ID,
     INVALID_TRACE_ID,
 )
-from sentry_sdk import get_client, start_transaction
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -106,6 +105,8 @@ class SentrySpanProcessor(SpanProcessor):
 
     def on_start(self, otel_span, parent_context=None):
         # type: (OTelSpan, Optional[context_api.Context]) -> None
+        from sentry_sdk import get_client, start_transaction
+
         client = get_client()
 
         if not client.dsn:
