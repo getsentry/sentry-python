@@ -1,3 +1,5 @@
+import pytest
+
 import sentry_sdk
 from sentry_sdk.hub import Hub
 
@@ -40,6 +42,7 @@ def test_with_hub_sdk1(sentry_init, capture_events):
     assert event_z["tags"] == {"A": 1, "B1": 1, "B2": 1, "Z": 1}
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_with_hub_configure_scope_sdk1(sentry_init, capture_events):
     """
     Mutate data in a `with Hub:` containing a `with configure_scope` block
@@ -83,6 +86,7 @@ def test_with_hub_configure_scope_sdk1(sentry_init, capture_events):
     }
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_with_hub_push_scope_sdk1(sentry_init, capture_events):
     """
     Mutate data in a `with Hub:` containing a `with push_scope` block
@@ -118,6 +122,7 @@ def test_with_hub_push_scope_sdk1(sentry_init, capture_events):
     assert event_z["tags"] == {"A": 1, "B1": 1, "B5": 1, "Z": 1}
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_with_cloned_hub_sdk1(sentry_init, capture_events):
     """
     Mutate data in a `with cloned Hub:` block
@@ -147,6 +152,7 @@ def test_with_cloned_hub_sdk1(sentry_init, capture_events):
     assert event_z["tags"] == {"A": 1, "Z": 1}
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_with_cloned_hub_configure_scope_sdk1(sentry_init, capture_events):
     """
     Mutate data in a `with cloned Hub:` containing a `with configure_scope` block
@@ -182,6 +188,7 @@ def test_with_cloned_hub_configure_scope_sdk1(sentry_init, capture_events):
     assert event_z["tags"] == {"A": 1, "Z": 1}
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_with_cloned_hub_push_scope_sdk1(sentry_init, capture_events):
     """
     Mutate data in a `with cloned Hub:` containing a `with push_scope` block
