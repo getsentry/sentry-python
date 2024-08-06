@@ -116,12 +116,12 @@ class PotelSentrySpanProcessor(SpanProcessor):
         span_id = format_span_id(span.context.span_id)
         parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
 
-        (op, description, status, _) = extract_span_data(span)
+        (op, description, status, _, origin) = extract_span_data(span)
 
         trace_context = {
             "trace_id": trace_id,
             "span_id": span_id,
-            "origin": SPAN_ORIGIN,
+            "origin": origin,
             "op": op,
             "status": status,
         }  # type: dict[str, Any]
@@ -160,17 +160,17 @@ class PotelSentrySpanProcessor(SpanProcessor):
         span_id = format_span_id(span.context.span_id)
         parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
 
-        (op, description, status, _) = extract_span_data(span)
+        (op, description, status, _, origin) = extract_span_data(span)
 
         span_json = {
             "trace_id": trace_id,
             "span_id": span_id,
-            "origin": SPAN_ORIGIN,
             "op": op,
             "description": description,
             "status": status,
             "start_timestamp": convert_otel_timestamp(span.start_time),
             "timestamp": convert_otel_timestamp(span.end_time),
+            "origin": origin or SPAN_ORIGIN,
         }  # type: dict[str, Any]
 
         if parent_span_id:
