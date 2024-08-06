@@ -32,7 +32,7 @@ def test_get_current_span():
 
 
 @pytest.mark.forked
-def test_get_current_span_default_hub(sentry_init):
+def test_get_current_span_current_scope(sentry_init):
     sentry_init()
 
     assert get_current_span() is None
@@ -45,7 +45,7 @@ def test_get_current_span_default_hub(sentry_init):
 
 
 @pytest.mark.forked
-def test_get_current_span_default_hub_with_transaction(sentry_init):
+def test_get_current_span_current_scope_with_transaction(sentry_init):
     sentry_init()
 
     assert get_current_span() is None
