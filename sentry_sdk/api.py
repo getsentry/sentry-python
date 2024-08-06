@@ -6,9 +6,14 @@ from sentry_sdk import tracing, tracing_utils, Client
 from sentry_sdk._init_implementation import init
 from sentry_sdk.tracing import POTelSpan, Transaction, trace
 from sentry_sdk.crons import monitor
-# TODO-neel-potel make 2 scope strategies/impls and switch
-from sentry_sdk.integrations.opentelemetry.scope import PotelScope as Scope, new_scope, isolation_scope
 
+# TODO-neel-potel make 2 scope strategies/impls and switch
+from sentry_sdk.integrations.opentelemetry.scope import (
+    PotelScope as Scope,
+    new_scope,
+    isolation_scope,
+)
+from sentry_sdk.scope import _ScopeManager
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
