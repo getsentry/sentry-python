@@ -23,6 +23,7 @@ from sentry_sdk.integrations.opentelemetry.utils import (
                 "description": "OTel Span Blank",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
         (
@@ -36,6 +37,7 @@ from sentry_sdk.integrations.opentelemetry.utils import (
                 "description": "OTel Span RPC",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
         (
@@ -49,6 +51,7 @@ from sentry_sdk.integrations.opentelemetry.utils import (
                 "description": "OTel Span Messaging",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
         (
@@ -62,6 +65,7 @@ from sentry_sdk.integrations.opentelemetry.utils import (
                 "description": "OTel Span FaaS",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
     ],
@@ -72,12 +76,13 @@ def test_extract_span_data(name, status, attributes, expected):
     otel_span.status = Status(StatusCode.UNSET)
     otel_span.attributes = attributes
 
-    op, description, status, http_status_code = extract_span_data(otel_span)
+    op, description, status, http_status_code, origin = extract_span_data(otel_span)
     result = {
         "op": op,
         "description": description,
         "status": status,
         "http_status_code": http_status_code,
+        "origin": origin,
     }
     assert result == expected
 
