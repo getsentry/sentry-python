@@ -163,11 +163,11 @@ class DramatiqMessageExtractor(object):
         request_info = contexts.setdefault("dramatiq", {})
         request_info["type"] = "dramatiq"
 
-        bodies = client.options["request_bodies"]
+        max_request_body_size = client.options["max_request_body_size"]
         if (
-            bodies == "never"
-            or (bodies == "small" and content_length > 10**3)
-            or (bodies == "medium" and content_length > 10**4)
+            max_request_body_size == "never"
+            or (max_request_body_size == "small" and content_length > 10**3)
+            or (max_request_body_size == "medium" and content_length > 10**4)
         ):
             data = AnnotatedValue(
                 "",
