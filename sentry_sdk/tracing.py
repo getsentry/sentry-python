@@ -1306,6 +1306,17 @@ class POTelSpan:
         # type: () -> Optional[Transaction]
         pass
 
+    @property
+    def trace_id(self):
+        # type: () -> Optional[str]
+        return self._otel_span.get_span_context().trace_id
+
+    @property
+    def sampled(self):
+        # type: () -> Optional[bool]
+        # XXX setting this
+        return self._otel_span.get_span_context().trace_flags.sampled
+
     def start_child(self, **kwargs):
         # type: (str, **Any) -> POTelSpan
         pass
