@@ -171,12 +171,15 @@ def test_span_data_for_http_method(kind, status, attributes, expected):
     otel_span.status = status
     otel_span.attributes = attributes
 
-    op, description, status, http_status_code = span_data_for_http_method(otel_span)
+    op, description, status, http_status_code, origin = span_data_for_http_method(
+        otel_span
+    )
     result = {
         "op": op,
         "description": description,
         "status": status,
         "http_status_code": http_status_code,
+        "origin": origin,
     }
     assert result == expected
 
@@ -186,19 +189,21 @@ def test_span_data_for_db_query():
     otel_span.name = "OTel Span"
     otel_span.attributes = {}
 
-    op, description, status, http_status = span_data_for_db_query(otel_span)
+    op, description, status, http_status, origin = span_data_for_db_query(otel_span)
     assert op == "db"
     assert description == "OTel Span"
     assert status is None
     assert http_status is None
+    assert origin is None
 
     otel_span.attributes = {"db.statement": "SELECT * FROM table;"}
 
-    op, description, status, http_status = span_data_for_db_query(otel_span)
+    op, description, status, http_status, origin = span_data_for_db_query(otel_span)
     assert op == "db"
     assert description == "SELECT * FROM table;"
     assert status is None
     assert http_status is None
+    assert origin is None
 
 
 @pytest.mark.parametrize(
