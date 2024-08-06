@@ -10,7 +10,6 @@ from clickhouse_driver import Client, connect
 
 from sentry_sdk import start_transaction, capture_message
 from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
-from tests.conftest import ApproxDict
 
 EXPECT_PARAMS_IN_SELECT = True
 if clickhouse_driver.VERSION < (0, 2, 6):
@@ -102,9 +101,6 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_breadcrumbs[-1]["data"].pop("db.params", None)
-
-    for crumb in expected_breadcrumbs:
-        crumb["data"] = ApproxDict(crumb["data"])
 
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
@@ -204,9 +200,6 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_breadcrumbs[-1]["data"].pop("db.params", None)
-
-    for crumb in expected_breadcrumbs:
-        crumb["data"] = ApproxDict(crumb["data"])
 
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
@@ -324,9 +317,6 @@ def test_clickhouse_client_spans(
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_spans[-1]["data"].pop("db.params", None)
-
-    for span in expected_spans:
-        span["data"] = ApproxDict(span["data"])
 
     for span in event["spans"]:
         span.pop("span_id", None)
@@ -454,9 +444,6 @@ def test_clickhouse_client_spans_with_pii(
     if not EXPECT_PARAMS_IN_SELECT:
         expected_spans[-1]["data"].pop("db.params", None)
 
-    for span in expected_spans:
-        span["data"] = ApproxDict(span["data"])
-
     for span in event["spans"]:
         span.pop("span_id", None)
         span.pop("start_timestamp", None)
@@ -551,9 +538,6 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_breadcrumbs[-1]["data"].pop("db.params", None)
-
-    for crumb in expected_breadcrumbs:
-        crumb["data"] = ApproxDict(crumb["data"])
 
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
@@ -654,9 +638,6 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_breadcrumbs[-1]["data"].pop("db.params", None)
-
-    for crumb in expected_breadcrumbs:
-        crumb["data"] = ApproxDict(crumb["data"])
 
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
@@ -772,9 +753,6 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_spans[-1]["data"].pop("db.params", None)
-
-    for span in expected_spans:
-        span["data"] = ApproxDict(span["data"])
 
     for span in event["spans"]:
         span.pop("span_id", None)
@@ -901,9 +879,6 @@ def test_clickhouse_dbapi_spans_with_pii(
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_spans[-1]["data"].pop("db.params", None)
-
-    for span in expected_spans:
-        span["data"] = ApproxDict(span["data"])
 
     for span in event["spans"]:
         span.pop("span_id", None)

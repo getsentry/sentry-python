@@ -9,7 +9,6 @@ import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
-from tests.conftest import ApproxDict
 
 
 @pytest.mark.parametrize(
@@ -44,8 +43,9 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-        assert crumb["data"] == ApproxDict(
-            {
+        assert (
+            crumb["data"].items()
+            >= {
                 "url": url,
                 SPANDATA.HTTP_METHOD: "GET",
                 SPANDATA.HTTP_FRAGMENT: "",
@@ -53,7 +53,7 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
                 SPANDATA.HTTP_STATUS_CODE: 200,
                 "reason": "OK",
                 "extra": "foo",
-            }
+            }.items()
         )
 
 
@@ -308,13 +308,14 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     capture_message("Testing!")
 
     (event,) = events
-    assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
-        {
+    assert (
+        event["breadcrumbs"]["values"][0]["data"].items()
+        >= {
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
             # no url related data
-        }
+        }.items()
     )
 
     assert "url" not in event["breadcrumbs"]["values"][0]["data"]

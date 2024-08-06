@@ -13,7 +13,6 @@ from sentry_sdk.integrations.celery import (
     _wrap_apply_async,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
-from tests.conftest import ApproxDict
 
 
 @pytest.fixture
@@ -227,12 +226,12 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "same_process_as_parent": True,
             "op": "queue.process",
             "description": "dummy_task",
-            "data": ApproxDict(),
+            "data": {},
         }.items()
     )
     assert submission_event["spans"] == [
         {
-            "data": ApproxDict(),
+            "data": {},
             "description": "dummy_task",
             "op": "queue.submit.celery",
             "origin": "auto.queue.celery",
