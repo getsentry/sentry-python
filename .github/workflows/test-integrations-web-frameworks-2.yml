@@ -59,6 +59,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-falcon-latest"
+      - name: Test litestar latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-litestar-latest"
       - name: Test pyramid latest
         run: |
           set -x # print commands that are executed
@@ -137,6 +141,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-falcon"
+      - name: Test litestar pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-litestar"
       - name: Test pyramid pinned
         run: |
           set -x # print commands that are executed
