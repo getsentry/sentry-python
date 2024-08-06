@@ -52,7 +52,7 @@ def _patch_dramatiq_broker():
             if len(args) > 0:
                 assert len(args) < 2
                 middleware = None if args[0] is None else args[0]
-                args = []
+                args = []  # type: ignore
             else:
                 middleware = None
 
@@ -74,7 +74,7 @@ def _patch_dramatiq_broker():
     Broker.__init__ = sentry_patched_broker__init__
 
 
-class SentryMiddleware(Middleware):
+class SentryMiddleware(Middleware):  # type: ignore[misc]
     """
     A Dramatiq middleware that automatically captures and sends
     exceptions to Sentry.
