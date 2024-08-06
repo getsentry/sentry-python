@@ -1370,7 +1370,14 @@ class POTelSpan:
 
     def set_status(self, status):
         # type: (str) -> None
-        pass
+        if status == SPANSTATUS.OK:
+            otel_status = StatusCode.OK
+            otel_description = "ok"
+        else:
+            otel_status = StatusCode.ERROR
+            otel_description = status.value
+
+        self._otel_span.set_status(otel_status, otel_description)
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
@@ -1391,7 +1398,12 @@ class POTelSpan:
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        pass
+        self.set_tag(
+            "http.status_code", str(http_status)
+        )  # we keep this for backwards compatibility
+        # XXX do we still need this? ^
+        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
+        self.set_status(get_span_status_from_http_code(http_status))
 
     def is_success(self):
         # type: () -> bool
