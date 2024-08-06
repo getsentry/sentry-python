@@ -1,7 +1,30 @@
-from uuid import UUID
+import pytest
+import uuid
 
 import dramatiq
+from dramatiq.brokers.stub import StubBroker
+
 import sentry_sdk
+from sentry_sdk.integrations.dramatiq import DramatiqIntegration
+
+
+@pytest.fixture
+def broker(sentry_init):
+    sentry_init(integrations=[DramatiqIntegration()])
+    broker = StubBroker()
+    broker.emit_after("process_boot")
+    dramatiq.set_broker(broker)
+    yield broker
+    broker.flush_all()
+    broker.close()
+
+
+@pytest.fixture
+def worker(broker):
+    worker = dramatiq.Worker(broker, worker_timeout=100, worker_threads=1)
+    worker.start()
+    yield worker
+    worker.stop()
 
 
 def test_that_a_single_error_is_captured(broker, worker, capture_events):
@@ -51,7 +74,7 @@ def test_that_dramatiq_message_id_is_set_as_tag(broker, worker, capture_events):
     event1, event2 = events
     assert "dramatiq_message_id" in event1["tags"]
     msg_ids = [e["tags"]["dramatiq_message_id"] for e in events]
-    assert all(UUID(msg_id) and isinstance(msg_id, str) for msg_id in msg_ids)
+    assert all(uuid.UUID(msg_id) and isinstance(msg_id, str) for msg_id in msg_ids)
 
 
 def test_that_local_variables_are_captured(broker, worker, capture_events):
@@ -168,7 +191,7 @@ def test_that_message_data_is_added_as_request(broker, worker, capture_events):
     assert request_data["args"] == [1, 0]
     assert request_data["kwargs"] == {}
     assert request_data["options"]["max_retries"] == 0
-    assert UUID(request_data["message_id"])
+    assert uuid.UUID(request_data["message_id"])
     assert isinstance(request_data["message_timestamp"], int)
 
 
