@@ -116,6 +116,7 @@ GROUPS = {
         "asgi",
         "bottle",
         "falcon",
+        "litestar",
         "pyramid",
         "quart",
         "sanic",
