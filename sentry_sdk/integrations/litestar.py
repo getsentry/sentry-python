@@ -3,6 +3,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
@@ -12,39 +13,34 @@ from sentry_sdk.utils import (
 )
 
 try:
-    from starlite import Request, Starlite, State  # type: ignore
-    from starlite.handlers.base import BaseRouteHandler  # type: ignore
-    from starlite.middleware import DefineMiddleware  # type: ignore
-    from starlite.plugins.base import get_plugin_for_value  # type: ignore
-    from starlite.routes.http import HTTPRoute  # type: ignore
-    from starlite.utils import ConnectionDataExtractor, is_async_callable, Ref  # type: ignore
-    from pydantic import BaseModel  # type: ignore
+    from litestar import Request, Litestar  # type: ignore
+    from litestar.handlers.base import BaseRouteHandler  # type: ignore
+    from litestar.middleware import DefineMiddleware  # type: ignore
+    from litestar.routes.http import HTTPRoute  # type: ignore
+    from litestar.data_extractors import ConnectionDataExtractor  # type: ignore
 except ImportError:
-    raise DidNotEnable("Starlite is not installed")
-
+    raise DidNotEnable("Litestar is not installed")
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
-    from starlite.types import (  # type: ignore
-        ASGIApp,
-        Hint,
+    from litestar.types.asgi_types import ASGIApp  # type: ignore
+    from litestar.types import (  # type: ignore
         HTTPReceiveMessage,
         HTTPScope,
         Message,
         Middleware,
         Receive,
-        Scope as StarliteScope,
+        Scope as LitestarScope,
         Send,
         WebSocketReceiveMessage,
     )
-    from starlite import MiddlewareProtocol
-    from sentry_sdk._types import Event
+    from litestar.middleware import MiddlewareProtocol
+    from sentry_sdk._types import Event, Hint
+
+_DEFAULT_TRANSACTION_NAME = "generic Litestar request"
 
 
-_DEFAULT_TRANSACTION_NAME = "generic Starlite request"
-
-
-class StarliteIntegration(Integration):
-    identifier = "starlite"
+class LitestarIntegration(Integration):
+    identifier = "litestar"
     origin = f"auto.http.{identifier}"
 
     @staticmethod
@@ -54,10 +50,21 @@ class StarliteIntegration(Integration):
         patch_middlewares()
         patch_http_route_handle()
 
+        # The following line follows the pattern found in other integrations such as `DjangoIntegration.setup_once`.
+        # The Litestar `ExceptionHandlerMiddleware.__call__` catches exceptions and does the following
+        # (among other things):
+        #   1. Logs them, some at least (such as 500s) as errors
+        #   2. Calls after_exception hooks
+        # The `LitestarIntegration`` provides an after_exception hook (see `patch_app_init` below) to create a Sentry event
+        # from an exception, which ends up being called during step 2 above. However, the Sentry `LoggingIntegration` will
+        # by default create a Sentry event from error logs made in step 1 if we do not prevent it from doing so.
+        ignore_logger("litestar")
 
-class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
-    def __init__(self, app, span_origin=StarliteIntegration.origin):
+
+class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
+    def __init__(self, app, span_origin=LitestarIntegration.origin):
         # type: (ASGIApp, str) -> None
+
         super().__init__(
             app=app,
             unsafe_context_data=False,
@@ -70,42 +77,35 @@ class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
 def patch_app_init():
     # type: () -> None
     """
-    Replaces the Starlite class's `__init__` function in order to inject `after_exception` handlers and set the
-    `SentryStarliteASGIMiddleware` as the outmost middleware in the stack.
+    Replaces the Litestar class's `__init__` function in order to inject `after_exception` handlers and set the
+    `SentryLitestarASGIMiddleware` as the outmost middleware in the stack.
     See:
-    - https://starlite-api.github.io/starlite/usage/0-the-starlite-app/5-application-hooks/#after-exception
-    - https://starlite-api.github.io/starlite/usage/7-middleware/0-middleware-intro/
+    - https://docs.litestar.dev/2/usage/applications.html#after-exception
+    - https://docs.litestar.dev/2/usage/middleware/using-middleware.html
     """
-    old__init__ = Starlite.__init__
+    old__init__ = Litestar.__init__
 
-    @ensure_integration_enabled(StarliteIntegration, old__init__)
+    @ensure_integration_enabled(LitestarIntegration, old__init__)
     def injection_wrapper(self, *args, **kwargs):
-        # type: (Starlite, *Any, **Any) -> None
-        after_exception = kwargs.pop("after_exception", [])
-        kwargs.update(
-            after_exception=[
-                exception_handler,
-                *(
-                    after_exception
-                    if isinstance(after_exception, list)
-                    else [after_exception]
-                ),
-            ]
-        )
+        # type: (Litestar, *Any, **Any) -> None
+        kwargs["after_exception"] = [
+            exception_handler,
+            *(kwargs.get("after_exception") or []),
+        ]
 
-        SentryStarliteASGIMiddleware.__call__ = SentryStarliteASGIMiddleware._run_asgi3  # type: ignore
+        SentryLitestarASGIMiddleware.__call__ = SentryLitestarASGIMiddleware._run_asgi3  # type: ignore
         middleware = kwargs.get("middleware") or []
-        kwargs["middleware"] = [SentryStarliteASGIMiddleware, *middleware]
+        kwargs["middleware"] = [SentryLitestarASGIMiddleware, *middleware]
         old__init__(self, *args, **kwargs)
 
-    Starlite.__init__ = injection_wrapper
+    Litestar.__init__ = injection_wrapper
 
 
 def patch_middlewares():
     # type: () -> None
     old_resolve_middleware_stack = BaseRouteHandler.resolve_middleware
 
-    @ensure_integration_enabled(StarliteIntegration, old_resolve_middleware_stack)
+    @ensure_integration_enabled(LitestarIntegration, old_resolve_middleware_stack)
     def resolve_middleware_wrapper(self):
         # type: (BaseRouteHandler) -> list[Middleware]
         return [
@@ -120,7 +120,7 @@ def enable_span_for_middleware(middleware):
     # type: (Middleware) -> Middleware
     if (
         not hasattr(middleware, "__call__")  # noqa: B004
-        or middleware is SentryStarliteASGIMiddleware
+        or middleware is SentryLitestarASGIMiddleware
     ):
         return middleware
 
@@ -130,29 +130,29 @@ def enable_span_for_middleware(middleware):
         old_call = middleware.__call__
 
     async def _create_span_call(self, scope, receive, send):
-        # type: (MiddlewareProtocol, StarliteScope, Receive, Send) -> None
-        if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
+        # type: (MiddlewareProtocol, LitestarScope, Receive, Send) -> None
+        if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
             return await old_call(self, scope, receive, send)
 
         middleware_name = self.__class__.__name__
         with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLITE,
+            op=OP.MIDDLEWARE_LITESTAR,
             description=middleware_name,
-            origin=StarliteIntegration.origin,
+            origin=LitestarIntegration.origin,
         ) as middleware_span:
-            middleware_span.set_tag("starlite.middleware_name", middleware_name)
+            middleware_span.set_tag("litestar.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
             async def _sentry_receive(*args, **kwargs):
                 # type: (*Any, **Any) -> Union[HTTPReceiveMessage, WebSocketReceiveMessage]
-                if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
+                if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
                     return await receive(*args, **kwargs)
                 with sentry_sdk.start_span(
-                    op=OP.MIDDLEWARE_STARLITE_RECEIVE,
+                    op=OP.MIDDLEWARE_LITESTAR_RECEIVE,
                     description=getattr(receive, "__qualname__", str(receive)),
-                    origin=StarliteIntegration.origin,
+                    origin=LitestarIntegration.origin,
                 ) as span:
-                    span.set_tag("starlite.middleware_name", middleware_name)
+                    span.set_tag("litestar.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -162,14 +162,14 @@ def enable_span_for_middleware(middleware):
             # Creating spans for the "send" callback
             async def _sentry_send(message):
                 # type: (Message) -> None
-                if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
+                if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
                     return await send(message)
                 with sentry_sdk.start_span(
-                    op=OP.MIDDLEWARE_STARLITE_SEND,
+                    op=OP.MIDDLEWARE_LITESTAR_SEND,
                     description=getattr(send, "__qualname__", str(send)),
-                    origin=StarliteIntegration.origin,
+                    origin=LitestarIntegration.origin,
                 ) as span:
-                    span.set_tag("starlite.middleware_name", middleware_name)
+                    span.set_tag("litestar.middleware_name", middleware_name)
                     return await send(message)
 
             send_name = getattr(send, "__name__", str(send))
@@ -195,7 +195,7 @@ def patch_http_route_handle():
 
     async def handle_wrapper(self, scope, receive, send):
         # type: (HTTPRoute, HTTPScope, Receive, Send) -> None
-        if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
+        if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
             return await old_handle(self, scope, receive, send)
 
         sentry_scope = sentry_sdk.get_isolation_scope()
@@ -223,7 +223,8 @@ def patch_http_route_handle():
             func = None
             if route_handler.name is not None:
                 tx_name = route_handler.name
-            elif isinstance(route_handler.fn, Ref):
+            # Accounts for use of type `Ref` in earlier versions of litestar without the need to reference it as a type
+            elif hasattr(route_handler.fn, "value"):
                 func = route_handler.fn.value
             else:
                 func = route_handler.fn
@@ -245,7 +246,7 @@ def patch_http_route_handle():
             )
             return event
 
-        sentry_scope._name = StarliteIntegration.identifier
+        sentry_scope._name = LitestarIntegration.identifier
         sentry_scope.add_event_processor(event_processor)
 
         return await old_handle(self, scope, receive, send)
@@ -254,27 +255,19 @@ def patch_http_route_handle():
 
 
 def retrieve_user_from_scope(scope):
-    # type: (StarliteScope) -> Optional[dict[str, Any]]
+    # type: (LitestarScope) -> Optional[dict[str, Any]]
     scope_user = scope.get("user")
-    if not scope_user:
-        return None
     if isinstance(scope_user, dict):
         return scope_user
-    if isinstance(scope_user, BaseModel):
-        return scope_user.dict()
     if hasattr(scope_user, "asdict"):  # dataclasses
         return scope_user.asdict()
-
-    plugin = get_plugin_for_value(scope_user)
-    if plugin and not is_async_callable(plugin.to_dict):
-        return plugin.to_dict(scope_user)
 
     return None
 
 
-@ensure_integration_enabled(StarliteIntegration)
-def exception_handler(exc, scope, _):
-    # type: (Exception, StarliteScope, State) -> None
+@ensure_integration_enabled(LitestarIntegration)
+def exception_handler(exc, scope):
+    # type: (Exception, LitestarScope) -> None
     user_info = None  # type: Optional[dict[str, Any]]
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
@@ -285,7 +278,7 @@ def exception_handler(exc, scope, _):
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
-        mechanism={"type": StarliteIntegration.identifier, "handled": False},
+        mechanism={"type": LitestarIntegration.identifier, "handled": False},
     )
 
     sentry_sdk.capture_event(event, hint=hint)

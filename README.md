@@ -1,8 +1,8 @@
 <a href="https://sentry.io/?utm_source=github&utm_medium=logo" target="_blank">
-  <img src="https://github.com/user-attachments/assets/d5bf9fe3-dd0a-4485-8191-8076eb3d9bc4" alt="Sentry for Python">
+  <img src="https://sentry-brand.storage.googleapis.com/github-banners/github-sdk-python.png" alt="Sentry for Python">
 </a>
 
-_Bad software is everywhere, and we're tired of it. Sentry is on a mission to help developers write better software faster, so we can get back to enjoying technology. If you want to join us [<kbd>**Check out our open positions**</kbd>](https://sentry.io/careers/)_
+_Bad software is everywhere, and we're tired of it. Sentry is on a mission to help developers write better software faster, so we can get back to enjoying technology. If you want to join us, [<kbd>**check out our open positions**</kbd>](https://sentry.io/careers/)_.
 
 # Official Sentry SDK for Python
 
