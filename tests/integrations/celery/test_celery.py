@@ -10,7 +10,7 @@ import sentry_sdk
 from sentry_sdk import start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
-    _wrap_apply_async,
+    _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
 from tests.conftest import ApproxDict
@@ -568,7 +568,7 @@ def test_apply_async_manually_span(sentry_init):
         assert "sentry-trace" in headers
         assert "baggage" in headers
 
-    wrapped = _wrap_apply_async(dummy_function)
+    wrapped = _wrap_task_run(dummy_function)
     wrapped(mock.MagicMock(), (), headers={})
 
 
