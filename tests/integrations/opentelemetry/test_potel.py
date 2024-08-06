@@ -250,3 +250,67 @@ def test_span_data_started_with_sentry(capture_envelopes):
         "sentry.description": "statement",
         "sentry.op": "db",
     }
+
+
+def test_transaction_tags_started_with_otel(capture_envelopes):
+    envelopes = capture_envelopes()
+
+    sentry_sdk.set_tag("tag.global", 99)
+    with tracer.start_as_current_span("request"):
+        sentry_sdk.set_tag("tag.inner", "foo")
+
+    (envelope,) = envelopes
+    (item,) = envelope.items
+    payload = item.payload.json
+
+    assert payload["tags"] == {"tag.global": 99, "tag.inner": "foo"}
+
+
+def test_transaction_tags_started_with_sentry(capture_envelopes):
+    envelopes = capture_envelopes()
+
+    sentry_sdk.set_tag("tag.global", 99)
+    with sentry_sdk.start_span(description="request"):
+        sentry_sdk.set_tag("tag.inner", "foo")
+
+    (envelope,) = envelopes
+    (item,) = envelope.items
+    payload = item.payload.json
+
+    assert payload["tags"] == {"tag.global": 99, "tag.inner": "foo"}
+
+
+def test_multiple_transaction_tags_isolation_scope_started_with_otel(capture_envelopes):
+    envelopes = capture_envelopes()
+
+    sentry_sdk.set_tag("tag.global", 99)
+    with sentry_sdk.isolation_scope():
+        with tracer.start_as_current_span("request a"):
+            sentry_sdk.set_tag("tag.inner.a", "a")
+    with sentry_sdk.isolation_scope():
+        with tracer.start_as_current_span("request b"):
+            sentry_sdk.set_tag("tag.inner.b", "b")
+
+    (payload_a, payload_b) = [envelope.items[0].payload.json for envelope in envelopes]
+
+    assert payload_a["tags"] == {"tag.global": 99, "tag.inner.a": "a"}
+    assert payload_b["tags"] == {"tag.global": 99, "tag.inner.b": "b"}
+
+
+def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
+    capture_envelopes,
+):
+    envelopes = capture_envelopes()
+
+    sentry_sdk.set_tag("tag.global", 99)
+    with sentry_sdk.isolation_scope():
+        with sentry_sdk.start_span(description="request a"):
+            sentry_sdk.set_tag("tag.inner.a", "a")
+    with sentry_sdk.isolation_scope():
+        with sentry_sdk.start_span(description="request b"):
+            sentry_sdk.set_tag("tag.inner.b", "b")
+
+    (payload_a, payload_b) = [envelope.items[0].payload.json for envelope in envelopes]
+
+    assert payload_a["tags"] == {"tag.global": 99, "tag.inner.a": "a"}
+    assert payload_b["tags"] == {"tag.global": 99, "tag.inner.b": "b"}
