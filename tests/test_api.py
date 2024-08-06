@@ -185,12 +185,14 @@ def test_set_tags(sentry_init, capture_events):
     }, "Updating tags with empty dict changed tags"
 
 
+@pytest.mark.xfail("configure_scope will be removed in 3.0")
 def test_configure_scope_deprecation():
     with pytest.warns(DeprecationWarning):
         with configure_scope():
             ...
 
 
+@pytest.mark.xfail("push_scope will be removed in 3.0")
 def test_push_scope_deprecation():
     with pytest.warns(DeprecationWarning):
         with push_scope():

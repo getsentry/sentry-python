@@ -330,6 +330,7 @@ def _init_sentry_sdk(sentry_init):
 #
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_event(sentry_init, capture_envelopes, expected_error, expected_transaction):
     _init_sentry_sdk(sentry_init)
 
@@ -359,6 +360,7 @@ def test_event(sentry_init, capture_envelopes, expected_error, expected_transact
     assert attachment.payload.bytes == b"Hello World"
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_event2(sentry_init, capture_envelopes, expected_error, expected_transaction):
     _init_sentry_sdk(sentry_init)
 
@@ -395,6 +397,7 @@ def test_event2(sentry_init, capture_envelopes, expected_error, expected_transac
     assert attachment.payload.bytes == b"Hello World"
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_event3(sentry_init, capture_envelopes, expected_error, expected_transaction):
     _init_sentry_sdk(sentry_init)
 
@@ -431,6 +434,7 @@ def test_event3(sentry_init, capture_envelopes, expected_error, expected_transac
     assert attachment.payload.bytes == b"Hello World"
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_event4(sentry_init, capture_envelopes, expected_error, expected_transaction):
     _init_sentry_sdk(sentry_init)
 
@@ -467,6 +471,7 @@ def test_event4(sentry_init, capture_envelopes, expected_error, expected_transac
     assert attachment.payload.bytes == b"Hello World"
 
 
+@pytest.mark.xfail("will be removed in 3.0")
 def test_event5(sentry_init, capture_envelopes, expected_error, expected_transaction):
     _init_sentry_sdk(sentry_init)
 
