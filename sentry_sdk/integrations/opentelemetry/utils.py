@@ -8,7 +8,6 @@ from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.tracing import get_span_status_from_http_code
 from urllib3.util import parse_url as urlparse
 
-from sentry_sdk import get_client
 from sentry_sdk.utils import Dsn
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -43,6 +42,8 @@ def is_sentry_span(span):
     Break infinite loop:
     HTTP requests to Sentry are caught by OTel and send again to Sentry.
     """
+    from sentry_sdk import get_client
+
     if not span.attributes:
         return False
 
