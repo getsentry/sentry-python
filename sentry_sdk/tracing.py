@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
     import sentry_sdk.profiler
+    from sentry_sdk.tracing import Scope
     from sentry_sdk._types import (
         Event,
         MeasurementUnit,
@@ -1259,10 +1260,10 @@ class POTelSpan:
     def __init__(
         self,
         *,
-        active=True,  # type: bool
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         origin="manual",  # type: str
+        scope=None,  # type: Optional[Scope]
         **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
@@ -1274,23 +1275,26 @@ class POTelSpan:
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         self._otel_span = tracer.start_span(description or op or "")  # XXX
-        self._active = active
 
         self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, origin)
         if op is not None:
-            self._otel_span.set_attribute(SentrySpanAttribute.OP, op)
+            self.op = op
+
         if description is not None:
             self._otel_span.set_attribute(SentrySpanAttribute.DESCRIPTION, description)
+
+        self.scope = scope
 
     def __enter__(self):
         # type: () -> POTelSpan
         # XXX use_span? https://github.com/open-telemetry/opentelemetry-python/blob/3836da8543ce9751051e38a110c0468724042e62/opentelemetry-api/src/opentelemetry/trace/__init__.py#L547
         #
         # create a Context object with parent set as current span
-        if self._active:
-            ctx = otel_trace.set_span_in_context(self._otel_span)
-            # set as the implicit current context
-            self._ctx_token = context.attach(ctx)
+        ctx = otel_trace.set_span_in_context(self._otel_span)
+        # set as the implicit current context
+        self._ctx_token = context.attach(ctx)
+        scope = self.scope or sentry_sdk.get_current_scope()
+        scope.span = self
 
         return self
 
@@ -1298,8 +1302,7 @@ class POTelSpan:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self._otel_span.end()
         # XXX set status to error if unset and an exception occurred?
-        if self._active:
-            context.detach(self._ctx_token)
+        context.detach(self._ctx_token)
 
     @property
     def containing_transaction(self):
@@ -1314,12 +1317,28 @@ class POTelSpan:
     @property
     def sampled(self):
         # type: () -> Optional[bool]
-        # XXX setting this
         return self._otel_span.get_span_context().trace_flags.sampled
+
+    @sampled.setter
+    def sampled(self, value):
+        pass
+
+    @property
+    def op(self):
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        self._otel_span.attributes.get(SentrySpanAttribute.OP)
+
+    @op.setter
+    def op(self, value):
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        self._otel_span.set_attribute(SentrySpanAttribute.OP, value)
 
     def start_child(self, **kwargs):
         # type: (str, **Any) -> POTelSpan
-        pass
+        child_span = POTelSpan(**kwargs)
+        return child_span
 
     @classmethod
     def continue_from_environ(

@@ -25,6 +25,7 @@ from sentry_sdk.tracing import (
     NoOpSpan,
     Span,
     Transaction,
+    POTelSpan,
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
@@ -979,6 +980,10 @@ class Scope(object):
     ):
         # type: (Optional[Transaction], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
+        .. deprecated:: 3.0.0
+            This function is deprecated and will be removed in a future release.
+            Use :py:meth:`sentry_sdk.start_span` instead.
+
         Start and return a transaction.
 
         Start an existing transaction if given, otherwise create and start a new
@@ -1007,6 +1012,11 @@ class Scope(object):
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
             available arguments.
         """
+        kwargs.setdefault("scope", self)
+        span = POTelSpan(**kwargs)
+        return span
+
+        # XXX
         kwargs.setdefault("scope", self)
 
         client = self.get_client()
@@ -1056,37 +1066,31 @@ class Scope(object):
         typically used as a context manager to start and stop timing in a `with`
         block.
 
-        Only spans contained in a transaction are sent to Sentry. Most
-        integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use
-        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
-        one is not already in progress.
-
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
-
-        The instrumenter parameter is deprecated for user code, and it will
-        be removed in the next major version. Going forward, it should only
-        be used by the SDK itself.
         """
-        with new_scope():
-            kwargs.setdefault("scope", self)
+        kwargs.setdefault("scope", self)
+        span = POTelSpan(**kwargs)
 
-            # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
+        # with new_scope():
+        #     kwargs.setdefault("scope", self)
 
-            if span is None:
-                # New spans get the `trace_id` from the scope
-                if "trace_id" not in kwargs:
-                    propagation_context = self.get_active_propagation_context()
-                    if propagation_context is not None:
-                        kwargs["trace_id"] = propagation_context.trace_id
+        #     # get current span or transaction
+        #     span = self.span or self.get_isolation_scope().span
 
-                span = Span(**kwargs)
-            else:
-                # Children take `trace_id`` from the parent span.
-                span = span.start_child(**kwargs)
+        #     if span is None:
+        #         # New spans get the `trace_id` from the scope
+        #         if "trace_id" not in kwargs:
+        #             propagation_context = self.get_active_propagation_context()
+        #             if propagation_context is not None:
+        #                 kwargs["trace_id"] = propagation_context.trace_id
 
-            return span
+        #         span = Span(**kwargs)
+        #     else:
+        #         # Children take `trace_id`` from the parent span.
+        #         span = span.start_child(**kwargs)
+
+        #     return span
+        return span
 
     def continue_trace(
         self, environ_or_headers, op=None, name=None, source=None, origin="manual"
