@@ -104,6 +104,7 @@ def test_extract_span_data(name, status, attributes, expected):
                 "description": "GET",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
         (
@@ -118,6 +119,7 @@ def test_extract_span_data(name, status, attributes, expected):
                 "description": "GET /target",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
         (
@@ -132,6 +134,7 @@ def test_extract_span_data(name, status, attributes, expected):
                 "description": "GET example.com",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
         (
@@ -147,6 +150,7 @@ def test_extract_span_data(name, status, attributes, expected):
                 "description": "GET /target",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
         (
@@ -161,6 +165,7 @@ def test_extract_span_data(name, status, attributes, expected):
                 "description": "GET https://example.com/bla/",
                 "status": "ok",
                 "http_status_code": None,
+                "origin": None,
             },
         ),
     ],
