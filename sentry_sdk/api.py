@@ -1,6 +1,5 @@
 import inspect
 import warnings
-from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
@@ -16,7 +15,6 @@ if TYPE_CHECKING:
 
     from typing import Any
     from typing import Dict
-    from typing import Generator
     from typing import Optional
     from typing import overload
     from typing import Callable
@@ -55,7 +53,6 @@ __all__ = [
     "capture_event",
     "capture_exception",
     "capture_message",
-    "configure_scope",
     "continue_trace",
     "flush",
     "get_baggage",
@@ -192,56 +189,6 @@ def add_breadcrumb(
 ):
     # type: (...) -> None
     return get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
-
-
-@overload
-def configure_scope():
-    # type: () -> ContextManager[Scope]
-    pass
-
-
-@overload
-def configure_scope(  # noqa: F811
-    callback,  # type: Callable[[Scope], None]
-):
-    # type: (...) -> None
-    pass
-
-
-def configure_scope(  # noqa: F811
-    callback=None,  # type: Optional[Callable[[Scope], None]]
-):
-    # type: (...) -> Optional[ContextManager[Scope]]
-    """
-    Reconfigures the scope.
-
-    :param callback: If provided, call the callback with the current scope.
-
-    :returns: If no callback is provided, returns a context manager that returns the scope.
-    """
-    warnings.warn(
-        "sentry_sdk.configure_scope is deprecated and will be removed in the next major version. "
-        "Please consult our migration guide to learn how to migrate to the new API: "
-        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-configuring",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    scope = get_isolation_scope()
-    scope.generate_propagation_context()
-
-    if callback is not None:
-        # TODO: used to return None when client is None. Check if this changes behavior.
-        callback(scope)
-
-        return None
-
-    @contextmanager
-    def inner():
-        # type: () -> Generator[Scope, None, None]
-        yield scope
-
-    return inner()
 
 
 @overload
