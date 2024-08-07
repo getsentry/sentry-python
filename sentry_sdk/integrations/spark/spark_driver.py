@@ -17,7 +17,7 @@ class SparkIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        patch_spark_context_init()
+        _setup_sentry_tracing()
 
 
 def _set_app_properties():
@@ -36,20 +36,63 @@ def _set_app_properties():
         )
 
 
-def _start_sentry_listener(sc):
+def _start_sentry_listener():
     # type: (Any) -> None
     """
     Start java gateway server to add custom `SparkListener`
     """
+    from pyspark import SparkContext
     from pyspark.java_gateway import ensure_callback_server_started
 
+    sc = SparkContext._active_spark_context
     gw = sc._gateway
     ensure_callback_server_started(gw)
     listener = SentryListener()
     sc._jsc.sc().addSparkListener(listener)
 
 
-def patch_spark_context_init():
+def _activate_integration(sc):
+    # type: (SparkContext) -> None
+    from pyspark import SparkContext
+
+    _start_sentry_listener()
+    _set_app_properties()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    @scope.add_event_processor
+    def process_event(event, hint):
+        # type: (Event, Hint) -> Optional[Event]
+        with capture_internal_exceptions():
+            if sentry_sdk.get_client().get_integration(SparkIntegration) is None:
+                return event
+
+            if sc._active_spark_context is None:
+                return event
+
+            event.setdefault("user", {}).setdefault("id", sc.sparkUser())
+
+            event.setdefault("tags", {}).setdefault(
+                "executor.id", sc._conf.get("spark.executor.id")
+            )
+            event["tags"].setdefault(
+                "spark-submit.deployMode",
+                sc._conf.get("spark.submit.deployMode"),
+            )
+            event["tags"].setdefault("driver.host", sc._conf.get("spark.driver.host"))
+            event["tags"].setdefault("driver.port", sc._conf.get("spark.driver.port"))
+            event["tags"].setdefault("spark_version", sc.version)
+            event["tags"].setdefault("app_name", sc.appName)
+            event["tags"].setdefault("application_id", sc.applicationId)
+            event["tags"].setdefault("master", sc.master)
+            event["tags"].setdefault("spark_home", sc.sparkHome)
+
+            event.setdefault("extra", {}).setdefault("web_url", sc.uiWebUrl)
+
+        return event
+
+
+def _patch_spark_context_init():
     # type: () -> None
     from pyspark import SparkContext
 
@@ -59,49 +102,20 @@ def patch_spark_context_init():
     def _sentry_patched_spark_context_init(self, *args, **kwargs):
         # type: (SparkContext, *Any, **Any) -> Optional[Any]
         rv = spark_context_init(self, *args, **kwargs)
-        _start_sentry_listener(self)
-        _set_app_properties()
-
-        scope = sentry_sdk.get_isolation_scope()
-
-        @scope.add_event_processor
-        def process_event(event, hint):
-            # type: (Event, Hint) -> Optional[Event]
-            with capture_internal_exceptions():
-                if sentry_sdk.get_client().get_integration(SparkIntegration) is None:
-                    return event
-
-                if self._active_spark_context is None:
-                    return event
-
-                event.setdefault("user", {}).setdefault("id", self.sparkUser())
-
-                event.setdefault("tags", {}).setdefault(
-                    "executor.id", self._conf.get("spark.executor.id")
-                )
-                event["tags"].setdefault(
-                    "spark-submit.deployMode",
-                    self._conf.get("spark.submit.deployMode"),
-                )
-                event["tags"].setdefault(
-                    "driver.host", self._conf.get("spark.driver.host")
-                )
-                event["tags"].setdefault(
-                    "driver.port", self._conf.get("spark.driver.port")
-                )
-                event["tags"].setdefault("spark_version", self.version)
-                event["tags"].setdefault("app_name", self.appName)
-                event["tags"].setdefault("application_id", self.applicationId)
-                event["tags"].setdefault("master", self.master)
-                event["tags"].setdefault("spark_home", self.sparkHome)
-
-                event.setdefault("extra", {}).setdefault("web_url", self.uiWebUrl)
-
-            return event
-
+        _activate_integration(self)
         return rv
 
     SparkContext._do_init = _sentry_patched_spark_context_init
+
+
+def _setup_sentry_tracing():
+    # type: () -> None
+    from pyspark import SparkContext
+
+    if SparkContext._active_spark_context is not None:
+        _activate_integration(SparkContext._active_spark_context)
+        return
+    _patch_spark_context_init()
 
 
 class SparkListener:
