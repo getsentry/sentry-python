@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
     import sentry_sdk.profiler
-    from sentry_sdk.tracing import Scope
+    from sentry_sdk.scope import Scope
     from sentry_sdk._types import (
         Event,
         MeasurementUnit,
@@ -1307,12 +1307,24 @@ class POTelSpan:
     @property
     def containing_transaction(self):
         # type: () -> Optional[Transaction]
-        pass
+        parent = None
+        while True:
+            # XXX
+            if self._otel_span.parent:
+                parent = self._otel_span.parent
+            else:
+                break
+
+        return parent
 
     @property
     def trace_id(self):
         # type: () -> Optional[str]
         return self._otel_span.get_span_context().trace_id
+
+    @property
+    def span_id(self):
+        return self._otel_span.get_span_context().span_id
 
     @property
     def sampled(self):
@@ -1337,6 +1349,7 @@ class POTelSpan:
 
     def start_child(self, **kwargs):
         # type: (str, **Any) -> POTelSpan
+        kwargs.setdefault("sampled", self.sampled)
         child_span = POTelSpan(**kwargs)
         return child_span
 
@@ -1373,7 +1386,18 @@ class POTelSpan:
 
     def to_traceparent(self):
         # type: () -> str
-        pass
+        if self.sampled is True:
+            sampled = "1"
+        elif self.sampled is False:
+            sampled = "0"
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
 
     def to_baggage(self):
         # type: () -> Optional[Baggage]
@@ -1391,7 +1415,7 @@ class POTelSpan:
         # type: (str) -> None
         if status == SPANSTATUS.OK:
             otel_status = StatusCode.OK
-            otel_description = "ok"
+            otel_description = None
         else:
             otel_status = StatusCode.ERROR
             otel_description = status.value
@@ -1430,7 +1454,14 @@ class POTelSpan:
 
     def finish(self, scope=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -> Optional[str]
-        pass
+        # XXX check if already finished
+        from sentry_sdk.integrations.opentelemetry.utils import convert_otel_timestamp
+
+        if end_timestamp is not None:
+            end_timestamp = convert_otel_timestamp(end_timestamp)
+        self._otel_span.end(end_time=end_timestamp)
+        scope = scope or sentry_sdk.get_current_scope()
+        maybe_create_breadcrumbs_from_span(scope, self)
 
     def to_json(self):
         # type: () -> dict[str, Any]
