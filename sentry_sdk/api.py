@@ -1,9 +1,8 @@
 import inspect
-import warnings
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
-from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
+from sentry_sdk.scope import Scope, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
 
@@ -16,10 +15,8 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
-    from typing import overload
     from typing import Callable
     from typing import TypeVar
-    from typing import ContextManager
     from typing import Union
 
     from typing_extensions import Unpack
@@ -39,11 +36,6 @@ if TYPE_CHECKING:
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
-else:
-
-    def overload(x):
-        # type: (T) -> T
-        return x
 
 
 # When changing this, update __all__ in __init__.py too
@@ -66,7 +58,6 @@ __all__ = [
     "isolation_scope",
     "last_event_id",
     "new_scope",
-    "push_scope",
     "set_context",
     "set_extra",
     "set_level",
@@ -189,51 +180,6 @@ def add_breadcrumb(
 ):
     # type: (...) -> None
     return get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
-
-
-@overload
-def push_scope():
-    # type: () -> ContextManager[Scope]
-    pass
-
-
-@overload
-def push_scope(  # noqa: F811
-    callback,  # type: Callable[[Scope], None]
-):
-    # type: (...) -> None
-    pass
-
-
-def push_scope(  # noqa: F811
-    callback=None,  # type: Optional[Callable[[Scope], None]]
-):
-    # type: (...) -> Optional[ContextManager[Scope]]
-    """
-    Pushes a new layer on the scope stack.
-
-    :param callback: If provided, this method pushes a scope, calls
-        `callback`, and pops the scope again.
-
-    :returns: If no `callback` is provided, a context manager that should
-        be used to pop the scope again.
-    """
-    warnings.warn(
-        "sentry_sdk.push_scope is deprecated and will be removed in the next major version. "
-        "Please consult our migration guide to learn how to migrate to the new API: "
-        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-pushing",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    if callback is not None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            with push_scope() as scope:
-                callback(scope)
-        return None
-
-    return _ScopeManager()
 
 
 @scopemethod
