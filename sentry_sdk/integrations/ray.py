@@ -1,4 +1,6 @@
+import inspect
 import sys
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -42,6 +44,12 @@ def _patch_ray_remote():
     @functools.wraps(old_remote)
     def new_remote(f, *args, **kwargs):
         # type: (Callable[..., Any], *Any, **Any) -> Callable[..., Any]
+        if inspect.isclass(f):
+            # Ray Actors
+            # (https://docs.ray.io/en/latest/ray-core/actors.html)
+            # are not supported
+            # (Only Ray Tasks are supported)
+            return old_remote(f, *args, *kwargs)
 
         def _f(*f_args, _tracing=None, **f_kwargs):
             # type: (Any, Optional[dict[str, Any]],  Any) -> Any
