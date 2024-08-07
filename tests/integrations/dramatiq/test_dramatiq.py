@@ -59,7 +59,7 @@ def test_that_actor_name_is_set_as_transaction(broker, worker, capture_events):
     assert event["transaction"] == "dummy_actor"
 
 
-def test_that_dramatiq_message_id_is_set_as_tag(broker, worker, capture_events):
+def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events):
     events = capture_events()
 
     @dramatiq.actor(max_retries=0)
@@ -71,9 +71,14 @@ def test_that_dramatiq_message_id_is_set_as_tag(broker, worker, capture_events):
     broker.join(dummy_actor.queue_name)
     worker.join()
 
-    event1, event2 = events
-    assert "dramatiq_message_id" in event1["tags"]
-    msg_ids = [e["tags"]["dramatiq_message_id"] for e in events]
+    event_message, event_error = events
+    assert "dramatiq_message_id" in event_message["extra"]
+    assert "dramatiq_message_id" in event_error["extra"]
+    assert (
+        event_message["extra"]["dramatiq_message_id"]
+        == event_error["extra"]["dramatiq_message_id"]
+    )
+    msg_ids = [e["extra"]["dramatiq_message_id"] for e in events]
     assert all(uuid.UUID(msg_id) and isinstance(msg_id, str) for msg_id in msg_ids)
 
 
