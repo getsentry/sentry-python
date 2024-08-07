@@ -2,7 +2,7 @@ import inspect
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
-from sentry_sdk.tracing import POTelSpan, Transaction, trace
+from sentry_sdk.tracing import Span, trace
 from sentry_sdk.crons import monitor
 
 # TODO-neel-potel make 2 scope strategies/impls and switch
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
         LogLevelStr,
         SamplingContext,
     )
-    from sentry_sdk.tracing import Span, TransactionKwargs
+    from sentry_sdk.tracing import TransactionKwargs
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -232,22 +232,24 @@ def flush(
 
 
 def start_span(
+    root_span=None,
+    custom_sampling_context=None,
     **kwargs,  # type: Any
 ):
-    # type: (...) -> POTelSpan
+    # type: (...) -> Span
     """
     Start and return a span.
     """
     # TODO: Consider adding type hints to the method signature.
-    return get_current_scope().start_span(**kwargs)
+    return get_current_scope().start_span(root_span, custom_sampling_context, **kwargs)
 
 
 def start_transaction(
-    transaction=None,  # type: Optional[Transaction]
+    transaction=None,  # type: Optional[Span]
     custom_sampling_context=None,  # type: Optional[SamplingContext]
     **kwargs,  # type: Unpack[TransactionKwargs]
 ):
-    # type: (...) -> POTelSpan
+    # type: (...) -> Span
     """
     .. deprecated:: 3.0.0
         This function is deprecated and will be removed in a future release.
@@ -282,7 +284,7 @@ def start_transaction(
         available arguments.
     """
     return get_current_scope().start_span(
-        transaction, custom_sampling_context, **kwargs
+        root_span=transaction, custom_sampling_context=custom_sampling_context, **kwargs
     )
 
 
@@ -324,7 +326,7 @@ def get_baggage():
 def continue_trace(
     environ_or_headers, op=None, name=None, source=None, origin="manual"
 ):
-    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Span
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """

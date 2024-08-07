@@ -687,7 +687,7 @@ def start_child_span_decorator(func):
 
 
 def get_current_span(scope=None):
-    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[sentry_sdk.tracing.Span]
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -702,6 +702,3 @@ from sentry_sdk.tracing import (
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
