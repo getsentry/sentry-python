@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk._types import NotImplementedType, Event
+    from sentry_sdk._types import NotImplementedType
 
     Span = Dict[str, Any]
 
@@ -95,7 +95,7 @@ class Memo:
 
 
 def serialize(event, **kwargs):
-    # type: (Event, **Any) -> Event
+    # type: (Dict[str, Any], **Any) -> Dict[str, Any]
     memo = Memo()
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
@@ -104,6 +104,7 @@ def serialize(event, **kwargs):
         kwargs.pop("max_request_body_size", None) == "always"
     )  # type: bool
     max_value_length = kwargs.pop("max_value_length", None)  # type: Optional[int]
+    is_vars = kwargs.pop("is_vars", False)
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -138,23 +139,7 @@ def serialize(event, **kwargs):
             are not (yet) in frame variables, but might encounter them when
             recursing (e.g.  we're in `event.exception`)
         """
-        try:
-            p0 = path[0]
-            if p0 == "stacktrace" and path[1] == "frames" and path[3] == "vars":
-                return True
-
-            if (
-                p0 in ("threads", "exception")
-                and path[1] == "values"
-                and path[3] == "stacktrace"
-                and path[4] == "frames"
-                and path[6] == "vars"
-            ):
-                return True
-        except IndexError:
-            return None
-
-        return False
+        return is_vars
 
     def _is_databag():
         # type: () -> Optional[bool]
@@ -387,7 +372,7 @@ def serialize(event, **kwargs):
     disable_capture_event.set(True)
     try:
         serialized_event = _serialize_node(event, **kwargs)
-        if meta_stack and isinstance(serialized_event, dict):
+        if not is_vars and meta_stack and isinstance(serialized_event, dict):
             serialized_event["_meta"] = meta_stack[0]
 
         return serialized_event
