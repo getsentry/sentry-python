@@ -43,7 +43,7 @@ def test_start_sentry_listener(create_spark_context):
     gateway = spark_context._gateway
     assert gateway._callback_server is None
 
-    _start_sentry_listener()
+    _start_sentry_listener(spark_context)
 
     assert gateway._callback_server is not None
 
