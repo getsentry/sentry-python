@@ -158,3 +158,48 @@ def test_ray_errors():
     )  # its in the worker, not the client thus not "ray test transaction"
     assert error["exception"]["values"][0]["mechanism"]["type"] == "ray"
     assert not error["exception"]["values"][0]["mechanism"]["handled"]
+
+
+# @pytest.mark.forked
+def test_ray_actor():
+    setup_sentry()
+
+    ray.init(
+        runtime_env={
+            "worker_process_setup_hook": setup_sentry,
+            "working_dir": "./",
+        }
+    )
+
+    @ray.remote
+    class Counter(object):
+        def __init__(self):
+            self.n = 0
+
+        def increment(self):
+            with sentry_sdk.start_span(op="task", description="example task step"):
+                self.n += 1
+
+            return sentry_sdk.get_client().transport.envelopes
+
+    with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
+        counter = Counter.remote()
+        worker_envelopes = ray.get(counter.increment.remote())
+
+    # Currently no transactions/spans are captured in actors
+    assert worker_envelopes == []
+
+    client_envelope = sentry_sdk.get_client().transport.envelopes[0]
+    client_transaction = client_envelope.get_transaction_event()
+
+    assert (
+        client_transaction["contexts"]["trace"]["trace_id"]
+        == client_transaction["contexts"]["trace"]["trace_id"]
+    )
+
+    for span in client_transaction["spans"]:
+        assert (
+            span["trace_id"]
+            == client_transaction["contexts"]["trace"]["trace_id"]
+            == client_transaction["contexts"]["trace"]["trace_id"]
+        )
