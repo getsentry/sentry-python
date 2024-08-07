@@ -1262,8 +1262,10 @@ class POTelSpan:
         *,
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
-        origin="manual",  # type: str
+        status=None,  # type: Optional[str]
         scope=None,  # type: Optional[Scope]
+        start_timestamp=None,  # type: Optional[Union[datetime, float]]
+        origin="manual",  # type: str
         **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
@@ -1273,15 +1275,24 @@ class POTelSpan:
         listed in the signature. These additional arguments are ignored.
         """
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+        from sentry_sdk.integrations.opentelemetry.utils import convert_otel_timestamp
 
-        self._otel_span = tracer.start_span(description or op or "")  # XXX
+        if start_timestamp is not None:
+            start_timestamp = convert_otel_timestamp(start_timestamp)
+
+        self._otel_span = tracer.start_span(
+            description or op or "", start_time=start_timestamp
+        )  # XXX
 
         self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, origin)
+
         if op is not None:
             self.op = op
 
-        if description is not None:
-            self._otel_span.set_attribute(SentrySpanAttribute.DESCRIPTION, description)
+        self.description = description
+
+        if status is not None:
+            self.set_status(status)
 
         self.scope = scope
 
@@ -1305,8 +1316,37 @@ class POTelSpan:
         context.detach(self._ctx_token)
 
     @property
-    def containing_transaction(self):
-        # type: () -> Optional[Transaction]
+    def description(self):
+        # type: () -> Optional[str]
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        return self._otel_span.attributes.get(SentrySpanAttribute.DESCRIPTION)
+
+    @description.setter
+    def description(self, value):
+        # type: (Optional[str]) -> None
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        if value is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
+
+    @property
+    def origin(self):
+        # type: () -> Optional[str]
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        return self._otel_span.attributes.get(SentrySpanAttribute.ORIGIN)
+
+    @origin.setter
+    def origin(self, value):
+        # type: (Optional[str]) -> None
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        if value is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, value)
+
+    @property
+    def root_span(self):
         parent = None
         while True:
             # XXX
@@ -1316,6 +1356,21 @@ class POTelSpan:
                 break
 
         return parent
+
+    @property
+    def containing_transaction(self):
+        # type: () -> Optional[Transaction]
+        """
+        Get the transaction this span is a child of.
+
+        .. deprecated:: 1.0.0
+            Use :func:`set_level` instead.
+        """
+
+        logger.warning(
+            "Deprecated: use root_span instead. This will be removed in the future."
+        )
+        return self.root_span
 
     @property
     def trace_id(self):
@@ -1360,7 +1415,9 @@ class POTelSpan:
         **kwargs,  # type: Any
     ):
         # type: (...) -> POTelSpan
-        pass
+        # XXX actually propagate
+        span = POTelSpan(**kwargs)
+        return span
 
     @classmethod
     def continue_from_headers(
@@ -1369,7 +1426,9 @@ class POTelSpan:
         **kwargs,  # type: Any
     ):
         # type: (...) -> POTelSpan
-        pass
+        # XXX actually propagate
+        span = POTelSpan(**kwargs)
+        return span
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
@@ -1424,7 +1483,8 @@ class POTelSpan:
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        pass
+        # XXX own namespace, e.g. sentry.measurement.xxx?
+        self._otel_span.set_attribute(name, (value, unit))
 
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None

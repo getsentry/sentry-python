@@ -281,7 +281,9 @@ def start_transaction(
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
-    return get_current_scope().start_span(**kwargs)
+    return get_current_scope().start_span(
+        transaction, custom_sampling_context, **kwargs
+    )
 
 
 def set_measurement(name, value, unit=""):

@@ -41,7 +41,7 @@ def test_root_span_transaction_payload_started_with_otel_only(capture_envelopes)
     trace_context = contexts["trace"]
     assert "trace_id" in trace_context
     assert "span_id" in trace_context
-    assert trace_context["origin"] == "auto.otel"
+    assert trace_context["origin"] == "manual"
     assert trace_context["op"] == "request"
     assert trace_context["status"] == "ok"
 
@@ -62,7 +62,7 @@ def test_child_span_payload_started_with_otel_only(capture_envelopes):
 
     assert span["op"] == "db"
     assert span["description"] == "db"
-    assert span["origin"] == "auto.otel"
+    assert span["origin"] == "manual"
     assert span["status"] == "ok"
     assert span["span_id"] is not None
     assert span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
@@ -124,7 +124,7 @@ def test_root_span_transaction_payload_started_with_sentry_only(capture_envelope
     trace_context = contexts["trace"]
     assert "trace_id" in trace_context
     assert "span_id" in trace_context
-    assert trace_context["origin"] == "auto.otel"
+    assert trace_context["origin"] == "manual"
     assert trace_context["op"] == "request"
     assert trace_context["status"] == "ok"
 
@@ -145,7 +145,7 @@ def test_child_span_payload_started_with_sentry_only(capture_envelopes):
 
     assert span["op"] == "db"
     assert span["description"] == "db"
-    assert span["origin"] == "auto.otel"
+    assert span["origin"] == "manual"
     assert span["status"] == "ok"
     assert span["span_id"] is not None
     assert span["trace_id"] == payload["contexts"]["trace"]["trace_id"]

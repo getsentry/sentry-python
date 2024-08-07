@@ -1057,8 +1057,8 @@ class Scope(object):
 
         return transaction
 
-    def start_span(self, **kwargs):
-        # type: (Any) -> Span
+    def start_span(self, span=None, custom_sampling_context=None, **kwargs):
+        # type: (Optional[POTelSpan], Optional[SamplingContext], Any) -> POTelSpan
         """
         Start a span whose parent is the currently active span or transaction, if any.
 
@@ -1069,7 +1069,8 @@ class Scope(object):
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
         kwargs.setdefault("scope", self)
-        span = POTelSpan(**kwargs)
+        if span is None:
+            span = POTelSpan(**kwargs)
 
         # with new_scope():
         #     kwargs.setdefault("scope", self)
@@ -1095,13 +1096,13 @@ class Scope(object):
     def continue_trace(
         self, environ_or_headers, op=None, name=None, source=None, origin="manual"
     ):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> POTelSpan
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
         self.generate_propagation_context(environ_or_headers)
 
-        transaction = Transaction.continue_from_headers(
+        root_span = POTelSpan.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
             op=op,
             origin=origin,
@@ -1109,7 +1110,7 @@ class Scope(object):
             source=source,
         )
 
-        return transaction
+        return root_span
 
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
