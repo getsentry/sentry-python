@@ -30,6 +30,7 @@ class DramatiqIntegration(Integration):
     by https://github.com/jacobsvante and later donated to the Sentry
     project.
     """
+
     identifier = "dramatiq"
 
     @staticmethod
