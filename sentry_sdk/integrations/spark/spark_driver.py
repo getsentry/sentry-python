@@ -36,28 +36,21 @@ def _set_app_properties():
         )
 
 
-def _start_sentry_listener():
+def _start_sentry_listener(sc):
     # type: (Any) -> None
     """
     Start java gateway server to add custom `SparkListener`
     """
-    from pyspark import SparkContext
     from pyspark.java_gateway import ensure_callback_server_started
 
-    sc = SparkContext._active_spark_context
     gw = sc._gateway
     ensure_callback_server_started(gw)
     listener = SentryListener()
     sc._jsc.sc().addSparkListener(listener)
 
 
-def _activate_integration(sc):
-    # type: (SparkContext) -> None
-    from pyspark import SparkContext
-
-    _start_sentry_listener()
-    _set_app_properties()
-
+def _add_event_processor(sc):
+    # type: (Any) -> None
     scope = sentry_sdk.get_isolation_scope()
 
     @scope.add_event_processor
@@ -92,6 +85,15 @@ def _activate_integration(sc):
         return event
 
 
+def _activate_integration(sc):
+    # type: (SparkContext) -> None
+    from pyspark import SparkContext
+
+    _start_sentry_listener(sc)
+    _set_app_properties()
+    _add_event_processor(sc)
+
+
 def _patch_spark_context_init():
     # type: () -> None
     from pyspark import SparkContext
@@ -114,7 +116,6 @@ def _setup_sentry_tracing():
 
     if SparkContext._active_spark_context is not None:
         _activate_integration(SparkContext._active_spark_context)
-        return
     _patch_spark_context_init()
 
 
