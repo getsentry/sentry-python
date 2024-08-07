@@ -25,8 +25,11 @@ class DramatiqIntegration(Integration):
 
     Please make sure that you call `sentry_sdk.init` *before* initializing
     your broker, as it monkey patches `Broker.__init__`.
-    """
 
+    This integration was originally developed and maintained
+    by https://github.com/jacobsvante and later donated to the Sentry
+    project.
+    """
     identifier = "dramatiq"
 
     @staticmethod
