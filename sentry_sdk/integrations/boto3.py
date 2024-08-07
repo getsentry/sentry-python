@@ -3,7 +3,6 @@ from functools import partial
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.tracing import Span
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
@@ -18,6 +17,8 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
     from typing import Type
+
+    from sentry_sdk.tracing import Span
 
 try:
     from botocore import __version__ as BOTOCORE_VERSION  # type: ignore
