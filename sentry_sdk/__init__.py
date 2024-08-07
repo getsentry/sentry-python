@@ -19,7 +19,6 @@ __all__ = [  # noqa
     "capture_event",
     "capture_exception",
     "capture_message",
-    "configure_scope",
     "continue_trace",
     "flush",
     "get_baggage",

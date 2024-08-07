@@ -335,71 +335,6 @@ def test_event(sentry_init, capture_envelopes, expected_error, expected_transact
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_transaction(
-        name="test_transaction", op="test_transaction_op"
-    ) as trx:
-        with sentry_sdk.start_span(op="test_span") as span:
-            with sentry_sdk.configure_scope() as scope:  # configure scope
-                _generate_event_data(scope)
-                _faulty_function()
-
-    (error_envelope, transaction_envelope) = envelopes
-
-    error = error_envelope.get_event()
-    transaction = transaction_envelope.get_transaction_event()
-    attachment = error_envelope.items[-1]
-
-    assert error == expected_error(trx, span)
-    assert transaction == expected_transaction(trx, span)
-    assert attachment.headers == {
-        "filename": "hello.txt",
-        "type": "attachment",
-        "content_type": "text/plain",
-    }
-    assert attachment.payload.bytes == b"Hello World"
-
-
-def test_event2(sentry_init, capture_envelopes, expected_error, expected_transaction):
-    _init_sentry_sdk(sentry_init)
-
-    envelopes = capture_envelopes()
-
-    with Hub(Hub.current):
-        sentry_sdk.set_tag("A", 1)  # will not be added
-
-    with Hub.current:  # with hub
-        with sentry_sdk.push_scope() as scope:
-            scope.set_tag("B", 1)  # will not be added
-
-        with sentry_sdk.start_transaction(
-            name="test_transaction", op="test_transaction_op"
-        ) as trx:
-            with sentry_sdk.start_span(op="test_span") as span:
-                with sentry_sdk.configure_scope() as scope:  # configure scope
-                    _generate_event_data(scope)
-                    _faulty_function()
-
-    (error_envelope, transaction_envelope) = envelopes
-
-    error = error_envelope.get_event()
-    transaction = transaction_envelope.get_transaction_event()
-    attachment = error_envelope.items[-1]
-
-    assert error == expected_error(trx, span)
-    assert transaction == expected_transaction(trx, span)
-    assert attachment.headers == {
-        "filename": "hello.txt",
-        "type": "attachment",
-        "content_type": "text/plain",
-    }
-    assert attachment.payload.bytes == b"Hello World"
-
-
-def test_event3(sentry_init, capture_envelopes, expected_error, expected_transaction):
-    _init_sentry_sdk(sentry_init)
-
-    envelopes = capture_envelopes()
-
     with Hub(Hub.current):
         sentry_sdk.set_tag("A", 1)  # will not be added
 
@@ -431,43 +366,7 @@ def test_event3(sentry_init, capture_envelopes, expected_error, expected_transac
     assert attachment.payload.bytes == b"Hello World"
 
 
-def test_event4(sentry_init, capture_envelopes, expected_error, expected_transaction):
-    _init_sentry_sdk(sentry_init)
-
-    envelopes = capture_envelopes()
-
-    with Hub(Hub.current):
-        sentry_sdk.set_tag("A", 1)  # will not be added
-
-    with Hub(Hub.current):  # with hub clone
-        with sentry_sdk.push_scope() as scope:
-            scope.set_tag("B", 1)  # will not be added
-
-        with sentry_sdk.start_transaction(
-            name="test_transaction", op="test_transaction_op"
-        ) as trx:
-            with sentry_sdk.start_span(op="test_span") as span:
-                with sentry_sdk.configure_scope() as scope:  # configure scope
-                    _generate_event_data(scope)
-                    _faulty_function()
-
-    (error_envelope, transaction_envelope) = envelopes
-
-    error = error_envelope.get_event()
-    transaction = transaction_envelope.get_transaction_event()
-    attachment = error_envelope.items[-1]
-
-    assert error == expected_error(trx, span)
-    assert transaction == expected_transaction(trx, span)
-    assert attachment.headers == {
-        "filename": "hello.txt",
-        "type": "attachment",
-        "content_type": "text/plain",
-    }
-    assert attachment.payload.bytes == b"Hello World"
-
-
-def test_event5(sentry_init, capture_envelopes, expected_error, expected_transaction):
+def test_event2(sentry_init, capture_envelopes, expected_error, expected_transaction):
     _init_sentry_sdk(sentry_init)
 
     envelopes = capture_envelopes()

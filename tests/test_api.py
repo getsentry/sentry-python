@@ -11,7 +11,6 @@ from sentry_sdk import (
     is_initialized,
     start_transaction,
     set_tags,
-    configure_scope,
     push_scope,
     get_global_scope,
     get_current_scope,
@@ -183,12 +182,6 @@ def test_set_tags(sentry_init, capture_events):
         "tag2": "updated",
         "tag3": "new",
     }, "Updating tags with empty dict changed tags"
-
-
-def test_configure_scope_deprecation():
-    with pytest.warns(DeprecationWarning):
-        with configure_scope():
-            ...
 
 
 def test_push_scope_deprecation():
