@@ -94,7 +94,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
 
         scope = sentry_sdk.get_current_scope()
         scope.transaction = message.actor_name
-        scope.set_tag("dramatiq_message_id", message.message_id)
+        scope.set_extra("dramatiq_message_id", message.message_id)
         scope.add_event_processor(_make_message_event_processor(message, integration))
 
     def after_process_message(self, broker, message, *, result=None, exception=None):
