@@ -63,6 +63,7 @@ else:
 
 
 from sentry_sdk import scope
+import sentry_sdk.integrations.opentelemetry.scope as potel_scope
 
 
 @pytest.fixture(autouse=True)
@@ -73,6 +74,9 @@ def clean_scopes():
     scope._global_scope = None
     scope._isolation_scope.set(None)
     scope._current_scope.set(None)
+
+    potel_scope._INITIAL_CURRENT_SCOPE.clear()
+    potel_scope._INITIAL_ISOLATION_SCOPE.clear()
 
 
 @pytest.fixture(autouse=True)

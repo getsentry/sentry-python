@@ -6,7 +6,12 @@ removed at any time without prior notice.
 
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
-from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.integrations.opentelemetry.potel_span_processor import (
+    PotelSentrySpanProcessor,
+)
+from sentry_sdk.integrations.opentelemetry.contextvars_context import (
+    SentryContextVarsRuntimeContext,
+)
 from sentry_sdk.utils import logger
 
 try:
@@ -46,9 +51,14 @@ class OpenTelemetryIntegration(Integration):
 
 def _setup_sentry_tracing():
     # type: () -> None
+    import opentelemetry.context
+
+    opentelemetry.context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
+
     provider = TracerProvider()
-    provider.add_span_processor(SentrySpanProcessor())
+    provider.add_span_processor(PotelSentrySpanProcessor())
     trace.set_tracer_provider(provider)
+
     set_global_textmap(SentryPropagator())
 
 
