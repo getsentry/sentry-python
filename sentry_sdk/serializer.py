@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     format_timestamp,
     safe_repr,
     strip_string,
+    serializable_str_types,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -31,10 +32,6 @@ if TYPE_CHECKING:
 
     ReprProcessor = Callable[[Any, Dict[str, Any]], Union[NotImplementedType, str]]
     Segment = Union[str, int]
-
-
-# Bytes are technically not strings in Python 3, but we can serialize them
-serializable_str_types = (str, bytes, bytearray, memoryview)
 
 
 # Maximum length of JSON-serialized event payloads that can be safely sent

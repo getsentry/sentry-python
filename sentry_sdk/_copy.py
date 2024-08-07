@@ -64,50 +64,76 @@ Agreement.
 
 import types
 import weakref
+import sys
+from collections.abc import Mapping, Sequence, Set
 
-from sentry_sdk.utils import safe_repr
+from sentry_sdk.utils import (
+    safe_repr,
+    serializable_str_types,
+    capture_internal_exception,
+    capture_event_disabled,
+)
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Callable
+    from typing import Any, Optional, Union
 
 
-def deepcopy_fallback_repr(x, memo=None, _nil=[]):  # noqa: B006
-    # type: (Any, Optional[dict[int, Any]], Any) -> Any
+# copying these over to avoid yet another circular dep
+MAX_DATABAG_DEPTH = 5
+MAX_DATABAG_BREADTH = 10
+
+
+def deepcopy_fallback_repr(x, memo=None, _nil=[], stack_depth=0):  # noqa: B006
+    # type: (Any, Optional[dict[int, Any]], Any, int) -> Any
     """Deep copy like operation on arbitrary Python objects that falls back to repr
     for non-datastructure like objects.
+    Also has a max recursion depth of 10 because more than that will be thrown away by
+    the serializer anyway.
     """
+    with capture_event_disabled():
+        try:
+            if memo is None:
+                memo = {}
 
-    if memo is None:
-        memo = {}
+            d = id(x)
+            y = memo.get(d, _nil)
+            if y is not _nil:
+                return y
 
-    d = id(x)
-    y = memo.get(d, _nil)
-    if y is not _nil:
-        return y
+            cls = type(x)
 
-    cls = type(x)
+            copier = _deepcopy_dispatch.get(cls)
+            if copier is not None:
+                y = copier(x, memo, stack_depth=stack_depth + 1)
+            elif issubclass(cls, type):
+                y = _deepcopy_atomic(x, memo, stack_depth=stack_depth + 1)
+            elif isinstance(x, serializable_str_types):
+                y = safe_repr(x)
+            elif isinstance(x, Mapping):
+                y = _deepcopy_dict(x, memo, stack_depth=stack_depth + 1)
+            elif not isinstance(x, serializable_str_types) and isinstance(
+                x, (Set, Sequence)
+            ):
+                y = _deepcopy_list(x, memo, stack_depth=stack_depth + 1)
+            else:
+                y = safe_repr(x)
 
-    copier = _deepcopy_dispatch.get(cls)
-    if copier is not None:
-        y = copier(x, memo)
-    elif issubclass(cls, type):
-        y = _deepcopy_atomic(x, memo)
-    else:
-        y = safe_repr(x)
-
-    # If is its own copy, don't memoize.
-    if y is not x:
-        memo[d] = y
-        _keep_alive(x, memo)  # Make sure x lives at least as long as d
-    return y
+            # If is its own copy, don't memoize.
+            if y is not x:
+                memo[d] = y
+                _keep_alive(x, memo)  # Make sure x lives at least as long as d
+            return y
+        except BaseException:
+            capture_internal_exception(sys.exc_info())
+            return "<failed to serialize, use init(debug=True) to see error logs>"
 
 
 _deepcopy_dispatch = d = {}  # type: dict[Any, Any]
 
 
-def _deepcopy_atomic(x, memo):
-    # type: (Any, dict[int, Any]) -> Any
+def _deepcopy_atomic(x, memo, stack_depth=0):
+    # type: (Any, dict[int, Any], int) -> Any
     return x
 
 
@@ -129,50 +155,33 @@ d[weakref.ref] = _deepcopy_atomic
 d[property] = _deepcopy_atomic
 
 
-def _deepcopy_list(x, memo, deepcopy=deepcopy_fallback_repr):
-    # type: (list[Any], dict[int, Any], Callable[..., Any]) -> list[Any]
+def _deepcopy_list(x, memo, stack_depth=0):
+    # type: (Union[Sequence[Any], Set[Any]], dict[int, Any], int) -> list[Any]
     y = []  # type: list[Any]
     memo[id(x)] = y
+    if stack_depth >= MAX_DATABAG_DEPTH:
+        return y
     append = y.append
-    for a in x:
-        append(deepcopy(a, memo))
-    return y
-
-
-d[list] = _deepcopy_list
-
-
-def _deepcopy_tuple(x, memo, deepcopy=deepcopy_fallback_repr):
-    # type: (tuple[Any, ...], dict[int, Any], Callable[..., Any]) -> tuple[Any, ...]
-    z = [deepcopy(a, memo) for a in x]
-    # We're not going to put the tuple in the memo, but it's still important we
-    # check for it, in case the tuple contains recursive mutable structures.
-    try:
-        return memo[id(x)]
-    except KeyError:
-        pass
-    for k, j in zip(x, z):
-        if k is not j:
-            y = tuple(z)
+    for i, a in enumerate(x):
+        if i >= MAX_DATABAG_BREADTH:
             break
-    else:
-        y = x
+        append(deepcopy_fallback_repr(a, memo, stack_depth=stack_depth + 1))
     return y
 
 
-d[tuple] = _deepcopy_tuple
-
-
-def _deepcopy_dict(x, memo, deepcopy=deepcopy_fallback_repr):
-    # type: (dict[Any, Any], dict[int, Any], Callable[..., Any]) -> dict[Any, Any]
+def _deepcopy_dict(x, memo, stack_depth=0):
+    # type: (Mapping[Any, Any], dict[int, Any], int) -> dict[Any, Any]
     y = {}  # type: dict[Any, Any]
     memo[id(x)] = y
+    if stack_depth >= MAX_DATABAG_DEPTH:
+        return y
+    i = 0
     for key, value in x.items():
-        y[deepcopy(key, memo)] = deepcopy(value, memo)
+        if i >= MAX_DATABAG_BREADTH:
+            break
+        y[deepcopy_fallback_repr(key, memo)] = deepcopy_fallback_repr(value, memo)
+        i += 1
     return y
-
-
-d[dict] = _deepcopy_dict
 
 
 def _deepcopy_method(x, memo):  # Copy instance methods

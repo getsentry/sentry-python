@@ -10,7 +10,6 @@ from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
-    disable_capture_event,
     format_timestamp,
     get_sdk_name,
     get_type_name,
@@ -726,9 +725,6 @@ class _Client(BaseClient):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        if disable_capture_event.get(False):
-            return None
-
         if hint is None:
             hint = {}
         event_id = event.get("event_id")

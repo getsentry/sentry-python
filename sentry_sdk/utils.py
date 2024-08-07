@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
         Type,
         TypeVar,
         Union,
+        Generator,
     )
 
     from gevent.hub import Hub
@@ -70,6 +72,9 @@ _installed_modules = None
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
+
+# Bytes are technically not strings in Python 3, but we can serialize them
+serializable_str_types = (str, bytes, bytearray, memoryview)
 
 
 def json_dumps(data):
@@ -549,10 +554,11 @@ def safe_str(value):
 
 def safe_repr(value):
     # type: (Any) -> str
-    try:
-        return repr(value)
-    except Exception:
-        return "<broken repr>"
+    with capture_event_disabled():
+        try:
+            return repr(value)
+        except Exception:
+            return "<broken repr>"
 
 
 def filename_for_module(module, abs_path):
@@ -1370,6 +1376,16 @@ def transaction_from_function(func):
 
 
 disable_capture_event = ContextVar("disable_capture_event")
+
+
+@contextmanager
+def capture_event_disabled():
+    # type: () -> Generator[None, None, None]
+    disable_capture_event.set(True)
+    try:
+        yield
+    finally:
+        disable_capture_event.set(False)
 
 
 class ServerlessTimeoutWarning(Exception):  # noqa: N818
