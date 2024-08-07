@@ -51,6 +51,4 @@ Client Management
 Managing Scope (advanced)
 =========================
 
-.. autofunction:: sentry_sdk.api.push_scope
-
 .. autofunction:: sentry_sdk.api.new_scope
