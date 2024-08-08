@@ -131,7 +131,8 @@ def pure_eval_frame(frame):
     atok = source.asttokens()
 
     expressions.sort(key=closeness, reverse=True)
-    return {
+    vars = {
         atok.get_text(nodes[0]): value
         for nodes, value in expressions[: serializer.MAX_DATABAG_BREADTH]
     }
+    return serializer.serialize(vars, is_vars=True)
