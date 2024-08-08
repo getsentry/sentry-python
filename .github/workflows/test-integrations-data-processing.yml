@@ -57,6 +57,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest"
+      - name: Test dramatiq latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-dramatiq-latest"
       - name: Test huey latest
         run: |
           set -x # print commands that are executed
@@ -129,6 +133,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery"
+      - name: Test dramatiq pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-dramatiq"
       - name: Test huey pinned
         run: |
           set -x # print commands that are executed
