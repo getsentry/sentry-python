@@ -96,6 +96,24 @@ class Memo:
 
 def serialize(event, **kwargs):
     # type: (Dict[str, Any], **Any) -> Dict[str, Any]
+    """
+    A very smart serializer that takes a dict and emits a json-friendly dict.
+    Currently used for serializing the final Event and also prematurely while fetching the stack
+    local variables for each frame in a stacktrace.
+
+    It works internally with 'databags' which are arbitrary data structures like Mapping, Sequence and Set.
+    The algorithm itself is a recursive graph walk down the data structures it encounters.
+
+    It has the following responsibilities:
+    * Trimming databags and keeping them within MAX_DATABAG_BREADTH and MAX_DATABAG_DEPTH.
+    * Calling safe_repr() on objects appropriately to keep them informative and readable in the final payload.
+    * Annotating the payload with the _meta field whenever trimming happens.
+
+    :param max_request_body_size: If set to "always", will never trim request bodies.
+    :param max_value_length: The max length to strip strings to, defaults to sentry_sdk.consts.DEFAULT_MAX_VALUE_LENGTH
+    :param is_vars: If we're serializing vars early, we want to repr() things that are JSON-serializable to make their type more apparent. For example, it's useful to see the difference between a unicode-string and a bytestring when viewing a stacktrace.
+
+    """
     memo = Memo()
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
@@ -119,40 +137,17 @@ def serialize(event, **kwargs):
 
         meta_stack[-1].setdefault("", {}).update(meta)
 
-    def _should_repr_strings():
-        # type: () -> Optional[bool]
-        """
-        By default non-serializable objects are going through
-        safe_repr(). For certain places in the event (local vars) we
-        want to repr() even things that are JSON-serializable to
-        make their type more apparent. For example, it's useful to
-        see the difference between a unicode-string and a bytestring
-        when viewing a stacktrace.
-
-        For container-types we still don't do anything different.
-        Generally we just try to make the Sentry UI present exactly
-        what a pretty-printed repr would look like.
-
-        :returns: `True` if we are somewhere in frame variables, and `False` if
-            we are in a position where we will never encounter frame variables
-            when recursing (for example, we're in `event.extra`). `None` if we
-            are not (yet) in frame variables, but might encounter them when
-            recursing (e.g.  we're in `event.exception`)
-        """
-        return is_vars
-
     def _is_databag():
         # type: () -> Optional[bool]
         """
         A databag is any value that we need to trim.
+        True for stuff like vars, request bodies, breadcrumbs and extra.
 
-        :returns: Works like `_should_repr_strings()`. `True` for "yes",
-            `False` for :"no", `None` for "maybe soon".
+        :returns: `True` for "yes", `False` for :"no", `None` for "maybe soon".
         """
         try:
-            rv = _should_repr_strings()
-            if rv in (True, None):
-                return rv
+            if is_vars:
+                return True
 
             is_request_body = _is_request_body()
             if is_request_body in (True, None):
@@ -238,7 +233,7 @@ def serialize(event, **kwargs):
         if isinstance(obj, AnnotatedValue):
             should_repr_strings = False
         if should_repr_strings is None:
-            should_repr_strings = _should_repr_strings()
+            should_repr_strings = is_vars
 
         if is_databag is None:
             is_databag = _is_databag()
