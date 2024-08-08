@@ -53,8 +53,7 @@ def _patch_dramatiq_broker():
             # Unfortunately Broker and StubBroker allows middleware to be
             # passed in as positional arguments, whilst RabbitmqBroker and
             # RedisBroker does not.
-            if len(args) > 0:
-                assert len(args) < 2
+            if len(args) == 1:
                 middleware = args[0]
                 args = []  # type: ignore
             else:
@@ -66,9 +65,7 @@ def _patch_dramatiq_broker():
             middleware = list(middleware)
 
         if integration is not None:
-            assert SentryMiddleware not in (
-                m.__class__ for m in middleware
-            ), "Sentry middleware must not be passed in manually to broker"
+            middleware = [m for m in middleware if not isinstance(m, SentryMiddleware)]
             middleware.insert(0, SentryMiddleware())
 
         kw["middleware"] = middleware
