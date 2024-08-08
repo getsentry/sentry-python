@@ -80,6 +80,7 @@ GROUPS = {
         "arq",
         "beam",
         "celery",
+        "dramatiq",
         "huey",
         "ray",
         "rq",
