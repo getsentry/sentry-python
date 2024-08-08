@@ -91,7 +91,7 @@ class SentryWsgiMiddleware:
                             )
                         )
 
-                    root_span = continue_trace(
+                    segment_span = continue_trace(
                         environ,
                         op=OP.HTTP_SERVER,
                         name="generic WSGI request",
@@ -100,13 +100,13 @@ class SentryWsgiMiddleware:
                     )
 
                     with sentry_sdk.start_transaction(
-                        root_span, custom_sampling_context={"wsgi_environ": environ}
+                        segment_span, custom_sampling_context={"wsgi_environ": environ}
                     ):
                         try:
                             response = self.app(
                                 environ,
                                 partial(
-                                    _sentry_start_response, start_response, root_span
+                                    _sentry_start_response, start_response, segment_span
                                 ),
                             )
                         except BaseException:

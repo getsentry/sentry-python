@@ -219,31 +219,6 @@ class _SpanRecorder:
 
 
 # class Span:
-#     """A span holds timing information of a block of code.
-#     Spans can have multiple child spans thus forming a span tree.
-
-#     :param trace_id: The trace ID of the root span. If this new span is to be the root span,
-#         omit this parameter, and a new trace ID will be generated.
-#     :param span_id: The span ID of this span. If omitted, a new span ID will be generated.
-#     :param parent_span_id: The span ID of the parent span, if applicable.
-#     :param same_process_as_parent: Whether this span is in the same process as the parent span.
-#     :param sampled: Whether the span should be sampled. Overrides the default sampling decision
-#         for this span when provided.
-#     :param op: The span's operation. A list of recommended values is available here:
-#         https://develop.sentry.dev/sdk/performance/span-operations/
-#     :param description: A description of what operation is being performed within the span.
-#     :param hub: The hub to use for this span.
-
-#         .. deprecated:: 2.0.0
-#             Please use the `scope` parameter, instead.
-#     :param status: The span's status. Possible values are listed at
-#         https://develop.sentry.dev/sdk/event-payloads/span/
-#     :param containing_transaction: The transaction that this span belongs to.
-#     :param start_timestamp: The timestamp when the span started. If omitted, the current time
-#         will be used.
-#     :param scope: The scope to use for this span. If not provided, we use the current scope.
-#     """
-
 #     __slots__ = (
 #         "trace_id",
 #         "span_id",
@@ -285,82 +260,6 @@ class _SpanRecorder:
 #         origin="manual",  # type: str
 #     ):
 #         # type: (...) -> None
-#         self.trace_id = trace_id or uuid.uuid4().hex
-#         self.span_id = span_id or uuid.uuid4().hex[16:]
-#         self.parent_span_id = parent_span_id
-#         self.same_process_as_parent = same_process_as_parent
-#         self.sampled = sampled
-#         self.op = op
-#         self.description = description
-#         self.status = status
-#         self.hub = hub  # backwards compatibility
-#         self.scope = scope
-#         self.origin = origin
-#         self._measurements = {}  # type: Dict[str, MeasurementValue]
-#         self._tags = {}  # type: MutableMapping[str, str]
-#         self._data = {}  # type: Dict[str, Any]
-#         self._containing_transaction = containing_transaction
-
-#         if hub is not None:
-#             warnings.warn(
-#                 "The `hub` parameter is deprecated. Please use `scope` instead.",
-#                 DeprecationWarning,
-#                 stacklevel=2,
-#             )
-
-#             self.scope = self.scope or hub.scope
-
-#         if start_timestamp is None:
-#             start_timestamp = datetime.now(timezone.utc)
-#         elif isinstance(start_timestamp, float):
-#             start_timestamp = datetime.fromtimestamp(start_timestamp, timezone.utc)
-#         self.start_timestamp = start_timestamp
-#         try:
-#             # profiling depends on this value and requires that
-#             # it is measured in nanoseconds
-#             self._start_timestamp_monotonic_ns = nanosecond_time()
-#         except AttributeError:
-#             pass
-
-#         #: End timestamp of span
-#         self.timestamp = None  # type: Optional[datetime]
-
-#         self._span_recorder = None  # type: Optional[_SpanRecorder]
-#         self._local_aggregator = None  # type: Optional[LocalAggregator]
-
-#         thread_id, thread_name = get_current_thread_meta()
-#         self.set_thread(thread_id, thread_name)
-#         self.set_profiler_id(get_profiler_id())
-
-#     # TODO this should really live on the Transaction class rather than the Span
-#     # class
-#     def init_span_recorder(self, maxlen):
-#         # type: (int) -> None
-#         if self._span_recorder is None:
-#             self._span_recorder = _SpanRecorder(maxlen)
-
-#     def _get_local_aggregator(self):
-#         # type: (...) -> LocalAggregator
-#         rv = self._local_aggregator
-#         if rv is None:
-#             rv = self._local_aggregator = LocalAggregator()
-#         return rv
-
-#     def __repr__(self):
-#         # type: () -> str
-#         return (
-#             "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
-#             % (
-#                 self.__class__.__name__,
-#                 self.op,
-#                 self.description,
-#                 self.trace_id,
-#                 self.span_id,
-#                 self.parent_span_id,
-#                 self.sampled,
-#                 self.origin,
-#             )
-#         )
 
 #     def __enter__(self):
 #         # type: () -> Span
@@ -379,18 +278,6 @@ class _SpanRecorder:
 #         del self._context_manager_state
 #         self.finish(scope)
 #         scope.span = old_span
-
-#     @property
-#     def containing_transaction(self):
-#         # type: () -> Optional[Transaction]
-#         """The ``Transaction`` that this span belongs to.
-#         The ``Transaction`` is the root of the span tree,
-#         so one could also think of this ``Transaction`` as the "root span"."""
-
-#         # this is a getter rather than a regular attribute so that transactions
-#         # can return `self` here instead (as a way to prevent them circularly
-#         # referencing themselves)
-#         return self._containing_transaction
 
 #     def start_child(self, **kwargs):
 #         # type: (**Any) -> Span
@@ -535,21 +422,6 @@ class _SpanRecorder:
 #             {SENTRY_TRACE_HEADER_NAME: traceparent}, **kwargs
 #         )
 
-#     def to_traceparent(self):
-#         # type: () -> str
-#         if self.sampled is True:
-#             sampled = "1"
-#         elif self.sampled is False:
-#             sampled = "0"
-#         else:
-#             sampled = None
-
-#         traceparent = "%s-%s" % (self.trace_id, self.span_id)
-#         if sampled is not None:
-#             traceparent += "-%s" % (sampled,)
-
-#         return traceparent
-
 #     def to_baggage(self):
 #         # type: () -> Optional[Baggage]
 #         """Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`
@@ -562,44 +434,6 @@ class _SpanRecorder:
 #     def set_tag(self, key, value):
 #         # type: (str, Any) -> None
 #         self._tags[key] = value
-
-#     def set_data(self, key, value):
-#         # type: (str, Any) -> None
-#         self._data[key] = value
-
-#     def set_status(self, value):
-#         # type: (str) -> None
-#         self.status = value
-
-#     def set_measurement(self, name, value, unit=""):
-#         # type: (str, float, MeasurementUnit) -> None
-#         self._measurements[name] = {"value": value, "unit": unit}
-
-#     def set_thread(self, thread_id, thread_name):
-#         # type: (Optional[int], Optional[str]) -> None
-
-#         if thread_id is not None:
-#             self.set_data(SPANDATA.THREAD_ID, str(thread_id))
-
-#             if thread_name is not None:
-#                 self.set_data(SPANDATA.THREAD_NAME, thread_name)
-
-#     def set_profiler_id(self, profiler_id):
-#         # type: (Optional[str]) -> None
-#         if profiler_id is not None:
-#             self.set_data(SPANDATA.PROFILER_ID, profiler_id)
-
-#     def set_http_status(self, http_status):
-#         # type: (int) -> None
-#         self.set_tag(
-#             "http.status_code", str(http_status)
-#         )  # we keep this for backwards compatibility
-#         self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
-#         self.set_status(get_span_status_from_http_code(http_status))
-
-#     def is_success(self):
-#         # type: () -> bool
-#         return self.status == "ok"
 
 #     def finish(self, scope=None, end_timestamp=None):
 #         # type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -> Optional[str]
@@ -1240,10 +1074,31 @@ class _SpanRecorder:
 
 class Span:
     """
-    OTel span wrapper providing compatibility with the old span interface.
+    A span holds timing information of a block of code.
 
-    The wrapper itself should have as little state as possible. Everything
-    persistent should be stored on the underlying OTel span.
+    Spans can have multiple child spans thus forming a span tree.
+
+    As of 3.0, this class is an OTel span wrapper providing compatibility
+    with the old span interface. The wrapper itself should have as little state
+    as possible. Everything persistent should be stored on the underlying OTel
+    span.
+
+    :param trace_id: The trace ID of the root span. If this new span is to be the root span,
+        omit this parameter, and a new trace ID will be generated.
+    :param span_id: The span ID of this span. If omitted, a new span ID will be generated.
+    :param parent_span_id: The span ID of the parent span, if applicable.
+    :param same_process_as_parent: Whether this span is in the same process as the parent span.
+    :param sampled: Whether the span should be sampled. Overrides the default sampling decision
+        for this span when provided.
+    :param op: The span's operation. A list of recommended values is available here:
+        https://develop.sentry.dev/sdk/performance/span-operations/
+    :param description: A description of what operation is being performed within the span.
+    :param status: The span's status. Possible values are listed at
+        https://develop.sentry.dev/sdk/event-payloads/span/
+    :param containing_transaction: The transaction that this span belongs to.
+    :param start_timestamp: The timestamp when the span started. If omitted, the current time
+        will be used.
+    :param scope: The scope to use for this span. If not provided, we use the current scope.
     """
 
     def __init__(
@@ -1256,18 +1111,35 @@ class Span:
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin="manual",  # type: str
         **_,  # type: dict[str, object]
+        # XXX old args:
+        #         trace_id=None,  # type: Optional[str]
+        #         span_id=None,  # type: Optional[str]
+        #         parent_span_id=None,  # type: Optional[str]
+        #         same_process_as_parent=True,  # type: bool
+        #         sampled=None,  # type: Optional[bool]
+        #         op=None,  # type: Optional[str]
+        #         description=None,  # type: Optional[str]
+        #         hub=None,  # type: Optional[sentry_sdk.Hub]  # deprecated
+        #         status=None,  # type: Optional[str]
+        #         containing_transaction=None,  # type: Optional[Transaction]
+        #         start_timestamp=None,  # type: Optional[Union[datetime, float]]
+        #         scope=None,  # type: Optional[sentry_sdk.Scope]
+        #         origin="manual",  # type: str
     ):
         # type: (...) -> None
         """
-        For backwards compatibility with old the old Span interface, this class
+        For backwards compatibility with the old Span interface, this class
         accepts arbitrary keyword arguments, in addition to the ones explicitly
         listed in the signature. These additional arguments are ignored.
         """
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-        from sentry_sdk.integrations.opentelemetry.utils import convert_otel_timestamp
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            convert_to_otel_timestamp,
+        )
 
         if start_timestamp is not None:
-            start_timestamp = convert_otel_timestamp(start_timestamp)
+            # OTel timestamps have nanosecond precision
+            start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
         self._otel_span = tracer.start_span(
             description or op or "", start_time=start_timestamp
@@ -1286,6 +1158,35 @@ class Span:
             self.set_status(status)
 
         self.scope = scope
+
+        try:
+            # profiling depends on this value and requires that
+            # it is measured in nanoseconds
+            self._start_timestamp_monotonic_ns = nanosecond_time()
+        except AttributeError:
+            pass
+
+        self._local_aggregator = None  # type: Optional[LocalAggregator]
+
+        thread_id, thread_name = get_current_thread_meta()
+        self.set_thread(thread_id, thread_name)
+        self.set_profiler_id(get_profiler_id())
+
+    def __repr__(self):
+        # type: () -> str
+        return (
+            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
+            % (
+                self.__class__.__name__,
+                self.op,
+                self.description,
+                self.trace_id,
+                self.span_id,
+                self.parent_span_id,
+                self.sampled,
+                self.origin,
+            )
+        )
 
     def __enter__(self):
         # type: () -> Span
@@ -1352,7 +1253,7 @@ class Span:
             self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, value)
 
     @property
-    def root_span(self):
+    def segment_span(self):
         if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
             return None
 
@@ -1367,7 +1268,7 @@ class Span:
         return parent
 
     @property
-    def is_root_span(self):
+    def is_segment(self):
         if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
             return False
 
@@ -1379,14 +1280,28 @@ class Span:
         """
         Get the transaction this span is a child of.
 
-        .. deprecated:: 1.0.0
-            Use :func:`set_level` instead.
+        .. deprecated:: 3.0.0
+            This will be removed in the future.
         """
 
-        logger.warning(
-            "Deprecated: use root_span instead. This will be removed in the future."
-        )
-        return self.root_span
+        logger.warning("Deprecated: This will be removed in the future.")
+        return self.segment_span
+
+    @containing_transaction.setter
+    def containing_transaction(self, value):
+        # type: (Span) -> None
+        """
+        Set this span's transaction.
+
+        .. deprecated:: 3.0.0
+            Use :func:`segment_span` instead.
+        """
+        pass
+
+    @property
+    def parent_span_id(self):
+        # type: () -> Optional[str]
+        return self._otel_span.parent if hasattr(self._otel_span, "parent") else None
 
     @property
     def trace_id(self):
@@ -1395,6 +1310,7 @@ class Span:
 
     @property
     def span_id(self):
+        # type: () -> Optional[str]
         return self._otel_span.get_span_context().span_id
 
     @property
@@ -1404,16 +1320,19 @@ class Span:
 
     @sampled.setter
     def sampled(self, value):
+        # type: () -> Optional[bool]
         pass
 
     @property
     def op(self):
+        # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         self._otel_span.attributes.get(SentrySpanAttribute.OP)
 
     @op.setter
     def op(self, value):
+        # type: (str) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         self._otel_span.set_attribute(SentrySpanAttribute.OP, value)
@@ -1457,7 +1376,9 @@ class Span:
         **kwargs,  # type: Any
     ):
         # type: (...) -> Optional[Span]
-        pass
+        # XXX actually propagate
+        span = Span(**kwargs)
+        return span
 
     def to_traceparent(self):
         # type: () -> str
@@ -1531,10 +1452,12 @@ class Span:
     def finish(self, scope=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -> Optional[str]
         # XXX check if already finished
-        from sentry_sdk.integrations.opentelemetry.utils import convert_otel_timestamp
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            convert_to_otel_timestamp,
+        )
 
         if end_timestamp is not None:
-            end_timestamp = convert_otel_timestamp(end_timestamp)
+            end_timestamp = convert_to_otel_timestamp(end_timestamp)
         self._otel_span.end(end_time=end_timestamp)
         scope = scope or sentry_sdk.get_current_scope()
         maybe_create_breadcrumbs_from_span(scope, self)
@@ -1550,6 +1473,13 @@ class Span:
     def get_profile_context(self):
         # type: () -> Optional[ProfileContext]
         pass
+
+    def _get_local_aggregator(self):
+        # type: (...) -> LocalAggregator
+        rv = self._local_aggregator
+        if rv is None:
+            rv = self._local_aggregator = LocalAggregator()
+        return rv
 
     # transaction/root span methods
 
