@@ -166,8 +166,8 @@ class Scope(object):
         "_level",
         "_name",
         "_fingerprint",
-        "_segment_span_name",
-        "_segment_span_info",
+        "_root_span_name",
+        "_root_span_info",
         "_user",
         "_tags",
         "_contexts",
@@ -219,8 +219,8 @@ class Scope(object):
         rv._level = self._level
         rv._name = self._name
         rv._fingerprint = self._fingerprint
-        rv._segment_span_name = self._segment_span_name
-        rv._segment_span_info = dict(self._segment_span_info)
+        rv._root_span_name = self._root_span_name
+        rv._root_span_info = dict(self._root_span_info)
         rv._user = self._user
 
         rv._tags = dict(self._tags)
@@ -670,8 +670,8 @@ class Scope(object):
         """Clears the entire scope."""
         self._level = None  # type: Optional[LogLevelStr]
         self._fingerprint = None  # type: Optional[List[str]]
-        self._segment_span_name = None  # type: Optional[str]
-        self._segment_span_info = {}  # type: MutableMapping[str, str]
+        self._root_span_name = None  # type: Optional[str]
+        self._root_span_info = {}  # type: MutableMapping[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
@@ -716,29 +716,29 @@ class Scope(object):
         Return the transaction in the scope, if any.
 
         .. deprecated:: 3.0.0
-            This function is deprecated and will be removed in a future release. Use Scope.segment_span instead.
+            This function is deprecated and will be removed in a future release. Use Scope.root_span instead.
         """
 
         logger.warning(
-            "Deprecated: use Scope.segment_span instead. This will be removed in the future."
+            "Deprecated: use Scope.root_span instead. This will be removed in the future."
         )
 
-        return self.segment_span
+        return self.root_span
 
     @property
-    def segment_span(self):
+    def root_span(self):
         """Return the root span in the scope, if any."""
         # there is no span/transaction on the scope
         if self._span is None:
             return None
 
         # there is an orphan span on the scope
-        if self._span.segment_span is None:
+        if self._span.root_span is None:
             return None
 
         # there is either a root span (which is its own containing
         # root span) or a non-orphan span on the scope
-        return self._span.segment_span
+        return self._span.root_span
 
     def set_transaction_name(self, name, source=None):
         # type: (str, Optional[str]) -> None
@@ -746,19 +746,19 @@ class Scope(object):
         Set the transaction name and optionally the transaction source.
 
         .. deprecated:: 3.0.0
-            This function is deprecated and will be removed in a future release. Use Scope.set_segment_span_name instead.
+            This function is deprecated and will be removed in a future release. Use Scope.set_root_span_name instead.
         """
-        self.set_segment_span_name(name, source)
+        self.set_root_span_name(name, source)
 
-    def set_segment_span_name(self, name, source=None):
+    def set_root_span_name(self, name, source=None):
         """Set the root span name and optionally the source."""
-        self._segment_span_name = name
-        if self._span and self._span.segment_span:
-            self._span.segment_span.name = name
+        self._root_span_name = name
+        if self._span and self._span.root_span:
+            self._span.root_span.name = name
             if source:
-                self._span.segment_span.source = source
+                self._span.root_span.source = source
         if source:
-            self._segment_span_info["source"] = source
+            self._root_span_info["source"] = source
 
     @_attr_setter
     def user(self, value):
@@ -790,9 +790,9 @@ class Scope(object):
         return
         if span.is_segment:
             if span.name:
-                self._segment_span_name = span.name
+                self._root_span_name = span.name
                 if span.source:
-                    self._segment_span_info["source"] = span.source
+                    self._root_span_info["source"] = span.source
 
     @property
     def profile(self):
@@ -1017,7 +1017,7 @@ class Scope(object):
 
         return span
 
-    def start_span(self, segment_span=None, custom_sampling_context=None, **kwargs):
+    def start_span(self, root_span=None, custom_sampling_context=None, **kwargs):
         # type: (Optional[Span], Optional[SamplingContext], Any) -> Span
         """
         Start a span whose parent is the currently active span or transaction, if any.
@@ -1029,8 +1029,8 @@ class Scope(object):
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
         kwargs.setdefault("scope", self)
-        if segment_span:
-            return segment_span
+        if root_span:
+            return root_span
 
         span = self.span or self.get_isolation_scope().span
 
@@ -1074,7 +1074,7 @@ class Scope(object):
         """
         self.generate_propagation_context(environ_or_headers)
 
-        segment_span = Span.continue_from_headers(
+        root_span = Span.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
             op=op,
             origin=origin,
@@ -1082,7 +1082,7 @@ class Scope(object):
             source=source,
         )
 
-        return segment_span
+        return root_span
 
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
@@ -1286,18 +1286,18 @@ class Scope(object):
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 
-    def _apply_segment_span_name_to_event(self, event, hint, options):
+    def _apply_root_span_name_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        if event.get("transaction") is None and self._segment_span_name is not None:
-            event["transaction"] = self._segment_span_name
+        if event.get("transaction") is None and self._root_span_name is not None:
+            event["transaction"] = self._root_span_name
 
-    def _apply_segment_span_info_to_event(self, event, hint, options):
+    def _apply_root_span_info_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if (
             event.get("transaction_info") is None
-            and self._segment_span_info is not None
+            and self._root_span_info is not None
         ):
-            event["transaction_info"] = self._segment_span_info
+            event["transaction_info"] = self._root_span_info
 
     def _apply_fingerprint_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
@@ -1419,8 +1419,8 @@ class Scope(object):
             self._apply_level_to_event(event, hint, options)
             self._apply_fingerprint_to_event(event, hint, options)
             self._apply_user_to_event(event, hint, options)
-            self._apply_segment_span_name_to_event(event, hint, options)
-            self._apply_segment_span_info_to_event(event, hint, options)
+            self._apply_root_span_name_to_event(event, hint, options)
+            self._apply_root_span_info_to_event(event, hint, options)
             self._apply_tags_to_event(event, hint, options)
             self._apply_extra_to_event(event, hint, options)
 
@@ -1444,10 +1444,10 @@ class Scope(object):
             self._level = scope._level
         if scope._fingerprint is not None:
             self._fingerprint = scope._fingerprint
-        if scope._segment_span_name is not None:
-            self._segment_span_name = scope._segment_span_name
-        if scope._segment_span_info is not None:
-            self._segment_span_info.update(scope._segment_span_info)
+        if scope._root_span_name is not None:
+            self._root_span_name = scope._root_span_name
+        if scope._root_span_info is not None:
+            self._root_span_info.update(scope._root_span_info)
         if scope._user is not None:
             self._user = scope._user
         if scope._tags:

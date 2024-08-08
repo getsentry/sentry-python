@@ -1253,7 +1253,7 @@ class Span:
             self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, value)
 
     @property
-    def segment_span(self):
+    def root_span(self):
         if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
             return None
 
@@ -1285,7 +1285,7 @@ class Span:
         """
 
         logger.warning("Deprecated: This will be removed in the future.")
-        return self.segment_span
+        return self.root_span
 
     @containing_transaction.setter
     def containing_transaction(self, value):
@@ -1294,7 +1294,7 @@ class Span:
         Set this span's transaction.
 
         .. deprecated:: 3.0.0
-            Use :func:`segment_span` instead.
+            Use :func:`root_span` instead.
         """
         pass
 

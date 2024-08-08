@@ -53,7 +53,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
             self._children_spans[span.parent.span_id].append(span)
         else:
             # if have a root span ending, we build a transaction and send it
-            self._flush_segment_span(span)
+            self._flush_root_span(span)
 
     # TODO-neel-potel not sure we need a clear like JS
     def shutdown(self):
@@ -66,9 +66,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
         # type: (int) -> bool
         return True
 
-    def _flush_segment_span(self, span):
+    def _flush_root_span(self, span):
         # type: (ReadableSpan) -> None
-        transaction_event = self._segment_span_to_transaction_event(span)
+        transaction_event = self._root_span_to_transaction_event(span)
         if not transaction_event:
             return
 
@@ -103,7 +103,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
     # we construct the event from scratch here
     # and not use the current Transaction class for easier refactoring
-    def _segment_span_to_transaction_event(self, span):
+    def _root_span_to_transaction_event(self, span):
         # type: (ReadableSpan) -> Optional[Event]
         if not span.context:
             return None
