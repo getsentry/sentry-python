@@ -3,6 +3,7 @@ import json
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -160,16 +161,8 @@ class DramatiqMessageExtractor(object):
         request_info = contexts.setdefault("dramatiq", {})
         request_info["type"] = "dramatiq"
 
-        max_request_body_size = client.options["max_request_body_size"]
-        if (
-            max_request_body_size == "never"
-            or (max_request_body_size == "small" and content_length > 10**3)
-            or (max_request_body_size == "medium" and content_length > 10**4)
-        ):
-            data = AnnotatedValue(
-                "",
-                {"rem": [["!config", "x", 0, content_length]], "len": content_length},
-            )
+        if not request_body_within_bounds(client, content_length):
+            data = AnnotatedValue.removed_because_over_size_limit()
         else:
             data = self.message_data
 
