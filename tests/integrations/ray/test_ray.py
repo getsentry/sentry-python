@@ -160,7 +160,7 @@ def test_ray_errors():
     assert not error["exception"]["values"][0]["mechanism"]["handled"]
 
 
-# @pytest.mark.forked
+@pytest.mark.forked
 def test_ray_actor():
     setup_sentry()
 
