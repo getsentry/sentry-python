@@ -55,7 +55,7 @@ def _patch_dramatiq_broker():
             # RedisBroker does not.
             if len(args) > 0:
                 assert len(args) < 2
-                middleware = None if args[0] is None else args[0]
+                middleware = args[0]
                 args = []  # type: ignore
             else:
                 middleware = None
@@ -72,7 +72,6 @@ def _patch_dramatiq_broker():
             middleware.insert(0, SentryMiddleware())
 
         kw["middleware"] = middleware
-        # raise Exception([args, kw])
         original_broker__init__(self, *args, **kw)
 
     Broker.__init__ = sentry_patched_broker__init__
