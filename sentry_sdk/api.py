@@ -340,7 +340,8 @@ def flush(
 
 
 def start_span(
-    root_span=None,
+    *,
+    segment_span=None,
     custom_sampling_context=None,
     **kwargs,  # type: Any
 ):
@@ -349,10 +350,13 @@ def start_span(
     Start and return a span.
     """
     # TODO: Consider adding type hints to the method signature.
-    return get_current_scope().start_span(root_span, custom_sampling_context, **kwargs)
+    return get_current_scope().start_span(
+        segment_span, custom_sampling_context, **kwargs
+    )
 
 
 def start_transaction(
+    *,
     transaction=None,  # type: Optional[Span]
     custom_sampling_context=None,  # type: Optional[SamplingContext]
     **kwargs,  # type: Unpack[TransactionKwargs]
@@ -392,7 +396,9 @@ def start_transaction(
         available arguments.
     """
     return get_current_scope().start_span(
-        root_span=transaction, custom_sampling_context=custom_sampling_context, **kwargs
+        segment_span=transaction,
+        custom_sampling_context=custom_sampling_context,
+        **kwargs,
     )
 
 
