@@ -48,29 +48,25 @@ def test_start_sentry_listener(create_spark_context):
     assert gateway._callback_server is not None
 
 
-def test_initialize_spark_integration(
-    sentry_init, create_spark_context, reset_integrations
-):
+def test_initialize_spark_integration(sentry_init, create_spark_context):
     sentry_init(integrations=[SparkIntegration()])
     create_spark_context()
 
 
-@patch("sentry_sdk.integrations.spark.spark_driver._patch_spark_context_init")
+@patch("sentry_sdk.integrations.spark.spark_driver._activate_integration")
 def test_initialize_spark_integration_before_spark_context_init(
-    mock_patch_spark_context_init,
+    mock_activate_integration,
     sentry_init,
     create_spark_context,
 ):
     sentry_init(integrations=[SparkIntegration()])
     create_spark_context()
 
-    mock_patch_spark_context_init.assert_called_once()
+    mock_activate_integration.assert_called_once()
 
 
 @patch("sentry_sdk.integrations.spark.spark_driver._activate_integration")
-@patch("sentry_sdk.integrations.spark.spark_driver._patch_spark_context_init")
 def test_initialize_spark_integration_after_spark_context_init(
-    mock_patch_spark_context_init,
     mock_activate_integration,
     create_spark_context,
     sentry_init,
@@ -79,7 +75,6 @@ def test_initialize_spark_integration_after_spark_context_init(
     sentry_init(integrations=[SparkIntegration()])
 
     mock_activate_integration.assert_called_once()
-    mock_patch_spark_context_init.assert_not_called()
 
 
 @pytest.fixture
