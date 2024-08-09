@@ -242,9 +242,7 @@ def start_span(
     Start and return a span.
     """
     # TODO: Consider adding type hints to the method signature.
-    return get_current_scope().start_span(
-        root_span, custom_sampling_context, **kwargs
-    )
+    return get_current_scope().start_span(root_span, custom_sampling_context, **kwargs)
 
 
 def start_transaction(

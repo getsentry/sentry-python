@@ -1293,10 +1293,7 @@ class Scope(object):
 
     def _apply_root_span_info_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        if (
-            event.get("transaction_info") is None
-            and self._root_span_info is not None
-        ):
+        if event.get("transaction_info") is None and self._root_span_info is not None:
             event["transaction_info"] = self._root_span_info
 
     def _apply_fingerprint_to_event(self, event, hint, options):
