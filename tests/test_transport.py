@@ -18,13 +18,11 @@ from sentry_sdk import (
     capture_message,
     isolation_scope,
     get_isolation_scope,
-    Hub,
 )
 from sentry_sdk.envelope import Envelope, Item, parse_json
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     _parse_rate_limits,
-    HttpTransport,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
@@ -647,24 +645,6 @@ def test_metric_bucket_limits_with_all_namespaces(
     assert report["discarded_events"] == [
         {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
     ]
-
-
-def test_hub_cls_backwards_compat():
-    class TestCustomHubClass(Hub):
-        pass
-
-    transport = HttpTransport(
-        defaultdict(lambda: None, {"dsn": "https://123abc@example.com/123"})
-    )
-
-    with pytest.deprecated_call():
-        assert transport.hub_cls is Hub
-
-    with pytest.deprecated_call():
-        transport.hub_cls = TestCustomHubClass
-
-    with pytest.deprecated_call():
-        assert transport.hub_cls is TestCustomHubClass
 
 
 @pytest.mark.parametrize("quantity", (1, 2, 10))

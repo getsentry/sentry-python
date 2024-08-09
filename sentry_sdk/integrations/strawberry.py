@@ -31,10 +31,6 @@ try:
     from strawberry import Schema
     from strawberry.extensions import SchemaExtension  # type: ignore
     from strawberry.extensions.tracing.utils import should_skip_tracing as strawberry_should_skip_tracing  # type: ignore
-    from strawberry.extensions.tracing import (  # type: ignore
-        SentryTracingExtension as StrawberrySentryAsyncExtension,
-        SentryTracingExtensionSync as StrawberrySentrySyncExtension,
-    )
     from strawberry.http import async_base_view, sync_base_view  # type: ignore
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
@@ -103,14 +99,6 @@ def _patch_schema_init():
                 "async" if should_use_async_extension else "sync",
                 "False" if should_use_async_extension else "True",
             )
-
-        # remove the built in strawberry sentry extension, if present
-        extensions = [
-            extension
-            for extension in extensions
-            if extension
-            not in (StrawberrySentryAsyncExtension, StrawberrySentrySyncExtension)
-        ]
 
         # add our extension
         extensions.append(
@@ -412,11 +400,6 @@ def _make_response_event_processor(response_data):
 
 def _guess_if_using_async(extensions):
     # type: (List[SchemaExtension]) -> bool
-    if StrawberrySentryAsyncExtension in extensions:
-        return True
-    elif StrawberrySentrySyncExtension in extensions:
-        return False
-
     return bool(
         {"starlette", "starlite", "litestar", "fastapi"} & set(_get_installed_modules())
     )

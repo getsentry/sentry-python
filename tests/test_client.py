@@ -12,10 +12,8 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import (
-    Hub,
     Client,
     add_breadcrumb,
-    configure_scope,
     capture_message,
     capture_exception,
     capture_event,
@@ -557,38 +555,11 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     )
 
     start = time.time()
-    output = subprocess.check_output([sys.executable, str(app)])
+    subprocess.check_output([sys.executable, str(app)])
     end = time.time()
 
     # Each message takes at least 0.1 seconds to process
     assert int(end - start) >= num_messages / 10
-
-    assert output.count(b"HI") == num_messages
-
-
-def test_configure_scope_available(
-    sentry_init, request, monkeypatch, suppress_deprecation_warnings
-):
-    """
-    Test that scope is configured if client is configured
-
-    This test can be removed once configure_scope and the Hub are removed.
-    """
-    sentry_init()
-
-    with configure_scope() as scope:
-        assert scope is Hub.current.scope
-        scope.set_tag("foo", "bar")
-
-    calls = []
-
-    def callback(scope):
-        calls.append(scope)
-        scope.set_tag("foo", "bar")
-
-    assert configure_scope(callback) is None
-    assert len(calls) == 1
-    assert calls[0] is Hub.current.scope
 
 
 @pytest.mark.tests_internal_exceptions
@@ -607,27 +578,6 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
 
     capture_internal_exception((ValueError, ValueError("OK"), None))
     assert "OK" not in caplog.text
-
-
-@pytest.mark.skip(
-    reason="New behavior in SDK 2.0: You have a scope before init and add data to it."
-)
-def test_scope_initialized_before_client(sentry_init, capture_events):
-    """
-    This is a consequence of how configure_scope() works. We must
-    make `configure_scope()` a noop if no client is configured. Even
-    if the user later configures a client: We don't know that.
-    """
-    with configure_scope() as scope:
-        scope.set_tag("foo", 42)
-
-    sentry_init()
-
-    events = capture_events()
-    capture_message("hi")
-    (event,) = events
-
-    assert "tags" not in event
 
 
 def test_weird_chars(sentry_init, capture_events):
