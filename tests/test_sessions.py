@@ -1,7 +1,7 @@
 from unittest import mock
 
 import sentry_sdk
-from sentry_sdk.sessions import auto_session_tracking
+from sentry_sdk.sessions import track_session
 
 
 def sorted_aggregates(item):
@@ -50,16 +50,17 @@ def test_aggregates(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    with auto_session_tracking(session_mode="request"):
-        with sentry_sdk.new_scope() as scope:
+    with sentry_sdk.isolation_scope() as scope:
+        with track_session(scope, session_mode="request"):
             try:
                 scope.set_user({"id": "42"})
                 raise Exception("all is wrong")
             except Exception:
                 sentry_sdk.capture_exception()
 
-    with auto_session_tracking(session_mode="request"):
-        pass
+    with sentry_sdk.isolation_scope() as scope:
+        with track_session(scope, session_mode="request"):
+            pass
 
     sentry_sdk.get_isolation_scope().start_session(session_mode="request")
     sentry_sdk.get_isolation_scope().end_session()
@@ -90,15 +91,16 @@ def test_aggregates_explicitly_disabled_session_tracking_request_mode(
     )
     envelopes = capture_envelopes()
 
-    with auto_session_tracking(session_mode="request"):
-        with sentry_sdk.new_scope():
+    with sentry_sdk.isolation_scope() as scope:
+        with track_session(scope, session_mode="request"):
             try:
                 raise Exception("all is wrong")
             except Exception:
                 sentry_sdk.capture_exception()
 
-    with auto_session_tracking(session_mode="request"):
-        pass
+    with sentry_sdk.isolation_scope() as scope:
+        with track_session(scope, session_mode="request"):
+            pass
 
     sentry_sdk.get_isolation_scope().start_session(session_mode="request")
     sentry_sdk.get_isolation_scope().end_session()
@@ -125,15 +127,16 @@ def test_no_thread_on_shutdown_no_errors(sentry_init):
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        with auto_session_tracking(session_mode="request"):
-            with sentry_sdk.new_scope():
+        with sentry_sdk.isolation_scope() as scope:
+            with track_session(scope, session_mode="request"):
                 try:
                     raise Exception("all is wrong")
                 except Exception:
                     sentry_sdk.capture_exception()
 
-        with auto_session_tracking(session_mode="request"):
-            pass
+        with sentry_sdk.isolation_scope() as scope:
+            with track_session(scope, session_mode="request"):
+                pass
 
         sentry_sdk.get_isolation_scope().start_session(session_mode="request")
         sentry_sdk.get_isolation_scope().end_session()

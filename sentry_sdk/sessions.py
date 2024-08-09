@@ -16,53 +16,14 @@ if TYPE_CHECKING:
     from typing import Generator
     from typing import List
     from typing import Optional
-    from typing import Union
 
 
-def is_auto_session_tracking_enabled(hub=None):
-    # type: (Optional[sentry_sdk.Hub]) -> Union[Any, bool, None]
-    """Utility function to find out if session tracking is enabled."""
-    # TODO: add deprecation warning
-
-    if hub is None:
-        hub = sentry_sdk.Hub.current
-
-    should_track = hub.scope._force_auto_session_tracking
-
-    if should_track is None:
-        client_options = hub.client.options if hub.client else {}
-        should_track = client_options.get("auto_session_tracking", False)
-
-    return should_track
-
-
-@contextmanager
-def auto_session_tracking(hub=None, session_mode="application"):
-    # type: (Optional[sentry_sdk.Hub], str) -> Generator[None, None, None]
-    """Starts and stops a session automatically around a block."""
-    # TODO: add deprecation warning
-
-    if hub is None:
-        hub = sentry_sdk.Hub.current
-    should_track = is_auto_session_tracking_enabled(hub)
-    if should_track:
-        hub.start_session(session_mode=session_mode)
-    try:
-        yield
-    finally:
-        if should_track:
-            hub.end_session()
-
-
-def is_auto_session_tracking_enabled_scope(scope):
+def _is_auto_session_tracking_enabled(scope):
     # type: (sentry_sdk.Scope) -> bool
     """
     Utility function to find out if session tracking is enabled.
-
-    TODO: This uses the new scopes. When the Hub is removed, the function
-    is_auto_session_tracking_enabled should be removed and this function
-    should be renamed to is_auto_session_tracking_enabled.
     """
+
     should_track = scope._force_auto_session_tracking
     if should_track is None:
         client_options = sentry_sdk.get_client().options
@@ -72,16 +33,14 @@ def is_auto_session_tracking_enabled_scope(scope):
 
 
 @contextmanager
-def auto_session_tracking_scope(scope, session_mode="application"):
+def track_session(scope, session_mode="application"):
     # type: (sentry_sdk.Scope, str) -> Generator[None, None, None]
     """
-    Starts and stops a session automatically around a block.
-
-    TODO: This uses the new scopes. When the Hub is removed, the function
-    auto_session_tracking should be removed and this function
-    should be renamed to auto_session_tracking.
+    Start a new session in the provided scope, assuming session tracking is enabled.
+    This is a no-op context manager if session tracking is not enabled.
     """
-    should_track = is_auto_session_tracking_enabled_scope(scope)
+
+    should_track = _is_auto_session_tracking_enabled(scope)
     if should_track:
         scope.start_session(session_mode=session_mode)
     try:

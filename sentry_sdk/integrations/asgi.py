@@ -19,7 +19,7 @@ from sentry_sdk.integrations._asgi_common import (
     _get_request_data,
     _get_url,
 )
-from sentry_sdk.sessions import auto_session_tracking_scope
+from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
@@ -169,7 +169,7 @@ class SentryAsgiMiddleware:
         _asgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as sentry_scope:
-                with auto_session_tracking_scope(sentry_scope, session_mode="request"):
+                with track_session(sentry_scope, session_mode="request"):
                     sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
                     processor = partial(self.event_processor, asgi_scope=scope)

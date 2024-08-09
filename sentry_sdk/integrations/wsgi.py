@@ -8,9 +8,7 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.sessions import (
-    auto_session_tracking_scope as auto_session_tracking,
-)  # When the Hub is removed, this should be renamed (see comment in sentry_sdk/sessions.py)
+from sentry_sdk.sessions import track_session
 from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
@@ -83,7 +81,7 @@ class SentryWsgiMiddleware:
         _wsgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as scope:
-                with auto_session_tracking(scope, session_mode="request"):
+                with track_session(scope, session_mode="request"):
                     with capture_internal_exceptions():
                         scope.clear_breadcrumbs()
                         scope._name = "wsgi"
