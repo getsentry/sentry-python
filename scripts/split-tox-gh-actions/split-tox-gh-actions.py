@@ -82,6 +82,7 @@ GROUPS = {
         "celery",
         "dramatiq",
         "huey",
+        "ray",
         "rq",
         "spark",
     ],
