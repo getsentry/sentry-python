@@ -1,7 +1,9 @@
+import contextlib
 import os
 
 import pytest
 from datetime import datetime
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from unittest import mock
 
 from django import VERSION as DJANGO_VERSION
@@ -15,13 +17,19 @@ except ImportError:
 from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import _get_frame_module_abs_path, record_sql_queries
+from sentry_sdk.utils import _module_in_list
 
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
+
+if TYPE_CHECKING:
+    from types import FrameType
+    from typing import Optional
 
 
 @pytest.fixture
@@ -283,7 +291,10 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_query_source_with_in_app_include(sentry_init, client, capture_events):
+@pytest.mark.parametrize("django_outside_of_project_root", [False, True])
+def test_query_source_with_in_app_include(
+    sentry_init, client, capture_events, django_outside_of_project_root
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
@@ -301,8 +312,43 @@ def test_query_source_with_in_app_include(sentry_init, client, capture_events):
 
     events = capture_events()
 
-    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
-    assert status == "200 OK"
+    # Simulate Django installation outside of the project root
+    original_get_frame_module_abs_path = _get_frame_module_abs_path
+
+    def patched_get_frame_module_abs_path_function(frame):
+        # type: (FrameType) -> Optional[str]
+        result = original_get_frame_module_abs_path(frame)
+        if result is None:
+            return result
+
+        namespace = frame.f_globals.get("__name__")
+        if _module_in_list(namespace, ["django"]):
+            # Since the result is used as `str` only and not accessed,
+            # it is sufficient to generate non-existent path
+            # that would be located outside of the project root.
+            # Use UNC path for simplicity on Windows.
+            non_existent_prefix = (
+                PureWindowsPath("//outside-of-project-root")
+                if os.name == "nt"
+                else PurePosixPath("/outside-of-project-root")
+            )
+            result = str(non_existent_prefix.joinpath(*Path(result).parts[1:]))
+        return result
+
+    patched_get_frame_module_abs_path = (
+        mock.patch(
+            "sentry_sdk.tracing_utils._get_frame_module_abs_path",
+            patched_get_frame_module_abs_path_function,
+        )
+        if django_outside_of_project_root
+        else contextlib.suppress()
+    )
+
+    with patched_get_frame_module_abs_path:
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
 
     (event,) = events
     for span in event["spans"]:
