@@ -145,6 +145,8 @@ def get_sdk_name(installed_integrations):
         "quart",
         "sanic",
         "starlette",
+        "litestar",
+        "starlite",
         "chalice",
         "serverless",
         "pyramid",
@@ -614,7 +616,9 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = frame.f_locals.copy()
+        from sentry_sdk.serializer import serialize
+
+        rv["vars"] = serialize(dict(frame.f_locals), is_vars=True)
 
     return rv
 

@@ -1022,6 +1022,15 @@ class Transaction(Span):
 
         return rv
 
+    def get_trace_context(self):
+        # type: () -> Any
+        trace_context = super().get_trace_context()
+
+        if self._data:
+            trace_context["data"] = self._data
+
+        return trace_context
+
     def get_baggage(self):
         # type: () -> Baggage
         """Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`

@@ -5,12 +5,12 @@ import socket
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
+from typing import cast
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
-    disable_capture_event,
     format_timestamp,
     get_sdk_name,
     get_type_name,
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk._types import Event, Hint, SDKInfo
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
@@ -68,7 +68,7 @@ SDK_INFO = {
     "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-}
+}  # type: SDKInfo
 
 
 def _get_options(*args, **kwargs):
@@ -386,6 +386,7 @@ class _Client(BaseClient):
                 try:
                     setup_continuous_profiler(
                         self.options,
+                        sdk_info=SDK_INFO,
                         capture_func=_capture_envelope,
                     )
                 except Exception as e:
@@ -519,10 +520,13 @@ class _Client(BaseClient):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = serialize(
-                event,
-                max_request_body_size=self.options.get("max_request_body_size"),
-                max_value_length=self.options.get("max_value_length"),
+            event = cast(
+                "Event",
+                serialize(
+                    cast("Dict[str, Any]", event),
+                    max_request_body_size=self.options.get("max_request_body_size"),
+                    max_value_length=self.options.get("max_value_length"),
+                ),
             )
 
         before_send = self.options["before_send"]
@@ -720,9 +724,6 @@ class _Client(BaseClient):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        if disable_capture_event.get(False):
-            return None
-
         if hint is None:
             hint = {}
         event_id = event.get("event_id")
