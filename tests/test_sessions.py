@@ -53,7 +53,6 @@ def test_aggregates(sentry_init, capture_envelopes):
     with auto_session_tracking(session_mode="request"):
         with sentry_sdk.new_scope() as scope:
             try:
-                scope = sentry_sdk.get_current_scope()
                 scope.set_user({"id": "42"})
                 raise Exception("all is wrong")
             except Exception:
