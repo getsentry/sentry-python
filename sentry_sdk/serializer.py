@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk._types import NotImplementedType, Event
+    from sentry_sdk._types import NotImplementedType
 
     Span = Dict[str, Any]
 
@@ -95,7 +95,25 @@ class Memo:
 
 
 def serialize(event, **kwargs):
-    # type: (Event, **Any) -> Event
+    # type: (Dict[str, Any], **Any) -> Dict[str, Any]
+    """
+    A very smart serializer that takes a dict and emits a json-friendly dict.
+    Currently used for serializing the final Event and also prematurely while fetching the stack
+    local variables for each frame in a stacktrace.
+
+    It works internally with 'databags' which are arbitrary data structures like Mapping, Sequence and Set.
+    The algorithm itself is a recursive graph walk down the data structures it encounters.
+
+    It has the following responsibilities:
+    * Trimming databags and keeping them within MAX_DATABAG_BREADTH and MAX_DATABAG_DEPTH.
+    * Calling safe_repr() on objects appropriately to keep them informative and readable in the final payload.
+    * Annotating the payload with the _meta field whenever trimming happens.
+
+    :param max_request_body_size: If set to "always", will never trim request bodies.
+    :param max_value_length: The max length to strip strings to, defaults to sentry_sdk.consts.DEFAULT_MAX_VALUE_LENGTH
+    :param is_vars: If we're serializing vars early, we want to repr() things that are JSON-serializable to make their type more apparent. For example, it's useful to see the difference between a unicode-string and a bytestring when viewing a stacktrace.
+
+    """
     memo = Memo()
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
@@ -104,6 +122,7 @@ def serialize(event, **kwargs):
         kwargs.pop("max_request_body_size", None) == "always"
     )  # type: bool
     max_value_length = kwargs.pop("max_value_length", None)  # type: Optional[int]
+    is_vars = kwargs.pop("is_vars", False)
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -118,56 +137,17 @@ def serialize(event, **kwargs):
 
         meta_stack[-1].setdefault("", {}).update(meta)
 
-    def _should_repr_strings():
-        # type: () -> Optional[bool]
-        """
-        By default non-serializable objects are going through
-        safe_repr(). For certain places in the event (local vars) we
-        want to repr() even things that are JSON-serializable to
-        make their type more apparent. For example, it's useful to
-        see the difference between a unicode-string and a bytestring
-        when viewing a stacktrace.
-
-        For container-types we still don't do anything different.
-        Generally we just try to make the Sentry UI present exactly
-        what a pretty-printed repr would look like.
-
-        :returns: `True` if we are somewhere in frame variables, and `False` if
-            we are in a position where we will never encounter frame variables
-            when recursing (for example, we're in `event.extra`). `None` if we
-            are not (yet) in frame variables, but might encounter them when
-            recursing (e.g.  we're in `event.exception`)
-        """
-        try:
-            p0 = path[0]
-            if p0 == "stacktrace" and path[1] == "frames" and path[3] == "vars":
-                return True
-
-            if (
-                p0 in ("threads", "exception")
-                and path[1] == "values"
-                and path[3] == "stacktrace"
-                and path[4] == "frames"
-                and path[6] == "vars"
-            ):
-                return True
-        except IndexError:
-            return None
-
-        return False
-
     def _is_databag():
         # type: () -> Optional[bool]
         """
         A databag is any value that we need to trim.
+        True for stuff like vars, request bodies, breadcrumbs and extra.
 
-        :returns: Works like `_should_repr_strings()`. `True` for "yes",
-            `False` for :"no", `None` for "maybe soon".
+        :returns: `True` for "yes", `False` for :"no", `None` for "maybe soon".
         """
         try:
-            rv = _should_repr_strings()
-            if rv in (True, None):
-                return rv
+            if is_vars:
+                return True
 
             is_request_body = _is_request_body()
             if is_request_body in (True, None):
@@ -253,7 +233,7 @@ def serialize(event, **kwargs):
         if isinstance(obj, AnnotatedValue):
             should_repr_strings = False
         if should_repr_strings is None:
-            should_repr_strings = _should_repr_strings()
+            should_repr_strings = is_vars
 
         if is_databag is None:
             is_databag = _is_databag()
@@ -387,7 +367,7 @@ def serialize(event, **kwargs):
     disable_capture_event.set(True)
     try:
         serialized_event = _serialize_node(event, **kwargs)
-        if meta_stack and isinstance(serialized_event, dict):
+        if not is_vars and meta_stack and isinstance(serialized_event, dict):
             serialized_event["_meta"] = meta_stack[0]
 
         return serialized_event
