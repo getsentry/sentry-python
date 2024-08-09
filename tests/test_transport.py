@@ -649,6 +649,7 @@ def test_metric_bucket_limits_with_all_namespaces(
     ]
 
 
+@pytest.mark.xfail(reason="hub will be removed in 3.0")
 def test_hub_cls_backwards_compat():
     class TestCustomHubClass(Hub):
         pass

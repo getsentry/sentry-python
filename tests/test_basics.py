@@ -294,6 +294,7 @@ def test_breadcrumb_arguments(sentry_init, capture_events):
     add_breadcrumb(crumb=dict(foo=42))
 
 
+@pytest.mark.xfail(reason="will be removed in 3.0")
 def test_push_scope(sentry_init, capture_events, suppress_deprecation_warnings):
     sentry_init()
     events = capture_events()
@@ -311,6 +312,7 @@ def test_push_scope(sentry_init, capture_events, suppress_deprecation_warnings):
     assert "exception" in event
 
 
+@pytest.mark.xfail(reason="will be removed in 3.0")
 def test_push_scope_null_client(
     sentry_init, capture_events, suppress_deprecation_warnings
 ):

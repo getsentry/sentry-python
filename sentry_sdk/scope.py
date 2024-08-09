@@ -22,9 +22,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    NoOpSpan,
     Span,
-    Transaction,
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
@@ -167,10 +165,8 @@ class Scope(object):
         "_level",
         "_name",
         "_fingerprint",
-        # note that for legacy reasons, _transaction is the transaction *name*,
-        # not a Transaction object (the object is stored in _span)
-        "_transaction",
-        "_transaction_info",
+        "_root_span_name",
+        "_root_span_info",
         "_user",
         "_tags",
         "_contexts",
@@ -222,8 +218,8 @@ class Scope(object):
         rv._level = self._level
         rv._name = self._name
         rv._fingerprint = self._fingerprint
-        rv._transaction = self._transaction
-        rv._transaction_info = dict(self._transaction_info)
+        rv._root_span_name = self._root_span_name
+        rv._root_span_info = dict(self._root_span_info)
         rv._user = self._user
 
         rv._tags = dict(self._tags)
@@ -673,8 +669,8 @@ class Scope(object):
         """Clears the entire scope."""
         self._level = None  # type: Optional[LogLevelStr]
         self._fingerprint = None  # type: Optional[List[str]]
-        self._transaction = None  # type: Optional[str]
-        self._transaction_info = {}  # type: MutableMapping[str, str]
+        self._root_span_name = None  # type: Optional[str]
+        self._root_span_info = {}  # type: MutableMapping[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
@@ -696,23 +692,6 @@ class Scope(object):
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id = None  # type: Optional[str]
 
-    @_attr_setter
-    def level(self, value):
-        # type: (LogLevelStr) -> None
-        """
-        When set this overrides the level.
-
-        .. deprecated:: 1.0.0
-            Use :func:`set_level` instead.
-
-        :param value: The level to set.
-        """
-        logger.warning(
-            "Deprecated: use .set_level() instead. This will be removed in the future."
-        )
-
-        self._level = value
-
     def set_level(self, value):
         # type: (LogLevelStr) -> None
         """
@@ -731,58 +710,54 @@ class Scope(object):
     @property
     def transaction(self):
         # type: () -> Any
-        # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
-        """Return the transaction (root span) in the scope, if any."""
+        # would be type: () -> Optional[Span], see https://github.com/python/mypy/issues/3004
+        """
+        Return the transaction in the scope, if any.
 
+        .. deprecated:: 3.0.0
+            This function is deprecated and will be removed in a future release. Use Scope.root_span instead.
+        """
+
+        logger.warning(
+            "Deprecated: use Scope.root_span instead. This will be removed in the future."
+        )
+
+        return self.root_span
+
+    @property
+    def root_span(self):
+        """Return the root span in the scope, if any."""
         # there is no span/transaction on the scope
         if self._span is None:
             return None
 
         # there is an orphan span on the scope
-        if self._span.containing_transaction is None:
+        if self._span.root_span is None:
             return None
 
-        # there is either a transaction (which is its own containing
-        # transaction) or a non-orphan span on the scope
-        return self._span.containing_transaction
-
-    @transaction.setter
-    def transaction(self, value):
-        # type: (Any) -> None
-        # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
-        """When set this forces a specific transaction name to be set.
-
-        Deprecated: use set_transaction_name instead."""
-
-        # XXX: the docstring above is misleading. The implementation of
-        # apply_to_event prefers an existing value of event.transaction over
-        # anything set in the scope.
-        # XXX: note that with the introduction of the Scope.transaction getter,
-        # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a Transaction, the setter sets a transaction name.
-        # Without breaking version compatibility, we could make the setter set a
-        # transaction name or transaction (self._span) depending on the type of
-        # the value argument.
-
-        logger.warning(
-            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
-        )
-        self._transaction = value
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = value
+        # there is either a root span (which is its own containing
+        # root span) or a non-orphan span on the scope
+        return self._span.root_span
 
     def set_transaction_name(self, name, source=None):
         # type: (str, Optional[str]) -> None
-        """Set the transaction name and optionally the transaction source."""
-        self._transaction = name
+        """
+        Set the transaction name and optionally the transaction source.
 
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = name
+        .. deprecated:: 3.0.0
+            This function is deprecated and will be removed in a future release. Use Scope.set_root_span_name instead.
+        """
+        self.set_root_span_name(name, source)
+
+    def set_root_span_name(self, name, source=None):
+        """Set the root span name and optionally the source."""
+        self._root_span_name = name
+        if self._span and self._span.root_span:
+            self._span.root_span.name = name
             if source:
-                self._span.containing_transaction.source = source
-
+                self._span.root_span.source = source
         if source:
-            self._transaction_info["source"] = source
+            self._root_span_info["source"] = source
 
     @_attr_setter
     def user(self, value):
@@ -801,21 +776,22 @@ class Scope(object):
     @property
     def span(self):
         # type: () -> Optional[Span]
-        """Get/set current tracing span or transaction."""
+        """Get current tracing span."""
         return self._span
 
     @span.setter
     def span(self, span):
+        """Set current tracing span."""
         # type: (Optional[Span]) -> None
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
-        # does not set Scope._transactionName.
-        if isinstance(span, Transaction):
-            transaction = span
-            if transaction.name:
-                self._transaction = transaction.name
-                if transaction.source:
-                    self._transaction_info["source"] = transaction.source
+        # does not set root span name.
+        return
+        if span.is_segment:
+            if span.name:
+                self._root_span_name = span.name
+                if span.source:
+                    self._root_span_info["source"] = span.source
 
     @property
     def profile(self):
@@ -976,8 +952,12 @@ class Scope(object):
     def start_transaction(
         self, transaction=None, custom_sampling_context=None, **kwargs
     ):
-        # type: (Optional[Transaction], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Span], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Span
         """
+        .. deprecated:: 3.0.0
+            This function is deprecated and will be removed in a future release.
+            Use :py:meth:`sentry_sdk.start_span` instead.
+
         Start and return a transaction.
 
         Start an existing transaction if given, otherwise create and start a new
@@ -1006,32 +986,20 @@ class Scope(object):
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
             available arguments.
         """
-        kwargs.setdefault("scope", self)
-
-        client = self.get_client()
-
         try_autostart_continuous_profiler()
-
         custom_sampling_context = custom_sampling_context or {}
 
-        # kwargs at this point has type TransactionKwargs, since we have removed
-        # the client and custom_sampling_context from it.
-        transaction_kwargs = kwargs  # type: TransactionKwargs
+        kwargs.setdefault("scope", self)
+        span = transaction or Span(**kwargs)
 
-        # if we haven't been given a transaction, make one
-        if transaction is None:
-            transaction = Transaction(**transaction_kwargs)
-
-        # use traces_sample_rate, traces_sampler, and/or inheritance to make a
-        # sampling decision
         sampling_context = {
             "transaction_context": transaction.to_json(),
             "parent_sampled": transaction.parent_sampled,
         }
         sampling_context.update(custom_sampling_context)
-        transaction._set_initial_sampling_decision(sampling_context=sampling_context)
+        span._set_initial_sampling_decision(sampling_context=sampling_context)
 
-        if transaction.sampled:
+        if span.sampled:
             profile = Profile(
                 transaction.sampled, transaction._start_timestamp_monotonic_ns
             )
@@ -1041,13 +1009,15 @@ class Scope(object):
 
             # we don't bother to keep spans if we already know we're not going to
             # send the transaction
-            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
+            max_spans = (
+                self.get_client().options["_experiments"].get("max_spans")
+            ) or 1000
+            span.init_span_recorder(maxlen=max_spans)
 
-        return transaction
+        return span
 
-    def start_span(self, **kwargs):
-        # type: (Any) -> Span
+    def start_span(self, root_span=None, custom_sampling_context=None, **kwargs):
+        # type: (Optional[Span], Optional[SamplingContext], Any) -> Span
         """
         Start a span whose parent is the currently active span or transaction, if any.
 
@@ -1055,48 +1025,55 @@ class Scope(object):
         typically used as a context manager to start and stop timing in a `with`
         block.
 
-        Only spans contained in a transaction are sent to Sentry. Most
-        integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use
-        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
-        one is not already in progress.
-
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
-
-        The instrumenter parameter is deprecated for user code, and it will
-        be removed in the next major version. Going forward, it should only
-        be used by the SDK itself.
         """
-        with new_scope():
-            kwargs.setdefault("scope", self)
+        kwargs.setdefault("scope", self)
+        if root_span:
+            return root_span
 
-            # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
+        span = self.span or self.get_isolation_scope().span
 
-            if span is None:
-                # New spans get the `trace_id` from the scope
-                if "trace_id" not in kwargs:
-                    propagation_context = self.get_active_propagation_context()
-                    if propagation_context is not None:
-                        kwargs["trace_id"] = propagation_context.trace_id
+        if span is None:
+            if "trace_id" not in kwargs:
+                propagation_context = self.get_active_propagation_context()
+                if propagation_context is not None:
+                    kwargs["trace_id"] = propagation_context.trace_id
 
-                span = Span(**kwargs)
-            else:
-                # Children take `trace_id`` from the parent span.
-                span = span.start_child(**kwargs)
+            return Span(**kwargs)
+        else:
+            return span.start_child(**kwargs)
 
-            return span
+        # XXX
+        # with new_scope():
+        #     kwargs.setdefault("scope", self)
+
+        #     # get current span or transaction
+        #     span = self.span or self.get_isolation_scope().span
+
+        #     if span is None:
+        #         # New spans get the `trace_id` from the scope
+        #         if "trace_id" not in kwargs:
+        #             propagation_context = self.get_active_propagation_context()
+        #             if propagation_context is not None:
+        #                 kwargs["trace_id"] = propagation_context.trace_id
+
+        #         span = Span(**kwargs)
+        #     else:
+        #         # Children take `trace_id`` from the parent span.
+        #         span = span.start_child(**kwargs)
+
+        #     return span
 
     def continue_trace(
         self, environ_or_headers, op=None, name=None, source=None, origin="manual"
     ):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Span
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
         self.generate_propagation_context(environ_or_headers)
 
-        transaction = Transaction.continue_from_headers(
+        root_span = Span.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
             op=op,
             origin=origin,
@@ -1104,7 +1081,7 @@ class Scope(object):
             source=source,
         )
 
-        return transaction
+        return root_span
 
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
@@ -1299,15 +1276,15 @@ class Scope(object):
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 
-    def _apply_transaction_name_to_event(self, event, hint, options):
+    def _apply_root_span_name_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        if event.get("transaction") is None and self._transaction is not None:
-            event["transaction"] = self._transaction
+        if event.get("transaction") is None and self._root_span_name is not None:
+            event["transaction"] = self._root_span_name
 
-    def _apply_transaction_info_to_event(self, event, hint, options):
+    def _apply_root_span_info_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        if event.get("transaction_info") is None and self._transaction_info is not None:
-            event["transaction_info"] = self._transaction_info
+        if event.get("transaction_info") is None and self._root_span_info is not None:
+            event["transaction_info"] = self._root_span_info
 
     def _apply_fingerprint_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
@@ -1429,8 +1406,8 @@ class Scope(object):
             self._apply_level_to_event(event, hint, options)
             self._apply_fingerprint_to_event(event, hint, options)
             self._apply_user_to_event(event, hint, options)
-            self._apply_transaction_name_to_event(event, hint, options)
-            self._apply_transaction_info_to_event(event, hint, options)
+            self._apply_root_span_name_to_event(event, hint, options)
+            self._apply_root_span_info_to_event(event, hint, options)
             self._apply_tags_to_event(event, hint, options)
             self._apply_extra_to_event(event, hint, options)
 
@@ -1454,10 +1431,10 @@ class Scope(object):
             self._level = scope._level
         if scope._fingerprint is not None:
             self._fingerprint = scope._fingerprint
-        if scope._transaction is not None:
-            self._transaction = scope._transaction
-        if scope._transaction_info is not None:
-            self._transaction_info.update(scope._transaction_info)
+        if scope._root_span_name is not None:
+            self._root_span_name = scope._root_span_name
+        if scope._root_span_info is not None:
+            self._root_span_info.update(scope._root_span_info)
         if scope._user is not None:
             self._user = scope._user
         if scope._tags:

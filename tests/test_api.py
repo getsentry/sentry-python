@@ -32,7 +32,7 @@ def test_get_current_span():
 
 
 @pytest.mark.forked
-def test_get_current_span_default_hub(sentry_init):
+def test_get_current_span_current_scope(sentry_init):
     sentry_init()
 
     assert get_current_span() is None
@@ -45,7 +45,7 @@ def test_get_current_span_default_hub(sentry_init):
 
 
 @pytest.mark.forked
-def test_get_current_span_default_hub_with_transaction(sentry_init):
+def test_get_current_span_current_scope_with_transaction(sentry_init):
     sentry_init()
 
     assert get_current_span() is None
@@ -185,12 +185,14 @@ def test_set_tags(sentry_init, capture_events):
     }, "Updating tags with empty dict changed tags"
 
 
+@pytest.mark.xfail(reason="configure_scope will be removed in 3.0")
 def test_configure_scope_deprecation():
     with pytest.warns(DeprecationWarning):
         with configure_scope():
             ...
 
 
+@pytest.mark.xfail(reason="push_scope will be removed in 3.0")
 def test_push_scope_deprecation():
     with pytest.warns(DeprecationWarning):
         with push_scope():
