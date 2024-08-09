@@ -116,6 +116,7 @@ def _setup_sentry_tracing():
 
     if SparkContext._active_spark_context is not None:
         _activate_integration(SparkContext._active_spark_context)
+        return
     _patch_spark_context_init()
 
 
