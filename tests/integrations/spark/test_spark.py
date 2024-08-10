@@ -20,6 +20,14 @@ from py4j.protocol import Py4JJavaError
 
 
 @pytest.fixture(scope="function")
+def sentry_init_with_reset(sentry_init):
+    from sentry_sdk.integrations import _processed_integrations
+
+    yield lambda: sentry_init(integrations=[SparkIntegration()])
+    _processed_integrations.remove("spark")
+
+
+@pytest.fixture(scope="function")
 def create_spark_context():
     yield lambda: SparkContext(appName="Testing123")
     if SparkContext._active_spark_context:
@@ -48,31 +56,26 @@ def test_start_sentry_listener(create_spark_context):
     assert gateway._callback_server is not None
 
 
-def test_initialize_spark_integration(sentry_init, create_spark_context):
-    sentry_init(integrations=[SparkIntegration()])
-    create_spark_context()
-
-
-@patch("sentry_sdk.integrations.spark.spark_driver._activate_integration")
+@patch("sentry_sdk.integrations.spark.spark_driver._patch_spark_context_init")
 def test_initialize_spark_integration_before_spark_context_init(
-    mock_activate_integration,
-    sentry_init,
+    mock_patch_spark_context_init,
+    sentry_init_with_reset,
     create_spark_context,
 ):
-    sentry_init(integrations=[SparkIntegration()])
+    sentry_init_with_reset()
     create_spark_context()
 
-    mock_activate_integration.assert_called_once()
+    mock_patch_spark_context_init.assert_called_once()
 
 
 @patch("sentry_sdk.integrations.spark.spark_driver._activate_integration")
 def test_initialize_spark_integration_after_spark_context_init(
     mock_activate_integration,
     create_spark_context,
-    sentry_init,
+    sentry_init_with_reset,
 ):
     create_spark_context()
-    sentry_init(integrations=[SparkIntegration()])
+    sentry_init_with_reset()
 
     mock_activate_integration.assert_called_once()
 
