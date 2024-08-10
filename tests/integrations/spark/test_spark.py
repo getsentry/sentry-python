@@ -30,8 +30,7 @@ def sentry_init_with_reset(sentry_init):
 @pytest.fixture(scope="function")
 def create_spark_context():
     yield lambda: SparkContext(appName="Testing123")
-    if SparkContext._active_spark_context:
-        SparkContext._active_spark_context.stop()
+    SparkContext._active_spark_context.stop()
 
 
 def test_set_app_properties(create_spark_context):
