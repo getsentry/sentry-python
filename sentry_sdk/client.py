@@ -531,6 +531,7 @@ class _Client(BaseClient):
                     cast("Dict[str, Any]", event),
                     max_request_body_size=self.options.get("max_request_body_size"),
                     max_value_length=self.options.get("max_value_length"),
+                    custom_repr=self.options.get("custom_repr"),
                 ),
             )
 
