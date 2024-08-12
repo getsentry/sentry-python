@@ -1297,6 +1297,22 @@ class POTelSpan:
         if status is not None:
             self.set_status(status)
 
+    def __repr__(self):
+        # type: () -> str
+        return (
+            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
+            % (
+                self.__class__.__name__,
+                self.op,
+                self.description,
+                self.trace_id,
+                self.span_id,
+                self.parent_span_id,
+                self.sampled,
+                self.origin,
+            )
+        )
+
     def __enter__(self):
         # type: () -> POTelSpan
         # XXX use_span? https://github.com/open-telemetry/opentelemetry-python/blob/3836da8543ce9751051e38a110c0468724042e62/opentelemetry-api/src/opentelemetry/trace/__init__.py#L547
@@ -1432,6 +1448,26 @@ class POTelSpan:
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         self._otel_span.set_attribute(SentrySpanAttribute.OP, value)
+
+    @property
+    def name(self):
+        # type: () -> str
+        pass
+
+    @name.setter
+    def name(self, value):
+        # type: (str) -> None
+        pass
+
+    @property
+    def source(self):
+        # type: () -> str
+        pass
+
+    @source.setter
+    def source(self, value):
+        # type: (str) -> None
+        pass
 
     def start_child(self, **kwargs):
         # type: (str, **Any) -> POTelSpan
