@@ -1,6 +1,6 @@
 import inspect
 
-from sentry_sdk import tracing, tracing_utils, Client
+from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
 from sentry_sdk.tracing import POTelSpan, Transaction, trace
 from sentry_sdk.crons import monitor
@@ -233,14 +233,17 @@ def flush(
 
 
 def start_span(
+    *,
+    root_span=None,
+    custom_sampling_context=None,
     **kwargs,  # type: Any
 ):
     # type: (...) -> POTelSpan
     """
-    Alias for tracing.POTelSpan constructor. The method signature is the same.
+    Start and return a span.
     """
     # TODO: Consider adding type hints to the method signature.
-    return tracing.POTelSpan(**kwargs)
+    return get_current_scope().start_span(root_span, custom_sampling_context, **kwargs)
 
 
 def start_transaction(
@@ -282,7 +285,11 @@ def start_transaction(
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
-    return start_span(**kwargs)
+    return get_current_scope().start_span(
+        root_span=transaction,
+        custom_sampling_context=custom_sampling_context,
+        **kwargs,
+    )
 
 
 def set_measurement(name, value, unit=""):
