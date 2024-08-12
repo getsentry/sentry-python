@@ -258,7 +258,7 @@ def test_circular_references(monkeypatch, sentry_init, request):
     assert gc.collect() == 0
 
 
-def test_set_meaurement(sentry_init, capture_events):
+def test_set_measurement(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
 
     events = capture_events()
@@ -286,7 +286,7 @@ def test_set_meaurement(sentry_init, capture_events):
     assert event["measurements"]["metric.foobar"] == {"value": 17.99, "unit": "percent"}
 
 
-def test_set_meaurement_public_api(sentry_init, capture_events):
+def test_set_measurement_public_api(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
 
     events = capture_events()
@@ -412,7 +412,7 @@ def test_transaction_dropped_debug_not_started(sentry_init, sampled):
         )
 
 
-def test_transaction_dropeed_sampled_false(sentry_init):
+def test_transaction_dropped_sampled_false(sentry_init):
     sentry_init(enable_tracing=True)
 
     tx = Transaction(sampled=False)
