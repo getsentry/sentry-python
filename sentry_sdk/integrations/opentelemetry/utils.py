@@ -73,13 +73,13 @@ def is_sentry_span(span):
 
 def convert_from_otel_timestamp(time):
     # type: (int) -> datetime
-    """Convert an OTel ns-level timestamp to a datetime."""
+    """Convert an OTel nanosecond-level timestamp to a datetime."""
     return datetime.fromtimestamp(time / 1e9, timezone.utc)
 
 
 def convert_to_otel_timestamp(time):
     # type: (Union[datetime.datetime, float]) -> int
-    """Convert a datetime to an OTel timestamp (with ns precision)."""
+    """Convert a datetime to an OTel timestamp (with nanosecond precision)."""
     if isinstance(time, datetime):
         return int(time.timestamp() * 1e9)
     return int(time * 1e9)
