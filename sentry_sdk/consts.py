@@ -539,6 +539,7 @@ class ClientConstructor:
         spotlight=None,  # type: Optional[Union[bool, str]]
         cert_file=None,  # type: Optional[str]
         key_file=None,  # type: Optional[str]
+        custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
     ):
         # type: (...) -> None
         pass
