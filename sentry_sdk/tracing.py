@@ -1308,7 +1308,9 @@ class POTelSpan:
 
     def start_child(self, **kwargs):
         # type: (str, **Any) -> POTelSpan
-        pass
+        kwargs.setdefault("sampled", self.sampled)
+
+        return POTelSpan(**kwargs)
 
     @classmethod
     def continue_from_environ(

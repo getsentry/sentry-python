@@ -998,15 +998,12 @@ class Scope(object):
         """
         kwargs.setdefault("scope", self)
 
-        client = self.get_client()
-
         try_autostart_continuous_profiler()
 
         custom_sampling_context = custom_sampling_context or {}
 
         # if we haven't been given a transaction, make one
-        if transaction is None:
-            transaction = POTelSpan(**kwargs)
+        transaction = transaction or POTelSpan(**kwargs)
 
         # use traces_sample_rate, traces_sampler, and/or inheritance to make a
         # sampling decision
@@ -1024,11 +1021,6 @@ class Scope(object):
             profile._set_initial_sampling_decision(sampling_context=sampling_context)
 
             transaction._profile = profile
-
-            # we don't bother to keep spans if we already know we're not going to
-            # send the transaction
-            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
 
         return transaction
 
