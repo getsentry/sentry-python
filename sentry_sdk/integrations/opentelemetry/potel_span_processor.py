@@ -7,7 +7,7 @@ from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 from sentry_sdk import capture_event
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
-    convert_otel_timestamp,
+    convert_from_otel_timestamp,
     extract_span_data,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
@@ -141,8 +141,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
             # TODO-neel-potel tx source based on integration
             "transaction_info": {"source": "custom"},
             "contexts": contexts,
-            "start_timestamp": convert_otel_timestamp(span.start_time),
-            "timestamp": convert_otel_timestamp(span.end_time),
+            "start_timestamp": convert_from_otel_timestamp(span.start_time),
+            "timestamp": convert_from_otel_timestamp(span.end_time),
         }  # type: Event
 
         return event
@@ -169,8 +169,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
             "op": op,
             "description": description,
             "status": status,
-            "start_timestamp": convert_otel_timestamp(span.start_time),
-            "timestamp": convert_otel_timestamp(span.end_time),
+            "start_timestamp": convert_from_otel_timestamp(span.start_time),
+            "timestamp": convert_from_otel_timestamp(span.end_time),
         }  # type: dict[str, Any]
 
         if parent_span_id:

@@ -13,7 +13,7 @@ from sentry_sdk.utils import Dsn
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, Mapping, Sequence
+    from typing import Optional, Mapping, Sequence, Union
 
 
 GRPC_ERROR_MAP = {
@@ -71,9 +71,18 @@ def is_sentry_span(span):
     return False
 
 
-def convert_otel_timestamp(time):
+def convert_from_otel_timestamp(time):
     # type: (int) -> datetime
+    """Convert an OTel ns-level timestamp to a datetime."""
     return datetime.fromtimestamp(time / 1e9, timezone.utc)
+
+
+def convert_to_otel_timestamp(time):
+    # type: (Union[datetime.datetime, float]) -> int
+    """Convert a datetime to an OTel timestamp (with ns precision)."""
+    if isinstance(time, datetime):
+        return int(time.timestamp() * 1e9)
+    return int(time * 1e9)
 
 
 def extract_span_data(span):
