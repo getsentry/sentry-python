@@ -697,23 +697,6 @@ class Scope(object):
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id = None  # type: Optional[str]
 
-    @_attr_setter
-    def level(self, value):
-        # type: (LogLevelStr) -> None
-        """
-        When set this overrides the level.
-
-        .. deprecated:: 1.0.0
-            Use :func:`set_level` instead.
-
-        :param value: The level to set.
-        """
-        logger.warning(
-            "Deprecated: use .set_level() instead. This will be removed in the future."
-        )
-
-        self._level = value
-
     def set_level(self, value):
         # type: (LogLevelStr) -> None
         """
@@ -802,11 +785,12 @@ class Scope(object):
     @property
     def span(self):
         # type: () -> Optional[Span]
-        """Get/set current tracing span or transaction."""
+        """Get current tracing span."""
         return self._span
 
     @span.setter
     def span(self, span):
+        """Set current tracing span."""
         # type: (Optional[Span]) -> None
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
