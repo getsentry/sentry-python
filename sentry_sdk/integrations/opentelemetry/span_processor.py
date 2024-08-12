@@ -259,7 +259,7 @@ class SentrySpanProcessor(SpanProcessor):
             for key, val in otel_span.attributes.items():
                 sentry_span.set_data(key, val)
 
-        (op, description, status, http_status) = extract_span_data(otel_span)
+        (op, description, status, http_status, _) = extract_span_data(otel_span)
         sentry_span.op = op
         sentry_span.description = description
 
@@ -270,7 +270,7 @@ class SentrySpanProcessor(SpanProcessor):
 
     def _update_transaction_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
-        (op, _, status, http_status) = extract_span_data(otel_span)
+        (op, _, status, http_status, _) = extract_span_data(otel_span)
         sentry_span.op = op
 
         if http_status:
