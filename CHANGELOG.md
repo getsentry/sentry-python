@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.12.0
+
+### Various fixes & improvements
+
+- API: Expose the scope getters to top level API and use them everywhere  (#3357) by @sl0thentr0py
+- API: `push_scope` deprecation warning (#3355) (#3355) by @szokeasaurusrex
+- API: Replace `push_scope` (#3353, #3354) by @szokeasaurusrex
+- API: Deprecate, avoid, or stop using `configure_scope` (#3348, #3349, #3350, #3351) by @szokeasaurusrex
+- OTel: Remove experimental autoinstrumentation (#3239) by @sentrivana
+- Graphene: Add span for grapqhl operation (#2788) by @czyber
+- AI: Add async support for `ai_track` decorator (#3376) by @czyber
+- CI: Workaround bug preventing Django test runs (#3371) by @szokeasaurusrex
+- CI: Remove Django setuptools pin (#3378) by @szokeasaurusrex
+- Tests: Test with Django 5.1 RC (#3370) by @sentrivana
+- Broaden `add_attachment` type (#3342) by @szokeasaurusrex
+- Add span data to the transactions trace context (#3374) by @antonpirker
+- Gracefully fail attachment path not found case (#3337) by @sl0thentr0py
+- Document attachment parameters (#3342) by @szokeasaurusrex
+- Bump checkouts/data-schemas from `0feb234` to `6d2c435` (#3369) by @dependabot
+- Bump checkouts/data-schemas from `88273a9` to `0feb234` (#3252) by @dependabot
+
 ## 2.11.0
 
 ### Various fixes & improvements

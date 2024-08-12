@@ -4,17 +4,20 @@ import functools
 import pytest
 
 from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlite import StarliteIntegration
+from sentry_sdk.integrations.litestar import LitestarIntegration
 
-from typing import Any, Dict
+from typing import Any
 
-from starlite import AbstractMiddleware, LoggingConfig, Starlite, get, Controller
-from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
-from starlite.middleware.session.memory_backend import MemoryBackendConfig
-from starlite.testing import TestClient
+from litestar import Litestar, get, Controller
+from litestar.logging.config import LoggingConfig
+from litestar.middleware import AbstractMiddleware
+from litestar.middleware.logging import LoggingMiddlewareConfig
+from litestar.middleware.rate_limit import RateLimitConfig
+from litestar.middleware.session.server_side import ServerSideSessionConfig
+from litestar.testing import TestClient
 
 
-def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
+def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
     class MyController(Controller):
         path = "/controller"
 
@@ -23,7 +26,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
             raise Exception("Whoa")
 
     @get("/some_url")
-    async def homepage_handler() -> "Dict[str, Any]":
+    async def homepage_handler() -> "dict[str, Any]":
         1 / 0
         return {"status": "ok"}
 
@@ -32,18 +35,18 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
         raise Exception("Too Hot")
 
     @get("/message")
-    async def message() -> "Dict[str, Any]":
+    async def message() -> "dict[str, Any]":
         capture_message("hi")
         return {"status": "ok"}
 
     @get("/message/{message_id:str}")
-    async def message_with_id() -> "Dict[str, Any]":
+    async def message_with_id() -> "dict[str, Any]":
         capture_message("hi")
         return {"status": "ok"}
 
     logging_config = LoggingConfig()
 
-    app = Starlite(
+    app = Litestar(
         route_handlers=[
             homepage_handler,
             custom_error,
@@ -67,7 +70,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
             "/some_url",
             ZeroDivisionError,
             "division by zero",
-            "tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.homepage_handler",
+            "tests.integrations.litestar.test_litestar.litestar_app_factory.<locals>.homepage_handler",
         ),
         (
             "/custom_error",
@@ -79,7 +82,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
             "/controller/error",
             Exception,
             "Whoa",
-            "partial(<function tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.MyController.controller_error>)",
+            "tests.integrations.litestar.test_litestar.litestar_app_factory.<locals>.MyController.controller_error",
         ),
     ],
 )
@@ -92,12 +95,12 @@ def test_catch_exceptions(
     expected_message,
     expected_tx_name,
 ):
-    sentry_init(integrations=[StarliteIntegration()])
-    starlite_app = starlite_app_factory()
+    sentry_init(integrations=[LitestarIntegration()])
+    litestar_app = litestar_app_factory()
     exceptions = capture_exceptions()
     events = capture_events()
 
-    client = TestClient(starlite_app)
+    client = TestClient(litestar_app)
     try:
         client.get(test_url)
     except Exception:
@@ -108,21 +111,21 @@ def test_catch_exceptions(
     assert str(exc) == expected_message
 
     (event,) = events
-    assert event["transaction"] == expected_tx_name
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "starlite"
+    assert expected_tx_name in event["transaction"]
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "litestar"
 
 
 def test_middleware_spans(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[StarliteIntegration()],
+        integrations=[LitestarIntegration()],
     )
 
     logging_config = LoggingMiddlewareConfig()
-    session_config = MemoryBackendConfig()
+    session_config = ServerSideSessionConfig()
     rate_limit_config = RateLimitConfig(rate_limit=("hour", 5))
 
-    starlite_app = starlite_app_factory(
+    litestar_app = litestar_app_factory(
         middleware=[
             session_config.middleware,
             logging_config.middleware,
@@ -132,7 +135,7 @@ def test_middleware_spans(sentry_init, capture_events):
     events = capture_events()
 
     client = TestClient(
-        starlite_app, raise_server_exceptions=False, base_url="http://testserver.local"
+        litestar_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
     client.get("/message")
 
@@ -141,17 +144,17 @@ def test_middleware_spans(sentry_init, capture_events):
     expected = {"SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"}
     found = set()
 
-    starlite_spans = (
+    litestar_spans = (
         span
         for span in transaction_event["spans"]
-        if span["op"] == "middleware.starlite"
+        if span["op"] == "middleware.litestar"
     )
 
-    for span in starlite_spans:
+    for span in litestar_spans:
         assert span["description"] in expected
         assert span["description"] not in found
         found.add(span["description"])
-        assert span["description"] == span["tags"]["starlite.middleware_name"]
+        assert span["description"] == span["tags"]["litestar.middleware_name"]
 
 
 def test_middleware_callback_spans(sentry_init, capture_events):
@@ -167,31 +170,31 @@ def test_middleware_callback_spans(sentry_init, capture_events):
 
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[StarliteIntegration()],
+        integrations=[LitestarIntegration()],
     )
-    starlite_app = starlite_app_factory(middleware=[SampleMiddleware])
+    litestar_app = litestar_app_factory(middleware=[SampleMiddleware])
     events = capture_events()
 
-    client = TestClient(starlite_app, raise_server_exceptions=False)
+    client = TestClient(litestar_app, raise_server_exceptions=False)
     client.get("/message")
 
     (_, transaction_events) = events
 
-    expected_starlite_spans = [
+    expected_litestar_spans = [
         {
-            "op": "middleware.starlite",
+            "op": "middleware.litestar",
             "description": "SampleMiddleware",
-            "tags": {"starlite.middleware_name": "SampleMiddleware"},
+            "tags": {"litestar.middleware_name": "SampleMiddleware"},
         },
         {
-            "op": "middleware.starlite.send",
+            "op": "middleware.litestar.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlite.middleware_name": "SampleMiddleware"},
+            "tags": {"litestar.middleware_name": "SampleMiddleware"},
         },
         {
-            "op": "middleware.starlite.send",
+            "op": "middleware.litestar.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlite.middleware_name": "SampleMiddleware"},
+            "tags": {"litestar.middleware_name": "SampleMiddleware"},
         },
     ]
 
@@ -202,17 +205,17 @@ def test_middleware_callback_spans(sentry_init, capture_events):
             and expected_span["tags"] == actual_span["tags"]
         )
 
-    actual_starlite_spans = list(
+    actual_litestar_spans = list(
         span
         for span in transaction_events["spans"]
-        if "middleware.starlite" in span["op"]
+        if "middleware.litestar" in span["op"]
     )
-    assert len(actual_starlite_spans) == 3
+    assert len(actual_litestar_spans) == 3
 
-    for expected_span in expected_starlite_spans:
+    for expected_span in expected_litestar_spans:
         assert any(
             is_matching_span(expected_span, actual_span)
-            for actual_span in actual_starlite_spans
+            for actual_span in actual_litestar_spans
         )
 
 
@@ -230,11 +233,11 @@ def test_middleware_receive_send(sentry_init, capture_events):
 
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[StarliteIntegration()],
+        integrations=[LitestarIntegration()],
     )
-    starlite_app = starlite_app_factory(middleware=[SampleReceiveSendMiddleware])
+    litestar_app = litestar_app_factory(middleware=[SampleReceiveSendMiddleware])
 
-    client = TestClient(starlite_app, raise_server_exceptions=False)
+    client = TestClient(litestar_app, raise_server_exceptions=False)
     # See SampleReceiveSendMiddleware.__call__ above for assertions of correct behavior
     client.get("/message")
 
@@ -262,32 +265,32 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
 
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[StarliteIntegration()],
+        integrations=[LitestarIntegration()],
     )
-    starlite_app = starlite_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
+    litestar_app = litestar_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
     events = capture_events()
 
-    client = TestClient(starlite_app, raise_server_exceptions=False)
+    client = TestClient(litestar_app, raise_server_exceptions=False)
     # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
     client.get("/message")
 
     (_, transaction_events) = events
 
-    expected_starlite_spans = [
+    expected_litestar_spans = [
         {
-            "op": "middleware.starlite",
+            "op": "middleware.litestar",
             "description": "SamplePartialReceiveSendMiddleware",
-            "tags": {"starlite.middleware_name": "SamplePartialReceiveSendMiddleware"},
+            "tags": {"litestar.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
         {
-            "op": "middleware.starlite.receive",
+            "op": "middleware.litestar.receive",
             "description": "TestClientTransport.create_receive.<locals>.receive",
-            "tags": {"starlite.middleware_name": "SamplePartialReceiveSendMiddleware"},
+            "tags": {"litestar.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
         {
-            "op": "middleware.starlite.send",
+            "op": "middleware.litestar.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlite.middleware_name": "SamplePartialReceiveSendMiddleware"},
+            "tags": {"litestar.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
     ]
 
@@ -298,31 +301,31 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
             and expected_span["tags"] == actual_span["tags"]
         )
 
-    actual_starlite_spans = list(
+    actual_litestar_spans = list(
         span
         for span in transaction_events["spans"]
-        if "middleware.starlite" in span["op"]
+        if "middleware.litestar" in span["op"]
     )
-    assert len(actual_starlite_spans) == 3
+    assert len(actual_litestar_spans) == 3
 
-    for expected_span in expected_starlite_spans:
+    for expected_span in expected_litestar_spans:
         assert any(
             is_matching_span(expected_span, actual_span)
-            for actual_span in actual_starlite_spans
+            for actual_span in actual_litestar_spans
         )
 
 
 def test_span_origin(sentry_init, capture_events):
     sentry_init(
-        integrations=[StarliteIntegration()],
+        integrations=[LitestarIntegration()],
         traces_sample_rate=1.0,
     )
 
     logging_config = LoggingMiddlewareConfig()
-    session_config = MemoryBackendConfig()
+    session_config = ServerSideSessionConfig()
     rate_limit_config = RateLimitConfig(rate_limit=("hour", 5))
 
-    starlite_app = starlite_app_factory(
+    litestar_app = litestar_app_factory(
         middleware=[
             session_config.middleware,
             logging_config.middleware,
@@ -332,15 +335,15 @@ def test_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     client = TestClient(
-        starlite_app, raise_server_exceptions=False, base_url="http://testserver.local"
+        litestar_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
     client.get("/message")
 
     (_, event) = events
 
-    assert event["contexts"]["trace"]["origin"] == "auto.http.starlite"
+    assert event["contexts"]["trace"]["origin"] == "auto.http.litestar"
     for span in event["spans"]:
-        assert span["origin"] == "auto.http.starlite"
+        assert span["origin"] == "auto.http.litestar"
 
 
 @pytest.mark.parametrize(
@@ -354,7 +357,7 @@ def test_span_origin(sentry_init, capture_events):
         "send_default_pii=False",
     ],
 )
-def test_starlite_scope_user_on_exception_event(
+def test_litestar_scope_user_on_exception_event(
     sentry_init, capture_exceptions, capture_events, is_send_default_pii
 ):
     class TestUserMiddleware(AbstractMiddleware):
@@ -367,14 +370,14 @@ def test_starlite_scope_user_on_exception_event(
             await self.app(scope, receive, send)
 
     sentry_init(
-        integrations=[StarliteIntegration()], send_default_pii=is_send_default_pii
+        integrations=[LitestarIntegration()], send_default_pii=is_send_default_pii
     )
-    starlite_app = starlite_app_factory(middleware=[TestUserMiddleware])
+    litestar_app = litestar_app_factory(middleware=[TestUserMiddleware])
     exceptions = capture_exceptions()
     events = capture_events()
 
     # This request intentionally raises an exception
-    client = TestClient(starlite_app)
+    client = TestClient(litestar_app)
     try:
         client.get("/some_url")
     except Exception:
