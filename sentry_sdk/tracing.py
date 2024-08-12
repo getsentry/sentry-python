@@ -1369,6 +1369,32 @@ class POTelSpan:
         pass
 
     @property
+    def root_span(self):
+        if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
+            return None
+
+        parent = None
+        while True:
+            # XXX test if this actually works
+            if self._otel_span.parent:
+                parent = self._otel_span.parent
+            else:
+                break
+
+        return parent
+
+    @root_span.setter
+    def root_span(self, value):
+        pass
+
+    @property
+    def is_root_span(self):
+        if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
+            return False
+
+        return self._otel_span.parent is None
+
+    @property
     def parent_span_id(self):
         # type: () -> Optional[str]
         return self._otel_span.parent if hasattr(self._otel_span, "parent") else None
@@ -1482,7 +1508,9 @@ class POTelSpan:
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        # XXX own namespace, e.g. sentry.measurement.xxx?
+        # XXX own namespace, e.g. sentry.measurement.xxx, so that we can group
+        # these back together in the processor?
+        # XXX otel throws a warning about value, unit being different types
         self._otel_span.set_attribute(name, (value, unit))
 
     def set_thread(self, thread_id, thread_name):
