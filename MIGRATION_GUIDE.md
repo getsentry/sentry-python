@@ -9,10 +9,13 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Changed
 
+- `sentry_sdk.start_span` now only takes keyword arguments.
+
 ### Removed
 
 ### Deprecated
 
+- `sentry_sdk.start_transaction` is deprecated. Use `sentry_sdk.start_span` instead.
 
 ## Upgrading to 2.0
 

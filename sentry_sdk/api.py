@@ -234,16 +234,25 @@ def flush(
 
 def start_span(
     *,
-    root_span=None,
+    span=None,
     custom_sampling_context=None,
     **kwargs,  # type: Any
 ):
     # type: (...) -> POTelSpan
     """
     Start and return a span.
+
+    This is the entry point to manual tracing instrumentation.
+
+    A tree structure can be built by adding child spans to the span.
+    To start a new child span within the span, call the `start_child()` method.
+
+    When used as a context manager, spans are automatically finished at the end
+    of the `with` block. If not using context managers, call the `finish()`
+    method.
     """
     # TODO: Consider adding type hints to the method signature.
-    return get_current_scope().start_span(root_span, custom_sampling_context, **kwargs)
+    return get_current_scope().start_span(span, custom_sampling_context, **kwargs)
 
 
 def start_transaction(

@@ -1024,7 +1024,7 @@ class Scope(object):
 
         return transaction
 
-    def start_span(self, root_span=None, custom_sampling_context=None, **kwargs):
+    def start_span(self, span=None, custom_sampling_context=None, **kwargs):
         # type: (Optional[Span], Optional[SamplingContext], Any) -> Span
         """
         Start a span whose parent is the currently active span, if any.
@@ -1039,7 +1039,7 @@ class Scope(object):
             kwargs.setdefault("scope", self)
 
             # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
+            span = span or self.span or self.get_isolation_scope().span
 
             if span is None:
                 # New spans get the `trace_id` from the scope
