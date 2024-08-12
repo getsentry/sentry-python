@@ -1310,7 +1310,8 @@ class POTelSpan:
         # type: (str, **Any) -> POTelSpan
         kwargs.setdefault("sampled", self.sampled)
 
-        return POTelSpan(**kwargs)
+        span = POTelSpan(**kwargs)
+        return span
 
     @classmethod
     def continue_from_environ(
@@ -1319,7 +1320,9 @@ class POTelSpan:
         **kwargs,  # type: Any
     ):
         # type: (...) -> POTelSpan
-        pass
+        # XXX actually propagate
+        span = POTelSpan(**kwargs)
+        return span
 
     @classmethod
     def continue_from_headers(
@@ -1328,7 +1331,9 @@ class POTelSpan:
         **kwargs,  # type: Any
     ):
         # type: (...) -> POTelSpan
-        pass
+        # XXX actually propagate
+        span = POTelSpan(**kwargs)
+        return span
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
@@ -1341,7 +1346,9 @@ class POTelSpan:
         **kwargs,  # type: Any
     ):
         # type: (...) -> Optional[Transaction]
-        pass
+        # XXX actually propagate
+        span = POTelSpan(**kwargs)
+        return span
 
     def to_traceparent(self):
         # type: () -> str
