@@ -295,7 +295,7 @@ def start_transaction(
         available arguments.
     """
     return start_span(
-        root_span=transaction,
+        span=transaction,
         custom_sampling_context=custom_sampling_context,
         **kwargs,
     )
