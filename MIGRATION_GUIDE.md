@@ -1,13 +1,29 @@
-# Sentry SDK 2.0 Migration Guide
+# Sentry SDK Migration Guide
+
+
+## Upgrading to 3.0
+
+Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of what's changed. Looking for a more digestable summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x) with the most common migration patterns.
+
+### New Features
+
+### Changed
+
+### Removed
+
+### Deprecated
+
+
+## Upgrading to 2.0
 
 Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed. Looking for a more digestable summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/1.x-to-2.x) with the most common migration patterns.
 
-## New Features
+### New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
 - While refactoring the [inner workings](https://docs.sentry.io/platforms/python/enriching-events/scopes/) of the SDK we added new top-level APIs for custom instrumentation called `new_scope` and `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
 
-## Changed
+### Changed
 
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
 - The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
@@ -59,7 +75,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 
     </details>
 
-## Removed
+### Removed
 
 - Removed support for Python 2 and Python 3.5. The SDK now requires at least Python 3.6.
 - Removed support for Celery 3.\*.
@@ -82,7 +98,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - Removed the experimental `metrics_summary_sample_rate` config option.
 - Removed the experimental `should_summarize_metric` config option.
 
-## Deprecated
+### Deprecated
 
 - Using the `Hub` directly as well as using hub-based APIs has been deprecated. Where available, use [the top-level API instead](sentry_sdk/api.py); otherwise use the [scope API](sentry_sdk/scope.py) or the [client API](sentry_sdk/client.py).
 
