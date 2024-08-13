@@ -12,6 +12,7 @@ from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    env_to_bool,
     get_current_thread_meta,
     get_default_release,
     get_error_message,
@@ -57,6 +58,55 @@ def _normalize_distribution_name(name):
     for more details.
     """
     return re.sub(r"[-_.]+", "-", name).lower()
+
+
+@pytest.mark.parametrize(
+    "env_var_value,strict,expected",
+    [
+        ("", True, False),
+        ("", False, False),
+        ("t", True, True),
+        ("t", False, True),
+        ("y", True, True),
+        ("y", False, True),
+        ("1", True, True),
+        ("1", False, True),
+        ("True", True, True),
+        ("True", False, True),
+        ("true", True, True),
+        ("true", False, True),
+        ("tRuE", True, True),
+        ("tRuE", False, True),
+        ("Yes", True, True),
+        ("Yes", False, True),
+        ("yes", True, True),
+        ("yes", False, True),
+        ("yEs", True, True),
+        ("yEs", False, True),
+        ("f", True, False),
+        ("f", False, False),
+        ("n", True, False),
+        ("n", False, False),
+        ("0", True, False),
+        ("0", False, False),
+        ("False", True, False),
+        ("False", False, False),
+        ("false", True, False),
+        ("false", False, False),
+        ("FaLsE", True, False),
+        ("FaLsE", False, False),
+        ("No", True, False),
+        ("No", False, False),
+        ("no", True, False),
+        ("no", False, False),
+        ("nO", True, False),
+        ("nO", False, False),
+        ("xxx", True, None),
+        ("xxx", False, True),
+    ],
+)
+def test_env_to_bool(env_var_value, strict, expected):
+    assert env_to_bool(env_var_value, strict=strict) == expected
 
 
 @pytest.mark.parametrize(

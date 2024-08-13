@@ -71,8 +71,8 @@ BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
-FALSY_ENV_VALUES = frozenset(("false", "n", "no", "off", "0"))
-TRUTHY_ENV_VALUES = frozenset(("true", "y", "yes", "on", "1"))
+FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
+TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
 
 
 def env_to_bool(value, *, strict=False):
