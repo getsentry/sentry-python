@@ -145,6 +145,8 @@ def get_sdk_name(installed_integrations):
         "quart",
         "sanic",
         "starlette",
+        "litestar",
+        "starlite",
         "chalice",
         "serverless",
         "pyramid",
@@ -583,8 +585,9 @@ def serialize_frame(
     include_local_variables=True,
     include_source_context=True,
     max_value_length=None,
+    custom_repr=None,
 ):
-    # type: (FrameType, Optional[int], bool, bool, Optional[int]) -> Dict[str, Any]
+    # type: (FrameType, Optional[int], bool, bool, Optional[int], Optional[Callable[..., Optional[str]]]) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -614,7 +617,11 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = frame.f_locals.copy()
+        from sentry_sdk.serializer import serialize
+
+        rv["vars"] = serialize(
+            dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+        )
 
     return rv
 
@@ -719,10 +726,12 @@ def single_exception_from_error_tuple(
         include_local_variables = True
         include_source_context = True
         max_value_length = DEFAULT_MAX_VALUE_LENGTH  # fallback
+        custom_repr = None
     else:
         include_local_variables = client_options["include_local_variables"]
         include_source_context = client_options["include_source_context"]
         max_value_length = client_options["max_value_length"]
+        custom_repr = client_options.get("custom_repr")
 
     frames = [
         serialize_frame(
@@ -731,6 +740,7 @@ def single_exception_from_error_tuple(
             include_local_variables=include_local_variables,
             include_source_context=include_source_context,
             max_value_length=max_value_length,
+            custom_repr=custom_repr,
         )
         for tb in iter_stacks(tb)
     ]
