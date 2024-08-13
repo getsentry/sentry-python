@@ -1127,7 +1127,7 @@ def test_spotlight_option(
     if client_option is None:
         sentry_init()
     else:
-        sentry_init(debug=client_option)
+        sentry_init(spotlight=client_option)
 
     client = sentry_sdk.get_client()
     url = client.spotlight.url if client.spotlight else None
