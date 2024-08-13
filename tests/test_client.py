@@ -21,6 +21,7 @@ from sentry_sdk import (
     capture_event,
     set_tag,
 )
+from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 from sentry_sdk.utils import capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
@@ -1095,6 +1096,43 @@ def test_debug_option(
         assert "something is wrong" in caplog.text
     else:
         assert "something is wrong" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "client_option,env_var_value,spotlight_url_expected",
+    [
+        (None, None, None),
+        (None, "", None),
+        (None, "F", None),
+        (False, None, None),
+        (False, "", None),
+        (False, "t", None),
+        (None, "t", DEFAULT_SPOTLIGHT_URL),
+        (None, "1", DEFAULT_SPOTLIGHT_URL),
+        (True, None, DEFAULT_SPOTLIGHT_URL),
+        (True, "http://localhost:8080/slurp", DEFAULT_SPOTLIGHT_URL),
+        ("http://localhost:8080/slurp", "f", "http://localhost:8080/slurp"),
+        (None, "http://localhost:8080/slurp", "http://localhost:8080/slurp"),
+    ],
+)
+def test_spotlight_option(
+    sentry_init,
+    monkeypatch,
+    client_option,
+    env_var_value,
+    spotlight_url_expected,
+):
+    monkeypatch.setenv("SENTRY_SPOTLIGHT", env_var_value)
+
+    if client_option is None:
+        client = sentry_init()
+    else:
+        client = sentry_init(debug=client_option)
+
+    url = client.spotlight.url if client.spotlight else None
+    assert (
+        url == spotlight_url_expected
+    ), f"With config {client_option} and env {env_var_value}"
 
 
 class IssuesSamplerTestConfig:
