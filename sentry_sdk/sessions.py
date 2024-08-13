@@ -1,6 +1,5 @@
 import os
 import time
-import warnings
 from threading import Thread, Lock
 from contextlib import contextmanager
 

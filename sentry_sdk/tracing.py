@@ -1,6 +1,5 @@
 import uuid
 import random
-import warnings
 from datetime import datetime, timedelta, timezone
 
 import sentry_sdk

@@ -33,7 +33,6 @@ import sys
 import threading
 import time
 import uuid
-import warnings
 from abc import ABC, abstractmethod
 from collections import deque
 

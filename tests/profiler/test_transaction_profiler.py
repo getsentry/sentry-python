@@ -1,6 +1,5 @@
 import inspect
 import os
-import sentry_sdk
 import sys
 import threading
 import time
