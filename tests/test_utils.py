@@ -63,12 +63,16 @@ def _normalize_distribution_name(name):
 @pytest.mark.parametrize(
     "env_var_value,strict,expected",
     [
-        ("", True, False),
+        ("", True, None),
         ("", False, False),
         ("t", True, True),
+        ("T", True, True),
         ("t", False, True),
+        ("T", False, True),
         ("y", True, True),
+        ("Y", True, True),
         ("y", False, True),
+        ("Y", False, True),
         ("1", True, True),
         ("1", False, True),
         ("True", True, True),
@@ -83,10 +87,18 @@ def _normalize_distribution_name(name):
         ("yes", False, True),
         ("yEs", True, True),
         ("yEs", False, True),
+        ("On", True, True),
+        ("On", False, True),
+        ("on", True, True),
+        ("on", False, True),
+        ("oN", True, True),
+        ("oN", False, True),
         ("f", True, False),
         ("f", False, False),
         ("n", True, False),
+        ("N", True, False),
         ("n", False, False),
+        ("N", False, False),
         ("0", True, False),
         ("0", False, False),
         ("False", True, False),
@@ -101,12 +113,20 @@ def _normalize_distribution_name(name):
         ("no", False, False),
         ("nO", True, False),
         ("nO", False, False),
+        ("Off", True, False),
+        ("Off", False, False),
+        ("off", True, False),
+        ("off", False, False),
+        ("oFf", True, False),
+        ("oFf", False, False),
         ("xxx", True, None),
         ("xxx", False, True),
     ],
 )
 def test_env_to_bool(env_var_value, strict, expected):
-    assert env_to_bool(env_var_value, strict=strict) == expected
+    assert (
+        env_to_bool(env_var_value, strict=strict) == expected
+    ), f"Value: {env_var_value}, strict: {strict}"
 
 
 @pytest.mark.parametrize(
