@@ -112,7 +112,7 @@ def record_sql_queries(
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
     record_cursor_repr=False,  # type: bool
-    span_origin="manual",  # type: str
+    span_origin=None,  # type: Optional[str]
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 

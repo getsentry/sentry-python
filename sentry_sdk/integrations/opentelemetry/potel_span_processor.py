@@ -5,6 +5,7 @@ from opentelemetry.context import Context
 from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
 from sentry_sdk import capture_event
+from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
     convert_from_otel_timestamp,
@@ -12,7 +13,6 @@ from sentry_sdk.integrations.opentelemetry.utils import (
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,
-    SPAN_ORIGIN,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -121,7 +121,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
         trace_context = {
             "trace_id": trace_id,
             "span_id": span_id,
-            "origin": origin,
+            "origin": origin or DEFAULT_SPAN_ORIGIN,
             "op": op,
             "status": status,
         }  # type: dict[str, Any]
@@ -170,7 +170,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
             "status": status,
             "start_timestamp": convert_from_otel_timestamp(span.start_time),
             "timestamp": convert_from_otel_timestamp(span.end_time),
-            "origin": origin or SPAN_ORIGIN,
+            "origin": origin or DEFAULT_SPAN_ORIGIN,
         }  # type: dict[str, Any]
 
         if parent_span_id:

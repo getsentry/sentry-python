@@ -153,6 +153,8 @@ SOURCE_FOR_STYLE = {
     "url": TRANSACTION_SOURCE_ROUTE,
 }
 
+DEFAULT_SPAN_ORIGIN = "manual"
+
 tracer = otel_trace.get_tracer(__name__)
 
 
@@ -282,7 +284,7 @@ class Span:
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         scope=None,  # type: Optional[sentry_sdk.Scope]
-        origin="manual",  # type: str
+        origin=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -295,7 +297,7 @@ class Span:
         self.status = status
         self.hub = hub  # backwards compatibility
         self.scope = scope
-        self.origin = origin
+        self.origin = origin or DEFAULT_SPAN_ORIGIN
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
@@ -1266,7 +1268,7 @@ class POTelSpan:
         status=None,  # type: Optional[str]
         scope=None,  # type: Optional[Scope]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
-        origin="manual",  # type: str
+        origin=None,  # type: Optional[str]
         **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
@@ -1290,7 +1292,7 @@ class POTelSpan:
         )  # XXX
         self._active = active
 
-        self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, origin)
+        self.origin = origin or DEFAULT_SPAN_ORIGIN
         self.op = op
         self.description = description
         if status is not None:

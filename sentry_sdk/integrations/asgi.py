@@ -96,9 +96,9 @@ class SentryAsgiMiddleware:
         unsafe_context_data=False,
         transaction_style="endpoint",
         mechanism_type="asgi",
-        span_origin="manual",
+        span_origin=None,
     ):
-        # type: (Any, bool, str, str, str) -> None
+        # type: (Any, bool, str, str, Optional[str]) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
