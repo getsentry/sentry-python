@@ -63,6 +63,8 @@ def _normalize_distribution_name(name):
 @pytest.mark.parametrize(
     "env_var_value,strict,expected",
     [
+        (None, True, None),
+        (None, False, False),
         ("", True, None),
         ("", False, False),
         ("t", True, True),

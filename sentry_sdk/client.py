@@ -373,8 +373,8 @@ class _Client(BaseClient):
 
             self.spotlight = None
             spotlight_config = self.options.get("spotlight")
-            if spotlight_config is None:
-                spotlight_env_value = os.environ.get("SENTRY_SPOTLIGHT", "0")
+            if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
+                spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
                 spotlight_config = env_to_bool(spotlight_env_value, strict=True)
                 self.options["spotlight"] = (
                     spotlight_config

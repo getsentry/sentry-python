@@ -1122,7 +1122,10 @@ def test_spotlight_option(
     env_var_value,
     spotlight_url_expected,
 ):
-    monkeypatch.setenv("SENTRY_SPOTLIGHT", env_var_value)
+    if env_var_value is None:
+        monkeypatch.delenv("SENTRY_SPOTLIGHT", raising=False)
+    else:
+        monkeypatch.setenv("SENTRY_SPOTLIGHT", env_var_value)
 
     if client_option is None:
         sentry_init()

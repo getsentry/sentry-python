@@ -80,7 +80,7 @@ def env_to_bool(value, *, strict=False):
     """Casts an ENV variable value to boolean using the constants defined above.
     In strict mode, it may return None if the value doesn't match any of the predefined values.
     """
-    normalized = str(value).lower()
+    normalized = str(value).lower() if value is not None else None
 
     if normalized in FALSY_ENV_VALUES:
         return False
