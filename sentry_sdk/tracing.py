@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
     import sentry_sdk.profiler
+    from sentry_sdk.scope import Scope
     from sentry_sdk._types import (
         Event,
         MeasurementUnit,
@@ -1262,6 +1263,9 @@ class POTelSpan:
         active=True,  # type: bool
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
+        status=None,  # type: Optional[str]
+        scope=None,  # type: Optional[Scope]
+        start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin="manual",  # type: str
         **_,  # type: dict[str, object]
     ):
@@ -1272,15 +1276,41 @@ class POTelSpan:
         listed in the signature. These additional arguments are ignored.
         """
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            convert_to_otel_timestamp,
+        )
 
-        self._otel_span = tracer.start_span(description or op or "")  # XXX
+        if start_timestamp is not None:
+            # OTel timestamps have nanosecond precision
+            start_timestamp = convert_to_otel_timestamp(start_timestamp)
+
+        # XXX deal with _otel_span being a NonRecordingSpan
+        self._otel_span = tracer.start_span(
+            description or op or "", start_time=start_timestamp
+        )  # XXX
         self._active = active
 
         self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, origin)
-        if op is not None:
-            self._otel_span.set_attribute(SentrySpanAttribute.OP, op)
-        if description is not None:
-            self._otel_span.set_attribute(SentrySpanAttribute.DESCRIPTION, description)
+        self.op = op
+        self.description = description
+        if status is not None:
+            self.set_status(status)
+
+    def __repr__(self):
+        # type: () -> str
+        return (
+            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
+            % (
+                self.__class__.__name__,
+                self.op,
+                self.description,
+                self.trace_id,
+                self.span_id,
+                self.parent_span_id,
+                self.sampled,
+                self.origin,
+            )
+        )
 
     def __enter__(self):
         # type: () -> POTelSpan
@@ -1302,8 +1332,141 @@ class POTelSpan:
             context.detach(self._ctx_token)
 
     @property
+    def description(self):
+        # type: () -> Optional[str]
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        return self._otel_span.attributes.get(SentrySpanAttribute.DESCRIPTION)
+
+    @description.setter
+    def description(self, value):
+        # type: (Optional[str]) -> None
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        if value is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
+
+    @property
+    def origin(self):
+        # type: () -> Optional[str]
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        return self._otel_span.attributes.get(SentrySpanAttribute.ORIGIN)
+
+    @origin.setter
+    def origin(self, value):
+        # type: (Optional[str]) -> None
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        if value is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, value)
+
+    @property
     def containing_transaction(self):
         # type: () -> Optional[Transaction]
+        """
+        Get the transaction this span is a child of.
+
+        .. deprecated:: 3.0.0
+            This will be removed in the future. Use :func:`root_span` instead.
+        """
+        logger.warning("Deprecated: This will be removed in the future.")
+        return self.root_span
+
+    @containing_transaction.setter
+    def containing_transaction(self, value):
+        # type: (Span) -> None
+        """
+        Set this span's transaction.
+        .. deprecated:: 3.0.0
+            Use :func:`root_span` instead.
+        """
+        pass
+
+    @property
+    def root_span(self):
+        if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
+            return None
+
+        parent = None
+        while True:
+            # XXX test if this actually works
+            if self._otel_span.parent:
+                parent = self._otel_span.parent
+            else:
+                break
+
+        return parent
+
+    @root_span.setter
+    def root_span(self, value):
+        pass
+
+    @property
+    def is_root_span(self):
+        if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
+            return False
+
+        return self._otel_span.parent is None
+
+    @property
+    def parent_span_id(self):
+        # type: () -> Optional[str]
+        return self._otel_span.parent if hasattr(self._otel_span, "parent") else None
+
+    @property
+    def trace_id(self):
+        # type: () -> Optional[str]
+        return self._otel_span.get_span_context().trace_id
+
+    @property
+    def span_id(self):
+        # type: () -> Optional[str]
+        return self._otel_span.get_span_context().span_id
+
+    @property
+    def sampled(self):
+        # type: () -> Optional[bool]
+        return self._otel_span.get_span_context().trace_flags.sampled
+
+    @sampled.setter
+    def sampled(self, value):
+        # type: () -> Optional[bool]
+        pass
+
+    @property
+    def op(self):
+        # type: () -> Optional[str]
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        self._otel_span.attributes.get(SentrySpanAttribute.OP)
+
+    @op.setter
+    def op(self, value):
+        # type: (Optional[str]) -> None
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        if value is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.OP, value)
+
+    @property
+    def name(self):
+        # type: () -> str
+        pass
+
+    @name.setter
+    def name(self, value):
+        # type: (str) -> None
+        pass
+
+    @property
+    def source(self):
+        # type: () -> str
+        pass
+
+    @source.setter
+    def source(self, value):
+        # type: (str) -> None
         pass
 
     def start_child(self, **kwargs):
@@ -1352,7 +1515,18 @@ class POTelSpan:
 
     def to_traceparent(self):
         # type: () -> str
-        pass
+        if self.sampled is True:
+            sampled = "1"
+        elif self.sampled is False:
+            sampled = "0"
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
 
     def to_baggage(self):
         # type: () -> Optional[Baggage]
@@ -1368,23 +1542,39 @@ class POTelSpan:
 
     def set_status(self, status):
         # type: (str) -> None
-        pass
+        if status == SPANSTATUS.OK:
+            otel_status = StatusCode.OK
+            otel_description = None
+        else:
+            otel_status = StatusCode.ERROR
+            otel_description = status.value
+
+        self._otel_span.set_status(otel_status, otel_description)
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        pass
+        # XXX own namespace, e.g. sentry.measurement.xxx, so that we can group
+        # these back together in the processor?
+        # XXX otel throws a warning about value, unit being different types
+        self._otel_span.set_attribute(name, (value, unit))
 
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
-        pass
+        if thread_id is not None:
+            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
+
+            if thread_name is not None:
+                self.set_data(SPANDATA.THREAD_NAME, thread_name)
 
     def set_profiler_id(self, profiler_id):
         # type: (Optional[str]) -> None
-        pass
+        if profiler_id is not None:
+            self.set_data(SPANDATA.PROFILER_ID, profiler_id)
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        pass
+        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
+        self.set_status(get_span_status_from_http_code(http_status))
 
     def is_success(self):
         # type: () -> bool
