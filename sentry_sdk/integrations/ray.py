@@ -32,7 +32,7 @@ def _check_sentry_initialized():
     if sentry_sdk.get_client().is_active():
         return
 
-    logger.warning(
+    logger.debug(
         "[Tracing] Sentry not initialized in ray cluster worker, performance data will be discarded."
     )
 
