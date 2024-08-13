@@ -9,6 +9,11 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Changed
 
+- The `Span()` constructor does not accept a `hub` parameter anymore.
+- `Span.finish()` does not accept a `hub` parameter anymore.
+- The `Profile()` constructor does not accept a `hub` parameter anymore.
+- A `Profile` object does not have a `.hub` property anymore.
+
 ### Removed
 
 - Class `Hub` has been removed.
