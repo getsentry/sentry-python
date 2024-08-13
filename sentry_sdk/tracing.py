@@ -1291,8 +1291,7 @@ class POTelSpan:
         self._active = active
 
         self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, origin)
-        if op is not None:
-            self.op = op
+        self.op = op
         self.description = description
         if status is not None:
             self.set_status(status)
@@ -1444,10 +1443,11 @@ class POTelSpan:
 
     @op.setter
     def op(self, value):
-        # type: (str) -> None
+        # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        self._otel_span.set_attribute(SentrySpanAttribute.OP, value)
+        if value is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.OP, value)
 
     @property
     def name(self):
