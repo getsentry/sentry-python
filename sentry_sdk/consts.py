@@ -465,6 +465,8 @@ class OP:
     QUEUE_TASK_RQ = "queue.task.rq"
     QUEUE_SUBMIT_HUEY = "queue.submit.huey"
     QUEUE_TASK_HUEY = "queue.task.huey"
+    QUEUE_SUBMIT_RAY = "queue.submit.ray"
+    QUEUE_TASK_RAY = "queue.task.ray"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
@@ -539,6 +541,7 @@ class ClientConstructor:
         spotlight=None,  # type: Optional[Union[bool, str]]
         cert_file=None,  # type: Optional[str]
         key_file=None,  # type: Optional[str]
+        custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
     ):
         # type: (...) -> None
         pass
