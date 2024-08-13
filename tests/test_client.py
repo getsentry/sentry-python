@@ -1125,10 +1125,11 @@ def test_spotlight_option(
     monkeypatch.setenv("SENTRY_SPOTLIGHT", env_var_value)
 
     if client_option is None:
-        client = sentry_init()
+        sentry_init()
     else:
-        client = sentry_init(debug=client_option)
+        sentry_init(debug=client_option)
 
+    client = sentry_sdk.get_client()
     url = client.spotlight.url if client.spotlight else None
     assert (
         url == spotlight_url_expected
