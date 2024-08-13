@@ -52,7 +52,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from gevent.hub import Hub
+    from gevent.hub import Hub as GeventHub
 
     from sentry_sdk._types import Event, ExcInfo
 
@@ -1808,9 +1808,9 @@ try:
 except ImportError:
 
     # it's not great that the signatures are different, get_hub can't return None
-    # consider adding an if TYPE_CHECKING to change the signature to Optional[Hub]
+    # consider adding an if TYPE_CHECKING to change the signature to Optional[GeventHub]
     def get_gevent_hub():  # type: ignore[misc]
-        # type: () -> Optional[Hub]
+        # type: () -> Optional[GeventHub]
         return None
 
     def is_module_patched(mod_name):
