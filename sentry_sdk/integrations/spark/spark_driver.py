@@ -1,6 +1,7 @@
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
+from sentry_sdk.scope import Scope
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -224,10 +225,20 @@ class SparkListener:
 
 
 class SentryListener(SparkListener):
+    def _add_breadcrumb(
+        self,
+        level,  # type: str
+        message,  # type: str
+        data=None,  # type: Optional[dict[str, Any]]
+    ):
+        # type: (...) -> None
+        Scope.set_isolation_scope(Scope.get_global_scope())
+        sentry_sdk.add_breadcrumb(level=level, message=message, data=data)
+
     def onJobStart(self, jobStart):  # noqa: N802,N803
         # type: (Any) -> None
         message = "Job {} Started".format(jobStart.jobId())
-        sentry_sdk.add_breadcrumb(level="info", message=message)
+        self._add_breadcrumb(level="info", message=message)
         _set_app_properties()
 
     def onJobEnd(self, jobEnd):  # noqa: N802,N803
@@ -243,14 +254,14 @@ class SentryListener(SparkListener):
             level = "warning"
             message = "Job {} Failed".format(jobEnd.jobId())
 
-        sentry_sdk.add_breadcrumb(level=level, message=message, data=data)
+        self._add_breadcrumb(level=level, message=message, data=data)
 
     def onStageSubmitted(self, stageSubmitted):  # noqa: N802,N803
         # type: (Any) -> None
         stage_info = stageSubmitted.stageInfo()
         message = "Stage {} Submitted".format(stage_info.stageId())
         data = {"attemptId": stage_info.attemptId(), "name": stage_info.name()}
-        sentry_sdk.add_breadcrumb(level="info", message=message, data=data)
+        self._add_breadcrumb(level="info", message=message, data=data)
         _set_app_properties()
 
     def onStageCompleted(self, stageCompleted):  # noqa: N802,N803
@@ -271,4 +282,4 @@ class SentryListener(SparkListener):
             message = "Stage {} Completed".format(stage_info.stageId())
             level = "info"
 
-        sentry_sdk.add_breadcrumb(level=level, message=message, data=data)
+        self._add_breadcrumb(level=level, message=message, data=data)
