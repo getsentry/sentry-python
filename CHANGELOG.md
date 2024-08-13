@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.13.0
+
+### Various fixes & improvements
+
+- feat: Add ray integration support (#2400) (#2444) by @glowskir
+- Expose custom_repr function that precedes safe_repr invocation in serializer (#3438) by @sl0thentr0py
+- ref(sessions): Deprecate hub-based `sessions.py` logic (#3419) by @szokeasaurusrex
+- ref(sessions): Deprecate `is_auto_session_tracking_enabled` (#3428) by @szokeasaurusrex
+- Add note to generated yaml files (#3423) by @sentrivana
+- test(sessions): Remove unnecessary line (#3418) by @szokeasaurusrex
+- Dramatiq integration from @jacobsvante (#3397) by @antonpirker
+- Serialize vars early to avoid living references (#3409) by @sl0thentr0py
+- feat(profiling): Add client sdk info to profile chunk (#3386) by @Zylphrex
+- Link to persistent banner in README (#3399) by @sentrivana
+- feat(integrations): Update StarliteIntegration to be more in line with new LitestarIntegration (#3384) by @KellyWalker
+- feat(integrations): Add litestar and starlite to get_sdk_name (#3385) by @KellyWalker
+- feat(integrations): Support Litestar (#2413) (#3358) by @KellyWalker
+- Use new banner in readme (#3390) by @sentrivana
+- meta: Slim down PR template (#3382) by @sentrivana
+
 ## 2.12.0
 
 ### Various fixes & improvements
