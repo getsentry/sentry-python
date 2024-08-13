@@ -4,21 +4,87 @@
 
 ### Various fixes & improvements
 
-- feat: Add ray integration support (#2400) (#2444) by @glowskir
-- Expose custom_repr function that precedes safe_repr invocation in serializer (#3438) by @sl0thentr0py
-- ref(sessions): Deprecate hub-based `sessions.py` logic (#3419) by @szokeasaurusrex
-- ref(sessions): Deprecate `is_auto_session_tracking_enabled` (#3428) by @szokeasaurusrex
-- Add note to generated yaml files (#3423) by @sentrivana
-- test(sessions): Remove unnecessary line (#3418) by @szokeasaurusrex
-- Dramatiq integration from @jacobsvante (#3397) by @antonpirker
+- **New integration:** [Ray](https://docs.sentry.io/platforms/python/integrations/ray/) (#2400) (#2444) by @glowskir
+
+  Usage: (add the RayIntegration to your `sentry_sdk.init()` call and make sure it is called in the worker processes)
+  ```python
+  import ray
+
+  import sentry_sdk
+  from sentry_sdk.integrations.ray import RayIntegration
+
+  def init_sentry():
+      sentry_sdk.init(
+          dsn="...",
+          traces_sample_rate=1.0,
+          integrations=[RayIntegration()],
+      )
+
+  init_sentry()
+
+  ray.init(
+      runtime_env=dict(worker_process_setup_hook=init_sentry), 
+  )
+  ```
+  For more information, see the documentation for the [Ray integration](https://docs.sentry.io/platforms/python/integrations/ray/).
+
+- **New integration:** [Litestar](https://docs.sentry.io/platforms/python/integrations/litestar/) (#2413) (#3358) by @KellyWalker
+
+  Usage: (add the LitestarIntegration to your `sentry_sdk.init()`)
+  ```python
+  from litestar import Litestar, get
+
+  import sentry_sdk
+  from sentry_sdk.integrations.litestar import LitestarIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[LitestarIntegration()],
+  )
+
+  @get("/")
+  async def index() -> str:
+      return "Hello, world!"
+
+  app = Litestar(...)
+  ```
+  For more information, see the documentation for the [Litestar integration](https://docs.sentry.io/platforms/python/integrations/litestar/).
+
+- **New integration:** [Dramatiq](https://docs.sentry.io/platforms/python/integrations/dramatiq/) from @jacobsvante (#3397) by @antonpirker
+  Usage: (add the DramatiqIntegration to your `sentry_sdk.init()`)
+  ```python
+  import dramatiq
+
+  import sentry_sdk
+  from sentry_sdk.integrations.dramatiq import DramatiqIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[DramatiqIntegration()],
+  )
+
+  @dramatiq.actor(max_retries=0)
+  def dummy_actor(x, y):
+      return x / y
+
+  dummy_actor.send(12, 0)
+  ```
+
+  For more information, see the documentation for the [Dramatiq integration](https://docs.sentry.io/platforms/python/integrations/dramatiq/).
+
+- **New config option:** Expose `custom_repr` function that precedes `safe_repr` invocation in serializer (#3438) by @sl0thentr0py
+  
+  See: https://docs.sentry.io/platforms/python/configuration/options/#custom-repr
+
+- Profiling: Add client SDK info to profile chunk (#3386) by @Zylphrex
 - Serialize vars early to avoid living references (#3409) by @sl0thentr0py
-- feat(profiling): Add client sdk info to profile chunk (#3386) by @Zylphrex
-- Link to persistent banner in README (#3399) by @sentrivana
-- feat(integrations): Update StarliteIntegration to be more in line with new LitestarIntegration (#3384) by @KellyWalker
-- feat(integrations): Add litestar and starlite to get_sdk_name (#3385) by @KellyWalker
-- feat(integrations): Support Litestar (#2413) (#3358) by @KellyWalker
+- Deprecate hub-based `sessions.py` logic (#3419) by @szokeasaurusrex
+- Deprecate `is_auto_session_tracking_enabled` (#3428) by @szokeasaurusrex
+- Add note to generated yaml files (#3423) by @sentrivana
+- Slim down PR template (#3382) by @sentrivana
 - Use new banner in readme (#3390) by @sentrivana
-- meta: Slim down PR template (#3382) by @sentrivana
 
 ## 2.12.0
 
