@@ -11,6 +11,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Removed
 
+- When setting span status, the HTTP status code is no longer automatically added as a tag.
+
 ### Deprecated
 
 

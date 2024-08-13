@@ -1564,10 +1564,6 @@ class POTelSpan:
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        self.set_tag(
-            "http.status_code", str(http_status)
-        )  # we keep this for backwards compatibility
-        # XXX do we still need this? ^
         self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
         self.set_status(get_span_status_from_http_code(http_status))
 
