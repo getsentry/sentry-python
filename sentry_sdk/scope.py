@@ -1056,9 +1056,9 @@ class Scope(object):
             return span
 
     def continue_trace(
-        self, environ_or_headers, op=None, name=None, source=None, origin="manual"
+        self, environ_or_headers, op=None, name=None, source=None, origin=None
     ):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], Optional[str]) -> Transaction
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
