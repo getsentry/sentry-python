@@ -6,6 +6,7 @@ from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.sdk.trace import ReadableSpan
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.tracing import get_span_status_from_http_code
+from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 from urllib3.util import parse_url as urlparse
 
 from sentry_sdk.utils import Dsn
@@ -77,13 +78,17 @@ def convert_otel_timestamp(time):
 
 
 def extract_span_data(span):
-    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int]]
+    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int], Optional[str]]
     op = span.name
     description = span.name
     status, http_status = extract_span_status(span)
+    origin = None
 
     if span.attributes is None:
-        return (op, description, status, http_status)
+        return (op, description, status, http_status, origin)
+
+    origin = span.attributes.get(SentrySpanAttribute.ORIGIN)
+    description = span.attributes.get(SentrySpanAttribute.DESCRIPTION) or description
 
     http_method = span.attributes.get(SpanAttributes.HTTP_METHOD)
     http_method = cast("Optional[str]", http_method)
@@ -96,26 +101,21 @@ def extract_span_data(span):
 
     rpc_service = span.attributes.get(SpanAttributes.RPC_SERVICE)
     if rpc_service:
-        return ("rpc", description, status, http_status)
+        return ("rpc", description, status, http_status, origin)
 
     messaging_system = span.attributes.get(SpanAttributes.MESSAGING_SYSTEM)
     if messaging_system:
-        return ("message", description, status, http_status)
+        return ("message", description, status, http_status, origin)
 
     faas_trigger = span.attributes.get(SpanAttributes.FAAS_TRIGGER)
     if faas_trigger:
-        return (
-            str(faas_trigger),
-            description,
-            status,
-            http_status,
-        )
+        return (str(faas_trigger), description, status, http_status, origin)
 
-    return (op, description, status, http_status)
+    return (op, description, status, http_status, origin)
 
 
 def span_data_for_http_method(span):
-    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int]]
+    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int], Optional[str]]
     span_attributes = span.attributes or {}
 
     op = "http"
@@ -151,11 +151,13 @@ def span_data_for_http_method(span):
 
     status, http_status = extract_span_status(span)
 
-    return (op, description, status, http_status)
+    origin = span_attributes.get(SentrySpanAttribute.ORIGIN)
+
+    return (op, description, status, http_status, origin)
 
 
 def span_data_for_db_query(span):
-    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int]]
+    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int], Optional[str]]
     span_attributes = span.attributes or {}
 
     op = "db"
@@ -164,8 +166,9 @@ def span_data_for_db_query(span):
     statement = cast("Optional[str]", statement)
 
     description = statement or span.name
+    origin = span_attributes.get(SentrySpanAttribute.ORIGIN)
 
-    return (op, description, None, None)
+    return (op, description, None, None, origin)
 
 
 def extract_span_status(span):
