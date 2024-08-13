@@ -71,6 +71,25 @@ BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
+FALSY_ENV_VALUES = frozenset(("false", "n", "no", "off", "0"))
+TRUTHY_ENV_VALUES = frozenset(("true", "y", "yes", "on", "1"))
+
+
+def env_to_bool(value, *, strict=False):
+    # type: (Any, Optional[bool]) -> bool | None
+    """Casts an ENV variable value to boolean using the constants defined above.
+    In strict mode, it may return None if the value doesn't match any of the predefined values.
+    """
+    normalized = str(value).lower()
+
+    if normalized in FALSY_ENV_VALUES:
+        return False
+
+    if normalized in TRUTHY_ENV_VALUES:
+        return True
+
+    return None if strict else bool(value)
+
 
 def json_dumps(data):
     # type: (Any) -> bytes
