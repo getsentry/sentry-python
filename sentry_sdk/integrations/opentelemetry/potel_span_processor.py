@@ -137,19 +137,16 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
 
-        event = {
-            "type": "transaction",
-            "transaction": description,
-            # TODO-neel-potel tx source based on integration
-            "transaction_info": {"source": "custom"},
-            "contexts": contexts,
-            "start_timestamp": convert_from_otel_timestamp(span.start_time),
-            "timestamp": convert_from_otel_timestamp(span.end_time),
-        }  # type: Event
-
-        measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
-        if measurements:
-            event["measurements"] = measurements
+        event = self._span_to_json(span)
+        event.update(
+            {
+                "type": "transaction",
+                "transaction": description,
+                # TODO-neel-potel tx source based on integration
+                "transaction_info": {"source": "custom"},
+                "contexts": contexts,
+            }
+        )  # type: Event
 
         return event
 
