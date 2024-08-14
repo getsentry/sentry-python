@@ -137,7 +137,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
 
-        event = self._common_span_transaction_attributes_as_json(span)
+        event = span_json
         event.update(
             {
                 "type": "transaction",
