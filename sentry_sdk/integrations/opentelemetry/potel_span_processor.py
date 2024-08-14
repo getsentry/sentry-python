@@ -109,9 +109,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
         # type: (ReadableSpan) -> Optional[Event]
         if not span.context:
             return None
-        if not span.start_time:
-            return None
-        if not span.end_time:
+
+        span_json = self._common_span_transaction_attributes_as_json(span)
+        if span_json is None:
             return None
 
         trace_id = format_trace_id(span.context.trace_id)
@@ -154,9 +154,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
         # type: (ReadableSpan) -> Optional[dict[str, Any]]
         if not span.context:
             return None
-        if not span.start_time:
-            return None
-        if not span.end_time:
+
+        span_json = self._common_span_transaction_attributes_as_json(span)
+        if span_json is None:
             return None
 
         trace_id = format_trace_id(span.context.trace_id)
@@ -171,9 +171,25 @@ class PotelSentrySpanProcessor(SpanProcessor):
             "op": op,
             "description": description,
             "status": status,
+            "origin": origin or DEFAULT_SPAN_ORIGIN,
+        }  # type: dict[str, Any]
+
+        if parent_span_id:
+            span_json["parent_span_id"] = parent_span_id
+
+        if span.attributes:
+            span_json["data"] = dict(span.attributes)
+
+        return span_json
+
+    def _common_span_transaction_attributes_as_json(self, span):
+        # type: (ReadableSpan) -> Optional[dict[str, Any]]
+        if not span.start_time or not span.end_time:
+            return None
+
+        span_json = {
             "start_timestamp": convert_from_otel_timestamp(span.start_time),
             "timestamp": convert_from_otel_timestamp(span.end_time),
-            "origin": origin or DEFAULT_SPAN_ORIGIN,
         }  # type: dict[str, Any]
 
         measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
@@ -183,11 +199,5 @@ class PotelSentrySpanProcessor(SpanProcessor):
         tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
         if tags:
             span_json["tags"] = tags
-
-        if parent_span_id:
-            span_json["parent_span_id"] = parent_span_id
-
-        if span.attributes:
-            span_json["data"] = dict(span.attributes)
 
         return span_json
