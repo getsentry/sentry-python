@@ -14,9 +14,10 @@ SPAN_ORIGIN = "auto.otel"
 
 
 class SentrySpanAttribute:
-    # XXX better name
     # XXX not all of these need separate attributes, we might just use
     # existing otel attrs for some
     DESCRIPTION = "sentry.description"
     OP = "sentry.op"
     ORIGIN = "sentry.origin"
+    MEASUREMENT = "sentry.measurement"
+    TAG = "sentry.tag"

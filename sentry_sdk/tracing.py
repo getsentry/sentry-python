@@ -1466,9 +1466,15 @@ class POTelSpan:
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        self.set_attribute(f"{SentrySpanAttribute.TAG}.{key}", value)
 
     def set_data(self, key, value):
+        # type: (str, Any) -> None
+        self.set_attribute(key, value)
+
+    def set_attribute(self, key, value):
         # type: (str, Any) -> None
         self._otel_span.set_attribute(key, value)
 
@@ -1485,10 +1491,12 @@ class POTelSpan:
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        # XXX own namespace, e.g. sentry.measurement.xxx, so that we can group
-        # these back together in the processor?
-        # XXX otel throws a warning about value, unit being different types
-        self._otel_span.set_attribute(name, (value, unit))
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        # Stringify value here since OTel expects all seq items to be of one type
+        self.set_attribute(
+            f"{SentrySpanAttribute.MEASUREMENT}.{name}", (str(value), unit)
+        )
 
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None

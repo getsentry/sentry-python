@@ -14,7 +14,7 @@ from sentry_sdk.utils import Dsn
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, Mapping, Sequence, Union
+    from typing import Any, Optional, Mapping, Sequence, Union
 
 
 GRPC_ERROR_MAP = {
@@ -238,3 +238,25 @@ def get_http_status_code(span_attributes):
     http_status = cast("Optional[int]", http_status)
 
     return http_status
+
+
+def extract_span_attributes(span, namespace):
+    # type: (ReadableSpan, str) -> dict[str, Any]
+    """
+    Extract Sentry-specific span attributes and make them look the way Sentry expects.
+    """
+    extracted_attrs = {}
+
+    for attr, value in (span.attributes or {}).items():
+        if attr.startswith(namespace):
+            key = attr[len(namespace) + 1 :]
+
+            if namespace == SentrySpanAttribute.MEASUREMENT:
+                value = {
+                    "value": float(value[0]),
+                    "unit": value[1],
+                }
+
+            extracted_attrs[key] = value
+
+    return extracted_attrs

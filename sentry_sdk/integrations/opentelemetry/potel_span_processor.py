@@ -9,10 +9,12 @@ from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
     convert_from_otel_timestamp,
+    extract_span_attributes,
     extract_span_data,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,
+    SentrySpanAttribute,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -107,9 +109,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
         # type: (ReadableSpan) -> Optional[Event]
         if not span.context:
             return None
-        if not span.start_time:
-            return None
-        if not span.end_time:
+
+        event = self._common_span_transaction_attributes_as_json(span)
+        if event is None:
             return None
 
         trace_id = format_trace_id(span.context.trace_id)
@@ -135,15 +137,15 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
 
-        event = {
-            "type": "transaction",
-            "transaction": description,
-            # TODO-neel-potel tx source based on integration
-            "transaction_info": {"source": "custom"},
-            "contexts": contexts,
-            "start_timestamp": convert_from_otel_timestamp(span.start_time),
-            "timestamp": convert_from_otel_timestamp(span.end_time),
-        }  # type: Event
+        event.update(
+            {
+                "type": "transaction",
+                "transaction": description,
+                # TODO-neel-potel tx source based on integration
+                "transaction_info": {"source": "custom"},
+                "contexts": contexts,
+            }
+        )  # type: Event
 
         return event
 
@@ -151,9 +153,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
         # type: (ReadableSpan) -> Optional[dict[str, Any]]
         if not span.context:
             return None
-        if not span.start_time:
-            return None
-        if not span.end_time:
+
+        span_json = self._common_span_transaction_attributes_as_json(span)
+        if span_json is None:
             return None
 
         trace_id = format_trace_id(span.context.trace_id)
@@ -162,20 +164,41 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         (op, description, status, _, origin) = extract_span_data(span)
 
-        span_json = {
-            "trace_id": trace_id,
-            "span_id": span_id,
-            "op": op,
-            "description": description,
-            "status": status,
-            "start_timestamp": convert_from_otel_timestamp(span.start_time),
-            "timestamp": convert_from_otel_timestamp(span.end_time),
-            "origin": origin or DEFAULT_SPAN_ORIGIN,
-        }  # type: dict[str, Any]
+        span_json.update(
+            {
+                "trace_id": trace_id,
+                "span_id": span_id,
+                "op": op,
+                "description": description,
+                "status": status,
+                "origin": origin or DEFAULT_SPAN_ORIGIN,
+            }
+        )
 
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id
+
         if span.attributes:
             span_json["data"] = dict(span.attributes)
 
         return span_json
+
+    def _common_span_transaction_attributes_as_json(self, span):
+        # type: (ReadableSpan) -> Optional[dict[str, Any]]
+        if not span.start_time or not span.end_time:
+            return None
+
+        common_json = {
+            "start_timestamp": convert_from_otel_timestamp(span.start_time),
+            "timestamp": convert_from_otel_timestamp(span.end_time),
+        }  # type: dict[str, Any]
+
+        measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
+        if measurements:
+            common_json["measurements"] = measurements
+
+        tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
+        if tags:
+            common_json["tags"] = tags
+
+        return common_json
