@@ -110,8 +110,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if not span.context:
             return None
 
-        span_json = self._common_span_transaction_attributes_as_json(span)
-        if span_json is None:
+        common_span_json = self._common_span_transaction_attributes_as_json(span)
+        if common_span_json is None:
             return None
 
         trace_id = format_trace_id(span.context.trace_id)
@@ -137,7 +137,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
 
-        event = span_json
+        event = common_span_json
         event.update(
             {
                 "type": "transaction",
@@ -155,8 +155,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if not span.context:
             return None
 
-        span_json = self._common_span_transaction_attributes_as_json(span)
-        if span_json is None:
+        common_span_json = self._common_span_transaction_attributes_as_json(span)
+        if common_span_json is None:
             return None
 
         trace_id = format_trace_id(span.context.trace_id)
@@ -165,14 +165,17 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         (op, description, status, _, origin) = extract_span_data(span)
 
-        span_json = {
-            "trace_id": trace_id,
-            "span_id": span_id,
-            "op": op,
-            "description": description,
-            "status": status,
-            "origin": origin or DEFAULT_SPAN_ORIGIN,
-        }  # type: dict[str, Any]
+        span_json = common_span_json
+        span_json.update(
+            {
+                "trace_id": trace_id,
+                "span_id": span_id,
+                "op": op,
+                "description": description,
+                "status": status,
+                "origin": origin or DEFAULT_SPAN_ORIGIN,
+            }
+        )
 
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id
@@ -187,17 +190,17 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if not span.start_time or not span.end_time:
             return None
 
-        span_json = {
+        common_json = {
             "start_timestamp": convert_from_otel_timestamp(span.start_time),
             "timestamp": convert_from_otel_timestamp(span.end_time),
         }  # type: dict[str, Any]
 
         measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
         if measurements:
-            span_json["measurements"] = measurements
+            common_json["measurements"] = measurements
 
         tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
         if tags:
-            span_json["tags"] = tags
+            common_json["tags"] = tags
 
-        return span_json
+        return common_json
