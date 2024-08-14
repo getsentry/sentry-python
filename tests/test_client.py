@@ -894,6 +894,39 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     assert frame["vars"]["environ"] == {"a": "<This is me>"}
 
 
+def test_custom_repr_on_vars(sentry_init, capture_events):
+    class Foo:
+        pass
+
+    class Fail:
+        pass
+
+    def custom_repr(value):
+        if isinstance(value, Foo):
+            return "custom repr"
+        elif isinstance(value, Fail):
+            raise ValueError("oops")
+        else:
+            return None
+
+    sentry_init(custom_repr=custom_repr)
+    events = capture_events()
+
+    try:
+        my_vars = {"foo": Foo(), "fail": Fail(), "normal": 42}
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    (event,) = events
+    (exception,) = event["exception"]["values"]
+    (frame,) = exception["stacktrace"]["frames"]
+    my_vars = frame["vars"]["my_vars"]
+    assert my_vars["foo"] == "custom repr"
+    assert my_vars["normal"] == "42"
+    assert "Fail object" in my_vars["fail"]
+
+
 @pytest.mark.parametrize(
     "dsn",
     [

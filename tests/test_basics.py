@@ -21,7 +21,6 @@ from sentry_sdk import (
     add_breadcrumb,
     isolation_scope,
     new_scope,
-    Hub,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
@@ -800,21 +799,3 @@ def test_last_event_id_scope(sentry_init):
     # Should not crash
     with isolation_scope() as scope:
         assert scope.last_event_id() is None
-
-
-def test_hub_constructor_deprecation_warning():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
-        Hub()
-
-
-def test_hub_current_deprecation_warning():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning) as warning_records:
-        Hub.current
-
-    # Make sure we only issue one deprecation warning
-    assert len(warning_records) == 1
-
-
-def test_hub_main_deprecation_warnings():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
-        Hub.main

@@ -67,6 +67,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest"
+      - name: Test ray latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-ray-latest"
       - name: Test rq latest
         run: |
           set -x # print commands that are executed
@@ -139,6 +143,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey"
+      - name: Test ray pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-ray"
       - name: Test rq pinned
         run: |
           set -x # print commands that are executed
