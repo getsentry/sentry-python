@@ -44,7 +44,7 @@ from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -881,7 +881,7 @@ class _Client(BaseClient):
         self.close()
 
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a

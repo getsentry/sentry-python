@@ -11,7 +11,7 @@ from sentry_sdk.utils import (
     safe_repr,
     strip_string,
 )
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from types import TracebackType

@@ -6,7 +6,7 @@ import sentry_sdk
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import ensure_integration_enabled
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

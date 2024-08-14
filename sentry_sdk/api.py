@@ -10,7 +10,7 @@ from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
 
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

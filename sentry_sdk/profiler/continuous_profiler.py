@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from sentry_sdk.consts import VERSION
 from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.profiler.utils import (
     DEFAULT_SAMPLING_FREQUENCY,
     extract_stack,

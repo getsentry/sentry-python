@@ -2,7 +2,7 @@ from collections import OrderedDict
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name, record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized

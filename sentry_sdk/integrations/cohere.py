@@ -1,7 +1,7 @@
 from functools import wraps
 
 from sentry_sdk import consts
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized

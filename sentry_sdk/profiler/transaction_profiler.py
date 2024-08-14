@@ -39,7 +39,7 @@ from collections import deque
 
 import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.profiler.utils import (
     DEFAULT_SAMPLING_FREQUENCY,
     extract_stack,

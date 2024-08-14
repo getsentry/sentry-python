@@ -1,4 +1,4 @@
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,

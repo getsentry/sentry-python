@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
 from sentry_sdk.integrations import Integration, DidNotEnable

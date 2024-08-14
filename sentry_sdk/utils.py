@@ -26,7 +26,7 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY37
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:

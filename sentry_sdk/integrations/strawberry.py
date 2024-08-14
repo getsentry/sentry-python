@@ -15,7 +15,7 @@ from sentry_sdk.utils import (
     package_version,
     _get_installed_modules,
 )
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 try:
     from functools import cached_property

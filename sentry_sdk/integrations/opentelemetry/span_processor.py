@@ -24,7 +24,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
 from sentry_sdk.utils import Dsn
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from urllib3.util import parse_url as urlparse
 

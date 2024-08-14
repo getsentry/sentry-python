@@ -4,7 +4,7 @@ Instrumentation for Redis
 https://github.com/redis/redis-py
 """
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,

@@ -33,7 +33,7 @@ try:
 except ImportError:
     raise DidNotEnable("Tornado not installed")
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

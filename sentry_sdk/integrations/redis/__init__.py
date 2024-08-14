@@ -1,4 +1,4 @@
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.redis.consts import _DEFAULT_MAX_DATA_SIZE
 from sentry_sdk.integrations.redis.rb import _patch_rb

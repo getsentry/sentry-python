@@ -2,7 +2,7 @@ import os
 from collections import deque
 
 from sentry_sdk._compat import PY311
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.utils import filename_for_module
 
 if TYPE_CHECKING:

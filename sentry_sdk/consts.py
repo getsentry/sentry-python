@@ -1,7 +1,7 @@
 import itertools
 
 from enum import Enum
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024

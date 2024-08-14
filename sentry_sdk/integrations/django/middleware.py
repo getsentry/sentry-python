@@ -7,7 +7,7 @@ from functools import wraps
 from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
     ContextVar,

@@ -10,7 +10,7 @@ from copy import deepcopy
 from functools import partial
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 

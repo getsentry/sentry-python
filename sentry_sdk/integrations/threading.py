@@ -3,7 +3,7 @@ from functools import wraps
 from threading import Thread, current_thread
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (

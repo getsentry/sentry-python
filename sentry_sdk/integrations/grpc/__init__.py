@@ -6,7 +6,7 @@ from grpc.aio import Channel as AsyncChannel
 from grpc.aio import Server as AsyncServer
 
 from sentry_sdk.integrations import Integration
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from .client import ClientInterceptor
 from .server import ServerInterceptor

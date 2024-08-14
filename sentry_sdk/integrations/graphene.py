@@ -10,7 +10,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
 )
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 
 try:

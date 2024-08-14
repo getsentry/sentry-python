@@ -4,7 +4,7 @@ from threading import Thread, Lock
 
 import sentry_sdk
 from sentry_sdk.utils import logger
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional
