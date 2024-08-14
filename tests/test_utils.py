@@ -12,6 +12,7 @@ from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    env_to_bool,
     get_current_thread_meta,
     get_default_release,
     get_error_message,
@@ -57,6 +58,77 @@ def _normalize_distribution_name(name):
     for more details.
     """
     return re.sub(r"[-_.]+", "-", name).lower()
+
+
+@pytest.mark.parametrize(
+    "env_var_value,strict,expected",
+    [
+        (None, True, None),
+        (None, False, False),
+        ("", True, None),
+        ("", False, False),
+        ("t", True, True),
+        ("T", True, True),
+        ("t", False, True),
+        ("T", False, True),
+        ("y", True, True),
+        ("Y", True, True),
+        ("y", False, True),
+        ("Y", False, True),
+        ("1", True, True),
+        ("1", False, True),
+        ("True", True, True),
+        ("True", False, True),
+        ("true", True, True),
+        ("true", False, True),
+        ("tRuE", True, True),
+        ("tRuE", False, True),
+        ("Yes", True, True),
+        ("Yes", False, True),
+        ("yes", True, True),
+        ("yes", False, True),
+        ("yEs", True, True),
+        ("yEs", False, True),
+        ("On", True, True),
+        ("On", False, True),
+        ("on", True, True),
+        ("on", False, True),
+        ("oN", True, True),
+        ("oN", False, True),
+        ("f", True, False),
+        ("f", False, False),
+        ("n", True, False),
+        ("N", True, False),
+        ("n", False, False),
+        ("N", False, False),
+        ("0", True, False),
+        ("0", False, False),
+        ("False", True, False),
+        ("False", False, False),
+        ("false", True, False),
+        ("false", False, False),
+        ("FaLsE", True, False),
+        ("FaLsE", False, False),
+        ("No", True, False),
+        ("No", False, False),
+        ("no", True, False),
+        ("no", False, False),
+        ("nO", True, False),
+        ("nO", False, False),
+        ("Off", True, False),
+        ("Off", False, False),
+        ("off", True, False),
+        ("off", False, False),
+        ("oFf", True, False),
+        ("oFf", False, False),
+        ("xxx", True, None),
+        ("xxx", False, True),
+    ],
+)
+def test_env_to_bool(env_var_value, strict, expected):
+    assert (
+        env_to_bool(env_var_value, strict=strict) == expected
+    ), f"Value: {env_var_value}, strict: {strict}"
 
 
 @pytest.mark.parametrize(
