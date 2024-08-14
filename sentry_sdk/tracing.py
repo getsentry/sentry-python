@@ -1472,9 +1472,7 @@ class POTelSpan:
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
-        self.set_attribute(f"{SentrySpanAttribute.DATA}.{key}", value)
+        self.set_attribute(key, value)
 
     def set_attribute(self, key, value):
         # type: (str, Any) -> None

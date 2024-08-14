@@ -180,10 +180,6 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if measurements:
             span_json["measurements"] = measurements
 
-        data = extract_span_attributes(span, SentrySpanAttribute.DATA)
-        if data:
-            span_json["data"] = data
-
         tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
         if tags:
             span_json["tags"] = tags
