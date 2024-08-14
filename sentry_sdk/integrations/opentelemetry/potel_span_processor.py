@@ -110,8 +110,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if not span.context:
             return None
 
-        common_span_json = self._common_span_transaction_attributes_as_json(span)
-        if common_span_json is None:
+        event = self._common_span_transaction_attributes_as_json(span)
+        if event is None:
             return None
 
         trace_id = format_trace_id(span.context.trace_id)
@@ -137,7 +137,6 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
 
-        event = common_span_json
         event.update(
             {
                 "type": "transaction",
@@ -155,8 +154,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if not span.context:
             return None
 
-        common_span_json = self._common_span_transaction_attributes_as_json(span)
-        if common_span_json is None:
+        span_json = self._common_span_transaction_attributes_as_json(span)
+        if span_json is None:
             return None
 
         trace_id = format_trace_id(span.context.trace_id)
@@ -165,7 +164,6 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         (op, description, status, _, origin) = extract_span_data(span)
 
-        span_json = common_span_json
         span_json.update(
             {
                 "trace_id": trace_id,
