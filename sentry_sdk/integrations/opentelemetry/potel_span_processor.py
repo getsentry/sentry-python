@@ -9,10 +9,12 @@ from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
     convert_from_otel_timestamp,
+    extract_span_attributes,
     extract_span_data,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,
+    SentrySpanAttribute,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -145,6 +147,10 @@ class PotelSentrySpanProcessor(SpanProcessor):
             "timestamp": convert_from_otel_timestamp(span.end_time),
         }  # type: Event
 
+        measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
+        if measurements:
+            event["measurements"] = measurements
+
         return event
 
     def _span_to_json(self, span):
@@ -173,8 +179,21 @@ class PotelSentrySpanProcessor(SpanProcessor):
             "origin": origin or DEFAULT_SPAN_ORIGIN,
         }  # type: dict[str, Any]
 
+        measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
+        if measurements:
+            span_json["measurements"] = measurements
+
+        data = extract_span_attributes(span, SentrySpanAttribute.DATA)
+        if data:
+            span_json["data"] = data
+
+        tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
+        if tags:
+            span_json["tags"] = tags
+
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id
+
         if span.attributes:
             span_json["data"] = dict(span.attributes)
 
