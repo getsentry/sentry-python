@@ -2,8 +2,9 @@ import os
 from collections import deque
 
 from sentry_sdk._compat import PY311
-from typing import TYPE_CHECKING
 from sentry_sdk.utils import filename_for_module
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk._lru_cache import LRUCache

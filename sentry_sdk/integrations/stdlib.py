@@ -18,6 +18,7 @@ from sentry_sdk.utils import (
     safe_repr,
     parse_url,
 )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

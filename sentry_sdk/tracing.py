@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
 )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

@@ -1,10 +1,11 @@
 from functools import wraps
 
 from sentry_sdk import consts
-from typing import TYPE_CHECKING
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator

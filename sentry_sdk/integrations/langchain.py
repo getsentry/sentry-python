@@ -2,18 +2,19 @@ from collections import OrderedDict
 from functools import wraps
 
 import sentry_sdk
-from typing import TYPE_CHECKING
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name, record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.utils import logger, capture_internal_exceptions
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, List, Callable, Dict, Union, Optional
     from uuid import UUID
-from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import logger, capture_internal_exceptions
 
 try:
     from langchain_core.messages import BaseMessage

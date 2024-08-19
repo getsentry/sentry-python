@@ -5,7 +5,6 @@ import weakref
 from importlib import import_module
 
 import sentry_sdk
-from typing import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
@@ -68,6 +67,7 @@ if DJANGO_VERSION[:2] > (1, 8):
 else:
     patch_caching = None  # type: ignore
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

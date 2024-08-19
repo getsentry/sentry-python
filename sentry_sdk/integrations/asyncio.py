@@ -3,7 +3,6 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
-from typing import TYPE_CHECKING
 from sentry_sdk.utils import event_from_exception, reraise
 
 try:
@@ -12,6 +11,7 @@ try:
 except ImportError:
     raise DidNotEnable("asyncio not available")
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

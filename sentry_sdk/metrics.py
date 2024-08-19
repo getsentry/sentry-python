@@ -27,6 +27,7 @@ from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_TASK,
 )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

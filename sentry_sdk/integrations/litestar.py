@@ -1,5 +1,4 @@
 import sentry_sdk
-from typing import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -20,6 +19,9 @@ try:
     from litestar.data_extractors import ConnectionDataExtractor  # type: ignore
 except ImportError:
     raise DidNotEnable("Litestar is not installed")
+
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
     from litestar.types.asgi_types import ASGIApp  # type: ignore

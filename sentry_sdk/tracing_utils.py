@@ -23,6 +23,7 @@ from sentry_sdk.utils import (
     _is_external_source,
     _module_in_list,
 )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

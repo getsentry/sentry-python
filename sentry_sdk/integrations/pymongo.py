@@ -8,12 +8,12 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
-from typing import TYPE_CHECKING
-
 try:
     from pymongo import monitoring
 except ImportError:
     raise DidNotEnable("Pymongo not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Union

@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from threading import Lock
 
-from typing import TYPE_CHECKING
 from sentry_sdk.utils import logger
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

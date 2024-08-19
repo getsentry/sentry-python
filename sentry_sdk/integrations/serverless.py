@@ -3,6 +3,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.utils import event_from_exception, reraise
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -11,7 +12,6 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Union
     from typing import Optional
-
     from typing import overload
 
     F = TypeVar("F", bound=Callable[..., Any])

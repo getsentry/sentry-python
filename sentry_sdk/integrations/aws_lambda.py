@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

@@ -7,8 +7,9 @@ from contextlib import contextmanager
 import sentry_sdk
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.session import Session
-from typing import TYPE_CHECKING
 from sentry_sdk.utils import format_timestamp
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

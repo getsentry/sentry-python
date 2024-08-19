@@ -3,6 +3,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     iter_event_frames,
 )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

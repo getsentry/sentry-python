@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
     parse_version,
     reraise,
 )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

@@ -9,7 +9,6 @@ from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
 
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

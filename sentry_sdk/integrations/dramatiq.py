@@ -2,7 +2,6 @@ import json
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
-from typing import TYPE_CHECKING
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -14,6 +13,8 @@ from dramatiq.broker import Broker  # type: ignore
 from dramatiq.message import Message  # type: ignore
 from dramatiq.middleware import Middleware, default_middleware  # type: ignore
 from dramatiq.errors import Retry  # type: ignore
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, Union

@@ -5,9 +5,10 @@ from django.utils.safestring import mark_safe
 from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
-from typing import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import ensure_integration_enabled
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

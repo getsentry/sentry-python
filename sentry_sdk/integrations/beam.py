@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     reraise,
 )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

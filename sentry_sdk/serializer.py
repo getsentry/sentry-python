@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
     safe_repr,
     strip_string,
 )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

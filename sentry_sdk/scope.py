@@ -26,7 +26,6 @@ from sentry_sdk.tracing import (
     Span,
     Transaction,
 )
-from typing import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
     capture_internal_exceptions,
@@ -36,6 +35,8 @@ from sentry_sdk.utils import (
     exc_info_from_error,
     logger,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping

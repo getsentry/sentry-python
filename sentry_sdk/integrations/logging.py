@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 from sentry_sdk.integrations import Integration
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

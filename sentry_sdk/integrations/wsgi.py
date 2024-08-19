@@ -2,7 +2,6 @@ import sys
 from functools import partial
 
 import sentry_sdk
-from typing import TYPE_CHECKING
 from sentry_sdk._werkzeug import get_host, _get_headers
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
@@ -17,6 +16,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     reraise,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Callable
