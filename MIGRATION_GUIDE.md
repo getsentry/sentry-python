@@ -9,6 +9,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Changed
 
+- The SDK now supports Python 3.7 and higher.
+- `sentry_sdk.start_span` now only takes keyword arguments.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
@@ -16,15 +18,17 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Removed
 
+- When setting span status, the HTTP status code is no longer automatically added as a tag.
 - Class `Hub` has been removed.
 - Class `_ScopeManager` has been removed.
 - The context manager `auto_session_tracking()` has been removed. Use `track_session()` instead.
 - The context manager `auto_session_tracking_scope()` has been removed. Use `track_session()` instead.
-- Utility function `is_auto_session_tracking_enabled()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function) It accepts a `scope` parameter instead of the previously used `hub` parameter. 
+- Utility function `is_auto_session_tracking_enabled()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function) It accepts a `scope` parameter instead of the previously used `hub` parameter.
 - Utility function `is_auto_session_tracking_enabled_scope()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function)
 
 ### Deprecated
 
+- `sentry_sdk.start_transaction` is deprecated. Use `sentry_sdk.start_span` instead.
 
 ## Upgrading to 2.0
 

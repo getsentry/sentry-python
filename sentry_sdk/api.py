@@ -2,10 +2,15 @@ import inspect
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
-from sentry_sdk.scope import Scope, new_scope, isolation_scope
-from sentry_sdk.tracing import NoOpSpan, Transaction, trace
+from sentry_sdk.tracing import POTelSpan, Transaction, trace
 from sentry_sdk.crons import monitor
 
+# TODO-neel-potel make 2 scope strategies/impls and switch
+from sentry_sdk.integrations.opentelemetry.scope import (
+    PotelScope as Scope,
+    new_scope,
+    isolation_scope,
+)
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -227,22 +232,40 @@ def flush(
     return get_client().flush(timeout=timeout, callback=callback)
 
 
-@scopemethod
 def start_span(
+    *,
+    span=None,
+    custom_sampling_context=None,
     **kwargs,  # type: Any
 ):
-    # type: (...) -> Span
-    return get_current_scope().start_span(**kwargs)
+    # type: (...) -> POTelSpan
+    """
+    Start and return a span.
+
+    This is the entry point to manual tracing instrumentation.
+
+    A tree structure can be built by adding child spans to the span.
+    To start a new child span within the span, call the `start_child()` method.
+
+    When used as a context manager, spans are automatically finished at the end
+    of the `with` block. If not using context managers, call the `finish()`
+    method.
+    """
+    # TODO: Consider adding type hints to the method signature.
+    return get_current_scope().start_span(span, custom_sampling_context, **kwargs)
 
 
-@scopemethod
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
     custom_sampling_context=None,  # type: Optional[SamplingContext]
     **kwargs,  # type: Unpack[TransactionKwargs]
 ):
-    # type: (...) -> Union[Transaction, NoOpSpan]
+    # type: (...) -> POTelSpan
     """
+    .. deprecated:: 3.0.0
+        This function is deprecated and will be removed in a future release.
+        Use :py:meth:`sentry_sdk.start_span` instead.
+
     Start and return a transaction on the current scope.
 
     Start an existing transaction if given, otherwise create and start a new
@@ -271,8 +294,10 @@ def start_transaction(
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
-    return get_current_scope().start_transaction(
-        transaction, custom_sampling_context, **kwargs
+    return start_span(
+        span=transaction,
+        custom_sampling_context=custom_sampling_context,
+        **kwargs,
     )
 
 
@@ -311,10 +336,8 @@ def get_baggage():
     return None
 
 
-def continue_trace(
-    environ_or_headers, op=None, name=None, source=None, origin="manual"
-):
-    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+def continue_trace(environ_or_headers, op=None, name=None, source=None, origin=None):
+    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], Optional[str]) -> Transaction
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """

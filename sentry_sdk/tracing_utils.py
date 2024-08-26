@@ -112,7 +112,7 @@ def record_sql_queries(
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
     record_cursor_repr=False,  # type: bool
-    span_origin="manual",  # type: str
+    span_origin=None,  # type: Optional[str]
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
@@ -687,7 +687,7 @@ def start_child_span_decorator(func):
 
 
 def get_current_span(scope=None):
-    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[sentry_sdk.tracing.Span]
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -702,6 +702,3 @@ from sentry_sdk.tracing import (
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span

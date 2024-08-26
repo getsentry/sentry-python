@@ -67,8 +67,8 @@ def get_request_url(environ, use_x_forwarded_for=False):
 class SentryWsgiMiddleware:
     __slots__ = ("app", "use_x_forwarded_for", "span_origin")
 
-    def __init__(self, app, use_x_forwarded_for=False, span_origin="manual"):
-        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool, str) -> None
+    def __init__(self, app, use_x_forwarded_for=False, span_origin=None):
+        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool, Optional[str]) -> None
         self.app = app
         self.use_x_forwarded_for = use_x_forwarded_for
         self.span_origin = span_origin

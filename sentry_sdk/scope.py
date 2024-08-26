@@ -25,6 +25,7 @@ from sentry_sdk.tracing import (
     NoOpSpan,
     Span,
     Transaction,
+    POTelSpan,
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
@@ -234,12 +235,20 @@ class Scope(object):
 
         Returns the current scope.
         """
-        current_scope = _current_scope.get()
+        current_scope = cls._get_current_scope()
         if current_scope is None:
             current_scope = Scope(ty=ScopeType.CURRENT)
             _current_scope.set(current_scope)
 
         return current_scope
+
+    @classmethod
+    def _get_current_scope(cls):
+        # type: () -> Optional[Scope]
+        """
+        Returns the current scope without creating a new one. Internal use only.
+        """
+        return _current_scope.get()
 
     @classmethod
     def set_current_scope(cls, new_current_scope):
@@ -260,12 +269,20 @@ class Scope(object):
 
         Returns the isolation scope.
         """
-        isolation_scope = _isolation_scope.get()
+        isolation_scope = cls._get_isolation_scope()
         if isolation_scope is None:
             isolation_scope = Scope(ty=ScopeType.ISOLATION)
             _isolation_scope.set(isolation_scope)
 
         return isolation_scope
+
+    @classmethod
+    def _get_isolation_scope(cls):
+        # type: () -> Optional[Scope]
+        """
+        Returns the isolation scope without creating a new one. Internal use only.
+        """
+        return _isolation_scope.get()
 
     @classmethod
     def set_isolation_scope(cls, new_isolation_scope):
@@ -321,13 +338,11 @@ class Scope(object):
         final_scope = copy(_global_scope) if _global_scope is not None else Scope()
         final_scope._type = ScopeType.MERGED
 
-        isolation_scope = _isolation_scope.get()
-        if isolation_scope is not None:
-            final_scope.update_from_scope(isolation_scope)
+        isolation_scope = self.get_isolation_scope()
+        final_scope.update_from_scope(isolation_scope)
 
-        current_scope = _current_scope.get()
-        if current_scope is not None:
-            final_scope.update_from_scope(current_scope)
+        current_scope = self.get_current_scope()
+        final_scope.update_from_scope(current_scope)
 
         if self != current_scope and self != isolation_scope:
             final_scope.update_from_scope(self)
@@ -353,7 +368,7 @@ class Scope(object):
         This checks the current scope, the isolation scope and the global scope for a client.
         If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
         """
-        current_scope = _current_scope.get()
+        current_scope = cls._get_current_scope()
         try:
             client = current_scope.client
         except AttributeError:
@@ -362,7 +377,7 @@ class Scope(object):
         if client is not None and client.is_active():
             return client
 
-        isolation_scope = _isolation_scope.get()
+        isolation_scope = cls._get_isolation_scope()
         try:
             client = isolation_scope.client
         except AttributeError:
@@ -661,23 +676,6 @@ class Scope(object):
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id = None  # type: Optional[str]
 
-    @_attr_setter
-    def level(self, value):
-        # type: (LogLevelStr) -> None
-        """
-        When set this overrides the level.
-
-        .. deprecated:: 1.0.0
-            Use :func:`set_level` instead.
-
-        :param value: The level to set.
-        """
-        logger.warning(
-            "Deprecated: use .set_level() instead. This will be removed in the future."
-        )
-
-        self._level = value
-
     def set_level(self, value):
         # type: (LogLevelStr) -> None
         """
@@ -766,11 +764,12 @@ class Scope(object):
     @property
     def span(self):
         # type: () -> Optional[Span]
-        """Get/set current tracing span or transaction."""
+        """Get current tracing span."""
         return self._span
 
     @span.setter
     def span(self, span):
+        """Set current tracing span."""
         # type: (Optional[Span]) -> None
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
@@ -943,6 +942,10 @@ class Scope(object):
     ):
         # type: (Optional[Transaction], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
+        .. deprecated:: 3.0.0
+            This function is deprecated and will be removed in a future release.
+            Use :py:meth:`sentry_sdk.start_span` instead.
+
         Start and return a transaction.
 
         Start an existing transaction if given, otherwise create and start a new
@@ -973,19 +976,12 @@ class Scope(object):
         """
         kwargs.setdefault("scope", self)
 
-        client = self.get_client()
-
         try_autostart_continuous_profiler()
 
         custom_sampling_context = custom_sampling_context or {}
 
-        # kwargs at this point has type TransactionKwargs, since we have removed
-        # the client and custom_sampling_context from it.
-        transaction_kwargs = kwargs  # type: TransactionKwargs
-
         # if we haven't been given a transaction, make one
-        if transaction is None:
-            transaction = Transaction(**transaction_kwargs)
+        transaction = transaction or POTelSpan(**kwargs)
 
         # use traces_sample_rate, traces_sampler, and/or inheritance to make a
         # sampling decision
@@ -1004,39 +1000,24 @@ class Scope(object):
 
             transaction._profile = profile
 
-            # we don't bother to keep spans if we already know we're not going to
-            # send the transaction
-            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
-
         return transaction
 
-    def start_span(self, **kwargs):
-        # type: (Any) -> Span
+    def start_span(self, span=None, custom_sampling_context=None, **kwargs):
+        # type: (Optional[Span], Optional[SamplingContext], Any) -> Span
         """
-        Start a span whose parent is the currently active span or transaction, if any.
+        Start a span whose parent is the currently active span, if any.
 
         The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
         typically used as a context manager to start and stop timing in a `with`
         block.
 
-        Only spans contained in a transaction are sent to Sentry. Most
-        integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use
-        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
-        one is not already in progress.
-
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
-
-        The instrumenter parameter is deprecated for user code, and it will
-        be removed in the next major version. Going forward, it should only
-        be used by the SDK itself.
         """
         with new_scope():
             kwargs.setdefault("scope", self)
 
             # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
+            span = span or self.span or self.get_isolation_scope().span
 
             if span is None:
                 # New spans get the `trace_id` from the scope
@@ -1045,7 +1026,7 @@ class Scope(object):
                     if propagation_context is not None:
                         kwargs["trace_id"] = propagation_context.trace_id
 
-                span = Span(**kwargs)
+                span = POTelSpan(**kwargs)
             else:
                 # Children take `trace_id`` from the parent span.
                 span = span.start_child(**kwargs)
@@ -1053,9 +1034,9 @@ class Scope(object):
             return span
 
     def continue_trace(
-        self, environ_or_headers, op=None, name=None, source=None, origin="manual"
+        self, environ_or_headers, op=None, name=None, source=None, origin=None
     ):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], Optional[str]) -> Transaction
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
@@ -1349,8 +1330,8 @@ class Scope(object):
 
         if not is_check_in:
             # Get scopes without creating them to prevent infinite recursion
-            isolation_scope = _isolation_scope.get()
-            current_scope = _current_scope.get()
+            isolation_scope = self._get_isolation_scope()
+            current_scope = self._get_current_scope()
 
             event_processors = chain(
                 global_event_processors,
