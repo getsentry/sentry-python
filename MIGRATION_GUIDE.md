@@ -15,6 +15,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
 - A `Profile` object does not have a `.hub` property anymore.
+- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
 
 ### Removed
 
