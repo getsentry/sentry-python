@@ -12,6 +12,9 @@ from sentry_sdk.utils import logger
 from sentry_sdk.envelope import Envelope
 
 
+DEFAULT_SPOTLIGHT_URL = "http://localhost:8969/stream"
+
+
 class SpotlightClient:
     def __init__(self, url):
         # type: (str) -> None
@@ -51,7 +54,7 @@ def setup_spotlight(options):
     if isinstance(url, str):
         pass
     elif url is True:
-        url = "http://localhost:8969/stream"
+        url = DEFAULT_SPOTLIGHT_URL
     else:
         return None
 
