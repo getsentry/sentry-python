@@ -12,7 +12,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Tuple, Optional, Generator
+    from typing import Tuple, Optional, Generator, Dict, Any
 
 
 class PotelScope(Scope):
@@ -57,6 +57,14 @@ class PotelScope(Scope):
         """
         scopes = cls._get_scopes()
         return scopes[1] if scopes else None
+
+    @contextmanager
+    def continue_trace(self, environ_or_headers):
+        # type: (Dict[str, Any]) -> Generator[None, None, None]
+        with new_scope() as scope:
+            scope.generate_propagation_context(environ_or_headers)
+            # TODO-neel-potel add remote span on context
+            yield
 
 
 _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
