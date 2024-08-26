@@ -47,8 +47,15 @@ def is_auto_session_tracking_enabled(hub=None):
 @contextmanager
 def auto_session_tracking(hub=None, session_mode="application"):
     # type: (Optional[sentry_sdk.Hub], str) -> Generator[None, None, None]
-    """Starts and stops a session automatically around a block."""
-    # TODO: add deprecation warning
+    """DEPRECATED: Use track_session instead
+    Starts and stops a session automatically around a block.
+    """
+    warnings.warn(
+        "This function is deprecated and will be removed in the next major release. "
+        "Use track_session instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     if hub is None:
         hub = sentry_sdk.Hub.current
@@ -98,13 +105,28 @@ def _is_auto_session_tracking_enabled(scope):
 @contextmanager
 def auto_session_tracking_scope(scope, session_mode="application"):
     # type: (sentry_sdk.Scope, str) -> Generator[None, None, None]
-    """
+    """DEPRECATED: This function is a deprecated alias for track_session.
     Starts and stops a session automatically around a block.
-
-    TODO: This uses the new scopes. When the Hub is removed, the function
-    auto_session_tracking should be removed and this function
-    should be renamed to auto_session_tracking.
     """
+
+    warnings.warn(
+        "This function is a deprecated alias for track_session and will be removed in the next major release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    with track_session(scope, session_mode=session_mode):
+        yield
+
+
+@contextmanager
+def track_session(scope, session_mode="application"):
+    # type: (sentry_sdk.Scope, str) -> Generator[None, None, None]
+    """
+    Start a new session in the provided scope, assuming session tracking is enabled.
+    This is a no-op context manager if session tracking is not enabled.
+    """
+
     should_track = _is_auto_session_tracking_enabled(scope)
     if should_track:
         scope.start_session(session_mode=session_mode)

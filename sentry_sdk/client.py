@@ -9,8 +9,10 @@ from typing import cast
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
+    ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
+    env_to_bool,
     format_timestamp,
     get_sdk_name,
     get_type_name,
@@ -30,7 +32,6 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
-from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -104,11 +105,7 @@ def _get_options(*args, **kwargs):
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
     if rv["debug"] is None:
-        rv["debug"] = os.environ.get("SENTRY_DEBUG", "False").lower() in (
-            "true",
-            "1",
-            "t",
-        )
+        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG", "False"), strict=True)
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -375,6 +372,16 @@ class _Client(BaseClient):
             )
 
             self.spotlight = None
+            spotlight_config = self.options.get("spotlight")
+            if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
+                spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
+                spotlight_config = env_to_bool(spotlight_env_value, strict=True)
+                self.options["spotlight"] = (
+                    spotlight_config
+                    if spotlight_config is not None
+                    else spotlight_env_value
+                )
+
             if self.options.get("spotlight"):
                 self.spotlight = setup_spotlight(self.options)
 
@@ -531,6 +538,7 @@ class _Client(BaseClient):
                     cast("Dict[str, Any]", event),
                     max_request_body_size=self.options.get("max_request_body_size"),
                     max_value_length=self.options.get("max_value_length"),
+                    custom_repr=self.options.get("custom_repr"),
                 ),
             )
 
