@@ -220,13 +220,13 @@ def add_query_source(span):
             "sentry_sdk."
         )
 
-        should_be_included = not _is_external_source(abs_path)
-        if _module_in_list(namespace, in_app_exclude):
-            should_be_included = False
-        if _module_in_list(namespace, in_app_include):
-            # in_app_include takes precedence over in_app_exclude, so doing it
-            # at the end
-            should_be_included = True
+        # in_app_include takes precedence over in_app_exclude
+        should_be_included = (
+            not (
+                _is_external_source(abs_path)
+                or _module_in_list(namespace, in_app_exclude)
+            )
+        ) or _module_in_list(namespace, in_app_include)
 
         if (
             _is_in_project_root(abs_path, project_root)
