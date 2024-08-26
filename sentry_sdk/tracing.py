@@ -89,7 +89,7 @@ if TYPE_CHECKING:
         scope: "sentry_sdk.Scope"
         """The scope to use for this span. If not provided, we use the current scope."""
 
-        origin: str
+        origin: Optional[str]
         """
         The origin of the span.
         See https://develop.sentry.dev/sdk/performance/trace-origin/
@@ -1401,6 +1401,32 @@ class POTelSpan:
         # type: (str) -> None
         pass
 
+    @property
+    def start_timestamp(self):
+        # type: () -> Optional[datetime]
+        start_time = self._otel_span.start_time
+        if start_time is None:
+            return None
+
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            convert_from_otel_timestamp,
+        )
+
+        return convert_from_otel_timestamp(start_time)
+
+    @property
+    def timestamp(self):
+        # type: () -> Optional[datetime]
+        end_time = self._otel_span.end_time
+        if end_time is None:
+            return None
+
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            convert_from_otel_timestamp,
+        )
+
+        return convert_from_otel_timestamp(end_time)
+
     def start_child(self, **kwargs):
         # type: (str, **Any) -> POTelSpan
         kwargs.setdefault("sampled", self.sampled)
@@ -1485,7 +1511,7 @@ class POTelSpan:
             otel_description = None
         else:
             otel_status = StatusCode.ERROR
-            otel_description = status.value
+            otel_description = status
 
         self._otel_span.set_status(otel_status, otel_description)
 

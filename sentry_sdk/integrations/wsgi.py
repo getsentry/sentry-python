@@ -91,26 +91,25 @@ class SentryWsgiMiddleware:
                             )
                         )
 
-                    transaction = continue_trace(
-                        environ,
-                        op=OP.HTTP_SERVER,
-                        name="generic WSGI request",
-                        source=TRANSACTION_SOURCE_ROUTE,
-                        origin=self.span_origin,
-                    )
-
-                    with sentry_sdk.start_transaction(
-                        transaction, custom_sampling_context={"wsgi_environ": environ}
-                    ):
-                        try:
-                            response = self.app(
-                                environ,
-                                partial(
-                                    _sentry_start_response, start_response, transaction
-                                ),
-                            )
-                        except BaseException:
-                            reraise(*_capture_exception())
+                    with continue_trace(environ):
+                        with sentry_sdk.start_transaction(
+                            op=OP.HTTP_SERVER,
+                            name="generic WSGI request",
+                            source=TRANSACTION_SOURCE_ROUTE,
+                            origin=self.span_origin,
+                            custom_sampling_context={"wsgi_environ": environ},
+                        ) as transaction:
+                            try:
+                                response = self.app(
+                                    environ,
+                                    partial(
+                                        _sentry_start_response,
+                                        start_response,
+                                        transaction,
+                                    ),
+                                )
+                            except BaseException:
+                                reraise(*_capture_exception())
         finally:
             _wsgi_middleware_applied.set(False)
 

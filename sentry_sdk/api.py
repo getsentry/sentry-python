@@ -1,4 +1,5 @@
 import inspect
+from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import TypeVar
     from typing import Union
+    from typing import Generator
 
     from typing_extensions import Unpack
 
@@ -336,11 +338,10 @@ def get_baggage():
     return None
 
 
-def continue_trace(environ_or_headers, op=None, name=None, source=None, origin=None):
-    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], Optional[str]) -> Transaction
+@contextmanager
+def continue_trace(environ_or_headers):
+    # type: (Dict[str, Any]) -> Generator[None, None, None]
     """
-    Sets the propagation context from environment or headers and returns a transaction.
+    Sets the propagation context from environment or headers to continue an incoming trace.
     """
-    return get_isolation_scope().continue_trace(
-        environ_or_headers, op, name, source, origin
-    )
+    yield get_isolation_scope().continue_trace(environ_or_headers)
