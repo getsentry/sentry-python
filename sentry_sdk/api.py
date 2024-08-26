@@ -344,4 +344,5 @@ def continue_trace(environ_or_headers):
     """
     Sets the propagation context from environment or headers to continue an incoming trace.
     """
-    yield get_isolation_scope().continue_trace(environ_or_headers)
+    with get_isolation_scope().continue_trace(environ_or_headers):
+        yield
