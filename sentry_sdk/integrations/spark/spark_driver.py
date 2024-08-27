@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from typing import Optional
 
     from sentry_sdk._types import Event, Hint
+    from pyspark import SparkContext
 
 
 class SparkIntegration(Integration):
@@ -38,7 +39,7 @@ def _set_app_properties():
 
 
 def _start_sentry_listener(sc):
-    # type: (Any) -> None
+    # type: (SparkContext) -> None
     """
     Start java gateway server to add custom `SparkListener`
     """
@@ -51,7 +52,7 @@ def _start_sentry_listener(sc):
 
 
 def _add_event_processor(sc):
-    # type: (Any) -> None
+    # type: (SparkContext) -> None
     scope = sentry_sdk.get_isolation_scope()
 
     @scope.add_event_processor
@@ -88,7 +89,6 @@ def _add_event_processor(sc):
 
 def _activate_integration(sc):
     # type: (SparkContext) -> None
-    from pyspark import SparkContext
 
     _start_sentry_listener(sc)
     _set_app_properties()
