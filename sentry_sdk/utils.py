@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
@@ -228,7 +228,15 @@ def to_timestamp(value):
 
 def format_timestamp(value):
     # type: (datetime) -> str
-    return value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    """Formats a timestamp in RFC 3339 format.
+
+    Any datetime objects with a non-UTC timezone are converted to UTC, so that all timestamps are formatted in UTC.
+    """
+    utctime = value.astimezone(timezone.utc)
+
+    # We use this custom formatting rather than isoformat for backwards compatibility (we have used this format for
+    # several years now), and isoformat is slightly different.
+    return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def event_hint_with_exc_info(exc_info=None):
