@@ -125,7 +125,7 @@ def _get_options(*args, **kwargs):
         rv["traces_sample_rate"] = 1.0
 
     if rv["event_scrubber"] is None:
-        rv["event_scrubber"] = EventScrubber()
+        rv["event_scrubber"] = EventScrubber(send_default_pii=rv["send_default_pii"])
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
@@ -526,7 +526,7 @@ class _Client(BaseClient):
 
         if event is not None:
             event_scrubber = self.options["event_scrubber"]
-            if event_scrubber and not self.options["send_default_pii"]:
+            if event_scrubber:
                 event_scrubber.scrub_event(event)
 
         # Postprocess the event here so that annotated types do
