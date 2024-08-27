@@ -145,7 +145,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
                 "transaction_info": {"source": "custom"},
                 "contexts": contexts,
             }
-        )  # type: Event
+        )
 
         return event
 
