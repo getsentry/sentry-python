@@ -25,13 +25,12 @@ from sentry_sdk.utils import (
     _module_in_list,
 )
 
-from typing import TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Generator
-    from typing import Optional
     from typing import Union
 
     from types import FrameType
@@ -180,6 +179,27 @@ def _get_frame_module_abs_path(frame):
         return None
 
 
+def _should_be_included(
+    is_sentry_sdk_frame: bool,
+    namespace: Optional[str],
+    in_app_include: Optional[List[str]],
+    in_app_exclude: Optional[List[str]],
+    abs_path: Optional[str],
+    project_root: Optional[str],
+) -> bool:
+    # in_app_include takes precedence over in_app_exclude
+    should_be_included = (
+        not (
+            _is_external_source(abs_path) or _module_in_list(namespace, in_app_exclude)
+        )
+    ) or _module_in_list(namespace, in_app_include)
+    return (
+        _is_in_project_root(abs_path, project_root)
+        and should_be_included
+        and not is_sentry_sdk_frame
+    )
+
+
 def add_query_source(span):
     # type: (sentry_sdk.tracing.Span) -> None
     """
@@ -221,19 +241,15 @@ def add_query_source(span):
             "sentry_sdk."
         )
 
-        # in_app_include takes precedence over in_app_exclude
-        should_be_included = (
-            not (
-                _is_external_source(abs_path)
-                or _module_in_list(namespace, in_app_exclude)
-            )
-        ) or _module_in_list(namespace, in_app_include)
-
-        if (
-            _is_in_project_root(abs_path, project_root)
-            and should_be_included
-            and not is_sentry_sdk_frame
-        ):
+        should_be_included = _should_be_included(
+            is_sentry_sdk_frame=is_sentry_sdk_frame,
+            namespace=namespace,
+            in_app_include=in_app_include,
+            in_app_exclude=in_app_exclude,
+            abs_path=abs_path,
+            project_root=project_root,
+        )
+        if should_be_included:
             break
 
         frame = frame.f_back
