@@ -1363,7 +1363,7 @@ class POTelSpan:
 
     @sampled.setter
     def sampled(self, value):
-        # type: () -> Optional[bool]
+        # type: (Optional[bool]) -> None
         pass
 
     @property

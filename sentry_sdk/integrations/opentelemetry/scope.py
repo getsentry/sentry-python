@@ -43,10 +43,10 @@ class PotelScope(Scope):
 
     @classmethod
     def get_isolation_scope(cls):
+        # type: () -> Scope
         """
         Returns the isolation scope.
         """
-        # type: () -> Scope
         return cls._get_isolation_scope() or _INITIAL_ISOLATION_SCOPE
 
     @classmethod
