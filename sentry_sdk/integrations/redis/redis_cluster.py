@@ -5,7 +5,6 @@ This is part of the main redis-py client.
 https://github.com/redis/redis-py/blob/master/redis/cluster.py
 """
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
@@ -14,6 +13,8 @@ from sentry_sdk.integrations.redis.modules.queries import _set_db_data_on_span
 from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 
 from sentry_sdk.utils import capture_internal_exceptions
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

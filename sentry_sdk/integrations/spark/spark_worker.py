@@ -10,7 +10,7 @@ from sentry_sdk.utils import (
     event_hint_with_exc_info,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

@@ -2,11 +2,11 @@
 Code used for the Queries module in Sentry
 """
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.utils import _get_safe_command
 from sentry_sdk.utils import capture_internal_exceptions
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from redis import Redis
