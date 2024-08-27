@@ -434,7 +434,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             [(b"content-type", b"application/json")],
             "post_echo_async",
             b'{"username":"xyz","password":"xyz"}',
-            {"username": "xyz", "password": "xyz"},
+            {"username": "xyz", "password": "[Filtered]"},
         ),
         (
             True,
@@ -453,7 +453,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             ],
             "post_echo_async",
             BODY_FORM,
-            {"password": "hello123", "photo": "", "username": "Jane"},
+            {"password": "[Filtered]", "photo": "", "username": "Jane"},
         ),
         (
             False,

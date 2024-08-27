@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
-
-from sentry_sdk.consts import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

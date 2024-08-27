@@ -1,7 +1,6 @@
 import sys
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
@@ -23,6 +22,8 @@ try:
     from arq.worker import JobExecutionFailed, Retry, RetryJob, Worker
 except ImportError:
     raise DidNotEnable("Arq is not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
