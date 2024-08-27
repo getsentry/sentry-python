@@ -24,7 +24,8 @@ from sentry_sdk.utils import (
     _is_in_project_root,
     _module_in_list,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

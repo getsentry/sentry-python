@@ -1,7 +1,4 @@
-try:
-    from typing import TYPE_CHECKING
-except ImportError:
-    TYPE_CHECKING = False
+from typing import TYPE_CHECKING
 
 
 # Re-exported for compat, since code out there in the wild might use this variable.

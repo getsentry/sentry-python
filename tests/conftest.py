@@ -35,7 +35,7 @@ from sentry_sdk.utils import reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional
