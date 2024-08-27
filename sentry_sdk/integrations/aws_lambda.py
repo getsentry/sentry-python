@@ -44,17 +44,17 @@ def _wrap_init_error(init_error):
         # type: (*Any, **Any) -> Any
         client = sentry_sdk.get_client()
 
-        with capture_internal_exceptions():
-            sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+        # with capture_internal_exceptions():
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-            exc_info = sys.exc_info()
-            if exc_info and all(exc_info):
-                sentry_event, hint = event_from_exception(
-                    exc_info,
-                    client_options=client.options,
-                    mechanism={"type": "aws_lambda", "handled": False},
-                )
-                sentry_sdk.capture_event(sentry_event, hint=hint)
+        exc_info = sys.exc_info()
+        if exc_info and all(exc_info):
+            sentry_event, hint = event_from_exception(
+                exc_info,
+                client_options=client.options,
+                mechanism={"type": "aws_lambda", "handled": False},
+            )
+            sentry_sdk.capture_event(sentry_event, hint=hint)
 
         return init_error(*args, **kwargs)
 
