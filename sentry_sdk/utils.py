@@ -1077,7 +1077,7 @@ def event_from_exception(
 
 
 def _module_in_list(name, items):
-    # type: (str, Optional[List[str]]) -> bool
+    # type: (Optional[str], Optional[List[str]]) -> bool
     if name is None:
         return False
 
@@ -1092,8 +1092,11 @@ def _module_in_list(name, items):
 
 
 def _is_external_source(abs_path):
-    # type: (str) -> bool
+    # type: (Optional[str]) -> bool
     # check if frame is in 'site-packages' or 'dist-packages'
+    if abs_path is None:
+        return False
+
     external_source = (
         re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
     )
@@ -1101,8 +1104,8 @@ def _is_external_source(abs_path):
 
 
 def _is_in_project_root(abs_path, project_root):
-    # type: (str, Optional[str]) -> bool
-    if project_root is None:
+    # type: (Optional[str], Optional[str]) -> bool
+    if abs_path is None or project_root is None:
         return False
 
     # check if path is in the project root
