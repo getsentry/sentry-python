@@ -215,7 +215,6 @@ def run_lambda_function(
     layer=None,
     initial_handler=None,
     subprocess_kwargs=(),
-    force_create=False,
 ):
     """
     Creates a Lambda function with the given code, and invokes it.
@@ -251,9 +250,10 @@ def run_lambda_function(
         base_dir = os.path.join(tmp_base_dir, fn_name)
         dir_already_existing = os.path.isdir(base_dir)
 
-        if dir_already_existing and not force_create:
+        if dir_already_existing:
             print("Local Lambda function directory already exists, skipping creation")
-        else:
+
+        if not dir_already_existing:
             os.mkdir(base_dir)
             _create_lambda_package(
                 base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
