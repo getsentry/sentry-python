@@ -48,6 +48,7 @@ def _wrap_init_error(init_error):
             sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
             exc_info = sys.exc_info()
+            print("NEEL: {}", exc_info)
             if exc_info and all(exc_info):
                 sentry_event, hint = event_from_exception(
                     exc_info,
