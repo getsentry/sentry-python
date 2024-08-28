@@ -4,13 +4,13 @@ from copy import deepcopy
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue, logger
-from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from django.http.request import RawPostDataException
 except ImportError:
     RawPostDataException = None
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

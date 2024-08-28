@@ -2,7 +2,8 @@ import functools
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

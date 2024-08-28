@@ -11,8 +11,9 @@ import sys
 import re
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

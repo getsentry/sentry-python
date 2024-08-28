@@ -12,7 +12,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
 )
-from sentry_sdk._types import TYPE_CHECKING
 
 try:
     # importing like this is necessary due to name shadowing in ariadne
@@ -21,6 +20,7 @@ try:
 except ImportError:
     raise DidNotEnable("ariadne is not installed")
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional

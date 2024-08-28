@@ -1,7 +1,7 @@
 import threading
 import re
 import sys
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from unittest import mock
 
 import pytest
@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     Components,
     Dsn,
     env_to_bool,
+    format_timestamp,
     get_current_thread_meta,
     get_default_release,
     get_error_message,
@@ -950,3 +951,39 @@ def test_get_current_thread_meta_failed_to_get_main_thread():
     thread.start()
     thread.join()
     assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+
+
+@pytest.mark.parametrize(
+    ("datetime_object", "expected_output"),
+    (
+        (
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+            "2021-01-01T00:00:00.000000Z",
+        ),  # UTC time
+        (
+            datetime(2021, 1, 1, tzinfo=timezone(timedelta(hours=2))),
+            "2020-12-31T22:00:00.000000Z",
+        ),  # UTC+2 time
+        (
+            datetime(2021, 1, 1, tzinfo=timezone(timedelta(hours=-7))),
+            "2021-01-01T07:00:00.000000Z",
+        ),  # UTC-7 time
+        (
+            datetime(2021, 2, 3, 4, 56, 7, 890123, tzinfo=timezone.utc),
+            "2021-02-03T04:56:07.890123Z",
+        ),  # UTC time all non-zero fields
+    ),
+)
+def test_format_timestamp(datetime_object, expected_output):
+    formatted = format_timestamp(datetime_object)
+
+    assert formatted == expected_output
+
+
+def test_format_timestamp_naive():
+    datetime_object = datetime(2021, 1, 1)
+    timestamp_regex = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}Z"
+
+    # Ensure that some timestamp is returned, without error. We currently treat these as local time, but this is an
+    # implementation detail which we should not assert here.
+    assert re.fullmatch(timestamp_regex, format_timestamp(datetime_object))

@@ -13,7 +13,8 @@ from sentry_sdk.integrations.opentelemetry.scope import (
     isolation_scope,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

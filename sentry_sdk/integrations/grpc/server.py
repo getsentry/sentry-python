@@ -1,9 +1,10 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Callable, Optional

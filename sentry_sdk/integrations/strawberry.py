@@ -15,7 +15,6 @@ from sentry_sdk.utils import (
     package_version,
     _get_installed_modules,
 )
-from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from functools import cached_property
@@ -34,6 +33,8 @@ try:
     from strawberry.http import async_base_view, sync_base_view  # type: ignore
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Generator, List, Optional

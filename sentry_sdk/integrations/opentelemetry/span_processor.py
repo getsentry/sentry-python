@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from time import time
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from opentelemetry.context import get_value
 from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
@@ -25,7 +25,6 @@ from sentry_sdk.integrations.opentelemetry.utils import (
 )
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
-from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:

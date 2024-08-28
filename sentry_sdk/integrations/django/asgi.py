@@ -13,7 +13,6 @@ import inspect
 from django.core.handlers.wsgi import WSGIRequest
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -23,6 +22,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
 )
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Union, TypeVar

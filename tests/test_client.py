@@ -25,7 +25,8 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
