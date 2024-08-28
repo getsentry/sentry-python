@@ -1252,6 +1252,10 @@ class POTelSpan:
         # set as the implicit current context
         self._ctx_token = context.attach(ctx)
 
+        # get the new scope that was forked on context.attach
+        self.scope = sentry_sdk.get_current_scope()
+        self.scope.span = self
+
         return self
 
     def __exit__(self, ty, value, tb):
@@ -1319,7 +1323,6 @@ class POTelSpan:
 
         parent = None
         while True:
-            # XXX test if this actually works
             if self._otel_span.parent:
                 parent = self._otel_span.parent
             else:
