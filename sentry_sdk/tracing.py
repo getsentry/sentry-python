@@ -1194,7 +1194,6 @@ class POTelSpan:
     def __init__(
         self,
         *,
-        active=True,  # type: bool
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
@@ -1221,7 +1220,6 @@ class POTelSpan:
         self._otel_span = tracer.start_span(
             description or op or "", start_time=start_timestamp
         )  # XXX
-        self._active = active
 
         self.origin = origin or DEFAULT_SPAN_ORIGIN
         self.op = op
@@ -1250,10 +1248,9 @@ class POTelSpan:
         # XXX use_span? https://github.com/open-telemetry/opentelemetry-python/blob/3836da8543ce9751051e38a110c0468724042e62/opentelemetry-api/src/opentelemetry/trace/__init__.py#L547
         #
         # create a Context object with parent set as current span
-        if self._active:
-            ctx = otel_trace.set_span_in_context(self._otel_span)
-            # set as the implicit current context
-            self._ctx_token = context.attach(ctx)
+        ctx = otel_trace.set_span_in_context(self._otel_span)
+        # set as the implicit current context
+        self._ctx_token = context.attach(ctx)
 
         return self
 
@@ -1261,8 +1258,7 @@ class POTelSpan:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self._otel_span.end()
         # XXX set status to error if unset and an exception occurred?
-        if self._active:
-            context.detach(self._ctx_token)
+        context.detach(self._ctx_token)
 
     @property
     def description(self):
