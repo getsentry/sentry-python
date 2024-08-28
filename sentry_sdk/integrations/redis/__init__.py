@@ -1,4 +1,3 @@
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.redis.consts import _DEFAULT_MAX_DATA_SIZE
 from sentry_sdk.integrations.redis.rb import _patch_rb
@@ -6,6 +5,8 @@ from sentry_sdk.integrations.redis.redis import _patch_redis
 from sentry_sdk.integrations.redis.redis_cluster import _patch_redis_cluster
 from sentry_sdk.integrations.redis.redis_py_cluster_legacy import _patch_rediscluster
 from sentry_sdk.utils import logger
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional

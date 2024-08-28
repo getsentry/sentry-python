@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
@@ -26,8 +26,9 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY37
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -227,7 +228,15 @@ def to_timestamp(value):
 
 def format_timestamp(value):
     # type: (datetime) -> str
-    return value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    """Formats a timestamp in RFC 3339 format.
+
+    Any datetime objects with a non-UTC timezone are converted to UTC, so that all timestamps are formatted in UTC.
+    """
+    utctime = value.astimezone(timezone.utc)
+
+    # We use this custom formatting rather than isoformat for backwards compatibility (we have used this format for
+    # several years now), and isoformat is slightly different.
+    return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def event_hint_with_exc_info(exc_info=None):
@@ -1076,7 +1085,7 @@ def event_from_exception(
 
 
 def _module_in_list(name, items):
-    # type: (str, Optional[List[str]]) -> bool
+    # type: (Optional[str], Optional[List[str]]) -> bool
     if name is None:
         return False
 
@@ -1091,8 +1100,11 @@ def _module_in_list(name, items):
 
 
 def _is_external_source(abs_path):
-    # type: (str) -> bool
+    # type: (Optional[str]) -> bool
     # check if frame is in 'site-packages' or 'dist-packages'
+    if abs_path is None:
+        return False
+
     external_source = (
         re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
     )
@@ -1100,8 +1112,8 @@ def _is_external_source(abs_path):
 
 
 def _is_in_project_root(abs_path, project_root):
-    # type: (str, Optional[str]) -> bool
-    if project_root is None:
+    # type: (Optional[str], Optional[str]) -> bool
+    if abs_path is None or project_root is None:
         return False
 
     # check if path is in the project root

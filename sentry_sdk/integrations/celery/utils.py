@@ -1,7 +1,5 @@
 import time
-from typing import cast
-
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from typing import Any, Tuple

@@ -10,14 +10,13 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
 )
-from sentry_sdk._types import TYPE_CHECKING
-
 
 try:
     from graphene.types import schema as graphene_schema  # type: ignore
 except ImportError:
     raise DidNotEnable("graphene is not installed")
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Generator

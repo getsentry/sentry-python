@@ -1,5 +1,4 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -11,6 +10,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
