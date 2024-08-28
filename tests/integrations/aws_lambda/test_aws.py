@@ -153,7 +153,13 @@ def lambda_runtime(request):
 @pytest.fixture
 def run_lambda_function(request, lambda_client, lambda_runtime):
     def inner(
-        code, payload, timeout=30, syntax_check=True, layer=None, initial_handler=None
+        code,
+        payload,
+        timeout=30,
+        syntax_check=True,
+        layer=None,
+        initial_handler=None,
+        force_create=False,
     ):
         from tests.integrations.aws_lambda.client import run_lambda_function
 
@@ -167,6 +173,7 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             syntax_check=syntax_check,
             layer=layer,
             initial_handler=initial_handler,
+            force_create=force_create,
         )
 
         # Make sure the "ENVELOPE:" and "EVENT:" log entries are always starting a new line. (Sometimes they don't.)
@@ -329,6 +336,7 @@ def test_init_error(run_lambda_function, lambda_runtime):
         ),
         b'{"foo": "bar"}',
         syntax_check=False,
+        force_create=True,
     )
 
     (event,) = envelope_items
