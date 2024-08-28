@@ -19,6 +19,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Removed
 
+- Dropped support for Python 3.6.
 - When setting span status, the HTTP status code is no longer automatically added as a tag.
 - Class `Hub` has been removed.
 - Class `_ScopeManager` has been removed.
