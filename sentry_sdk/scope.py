@@ -770,8 +770,8 @@ class Scope(object):
 
     @span.setter
     def span(self, span):
-        """Set current tracing span."""
         # type: (Optional[Span]) -> None
+        """Set current tracing span."""
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.

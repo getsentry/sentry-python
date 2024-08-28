@@ -1,4 +1,5 @@
 from collections import deque, defaultdict
+from typing import cast
 
 from opentelemetry.trace import format_trace_id, format_span_id
 from opentelemetry.context import Context
@@ -145,7 +146,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
                 "transaction_info": {"source": "custom"},
                 "contexts": contexts,
             }
-        )  # type: Event
+        )
 
         return event
 
@@ -154,7 +155,10 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if not span.context:
             return None
 
-        span_json = self._common_span_transaction_attributes_as_json(span)
+        # This is a safe cast because dict[str, Any] is a superset of Event
+        span_json = cast(
+            "dict[str, Any]", self._common_span_transaction_attributes_as_json(span)
+        )
         if span_json is None:
             return None
 
@@ -184,14 +188,14 @@ class PotelSentrySpanProcessor(SpanProcessor):
         return span_json
 
     def _common_span_transaction_attributes_as_json(self, span):
-        # type: (ReadableSpan) -> Optional[dict[str, Any]]
+        # type: (ReadableSpan) -> Optional[Event]
         if not span.start_time or not span.end_time:
             return None
 
         common_json = {
             "start_timestamp": convert_from_otel_timestamp(span.start_time),
             "timestamp": convert_from_otel_timestamp(span.end_time),
-        }  # type: dict[str, Any]
+        }  # type: Event
 
         measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
         if measurements:
