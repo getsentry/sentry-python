@@ -1200,6 +1200,7 @@ class POTelSpan:
         scope=None,  # type: Optional[Scope]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
+        name=None,  # type: Optional[str]
         **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
@@ -1224,6 +1225,7 @@ class POTelSpan:
         self.origin = origin or DEFAULT_SPAN_ORIGIN
         self.op = op
         self.description = description
+        self.name = name
         if status is not None:
             self.set_status(status)
 
@@ -1371,7 +1373,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        self._otel_span.attributes.get(SentrySpanAttribute.OP)
+        return self._otel_span.attributes.get(SentrySpanAttribute.OP)
 
     @op.setter
     def op(self, value):
@@ -1384,12 +1386,17 @@ class POTelSpan:
     @property
     def name(self):
         # type: () -> str
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        return self._otel_span.attributes.get(SentrySpanAttribute.NAME)
 
     @name.setter
     def name(self, value):
         # type: (str) -> None
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        if value is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property
     def source(self):
