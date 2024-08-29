@@ -1305,7 +1305,9 @@ class POTelSpan:
         .. deprecated:: 3.0.0
             This will be removed in the future. Use :func:`root_span` instead.
         """
-        logger.warning("Deprecated: This will be removed in the future.")
+        logger.warning(
+            "Deprecated: This will be removed in the future. Use root_span instead."
+        )
         return self.root_span
 
     @containing_transaction.setter
@@ -1320,17 +1322,11 @@ class POTelSpan:
 
     @property
     def root_span(self):
-        if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
-            return None
-
-        parent = None
-        while True:
-            if self._otel_span.parent:
-                parent = self._otel_span.parent
-            else:
-                break
-
-        return parent
+        # type: () -> Optional[POTelSpan]
+        # XXX implement this
+        # there's a span.parent property, but it returns the parent spancontext
+        # not sure if there's a way to retrieve the parent with pure otel.
+        return None
 
     @root_span.setter
     def root_span(self, value):
@@ -1385,14 +1381,14 @@ class POTelSpan:
 
     @property
     def name(self):
-        # type: () -> str
+        # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         return self._otel_span.attributes.get(SentrySpanAttribute.NAME)
 
     @name.setter
     def name(self, value):
-        # type: (str) -> None
+        # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         if value is not None:
