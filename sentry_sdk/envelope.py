@@ -260,7 +260,7 @@ class Item:
     def data_category(self):
         # type: (...) -> EventDataCategory
         ty = self.headers.get("type")
-        if ty == "session":
+        if ty == "session" or ty == "sessions":
             return "session"
         elif ty == "attachment":
             return "attachment"
