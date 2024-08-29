@@ -2,8 +2,10 @@ from typing import cast
 from contextlib import contextmanager
 
 from opentelemetry.context import get_value, set_value, attach, detach, get_current
+from opentelemetry.trace import SpanContext, NonRecordingSpan, TraceFlags, use_span
 
 from sentry_sdk.scope import Scope, ScopeType
+from sentry_sdk.tracing import POTelSpan
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
@@ -13,6 +15,8 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Tuple, Optional, Generator, Dict, Any
+
+    from sentry_sdk._types import SamplingContext
 
 
 class PotelScope(Scope):
@@ -61,10 +65,43 @@ class PotelScope(Scope):
     @contextmanager
     def continue_trace(self, environ_or_headers):
         # type: (Dict[str, Any]) -> Generator[None, None, None]
-        with new_scope() as scope:
-            scope.generate_propagation_context(environ_or_headers)
-            # TODO-neel-potel add remote span on context
+        self.generate_propagation_context(environ_or_headers)
+
+        span_context = self._incoming_otel_span_context()
+        if span_context is None:
             yield
+        else:
+            with use_span(NonRecordingSpan(span_context)):
+                yield
+
+    def _incoming_otel_span_context(self):
+        # type: () -> Optional[SpanContext]
+        if self._propagation_context is None:
+            return None
+        # If sentry-trace extraction didn't have a parent_span_id, we don't have an upstream header
+        if self._propagation_context.parent_span_id is None:
+            return None
+
+        trace_flags = TraceFlags(
+            TraceFlags.SAMPLED
+            if self._propagation_context.parent_sampled
+            else TraceFlags.DEFAULT
+        )
+
+        # TODO-neel-potel tracestate
+        span_context = SpanContext(
+            trace_id=int(self._propagation_context.trace_id, 16),  # type: ignore
+            span_id=int(self._propagation_context.parent_span_id, 16),  # type: ignore
+            is_remote=True,
+            trace_flags=trace_flags,
+        )
+
+        return span_context
+
+    def start_span(self, custom_sampling_context=None, **kwargs):
+        # type: (Optional[SamplingContext], Any) -> POTelSpan
+        # TODO-neel-potel ideally want to remove the span argument, discuss with ivana
+        return POTelSpan(**kwargs, scope=self)
 
 
 _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)

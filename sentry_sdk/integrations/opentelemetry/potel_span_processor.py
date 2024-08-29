@@ -51,8 +51,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if is_sentry_span(span):
             return
 
-        # TODO-neel-potel-remote only take parent if not remote
-        if span.parent:
+        if span.parent and not span.parent.is_remote:
             self._children_spans[span.parent.span_id].append(span)
         else:
             # if have a root span ending, we build a transaction and send it
