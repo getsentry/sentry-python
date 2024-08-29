@@ -696,19 +696,13 @@ class Scope(object):
     def transaction(self):
         # type: () -> Any
         # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
-        """Return the transaction (root span) in the scope, if any."""
+        """
+        Return the transaction (root span) in the scope, if any.
 
-        # there is no span/transaction on the scope
-        if self._span is None:
-            return None
-
-        # there is an orphan span on the scope
-        if self._span.containing_transaction is None:
-            return None
-
-        # there is either a transaction (which is its own containing
-        # transaction) or a non-orphan span on the scope
-        return self._span.containing_transaction
+        .. deprecated:: 3.0.0
+            This property is deprecated. Use root_span instead.
+        """
+        return self.root_span
 
     @transaction.setter
     def transaction(self, value):
@@ -734,6 +728,22 @@ class Scope(object):
         self._transaction = value
         if self._span and self._span.containing_transaction:
             self._span.containing_transaction.name = value
+
+    @property
+    def root_span(self):
+        # type: () -> POTelSpan
+        """Return the root span in the scope, if any."""
+
+        # there is no span on the scope
+        if self._span is None:
+            return None
+
+        # this is a root span
+        if self._span.root_span is None:
+            return self._span
+
+        # get the topmost parent
+        return self._span.root_span
 
     def set_transaction_name(self, name, source=None):
         # type: (str, Optional[str]) -> None
@@ -1014,25 +1024,24 @@ class Scope(object):
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        with new_scope():
-            kwargs.setdefault("scope", self)
+        kwargs.setdefault("scope", self)
 
-            # get current span or transaction
-            span = span or self.span or self.get_isolation_scope().span
+        # get current span or transaction
+        span = span or self.span or self.get_isolation_scope().span
 
-            if span is None:
-                # New spans get the `trace_id` from the scope
-                if "trace_id" not in kwargs:
-                    propagation_context = self.get_active_propagation_context()
-                    if propagation_context is not None:
-                        kwargs["trace_id"] = propagation_context.trace_id
+        if span is None:
+            # New spans get the `trace_id` from the scope
+            if "trace_id" not in kwargs:
+                propagation_context = self.get_active_propagation_context()
+                if propagation_context is not None:
+                    kwargs["trace_id"] = propagation_context.trace_id
 
-                span = POTelSpan(**kwargs)
-            else:
-                # Children take `trace_id`` from the parent span.
-                span = span.start_child(**kwargs)
+            span = POTelSpan(**kwargs)
+        else:
+            # Children take `trace_id`` from the parent span.
+            span = span.start_child(**kwargs)
 
-            return span
+        return span
 
     def continue_trace(
         self, environ_or_headers, op=None, name=None, source=None, origin=None
