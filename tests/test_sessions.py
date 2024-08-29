@@ -143,3 +143,5 @@ def test_no_thread_on_shutdown_no_errors(sentry_init):
         sentry_sdk.get_isolation_scope().start_session(session_mode="request")
         sentry_sdk.get_isolation_scope().end_session()
         sentry_sdk.flush()
+
+    # If we reach this point without error, the test is successful.
