@@ -3,6 +3,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context
+from opentelemetry.trace import format_trace_id, format_span_id
 from opentelemetry.trace.status import StatusCode
 
 import sentry_sdk
@@ -1346,13 +1347,13 @@ class POTelSpan:
 
     @property
     def trace_id(self):
-        # type: () -> Optional[str]
-        return self._otel_span.get_span_context().trace_id
+        # type: () -> str
+        return format_trace_id(self._otel_span.get_span_context().trace_id)
 
     @property
     def span_id(self):
-        # type: () -> Optional[str]
-        return self._otel_span.get_span_context().span_id
+        # type: () -> str
+        return format_span_id(self._otel_span.get_span_context().span_id)
 
     @property
     def sampled(self):
