@@ -27,6 +27,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The context manager `auto_session_tracking_scope()` has been removed. Use `track_session()` instead.
 - Utility function `is_auto_session_tracking_enabled()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function) It accepts a `scope` parameter instead of the previously used `hub` parameter.
 - Utility function `is_auto_session_tracking_enabled_scope()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function)
+- Setting `scope.level` has been removed. Use `scope.set_level` instead.
+
 
 ### Deprecated
 
