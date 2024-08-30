@@ -164,7 +164,7 @@ def get_profiler_id():
     return _scheduler.profiler_id
 
 
-class ContinuousScheduler(object):
+class ContinuousScheduler:
     mode = "unknown"  # type: ContinuousProfilerMode
 
     def __init__(self, frequency, options, sdk_info, capture_func):
@@ -410,7 +410,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
 PROFILE_BUFFER_SECONDS = 10
 
 
-class ProfileBuffer(object):
+class ProfileBuffer:
     def __init__(self, options, sdk_info, buffer_size, capture_func):
         # type: (Dict[str, Any], SDKInfo, int, Callable[[Envelope], None]) -> None
         self.options = options
@@ -458,7 +458,7 @@ class ProfileBuffer(object):
         self.capture_func(envelope)
 
 
-class ProfileChunk(object):
+class ProfileChunk:
     def __init__(self):
         # type: () -> None
         self.chunk_id = uuid.uuid4().hex
