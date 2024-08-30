@@ -4,7 +4,6 @@ from inspect import isawaitable
 from urllib.parse import urlsplit
 
 import sentry_sdk
-from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
@@ -193,16 +192,17 @@ async def _context_enter(request):
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
-    transaction = continue_trace(
-        dict(request.headers),
+    # TODO-neel-potel test if this works
+    request.ctx._sentry_continue_trace = sentry_sdk.continue_trace(
+        dict(request.headers)
+    )
+    request.ctx._sentry_continue_trace.__enter__()
+    request.ctx._sentry_transaction = sentry_sdk.start_transaction(
         op=OP.HTTP_SERVER,
         # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
         name=request.path,
         source=TRANSACTION_SOURCE_URL,
         origin=SanicIntegration.origin,
-    )
-    request.ctx._sentry_transaction = sentry_sdk.start_transaction(
-        transaction
     ).__enter__()
 
 
@@ -227,6 +227,7 @@ async def _context_exit(request, response=None):
                 and response_status not in integration._unsampled_statuses
             )
             request.ctx._sentry_transaction.__exit__(None, None, None)
+            request.ctx._sentry_continue_trace.__exit__(None, None, None)
 
         request.ctx._sentry_scope.__exit__(None, None, None)
 

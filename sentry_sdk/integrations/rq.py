@@ -2,7 +2,6 @@ import weakref
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.api import continue_trace
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
@@ -59,22 +58,20 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                transaction = continue_trace(
-                    job.meta.get("_sentry_trace_headers") or {},
-                    op=OP.QUEUE_TASK_RQ,
-                    name="unknown RQ task",
-                    source=TRANSACTION_SOURCE_TASK,
-                    origin=RqIntegration.origin,
-                )
-
-                with capture_internal_exceptions():
-                    transaction.name = job.func_name
-
-                with sentry_sdk.start_transaction(
-                    transaction,
-                    custom_sampling_context={"rq_job": job},
+                with sentry_sdk.continue_trace(
+                    job.meta.get("_sentry_trace_headers") or {}
                 ):
-                    rv = old_perform_job(self, job, *args, **kwargs)
+                    with sentry_sdk.start_transaction(
+                        op=OP.QUEUE_TASK_RQ,
+                        name="unknown RQ task",
+                        source=TRANSACTION_SOURCE_TASK,
+                        origin=RqIntegration.origin,
+                        custom_sampling_context={"rq_job": job},
+                    ) as transaction:
+                        with capture_internal_exceptions():
+                            transaction.name = job.func_name
+
+                        rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is

@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from os import environ
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -82,42 +81,40 @@ def _wrap_func(func):
             if hasattr(gcp_event, "headers"):
                 headers = gcp_event.headers
 
-            transaction = continue_trace(
-                headers,
-                op=OP.FUNCTION_GCP,
-                name=environ.get("FUNCTION_NAME", ""),
-                source=TRANSACTION_SOURCE_COMPONENT,
-                origin=GcpIntegration.origin,
-            )
-            sampling_context = {
-                "gcp_env": {
-                    "function_name": environ.get("FUNCTION_NAME"),
-                    "function_entry_point": environ.get("ENTRY_POINT"),
-                    "function_identity": environ.get("FUNCTION_IDENTITY"),
-                    "function_region": environ.get("FUNCTION_REGION"),
-                    "function_project": environ.get("GCP_PROJECT"),
-                },
-                "gcp_event": gcp_event,
-            }
-            with sentry_sdk.start_transaction(
-                transaction, custom_sampling_context=sampling_context
-            ):
-                try:
-                    return func(functionhandler, gcp_event, *args, **kwargs)
-                except Exception:
-                    exc_info = sys.exc_info()
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "gcp", "handled": False},
-                    )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
-                    reraise(*exc_info)
-                finally:
-                    if timeout_thread:
-                        timeout_thread.stop()
-                    # Flush out the event queue
-                    client.flush()
+            with sentry_sdk.continue_trace(headers):
+                sampling_context = {
+                    "gcp_env": {
+                        "function_name": environ.get("FUNCTION_NAME"),
+                        "function_entry_point": environ.get("ENTRY_POINT"),
+                        "function_identity": environ.get("FUNCTION_IDENTITY"),
+                        "function_region": environ.get("FUNCTION_REGION"),
+                        "function_project": environ.get("GCP_PROJECT"),
+                    },
+                    "gcp_event": gcp_event,
+                }
+                with sentry_sdk.start_transaction(
+                    op=OP.FUNCTION_GCP,
+                    name=environ.get("FUNCTION_NAME", ""),
+                    source=TRANSACTION_SOURCE_COMPONENT,
+                    origin=GcpIntegration.origin,
+                    custom_sampling_context=sampling_context,
+                ):
+                    try:
+                        return func(functionhandler, gcp_event, *args, **kwargs)
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        sentry_event, hint = event_from_exception(
+                            exc_info,
+                            client_options=client.options,
+                            mechanism={"type": "gcp", "handled": False},
+                        )
+                        sentry_sdk.capture_event(sentry_event, hint=hint)
+                        reraise(*exc_info)
+                    finally:
+                        if timeout_thread:
+                            timeout_thread.stop()
+                        # Flush out the event queue
+                        client.flush()
 
     return sentry_func  # type: ignore
 

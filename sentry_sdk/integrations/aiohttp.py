@@ -2,7 +2,6 @@ import sys
 import weakref
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -113,34 +112,31 @@ class AioHttpIntegration(Integration):
                     scope.add_event_processor(_make_request_processor(weak_request))
 
                     headers = dict(request.headers)
-                    transaction = continue_trace(
-                        headers,
-                        op=OP.HTTP_SERVER,
-                        # If this transaction name makes it to the UI, AIOHTTP's
-                        # URL resolver did not find a route or died trying.
-                        name="generic AIOHTTP request",
-                        source=TRANSACTION_SOURCE_ROUTE,
-                        origin=AioHttpIntegration.origin,
-                    )
-                    with sentry_sdk.start_transaction(
-                        transaction,
-                        custom_sampling_context={"aiohttp_request": request},
-                    ):
-                        try:
-                            response = await old_handle(self, request)
-                        except HTTPException as e:
-                            transaction.set_http_status(e.status_code)
-                            raise
-                        except (asyncio.CancelledError, ConnectionResetError):
-                            transaction.set_status(SPANSTATUS.CANCELLED)
-                            raise
-                        except Exception:
-                            # This will probably map to a 500 but seems like we
-                            # have no way to tell. Do not set span status.
-                            reraise(*_capture_exception())
+                    with sentry_sdk.continue_trace(headers):
+                        with sentry_sdk.start_transaction(
+                            op=OP.HTTP_SERVER,
+                            # If this transaction name makes it to the UI, AIOHTTP's
+                            # URL resolver did not find a route or died trying.
+                            name="generic AIOHTTP request",
+                            source=TRANSACTION_SOURCE_ROUTE,
+                            origin=AioHttpIntegration.origin,
+                            custom_sampling_context={"aiohttp_request": request},
+                        ) as transaction:
+                            try:
+                                response = await old_handle(self, request)
+                            except HTTPException as e:
+                                transaction.set_http_status(e.status_code)
+                                raise
+                            except (asyncio.CancelledError, ConnectionResetError):
+                                transaction.set_status(SPANSTATUS.CANCELLED)
+                                raise
+                            except Exception:
+                                # This will probably map to a 500 but seems like we
+                                # have no way to tell. Do not set span status.
+                                reraise(*_capture_exception())
 
-                        transaction.set_http_status(response.status)
-                        return response
+                            transaction.set_http_status(response.status)
+                            return response
 
         Application._handle = sentry_app_handle
 

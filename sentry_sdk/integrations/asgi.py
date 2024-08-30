@@ -10,7 +10,6 @@ from copy import deepcopy
 from functools import partial
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations._asgi_common import (
@@ -34,7 +33,6 @@ from sentry_sdk.utils import (
     transaction_from_function,
     _get_installed_modules,
 )
-from sentry_sdk.tracing import Transaction
 
 from typing import TYPE_CHECKING
 
@@ -185,66 +183,47 @@ class SentryAsgiMiddleware:
                         scope,
                     )
 
-                    if ty in ("http", "websocket"):
-                        transaction = continue_trace(
-                            _get_headers(scope),
-                            op="{}.server".format(ty),
+                    with sentry_sdk.continue_trace(_get_headers(scope)):
+                        with sentry_sdk.start_transaction(
+                            op=(
+                                OP.WEBSOCKET_SERVER
+                                if ty == "websocket"
+                                else OP.HTTP_SERVER
+                            ),
                             name=transaction_name,
                             source=transaction_source,
                             origin=self.span_origin,
-                        )
-                        logger.debug(
-                            "[ASGI] Created transaction (continuing trace): %s",
-                            transaction,
-                        )
-                    else:
-                        transaction = Transaction(
-                            op=OP.HTTP_SERVER,
-                            name=transaction_name,
-                            source=transaction_source,
-                            origin=self.span_origin,
-                        )
-                        logger.debug(
-                            "[ASGI] Created transaction (new): %s", transaction
-                        )
+                            custom_sampling_context={"asgi_scope": scope},
+                        ) as transaction:
+                            logger.debug("[ASGI] Started transaction: %s", transaction)
+                            transaction.set_tag("asgi.type", ty)
+                            try:
 
-                    transaction.set_tag("asgi.type", ty)
-                    logger.debug(
-                        "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
-                        transaction.name,
-                        transaction.source,
-                    )
+                                async def _sentry_wrapped_send(event):
+                                    # type: (Dict[str, Any]) -> Any
+                                    is_http_response = (
+                                        event.get("type") == "http.response.start"
+                                        and transaction is not None
+                                        and "status" in event
+                                    )
+                                    if is_http_response:
+                                        transaction.set_http_status(event["status"])
 
-                    with sentry_sdk.start_transaction(
-                        transaction,
-                        custom_sampling_context={"asgi_scope": scope},
-                    ):
-                        logger.debug("[ASGI] Started transaction: %s", transaction)
-                        try:
+                                    return await send(event)
 
-                            async def _sentry_wrapped_send(event):
-                                # type: (Dict[str, Any]) -> Any
-                                is_http_response = (
-                                    event.get("type") == "http.response.start"
-                                    and transaction is not None
-                                    and "status" in event
+                                if asgi_version == 2:
+                                    return await self.app(scope)(
+                                        receive, _sentry_wrapped_send
+                                    )
+                                else:
+                                    return await self.app(
+                                        scope, receive, _sentry_wrapped_send
+                                    )
+                            except Exception as exc:
+                                _capture_exception(
+                                    exc, mechanism_type=self.mechanism_type
                                 )
-                                if is_http_response:
-                                    transaction.set_http_status(event["status"])
-
-                                return await send(event)
-
-                            if asgi_version == 2:
-                                return await self.app(scope)(
-                                    receive, _sentry_wrapped_send
-                                )
-                            else:
-                                return await self.app(
-                                    scope, receive, _sentry_wrapped_send
-                                )
-                        except Exception as exc:
-                            _capture_exception(exc, mechanism_type=self.mechanism_type)
-                            raise exc from None
+                                raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
 
