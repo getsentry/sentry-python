@@ -172,7 +172,7 @@ def test_ray_actor():
     )
 
     @ray.remote
-    class Counter(object):
+    class Counter:
         def __init__(self):
             self.n = 0
 

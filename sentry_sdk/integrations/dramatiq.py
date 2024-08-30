@@ -140,7 +140,7 @@ def _make_message_event_processor(message, integration):
     return inner
 
 
-class DramatiqMessageExtractor(object):
+class DramatiqMessageExtractor:
     def __init__(self, message):
         # type: (Message) -> None
         self.message_data = dict(message.asdict())

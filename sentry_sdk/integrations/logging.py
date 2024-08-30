@@ -111,7 +111,7 @@ class LoggingIntegration(Integration):
         logging.Logger.callHandlers = sentry_patched_callhandlers  # type: ignore
 
 
-class _BaseHandler(logging.Handler, object):
+class _BaseHandler(logging.Handler):
     COMMON_RECORD_ATTRS = frozenset(
         (
             "args",

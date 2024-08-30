@@ -154,7 +154,7 @@ def _disable_capture(fn):
     return wrapper  # type: ignore
 
 
-class Scope(object):
+class Scope:
     """The scope holds extra information that should be sent with all
     events that belong to it.
     """
