@@ -4,19 +4,20 @@ from contextlib import contextmanager
 from opentelemetry.context import get_value, set_value, attach, detach, get_current
 from opentelemetry.trace import SpanContext, NonRecordingSpan, TraceFlags, use_span
 
-from sentry_sdk.scope import Scope, ScopeType
-from sentry_sdk.tracing import POTelSpan
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
 )
-
+from sentry_sdk.scope import Scope, ScopeType
+from sentry_sdk.tracing import POTelSpan
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Tuple, Optional, Generator, Dict, Any
+    from typing_extensions import Unpack
 
     from sentry_sdk._types import SamplingContext
+    from sentry_sdk.tracing import TransactionKwargs
 
 
 class PotelScope(Scope):
@@ -98,9 +99,17 @@ class PotelScope(Scope):
 
         return span_context
 
+    def start_transaction(self, custom_sampling_context=None, **kwargs):
+        # type: (Optional[SamplingContext], Unpack[TransactionKwargs]) -> POTelSpan
+        """
+        .. deprecated:: 3.0.0
+            This function is deprecated and will be removed in a future release.
+            Use :py:meth:`sentry_sdk.start_span` instead.
+        """
+        return self.start_span(custom_sampling_context=custom_sampling_context)
+
     def start_span(self, custom_sampling_context=None, **kwargs):
         # type: (Optional[SamplingContext], Any) -> POTelSpan
-        # TODO-neel-potel ideally want to remove the span argument, discuss with ivana
         return POTelSpan(**kwargs, scope=self)
 
 
