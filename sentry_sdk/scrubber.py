@@ -59,7 +59,7 @@ DEFAULT_PII_DENYLIST = [
 ]
 
 
-class EventScrubber(object):
+class EventScrubber:
     def __init__(
         self, denylist=None, recursive=False, send_default_pii=False, pii_denylist=None
     ):
