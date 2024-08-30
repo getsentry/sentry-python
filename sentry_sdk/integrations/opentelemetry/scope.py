@@ -106,7 +106,7 @@ class PotelScope(Scope):
             This function is deprecated and will be removed in a future release.
             Use :py:meth:`sentry_sdk.start_span` instead.
         """
-        return self.start_span(custom_sampling_context)
+        return self.start_span(custom_sampling_context=custom_sampling_context)
 
     def start_span(self, custom_sampling_context=None, **kwargs):
         # type: (Optional[SamplingContext], Any) -> POTelSpan
