@@ -785,6 +785,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
 
 
+@pytest.mark.forked
 def test_send_task_wrapped(monkeypatch, sentry_init, capture_events):
     calls = []
 
