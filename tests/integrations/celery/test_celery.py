@@ -785,15 +785,13 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
 
 
-@pytest.mark.forked
-def test_send_task_wrapped(monkeypatch, sentry_init, capture_events):
-    calls = []
-
-    def send_task(*args, **kwargs):
-        calls.append((args, kwargs))
-
-    monkeypatch.setattr(Celery, "send_task", send_task)
-
+@mock.patch("celery.Celery.send_task")
+def test_send_task_wrapped(
+    patched_send_task,
+    sentry_init,
+    capture_events,
+    reset_integrations,
+):
     sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
@@ -802,7 +800,7 @@ def test_send_task_wrapped(monkeypatch, sentry_init, capture_events):
     with sentry_sdk.start_transaction(name="custom_transaction"):
         celery.send_task("very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"})
 
-    (call,) = calls  # We should have exactly one call
+    (call,) = patched_send_task.call_args_list  # We should have exactly one call
     (args, kwargs) = call
 
     assert args == (celery, "very_creative_task_name")
