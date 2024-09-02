@@ -263,9 +263,11 @@ def _wrap_task_run(f):
             return f(*args, **kwargs)
 
         if isinstance(args[0], Task):
-            task_name = args[0].name
-        else:
+            task_name = args[0].name  # type: str
+        elif len(args) > 1 and isinstance(args[1], str):
             task_name = args[1]
+        else:
+            task_name = "<unknown Celery task>"
 
         task_started_from_beat = sentry_sdk.get_isolation_scope()._name == "celery-beat"
 
