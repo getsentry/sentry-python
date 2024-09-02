@@ -2,7 +2,7 @@ import sys
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
+from sentry_sdk.api import get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -153,22 +153,19 @@ def patch_execute():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(task))
 
-            sentry_headers = task.kwargs.pop("sentry_headers", None)
-
-            transaction = continue_trace(
-                sentry_headers or {},
-                name=task.name,
-                op=OP.QUEUE_TASK_HUEY,
-                source=TRANSACTION_SOURCE_TASK,
-                origin=HueyIntegration.origin,
-            )
-            transaction.set_status(SPANSTATUS.OK)
-
             if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)
                 task._sentry_is_patched = True
 
-            with sentry_sdk.start_transaction(transaction):
-                return old_execute(self, task, timestamp)
+            sentry_headers = task.kwargs.pop("sentry_headers", {})
+            with sentry_sdk.continue_trace(sentry_headers):
+                with sentry_sdk.start_transaction(
+                    name=task.name,
+                    op=OP.QUEUE_TASK_HUEY,
+                    source=TRANSACTION_SOURCE_TASK,
+                    origin=HueyIntegration.origin,
+                ) as transaction:
+                    transaction.set_status(SPANSTATUS.OK)
+                    return old_execute(self, task, timestamp)
 
     Huey._execute = _sentry_execute

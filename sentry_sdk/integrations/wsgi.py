@@ -3,7 +3,6 @@ from functools import partial
 
 import sentry_sdk
 from sentry_sdk._werkzeug import get_host, _get_headers
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -92,7 +91,7 @@ class SentryWsgiMiddleware:
                             )
                         )
 
-                    with continue_trace(environ):
+                    with sentry_sdk.continue_trace(environ):
                         with sentry_sdk.start_transaction(
                             op=OP.HTTP_SERVER,
                             name="generic WSGI request",

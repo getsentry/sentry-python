@@ -58,25 +58,23 @@ def _patch_ray_remote():
             """
             _check_sentry_initialized()
 
-            transaction = sentry_sdk.continue_trace(
-                _tracing or {},
-                op=OP.QUEUE_TASK_RAY,
-                name=qualname_from_function(f),
-                origin=RayIntegration.origin,
-                source=TRANSACTION_SOURCE_TASK,
-            )
+            with sentry_sdk.continue_trace(_tracing or {}):
+                with sentry_sdk.start_transaction(
+                    op=OP.QUEUE_TASK_RAY,
+                    name=qualname_from_function(f) or "unknown Ray function",
+                    origin=RayIntegration.origin,
+                    source=TRANSACTION_SOURCE_TASK,
+                ) as transaction:
+                    try:
+                        result = f(*f_args, **f_kwargs)
+                        transaction.set_status(SPANSTATUS.OK)
+                    except Exception:
+                        transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+                        exc_info = sys.exc_info()
+                        _capture_exception(exc_info)
+                        reraise(*exc_info)
 
-            with sentry_sdk.start_transaction(transaction) as transaction:
-                try:
-                    result = f(*f_args, **f_kwargs)
-                    transaction.set_status(SPANSTATUS.OK)
-                except Exception:
-                    transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    exc_info = sys.exc_info()
-                    _capture_exception(exc_info)
-                    reraise(*exc_info)
-
-                return result
+                    return result
 
         rv = old_remote(_f, *args, *kwargs)
         old_remote_method = rv.remote

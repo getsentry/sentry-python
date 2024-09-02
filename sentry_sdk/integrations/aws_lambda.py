@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from os import environ
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
@@ -135,34 +134,31 @@ def _wrap_handler(handler):
             if not isinstance(headers, dict):
                 headers = {}
 
-            transaction = continue_trace(
-                headers,
-                op=OP.FUNCTION_AWS,
-                name=aws_context.function_name,
-                source=TRANSACTION_SOURCE_COMPONENT,
-                origin=AwsLambdaIntegration.origin,
-            )
-            with sentry_sdk.start_transaction(
-                transaction,
-                custom_sampling_context={
-                    "aws_event": aws_event,
-                    "aws_context": aws_context,
-                },
-            ):
-                try:
-                    return handler(aws_event, aws_context, *args, **kwargs)
-                except Exception:
-                    exc_info = sys.exc_info()
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "aws_lambda", "handled": False},
-                    )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
-                    reraise(*exc_info)
-                finally:
-                    if timeout_thread:
-                        timeout_thread.stop()
+            with sentry_sdk.continue_trace(headers):
+                with sentry_sdk.start_transaction(
+                    op=OP.FUNCTION_AWS,
+                    name=aws_context.function_name,
+                    source=TRANSACTION_SOURCE_COMPONENT,
+                    origin=AwsLambdaIntegration.origin,
+                    custom_sampling_context={
+                        "aws_event": aws_event,
+                        "aws_context": aws_context,
+                    },
+                ):
+                    try:
+                        return handler(aws_event, aws_context, *args, **kwargs)
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        sentry_event, hint = event_from_exception(
+                            exc_info,
+                            client_options=client.options,
+                            mechanism={"type": "aws_lambda", "handled": False},
+                        )
+                        sentry_sdk.capture_event(sentry_event, hint=hint)
+                        reraise(*exc_info)
+                    finally:
+                        if timeout_thread:
+                            timeout_thread.stop()
 
     return sentry_handler  # type: ignore
 
