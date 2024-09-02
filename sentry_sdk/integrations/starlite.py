@@ -1,5 +1,4 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -21,6 +20,8 @@ try:
     from pydantic import BaseModel  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlite is not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union

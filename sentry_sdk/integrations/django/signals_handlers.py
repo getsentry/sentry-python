@@ -3,10 +3,10 @@ from functools import wraps
 from django.dispatch import Signal
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.django import DJANGO_VERSION
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable

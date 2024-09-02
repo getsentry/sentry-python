@@ -2,13 +2,14 @@
 Code used for the Caches module in Sentry
 """
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import capture_internal_exceptions
 
 GET_COMMANDS = ("get", "mget")
 SET_COMMANDS = ("set", "setex")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk.integrations.redis import RedisIntegration

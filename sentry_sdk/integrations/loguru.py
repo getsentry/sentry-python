@@ -1,12 +1,13 @@
 import enum
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import (
     BreadcrumbHandler,
     EventHandler,
     _BaseHandler,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import LogRecord

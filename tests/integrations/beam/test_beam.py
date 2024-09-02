@@ -45,7 +45,7 @@ class A:
         return self.fn()
 
 
-class B(A, object):
+class B(A):
     def fa(self, x, element=False, another_element=False):
         if x or (element and not another_element):
             # print(self.r)
