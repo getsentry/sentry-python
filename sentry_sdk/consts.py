@@ -1,7 +1,7 @@
 import itertools
 
 from enum import Enum
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
@@ -437,6 +437,9 @@ class OP:
     HTTP_CLIENT_STREAM = "http.client.stream"
     HTTP_SERVER = "http.server"
     MIDDLEWARE_DJANGO = "middleware.django"
+    MIDDLEWARE_LITESTAR = "middleware.litestar"
+    MIDDLEWARE_LITESTAR_RECEIVE = "middleware.litestar.receive"
+    MIDDLEWARE_LITESTAR_SEND = "middleware.litestar.send"
     MIDDLEWARE_STARLETTE = "middleware.starlette"
     MIDDLEWARE_STARLETTE_RECEIVE = "middleware.starlette.receive"
     MIDDLEWARE_STARLETTE_SEND = "middleware.starlette.send"
@@ -462,6 +465,8 @@ class OP:
     QUEUE_TASK_RQ = "queue.task.rq"
     QUEUE_SUBMIT_HUEY = "queue.submit.huey"
     QUEUE_TASK_HUEY = "queue.task.huey"
+    QUEUE_SUBMIT_RAY = "queue.submit.ray"
+    QUEUE_TASK_RAY = "queue.task.ray"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
@@ -536,6 +541,7 @@ class ClientConstructor:
         spotlight=None,  # type: Optional[Union[bool, str]]
         cert_file=None,  # type: Optional[str]
         key_file=None,  # type: Optional[str]
+        custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
     ):
         # type: (...) -> None
         pass
@@ -561,4 +567,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.12.0"
+VERSION = "2.13.0"

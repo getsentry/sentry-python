@@ -21,12 +21,14 @@ from sentry_sdk import (
     capture_event,
     set_tag,
 )
+from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 from sentry_sdk.utils import capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -944,6 +946,39 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     assert frame["vars"]["environ"] == {"a": "<This is me>"}
 
 
+def test_custom_repr_on_vars(sentry_init, capture_events):
+    class Foo:
+        pass
+
+    class Fail:
+        pass
+
+    def custom_repr(value):
+        if isinstance(value, Foo):
+            return "custom repr"
+        elif isinstance(value, Fail):
+            raise ValueError("oops")
+        else:
+            return None
+
+    sentry_init(custom_repr=custom_repr)
+    events = capture_events()
+
+    try:
+        my_vars = {"foo": Foo(), "fail": Fail(), "normal": 42}
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    (event,) = events
+    (exception,) = event["exception"]["values"]
+    (frame,) = exception["stacktrace"]["frames"]
+    my_vars = frame["vars"]["my_vars"]
+    assert my_vars["foo"] == "custom repr"
+    assert my_vars["normal"] == "42"
+    assert "Fail object" in my_vars["fail"]
+
+
 @pytest.mark.parametrize(
     "dsn",
     [
@@ -1062,6 +1097,47 @@ def test_debug_option(
         assert "something is wrong" in caplog.text
     else:
         assert "something is wrong" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "client_option,env_var_value,spotlight_url_expected",
+    [
+        (None, None, None),
+        (None, "", None),
+        (None, "F", None),
+        (False, None, None),
+        (False, "", None),
+        (False, "t", None),
+        (None, "t", DEFAULT_SPOTLIGHT_URL),
+        (None, "1", DEFAULT_SPOTLIGHT_URL),
+        (True, None, DEFAULT_SPOTLIGHT_URL),
+        (True, "http://localhost:8080/slurp", DEFAULT_SPOTLIGHT_URL),
+        ("http://localhost:8080/slurp", "f", "http://localhost:8080/slurp"),
+        (None, "http://localhost:8080/slurp", "http://localhost:8080/slurp"),
+    ],
+)
+def test_spotlight_option(
+    sentry_init,
+    monkeypatch,
+    client_option,
+    env_var_value,
+    spotlight_url_expected,
+):
+    if env_var_value is None:
+        monkeypatch.delenv("SENTRY_SPOTLIGHT", raising=False)
+    else:
+        monkeypatch.setenv("SENTRY_SPOTLIGHT", env_var_value)
+
+    if client_option is None:
+        sentry_init()
+    else:
+        sentry_init(spotlight=client_option)
+
+    client = sentry_sdk.get_client()
+    url = client.spotlight.url if client.spotlight else None
+    assert (
+        url == spotlight_url_expected
+    ), f"With config {client_option} and env {env_var_value}"
 
 
 class IssuesSamplerTestConfig:

@@ -14,7 +14,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     reraise,
 )
-from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from pyramid.httpexceptions import HTTPException
@@ -22,6 +21,7 @@ try:
 except ImportError:
     raise DidNotEnable("Pyramid not installed")
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pyramid.response import Response

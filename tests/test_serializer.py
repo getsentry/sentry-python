@@ -114,6 +114,31 @@ def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
     assert len(m.mock_calls) == 0
 
 
+def test_custom_repr(extra_normalizer):
+    class Foo:
+        pass
+
+    def custom_repr(value):
+        if isinstance(value, Foo):
+            return "custom"
+        else:
+            return value
+
+    result = extra_normalizer({"foo": Foo(), "string": "abc"}, custom_repr=custom_repr)
+    assert result == {"foo": "custom", "string": "abc"}
+
+
+def test_custom_repr_graceful_fallback_to_safe_repr(extra_normalizer):
+    class Foo:
+        pass
+
+    def custom_repr(value):
+        raise ValueError("oops")
+
+    result = extra_normalizer({"foo": Foo()}, custom_repr=custom_repr)
+    assert "Foo object" in result["foo"]
+
+
 def test_trim_databag_breadth(body_normalizer):
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)

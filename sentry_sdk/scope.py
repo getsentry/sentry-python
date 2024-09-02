@@ -26,15 +26,17 @@ from sentry_sdk.tracing import (
     Span,
     Transaction,
 )
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
     capture_internal_exceptions,
     ContextVar,
+    disable_capture_event,
     event_from_exception,
     exc_info_from_error,
     logger,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
@@ -152,7 +154,7 @@ def _disable_capture(fn):
     return wrapper  # type: ignore
 
 
-class Scope(object):
+class Scope:
     """The scope holds extra information that should be sent with all
     events that belong to it.
     """
@@ -1130,6 +1132,9 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
+        if disable_capture_event.get(False):
+            return None
+
         scope = self._merge_scopes(scope, scope_kwargs)
 
         event_id = self.get_client().capture_event(event=event, hint=hint, scope=scope)
@@ -1157,6 +1162,9 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
+        if disable_capture_event.get(False):
+            return None
+
         if level is None:
             level = "info"
 
@@ -1182,6 +1190,9 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
+        if disable_capture_event.get(False):
+            return None
+
         if error is not None:
             exc_info = exc_info_from_error(error)
         else:

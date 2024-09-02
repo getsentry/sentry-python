@@ -19,7 +19,8 @@ from sentry_sdk.utils import (
     parse_version,
     reraise,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Container

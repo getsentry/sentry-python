@@ -1,7 +1,4 @@
-try:
-    from typing import TYPE_CHECKING
-except ImportError:
-    TYPE_CHECKING = False
+from typing import TYPE_CHECKING
 
 
 # Re-exported for compat, since code out there in the wild might use this variable.
@@ -9,7 +6,7 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import Container, MutableMapping
+    from collections.abc import Container, MutableMapping, Sequence
 
     from datetime import datetime
 
@@ -24,6 +21,11 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
     from typing_extensions import Literal, TypedDict
+
+    class SDKInfo(TypedDict):
+        name: str
+        version: str
+        packages: Sequence[Mapping[str, str]]
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
