@@ -783,3 +783,51 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
         assert span["origin"] == "auto.queue.celery"
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
+
+
+def test_send_task_wrapped(monkeypatch, sentry_init, capture_events):
+    calls = []
+
+    def send_task(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(Celery, "send_task", send_task)
+
+    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="custom_transaction"):
+        celery.send_task("very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"})
+
+    (call,) = calls  # We should have exactly one call
+    (args, kwargs) = call
+
+    assert args == (celery, "very_creative_task_name")
+    assert kwargs["args"] == (1, 2)
+    assert kwargs["kwargs"] == {"foo": "bar"}
+    assert set(kwargs["headers"].keys()) == {
+        "sentry-task-enqueued-time",
+        "sentry-trace",
+        "baggage",
+        "headers",
+    }
+    assert set(kwargs["headers"]["headers"].keys()) == {
+        "sentry-trace",
+        "baggage",
+        "sentry-task-enqueued-time",
+    }
+    assert (
+        kwargs["headers"]["sentry-trace"]
+        == kwargs["headers"]["headers"]["sentry-trace"]
+    )
+
+    (event,) = events  # We should have exactly one event (the transaction)
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "custom_transaction"
+
+    (span,) = event["spans"]  # We should have exactly one span
+    assert span["description"] == "very_creative_task_name"
+    assert span["op"] == "queue.submit.celery"
+    assert span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
