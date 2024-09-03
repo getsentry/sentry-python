@@ -1380,7 +1380,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        self._get_attribute(SentrySpanAttribute.NAME)
+        return self._get_attribute(SentrySpanAttribute.NAME)
 
     @name.setter
     def name(self, value):
