@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace import format_trace_id, format_span_id
 from opentelemetry.trace.status import StatusCode
+from opentelemetry.sdk.trace import ReadableSpan
 
 import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS, SPANDATA
@@ -37,7 +38,6 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
     import sentry_sdk.profiler
-    from sentry_sdk.scope import Scope
     from sentry_sdk._types import (
         Event,
         MeasurementUnit,
@@ -1198,7 +1198,6 @@ class POTelSpan:
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
-        scope=None,  # type: Optional[Scope]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
@@ -1218,10 +1217,9 @@ class POTelSpan:
             # OTel timestamps have nanosecond precision
             start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
-        # XXX deal with _otel_span being a NonRecordingSpan
         self._otel_span = tracer.start_span(
             description or op or "", start_time=start_timestamp
-        )  # XXX
+        )
 
         self.origin = origin or DEFAULT_SPAN_ORIGIN
         self.op = op
@@ -1267,12 +1265,18 @@ class POTelSpan:
         # XXX set status to error if unset and an exception occurred?
         context.detach(self._ctx_token)
 
+    def _get_attribute(self, name):
+        # type: (str) -> Optional[Any]
+        if not isinstance(self._otel_span, ReadableSpan):
+            return None
+        self._otel_span.attributes.get(name)
+
     @property
     def description(self):
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._otel_span.attributes.get(SentrySpanAttribute.DESCRIPTION)
+        return self._get_attribute(SentrySpanAttribute.DESCRIPTION)
 
     @description.setter
     def description(self, value):
@@ -1287,7 +1291,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._otel_span.attributes.get(SentrySpanAttribute.ORIGIN)
+        return self._get_attribute(SentrySpanAttribute.ORIGIN)
 
     @origin.setter
     def origin(self, value):
@@ -1299,7 +1303,7 @@ class POTelSpan:
 
     @property
     def containing_transaction(self):
-        # type: () -> Optional[Transaction]
+        # type: () -> Optional[POTelSpan]
         """
         Get the transaction this span is a child of.
 
@@ -1311,16 +1315,6 @@ class POTelSpan:
         )
         return self.root_span
 
-    @containing_transaction.setter
-    def containing_transaction(self, value):
-        # type: (Span) -> None
-        """
-        Set this span's transaction.
-        .. deprecated:: 3.0.0
-            Use :func:`root_span` instead.
-        """
-        pass
-
     @property
     def root_span(self):
         # type: () -> Optional[POTelSpan]
@@ -1329,21 +1323,22 @@ class POTelSpan:
         # not sure if there's a way to retrieve the parent with pure otel.
         return None
 
-    @root_span.setter
-    def root_span(self, value):
-        pass
-
     @property
     def is_root_span(self):
-        if isinstance(self._otel_span, otel_trace.NonRecordingSpan):
-            return False
-
-        return self._otel_span.parent is None
+        # type: () -> bool
+        return (
+            isinstance(self._otel_span, ReadableSpan) and self._otel_span.parent is None
+        )
 
     @property
     def parent_span_id(self):
         # type: () -> Optional[str]
-        return self._otel_span.parent if hasattr(self._otel_span, "parent") else None
+        if (
+            not isinstance(self._otel_span, ReadableSpan)
+            or self._otel_span.parent is None
+        ):
+            return None
+        return format_span_id(self._otel_span.parent.span_id)
 
     @property
     def trace_id(self):
@@ -1370,7 +1365,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._otel_span.attributes.get(SentrySpanAttribute.OP)
+        self._get_attribute(SentrySpanAttribute.OP)
 
     @op.setter
     def op(self, value):
@@ -1385,7 +1380,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._otel_span.attributes.get(SentrySpanAttribute.NAME)
+        self._get_attribute(SentrySpanAttribute.NAME)
 
     @name.setter
     def name(self, value):
@@ -1408,6 +1403,9 @@ class POTelSpan:
     @property
     def start_timestamp(self):
         # type: () -> Optional[datetime]
+        if not isinstance(self._otel_span, ReadableSpan):
+            return None
+
         start_time = self._otel_span.start_time
         if start_time is None:
             return None
@@ -1421,6 +1419,9 @@ class POTelSpan:
     @property
     def timestamp(self):
         # type: () -> Optional[datetime]
+        if not isinstance(self._otel_span, ReadableSpan):
+            return None
+
         end_time = self._otel_span.end_time
         if end_time is None:
             return None
@@ -1432,48 +1433,15 @@ class POTelSpan:
         return convert_from_otel_timestamp(end_time)
 
     def start_child(self, **kwargs):
-        # type: (str, **Any) -> POTelSpan
+        # type: (**Any) -> POTelSpan
         kwargs.setdefault("sampled", self.sampled)
 
-        span = POTelSpan(**kwargs)
-        return span
-
-    @classmethod
-    def continue_from_environ(
-        cls,
-        environ,  # type: Mapping[str, str]
-        **kwargs,  # type: Any
-    ):
-        # type: (...) -> POTelSpan
-        # XXX actually propagate
-        span = POTelSpan(**kwargs)
-        return span
-
-    @classmethod
-    def continue_from_headers(
-        cls,
-        headers,  # type: Mapping[str, str]
-        **kwargs,  # type: Any
-    ):
-        # type: (...) -> POTelSpan
-        # XXX actually propagate
         span = POTelSpan(**kwargs)
         return span
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         pass
-
-    @classmethod
-    def from_traceparent(
-        cls,
-        traceparent,  # type: Optional[str]
-        **kwargs,  # type: Any
-    ):
-        # type: (...) -> Optional[Transaction]
-        # XXX actually propagate
-        span = POTelSpan(**kwargs)
-        return span
 
     def to_traceparent(self):
         # type: () -> str
