@@ -785,6 +785,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
 
 
+@pytest.mark.forked
 @mock.patch("celery.Celery.send_task")
 def test_send_task_wrapped(
     patched_send_task,
