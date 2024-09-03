@@ -1269,7 +1269,7 @@ class POTelSpan:
         # type: (str) -> Optional[Any]
         if not isinstance(self._otel_span, ReadableSpan):
             return None
-        self._otel_span.attributes.get(name)
+        return self._otel_span.attributes.get(name)
 
     @property
     def description(self):
