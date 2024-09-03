@@ -1365,7 +1365,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        self._get_attribute(SentrySpanAttribute.OP)
+        return self._get_attribute(SentrySpanAttribute.OP)
 
     @op.setter
     def op(self, value):
