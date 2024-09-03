@@ -309,7 +309,7 @@ def _patch_execute():
         # type: (Any, Any) -> ExecutionResult
         result = old_execute_sync(*args, **kwargs)
 
-        if "execution_context" in kwargs and result.errors:
+        if "execution_context" in kwargs:
             scope = sentry_sdk.get_isolation_scope()
             event_processor = _make_request_event_processor(kwargs["execution_context"])
             scope.add_event_processor(event_processor)
