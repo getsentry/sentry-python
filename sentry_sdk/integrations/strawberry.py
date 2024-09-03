@@ -41,10 +41,10 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Generator, List, Optional
+    from typing import Any, Callable, Generator, List, Optional, Union
     from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
     from strawberry.http import GraphQLHTTPResponse
-    from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
+    from strawberry.types import ExecutionContext, ExecutionResult, SubscriptionExecutionResult  # type: ignore
     from sentry_sdk._types import Event, EventProcessor
 
 
@@ -291,13 +291,13 @@ def _patch_execute():
     old_execute_sync = strawberry_schema.execute_sync
 
     async def _sentry_patched_execute_async(*args, **kwargs):
-        # type: (Any, Any) -> ExecutionResult
+        # type: (Any, Any) -> Union[ExecutionResult, SubscriptionExecutionResult]
         result = await old_execute_async(*args, **kwargs)
 
         if sentry_sdk.get_client().get_integration(StrawberryIntegration) is None:
             return result
 
-        if "execution_context" in kwargs and result.errors:
+        if "execution_context" in kwargs:
             scope = sentry_sdk.get_isolation_scope()
             event_processor = _make_request_event_processor(kwargs["execution_context"])
             scope.add_event_processor(event_processor)
