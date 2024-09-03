@@ -1,9 +1,15 @@
 import warnings
 from contextlib import contextmanager
 
+from sentry_sdk import (
+    get_client,
+    get_global_scope,
+    get_isolation_scope,
+    get_current_scope,
+)
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope, _ScopeManager
+from sentry_sdk.scope import _ScopeManager
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import (
     NoOpSpan,
@@ -16,7 +22,7 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -34,6 +40,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
+    from sentry_sdk.scope import Scope
     from sentry_sdk.client import BaseClient
     from sentry_sdk.integrations import Integration
     from sentry_sdk._types import (
@@ -139,23 +146,23 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         current_scope = None
 
         if isinstance(client_or_hub, Hub):
-            client = Scope.get_client()
+            client = get_client()
             if scope is None:
                 # hub cloning is going on, we use a fork of the current/isolation scope for context manager
-                scope = Scope.get_isolation_scope().fork()
-                current_scope = Scope.get_current_scope().fork()
+                scope = get_isolation_scope().fork()
+                current_scope = get_current_scope().fork()
         else:
             client = client_or_hub  # type: ignore
-            Scope.get_global_scope().set_client(client)
+            get_global_scope().set_client(client)
 
         if scope is None:  # so there is no Hub cloning going on
             # just the current isolation scope is used for context manager
-            scope = Scope.get_isolation_scope()
-            current_scope = Scope.get_current_scope()
+            scope = get_isolation_scope()
+            current_scope = get_current_scope()
 
         if current_scope is None:
             # just the current current scope is used for context manager
-            current_scope = Scope.get_current_scope()
+            current_scope = get_current_scope()
 
         self._stack = [(client, scope)]  # type: ignore
         self._last_event_id = None  # type: Optional[str]
@@ -171,11 +178,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self._old_hubs.append(Hub.current)
         _local.set(self)
 
-        current_scope = Scope.get_current_scope()
+        current_scope = get_current_scope()
         self._old_current_scopes.append(current_scope)
         scope._current_scope.set(self._current_scope)
 
-        isolation_scope = Scope.get_isolation_scope()
+        isolation_scope = get_isolation_scope()
         self._old_isolation_scopes.append(isolation_scope)
         scope._isolation_scope.set(self._scope)
 
@@ -227,7 +234,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         If the return value is not `None` the hub is guaranteed to have a
         client attached.
         """
-        return Scope.get_client().get_integration(name_or_class)
+        return get_client().get_integration(name_or_class)
 
     @property
     def client(self):
@@ -239,7 +246,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Returns the current client on the hub.
         """
-        client = Scope.get_client()
+        client = get_client()
 
         if not client.is_active():
             return None
@@ -254,7 +261,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             This property is deprecated and will be removed in a future release.
             Returns the current scope on the hub.
         """
-        return Scope.get_isolation_scope()
+        return get_isolation_scope()
 
     def last_event_id(self):
         # type: () -> Optional[str]
@@ -280,7 +287,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Binds a new client to the hub.
         """
-        Scope.get_global_scope().set_client(new)
+        get_global_scope().set_client(new)
 
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
@@ -304,7 +311,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
         """
-        last_event_id = Scope.get_current_scope().capture_event(
+        last_event_id = get_current_scope().capture_event(
             event, hint, scope=scope, **scope_kwargs
         )
 
@@ -338,7 +345,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
-        last_event_id = Scope.get_current_scope().capture_message(
+        last_event_id = get_current_scope().capture_message(
             message, level=level, scope=scope, **scope_kwargs
         )
 
@@ -369,7 +376,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
-        last_event_id = Scope.get_current_scope().capture_exception(
+        last_event_id = get_current_scope().capture_exception(
             error, scope=scope, **scope_kwargs
         )
 
@@ -392,7 +399,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
         """
-        Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
+        get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
     def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (str, Any) -> Span
@@ -415,7 +422,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        scope = Scope.get_current_scope()
+        scope = get_current_scope()
         return scope.start_span(instrumenter=instrumenter, **kwargs)
 
     def start_transaction(
@@ -454,7 +461,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
-        scope = Scope.get_current_scope()
+        scope = get_current_scope()
 
         # For backwards compatibility, we allow passing the scope as the hub.
         # We need a major release to make this nice. (if someone searches the code: deprecated)
@@ -474,7 +481,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Sets the propagation context from environment or headers and returns a transaction.
         """
-        return Scope.get_isolation_scope().continue_trace(
+        return get_isolation_scope().continue_trace(
             environ_or_headers=environ_or_headers, op=op, name=name, source=source
         )
 
@@ -561,7 +568,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: If no callback is provided, returns a context manager that returns the scope.
         """
-        scope = Scope.get_isolation_scope()
+        scope = get_isolation_scope()
 
         if continue_trace:
             scope.generate_propagation_context()
@@ -590,7 +597,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Starts a new session.
         """
-        Scope.get_isolation_scope().start_session(
+        get_isolation_scope().start_session(
             session_mode=session_mode,
         )
 
@@ -603,7 +610,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Ends the current session if there is one.
         """
-        Scope.get_isolation_scope().end_session()
+        get_isolation_scope().end_session()
 
     def stop_auto_session_tracking(self):
         # type: (...) -> None
@@ -617,7 +624,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         This temporarily session tracking for the current scope when called.
         To resume session tracking call `resume_auto_session_tracking`.
         """
-        Scope.get_isolation_scope().stop_auto_session_tracking()
+        get_isolation_scope().stop_auto_session_tracking()
 
     def resume_auto_session_tracking(self):
         # type: (...) -> None
@@ -630,7 +637,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
         """
-        Scope.get_isolation_scope().resume_auto_session_tracking()
+        get_isolation_scope().resume_auto_session_tracking()
 
     def flush(
         self,
@@ -645,7 +652,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Alias for :py:meth:`sentry_sdk.client._Client.flush`
         """
-        return Scope.get_client().flush(timeout=timeout, callback=callback)
+        return get_client().flush(timeout=timeout, callback=callback)
 
     def get_traceparent(self):
         # type: () -> Optional[str]
@@ -656,11 +663,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Returns the traceparent either from the active span or from the scope.
         """
-        current_scope = Scope.get_current_scope()
+        current_scope = get_current_scope()
         traceparent = current_scope.get_traceparent()
 
         if traceparent is None:
-            isolation_scope = Scope.get_isolation_scope()
+            isolation_scope = get_isolation_scope()
             traceparent = isolation_scope.get_traceparent()
 
         return traceparent
@@ -674,11 +681,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Returns Baggage either from the active span or from the scope.
         """
-        current_scope = Scope.get_current_scope()
+        current_scope = get_current_scope()
         baggage = current_scope.get_baggage()
 
         if baggage is None:
-            isolation_scope = Scope.get_isolation_scope()
+            isolation_scope = get_isolation_scope()
             baggage = isolation_scope.get_baggage()
 
         if baggage is not None:
@@ -697,7 +704,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        return Scope.get_current_scope().iter_trace_propagation_headers(
+        return get_current_scope().iter_trace_propagation_headers(
             span=span,
         )
 
@@ -716,7 +723,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
             )
 
-        return Scope.get_current_scope().trace_propagation_meta(
+        return get_current_scope().trace_propagation_meta(
             span=span,
         )
 

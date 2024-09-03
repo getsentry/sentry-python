@@ -10,7 +10,8 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 from sentry_sdk.integrations import Integration
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -110,7 +111,7 @@ class LoggingIntegration(Integration):
         logging.Logger.callHandlers = sentry_patched_callhandlers  # type: ignore
 
 
-class _BaseHandler(logging.Handler, object):
+class _BaseHandler(logging.Handler):
     COMMON_RECORD_ATTRS = frozenset(
         (
             "args",

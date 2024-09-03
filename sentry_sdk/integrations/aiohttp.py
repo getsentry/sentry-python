@@ -6,8 +6,7 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import Scope
-from sentry_sdk.sessions import auto_session_tracking_scope
+from sentry_sdk.sessions import track_session
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
@@ -42,7 +41,7 @@ try:
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp.web_request import Request
@@ -106,7 +105,7 @@ class AioHttpIntegration(Integration):
             weak_request = weakref.ref(request)
 
             with sentry_sdk.isolation_scope() as scope:
-                with auto_session_tracking_scope(scope, session_mode="request"):
+                with track_session(scope, session_mode="request"):
                     # Scope data will not leak between requests because aiohttp
                     # create a task to wrap each request.
                     scope.generate_propagation_context()
@@ -166,7 +165,7 @@ class AioHttpIntegration(Integration):
                 pass
 
             if name is not None:
-                Scope.get_current_scope().set_transaction_name(
+                sentry_sdk.get_current_scope().set_transaction_name(
                     name,
                     source=SOURCE_FOR_STYLE[integration.transaction_style],
                 )
@@ -219,7 +218,10 @@ def create_trace_config():
         client = sentry_sdk.get_client()
 
         if should_propagate_trace(client, str(params.url)):
-            for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
+            for (
+                key,
+                value,
+            ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
                 logger.debug(

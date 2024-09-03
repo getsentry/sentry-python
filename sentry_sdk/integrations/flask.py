@@ -1,9 +1,8 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -11,6 +10,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
@@ -96,14 +97,14 @@ def _add_sentry_trace(sender, template, context, **extra):
     if "sentry_trace" in context:
         return
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     trace_meta = Markup(scope.trace_propagation_meta())
     context["sentry_trace"] = trace_meta  # for backwards compatibility
     context["sentry_trace_meta"] = trace_meta
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Request) -> None
+    # type: (sentry_sdk.Scope, str, Request) -> None
     try:
         name_for_style = {
             "url": request.url_rule.rule,
@@ -126,10 +127,10 @@ def _request_started(app, **kwargs):
     # Set the transaction name and source here,
     # but rely on WSGI middleware to actually start the transaction
     _set_transaction_name_and_source(
-        Scope.get_current_scope(), integration.transaction_style, request
+        sentry_sdk.get_current_scope(), integration.transaction_style, request
     )
 
-    scope = Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
 

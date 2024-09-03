@@ -1,9 +1,9 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.scope import Scope
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator, Iterable, Union
@@ -74,7 +74,10 @@ class ClientInterceptor(
         metadata = (
             list(client_call_details.metadata) if client_call_details.metadata else []
         )
-        for key, value in Scope.get_current_scope().iter_trace_propagation_headers():
+        for (
+            key,
+            value,
+        ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers():
             metadata.append((key, value))
 
         client_call_details = grpc._interceptor._ClientCallDetails(

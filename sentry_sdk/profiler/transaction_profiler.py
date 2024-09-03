@@ -39,7 +39,6 @@ from collections import deque
 
 import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.profiler.utils import (
     DEFAULT_SAMPLING_FREQUENCY,
     extract_stack,
@@ -53,6 +52,8 @@ from sentry_sdk.utils import (
     nanosecond_time,
     set_in_app_in_frames,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -288,7 +289,7 @@ class Profile:
             self.sampled = False
             return
 
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
         if not client.is_active():
             self.sampled = False
             return
@@ -356,7 +357,7 @@ class Profile:
 
     def __enter__(self):
         # type: () -> Profile
-        scope = sentry_sdk.scope.Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
@@ -492,7 +493,7 @@ class Profile:
 
     def valid(self):
         # type: () -> bool
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
         if not client.is_active():
             return False
 

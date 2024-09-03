@@ -27,7 +27,8 @@ from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_TASK,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -738,7 +739,7 @@ def _get_aggregator_and_update_tags(key, value, unit, tags):
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
-    scope = sentry_sdk.Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     local_aggregator = None
 
     # We go with the low-level API here to access transaction information as

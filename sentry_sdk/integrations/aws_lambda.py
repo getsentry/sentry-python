@@ -6,7 +6,7 @@ from os import environ
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -19,7 +19,8 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -44,7 +45,7 @@ def _wrap_init_error(init_error):
         client = sentry_sdk.get_client()
 
         with capture_internal_exceptions():
-            Scope.get_isolation_scope().clear_breadcrumbs()
+            sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
             exc_info = sys.exc_info()
             if exc_info and all(exc_info):

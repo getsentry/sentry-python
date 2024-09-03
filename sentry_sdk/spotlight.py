@@ -1,7 +1,7 @@
 import io
 import urllib3
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -10,6 +10,9 @@ if TYPE_CHECKING:
 
 from sentry_sdk.utils import logger
 from sentry_sdk.envelope import Envelope
+
+
+DEFAULT_SPOTLIGHT_URL = "http://localhost:8969/stream"
 
 
 class SpotlightClient:
@@ -51,7 +54,7 @@ def setup_spotlight(options):
     if isinstance(url, str):
         pass
     elif url is True:
-        url = "http://localhost:8969/stream"
+        url = DEFAULT_SPOTLIGHT_URL
     else:
         return None
 

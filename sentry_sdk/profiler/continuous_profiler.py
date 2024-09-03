@@ -6,9 +6,9 @@ import time
 import uuid
 from datetime import datetime, timezone
 
+from sentry_sdk.consts import VERSION
 from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.profiler.utils import (
     DEFAULT_SAMPLING_FREQUENCY,
     extract_stack,
@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
     set_in_app_in_frames,
 )
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
     from typing_extensions import TypedDict
-    from sentry_sdk._types import ContinuousProfilerMode
+    from sentry_sdk._types import ContinuousProfilerMode, SDKInfo
     from sentry_sdk.profiler.utils import (
         ExtractedSample,
         FrameId,
@@ -65,8 +66,8 @@ except ImportError:
 _scheduler = None  # type: Optional[ContinuousScheduler]
 
 
-def setup_continuous_profiler(options, capture_func):
-    # type: (Dict[str, Any], Callable[[Envelope], None]) -> bool
+def setup_continuous_profiler(options, sdk_info, capture_func):
+    # type: (Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> bool
     global _scheduler
 
     if _scheduler is not None:
@@ -91,9 +92,13 @@ def setup_continuous_profiler(options, capture_func):
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
     if profiler_mode == ThreadContinuousScheduler.mode:
-        _scheduler = ThreadContinuousScheduler(frequency, options, capture_func)
+        _scheduler = ThreadContinuousScheduler(
+            frequency, options, sdk_info, capture_func
+        )
     elif profiler_mode == GeventContinuousScheduler.mode:
-        _scheduler = GeventContinuousScheduler(frequency, options, capture_func)
+        _scheduler = GeventContinuousScheduler(
+            frequency, options, sdk_info, capture_func
+        )
     else:
         raise ValueError("Unknown continuous profiler mode: {}".format(profiler_mode))
 
@@ -159,13 +164,14 @@ def get_profiler_id():
     return _scheduler.profiler_id
 
 
-class ContinuousScheduler(object):
+class ContinuousScheduler:
     mode = "unknown"  # type: ContinuousProfilerMode
 
-    def __init__(self, frequency, options, capture_func):
-        # type: (int, Dict[str, Any], Callable[[Envelope], None]) -> None
+    def __init__(self, frequency, options, sdk_info, capture_func):
+        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
         self.interval = 1.0 / frequency
         self.options = options
+        self.sdk_info = sdk_info
         self.capture_func = capture_func
         self.sampler = self.make_sampler()
         self.buffer = None  # type: Optional[ProfileBuffer]
@@ -194,7 +200,7 @@ class ContinuousScheduler(object):
     def reset_buffer(self):
         # type: () -> None
         self.buffer = ProfileBuffer(
-            self.options, PROFILE_BUFFER_SECONDS, self.capture_func
+            self.options, self.sdk_info, PROFILE_BUFFER_SECONDS, self.capture_func
         )
 
     @property
@@ -266,9 +272,9 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     mode = "thread"  # type: ContinuousProfilerMode
     name = "sentry.profiler.ThreadContinuousScheduler"
 
-    def __init__(self, frequency, options, capture_func):
-        # type: (int, Dict[str, Any], Callable[[Envelope], None]) -> None
-        super().__init__(frequency, options, capture_func)
+    def __init__(self, frequency, options, sdk_info, capture_func):
+        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
+        super().__init__(frequency, options, sdk_info, capture_func)
 
         self.thread = None  # type: Optional[threading.Thread]
         self.pid = None  # type: Optional[int]
@@ -341,13 +347,13 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
     mode = "gevent"  # type: ContinuousProfilerMode
 
-    def __init__(self, frequency, options, capture_func):
-        # type: (int, Dict[str, Any], Callable[[Envelope], None]) -> None
+    def __init__(self, frequency, options, sdk_info, capture_func):
+        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
 
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super().__init__(frequency, options, capture_func)
+        super().__init__(frequency, options, sdk_info, capture_func)
 
         self.thread = None  # type: Optional[_ThreadPool]
         self.pid = None  # type: Optional[int]
@@ -404,10 +410,11 @@ class GeventContinuousScheduler(ContinuousScheduler):
 PROFILE_BUFFER_SECONDS = 10
 
 
-class ProfileBuffer(object):
-    def __init__(self, options, buffer_size, capture_func):
-        # type: (Dict[str, Any], int, Callable[[Envelope], None]) -> None
+class ProfileBuffer:
+    def __init__(self, options, sdk_info, buffer_size, capture_func):
+        # type: (Dict[str, Any], SDKInfo, int, Callable[[Envelope], None]) -> None
         self.options = options
+        self.sdk_info = sdk_info
         self.buffer_size = buffer_size
         self.capture_func = capture_func
 
@@ -445,13 +452,13 @@ class ProfileBuffer(object):
 
     def flush(self):
         # type: () -> None
-        chunk = self.chunk.to_json(self.profiler_id, self.options)
+        chunk = self.chunk.to_json(self.profiler_id, self.options, self.sdk_info)
         envelope = Envelope()
         envelope.add_profile_chunk(chunk)
         self.capture_func(envelope)
 
 
-class ProfileChunk(object):
+class ProfileChunk:
     def __init__(self):
         # type: () -> None
         self.chunk_id = uuid.uuid4().hex
@@ -491,8 +498,8 @@ class ProfileChunk(object):
                 # When this happens, we abandon the current sample as it's bad.
                 capture_internal_exception(sys.exc_info())
 
-    def to_json(self, profiler_id, options):
-        # type: (str, Dict[str, Any]) -> Dict[str, Any]
+    def to_json(self, profiler_id, options, sdk_info):
+        # type: (str, Dict[str, Any], SDKInfo) -> Dict[str, Any]
         profile = {
             "frames": self.frames,
             "stacks": self.stacks,
@@ -514,6 +521,10 @@ class ProfileChunk(object):
 
         payload = {
             "chunk_id": self.chunk_id,
+            "client_sdk": {
+                "name": sdk_info["name"],
+                "version": VERSION,
+            },
             "platform": "python",
             "profile": profile,
             "profiler_id": profiler_id,

@@ -13,8 +13,6 @@ import inspect
 from django.core.handlers.wsgi import WSGIRequest
 
 import sentry_sdk
-from sentry_sdk import Scope
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -24,6 +22,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
 )
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Union, TypeVar
@@ -112,7 +111,7 @@ def patch_django_asgi_handler_impl(cls):
         def sentry_patched_create_request(self, *args, **kwargs):
             # type: (Any, *Any, **Any) -> Any
             request, error_response = old_create_request(self, *args, **kwargs)
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             scope.add_event_processor(_make_asgi_request_event_processor(request))
 
             return request, error_response
@@ -169,7 +168,7 @@ def wrap_async_view(callback):
     @functools.wraps(callback)
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
-        sentry_scope = Scope.get_isolation_scope()
+        sentry_scope = sentry_sdk.get_isolation_scope()
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
 

@@ -15,8 +15,6 @@ from sentry_sdk.integrations.celery.beat import (
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -24,6 +22,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     reraise,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -100,7 +100,7 @@ class CeleryIntegration(Integration):
 def _set_status(status):
     # type: (str) -> None
     with capture_internal_exceptions():
-        scope = Scope.get_current_scope()
+        scope = sentry_sdk.get_current_scope()
         if scope.span is not None:
             scope.span.set_status(status)
 
@@ -170,7 +170,7 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
         # if span is None (when the task was started by Celery Beat)
         # this will return the trace headers from the scope.
         headers = dict(
-            Scope.get_isolation_scope().iter_trace_propagation_headers(span=span)
+            sentry_sdk.get_isolation_scope().iter_trace_propagation_headers(span=span)
         )
 
         if monitor_beat_tasks:
@@ -262,9 +262,7 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
-        task_started_from_beat = (
-            sentry_sdk.Scope.get_isolation_scope()._name == "celery-beat"
-        )
+        task_started_from_beat = sentry_sdk.get_isolation_scope()._name == "celery-beat"
 
         span_mgr = (
             sentry_sdk.start_span(

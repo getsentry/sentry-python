@@ -15,7 +15,6 @@ import sentry_sdk.scope
 from sentry_sdk import (
     get_client,
     push_scope,
-    configure_scope,
     capture_event,
     capture_exception,
     capture_message,
@@ -23,8 +22,8 @@ from sentry_sdk import (
     last_event_id,
     add_breadcrumb,
     isolation_scope,
+    new_scope,
     Hub,
-    Scope,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
@@ -74,13 +73,11 @@ def test_processors(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    with configure_scope() as scope:
+    def error_processor(event, exc_info):
+        event["exception"]["values"][0]["value"] += " whatever"
+        return event
 
-        def error_processor(event, exc_info):
-            event["exception"]["values"][0]["value"] += " whatever"
-            return event
-
-        scope.add_error_processor(error_processor, ValueError)
+    sentry_sdk.get_isolation_scope().add_error_processor(error_processor, ValueError)
 
     try:
         raise ValueError("aha!")
@@ -297,7 +294,7 @@ def test_breadcrumb_arguments(sentry_init, capture_events):
     add_breadcrumb(crumb=dict(foo=42))
 
 
-def test_push_scope(sentry_init, capture_events):
+def test_push_scope(sentry_init, capture_events, suppress_deprecation_warnings):
     sentry_init()
     events = capture_events()
 
@@ -314,7 +311,9 @@ def test_push_scope(sentry_init, capture_events):
     assert "exception" in event
 
 
-def test_push_scope_null_client(sentry_init, capture_events):
+def test_push_scope_null_client(
+    sentry_init, capture_events, suppress_deprecation_warnings
+):
     """
     This test can be removed when we remove push_scope and the Hub from the SDK.
     """
@@ -388,7 +387,7 @@ def test_breadcrumbs(sentry_init, capture_events):
             category="auth", message="Authenticated user %s" % i, level="info"
         )
 
-    Scope.get_isolation_scope().clear()
+    sentry_sdk.get_isolation_scope().clear()
 
     capture_exception(ValueError())
     (event,) = events
@@ -432,9 +431,9 @@ def test_attachments(sentry_init, capture_envelopes):
 
     this_file = os.path.abspath(__file__.rstrip("c"))
 
-    with configure_scope() as scope:
-        scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
-        scope.add_attachment(path=this_file)
+    scope = sentry_sdk.get_isolation_scope()
+    scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
+    scope.add_attachment(path=this_file)
 
     capture_exception(ValueError())
 
@@ -466,8 +465,7 @@ def test_attachments_graceful_failure(
     sentry_init()
     envelopes = capture_envelopes()
 
-    with configure_scope() as scope:
-        scope.add_attachment(path="non_existent")
+    sentry_sdk.get_isolation_scope().add_attachment(path="non_existent")
     capture_exception(ValueError())
 
     (envelope,) = envelopes
@@ -610,14 +608,14 @@ def test_scope_event_processor_order(sentry_init, capture_events):
     sentry_init(debug=True, before_send=before_send)
     events = capture_events()
 
-    with push_scope() as scope:
+    with new_scope() as scope:
 
         @scope.add_event_processor
         def foo(event, hint):
             event["message"] += "foo"
             return event
 
-        with push_scope() as scope:
+        with new_scope() as scope:
 
             @scope.add_event_processor
             def bar(event, hint):
@@ -720,6 +718,8 @@ def test_event_processor_drop_records_client_report(
         (["quart"], "sentry.python.quart"),
         (["sanic"], "sentry.python.sanic"),
         (["starlette"], "sentry.python.starlette"),
+        (["starlite"], "sentry.python.starlite"),
+        (["litestar"], "sentry.python.litestar"),
         (["chalice"], "sentry.python.chalice"),
         (["serverless"], "sentry.python.serverless"),
         (["pyramid"], "sentry.python.pyramid"),
@@ -758,6 +758,8 @@ def test_event_processor_drop_records_client_report(
         (["sanic", "quart", "sqlalchemy"], "sentry.python.quart"),
         (["starlette", "sanic", "rq"], "sentry.python.sanic"),
         (["chalice", "starlette", "modules"], "sentry.python.starlette"),
+        (["chalice", "starlite", "modules"], "sentry.python.starlite"),
+        (["chalice", "litestar", "modules"], "sentry.python.litestar"),
         (["serverless", "chalice", "pure_eval"], "sentry.python.chalice"),
         (["pyramid", "serverless", "modules"], "sentry.python.serverless"),
         (["tornado", "pyramid", "executing"], "sentry.python.pyramid"),

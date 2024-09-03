@@ -3,14 +3,15 @@ from copy import deepcopy
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     transaction_from_function,
     logger,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict
@@ -43,7 +44,7 @@ class FastApiIntegration(StarletteIntegration):
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Any) -> None
+    # type: (sentry_sdk.Scope, str, Any) -> None
     name = ""
 
     if transaction_style == "endpoint":
@@ -87,7 +88,7 @@ def patch_get_request_handler():
             @wraps(old_call)
             def _sentry_call(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
-                sentry_scope = Scope.get_isolation_scope()
+                sentry_scope = sentry_sdk.get_isolation_scope()
                 if sentry_scope.profile is not None:
                     sentry_scope.profile.update_active_thread_id()
                 return old_call(*args, **kwargs)
@@ -105,9 +106,9 @@ def patch_get_request_handler():
             request = args[0]
 
             _set_transaction_name_and_source(
-                Scope.get_current_scope(), integration.transaction_style, request
+                sentry_sdk.get_current_scope(), integration.transaction_style, request
             )
-            sentry_scope = Scope.get_isolation_scope()
+            sentry_scope = sentry_sdk.get_isolation_scope()
             extractor = StarletteRequestExtractor(request)
             info = await extractor.extract_request_info()
 

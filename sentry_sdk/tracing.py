@@ -12,7 +12,8 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
@@ -358,7 +359,7 @@ class Span:
 
     def __enter__(self):
         # type: () -> Span
-        scope = self.scope or sentry_sdk.Scope.get_current_scope()
+        scope = self.scope or sentry_sdk.get_current_scope()
         old_span = scope.span
         scope.span = self
         self._context_manager_state = (scope, old_span)
@@ -399,9 +400,7 @@ class Span:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
-        configuration_instrumenter = sentry_sdk.Scope.get_client().options[
-            "instrumenter"
-        ]
+        configuration_instrumenter = sentry_sdk.get_client().options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
@@ -635,7 +634,7 @@ class Span:
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
-        scope = scope or sentry_sdk.Scope.get_current_scope()
+        scope = scope or sentry_sdk.get_current_scope()
         maybe_create_breadcrumbs_from_span(scope, self)
 
         return None
@@ -903,8 +902,8 @@ class Transaction(Span):
             scope, hub
         )  # type: Optional[sentry_sdk.Scope]
 
-        scope = scope or self.scope or sentry_sdk.Scope.get_current_scope()
-        client = sentry_sdk.Scope.get_client()
+        scope = scope or self.scope or sentry_sdk.get_current_scope()
+        client = sentry_sdk.get_client()
 
         if not client.is_active():
             # We have no active client and therefore nowhere to send this transaction.
@@ -1029,6 +1028,15 @@ class Transaction(Span):
 
         return rv
 
+    def get_trace_context(self):
+        # type: () -> Any
+        trace_context = super().get_trace_context()
+
+        if self._data:
+            trace_context["data"] = self._data
+
+        return trace_context
+
     def get_baggage(self):
         # type: () -> Baggage
         """Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`
@@ -1063,7 +1071,7 @@ class Transaction(Span):
         4. If `traces_sampler` is not defined and there's no parent sampling
         decision, `traces_sample_rate` will be used.
         """
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
 
         transaction_description = "{op}transaction <{name}>".format(
             op=("<" + self.op + "> " if self.op else ""), name=self.name

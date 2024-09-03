@@ -1,5 +1,112 @@
 # Changelog
 
+## 2.13.0
+
+### Various fixes & improvements
+
+- **New integration:** [Ray](https://docs.sentry.io/platforms/python/integrations/ray/) (#2400) (#2444) by @glowskir
+
+  Usage: (add the RayIntegration to your `sentry_sdk.init()` call and make sure it is called in the worker processes)
+  ```python
+  import ray
+
+  import sentry_sdk
+  from sentry_sdk.integrations.ray import RayIntegration
+
+  def init_sentry():
+      sentry_sdk.init(
+          dsn="...",
+          traces_sample_rate=1.0,
+          integrations=[RayIntegration()],
+      )
+
+  init_sentry()
+
+  ray.init(
+      runtime_env=dict(worker_process_setup_hook=init_sentry), 
+  )
+  ```
+  For more information, see the documentation for the [Ray integration](https://docs.sentry.io/platforms/python/integrations/ray/).
+
+- **New integration:** [Litestar](https://docs.sentry.io/platforms/python/integrations/litestar/) (#2413) (#3358) by @KellyWalker
+
+  Usage: (add the LitestarIntegration to your `sentry_sdk.init()`)
+  ```python
+  from litestar import Litestar, get
+
+  import sentry_sdk
+  from sentry_sdk.integrations.litestar import LitestarIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[LitestarIntegration()],
+  )
+
+  @get("/")
+  async def index() -> str:
+      return "Hello, world!"
+
+  app = Litestar(...)
+  ```
+  For more information, see the documentation for the [Litestar integration](https://docs.sentry.io/platforms/python/integrations/litestar/).
+
+- **New integration:** [Dramatiq](https://docs.sentry.io/platforms/python/integrations/dramatiq/) from @jacobsvante (#3397) by @antonpirker
+  Usage: (add the DramatiqIntegration to your `sentry_sdk.init()`)
+  ```python
+  import dramatiq
+
+  import sentry_sdk
+  from sentry_sdk.integrations.dramatiq import DramatiqIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[DramatiqIntegration()],
+  )
+
+  @dramatiq.actor(max_retries=0)
+  def dummy_actor(x, y):
+      return x / y
+
+  dummy_actor.send(12, 0)
+  ```
+
+  For more information, see the documentation for the [Dramatiq integration](https://docs.sentry.io/platforms/python/integrations/dramatiq/).
+
+- **New config option:** Expose `custom_repr` function that precedes `safe_repr` invocation in serializer (#3438) by @sl0thentr0py
+  
+  See: https://docs.sentry.io/platforms/python/configuration/options/#custom-repr
+
+- Profiling: Add client SDK info to profile chunk (#3386) by @Zylphrex
+- Serialize vars early to avoid living references (#3409) by @sl0thentr0py
+- Deprecate hub-based `sessions.py` logic (#3419) by @szokeasaurusrex
+- Deprecate `is_auto_session_tracking_enabled` (#3428) by @szokeasaurusrex
+- Add note to generated yaml files (#3423) by @sentrivana
+- Slim down PR template (#3382) by @sentrivana
+- Use new banner in readme (#3390) by @sentrivana
+
+## 2.12.0
+
+### Various fixes & improvements
+
+- API: Expose the scope getters to top level API and use them everywhere  (#3357) by @sl0thentr0py
+- API: `push_scope` deprecation warning (#3355) (#3355) by @szokeasaurusrex
+- API: Replace `push_scope` (#3353, #3354) by @szokeasaurusrex
+- API: Deprecate, avoid, or stop using `configure_scope` (#3348, #3349, #3350, #3351) by @szokeasaurusrex
+- OTel: Remove experimental autoinstrumentation (#3239) by @sentrivana
+- Graphene: Add span for grapqhl operation (#2788) by @czyber
+- AI: Add async support for `ai_track` decorator (#3376) by @czyber
+- CI: Workaround bug preventing Django test runs (#3371) by @szokeasaurusrex
+- CI: Remove Django setuptools pin (#3378) by @szokeasaurusrex
+- Tests: Test with Django 5.1 RC (#3370) by @sentrivana
+- Broaden `add_attachment` type (#3342) by @szokeasaurusrex
+- Add span data to the transactions trace context (#3374) by @antonpirker
+- Gracefully fail attachment path not found case (#3337) by @sl0thentr0py
+- Document attachment parameters (#3342) by @szokeasaurusrex
+- Bump checkouts/data-schemas from `0feb234` to `6d2c435` (#3369) by @dependabot
+- Bump checkouts/data-schemas from `88273a9` to `0feb234` (#3252) by @dependabot
+
 ## 2.11.0
 
 ### Various fixes & improvements
@@ -15,7 +122,7 @@
   ```python
   import sentry_sdk
   from sentry_sdk.integrations.flask import FlaskIntegration
-  
+
   sentry_sdk.init(
       # Do not use the Flask integration even if Flask is installed.
       disabled_integrations=[
@@ -68,7 +175,7 @@
           LangchainIntegration(tiktoken_encoding_name="cl100k_base"),
       ],
   )
-  ``` 
+  ```
 
 - PyMongo: Send query description as valid JSON (#3291) by @0Calories
 - Remove Python 2 compatibility code (#3284) by @szokeasaurusrex
@@ -183,7 +290,7 @@ This change fixes a regression in our cron monitoring feature, which caused cron
   ```python
   from sentry_sdk.integrations.starlette import StarletteIntegration
   from sentry_sdk.integrations.fastapi import FastApiIntegration
-  
+
   sentry_sdk.init(
       # ...
       integrations=[
@@ -312,9 +419,9 @@ This change fixes a regression in our cron monitoring feature, which caused cron
       integrations=[AnthropicIntegration()],
   )
 
-  client = Anthropic()  
+  client = Anthropic()
   ```
-  Check out [the Anthropic docs](https://docs.sentry.io/platforms/python/integrations/anthropic/) for details. 
+  Check out [the Anthropic docs](https://docs.sentry.io/platforms/python/integrations/anthropic/) for details.
 
 - **New integration:** [Huggingface Hub](https://docs.sentry.io/platforms/python/integrations/huggingface/) (#3033) by @colin-sentry
 
@@ -369,13 +476,13 @@ This change fixes a regression in our cron monitoring feature, which caused cron
 
 ## 2.0.0
 
-This is the first major update in a *long* time! 
+This is the first major update in a *long* time!
 
 We dropped support for some ancient languages and frameworks (Yes, Python 2.7 is no longer supported). Additionally we refactored a big part of the foundation of the SDK (how data inside the SDK is handled).
 
 We hope you like it!
 
-For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: https://docs.sentry.io/platforms/python/migration/1.x-to-2.x 
+For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: https://docs.sentry.io/platforms/python/migration/1.x-to-2.x
 
 ### New Features
 
@@ -415,7 +522,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
 
     # later in the code execution:
 
-    scope = sentry_sdk.Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     scope.set_transaction_name("new-transaction-name")
     ```
 - The classes listed in the table below are now abstract base classes. Therefore, they can no longer be instantiated. Subclasses can only be instantiated if they implement all of the abstract methods.
@@ -492,7 +599,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
       # do something with the forked scope
   ```
 
-- `configure_scope` is deprecated. Use the new isolation scope directly via `Scope.get_isolation_scope()` instead.
+- `configure_scope` is deprecated. Use the new isolation scope directly via `get_isolation_scope()` instead.
 
   Before:
 
@@ -504,9 +611,9 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
   After:
 
   ```python
-  from sentry_sdk.scope import Scope
+  from sentry_sdk import get_isolation_scope
 
-  scope = Scope.get_isolation_scope()
+  scope = get_isolation_scope()
   # do something with `scope`
   ```
 
@@ -563,7 +670,7 @@ This is the final 1.x release for the forseeable future. Development will contin
       "failure_issue_threshold": 5,
       "recovery_threshold": 5,
   }
-  
+
   @monitor(monitor_slug='<monitor-slug>', monitor_config=monitor_config)
   def tell_the_world():
       print('My scheduled task...')
@@ -578,14 +685,14 @@ This is the final 1.x release for the forseeable future. Development will contin
   ```python
   import django.db.models.signals
   import sentry_sdk
-  
+
   sentry_sdk.init(
       ...
       integrations=[
           DjangoIntegration(
               ...
               signals_denylist=[
-                  django.db.models.signals.pre_init, 
+                  django.db.models.signals.pre_init,
                   django.db.models.signals.post_init,
               ],
           ),
@@ -608,7 +715,7 @@ This is the final 1.x release for the forseeable future. Development will contin
       tags["extra"] = "foo"
       del tags["release"]
       return True
-  
+
   sentry_sdk.init(
       ...
       _experiments={

@@ -10,8 +10,8 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
-from sentry_sdk.scope import Scope
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk.integrations.wsgi import _ScopedResponse
@@ -86,7 +86,7 @@ class BottleIntegration(Integration):
             # type: (Bottle, Dict[str, Any]) -> Any
             integration = sentry_sdk.get_client().get_integration(BottleIntegration)
 
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             scope._name = "bottle"
             scope.add_event_processor(
                 _make_request_event_processor(self, bottle_request, integration)

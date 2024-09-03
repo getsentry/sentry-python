@@ -3,7 +3,6 @@ import functools
 from copy import deepcopy
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
@@ -12,7 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_COMPONENT,
@@ -27,6 +26,8 @@ from sentry_sdk.utils import (
     parse_version,
     transaction_from_function,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
@@ -124,7 +125,7 @@ def _enable_span_for_middleware(middleware_class):
         # Update transaction name with middleware name
         name, source = _get_transaction_from_middleware(app, scope, integration)
         if name is not None:
-            Scope.get_current_scope().set_transaction_name(
+            sentry_sdk.get_current_scope().set_transaction_name(
                 name,
                 source=source,
             )
@@ -298,7 +299,7 @@ def _add_user_to_sentry_scope(scope):
     if email:
         user_info.setdefault("email", starlette_user.email)
 
-    sentry_scope = Scope.get_isolation_scope()
+    sentry_scope = sentry_sdk.get_isolation_scope()
     sentry_scope.user = user_info
 
 
@@ -410,10 +411,12 @@ def patch_request_response():
                 request = args[0]
 
                 _set_transaction_name_and_source(
-                    Scope.get_current_scope(), integration.transaction_style, request
+                    sentry_sdk.get_current_scope(),
+                    integration.transaction_style,
+                    request,
                 )
 
-                sentry_scope = Scope.get_isolation_scope()
+                sentry_scope = sentry_sdk.get_isolation_scope()
                 extractor = StarletteRequestExtractor(request)
                 info = await extractor.extract_request_info()
 
@@ -452,7 +455,7 @@ def patch_request_response():
                 integration = sentry_sdk.get_client().get_integration(
                     StarletteIntegration
                 )
-                sentry_scope = Scope.get_isolation_scope()
+                sentry_scope = sentry_sdk.get_isolation_scope()
 
                 if sentry_scope.profile is not None:
                     sentry_scope.profile.update_active_thread_id()
@@ -521,7 +524,9 @@ def patch_templates():
             # type: (Jinja2Templates, *Any, **Any) -> None
             def add_sentry_trace_meta(request):
                 # type: (Request) -> Dict[str, Any]
-                trace_meta = Markup(Scope.get_current_scope().trace_propagation_meta())
+                trace_meta = Markup(
+                    sentry_sdk.get_current_scope().trace_propagation_meta()
+                )
                 return {
                     "sentry_trace_meta": trace_meta,
                 }
@@ -655,7 +660,7 @@ def _transaction_name_from_router(scope):
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Any) -> None
+    # type: (sentry_sdk.Scope, str, Any) -> None
     name = None
     source = SOURCE_FOR_STYLE[transaction_style]
 
