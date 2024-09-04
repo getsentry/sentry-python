@@ -136,7 +136,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
     )
     span.__enter__()
     try:
-        res = yield f(*args, **kwargs)
+        res = yield f, args, kwargs
     except Exception as e:
         _capture_exception(e)
         span.__exit__(None, None, None)
@@ -264,7 +264,7 @@ def _new_embeddings_create_common(f, *args, **kwargs):
         if "model" in kwargs:
             set_data_normalized(span, "ai.model_id", kwargs["model"])
         try:
-            response = yield f(*args, **kwargs)
+            response = yield f, args, kwargs
         except Exception as e:
             _capture_exception(e)
             raise e from None

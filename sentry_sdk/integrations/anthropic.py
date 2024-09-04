@@ -96,7 +96,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     span.__enter__()
 
     try:
-        result = yield f(*args, **kwargs)
+        result = yield f, args, kwargs
     except Exception as exc:
         _capture_exception(exc)
         span.__exit__(None, None, None)
