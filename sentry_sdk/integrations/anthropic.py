@@ -96,7 +96,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     span.__enter__()
 
     try:
-        result = f(*args, **kwargs)
+        result = yield f(*args, **kwargs)
     except Exception as exc:
         _capture_exception(exc)
         span.__exit__(None, None, None)
@@ -173,21 +173,34 @@ def _sentry_patched_create_common(f, *args, **kwargs):
 
 def _wrap_message_create(f):
     # type: (Any) -> Any
+    def _execute_sync(f, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
+        gen = _sentry_patched_create_common(f, *args, **kwargs)
+        f, args, kwargs = next(gen)
+        return gen.send(f(*args, **kwargs))
+
     @wraps(f)
     @ensure_integration_enabled(AnthropicIntegration, f)
     def _sentry_patched_create_sync(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        return _sentry_patched_create_common(f, *args, **kwargs)
+        return _execute_sync(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
 
 
 def _wrap_async_message_create(f):
     # type: (Any) -> Any
+
+    async def _execute_async(f, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
+        gen = _sentry_patched_create_common(f, *args, **kwargs)
+        f, args, kwargs = next(gen)
+        return gen.send(await f(*args, **kwargs))
+
     @wraps(f)
     @ensure_integration_enabled(AnthropicIntegration, f)
     async def _sentry_patched_create_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        return await _sentry_patched_create_common(f, *args, **kwargs)
+        return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_create_async
