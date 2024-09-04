@@ -47,9 +47,11 @@ class OpenAIIntegration(Integration):
     def setup_once():
         # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
-        AsyncCompletions.create = _wrap_chat_completion_create(AsyncCompletions.create)
+        AsyncCompletions.create = _wrap_async_chat_completion_create(
+            AsyncCompletions.create
+        )
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
-        AsyncEmbeddings.create = _wrap_embeddings_create(AsyncEmbeddings.create)
+        AsyncEmbeddings.create = _wrap_async_embeddings_create(AsyncEmbeddings.create)
 
     def count_tokens(self, s):
         # type: (OpenAIIntegration, str) -> int
@@ -212,8 +214,17 @@ def _wrap_chat_completion_create(f):
     def _execute_sync(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _new_chat_completion_common(f, *args, **kwargs)
-        f, args, kwargs = next(gen)
-        return gen.send(f(*args, **kwargs))
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return e.value
+
+        try:
+            result = f(*args, **kwargs)
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
 
     @wraps(f)
     @ensure_integration_enabled(OpenAIIntegration, f)
@@ -230,8 +241,17 @@ def _wrap_async_chat_completion_create(f):
     async def _execute_async(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _new_chat_completion_common(f, *args, **kwargs)
-        f, args, kwargs = next(gen)
-        return gen.send(await f(*args, **kwargs))
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return await e.value
+
+        try:
+            result = await f(*args, **kwargs)
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
 
     @wraps(f)
     @ensure_integration_enabled(OpenAIIntegration, f)
@@ -295,8 +315,17 @@ def _wrap_embeddings_create(f):
     def _execute_sync(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _new_embeddings_create_common(f, *args, **kwargs)
-        f, args, kwargs = next(gen)
-        return gen.send(f(*args, **kwargs))
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return e.value
+
+        try:
+            result = f(*args, **kwargs)
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
 
     @wraps(f)
     @ensure_integration_enabled(OpenAIIntegration, f)
@@ -312,8 +341,17 @@ def _wrap_async_embeddings_create(f):
     async def _execute_async(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _new_embeddings_create_common(f, *args, **kwargs)
-        f, args, kwargs = next(gen)
-        return gen.send(await f(*args, **kwargs))
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return await e.value
+
+        try:
+            result = await f(*args, **kwargs)
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
 
     @wraps(f)
     @ensure_integration_enabled(OpenAIIntegration, f)

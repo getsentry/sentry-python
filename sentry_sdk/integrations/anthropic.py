@@ -176,8 +176,17 @@ def _wrap_message_create(f):
     def _execute_sync(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _sentry_patched_create_common(f, *args, **kwargs)
-        f, args, kwargs = next(gen)
-        return gen.send(f(*args, **kwargs))
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return e.value
+
+        try:
+            result = f(*args, **kwargs)
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
 
     @wraps(f)
     @ensure_integration_enabled(AnthropicIntegration, f)
@@ -194,8 +203,17 @@ def _wrap_async_message_create(f):
     async def _execute_async(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _sentry_patched_create_common(f, *args, **kwargs)
-        f, args, kwargs = next(gen)
-        return gen.send(await f(*args, **kwargs))
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return await e.value
+
+        try:
+            result = await f(*args, **kwargs)
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
 
     @wraps(f)
     @ensure_integration_enabled(AnthropicIntegration, f)
