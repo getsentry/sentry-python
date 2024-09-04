@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
 try:
     from celery import VERSION as CELERY_VERSION  # type: ignore
+    from celery.app.task import Task  # type: ignore
     from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
         Ignore,
@@ -83,6 +84,7 @@ class CeleryIntegration(Integration):
 
         _patch_build_tracer()
         _patch_task_apply_async()
+        _patch_celery_send_task()
         _patch_worker_exit()
         _patch_producer_publish()
 
@@ -243,7 +245,7 @@ class NoOpMgr:
         return None
 
 
-def _wrap_apply_async(f):
+def _wrap_task_run(f):
     # type: (F) -> F
     @wraps(f)
     @ensure_integration_enabled(CeleryIntegration, f)
@@ -260,14 +262,19 @@ def _wrap_apply_async(f):
         if not propagate_traces:
             return f(*args, **kwargs)
 
-        task = args[0]
+        if isinstance(args[0], Task):
+            task_name = args[0].name  # type: str
+        elif len(args) > 1 and isinstance(args[1], str):
+            task_name = args[1]
+        else:
+            task_name = "<unknown Celery task>"
 
         task_started_from_beat = sentry_sdk.get_isolation_scope()._name == "celery-beat"
 
         span_mgr = (
             sentry_sdk.start_span(
                 op=OP.QUEUE_SUBMIT_CELERY,
-                description=task.name,
+                description=task_name,
                 origin=CeleryIntegration.origin,
             )
             if not task_started_from_beat
@@ -437,9 +444,14 @@ def _patch_build_tracer():
 
 def _patch_task_apply_async():
     # type: () -> None
-    from celery.app.task import Task  # type: ignore
+    Task.apply_async = _wrap_task_run(Task.apply_async)
 
-    Task.apply_async = _wrap_apply_async(Task.apply_async)
+
+def _patch_celery_send_task():
+    # type: () -> None
+    from celery import Celery
+
+    Celery.send_task = _wrap_task_run(Celery.send_task)
 
 
 def _patch_worker_exit():
