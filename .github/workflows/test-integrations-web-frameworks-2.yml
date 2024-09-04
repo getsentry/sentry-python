@@ -88,8 +88,8 @@ jobs:
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |
-          coverage combine .coverage*
-          coverage xml -i
+          coverage combine .coverage-sentry-*
+          coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0
@@ -170,8 +170,8 @@ jobs:
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |
-          coverage combine .coverage*
-          coverage xml -i
+          coverage combine .coverage-sentry-*
+          coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0

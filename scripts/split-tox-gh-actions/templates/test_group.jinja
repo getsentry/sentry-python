@@ -80,8 +80,8 @@
       - name: Generate coverage XML
         if: {% raw %}${{ !cancelled() }}{% endraw %}
         run: |
-          coverage combine .coverage*
-          coverage xml -i
+          coverage combine .coverage-sentry-*
+          coverage xml
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
