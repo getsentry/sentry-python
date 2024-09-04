@@ -36,6 +36,13 @@ from textwrap import dedent
 
 import pytest
 
+RUNTIMES_TO_TEST = [
+    "python3.8",
+    "python3.9",
+    "python3.10",
+    "python3.11",
+    "python3.12",
+]
 
 LAMBDA_PRELUDE = """
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
@@ -137,15 +144,7 @@ def lambda_client():
     return get_boto_client()
 
 
-@pytest.fixture(
-    params=[
-        "python3.8",
-        "python3.9",
-        "python3.10",
-        "python3.11",
-        "python3.12",
-    ]
-)
+@pytest.fixture(params=RUNTIMES_TO_TEST)
 def lambda_runtime(request):
     return request.param
 
@@ -331,7 +330,9 @@ def test_init_error(run_lambda_function, lambda_runtime):
         syntax_check=False,
     )
 
-    (event,) = envelope_items
+    # We just take the last one, because it could be that in the output of the Lambda
+    # invocation there is still the envelope of the previous invocation of the function.
+    event = envelope_items[-1]
     assert event["exception"]["values"][0]["value"] == "name 'func' is not defined"
 
 
