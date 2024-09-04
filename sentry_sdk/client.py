@@ -482,6 +482,9 @@ class _Client(BaseClient):
                     "event_processor", data_category="span", quantity=spans_delta
                 )
 
+        # TODO: Where should I put this?
+        event["contexts"]["flags"] = scope._flag_manager.serialize()
+
         if (
             self.options["attach_stacktrace"]
             and "exception" not in event

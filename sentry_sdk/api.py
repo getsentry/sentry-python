@@ -314,6 +314,12 @@ def set_extra(key, value):
 
 
 @scopemethod
+def set_flag(flag, result):
+    # type: (str, bool) -> None
+    return get_isolation_scope().set_flag(flag, result)
+
+
+@scopemethod
 def set_user(value):
     # type: (Optional[Dict[str, Any]]) -> None
     return get_isolation_scope().set_user(value)

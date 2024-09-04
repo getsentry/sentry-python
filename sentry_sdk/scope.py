@@ -10,6 +10,7 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
+from sentry_sdk.flag import FlagManager
 from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
@@ -190,6 +191,7 @@ class Scope:
         "client",
         "_type",
         "_last_event_id",
+        "_flag_manager",
     )
 
     def __init__(self, ty=None, client=None):
@@ -198,6 +200,7 @@ class Scope:
 
         self._event_processors = []  # type: List[EventProcessor]
         self._error_processors = []  # type: List[ErrorProcessor]
+        self._flag_manager = FlagManager(capacity=50)
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[PropagationContext]
@@ -785,6 +788,10 @@ class Scope:
         session = self.get_isolation_scope()._session
         if session is not None:
             session.update(user=value)
+
+    def set_flag(self, flag, result):
+        # type: (str, bool) -> None
+        self._flag_manager.add(flag, result)
 
     @property
     def span(self):
