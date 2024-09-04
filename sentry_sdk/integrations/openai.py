@@ -113,7 +113,7 @@ def _calculate_chat_completion_usage(
 
 
 def _new_chat_completion_common(f, *args, **kwargs):
-    # type: (*Any, **Any) -> Any
+    # type: (Any, *Any, **Any) -> Any
     if "messages" not in kwargs:
         # invalid call (in all versions of openai), let it return error
         return f(*args, **kwargs)
@@ -230,7 +230,7 @@ def _wrap_async_chat_completion_create(f):
 
 
 def _new_embeddings_create_common(f, *args, **kwargs):
-    # type: (*Any, **Any) -> Any
+    # type: (Any, *Any, **Any) -> Any
     with sentry_sdk.start_span(
         op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
         description="OpenAI Embedding Creation",
