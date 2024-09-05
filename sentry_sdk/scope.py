@@ -335,11 +335,14 @@ class Scope:
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
 
-        final_scope = copy(_global_scope) if _global_scope is not None else Scope()
+        final_scope = self.__class__()
         final_scope._type = ScopeType.MERGED
 
+        global_scope = self.get_global_scope()
+        final_scope.update_from_scope(global_scope)
+
         isolation_scope = self.get_isolation_scope()
-        final_scope.update_from_scope(isolation_scope)
+        final_scope.update_from_scope(self.get_isolation_scope())
 
         current_scope = self.get_current_scope()
         final_scope.update_from_scope(current_scope)
