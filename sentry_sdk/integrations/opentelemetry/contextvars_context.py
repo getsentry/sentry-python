@@ -31,10 +31,10 @@ class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
         else:
             new_scope = current_scope.fork()
 
-        if should_fork_isolation_scope:
-            new_isolation_scope = isolation_scope.fork()
-        elif should_use_isolation_scope:
+        if should_use_isolation_scope:
             new_isolation_scope = should_use_isolation_scope
+        elif should_fork_isolation_scope:
+            new_isolation_scope = isolation_scope.fork()
         else:
             new_isolation_scope = isolation_scope
 
