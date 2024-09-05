@@ -66,12 +66,12 @@ jobs:
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub-latest"
       - name: Generate coverage XML (old python  ${{ matrix.python-version }})
-        if: ${{ !cancelled() &&  matrix.python-version == '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
         run: |
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
       - name: Generate coverage XML (new pythons  ${{ matrix.python-version }})
-        if: ${{ !cancelled() &&  matrix.python-version != '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
@@ -133,12 +133,12 @@ jobs:
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huggingface_hub"
       - name: Generate coverage XML (old python  ${{ matrix.python-version }})
-        if: ${{ !cancelled() &&  matrix.python-version == '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
         run: |
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
       - name: Generate coverage XML (new pythons  ${{ matrix.python-version }})
-        if: ${{ !cancelled() &&  matrix.python-version != '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
