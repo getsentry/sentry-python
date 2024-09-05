@@ -17,8 +17,8 @@ class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
         should_fork_isolation_scope = context.pop(
             SENTRY_FORK_ISOLATION_SCOPE_KEY, False
         )
-        should_use_isolation_scope = context.pop(SENTRY_USE_ISOLATION_SCOPE_KEY, False)
-        should_use_current_scope = context.pop(SENTRY_USE_CURRENT_SCOPE_KEY, False)
+        should_use_isolation_scope = context.pop(SENTRY_USE_ISOLATION_SCOPE_KEY, None)
+        should_use_current_scope = context.pop(SENTRY_USE_CURRENT_SCOPE_KEY, None)
 
         if scopes and isinstance(scopes, tuple):
             (current_scope, isolation_scope) = scopes
