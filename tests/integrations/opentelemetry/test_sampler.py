@@ -160,4 +160,33 @@ def test_sampling_traces_sampler(init_sentry_with_potel, capture_envelopes):
     assert len(transaction2["spans"]) == 0
 
 
-# TODO-anton: write traces_sampler with booleans
+def test_sampling_traces_sampler_boolean(init_sentry_with_potel, capture_envelopes):
+    def keep_only_a(sampling_context):
+        if " a" in sampling_context["transaction_context"]["name"]:
+            return True
+        else:
+            return False
+
+    init_sentry_with_potel(
+        traces_sample_rate=1.0,
+        traces_sampler=keep_only_a,
+    )
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.start_span(description="request a"):  # keep
+        with sentry_sdk.start_span(description="cache a"):  # keep
+            with sentry_sdk.start_span(description="db X"):  # drop
+                ...
+
+    with sentry_sdk.start_span(description="request b"):  # drop
+        with sentry_sdk.start_span(description="cache b"):  # drop
+            with sentry_sdk.start_span(description="db b"):  # drop
+                ...
+
+    assert len(envelopes) == 1
+    (envelope,) = envelopes
+    transaction = envelope.items[0].payload.json
+
+    assert transaction["transaction"] == "request a"
+    assert len(transaction["spans"]) == 1
