@@ -77,11 +77,18 @@
           {% endif %}
       {% endfor %}
 
-      - name: Generate coverage XML
-        if: {% raw %}${{ !cancelled() }}{% endraw %}
+      - name: Generate coverage XML (Python 3.6)
+        if: {% raw %}${{ !cancelled() && matrix.python-version == '3.6' }}{% endraw %} 
         run: |
-          coverage combine .coverage*
-          coverage xml -i
+          export COVERAGE_RCFILE=.coveragerc36
+          coverage combine .coverage-sentry-*
+          coverage xml --ignore-errors
+
+      - name: Generate coverage XML
+        if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %} 
+        run: |
+          coverage combine .coverage-sentry-*
+          coverage xml
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
