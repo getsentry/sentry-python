@@ -5,6 +5,8 @@ import sentry_sdk
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
+    SENTRY_USE_CURRENT_SCOPE_KEY,
+    SENTRY_USE_ISOLATION_SCOPE_KEY,
 )
 
 
@@ -15,6 +17,8 @@ class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
         should_fork_isolation_scope = context.pop(
             SENTRY_FORK_ISOLATION_SCOPE_KEY, False
         )
+        should_use_isolation_scope = context.pop(SENTRY_USE_ISOLATION_SCOPE_KEY, False)
+        should_use_current_scope = context.pop(SENTRY_USE_CURRENT_SCOPE_KEY, False)
 
         if scopes and isinstance(scopes, tuple):
             (current_scope, isolation_scope) = scopes
@@ -22,10 +26,18 @@ class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
             current_scope = sentry_sdk.get_current_scope()
             isolation_scope = sentry_sdk.get_isolation_scope()
 
-        new_scope = current_scope.fork()
-        new_isolation_scope = (
-            isolation_scope.fork() if should_fork_isolation_scope else isolation_scope
-        )
+        if should_use_current_scope:
+            new_scope = should_use_current_scope
+        else:
+            new_scope = current_scope.fork()
+
+        if should_fork_isolation_scope:
+            new_isolation_scope = isolation_scope.fork()
+        elif should_use_isolation_scope:
+            new_isolation_scope = should_use_isolation_scope
+        else:
+            new_isolation_scope = isolation_scope
+
         new_scopes = (new_scope, new_isolation_scope)
 
         new_context = set_value(SENTRY_SCOPES_KEY, new_scopes, context)

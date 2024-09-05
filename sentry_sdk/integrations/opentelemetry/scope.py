@@ -7,6 +7,8 @@ from opentelemetry.trace import SpanContext, NonRecordingSpan, TraceFlags, use_s
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
+    SENTRY_USE_CURRENT_SCOPE_KEY,
+    SENTRY_USE_ISOLATION_SCOPE_KEY,
 )
 from sentry_sdk.scope import Scope, ScopeType
 from sentry_sdk.tracing import POTelSpan
@@ -134,5 +136,29 @@ def new_scope():
     token = attach(get_current())
     try:
         yield PotelScope.get_current_scope()
+    finally:
+        detach(token)
+
+
+@contextmanager
+def use_scope(scope):
+    # type: (Scope) -> Generator[Scope, None, None]
+    context = set_value(SENTRY_USE_CURRENT_SCOPE_KEY, scope)
+    token = attach(context)
+
+    try:
+        yield scope
+    finally:
+        detach(token)
+
+
+@contextmanager
+def use_isolation_scope(isolation_scope):
+    # type: (Scope) -> Generator[Scope, None, None]
+    context = set_value(SENTRY_USE_ISOLATION_SCOPE_KEY, isolation_scope)
+    token = attach(context)
+
+    try:
+        yield isolation_scope
     finally:
         detach(token)
