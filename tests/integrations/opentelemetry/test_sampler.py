@@ -23,9 +23,9 @@ def init_sentry_with_potel(sentry_init):
 
 
 @pytest.mark.parametrize(
-    "traces_sampling_rate,expected_num_of_envelopes",
+    "traces_sample_rate,expected_num_of_envelopes",
     [
-        (-1, 0),  # special case, do not pass any traces_sampling_rate to init()
+        (-1, 0),  # special case, do not pass any traces_sample_rate to init()
         (None, 0),
         (0, 0),
         (1, 2),
@@ -34,12 +34,12 @@ def init_sentry_with_potel(sentry_init):
 def test_sampling_traces_sample_rate_0_or_100(
     init_sentry_with_potel,
     capture_envelopes,
-    traces_sampling_rate,
+    traces_sample_rate,
     expected_num_of_envelopes,
 ):
     kwargs = {}
-    if traces_sampling_rate != -1:
-        kwargs["traces_sample_rate"] = traces_sampling_rate
+    if traces_sample_rate != -1:
+        kwargs["traces_sample_rate"] = traces_sample_rate
 
     init_sentry_with_potel(**kwargs)
 
