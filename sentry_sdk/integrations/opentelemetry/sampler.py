@@ -105,7 +105,7 @@ class SentrySampler(Sampler):
             sample_rate = 1.0
 
         # If the sample rate is invalid, drop the span
-        if not is_valid_sample_rate(sample_rate, source="SentrySampler"):
+        if not is_valid_sample_rate(sample_rate, source=self.__class__.__name__):
             logger.warning(
                 f"[Tracing] Discarding {name} because of invalid sample rate."
             )
@@ -121,4 +121,4 @@ class SentrySampler(Sampler):
 
     def get_description(self) -> str:
         print("YYYYYYYYYYYYYYYY")
-        return "SentrySampler"
+        return self.__class__.__name__
