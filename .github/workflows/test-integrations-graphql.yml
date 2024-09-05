@@ -61,13 +61,13 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-strawberry-latest"
-      - name: Generate coverage XML (old python)
-        if: ${{ !cancelled() }} && matrix.python-version == 'py3.6'
+      - name: Generate coverage XML (old python  ${{ matrix.python-version }})
+        if: ${{ !cancelled() }} && matrix.python-version == '3.6'
         run: |
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
-      - name: Generate coverage XML (new pythons)
-        if: ${{ !cancelled() }} && matrix.python-version != 'py3.6'
+      - name: Generate coverage XML (new pythons  ${{ matrix.python-version }})
+        if: ${{ !cancelled() }} && matrix.python-version != '3.6'
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
@@ -124,13 +124,13 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-strawberry"
-      - name: Generate coverage XML (old python)
-        if: ${{ !cancelled() }} && matrix.python-version == 'py3.6'
+      - name: Generate coverage XML (old python  ${{ matrix.python-version }})
+        if: ${{ !cancelled() }} && matrix.python-version == '3.6'
         run: |
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
-      - name: Generate coverage XML (new pythons)
-        if: ${{ !cancelled() }} && matrix.python-version != 'py3.6'
+      - name: Generate coverage XML (new pythons  ${{ matrix.python-version }})
+        if: ${{ !cancelled() }} && matrix.python-version != '3.6'
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
