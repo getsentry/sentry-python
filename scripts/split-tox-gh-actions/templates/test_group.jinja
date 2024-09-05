@@ -80,6 +80,7 @@
       - name: Generate coverage XML (Python 3.6)
         if: {% raw %}${{ !cancelled() && matrix.python-version == '3.6' }}{% endraw %} 
         run: |
+          export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
 
