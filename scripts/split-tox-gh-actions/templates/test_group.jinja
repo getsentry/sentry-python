@@ -77,8 +77,14 @@
           {% endif %}
       {% endfor %}
 
-      - name: Generate coverage XML
-        if: {% raw %}${{ !cancelled() }}{% endraw %}
+      - name: Generate coverage XML (old python)
+        if: {% raw %}${{ !cancelled() }}{% endraw %} && matrix.python-version == 'py3.6'
+        run: |
+          coverage combine .coverage-sentry-*
+          coverage xml --ignore-errors
+
+      - name: Generate coverage XML (new pythons)
+        if: {% raw %}${{ !cancelled() }}{% endraw %} && matrix.python-version != 'py3.6'
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
