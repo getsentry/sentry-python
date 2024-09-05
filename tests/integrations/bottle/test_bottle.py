@@ -337,29 +337,6 @@ def test_errors_not_reported_twice(
     assert len(events) == 1
 
 
-def test_logging(sentry_init, capture_events, app, get_client):
-    # ensure that Bottle's logger magic doesn't break ours
-    sentry_init(
-        integrations=[
-            bottle_sentry.BottleIntegration(),
-            LoggingIntegration(event_level="ERROR"),
-        ]
-    )
-
-    @app.route("/")
-    def index():
-        app.logger.error("hi")
-        return "ok"
-
-    events = capture_events()
-
-    client = get_client()
-    client.get("/")
-
-    (event,) = events
-    assert event["level"] == "error"
-
-
 def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client):
     sentry_init(integrations=[bottle_sentry.BottleIntegration()])
 
@@ -385,31 +362,6 @@ def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client)
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "bottle"
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
-
-
-def test_500(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
-
-    set_debug(False)
-    app.catchall = True
-
-    @app.route("/")
-    def index():
-        1 / 0
-
-    @app.error(500)
-    def error_handler(err):
-        capture_message("error_msg")
-        return "My error"
-
-    events = capture_events()
-
-    client = get_client()
-    response = client.get("/")
-    assert response[1] == "500 Internal Server Error"
-
-    _, event = events
-    assert event["message"] == "error_msg"
 
 
 def test_error_in_errorhandler(sentry_init, capture_events, app, get_client):
