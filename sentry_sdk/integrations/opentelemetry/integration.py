@@ -12,6 +12,7 @@ from sentry_sdk.integrations.opentelemetry.potel_span_processor import (
 from sentry_sdk.integrations.opentelemetry.contextvars_context import (
     SentryContextVarsRuntimeContext,
 )
+from sentry_sdk.integrations.opentelemetry.sampler import SentrySampler
 from sentry_sdk.utils import logger
 
 try:
@@ -55,7 +56,7 @@ def _setup_sentry_tracing():
 
     opentelemetry.context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
 
-    provider = TracerProvider()
+    provider = TracerProvider(sampler=SentrySampler())
     provider.add_span_processor(PotelSentrySpanProcessor())
     trace.set_tracer_provider(provider)
 
