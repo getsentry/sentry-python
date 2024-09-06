@@ -87,7 +87,7 @@
           echo "api.py in report:"
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           echo "finding a line that should not be in there"
-          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"1\""  > bla.txt || true
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\""  > bla.txt || true
           echo "content of bla.txt:"
           cat bla.txt
           echo "delete bla.txt if empty"
@@ -105,7 +105,7 @@
           echo "api.py in report:"
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           echo "finding a line that should not be in there"
-          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"1\""  > bla.txt || true
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\""  > bla.txt || true
           echo "content of bla.txt:"
           cat bla.txt
           echo "delete bla.txt if empty"
