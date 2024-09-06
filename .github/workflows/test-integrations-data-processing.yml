@@ -85,8 +85,10 @@ jobs:
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
+          echo "api.py in report:"
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
-          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
+          echo "finding a line that should not be in there"
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\""  > bla.txt || true
           echo "content of bla.txt:"
           cat bla.txt
           echo "delete bla.txt if empty"
@@ -100,8 +102,10 @@ jobs:
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
+          echo "api.py in report:"
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
-          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
+          echo "finding a line that should not be in there"
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\""  > bla.txt || true
           echo "content of bla.txt:"
           cat bla.txt
           echo "delete bla.txt if empty"
@@ -187,8 +191,10 @@ jobs:
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
+          echo "api.py in report:"
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
-          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
+          echo "finding a line that should not be in there"
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\""  > bla.txt || true
           echo "content of bla.txt:"
           cat bla.txt
           echo "delete bla.txt if empty"
@@ -202,8 +208,10 @@ jobs:
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
+          echo "api.py in report:"
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
-          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
+          echo "finding a line that should not be in there"
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\""  > bla.txt || true
           echo "content of bla.txt:"
           cat bla.txt
           echo "delete bla.txt if empty"
