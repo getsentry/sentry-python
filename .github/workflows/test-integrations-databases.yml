@@ -94,6 +94,7 @@ jobs:
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
           cat bla.txt
           [ -s bla.txt ] || rm bla.txt
@@ -103,6 +104,7 @@ jobs:
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
           cat bla.txt
           [ -s bla.txt ] || rm bla.txt
@@ -193,6 +195,7 @@ jobs:
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
           cat bla.txt
           [ -s bla.txt ] || rm bla.txt
@@ -202,6 +205,7 @@ jobs:
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
           cat bla.txt
           [ -s bla.txt ] || rm bla.txt
