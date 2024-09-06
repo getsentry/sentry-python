@@ -83,12 +83,14 @@
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
 
       - name: Generate coverage XML
         if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %} 
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}

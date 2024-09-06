@@ -91,11 +91,13 @@ jobs:
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
       - name: Generate coverage XML
         if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0
@@ -179,11 +181,13 @@ jobs:
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
       - name: Generate coverage XML
         if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
+          grep "\"sentry_sdk/api.py" -A 20 coverage.xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0
