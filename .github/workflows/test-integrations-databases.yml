@@ -96,8 +96,13 @@ jobs:
           coverage xml --ignore-errors
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
+          echo "content of bla.txt:"
           cat bla.txt
+          echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          echo "is bla.txt still there?"
+          ls bla.txt
+          echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
       - name: Generate coverage XML
         if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
@@ -106,8 +111,13 @@ jobs:
           coverage xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
+          echo "content of bla.txt:"
           cat bla.txt
+          echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          echo "is bla.txt still there?"
+          ls bla.txt
+          echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
@@ -197,8 +207,13 @@ jobs:
           coverage xml --ignore-errors
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
+          echo "content of bla.txt:"
           cat bla.txt
+          echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          echo "is bla.txt still there?"
+          ls bla.txt
+          echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
       - name: Generate coverage XML
         if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
@@ -207,8 +222,13 @@ jobs:
           coverage xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml
           grep "\"sentry_sdk/api.py" -A 20 coverage.xml | grep "number=\"20\"" > bla.txt
+          echo "content of bla.txt:"
           cat bla.txt
+          echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          echo "is bla.txt still there?"
+          ls bla.txt
+          echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
