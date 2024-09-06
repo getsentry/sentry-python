@@ -4,7 +4,9 @@
 *.db
 *.pid
 .python-version
-.coverage*
+.coverage
+.coverage-sentry*
+coverage.xml
 .junitxml*
 .DS_Store
 .tox

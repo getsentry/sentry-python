@@ -65,11 +65,17 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest"
-      - name: Generate coverage XML
-        if: ${{ !cancelled() }}
+      - name: Generate coverage XML (Python 3.6)
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
         run: |
-          coverage combine .coverage*
-          coverage xml -i
+          export COVERAGE_RCFILE=.coveragerc36
+          coverage combine .coverage-sentry-*
+          coverage xml --ignore-errors
+      - name: Generate coverage XML
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
+        run: |
+          coverage combine .coverage-sentry-*
+          coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0
@@ -127,11 +133,17 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond"
-      - name: Generate coverage XML
-        if: ${{ !cancelled() }}
+      - name: Generate coverage XML (Python 3.6)
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
         run: |
-          coverage combine .coverage*
-          coverage xml -i
+          export COVERAGE_RCFILE=.coveragerc36
+          coverage combine .coverage-sentry-*
+          coverage xml --ignore-errors
+      - name: Generate coverage XML
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
+        run: |
+          coverage combine .coverage-sentry-*
+          coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0
