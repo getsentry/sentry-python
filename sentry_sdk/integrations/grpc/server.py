@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
+from sentry_sdk.tracing import TRANSACTION_SOURCE_CUSTOM
 
 from typing import TYPE_CHECKING
 
@@ -38,19 +38,17 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 if name:
                     metadata = dict(context.invocation_metadata())
 
-                    transaction = Transaction.continue_from_headers(
-                        metadata,
-                        op=OP.GRPC_SERVER,
-                        name=name,
-                        source=TRANSACTION_SOURCE_CUSTOM,
-                        origin=SPAN_ORIGIN,
-                    )
-
-                    with sentry_sdk.start_transaction(transaction=transaction):
-                        try:
-                            return handler.unary_unary(request, context)
-                        except BaseException as e:
-                            raise e
+                    with sentry_sdk.continue_trace(metadata):
+                        with sentry_sdk.start_transaction(
+                            op=OP.GRPC_SERVER,
+                            name=name,
+                            source=TRANSACTION_SOURCE_CUSTOM,
+                            origin=SPAN_ORIGIN,
+                        ):
+                            try:
+                                return handler.unary_unary(request, context)
+                            except BaseException as e:
+                                raise e
                 else:
                     return handler.unary_unary(request, context)
 
