@@ -80,6 +80,7 @@
       - name: Generate coverage XML (Python 3.6)
         if: {% raw %}${{ !cancelled() && matrix.python-version == '3.6' }}{% endraw %} 
         run: |
+          set -x
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
@@ -91,12 +92,14 @@
           cat bla.txt
           echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          ls
           echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
 
       - name: Generate coverage XML
         if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %} 
         run: |
+          set -x
           coverage combine .coverage-sentry-*
           coverage xml
           echo "api.py in report:"
@@ -107,6 +110,7 @@
           cat bla.txt
           echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          ls
           echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
 

@@ -64,6 +64,7 @@ jobs:
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
         run: |
+          set -x
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
@@ -75,11 +76,13 @@ jobs:
           cat bla.txt
           echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          ls
           echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
       - name: Generate coverage XML
         if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
         run: |
+          set -x
           coverage combine .coverage-sentry-*
           coverage xml
           echo "api.py in report:"
@@ -90,6 +93,7 @@ jobs:
           cat bla.txt
           echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          ls
           echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
       - name: Upload coverage to Codecov
@@ -148,6 +152,7 @@ jobs:
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
         run: |
+          set -x
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
@@ -159,11 +164,13 @@ jobs:
           cat bla.txt
           echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          ls
           echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
       - name: Generate coverage XML
         if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
         run: |
+          set -x
           coverage combine .coverage-sentry-*
           coverage xml
           echo "api.py in report:"
@@ -174,6 +181,7 @@ jobs:
           cat bla.txt
           echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
+          ls
           echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
       - name: Upload coverage to Codecov
