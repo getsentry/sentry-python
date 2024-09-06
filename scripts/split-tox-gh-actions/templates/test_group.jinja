@@ -94,7 +94,7 @@
           [ ! -s bla.txt ] && rm bla.txt
           ls
           echo "if bla.txt is still there, exit with error"
-          [ -f bla.txt ] && exit 1
+          [ -f bla.txt ] && exit 1 || true
 
       - name: Generate coverage XML
         if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %} 
@@ -112,7 +112,7 @@
           [ ! -s bla.txt ] && rm bla.txt
           ls
           echo "if bla.txt is still there, exit with error"
-          [ -f bla.txt ] && exit 1
+          [ -f bla.txt ] && exit 1 || true
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
