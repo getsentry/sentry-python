@@ -91,8 +91,6 @@
           cat bla.txt
           echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
-          echo "is bla.txt still there?"
-          ls bla.txt
           echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
 
@@ -109,8 +107,6 @@
           cat bla.txt
           echo "delete bla.txt if empty"
           [ -s bla.txt ] || rm bla.txt
-          echo "is bla.txt still there?"
-          ls bla.txt
           echo "if bla.txt is still there, exit with error"
           [ -f bla.txt ] && exit 1
 
