@@ -6,11 +6,7 @@
       fail-fast: false
       matrix:
         python-version: [{{ py_versions.get(category)|join(",") }}]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-latest]
 
     {% if needs_github_secrets %}
     needs: check-permissions
@@ -80,8 +76,8 @@
       - name: Generate coverage XML
         if: {% raw %}${{ !cancelled() }}{% endraw %}
         run: |
-          coverage combine .coverage*
-          coverage xml -i
+          coverage combine .coverage-sentry-*
+          coverage xml
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}

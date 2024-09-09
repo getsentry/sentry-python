@@ -1,3 +1,5 @@
+import json
+import re
 import sys
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -54,6 +56,11 @@ def _wrap_init_error(init_error):
                     mechanism={"type": "aws_lambda", "handled": False},
                 )
                 sentry_sdk.capture_event(sentry_event, hint=hint)
+
+            else:
+                # Fall back to AWS lambdas JSON representation of the error
+                sentry_event = _event_from_error_json(json.loads(args[1]))
+                sentry_sdk.capture_event(sentry_event)
 
         return init_error(*args, **kwargs)
 
@@ -424,3 +431,58 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
     )
 
     return url
+
+
+def _parse_formatted_traceback(formatted_tb):
+    # type: (list[str]) -> list[dict[str, Any]]
+    frames = []
+    for frame in formatted_tb:
+        match = re.match(r'File "(.+)", line (\d+), in (.+)', frame.strip())
+        if match:
+            file_name, line_number, func_name = match.groups()
+            line_number = int(line_number)
+            frames.append(
+                {
+                    "filename": file_name,
+                    "function": func_name,
+                    "lineno": line_number,
+                    "vars": None,
+                    "pre_context": None,
+                    "context_line": None,
+                    "post_context": None,
+                }
+            )
+    return frames
+
+
+def _event_from_error_json(error_json):
+    # type: (dict[str, Any]) -> Event
+    """
+    Converts the error JSON from AWS Lambda into a Sentry error event.
+    This is not a full fletched event, but better than nothing.
+
+    This is an example of where AWS creates the error JSON:
+    https://github.com/aws/aws-lambda-python-runtime-interface-client/blob/2.2.1/awslambdaric/bootstrap.py#L479
+    """
+    event = {
+        "level": "error",
+        "exception": {
+            "values": [
+                {
+                    "type": error_json.get("errorType"),
+                    "value": error_json.get("errorMessage"),
+                    "stacktrace": {
+                        "frames": _parse_formatted_traceback(
+                            error_json.get("stackTrace", [])
+                        ),
+                    },
+                    "mechanism": {
+                        "type": "aws_lambda",
+                        "handled": False,
+                    },
+                }
+            ],
+        },
+    }  # type: Event
+
+    return event

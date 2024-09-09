@@ -60,11 +60,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.9"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-latest]
     needs: check-permissions
     steps:
       - uses: actions/checkout@v4.1.7
@@ -87,8 +83,8 @@ jobs:
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |
-          coverage combine .coverage*
-          coverage xml -i
+          coverage combine .coverage-sentry-*
+          coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0
