@@ -214,12 +214,11 @@ def test_sampling_parent_sampled(init_sentry_with_potel, traces_sample_rate, exp
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
     }
-    sentry_sdk.continue_trace(headers)
-
-    with sentry_sdk.start_span(description="request a"):
-        with sentry_sdk.start_span(description="cache a"):
-            with sentry_sdk.start_span(description="db X"):
-                ...
+    with sentry_sdk.continue_trace(headers):
+        with sentry_sdk.start_span(description="request a"):
+            with sentry_sdk.start_span(description="cache a"):
+                with sentry_sdk.start_span(description="db X"):
+                    ...
 
     assert len(envelopes) == expected_num_of_envelopes
 
@@ -246,12 +245,11 @@ def test_sampling_parent_dropped(init_sentry_with_potel, traces_sample_rate, exp
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-0",
     }
-    sentry_sdk.continue_trace(headers)
-
-    with sentry_sdk.start_span(description="request a"):
-        with sentry_sdk.start_span(description="cache a"):
-            with sentry_sdk.start_span(description="db X"):
-                ...
+    with sentry_sdk.continue_trace(headers):
+        with sentry_sdk.start_span(description="request a"):
+            with sentry_sdk.start_span(description="cache a"):
+                with sentry_sdk.start_span(description="db X"):
+                    ...
 
     assert len(envelopes) == expected_num_of_envelopes
 
@@ -278,11 +276,10 @@ def test_sampling_parent_deferred(init_sentry_with_potel, traces_sample_rate, ex
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-",
     }
-    sentry_sdk.continue_trace(headers)
-
-    with sentry_sdk.start_span(description="request a"):
-        with sentry_sdk.start_span(description="cache a"):
-            with sentry_sdk.start_span(description="db X"):
-                ...
+    with sentry_sdk.continue_trace(headers):
+        with sentry_sdk.start_span(description="request a"):
+            with sentry_sdk.start_span(description="cache a"):
+                with sentry_sdk.start_span(description="db X"):
+                    ...
 
     assert len(envelopes) == expected_num_of_envelopes
