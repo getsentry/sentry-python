@@ -244,6 +244,7 @@ def test_sampling_parent_sampled(
             transaction["contexts"]["trace"]["trace_id"]
             == "771a43a4192642f0b136d5159a501700"
         )
+        assert transaction["contexts"]["trace"]["span_id"] != "1234567890abcdef"
         assert transaction["contexts"]["trace"]["parent_span_id"] == "1234567890abcdef"
 
 
@@ -294,6 +295,7 @@ def test_sampling_parent_dropped(
             transaction["contexts"]["trace"]["trace_id"]
             == "771a43a4192642f0b136d5159a501700"
         )
+        assert transaction["contexts"]["trace"]["span_id"] != "1234567890abcdef"
         assert transaction["contexts"]["trace"]["parent_span_id"] == "1234567890abcdef"
 
 
@@ -345,4 +347,5 @@ def test_sampling_parent_deferred(
             transaction["contexts"]["trace"]["trace_id"]
             == "771a43a4192642f0b136d5159a501700"
         )
+        assert transaction["contexts"]["trace"]["span_id"] != "1234567890abcdef"
         assert transaction["contexts"]["trace"]["parent_span_id"] == "1234567890abcdef"
