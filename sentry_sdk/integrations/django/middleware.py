@@ -125,6 +125,7 @@ def _wrap_middleware(middleware, middleware_name):
     class SentryWrappingMiddleware(
         _asgi_middleware_mixin_factory(_check_middleware_span)  # type: ignore
     ):
+        sync_capable = getattr(middleware, "sync_capable", True)
         async_capable = DJANGO_SUPPORTS_ASYNC_MIDDLEWARE and getattr(
             middleware, "async_capable", False
         )
