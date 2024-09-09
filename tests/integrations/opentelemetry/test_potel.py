@@ -314,3 +314,18 @@ def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
 
     assert payload_a["tags"] == {"tag.global": 99, "tag.inner.a": "a"}
     assert payload_b["tags"] == {"tag.global": 99, "tag.inner.b": "b"}
+
+
+def test_potel_span_root_span_references():
+    with sentry_sdk.start_span(description="request") as request_span:
+        assert request_span.is_root_span
+        assert request_span.root_span == request_span
+        with sentry_sdk.start_span(description="db") as db_span:
+            assert not db_span.is_root_span
+            assert db_span.root_span == request_span
+            with sentry_sdk.start_span(description="redis") as redis_span:
+                assert not redis_span.is_root_span
+                assert redis_span.root_span == request_span
+        with sentry_sdk.start_span(description="http") as http_span:
+            assert not http_span.is_root_span
+            assert http_span.root_span == request_span
