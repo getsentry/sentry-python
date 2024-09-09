@@ -222,6 +222,13 @@ def test_sampling_parent_sampled(init_sentry_with_potel, traces_sample_rate, exp
 
     assert len(envelopes) == expected_num_of_envelopes
 
+    if expected_num_of_envelopes == 1:
+        (envelope,) = envelopes
+        transaction = envelope.items[0].payload.json
+        assert transaction["transaction"] == "request a"
+        assert transaction["contexts"]["trace"]["trace_id"] == "771a43a4192642f0b136d5159a501700"
+        assert transaction["contexts"]["trace"]["parent_span_id"] == "1234567890abcdef"
+
 
 @pytest.mark.parametrize(
     "traces_sample_rate, expected_num_of_envelopes",
@@ -253,6 +260,13 @@ def test_sampling_parent_dropped(init_sentry_with_potel, traces_sample_rate, exp
 
     assert len(envelopes) == expected_num_of_envelopes
 
+    if expected_num_of_envelopes == 1:
+        (envelope,) = envelopes
+        transaction = envelope.items[0].payload.json
+        assert transaction["transaction"] == "request a"
+        assert transaction["contexts"]["trace"]["trace_id"] == "771a43a4192642f0b136d5159a501700"
+        assert transaction["contexts"]["trace"]["parent_span_id"] == "1234567890abcdef"
+
 
 @pytest.mark.parametrize(
     "traces_sample_rate, expected_num_of_envelopes",
@@ -276,6 +290,7 @@ def test_sampling_parent_deferred(init_sentry_with_potel, traces_sample_rate, ex
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-",
     }
+    
     with sentry_sdk.continue_trace(headers):
         with sentry_sdk.start_span(description="request a"):
             with sentry_sdk.start_span(description="cache a"):
@@ -283,3 +298,10 @@ def test_sampling_parent_deferred(init_sentry_with_potel, traces_sample_rate, ex
                     ...
 
     assert len(envelopes) == expected_num_of_envelopes
+
+    if expected_num_of_envelopes == 1:
+        (envelope,) = envelopes
+        transaction = envelope.items[0].payload.json
+        assert transaction["transaction"] == "request a"
+        assert transaction["contexts"]["trace"]["trace_id"] == "771a43a4192642f0b136d5159a501700"
+        assert transaction["contexts"]["trace"]["parent_span_id"] == "1234567890abcdef"
