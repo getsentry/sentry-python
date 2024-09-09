@@ -23,12 +23,12 @@ def init_sentry_with_potel(sentry_init):
 
 
 @pytest.mark.parametrize(
-    "traces_sample_rate,expected_num_of_envelopes",
+    "traces_sample_rate, expected_num_of_envelopes",
     [
-        (-1, 0),  # special case, do not pass any traces_sample_rate to init()
-        (None, 0),
-        (0, 0),
-        (1, 2),
+        (-1, 0),  # special case for testing, do not pass any traces_sample_rate to init() (the default traces_sample_rate=None will be used)
+        (None, 0),  # traces_sample_rate=None means do not create new traces, and also do not continue incoming traces. So, no envelopes at all.
+        (0, 0),  # traces_sample_rate=0 means do not create new traces (0% of the requests), but continue incoming traces. So envelopes will be created only if there is an incoming trace.
+        (1, 2),  # traces_sample_rate=1 means create new traces for 100% of requests (and also continue incoming traces, of course).
     ],
 )
 def test_sampling_traces_sample_rate_0_or_100(
@@ -82,7 +82,7 @@ def test_sampling_traces_sample_rate_50(init_sentry_with_potel, capture_envelope
 
     # Make sure random() always returns the same values
     with mock.patch(
-        "sentry_sdk.integrations.opentelemetry.sampler.random", side_effect=[0.7, 0.2]
+        "sentry_sdk.integrations.opentelemetry.sampler.random", side_effect=[0.7, 0.7, 0.7, 0.2, 0.2, 0.2]
     ):
         with sentry_sdk.start_span(description="request a"):
             with sentry_sdk.start_span(description="cache a"):
@@ -190,3 +190,99 @@ def test_sampling_traces_sampler_boolean(init_sentry_with_potel, capture_envelop
 
     assert transaction["transaction"] == "request a"
     assert len(transaction["spans"]) == 1
+
+
+@pytest.mark.parametrize(
+    "traces_sample_rate, expected_num_of_envelopes",
+    [
+        (-1, 0),  # special case for testing, do not pass any traces_sample_rate to init() (the default traces_sample_rate=None will be used)
+        (None, 0),  # traces_sample_rate=None means do not create new traces, and also do not continue incoming traces. So, no envelopes at all.
+        (0, 1),  # traces_sample_rate=0 means do not create new traces (0% of the requests), but continue incoming traces. So envelopes will be created only if there is an incoming trace.
+        (1, 1),  # traces_sample_rate=1 means create new traces for 100% of requests (and also continue incoming traces, of course).
+    ],
+)
+def test_sampling_parent_sampled(init_sentry_with_potel, traces_sample_rate, expected_num_of_envelopes, capture_envelopes):
+    kwargs = {}
+    if traces_sample_rate != -1:
+        kwargs["traces_sample_rate"] = traces_sample_rate
+
+    init_sentry_with_potel(**kwargs)
+
+    envelopes = capture_envelopes()
+
+    # The upstream service has sampled the request
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+    }
+    sentry_sdk.continue_trace(headers)
+
+    with sentry_sdk.start_span(description="request a"):
+        with sentry_sdk.start_span(description="cache a"):
+            with sentry_sdk.start_span(description="db X"):
+                ...
+
+    assert len(envelopes) == expected_num_of_envelopes
+
+
+@pytest.mark.parametrize(
+    "traces_sample_rate, expected_num_of_envelopes",
+    [
+        (-1, 0),  # special case for testing, do not pass any traces_sample_rate to init() (the default traces_sample_rate=None will be used)
+        (None, 0),  # traces_sample_rate=None means do not create new traces, and also do not continue incoming traces. So, no envelopes at all.
+        (0, 0),  # traces_sample_rate=0 means do not create new traces (0% of the requests), but continue incoming traces. So envelopes will be created only if there is an incoming trace.
+        (1, 0),  # traces_sample_rate=1 means create new traces for 100% of requests (and also continue incoming traces, of course).
+    ],
+)
+def test_sampling_parent_dropped(init_sentry_with_potel, traces_sample_rate, expected_num_of_envelopes, capture_envelopes):
+    kwargs = {}
+    if traces_sample_rate != -1:
+        kwargs["traces_sample_rate"] = traces_sample_rate
+
+    init_sentry_with_potel(**kwargs)
+
+    envelopes = capture_envelopes()
+
+    # The upstream service has dropped the request
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-0",
+    }
+    sentry_sdk.continue_trace(headers)
+
+    with sentry_sdk.start_span(description="request a"):
+        with sentry_sdk.start_span(description="cache a"):
+            with sentry_sdk.start_span(description="db X"):
+                ...
+
+    assert len(envelopes) == expected_num_of_envelopes
+
+
+@pytest.mark.parametrize(
+    "traces_sample_rate, expected_num_of_envelopes",
+    [
+        (-1, 0),  # special case for testing, do not pass any traces_sample_rate to init() (the default traces_sample_rate=None will be used)
+        (None, 0),  # traces_sample_rate=None means do not create new traces, and also do not continue incoming traces. So, no envelopes at all.
+        (0, 0),  # traces_sample_rate=0 means do not create new traces (0% of the requests), but continue incoming traces. So envelopes will be created only if there is an incoming trace.
+        (1, 1),  # traces_sample_rate=1 means create new traces for 100% of requests (and also continue incoming traces, of course).
+    ],
+)
+def test_sampling_parent_deferred(init_sentry_with_potel, traces_sample_rate, expected_num_of_envelopes, capture_envelopes):
+    kwargs = {}
+    if traces_sample_rate != -1:
+        kwargs["traces_sample_rate"] = traces_sample_rate
+
+    init_sentry_with_potel(**kwargs)
+
+    envelopes = capture_envelopes()
+
+    # The upstream service has deferred the sampling decision to us.
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-",
+    }
+    sentry_sdk.continue_trace(headers)
+
+    with sentry_sdk.start_span(description="request a"):
+        with sentry_sdk.start_span(description="cache a"):
+            with sentry_sdk.start_span(description="db X"):
+                ...
+
+    assert len(envelopes) == expected_num_of_envelopes

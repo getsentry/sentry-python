@@ -75,6 +75,8 @@ class SentrySampler(Sampler):
         parent_span = trace.get_current_span()
         parent_context = parent_span.get_span_context()
 
+        sample_rate = None
+
         # Check if there is a traces_sampler
         # Traces_sampler is responsible to check parent sampled to have full transactions.
         has_traces_sampler = callable(client.options.get("traces_sampler"))
