@@ -4,24 +4,25 @@
 
 ### Various fixes & improvements
 
-- tests: Remove broken bottle tests (#3505) by @sentrivana
-- Fixed config for old coverage versions (#3504) by @antonpirker
-- Fix AWS Lambda tests  (#3495) by @antonpirker
-- Better test coverage reports (#3498) by @antonpirker
-- feat(celery): Add wrapper for `Celery().send_task` to support behavior as `Task.apply_async` (#2377) by @divaltor
-- fix(django): SentryWrappingMiddleware.__init__ fails if super() is object (#2466) by @cameron-simpson
-- feat(strawberry): Support Strawberry 0.239.2 (#3491) by @szokeasaurusrex
-- ref: Remove obsolete object as superclass (#3480) by @sentrivana
+- New `SysExitIntegration` (#3401) by @szokeasaurusrex
+
+  For more information, see the documentation for the [SysExitIntegration](https://docs.sentry.io/platforms/python/integrations/sys_exit).
+
+- Add `SENTRY_SPOTLIGHT` env variable support (#3443) by @BYK
+- Support Strawberry `0.239.2` (#3491) by @szokeasaurusrex
+- Add separate `pii_denylist` to `EventScrubber` and run it always (#3463) by @sl0thentr0py
+- Celery: Add wrapper for `Celery().send_task` to support behavior as `Task.apply_async` (#2377) by @divaltor
+- Django: SentryWrappingMiddleware.__init__ fails if super() is object (#2466) by @cameron-simpson
 - Fix data_category for sessions envelope items (#3473) by @sl0thentr0py
-- fix: Fix non-UTC timestamps (#3461) by @szokeasaurusrex
-- Add separate pii_denylist to EventScrubber and run it always (#3463) by @sl0thentr0py
-- Revert "Pin httpx till upstream gets resolved (#3465)" (#3466) by @sl0thentr0py
-- feat(integrations): New `SysExitIntegration` (#3401) by @szokeasaurusrex
-- ref(types): Replace custom TYPE_CHECKING with stdlib typing.TYPE_CHECKING (#3447) by @dev-satoshi
-- Pin httpx till upstream gets resolved (#3465) by @sl0thentr0py
-- chore(tracing): Refactor `tracing_utils.py` (#3452) by @rominf
-- feat: Add SENTRY_SPOTLIGHT env variable support (#3443) by @BYK
-- style: explicitly export symbols instead of ignoring (#3400) by @hartungstenio
+- Fix non-UTC timestamps (#3461) by @szokeasaurusrex
+- Remove obsolete object as superclass (#3480) by @sentrivana
+- Replace custom `TYPE_CHECKING` with stdlib `typing.TYPE_CHECKING` (#3447) by @dev-satoshi
+- Refactor `tracing_utils.py` (#3452) by @rominf
+- Explicitly export symbol in subpackages instead of ignoring (#3400) by @hartungstenio
+- Better test coverage reports (#3498) by @antonpirker
+- Fixed config for old coverage versions (#3504) by @antonpirker
+- Fix AWS Lambda tests (#3495) by @antonpirker
+- Remove broken Bottle tests (#3505) by @sentrivana
 
 ## 2.13.0
 
