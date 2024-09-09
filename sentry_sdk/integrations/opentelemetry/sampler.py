@@ -8,28 +8,26 @@ from opentelemetry.util.types import Attributes
 import sentry_sdk
 from sentry_sdk.integrations.opentelemetry.consts import SENTRY_TRACE_STATE_DROPPED
 from sentry_sdk.tracing_utils import has_tracing_enabled
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import is_valid_sample_rate, logger
 
 from typing import Optional, Sequence
 
-from sentry_sdk.utils import is_valid_sample_rate
-
 
 def get_parent_sampled(parent_context, trace_id):
+    # type: (Optional["Context"], int) -> Optional[bool]
     is_span_context_valid = parent_context is not None and parent_context.is_valid
 
+    # Only inherit sample rate if `traceId` is the same
     if is_span_context_valid and parent_context.trace_id == trace_id:
-        if parent_context.is_remote:
-            dropped = (
-                parent_context.trace_state.get(SENTRY_TRACE_STATE_DROPPED) == "true"
-            )
-            if parent_context.trace_flags.sampled:
-                return True
+        # this is getSamplingDecision in JS
+        if parent_context.trace_flags.sampled:
+            return True
 
-            if dropped:
-                return False
+        dropped = parent_context.trace_state.get(SENTRY_TRACE_STATE_DROPPED) == "true"
+        if dropped:
+            return False
 
-            # TODO-anton: fall back to sampling decision in DSC (for this die DSC needs to be set in the trace_state )
+        # TODO-anton: fall back to sampling decision in DSC (for this die DSC needs to be set in the trace_state)
 
     return None
 
@@ -55,7 +53,7 @@ class SentrySampler(Sampler):
         # TODO-anton: Do we want to keep the start_transaction(sampled=True) thing?
 
         parent_span = trace.get_current_span()
-        parent_context = parent_span.get_span_context()
+        parent_context = parent_span and parent_span.get_span_context()
 
         sample_rate = None
         # Check if there is a traces_sampler
