@@ -14,6 +14,25 @@ from typing import Optional, Sequence
 from sentry_sdk.utils import is_valid_sample_rate
 
 
+def get_parent_sampled(parent_context, trace_id):
+    is_span_context_valid = parent_context is not None and parent_context.is_valid
+
+    if is_span_context_valid and parent_context.trace_id == trace_id:
+        if parent_context.is_remote:
+            dropped = (
+                parent_context.trace_state.get("SENTRY_TRACE_STATE_DROPPED") == "true"
+            )
+            if parent_context.trace_flags.sampled:
+                return True
+
+            if dropped:
+                return False
+
+            # TODO-anton: fall back to sampling decision in DSC (for this die DSC needs to be set in the trace_state )
+
+    return None
+
+
 class SentrySampler(Sampler):
     def should_sample(
         self,
@@ -92,9 +111,9 @@ class SentrySampler(Sampler):
 
         # Check if there is a parent with a sampling decision
         if sample_rate is None:
-            has_parent = parent_context is not None and parent_context.is_valid
-            if has_parent:
-                sample_rate = parent_context.trace_flags.sampled
+            parent_sampled = get_parent_sampled(parent_context, trace_id)
+            if parent_sampled is not None:
+                sample_rate = parent_sampled
 
         # Check if there is a traces_sample_rate
         if sample_rate is None:
@@ -118,6 +137,8 @@ class SentrySampler(Sampler):
         if sampled:
             return SamplingResult(Decision.RECORD_AND_SAMPLE)
         else:
+            # TODO-anton: set span_context.trace_state.
+            parent_context.trace_state.update("SENTRY_TRACE_STATE_DROPPED", "true")
             return SamplingResult(Decision.DROP)
 
     def get_description(self) -> str:
