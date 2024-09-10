@@ -9,19 +9,6 @@ import sentry_sdk
 tracer = trace.get_tracer(__name__)
 
 
-@pytest.fixture()
-def init_sentry_with_potel(sentry_init):
-    def wrapped_sentry_init(*args, **kwargs):
-        kwargs.update(
-            {
-                "_experiments": {"otel_powered_performance": True},
-            }
-        )
-        sentry_init(*args, **kwargs)
-
-    return wrapped_sentry_init
-
-
 @pytest.mark.parametrize(
     "traces_sample_rate, expected_num_of_envelopes",
     [
@@ -36,7 +23,7 @@ def init_sentry_with_potel(sentry_init):
     ],
 )
 def test_sampling_traces_sample_rate_0_or_100(
-    init_sentry_with_potel,
+    sentry_init,
     capture_envelopes,
     traces_sample_rate,
     expected_num_of_envelopes,
@@ -45,7 +32,7 @@ def test_sampling_traces_sample_rate_0_or_100(
     if traces_sample_rate != -1:
         kwargs["traces_sample_rate"] = traces_sample_rate
 
-    init_sentry_with_potel(**kwargs)
+    sentry_init(**kwargs)
 
     envelopes = capture_envelopes()
 
@@ -79,8 +66,8 @@ def test_sampling_traces_sample_rate_0_or_100(
         assert spans_b[1]["description"] == "db b"
 
 
-def test_sampling_traces_sample_rate_50(init_sentry_with_potel, capture_envelopes):
-    init_sentry_with_potel(traces_sample_rate=0.5)
+def test_sampling_traces_sample_rate_50(sentry_init, capture_envelopes):
+    sentry_init(traces_sample_rate=0.5)
 
     envelopes = capture_envelopes()
 
@@ -110,14 +97,14 @@ def test_sampling_traces_sample_rate_50(init_sentry_with_potel, capture_envelope
     assert spans[1]["description"] == "db b"
 
 
-def test_sampling_traces_sampler(init_sentry_with_potel, capture_envelopes):
+def test_sampling_traces_sampler(sentry_init, capture_envelopes):
     def keep_only_a(sampling_context):
         if " a" in sampling_context["transaction_context"]["name"]:
             return 0.05
         else:
             return 0
 
-    init_sentry_with_potel(
+    sentry_init(
         traces_sample_rate=1.0,
         traces_sampler=keep_only_a,
     )
@@ -165,14 +152,14 @@ def test_sampling_traces_sampler(init_sentry_with_potel, capture_envelopes):
     assert len(transaction2["spans"]) == 0
 
 
-def test_sampling_traces_sampler_boolean(init_sentry_with_potel, capture_envelopes):
+def test_sampling_traces_sampler_boolean(sentry_init, capture_envelopes):
     def keep_only_a(sampling_context):
         if " a" in sampling_context["transaction_context"]["name"]:
             return True
         else:
             return False
 
-    init_sentry_with_potel(
+    sentry_init(
         traces_sample_rate=1.0,
         traces_sampler=keep_only_a,
     )
@@ -211,7 +198,7 @@ def test_sampling_traces_sampler_boolean(init_sentry_with_potel, capture_envelop
     ],
 )
 def test_sampling_parent_sampled(
-    init_sentry_with_potel,
+    sentry_init,
     traces_sample_rate,
     expected_num_of_envelopes,
     capture_envelopes,
@@ -220,7 +207,7 @@ def test_sampling_parent_sampled(
     if traces_sample_rate != -1:
         kwargs["traces_sample_rate"] = traces_sample_rate
 
-    init_sentry_with_potel(**kwargs)
+    sentry_init(**kwargs)
 
     envelopes = capture_envelopes()
 
@@ -262,7 +249,7 @@ def test_sampling_parent_sampled(
     ],
 )
 def test_sampling_parent_dropped(
-    init_sentry_with_potel,
+    sentry_init,
     traces_sample_rate,
     expected_num_of_envelopes,
     capture_envelopes,
@@ -271,7 +258,7 @@ def test_sampling_parent_dropped(
     if traces_sample_rate != -1:
         kwargs["traces_sample_rate"] = traces_sample_rate
 
-    init_sentry_with_potel(**kwargs)
+    sentry_init(**kwargs)
 
     envelopes = capture_envelopes()
 
@@ -313,7 +300,7 @@ def test_sampling_parent_dropped(
     ],
 )
 def test_sampling_parent_deferred(
-    init_sentry_with_potel,
+    sentry_init,
     traces_sample_rate,
     expected_num_of_envelopes,
     capture_envelopes,
@@ -322,7 +309,7 @@ def test_sampling_parent_deferred(
     if traces_sample_rate != -1:
         kwargs["traces_sample_rate"] = traces_sample_rate
 
-    init_sentry_with_potel(**kwargs)
+    sentry_init(**kwargs)
 
     envelopes = capture_envelopes()
 
