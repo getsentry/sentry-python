@@ -99,13 +99,11 @@ class SentrySampler(Sampler):
         if sampled:
             return SamplingResult(Decision.RECORD_AND_SAMPLE)
         else:
+            updated_trace_context = parent_context.trace_state or TraceState()
+            updated_trace_context = updated_trace_context.update(SENTRY_TRACE_STATE_DROPPED, "true")
             return SamplingResult(
                 Decision.DROP,
-                trace_state=TraceState(
-                    [
-                        (SENTRY_TRACE_STATE_DROPPED, "true"),
-                    ]
-                ),
+                trace_state=updated_trace_context,
             )
 
     def get_description(self) -> str:

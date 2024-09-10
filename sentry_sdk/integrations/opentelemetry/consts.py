@@ -11,7 +11,7 @@ SENTRY_FORK_ISOLATION_SCOPE_KEY = create_key("sentry_fork_isolation_scope")
 SENTRY_USE_CURRENT_SCOPE_KEY = create_key("sentry_use_current_scope")
 SENTRY_USE_ISOLATION_SCOPE_KEY = create_key("sentry_use_isolation_scope")
 
-SENTRY_TRACE_STATE_DROPPED = "sentry.dropped"
+SENTRY_TRACE_STATE_DROPPED = "sentry_dropped"
 
 OTEL_SENTRY_CONTEXT = "otel"
 SPAN_ORIGIN = "auto.otel"
