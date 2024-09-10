@@ -97,6 +97,9 @@ class PotelScope(Scope):
             span_id=int(self._propagation_context.parent_span_id, 16),  # type: ignore
             is_remote=True,
             trace_flags=trace_flags,
+            # TODO-anton: add trace_state (mapping[str,str]) with the parentSpanId, dsc and sampled from self._propagation_context
+            # trace_state={
+            # }
         )
 
         return span_context
