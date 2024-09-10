@@ -1,21 +1,29 @@
 from random import random
 
 from opentelemetry import trace
+
 from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
-from opentelemetry.trace import SpanKind
 from opentelemetry.trace.span import TraceState
-from opentelemetry.util.types import Attributes
 
 import sentry_sdk
 from sentry_sdk.integrations.opentelemetry.consts import SENTRY_TRACE_STATE_DROPPED
 from sentry_sdk.tracing_utils import has_tracing_enabled
 from sentry_sdk.utils import is_valid_sample_rate, logger
 
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING, Optional, Sequence
+
+if TYPE_CHECKING:
+    from opentelemetry.context import Context
+    from opentelemetry.trace import Link, SpanKind
+    from opentelemetry.trace.span import SpanContext
+    from opentelemetry.util.types import Attributes
 
 
 def get_parent_sampled(parent_context, trace_id):
-    # type: (Optional["Context"], int) -> Optional[bool]
+    # type: (Optional[SpanContext], int) -> Optional[bool]
+    if parent_context is None:
+        return None
+
     is_span_context_valid = parent_context is not None and parent_context.is_valid
 
     # Only inherit sample rate if `traceId` is the same
@@ -33,8 +41,9 @@ def get_parent_sampled(parent_context, trace_id):
     return None
 
 
-def dropped(trace_state=None):
-    # type: (Optional["TraceState"]) -> SamplingResult
+def dropped(parent_context=None):
+    # type: (Optional[SpanContext]) -> SamplingResult
+    trace_state = parent_context.trace_state if parent_context is not None else None
     updated_trace_context = trace_state or TraceState()
     updated_trace_context = updated_trace_context.update(
         SENTRY_TRACE_STATE_DROPPED, "true"
@@ -48,22 +57,23 @@ def dropped(trace_state=None):
 class SentrySampler(Sampler):
     def should_sample(
         self,
-        parent_context: Optional["Context"],
-        trace_id: int,
-        name: str,
-        kind: Optional[SpanKind] = None,
-        attributes: Attributes = None,
-        links: Optional[Sequence["Link"]] = None,
-        trace_state: Optional["TraceState"] = None,
-    ) -> "SamplingResult":
+        parent_context,  # type: Optional[Context]
+        trace_id,  # type: int
+        name,  # type: str
+        kind=None,  # type: Optional[SpanKind]
+        attributes=None,  # type: Attributes
+        links=None,  # type: Optional[Sequence[Link]]
+        trace_state=None,  # type: Optional[TraceState]
+    ):
+        # type: (...) -> SamplingResult
         client = sentry_sdk.get_client()
 
         parent_span = trace.get_current_span(parent_context)
-        parent_context = parent_span and parent_span.get_span_context()
+        parent_context = parent_span.get_span_context() if parent_span else None
 
         # No tracing enabled, thus no sampling
         if not has_tracing_enabled(client.options):
-            return dropped(parent_context.trace_state)
+            return dropped(parent_context)
 
         sample_rate = None
 
@@ -79,7 +89,7 @@ class SentrySampler(Sampler):
                 "transaction_context": {
                     "name": name,
                 },
-                "parent_sampled": parent_context.trace_flags.sampled,
+                "parent_sampled": get_parent_sampled(parent_context, trace_id),
             }
 
             sample_rate = client.options["traces_sampler"](sampling_context)
@@ -103,7 +113,7 @@ class SentrySampler(Sampler):
             logger.warning(
                 f"[Tracing] Discarding {name} because of invalid sample rate."
             )
-            return dropped(parent_context.trace_state)
+            return dropped(parent_context)
 
         # Roll the dice on sample rate
         sampled = random() < float(sample_rate)
@@ -111,7 +121,7 @@ class SentrySampler(Sampler):
         if sampled:
             return SamplingResult(Decision.RECORD_AND_SAMPLE)
         else:
-            return dropped(parent_context.trace_state)
+            return dropped(parent_context)
 
     def get_description(self) -> str:
         return self.__class__.__name__
