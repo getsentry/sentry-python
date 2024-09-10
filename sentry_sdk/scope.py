@@ -1307,7 +1307,16 @@ class Scope:
         event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
             self._breadcrumbs
         )
-        event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+
+        # Attempt to sort timestamps
+        try:
+            for crumb in event["breadcrumbs"]["values"]:
+                if isinstance(crumb, str):
+                    crumb["timestamp"] = datetime.fromisoformat(crumb["timestamp"])
+
+            event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+        except:  # noqa: E722
+            pass
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
