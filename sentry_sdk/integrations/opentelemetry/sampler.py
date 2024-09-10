@@ -52,7 +52,7 @@ class SentrySampler(Sampler):
         # Check if sampled=True was passed to start_transaction
         # TODO-anton: Do we want to keep the start_transaction(sampled=True) thing?
 
-        parent_span = trace.get_current_span()
+        parent_span = trace.get_current_span(parent_context)
         parent_context = parent_span and parent_span.get_span_context()
 
         sample_rate = None
