@@ -1315,7 +1315,7 @@ class Scope:
                     crumb["timestamp"] = datetime.fromisoformat(crumb["timestamp"])
 
             event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
-        except:  # noqa: E722
+        except Exception:  # noqa: E722
             pass
 
     def _apply_user_to_event(self, event, hint, options):
