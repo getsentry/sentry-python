@@ -103,11 +103,6 @@ class SentrySampler(Sampler):
                 # Check if there is a traces_sample_rate
                 sample_rate = client.options.get("traces_sample_rate")
 
-        # If we still have no sample rate (but enable_tracing==True,
-        # because has_tracing_enabled returned True above), default to 1.0
-        if sample_rate is None:
-            sample_rate = 1.0
-
         # If the sample rate is invalid, drop the span
         if not is_valid_sample_rate(sample_rate, source=self.__class__.__name__):
             logger.warning(
