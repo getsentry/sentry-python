@@ -33,6 +33,18 @@ def get_parent_sampled(parent_context, trace_id):
     return None
 
 
+def dropped(trace_state=None):
+    # type: (Optional["TraceState"]) -> SamplingResult
+    updated_trace_context = trace_state or TraceState()
+    updated_trace_context = updated_trace_context.update(
+        SENTRY_TRACE_STATE_DROPPED, "true"
+    )
+    return SamplingResult(
+        Decision.DROP,
+        trace_state=updated_trace_context,
+    )
+
+
 class SentrySampler(Sampler):
     def should_sample(
         self,
@@ -46,17 +58,18 @@ class SentrySampler(Sampler):
     ) -> "SamplingResult":
         client = sentry_sdk.get_client()
 
+        parent_span = trace.get_current_span(parent_context)
+        parent_context = parent_span and parent_span.get_span_context()
+
         # No tracing enabled, thus no sampling
         if not has_tracing_enabled(client.options):
-            return SamplingResult(Decision.DROP)
+            return dropped(parent_context.trace_state)
+
+        sample_rate = None
 
         # Check if sampled=True was passed to start_transaction
         # TODO-anton: Do we want to keep the start_transaction(sampled=True) thing?
 
-        parent_span = trace.get_current_span(parent_context)
-        parent_context = parent_span and parent_span.get_span_context()
-
-        sample_rate = None
         # Check if there is a traces_sampler
         # Traces_sampler is responsible to check parent sampled to have full transactions.
         has_traces_sampler = callable(client.options.get("traces_sampler"))
@@ -71,17 +84,16 @@ class SentrySampler(Sampler):
 
             sample_rate = client.options["traces_sampler"](sampling_context)
 
-        # Check if there is a parent with a sampling decision
-        if sample_rate is None:
+        else:
+            # Check if there is a parent with a sampling decision
             parent_sampled = get_parent_sampled(parent_context, trace_id)
             if parent_sampled is not None:
                 sample_rate = parent_sampled
+            else:
+                # Check if there is a traces_sample_rate
+                sample_rate = client.options.get("traces_sample_rate")
 
-        # Check if there is a traces_sample_rate
-        if sample_rate is None:
-            sample_rate = client.options.get("traces_sample_rate")
-
-        # If we still have no sample rate (but tracing is enabled,
+        # If we still have no sample rate (but enable_tracing==True,
         # because has_tracing_enabled returned True above), default to 1.0
         if sample_rate is None:
             sample_rate = 1.0
@@ -91,7 +103,7 @@ class SentrySampler(Sampler):
             logger.warning(
                 f"[Tracing] Discarding {name} because of invalid sample rate."
             )
-            return SamplingResult(Decision.DROP)
+            return dropped(parent_context.trace_state)
 
         # Roll the dice on sample rate
         sampled = random() < float(sample_rate)
@@ -99,12 +111,7 @@ class SentrySampler(Sampler):
         if sampled:
             return SamplingResult(Decision.RECORD_AND_SAMPLE)
         else:
-            updated_trace_context = parent_context.trace_state or TraceState()
-            updated_trace_context = updated_trace_context.update(SENTRY_TRACE_STATE_DROPPED, "true")
-            return SamplingResult(
-                Decision.DROP,
-                trace_state=updated_trace_context,
-            )
+            return dropped(parent_context.trace_state)
 
     def get_description(self) -> str:
         return self.__class__.__name__
