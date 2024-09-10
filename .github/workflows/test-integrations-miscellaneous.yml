@@ -106,12 +106,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   test-miscellaneous-pinned:
     name: Miscellaneous (pinned)
     timeout-minutes: 30
@@ -198,12 +200,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   check_required_tests:
     name: All Miscellaneous tests passed
     needs: test-miscellaneous-pinned

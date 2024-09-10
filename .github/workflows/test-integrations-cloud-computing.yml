@@ -102,12 +102,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   test-cloud_computing-pinned:
     name: Cloud Computing (pinned)
     timeout-minutes: 30
@@ -190,12 +192,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   check_required_tests:
     name: All Cloud Computing tests passed
     needs: test-cloud_computing-pinned

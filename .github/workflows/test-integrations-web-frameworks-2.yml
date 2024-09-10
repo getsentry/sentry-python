@@ -126,12 +126,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   test-web_frameworks_2-pinned:
     name: Web Frameworks 2 (pinned)
     timeout-minutes: 30
@@ -238,12 +240,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   check_required_tests:
     name: All Web Frameworks 2 tests passed
     needs: test-web_frameworks_2-pinned
