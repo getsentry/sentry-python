@@ -3,6 +3,7 @@ from random import random
 from opentelemetry import trace
 from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace import SpanKind
+from opentelemetry.trace.span import TraceState
 from opentelemetry.util.types import Attributes
 
 import sentry_sdk
@@ -98,8 +99,14 @@ class SentrySampler(Sampler):
         if sampled:
             return SamplingResult(Decision.RECORD_AND_SAMPLE)
         else:
-            parent_context.trace_state.update(SENTRY_TRACE_STATE_DROPPED, "true")
-            return SamplingResult(Decision.DROP)
+            return SamplingResult(
+                Decision.DROP,
+                trace_state=TraceState(
+                    [
+                        (SENTRY_TRACE_STATE_DROPPED, "true"),
+                    ]
+                ),
+            )
 
     def get_description(self) -> str:
         return self.__class__.__name__
