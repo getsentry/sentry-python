@@ -30,6 +30,7 @@ from sentry_sdk.utils import (
     capture_internal_exception,
     capture_internal_exceptions,
     ContextVar,
+    datetime_from_isoformat,
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
@@ -1312,7 +1313,7 @@ class Scope:
         try:
             for crumb in event["breadcrumbs"]["values"]:
                 if isinstance(crumb["timestamp"], str):
-                    crumb["timestamp"] = datetime.fromisoformat(crumb["timestamp"])
+                    crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
 
             event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
         except Exception:

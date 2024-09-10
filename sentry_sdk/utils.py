@@ -239,6 +239,15 @@ def format_timestamp(value):
     return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
+def datetime_from_isoformat(value):
+    # type: (str) -> datetime.datetime
+    try:
+        return datetime.fromisoformat(value)
+    except AttributeError:
+        # py 3.6
+        return datetime.strptime("%Y-%m-%dT%H:%M:%S.%f")
+
+
 def event_hint_with_exc_info(exc_info=None):
     # type: (Optional[ExcInfo]) -> Dict[str, Optional[ExcInfo]]
     """Creates a hint with the exc info filled in."""
