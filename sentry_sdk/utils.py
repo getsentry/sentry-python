@@ -240,12 +240,12 @@ def format_timestamp(value):
 
 
 def datetime_from_isoformat(value):
-    # type: (str) -> datetime.datetime
+    # type: (str) -> datetime
     try:
         return datetime.fromisoformat(value)
     except AttributeError:
         # py 3.6
-        return datetime.strptime("%Y-%m-%dT%H:%M:%S.%f")
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
 
 
 def event_hint_with_exc_info(exc_info=None):
