@@ -71,16 +71,17 @@ def test_sampling_traces_sample_rate_50(sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    # Make sure random() always returns the same values
     with mock.patch(
-        "sentry_sdk.integrations.opentelemetry.sampler.random",
-        side_effect=[0.7, 0.7, 0.7, 0.2, 0.2, 0.2],
-    ):
+        "sentry_sdk.integrations.opentelemetry.sampler.random", return_value=0.2
+    ):  # drop
         with sentry_sdk.start_span(description="request a"):
             with sentry_sdk.start_span(description="cache a"):
                 with sentry_sdk.start_span(description="db a"):
                     ...
 
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.sampler.random", return_value=0.7
+    ):  # keep
         with sentry_sdk.start_span(description="request b"):
             with sentry_sdk.start_span(description="cache b"):
                 with sentry_sdk.start_span(description="db b"):
@@ -90,11 +91,11 @@ def test_sampling_traces_sample_rate_50(sentry_init, capture_envelopes):
 
     (envelope,) = envelopes
     transaction = envelope.items[0].payload.json
-    assert transaction["transaction"] == "request b"
+    assert transaction["transaction"] == "request a"
     spans = transaction["spans"]
     assert len(spans) == 2
-    assert spans[0]["description"] == "cache b"
-    assert spans[1]["description"] == "db b"
+    assert spans[0]["description"] == "cache a"
+    assert spans[1]["description"] == "db a"
 
 
 def test_sampling_traces_sampler(sentry_init, capture_envelopes):
