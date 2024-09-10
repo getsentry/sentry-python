@@ -1,7 +1,13 @@
 from collections import deque, defaultdict
 from typing import cast
 
-from opentelemetry.trace import format_trace_id, format_span_id
+from opentelemetry.trace import (
+    format_trace_id,
+    format_span_id,
+    get_current_span,
+    INVALID_SPAN,
+    Span as TraceApiSpan,
+)
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
@@ -44,7 +50,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
     def on_start(self, span, parent_context=None):
         # type: (Span, Optional[Context]) -> None
-        pass
+        if not is_sentry_span(span):
+            self._add_root_span(span, get_current_span(parent_context))
 
     def on_end(self, span):
         # type: (ReadableSpan) -> None
@@ -67,6 +74,21 @@ class PotelSentrySpanProcessor(SpanProcessor):
     def force_flush(self, timeout_millis=30000):
         # type: (int) -> bool
         return True
+
+    def _add_root_span(self, span, parent_span):
+        # type: (Span, TraceApiSpan) -> None
+        """
+        This is required to make POTelSpan.root_span work
+        since we can't traverse back to the root purely with otel efficiently.
+        """
+        if parent_span != INVALID_SPAN and not parent_span.get_span_context().is_remote:
+            # child span points to parent's root or parent
+            span._sentry_root_otel_span = getattr(
+                parent_span, "_sentry_root_otel_span", parent_span
+            )
+        else:
+            # root span points to itself
+            span._sentry_root_otel_span = span
 
     def _flush_root_span(self, span):
         # type: (ReadableSpan) -> None

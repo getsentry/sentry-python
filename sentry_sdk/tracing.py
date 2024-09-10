@@ -3,7 +3,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context
-from opentelemetry.trace import format_trace_id, format_span_id
+from opentelemetry.trace import format_trace_id, format_span_id, Span as OtelSpan
 from opentelemetry.trace.status import StatusCode
 from opentelemetry.sdk.trace import ReadableSpan
 
@@ -17,7 +17,7 @@ from sentry_sdk.utils import (
     nanosecond_time,
 )
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
@@ -1201,6 +1201,7 @@ class POTelSpan:
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
+        otel_span=None,  # type: Optional[OtelSpan]
         **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
@@ -1208,25 +1209,34 @@ class POTelSpan:
         For backwards compatibility with old the old Span interface, this class
         accepts arbitrary keyword arguments, in addition to the ones explicitly
         listed in the signature. These additional arguments are ignored.
+
+        If otel_span is passed explicitly, just acts as a proxy.
         """
-        from sentry_sdk.integrations.opentelemetry.utils import (
-            convert_to_otel_timestamp,
-        )
+        if otel_span is not None:
+            self._otel_span = otel_span
+        else:
+            from sentry_sdk.integrations.opentelemetry.utils import (
+                convert_to_otel_timestamp,
+            )
 
-        if start_timestamp is not None:
-            # OTel timestamps have nanosecond precision
-            start_timestamp = convert_to_otel_timestamp(start_timestamp)
+            if start_timestamp is not None:
+                # OTel timestamps have nanosecond precision
+                start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
-        self._otel_span = tracer.start_span(
-            description or op or "", start_time=start_timestamp
-        )
+            self._otel_span = tracer.start_span(
+                description or op or "", start_time=start_timestamp
+            )
 
-        self.origin = origin or DEFAULT_SPAN_ORIGIN
-        self.op = op
-        self.description = description
-        self.name = name
-        if status is not None:
-            self.set_status(status)
+            self.origin = origin or DEFAULT_SPAN_ORIGIN
+            self.op = op
+            self.description = description
+            self.name = name
+            if status is not None:
+                self.set_status(status)
+
+    def __eq__(self, other):
+        # type: (POTelSpan) -> bool
+        return self._otel_span == other._otel_span
 
     def __repr__(self):
         # type: () -> str
@@ -1318,17 +1328,16 @@ class POTelSpan:
     @property
     def root_span(self):
         # type: () -> Optional[POTelSpan]
-        # XXX implement this
-        # there's a span.parent property, but it returns the parent spancontext
-        # not sure if there's a way to retrieve the parent with pure otel.
-        return None
+        root_otel_span = cast(
+            "Optional[OtelSpan]",
+            getattr(self._otel_span, "_sentry_root_otel_span", None),
+        )
+        return POTelSpan(otel_span=root_otel_span) if root_otel_span else None
 
     @property
     def is_root_span(self):
         # type: () -> bool
-        return (
-            isinstance(self._otel_span, ReadableSpan) and self._otel_span.parent is None
-        )
+        return self.root_span == self
 
     @property
     def parent_span_id(self):
