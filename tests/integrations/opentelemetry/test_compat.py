@@ -9,7 +9,10 @@ def test_transaction_span_compat(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="trx-name", op="trx-op") as trx:
+    with sentry_sdk.start_transaction(
+        name="trx-name",
+        op="trx-op",
+    ) as trx:
         with sentry_sdk.start_span(
             description="span-desc",
             op="span-op",
