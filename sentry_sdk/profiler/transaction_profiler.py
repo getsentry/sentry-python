@@ -48,7 +48,6 @@ from sentry_sdk.utils import (
     is_gevent,
     is_valid_sample_rate,
     logger,
-    nanosecond_time,
     set_in_app_in_frames,
 )
 
@@ -330,7 +329,7 @@ class Profile:
         logger.debug("[Profiling] Starting profile")
         self.active = True
         if not self.start_ns:
-            self.start_ns = nanosecond_time()
+            self.start_ns = time.perf_counter_ns()
         self.scheduler.start_profiling(self)
 
     def stop(self):
@@ -341,7 +340,7 @@ class Profile:
         assert self.scheduler, "No scheduler specified"
         logger.debug("[Profiling] Stopping profile")
         self.active = False
-        self.stop_ns = nanosecond_time()
+        self.stop_ns = time.perf_counter_ns()
 
     def __enter__(self):
         # type: () -> Profile
@@ -580,7 +579,7 @@ class Scheduler(ABC):
             # were started after this point.
             new_profiles = len(self.new_profiles)
 
-            now = nanosecond_time()
+            now = time.perf_counter_ns()
 
             try:
                 sample = [

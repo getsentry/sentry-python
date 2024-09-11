@@ -16,7 +16,6 @@ import sentry_sdk
 from sentry_sdk.utils import (
     ContextVar,
     now,
-    nanosecond_time,
     to_timestamp,
     serialize_frame,
     json_dumps,
@@ -362,9 +361,9 @@ METRIC_TYPES = {
 
 # some of these are dumb
 TIMING_FUNCTIONS = {
-    "nanosecond": nanosecond_time,
-    "microsecond": lambda: nanosecond_time() / 1000.0,
-    "millisecond": lambda: nanosecond_time() / 1000000.0,
+    "nanosecond": time.perf_counter_ns(),
+    "microsecond": lambda: time.perf_counter_ns() / 1000.0,
+    "millisecond": lambda: time.perf_counter_ns() / 1000000.0,
     "second": now,
     "minute": lambda: now() / 60.0,
     "hour": lambda: now() / 3600.0,
