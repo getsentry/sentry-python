@@ -1,7 +1,7 @@
 import sentry_sdk
 
 
-def test_transaction_span_compat(
+def test_transaction_name_span_description_compat(
     sentry_init,
     capture_events,
 ):
