@@ -476,18 +476,12 @@ class Scope:
         # type: () -> Optional[Dict[str, str]]
         """
         Returns the Dynamic Sampling Context from the Propagation Context.
-        If not existing, creates a new one.
         """
-        if self._propagation_context is None:
-            return None
-
-        baggage = self.get_baggage()
-        if baggage is not None:
-            self._propagation_context.dynamic_sampling_context = (
-                baggage.dynamic_sampling_context()
-            )
-
-        return self._propagation_context.dynamic_sampling_context
+        return (
+            self._propagation_context.dynamic_sampling_context
+            if self._propagation_context
+            else None
+        )
 
     def get_traceparent(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[str]
@@ -517,6 +511,7 @@ class Scope:
         """
         Returns the Sentry "baggage" header containing trace information from the
         currently active span or the scopes Propagation Context.
+        If not existing, creates a new one.
         """
         client = self.get_client()
 
@@ -525,14 +520,11 @@ class Scope:
             return self.span.to_baggage()
 
         # If this scope has a propagation context, return baggage from there
+        # populate a fresh one if it doesn't exist
         if self._propagation_context is not None:
-            dynamic_sampling_context = (
-                self._propagation_context.dynamic_sampling_context
-            )
-            if dynamic_sampling_context is None:
-                return Baggage.from_options(self)
-            else:
-                return Baggage(dynamic_sampling_context)
+            if self._propagation_context.baggage is None:
+                self._propagation_context.baggage = Baggage.from_options(self)
+            return self._propagation_context.baggage
 
         # Fall back to isolation scope's baggage. It always has one
         return self.get_isolation_scope().get_baggage()
@@ -594,10 +586,9 @@ class Scope:
             if traceparent is not None:
                 yield SENTRY_TRACE_HEADER_NAME, traceparent
 
-            dsc = self.get_dynamic_sampling_context()
-            if dsc is not None:
-                baggage = Baggage(dsc).serialize()
-                yield BAGGAGE_HEADER_NAME, baggage
+            baggage = self.get_baggage()
+            if baggage is not None:
+                yield BAGGAGE_HEADER_NAME, baggage.serialize()
 
     def iter_trace_propagation_headers(self, *args, **kwargs):
         # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
