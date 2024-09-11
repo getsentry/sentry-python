@@ -5,6 +5,7 @@ import re
 import sys
 import threading
 import time
+import warnings
 import zlib
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -53,6 +54,14 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricType
     from sentry_sdk._types import MetricValue
 
+
+warnings.warn(
+    "The sentry_sdk.metrics module is deprecated and will be removed in the next major release. "
+    "Sentry will reject all metrics sent after October 7, 2024. "
+    "Learn more: https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 _in_metrics = ContextVar("in_metrics", default=False)
 _set = set  # set is shadowed below
