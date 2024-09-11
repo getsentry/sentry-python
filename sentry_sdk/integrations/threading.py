@@ -4,7 +4,7 @@ from threading import Thread, current_thread
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import use_isolation_scope, use_scope
+from sentry_sdk.integrations.opentelemetry.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
