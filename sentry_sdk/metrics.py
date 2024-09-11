@@ -826,7 +826,7 @@ class _Timing:
         # type: (...) -> _Timing
         self.entered = TIMING_FUNCTIONS[self.unit]()
         self._validate_invocation("context-manager")
-        self._span = sentry_sdk.start_span(op="metric.timing", description=self.key)
+        self._span = sentry_sdk.start_span(op="metric.timing", name=self.key)
         if self.tags:
             for key, value in self.tags.items():
                 if isinstance(value, (tuple, list)):

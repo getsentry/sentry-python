@@ -182,13 +182,13 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         if span:
             self.graphql_span = span.start_child(
                 op=op,
-                description=description,
+                name=description,
                 origin=StrawberryIntegration.origin,
             )
         else:
             self.graphql_span = sentry_sdk.start_span(
                 op=op,
-                description=description,
+                name=description,
                 origin=StrawberryIntegration.origin,
             )
 
@@ -211,7 +211,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         # type: () -> Generator[None, None, None]
         self.validation_span = self.graphql_span.start_child(
             op=OP.GRAPHQL_VALIDATE,
-            description="validation",
+            name="validation",
             origin=StrawberryIntegration.origin,
         )
 
@@ -223,7 +223,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         # type: () -> Generator[None, None, None]
         self.parsing_span = self.graphql_span.start_child(
             op=OP.GRAPHQL_PARSE,
-            description="parsing",
+            name="parsing",
             origin=StrawberryIntegration.origin,
         )
 
@@ -253,7 +253,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         with self.graphql_span.start_child(
             op=OP.GRAPHQL_RESOLVE,
-            description="resolving {}".format(field_path),
+            name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
         ) as span:
             span.set_data("graphql.field_name", info.field_name)
@@ -274,7 +274,7 @@ class SentrySyncExtension(SentryAsyncExtension):
 
         with self.graphql_span.start_child(
             op=OP.GRAPHQL_RESOLVE,
-            description="resolving {}".format(field_path),
+            name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
         ) as span:
             span.set_data("graphql.field_name", info.field_name)

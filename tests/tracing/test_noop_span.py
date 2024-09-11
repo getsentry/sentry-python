@@ -23,7 +23,7 @@ def test_noop_start_transaction(sentry_init):
 def test_noop_start_span(sentry_init):
     sentry_init(instrumenter="otel")
 
-    with sentry_sdk.start_span(op="http", description="GET /") as span:
+    with sentry_sdk.start_span(op="http", name="GET /") as span:
         assert isinstance(span, NoOpSpan)
         assert sentry_sdk.get_current_scope().span is span
 

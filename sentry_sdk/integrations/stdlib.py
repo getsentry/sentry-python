@@ -90,7 +90,7 @@ def _install_httplib():
 
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
+            name="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin="auto.http.stdlib.httplib",
         )
@@ -203,7 +203,7 @@ def _install_subprocess():
 
         with sentry_sdk.start_span(
             op=OP.SUBPROCESS,
-            description=description,
+            name=description,
             origin="auto.subprocess.stdlib.subprocess",
         ) as span:
             for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers(

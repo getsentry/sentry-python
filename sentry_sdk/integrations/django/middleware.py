@@ -87,7 +87,7 @@ def _wrap_middleware(middleware, middleware_name):
 
         middleware_span = sentry_sdk.start_span(
             op=OP.MIDDLEWARE_DJANGO,
-            description=description,
+            name=description,
             origin=DjangoIntegration.origin,
         )
         middleware_span.set_tag("django.function_name", function_name)

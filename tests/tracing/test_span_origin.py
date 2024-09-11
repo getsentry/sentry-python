@@ -6,7 +6,7 @@ def test_span_origin_manual(sentry_init, capture_events):
     events = capture_events()
 
     with start_transaction(name="hi"):
-        with start_span(op="foo", description="bar"):
+        with start_span(op="foo", name="bar"):
             pass
 
     (event,) = events
@@ -21,11 +21,11 @@ def test_span_origin_custom(sentry_init, capture_events):
     events = capture_events()
 
     with start_transaction(name="hi"):
-        with start_span(op="foo", description="bar", origin="foo.foo2.foo3"):
+        with start_span(op="foo", name="bar", origin="foo.foo2.foo3"):
             pass
 
     with start_transaction(name="ho", origin="ho.ho2.ho3"):
-        with start_span(op="baz", description="qux", origin="baz.baz2.baz3"):
+        with start_span(op="baz", name="qux", origin="baz.baz2.baz3"):
             pass
 
     (first_transaction, second_transaction) = events

@@ -46,7 +46,7 @@ def patch_asyncio():
                 with sentry_sdk.isolation_scope():
                     with sentry_sdk.start_span(
                         op=OP.FUNCTION,
-                        description=get_name(coro),
+                        name=get_name(coro),
                         origin=AsyncioIntegration.origin,
                     ):
                         try:

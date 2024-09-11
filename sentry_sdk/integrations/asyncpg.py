@@ -165,7 +165,7 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
 
         with sentry_sdk.start_span(
             op=OP.DB,
-            description="connect",
+            name="connect",
             origin=AsyncPGIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
