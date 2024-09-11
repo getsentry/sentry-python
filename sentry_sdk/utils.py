@@ -25,7 +25,6 @@ except ImportError:
     BaseExceptionGroup = None  # type: ignore
 
 import sentry_sdk
-from sentry_sdk._compat import PY37
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 from typing import TYPE_CHECKING
@@ -237,15 +236,6 @@ def format_timestamp(value):
     # We use this custom formatting rather than isoformat for backwards compatibility (we have used this format for
     # several years now), and isoformat is slightly different.
     return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-def datetime_from_isoformat(value):
-    # type: (str) -> datetime
-    try:
-        return datetime.fromisoformat(value)
-    except AttributeError:
-        # py 3.6
-        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
 
 
 def event_hint_with_exc_info(exc_info=None):
@@ -1325,27 +1315,13 @@ def _get_contextvars():
     See https://docs.sentry.io/platforms/python/contextvars/ for more information.
     """
     if not _is_contextvars_broken():
-        # aiocontextvars is a PyPI package that ensures that the contextvars
-        # backport (also a PyPI package) works with asyncio under Python 3.6
-        #
-        # Import it if available.
-        if sys.version_info < (3, 7):
-            # `aiocontextvars` is absolutely required for functional
-            # contextvars on Python 3.6.
-            try:
-                from aiocontextvars import ContextVar
+        # On Python 3.7+ contextvars are functional.
+        try:
+            from contextvars import ContextVar
 
-                return True, ContextVar
-            except ImportError:
-                pass
-        else:
-            # On Python 3.7 contextvars are functional.
-            try:
-                from contextvars import ContextVar
-
-                return True, ContextVar
-            except ImportError:
-                pass
+            return True, ContextVar
+        except ImportError:
+            pass
 
     # Fall back to basic thread-local usage.
 
@@ -1828,19 +1804,6 @@ def ensure_integration_enabled_async(  # type: ignore[no-redef]
         return wraps(original_function)(runner)
 
     return patcher
-
-
-if PY37:
-
-    def nanosecond_time():
-        # type: () -> int
-        return time.perf_counter_ns()
-
-else:
-
-    def nanosecond_time():
-        # type: () -> int
-        return int(time.perf_counter() * 1e9)
 
 
 def now():

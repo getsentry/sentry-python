@@ -1,5 +1,6 @@
 import uuid
 import random
+import time
 import warnings
 from datetime import datetime, timedelta, timezone
 
@@ -15,7 +16,6 @@ from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
     logger,
-    nanosecond_time,
 )
 
 from typing import TYPE_CHECKING, cast
@@ -303,7 +303,7 @@ class Span:
         try:
             # profiling depends on this value and requires that
             # it is measured in nanoseconds
-            self._start_timestamp_monotonic_ns = nanosecond_time()
+            self._start_timestamp_monotonic_ns = time.perf_counter_ns()
         except AttributeError:
             pass
 
@@ -612,7 +612,7 @@ class Span:
                     end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
                 self.timestamp = end_timestamp
             else:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+                elapsed = time.perf_counter_ns() - self._start_timestamp_monotonic_ns
                 self.timestamp = self.start_timestamp + timedelta(
                     microseconds=elapsed / 1000
                 )

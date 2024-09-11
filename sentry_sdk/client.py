@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from importlib import import_module
 from typing import cast
 
-from sentry_sdk._compat import PY37, check_uwsgi_thread_support
+from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -18,7 +18,6 @@ from sentry_sdk.utils import (
     get_type_name,
     get_default_release,
     handle_in_app,
-    is_gevent,
     logger,
 )
 from sentry_sdk.serializer import serialize
@@ -130,14 +129,6 @@ def _get_options(*args, **kwargs):
         rv["socket_options"] = None
 
     return rv
-
-
-try:
-    # Python 3.6+
-    module_not_found_error = ModuleNotFoundError
-except Exception:
-    # Older Python versions
-    module_not_found_error = ImportError  # type: ignore
 
 
 class BaseClient:
@@ -264,7 +255,7 @@ class _Client(BaseClient):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
                 logger.debug("Enabled tracing for %s", function_qualname)
-            except module_not_found_error:
+            except ModuleNotFoundError:
                 try:
                     # Try to import a class
                     # ex: "mymodule.submodule.MyClassName.member_function"
@@ -320,22 +311,14 @@ class _Client(BaseClient):
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                # Context vars are not working correctly on Python <=3.6
-                # with gevent.
-                metrics_supported = not is_gevent() or PY37
-                if metrics_supported:
-                    from sentry_sdk.metrics import MetricsAggregator
+                from sentry_sdk.metrics import MetricsAggregator
 
-                    self.metrics_aggregator = MetricsAggregator(
-                        capture_func=_capture_envelope,
-                        enable_code_locations=bool(
-                            experiments.get("metric_code_locations", True)
-                        ),
-                    )
-                else:
-                    logger.info(
-                        "Metrics not supported on Python 3.6 and lower with gevent."
-                    )
+                self.metrics_aggregator = MetricsAggregator(
+                    capture_func=_capture_envelope,
+                    enable_code_locations=bool(
+                        experiments.get("metric_code_locations", True)
+                    ),
+                )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
