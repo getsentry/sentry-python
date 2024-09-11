@@ -9,7 +9,7 @@ def test_start_span_description(sentry_init, capture_events):
 
     with sentry_sdk.start_transaction(name="hi"):
         with pytest.deprecated_call():
-            with sentry_sdk.start_span(op="foo", name="span-desc"):
+            with sentry_sdk.start_span(op="foo", description="span-desc"):
                 ...
 
     (event,) = events
@@ -36,8 +36,8 @@ def test_start_child_description(sentry_init, capture_events):
 
     with sentry_sdk.start_transaction(name="hi"):
         with pytest.deprecated_call():
-            with sentry_sdk.start_span(op="foo", name="span-desc") as span:
-                with span.start_child(op="bar", name="child-desc"):
+            with sentry_sdk.start_span(op="foo", description="span-desc") as span:
+                with span.start_child(op="bar", description="child-desc"):
                     ...
 
     (event,) = events
