@@ -55,7 +55,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Event, Hint, SDKInfo
     from sentry_sdk.integrations import Integration
-    from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.transport import Transport
@@ -146,7 +145,6 @@ class BaseClient:
 
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
-        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -308,18 +306,6 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
-            experiments = self.options.get("_experiments", {})
-            if experiments.get("enable_metrics", True):
-                from sentry_sdk.metrics import MetricsAggregator
-
-                self.metrics_aggregator = MetricsAggregator(
-                    capture_func=_capture_envelope,
-                    enable_code_locations=bool(
-                        experiments.get("metric_code_locations", True)
-                    ),
-                )
-
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
                 raise ValueError(
@@ -377,7 +363,6 @@ class _Client(BaseClient):
 
         if (
             self.monitor
-            or self.metrics_aggregator
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, HttpTransport)
         ):
@@ -810,8 +795,6 @@ class _Client(BaseClient):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -834,8 +817,6 @@ class _Client(BaseClient):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self.session_flusher.flush()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):

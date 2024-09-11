@@ -38,12 +38,9 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
-        MeasurementUnit,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
-        MetricTags,
-        MetricValue,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -61,11 +58,6 @@ if TYPE_CHECKING:
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
-            "enable_metrics": Optional[bool],
-            "before_emit_metric": Optional[
-                Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
-            ],
-            "metric_code_locations": Optional[bool],
         },
         total=False,
     )
