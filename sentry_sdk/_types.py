@@ -118,7 +118,6 @@ if TYPE_CHECKING:
             "transaction_info": Mapping[str, Any],  # TODO: We can expand on this type
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
-            "_metrics_summary": dict[str, object],
         },
         total=False,
     )

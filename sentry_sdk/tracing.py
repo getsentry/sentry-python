@@ -1,7 +1,6 @@
 import uuid
 import random
 import time
-import warnings
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context
@@ -259,7 +258,6 @@ class Span:
         "_span_recorder",
         "_context_manager_state",
         "_containing_transaction",
-        "_local_aggregator",
         "scope",
         "origin",
     )
@@ -311,7 +309,6 @@ class Span:
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
-        self._local_aggregator = None  # type: Optional[LocalAggregator]
 
         thread_id, thread_name = get_current_thread_meta()
         self.set_thread(thread_id, thread_name)
@@ -323,13 +320,6 @@ class Span:
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
-
-    def _get_local_aggregator(self):
-        # type: (...) -> LocalAggregator
-        rv = self._local_aggregator
-        if rv is None:
-            rv = self._local_aggregator = LocalAggregator()
-        return rv
 
     def __repr__(self):
         # type: () -> str
@@ -643,11 +633,6 @@ class Span:
         if self.status:
             self._tags["status"] = self.status
 
-        if self._local_aggregator is not None:
-            metrics_summary = self._local_aggregator.to_json()
-            if metrics_summary:
-                rv["_metrics_summary"] = metrics_summary
-
         if len(self._measurements) > 0:
             rv["measurements"] = self._measurements
 
@@ -925,13 +910,6 @@ class Transaction(Span):
             self._profile = None
 
         event["measurements"] = self._measurements
-
-        # This is here since `to_json` is not invoked.  This really should
-        # be gone when we switch to onlyspans.
-        if self._local_aggregator is not None:
-            metrics_summary = self._local_aggregator.to_json()
-            if metrics_summary:
-                event["_metrics_summary"] = metrics_summary
 
         return scope.capture_event(event)
 
@@ -1606,8 +1584,3 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
-
-with warnings.catch_warnings():
-    # The code in this file which uses `LocalAggregator` is only called from the deprecated `metrics` module.
-    warnings.simplefilter("ignore", DeprecationWarning)
-    from sentry_sdk.metrics import LocalAggregator
