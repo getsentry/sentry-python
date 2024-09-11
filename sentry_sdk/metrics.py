@@ -361,7 +361,7 @@ METRIC_TYPES = {
 
 # some of these are dumb
 TIMING_FUNCTIONS = {
-    "nanosecond": time.perf_counter_ns(),
+    "nanosecond": time.perf_counter_ns,
     "microsecond": lambda: time.perf_counter_ns() / 1000.0,
     "millisecond": lambda: time.perf_counter_ns() / 1000000.0,
     "second": now,
