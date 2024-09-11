@@ -4,7 +4,6 @@ from threading import Thread, current_thread
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations.opentelemetry.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -95,8 +94,8 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
                 reraise(*_capture_exception())
 
         if isolation_scope_to_use is not None and current_scope_to_use is not None:
-            with use_isolation_scope(isolation_scope_to_use):
-                with use_scope(current_scope_to_use):
+            with sentry_sdk.use_isolation_scope(isolation_scope_to_use):
+                with sentry_sdk.use_scope(current_scope_to_use):
                     return _run_old_run_func()
         else:
             return _run_old_run_func()

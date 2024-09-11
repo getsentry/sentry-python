@@ -6,7 +6,6 @@ from sentry_sdk._werkzeug import get_host, _get_headers
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.integrations.opentelemetry.scope import use_isolation_scope
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
@@ -219,7 +218,7 @@ class _ScopedResponse:
         iterator = iter(self._response)
 
         while True:
-            with use_isolation_scope(self._scope):
+            with sentry_sdk.use_isolation_scope(self._scope):
                 try:
                     chunk = next(iterator)
                 except StopIteration:
@@ -231,7 +230,7 @@ class _ScopedResponse:
 
     def close(self):
         # type: () -> None
-        with use_isolation_scope(self._scope):
+        with sentry_sdk.use_isolation_scope(self._scope):
             try:
                 self._response.close()  # type: ignore
             except AttributeError:
