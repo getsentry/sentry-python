@@ -32,7 +32,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Utility function `is_auto_session_tracking_enabled_scope()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function)
 - Setting `scope.level` has been removed. Use `scope.set_level` instead.
 - `span.containing_transaction` has been removed. Use `span.root_span` instead.
-- `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.`
+- `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.
+- `PropagationContext` constructor no longer takes a `dynamic_sampling_context` but takes a `baggage` object instead.
 
 
 ### Deprecated
