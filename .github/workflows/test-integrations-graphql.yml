@@ -78,8 +78,9 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugin: noop  
           verbose: true
-          plugin: noop
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
@@ -145,8 +146,9 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugin: noop  
           verbose: true
-          plugin: noop
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
