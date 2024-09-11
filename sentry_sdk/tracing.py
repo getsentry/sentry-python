@@ -1605,4 +1605,8 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
-from sentry_sdk.metrics import LocalAggregator
+
+with warnings.catch_warnings():
+    # The code in this file which uses `LocalAggregator` is only called from the deprecated `metrics` module.
+    warnings.simplefilter("ignore", DeprecationWarning)
+    from sentry_sdk.metrics import LocalAggregator
