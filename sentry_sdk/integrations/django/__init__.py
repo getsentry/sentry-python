@@ -26,7 +26,10 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations._wsgi_common import (
+    DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    RequestExtractor,
+)
 
 try:
     from django import VERSION as DJANGO_VERSION
@@ -126,13 +129,14 @@ class DjangoIntegration(Integration):
 
     def __init__(
         self,
-        transaction_style="url",
-        middleware_spans=True,
-        signals_spans=True,
-        cache_spans=False,
-        signals_denylist=None,
+        transaction_style="url",  # type: str
+        middleware_spans=True,  # type: bool
+        signals_spans=True,  # type: bool
+        cache_spans=False,  # type: bool
+        signals_denylist=None,  # type: Optional[list[signals.Signal]]
+        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
-        # type: (str, bool, bool, bool, Optional[list[signals.Signal]]) -> None
+        # type: (...) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -145,6 +149,8 @@ class DjangoIntegration(Integration):
         self.signals_denylist = signals_denylist or []
 
         self.cache_spans = cache_spans
+
+        self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
     @staticmethod
     def setup_once():
@@ -173,10 +179,17 @@ class DjangoIntegration(Integration):
 
             use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
 
+            integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+
             middleware = SentryWsgiMiddleware(
                 bound_old_app,
                 use_x_forwarded_for,
                 span_origin=DjangoIntegration.origin,
+                http_methods_to_capture=(
+                    integration.http_methods_to_capture
+                    if integration
+                    else DEFAULT_HTTP_METHODS_TO_CAPTURE
+                ),
             )
             return middleware(environ, start_response)
 

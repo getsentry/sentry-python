@@ -1157,3 +1157,42 @@ def test_span_origin(sentry_init, client, capture_events):
             signal_span_found = True
 
     assert signal_span_found
+
+
+def test_transaction_http_method_default(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("not_cached_view"))
+    client.options(reverse("not_cached_view"))
+    client.head(reverse("not_cached_view"))
+
+    (event,) = events
+
+    assert len(events) == 1
+    assert event["request"]["method"] == "GET"
+
+
+def test_transaction_http_method_custom(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=("OPTIONS", "HEAD"),
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("not_cached_view"))
+    client.options(reverse("not_cached_view"))
+    client.head(reverse("not_cached_view"))
+
+    assert len(events) == 2
+
+    (event1, event2) = events
+    assert event1["request"]["method"] == "OPTIONS"
+    assert event2["request"]["method"] == "HEAD"
