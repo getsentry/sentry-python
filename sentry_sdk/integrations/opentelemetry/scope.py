@@ -4,7 +4,7 @@ from typing import cast
 from contextlib import contextmanager
 
 from opentelemetry.context import get_value, set_value, attach, detach, get_current
-from opentelemetry.trace import SpanContext, NonRecordingSpan, TraceFlags, use_span
+from opentelemetry.trace import SpanContext, NonRecordingSpan, TraceFlags, TraceState, use_span
 
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
@@ -93,15 +93,17 @@ class PotelScope(Scope):
             else TraceFlags.DEFAULT
         )
 
-        # TODO-neel-potel tracestate
+        # TODO-neel-potel do we need parent and sampled like JS?
+        trace_state = None
+        if self._propagation_context.baggage:
+            trace_state = TraceState(self._propagation_context.baggage.trace_state_items)
+
         span_context = SpanContext(
             trace_id=int(self._propagation_context.trace_id, 16),  # type: ignore
             span_id=int(self._propagation_context.parent_span_id, 16),  # type: ignore
             is_remote=True,
             trace_flags=trace_flags,
-            # TODO-anton: add trace_state (mapping[str,str]) with the parentSpanId, dsc and sampled from self._propagation_context
-            # trace_state={
-            # }
+            trace_state=trace_state,
         )
 
         return span_context

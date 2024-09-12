@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
+    from typing import ItemsView
     from typing import Generator
     from typing import Optional
     from typing import Union
@@ -596,6 +597,17 @@ class Baggage:
             items.append(self.third_party_items)
 
         return ",".join(items)
+
+    @property
+    def trace_state_items(self):
+        # type: () -> list[tuple[str, str]]
+        return [(Baggage.SENTRY_PREFIX + quote(k), quote(str(v))) for k, v in self.sentry_items.items()]
+
+    @classmethod
+    def serialize_trace_state_items(cls, trace_state_items):
+        # type: (ItemsView[str, str]) -> str
+        sentry_items = [(k, v) for k, v in trace_state_items if Baggage.SENTRY_PREFIX_REGEX.match(k)]
+        return ",".join(key + "=" + value for key, value in sentry_items)
 
 
 def should_propagate_trace(client, url):

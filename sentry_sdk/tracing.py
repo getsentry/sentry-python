@@ -1447,7 +1447,10 @@ class POTelSpan:
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
-        pass
+        yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
+
+        trace_state  = self._otel_span.get_span_context().trace_state
+        yield BAGGAGE_HEADER_NAME, Baggage.serialize_trace_state_items(trace_state.items())
 
     def to_traceparent(self):
         # type: () -> str
@@ -1466,6 +1469,7 @@ class POTelSpan:
 
     def to_baggage(self):
         # type: () -> Optional[Baggage]
+        # TODO-neel-potel head SDK populate baggage mess
         pass
 
     def set_tag(self, key, value):
