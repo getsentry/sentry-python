@@ -1,4 +1,5 @@
 import sys
+from contextlib import contextmanager
 from functools import partial
 
 import sentry_sdk
@@ -6,7 +7,10 @@ from sentry_sdk._werkzeug import get_host, _get_headers
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import (
+    DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    _filter_headers,
+)
 from sentry_sdk.sessions import track_session
 from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
@@ -45,6 +49,13 @@ if TYPE_CHECKING:
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
 
+# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
+@contextmanager
+def nullcontext():
+    # type: () -> Iterator[None]
+    yield
+
+
 def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
     # type: (str, str, str) -> str
     return s.encode("latin1").decode(charset, errors)
@@ -66,13 +77,25 @@ def get_request_url(environ, use_x_forwarded_for=False):
 
 
 class SentryWsgiMiddleware:
-    __slots__ = ("app", "use_x_forwarded_for", "span_origin")
+    __slots__ = (
+        "app",
+        "use_x_forwarded_for",
+        "span_origin",
+        "http_methods_to_capture",
+    )
 
-    def __init__(self, app, use_x_forwarded_for=False, span_origin="manual"):
-        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool, str) -> None
+    def __init__(
+        self,
+        app,  # type: Callable[[Dict[str, str], Callable[..., Any]], Any]
+        use_x_forwarded_for=False,  # type: bool
+        span_origin="manual",  # type: str
+        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: Tuple[str, ...]
+    ):
+        # type: (...) -> None
         self.app = app
         self.use_x_forwarded_for = use_x_forwarded_for
         self.span_origin = span_origin
+        self.http_methods_to_capture = http_methods_to_capture
 
     def __call__(self, environ, start_response):
         # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
@@ -92,16 +115,24 @@ class SentryWsgiMiddleware:
                             )
                         )
 
-                    transaction = continue_trace(
-                        environ,
-                        op=OP.HTTP_SERVER,
-                        name="generic WSGI request",
-                        source=TRANSACTION_SOURCE_ROUTE,
-                        origin=self.span_origin,
-                    )
+                    method = environ.get("REQUEST_METHOD", "").upper()
+                    transaction = None
+                    if method in self.http_methods_to_capture:
+                        transaction = continue_trace(
+                            environ,
+                            op=OP.HTTP_SERVER,
+                            name="generic WSGI request",
+                            source=TRANSACTION_SOURCE_ROUTE,
+                            origin=self.span_origin,
+                        )
 
-                    with sentry_sdk.start_transaction(
-                        transaction, custom_sampling_context={"wsgi_environ": environ}
+                    with (
+                        sentry_sdk.start_transaction(
+                            transaction,
+                            custom_sampling_context={"wsgi_environ": environ},
+                        )
+                        if transaction is not None
+                        else nullcontext()
                     ):
                         try:
                             response = self.app(
@@ -120,7 +151,7 @@ class SentryWsgiMiddleware:
 
 def _sentry_start_response(  # type: ignore
     old_start_response,  # type: StartResponse
-    transaction,  # type: Transaction
+    transaction,  # type: Optional[Transaction]
     status,  # type: str
     response_headers,  # type: WsgiResponseHeaders
     exc_info=None,  # type: Optional[WsgiExcInfo]
@@ -128,7 +159,8 @@ def _sentry_start_response(  # type: ignore
     # type: (...) -> WsgiResponseIter
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
-        transaction.set_http_status(status_int)
+        if transaction is not None:
+            transaction.set_http_status(status_int)
 
     if exc_info is None:
         # The Django Rest Framework WSGI test client, and likely other
