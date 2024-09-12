@@ -197,3 +197,5 @@ if TYPE_CHECKING:
     )
 
     HttpStatusCodeRange = Union[int, Container[int]]
+
+    OtelExtractedSpanData = tuple[str, str, Optional[str], Optional[int], Optional[str]]

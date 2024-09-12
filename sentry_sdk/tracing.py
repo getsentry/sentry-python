@@ -1,7 +1,7 @@
 import uuid
 import random
 import time
-import warnings 
+import warnings
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context
@@ -1447,7 +1447,14 @@ class POTelSpan:
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
-        pass
+        yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
+
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            serialize_trace_state,
+        )
+
+        trace_state  = self._otel_span.get_span_context().trace_state
+        yield BAGGAGE_HEADER_NAME, serialize_trace_state(trace_state)
 
     def to_traceparent(self):
         # type: () -> str
@@ -1466,6 +1473,7 @@ class POTelSpan:
 
     def to_baggage(self):
         # type: () -> Optional[Baggage]
+        # TODO-neel-potel head SDK populate baggage mess
         pass
 
     def set_tag(self, key, value):
@@ -1540,8 +1548,15 @@ class POTelSpan:
         pass
 
     def get_trace_context(self):
-        # type: () -> Any
-        pass
+        # type: () -> dict[str, Any]
+        if not isinstance(self._otel_span, ReadableSpan):
+            return {}
+
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            get_trace_context,
+        )
+
+        return get_trace_context(self._otel_span)
 
     def get_profile_context(self):
         # type: () -> Optional[ProfileContext]
