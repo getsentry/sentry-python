@@ -32,8 +32,9 @@ class FlagManager:
 
     def add(self, name, result):
         # type: (str, bool) -> None
-        assert name is not None
-        self._cache.set(name, Flag(name, result))
+        # NOTE: Should we log null names?
+        if name is not None:
+            self._cache.set(name, Flag(name, result))
 
     def serialize(self):
         # type: () -> Flags
