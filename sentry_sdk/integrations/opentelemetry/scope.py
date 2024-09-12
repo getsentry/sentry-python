@@ -1,3 +1,5 @@
+import warnings
+
 from typing import cast
 from contextlib import contextmanager
 
@@ -115,6 +117,13 @@ class PotelScope(Scope):
 
     def start_span(self, custom_sampling_context=None, **kwargs):
         # type: (Optional[SamplingContext], Any) -> POTelSpan
+        if kwargs.get("description") is not None:
+            warnings.warn(
+                "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         return POTelSpan(**kwargs, scope=self)
 
 

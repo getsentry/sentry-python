@@ -1221,7 +1221,7 @@ class POTelSpan:
                 start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
             self._otel_span = tracer.start_span(
-                description or op or "", start_time=start_timestamp
+                name or description or op or "", start_time=start_timestamp
             )
 
             self.origin = origin or DEFAULT_SPAN_ORIGIN

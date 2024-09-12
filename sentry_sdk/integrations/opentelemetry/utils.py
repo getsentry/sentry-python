@@ -96,8 +96,9 @@ def extract_span_data(span):
     if span.attributes is None:
         return (op, description, status, http_status, origin)
 
-    origin = span.attributes.get(SentrySpanAttribute.ORIGIN)
+    op = span.attributes.get(SentrySpanAttribute.OP) or op
     description = span.attributes.get(SentrySpanAttribute.DESCRIPTION) or description
+    origin = span.attributes.get(SentrySpanAttribute.ORIGIN)
 
     http_method = span.attributes.get(SpanAttributes.HTTP_METHOD)
     http_method = cast("Optional[str]", http_method)
