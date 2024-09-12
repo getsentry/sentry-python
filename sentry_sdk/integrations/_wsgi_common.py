@@ -41,8 +41,8 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "CONNECT",
     "DELETE",
     "GET",
-    # "HEAD",  # do not capture HEAD requests
-    # "OPTIONS",  # do not capture OPTIONS requests
+    # "HEAD",  # do not capture HEAD requests by default
+    # "OPTIONS",  # do not capture OPTIONS requests by default
     "PATCH",
     "POST",
     "PUT",
