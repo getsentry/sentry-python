@@ -142,7 +142,7 @@ def _wrap_chat(f, streaming):
 
         span = sentry_sdk.start_span(
             op=consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
-            description="cohere.client.Chat",
+            name="cohere.client.Chat",
             origin=CohereIntegration.origin,
         )
         span.__enter__()
@@ -227,7 +227,7 @@ def _wrap_embed(f):
         # type: (*Any, **Any) -> Any
         with sentry_sdk.start_span(
             op=consts.OP.COHERE_EMBEDDINGS_CREATE,
-            description="Cohere Embedding Creation",
+            name="Cohere Embedding Creation",
             origin=CohereIntegration.origin,
         ) as span:
             integration = sentry_sdk.get_client().get_integration(CohereIntegration)

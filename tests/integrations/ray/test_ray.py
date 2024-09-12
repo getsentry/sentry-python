@@ -52,7 +52,7 @@ def test_ray_tracing():
 
     @ray.remote
     def example_task():
-        with sentry_sdk.start_span(op="task", description="example task step"):
+        with sentry_sdk.start_span(op="task", name="example task step"):
             ...
 
         return sentry_sdk.get_client().transport.envelopes
@@ -177,7 +177,7 @@ def test_ray_actor():
             self.n = 0
 
         def increment(self):
-            with sentry_sdk.start_span(op="task", description="example task step"):
+            with sentry_sdk.start_span(op="task", name="example task step"):
                 self.n += 1
 
             return sentry_sdk.get_client().transport.envelopes

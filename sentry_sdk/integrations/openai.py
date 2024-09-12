@@ -133,7 +133,7 @@ def _wrap_chat_completion_create(f):
 
         span = sentry_sdk.start_span(
             op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
-            description="Chat Completion",
+            name="Chat Completion",
             origin=OpenAIIntegration.origin,
         )
         span.__enter__()
@@ -223,7 +223,7 @@ def _wrap_embeddings_create(f):
         # type: (*Any, **Any) -> Any
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
-            description="OpenAI Embedding Creation",
+            name="OpenAI Embedding Creation",
             origin=OpenAIIntegration.origin,
         ) as span:
             integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)

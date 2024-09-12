@@ -208,77 +208,44 @@ class AwsLambdaIntegration(Integration):
             )
             return
 
-        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")  # Python 3.6
+        lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
+            lambda_bootstrap.LambdaRuntimeClient.post_init_error
+        )
 
-        if pre_37:
-            old_handle_event_request = lambda_bootstrap.handle_event_request
+        old_handle_event_request = lambda_bootstrap.handle_event_request
 
-            def sentry_handle_event_request(request_handler, *args, **kwargs):
-                # type: (Any, *Any, **Any) -> Any
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_event_request(request_handler, *args, **kwargs)
+        def sentry_handle_event_request(  # type: ignore
+            lambda_runtime_client, request_handler, *args, **kwargs
+        ):
+            request_handler = _wrap_handler(request_handler)
+            return old_handle_event_request(
+                lambda_runtime_client, request_handler, *args, **kwargs
+            )
 
-            lambda_bootstrap.handle_event_request = sentry_handle_event_request
+        lambda_bootstrap.handle_event_request = sentry_handle_event_request
 
-            old_handle_http_request = lambda_bootstrap.handle_http_request
+        # Patch the runtime client to drain the queue. This should work
+        # even when the SDK is initialized inside of the handler
 
-            def sentry_handle_http_request(request_handler, *args, **kwargs):
-                # type: (Any, *Any, **Any) -> Any
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_http_request(request_handler, *args, **kwargs)
-
-            lambda_bootstrap.handle_http_request = sentry_handle_http_request
-
-            # Patch to_json to drain the queue. This should work even when the
-            # SDK is initialized inside of the handler
-
-            old_to_json = lambda_bootstrap.to_json
-
-            def sentry_to_json(*args, **kwargs):
+        def _wrap_post_function(f):
+            # type: (F) -> F
+            def inner(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 _drain_queue()
-                return old_to_json(*args, **kwargs)
+                return f(*args, **kwargs)
 
-            lambda_bootstrap.to_json = sentry_to_json
-        else:
-            lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
-                lambda_bootstrap.LambdaRuntimeClient.post_init_error
+            return inner  # type: ignore
+
+        lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = (
+            _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
             )
-
-            old_handle_event_request = lambda_bootstrap.handle_event_request
-
-            def sentry_handle_event_request(  # type: ignore
-                lambda_runtime_client, request_handler, *args, **kwargs
-            ):
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_event_request(
-                    lambda_runtime_client, request_handler, *args, **kwargs
-                )
-
-            lambda_bootstrap.handle_event_request = sentry_handle_event_request
-
-            # Patch the runtime client to drain the queue. This should work
-            # even when the SDK is initialized inside of the handler
-
-            def _wrap_post_function(f):
-                # type: (F) -> F
-                def inner(*args, **kwargs):
-                    # type: (*Any, **Any) -> Any
-                    _drain_queue()
-                    return f(*args, **kwargs)
-
-                return inner  # type: ignore
-
-            lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = (
-                _wrap_post_function(
-                    lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
-                )
+        )
+        lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = (
+            _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
             )
-            lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = (
-                _wrap_post_function(
-                    lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
-                )
-            )
+        )
 
 
 def get_lambda_bootstrap():

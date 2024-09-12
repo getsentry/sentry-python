@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from importlib import import_module
 from typing import cast
 
-from sentry_sdk._compat import PY37, check_uwsgi_thread_support
+from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -18,7 +18,6 @@ from sentry_sdk.utils import (
     get_type_name,
     get_default_release,
     handle_in_app,
-    is_gevent,
     logger,
 )
 from sentry_sdk.serializer import serialize
@@ -56,7 +55,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Event, Hint, SDKInfo
     from sentry_sdk.integrations import Integration
-    from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.transport import Transport
@@ -132,14 +130,6 @@ def _get_options(*args, **kwargs):
     return rv
 
 
-try:
-    # Python 3.6+
-    module_not_found_error = ModuleNotFoundError
-except Exception:
-    # Older Python versions
-    module_not_found_error = ImportError  # type: ignore
-
-
 class BaseClient:
     """
     .. versionadded:: 2.0.0
@@ -155,7 +145,6 @@ class BaseClient:
 
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
-        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -264,7 +253,7 @@ class _Client(BaseClient):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
                 logger.debug("Enabled tracing for %s", function_qualname)
-            except module_not_found_error:
+            except ModuleNotFoundError:
                 try:
                     # Try to import a class
                     # ex: "mymodule.submodule.MyClassName.member_function"
@@ -316,26 +305,6 @@ class _Client(BaseClient):
                     self.monitor = Monitor(self.transport)
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
-
-            self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
-            experiments = self.options.get("_experiments", {})
-            if experiments.get("enable_metrics", True):
-                # Context vars are not working correctly on Python <=3.6
-                # with gevent.
-                metrics_supported = not is_gevent() or PY37
-                if metrics_supported:
-                    from sentry_sdk.metrics import MetricsAggregator
-
-                    self.metrics_aggregator = MetricsAggregator(
-                        capture_func=_capture_envelope,
-                        enable_code_locations=bool(
-                            experiments.get("metric_code_locations", True)
-                        ),
-                    )
-                else:
-                    logger.info(
-                        "Metrics not supported on Python 3.6 and lower with gevent."
-                    )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -394,7 +363,6 @@ class _Client(BaseClient):
 
         if (
             self.monitor
-            or self.metrics_aggregator
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, HttpTransport)
         ):
@@ -827,8 +795,6 @@ class _Client(BaseClient):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -851,8 +817,6 @@ class _Client(BaseClient):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self.session_flusher.flush()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):

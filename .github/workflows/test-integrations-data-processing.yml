@@ -86,12 +86,16 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugin: noop  
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   test-data_processing-pinned:
     name: Data Processing (pinned)
     timeout-minutes: 30
@@ -158,12 +162,16 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugin: noop  
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   check_required_tests:
     name: All Data Processing tests passed
     needs: test-data_processing-pinned

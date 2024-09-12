@@ -85,6 +85,9 @@
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
           files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugin: noop  
+          verbose: true
 
       - name: Upload test results to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
@@ -92,3 +95,4 @@
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
           files: .junitxml
+          verbose: true

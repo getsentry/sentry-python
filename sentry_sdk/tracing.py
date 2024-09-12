@@ -1,6 +1,7 @@
 import uuid
 import random
-import warnings
+import time
+import warnings 
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context
@@ -15,7 +16,6 @@ from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
     logger,
-    nanosecond_time,
 )
 
 from typing import TYPE_CHECKING, cast
@@ -75,7 +75,7 @@ if TYPE_CHECKING:
         """
 
         description: str
-        """A description of what operation is being performed within the span."""
+        """A description of what operation is being performed within the span. This argument is DEPRECATED. Please use the `name` parameter, instead."""
 
         status: str
         """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
@@ -99,10 +99,10 @@ if TYPE_CHECKING:
         Default "manual".
         """
 
-    class TransactionKwargs(SpanKwargs, total=False):
         name: str
-        """Identifier of the transaction. Will show up in the Sentry UI."""
+        """A string describing what operation is being performed within the span/transaction."""
 
+    class TransactionKwargs(SpanKwargs, total=False):
         source: str
         """
         A string describing the source of the transaction name. This will be used to determine the transaction's type.
@@ -233,6 +233,14 @@ class Span:
     :param op: The span's operation. A list of recommended values is available here:
         https://develop.sentry.dev/sdk/performance/span-operations/
     :param description: A description of what operation is being performed within the span.
+
+        .. deprecated:: 2.X.X
+            Please use the `name` parameter, instead.
+    :param name: A string describing what operation is being performed within the span.
+    :param hub: The hub to use for this span.
+
+        .. deprecated:: 2.0.0
+            Please use the `scope` parameter, instead.
     :param status: The span's status. Possible values are listed at
         https://develop.sentry.dev/sdk/event-payloads/span/
     :param containing_transaction: The transaction that this span belongs to.
@@ -259,9 +267,9 @@ class Span:
         "_span_recorder",
         "_context_manager_state",
         "_containing_transaction",
-        "_local_aggregator",
         "scope",
         "origin",
+        "name",
     )
 
     def __init__(
@@ -278,6 +286,7 @@ class Span:
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         scope=None,  # type: Optional[sentry_sdk.Scope]
         origin=None,  # type: Optional[str]
+        name=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -286,7 +295,7 @@ class Span:
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
         self.op = op
-        self.description = description
+        self.description = name or description
         self.status = status
         self.scope = scope
         self.origin = origin or DEFAULT_SPAN_ORIGIN
@@ -303,7 +312,7 @@ class Span:
         try:
             # profiling depends on this value and requires that
             # it is measured in nanoseconds
-            self._start_timestamp_monotonic_ns = nanosecond_time()
+            self._start_timestamp_monotonic_ns = time.perf_counter_ns()
         except AttributeError:
             pass
 
@@ -311,7 +320,6 @@ class Span:
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
-        self._local_aggregator = None  # type: Optional[LocalAggregator]
 
         thread_id, thread_name = get_current_thread_meta()
         self.set_thread(thread_id, thread_name)
@@ -323,13 +331,6 @@ class Span:
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
-
-    def _get_local_aggregator(self):
-        # type: (...) -> LocalAggregator
-        rv = self._local_aggregator
-        if rv is None:
-            rv = self._local_aggregator = LocalAggregator()
-        return rv
 
     def __repr__(self):
         # type: () -> str
@@ -390,6 +391,13 @@ class Span:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        if kwargs.get("description") is not None:
+            warnings.warn(
+                "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         kwargs.setdefault("sampled", self.sampled)
 
         child = Span(
@@ -612,7 +620,7 @@ class Span:
                     end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
                 self.timestamp = end_timestamp
             else:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
+                elapsed = time.perf_counter_ns() - self._start_timestamp_monotonic_ns
                 self.timestamp = self.start_timestamp + timedelta(
                     microseconds=elapsed / 1000
                 )
@@ -642,11 +650,6 @@ class Span:
 
         if self.status:
             self._tags["status"] = self.status
-
-        if self._local_aggregator is not None:
-            metrics_summary = self._local_aggregator.to_json()
-            if metrics_summary:
-                rv["_metrics_summary"] = metrics_summary
 
         if len(self._measurements) > 0:
             rv["measurements"] = self._measurements
@@ -735,7 +738,7 @@ class Transaction(Span):
         "_baggage",
     )
 
-    def __init__(
+    def __init__(  # type: ignore[misc]
         self,
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
@@ -925,13 +928,6 @@ class Transaction(Span):
             self._profile = None
 
         event["measurements"] = self._measurements
-
-        # This is here since `to_json` is not invoked.  This really should
-        # be gone when we switch to onlyspans.
-        if self._local_aggregator is not None:
-            metrics_summary = self._local_aggregator.to_json()
-            if metrics_summary:
-                event["_metrics_summary"] = metrics_summary
 
         return scope.capture_event(event)
 
@@ -1606,8 +1602,3 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
-
-with warnings.catch_warnings():
-    # The code in this file which uses `LocalAggregator` is only called from the deprecated `metrics` module.
-    warnings.simplefilter("ignore", DeprecationWarning)
-    from sentry_sdk.metrics import LocalAggregator

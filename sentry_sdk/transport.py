@@ -177,17 +177,7 @@ def _parse_rate_limits(header, now=None):
 
             retry_after = now + timedelta(seconds=int(retry_after))
             for category in categories and categories.split(";") or (None,):
-                if category == "metric_bucket":
-                    try:
-                        namespaces = parameters[4].split(";")
-                    except IndexError:
-                        namespaces = []
-
-                    if not namespaces or "custom" in namespaces:
-                        yield category, retry_after
-
-                else:
-                    yield category, retry_after
+                yield category, retry_after
         except (LookupError, ValueError):
             continue
 
@@ -386,12 +376,6 @@ class HttpTransport(Transport):
         # type: (str) -> bool
         def _disabled(bucket):
             # type: (Any) -> bool
-
-            # The envelope item type used for metrics is statsd
-            # whereas the rate limit category is metric_bucket
-            if bucket == "statsd":
-                bucket = "metric_bucket"
-
             ts = self._disabled_until.get(bucket)
             return ts is not None and ts > datetime.now(timezone.utc)
 
@@ -420,7 +404,7 @@ class HttpTransport(Transport):
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
-                if item.data_category in ("transaction", "error", "default", "statsd"):
+                if item.data_category in ("transaction", "error", "default"):
                     self.on_dropped_event("self_rate_limits")
                 self.record_lost_event("ratelimit_backoff", item=item)
             else:

@@ -282,7 +282,7 @@ class TestService(gRPCTestServiceServicer):
     async def TestServe(cls, request, context):  # noqa: N802
         with start_span(
             op="test",
-            description="test",
+            name="test",
             origin="auto.grpc.grpc.TestService.aio",
         ):
             pass

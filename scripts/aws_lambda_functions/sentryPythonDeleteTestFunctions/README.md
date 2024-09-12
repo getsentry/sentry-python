@@ -9,5 +9,5 @@ The Lambda function has been deployed here:
 - Region: `us-east-1`
 - Function ARN: `arn:aws:lambda:us-east-1:943013980633:function:sentryPythonDeleteTestFunctions`
 
-This function also emits Sentry Metrics and Sentry Crons checkins to the `sentry-python` project in the `Sentry SDKs` organisation on Sentry.io:
+This function also emits Sentry Crons checkins to the `sentry-python` project in the `Sentry SDKs` organisation on Sentry.io:
 https://sentry-sdks.sentry.io/projects/sentry-python/?project=5461230

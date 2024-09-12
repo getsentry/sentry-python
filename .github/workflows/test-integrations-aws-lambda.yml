@@ -91,12 +91,16 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugin: noop  
+          verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: .junitxml
+          verbose: true
   check_required_tests:
     name: All AWS Lambda tests passed
     needs: test-aws_lambda-pinned
