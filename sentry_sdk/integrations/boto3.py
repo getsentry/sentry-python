@@ -69,7 +69,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     description = "aws.%s.%s" % (service_id, operation_name)
     span = sentry_sdk.start_span(
         op=OP.HTTP_CLIENT,
-        description=description,
+        name=description,
         origin=Boto3Integration.origin,
     )
 
@@ -107,7 +107,7 @@ def _sentry_after_call(context, parsed, **kwargs):
 
     streaming_span = span.start_child(
         op=OP.HTTP_CLIENT_STREAM,
-        description=span.description,
+        name=span.description,
         origin=Boto3Integration.origin,
     )
 

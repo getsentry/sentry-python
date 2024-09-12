@@ -23,10 +23,10 @@ def test_basic(sentry_init, capture_events, sample_rate):
     with start_transaction(name="hi") as transaction:
         transaction.set_status(SPANSTATUS.OK)
         with pytest.raises(ZeroDivisionError):
-            with start_span(op="foo", description="foodesc"):
+            with start_span(op="foo", name="foodesc"):
                 1 / 0
 
-        with start_span(op="bar", description="bardesc"):
+        with start_span(op="bar", name="bardesc"):
             pass
 
     if sample_rate:
@@ -158,7 +158,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     assert baggage.third_party_items == ""
 
     with start_transaction(transaction):
-        with start_span(op="foo", description="foodesc"):
+        with start_span(op="foo", name="foodesc"):
             pass
 
     # finish will create a new baggage entry
@@ -211,7 +211,7 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
 
     with start_transaction(name="hi"):
         for i in range(100):
-            with start_span(op="helloworld", description="hi {}".format(i)) as span:
+            with start_span(op="helloworld", name="hi {}".format(i)) as span:
 
                 def foo():
                     pass
@@ -248,14 +248,14 @@ def test_start_span_after_finish(sentry_init, capture_events):
             pass
 
         def capture_event(self, event):
-            start_span(op="toolate", description="justdont")
+            start_span(op="toolate", name="justdont")
             pass
 
     sentry_init(traces_sample_rate=1, transport=CustomTransport())
     events = capture_events()
 
     with start_transaction(name="hi"):
-        with start_span(op="bar", description="bardesc"):
+        with start_span(op="bar", name="bardesc"):
             pass
 
     assert len(events) == 1
@@ -269,7 +269,7 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
     span = None
 
     with start_transaction(transaction):
-        with start_span(op="foo", description="foodesc") as current_span:
+        with start_span(op="foo", name="foodesc") as current_span:
             span = current_span
             meta = sentry_sdk.get_current_scope().trace_propagation_meta()
 

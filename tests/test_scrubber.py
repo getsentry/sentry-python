@@ -146,7 +146,7 @@ def test_span_data_scrubbing(sentry_init, capture_events):
     events = capture_events()
 
     with start_transaction(name="hi"):
-        with start_span(op="foo", description="bar") as span:
+        with start_span(op="foo", name="bar") as span:
             span.set_data("password", "secret")
             span.set_data("datafoo", "databar")
 

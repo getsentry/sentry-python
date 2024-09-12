@@ -683,7 +683,7 @@ def install_sql_hook():
 
         with sentry_sdk.start_span(
             op=OP.DB,
-            description="connect",
+            name="connect",
             origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)

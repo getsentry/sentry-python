@@ -73,7 +73,7 @@ def _wrap_text_generation(f):
 
         span = sentry_sdk.start_span(
             op=consts.OP.HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE,
-            description="Text Generation",
+            name="Text Generation",
             origin=HuggingfaceHubIntegration.origin,
         )
         span.__enter__()
