@@ -141,7 +141,7 @@ def test_has_trace_if_performance_enabled(sentry_init, client, capture_events):
     sentry_init(
         integrations=[
             DjangoIntegration(
-                http_methods_to_capture=("HEAD", ),
+                http_methods_to_capture=("HEAD",),
             )
         ],
         traces_sample_rate=1.0,
@@ -190,9 +190,11 @@ def test_has_trace_if_performance_disabled(sentry_init, client, capture_events):
 
 def test_trace_from_headers_if_performance_enabled(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration(
-            http_methods_to_capture=("HEAD", ),
-        )],
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=("HEAD",),
+            )
+        ],
         traces_sample_rate=1.0,
     )
 
@@ -225,9 +227,11 @@ def test_trace_from_headers_if_performance_disabled(
     sentry_init, client, capture_events
 ):
     sentry_init(
-        integrations=[DjangoIntegration(
-            http_methods_to_capture=("HEAD", ),
-        )],
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=("HEAD",),
+            )
+        ],
     )
 
     events = capture_events()
@@ -1168,6 +1172,9 @@ def test_span_origin(sentry_init, client, capture_events):
 
 
 def test_transaction_http_method_default(sentry_init, client, capture_events):
+    """
+    By default OPTIONS and HEAD requests do not create a transaction.
+    """
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
@@ -1188,7 +1195,10 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     sentry_init(
         integrations=[
             DjangoIntegration(
-                http_methods_to_capture=("OPTIONS", "HEAD"),
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                ),  # capitalization does not matter
             )
         ],
         traces_sample_rate=1.0,

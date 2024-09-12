@@ -1010,7 +1010,10 @@ def test_transaction_http_method_custom(
         traces_sample_rate=1.0,
         integrations=[
             flask_sentry.FlaskIntegration(
-                http_methods_to_capture=("OPTIONS", "HEAD")
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                )  # capitalization does not matter
             )  # case does not matter
         ],
     )
