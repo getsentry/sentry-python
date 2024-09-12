@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from copy import copy
 from collections import deque
 from contextlib import contextmanager
@@ -1067,6 +1068,13 @@ class Scope:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        if kwargs.get("description") is not None:
+            warnings.warn(
+                "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         with new_scope():
             kwargs.setdefault("scope", self)
 
