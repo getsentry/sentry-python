@@ -1,74 +1,39 @@
-from datetime import datetime, timezone
-from time import time
-from typing import TYPE_CHECKING, cast
+from collections import deque, defaultdict
+from typing import cast
 
-from opentelemetry.context import get_value
-from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
 from opentelemetry.trace import (
-    format_span_id,
     format_trace_id,
+    format_span_id,
     get_current_span,
+    INVALID_SPAN,
+    Span as TraceApiSpan,
 )
-from opentelemetry.trace.span import (
-    INVALID_SPAN_ID,
-    INVALID_TRACE_ID,
-)
-from sentry_sdk.integrations.opentelemetry.consts import (
-    SENTRY_BAGGAGE_KEY,
-    SENTRY_TRACE_KEY,
-    OTEL_SENTRY_CONTEXT,
-    SPAN_ORIGIN,
-)
+from opentelemetry.context import Context
+from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
+
+from sentry_sdk import capture_event
+from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
+    convert_from_otel_timestamp,
+    extract_span_attributes,
     extract_span_data,
 )
-from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing import Transaction, Span as SentrySpan
-
+from sentry_sdk.integrations.opentelemetry.consts import (
+    OTEL_SENTRY_CONTEXT,
+    SentrySpanAttribute,
+)
+from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
-    from opentelemetry import context as context_api
-    from sentry_sdk._types import Event, Hint
-
-SPAN_MAX_TIME_OPEN_MINUTES = 10
-
-
-def link_trace_context_to_error_event(event, otel_span_map):
-    # type: (Event, dict[str, Union[Transaction, SentrySpan]]) -> Event
-    if hasattr(event, "type") and event["type"] == "transaction":
-        return event
-
-    otel_span = get_current_span()
-    if not otel_span:
-        return event
-
-    ctx = otel_span.get_span_context()
-
-    if ctx.trace_id == INVALID_TRACE_ID or ctx.span_id == INVALID_SPAN_ID:
-        return event
-
-    sentry_span = otel_span_map.get(format_span_id(ctx.span_id), None)
-    if not sentry_span:
-        return event
-
-    contexts = event.setdefault("contexts", {})
-    contexts.setdefault("trace", {}).update(sentry_span.get_trace_context())
-
-    return event
+    from typing import Optional, List, Any, Deque, DefaultDict
+    from sentry_sdk._types import Event
 
 
 class SentrySpanProcessor(SpanProcessor):
     """
     Converts OTel spans into Sentry spans so they can be sent to the Sentry backend.
     """
-
-    # The mapping from otel span ids to sentry spans
-    otel_span_map = {}  # type: dict[str, Union[Transaction, SentrySpan]]
-
-    # The currently open spans. Elements will be discarded after SPAN_MAX_TIME_OPEN_MINUTES
-    open_spans = {}  # type: dict[int, set[str]]
 
     def __new__(cls):
         # type: () -> SentrySpanProcessor
@@ -79,200 +44,186 @@ class SentrySpanProcessor(SpanProcessor):
 
     def __init__(self):
         # type: () -> None
-        @add_global_event_processor
-        def global_event_processor(event, hint):
-            # type: (Event, Hint) -> Event
-            return link_trace_context_to_error_event(event, self.otel_span_map)
+        self._children_spans = defaultdict(
+            list
+        )  # type: DefaultDict[int, List[ReadableSpan]]
 
-    def _prune_old_spans(self):
-        # type: (SentrySpanProcessor) -> None
+    def on_start(self, span, parent_context=None):
+        # type: (Span, Optional[Context]) -> None
+        if not is_sentry_span(span):
+            self._add_root_span(span, get_current_span(parent_context))
+
+    def on_end(self, span):
+        # type: (ReadableSpan) -> None
+        if is_sentry_span(span):
+            return
+
+        if span.parent and not span.parent.is_remote:
+            self._children_spans[span.parent.span_id].append(span)
+        else:
+            # if have a root span ending, we build a transaction and send it
+            self._flush_root_span(span)
+
+    # TODO-neel-potel not sure we need a clear like JS
+    def shutdown(self):
+        # type: () -> None
+        pass
+
+    # TODO-neel-potel change default? this is 30 sec
+    # TODO-neel-potel call this in client.flush
+    def force_flush(self, timeout_millis=30000):
+        # type: (int) -> bool
+        return True
+
+    def _add_root_span(self, span, parent_span):
+        # type: (Span, TraceApiSpan) -> None
         """
-        Prune spans that have been open for too long.
+        This is required to make POTelSpan.root_span work
+        since we can't traverse back to the root purely with otel efficiently.
         """
-        current_time_minutes = int(time() / 60)
-        for span_start_minutes in list(
-            self.open_spans.keys()
-        ):  # making a list because we change the dict
-            # prune empty open spans buckets
-            if self.open_spans[span_start_minutes] == set():
-                self.open_spans.pop(span_start_minutes)
-
-            # prune old buckets
-            elif current_time_minutes - span_start_minutes > SPAN_MAX_TIME_OPEN_MINUTES:
-                for span_id in self.open_spans.pop(span_start_minutes):
-                    self.otel_span_map.pop(span_id, None)
-
-    def on_start(self, otel_span, parent_context=None):
-        # type: (OTelSpan, Optional[context_api.Context]) -> None
-        from sentry_sdk import get_client, start_transaction
-
-        client = get_client()
-
-        if not client.dsn:
-            return
-
-        if not otel_span.get_span_context().is_valid:
-            return
-
-        if is_sentry_span(otel_span):
-            return
-
-        trace_data = self._get_trace_data(otel_span, parent_context)
-
-        parent_span_id = trace_data["parent_span_id"]
-        sentry_parent_span = (
-            self.otel_span_map.get(parent_span_id) if parent_span_id else None
-        )
-
-        start_timestamp = None
-        if otel_span.start_time is not None:
-            start_timestamp = datetime.fromtimestamp(
-                otel_span.start_time / 1e9, timezone.utc
-            )  # OTel spans have nanosecond precision
-
-        sentry_span = None
-        if sentry_parent_span:
-            sentry_span = sentry_parent_span.start_child(
-                span_id=trace_data["span_id"],
-                name=otel_span.name,
-                start_timestamp=start_timestamp,
-                origin=SPAN_ORIGIN,
+        if parent_span != INVALID_SPAN and not parent_span.get_span_context().is_remote:
+            # child span points to parent's root or parent
+            span._sentry_root_otel_span = getattr(
+                parent_span, "_sentry_root_otel_span", parent_span
             )
         else:
-            sentry_span = start_transaction(
-                name=otel_span.name,
-                span_id=trace_data["span_id"],
-                parent_span_id=parent_span_id,
-                trace_id=trace_data["trace_id"],
-                baggage=trace_data["baggage"],
-                start_timestamp=start_timestamp,
-                origin=SPAN_ORIGIN,
-            )
+            # root span points to itself
+            span._sentry_root_otel_span = span
 
-        self.otel_span_map[trace_data["span_id"]] = sentry_span
-
-        if otel_span.start_time is not None:
-            span_start_in_minutes = int(
-                otel_span.start_time / 1e9 / 60
-            )  # OTel spans have nanosecond precision
-            self.open_spans.setdefault(span_start_in_minutes, set()).add(
-                trace_data["span_id"]
-            )
-
-        self._prune_old_spans()
-
-    def on_end(self, otel_span):
-        # type: (OTelSpan) -> None
-        span_context = otel_span.get_span_context()
-        if not span_context.is_valid:
+    def _flush_root_span(self, span):
+        # type: (ReadableSpan) -> None
+        transaction_event = self._root_span_to_transaction_event(span)
+        if not transaction_event:
             return
 
-        span_id = format_span_id(span_context.span_id)
-        sentry_span = self.otel_span_map.pop(span_id, None)
-        if not sentry_span:
-            return
+        spans = []
+        for child in self._collect_children(span):
+            span_json = self._span_to_json(child)
+            if span_json:
+                spans.append(span_json)
+        transaction_event["spans"] = spans
+        # TODO-neel-potel sort and cutoff max spans
 
-        sentry_span.op = otel_span.name
+        capture_event(transaction_event)
 
-        if isinstance(sentry_span, Transaction):
-            sentry_span.name = otel_span.name
-            sentry_span.set_context(
-                OTEL_SENTRY_CONTEXT, self._get_otel_context(otel_span)
+    def _collect_children(self, span):
+        # type: (ReadableSpan) -> List[ReadableSpan]
+        if not span.context:
+            return []
+
+        children = []
+        bfs_queue = deque()  # type: Deque[int]
+        bfs_queue.append(span.context.span_id)
+
+        while bfs_queue:
+            parent_span_id = bfs_queue.popleft()
+            node_children = self._children_spans.pop(parent_span_id, [])
+            children.extend(node_children)
+            bfs_queue.extend(
+                [child.context.span_id for child in node_children if child.context]
             )
-            self._update_transaction_with_otel_data(sentry_span, otel_span)
 
-        else:
-            self._update_span_with_otel_data(sentry_span, otel_span)
+        return children
 
-        end_timestamp = None
-        if otel_span.end_time is not None:
-            end_timestamp = datetime.fromtimestamp(
-                otel_span.end_time / 1e9, timezone.utc
-            )  # OTel spans have nanosecond precision
+    # we construct the event from scratch here
+    # and not use the current Transaction class for easier refactoring
+    def _root_span_to_transaction_event(self, span):
+        # type: (ReadableSpan) -> Optional[Event]
+        if not span.context:
+            return None
 
-        sentry_span.finish(end_timestamp=end_timestamp)
+        event = self._common_span_transaction_attributes_as_json(span)
+        if event is None:
+            return None
 
-        if otel_span.start_time is not None:
-            span_start_in_minutes = int(
-                otel_span.start_time / 1e9 / 60
-            )  # OTel spans have nanosecond precision
-            self.open_spans.setdefault(span_start_in_minutes, set()).discard(span_id)
+        trace_id = format_trace_id(span.context.trace_id)
+        span_id = format_span_id(span.context.span_id)
+        parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
 
-        self._prune_old_spans()
+        (op, description, status, _, origin) = extract_span_data(span)
 
-    def _get_otel_context(self, otel_span):
-        # type: (OTelSpan) -> dict[str, Any]
-        """
-        Returns the OTel context for Sentry.
-        See: https://develop.sentry.dev/sdk/performance/opentelemetry/#step-5-add-opentelemetry-context
-        """
-        ctx = {}
+        trace_context = {
+            "trace_id": trace_id,
+            "span_id": span_id,
+            "origin": origin or DEFAULT_SPAN_ORIGIN,
+            "op": op,
+            "status": status,
+        }  # type: dict[str, Any]
 
-        if otel_span.attributes:
-            ctx["attributes"] = dict(otel_span.attributes)
+        if parent_span_id:
+            trace_context["parent_span_id"] = parent_span_id
+        if span.attributes:
+            trace_context["data"] = dict(span.attributes)
 
-        if otel_span.resource.attributes:
-            ctx["resource"] = dict(otel_span.resource.attributes)
+        contexts = {"trace": trace_context}
+        if span.resource.attributes:
+            contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
 
-        return ctx
-
-    def _get_trace_data(self, otel_span, parent_context):
-        # type: (OTelSpan, Optional[context_api.Context]) -> dict[str, Any]
-        """
-        Extracts tracing information from one OTel span and its parent OTel context.
-        """
-        trace_data = {}  # type: dict[str, Any]
-        span_context = otel_span.get_span_context()
-
-        span_id = format_span_id(span_context.span_id)
-        trace_data["span_id"] = span_id
-
-        trace_id = format_trace_id(span_context.trace_id)
-        trace_data["trace_id"] = trace_id
-
-        parent_span_id = (
-            format_span_id(otel_span.parent.span_id) if otel_span.parent else None
-        )
-        trace_data["parent_span_id"] = parent_span_id
-
-        sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
-        sentry_trace_data = cast("dict[str, Union[str, bool, None]]", sentry_trace_data)
-        trace_data["parent_sampled"] = (
-            sentry_trace_data["parent_sampled"] if sentry_trace_data else None
+        event.update(
+            {
+                "type": "transaction",
+                "transaction": description,
+                # TODO-neel-potel tx source based on integration
+                "transaction_info": {"source": "custom"},
+                "contexts": contexts,
+            }
         )
 
-        baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)
-        trace_data["baggage"] = baggage
+        return event
 
-        return trace_data
+    def _span_to_json(self, span):
+        # type: (ReadableSpan) -> Optional[dict[str, Any]]
+        if not span.context:
+            return None
 
-    def _update_span_with_otel_data(self, sentry_span, otel_span):
-        # type: (SentrySpan, OTelSpan) -> None
-        """
-        Convert OTel span data and update the Sentry span with it.
-        This should eventually happen on the server when ingesting the spans.
-        """
-        sentry_span.set_data("otel.kind", otel_span.kind)
+        # This is a safe cast because dict[str, Any] is a superset of Event
+        span_json = cast(
+            "dict[str, Any]", self._common_span_transaction_attributes_as_json(span)
+        )
+        if span_json is None:
+            return None
 
-        if otel_span.attributes is not None:
-            for key, val in otel_span.attributes.items():
-                sentry_span.set_data(key, val)
+        trace_id = format_trace_id(span.context.trace_id)
+        span_id = format_span_id(span.context.span_id)
+        parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
 
-        (op, description, status, http_status, _) = extract_span_data(otel_span)
-        sentry_span.op = op
-        sentry_span.description = description
+        (op, description, status, _, origin) = extract_span_data(span)
 
-        if http_status:
-            sentry_span.set_http_status(http_status)
-        elif status:
-            sentry_span.set_status(status)
+        span_json.update(
+            {
+                "trace_id": trace_id,
+                "span_id": span_id,
+                "op": op,
+                "description": description,
+                "status": status,
+                "origin": origin or DEFAULT_SPAN_ORIGIN,
+            }
+        )
 
-    def _update_transaction_with_otel_data(self, sentry_span, otel_span):
-        # type: (SentrySpan, OTelSpan) -> None
-        (op, _, status, http_status, _) = extract_span_data(otel_span)
-        sentry_span.op = op
+        if parent_span_id:
+            span_json["parent_span_id"] = parent_span_id
 
-        if http_status:
-            sentry_span.set_http_status(http_status)
-        elif status:
-            sentry_span.set_status(status)
+        if span.attributes:
+            span_json["data"] = dict(span.attributes)
+
+        return span_json
+
+    def _common_span_transaction_attributes_as_json(self, span):
+        # type: (ReadableSpan) -> Optional[Event]
+        if not span.start_time or not span.end_time:
+            return None
+
+        common_json = {
+            "start_timestamp": convert_from_otel_timestamp(span.start_time),
+            "timestamp": convert_from_otel_timestamp(span.end_time),
+        }  # type: Event
+
+        measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
+        if measurements:
+            common_json["measurements"] = measurements
+
+        tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
+        if tags:
+            common_json["tags"] = tags
+
+        return common_json
