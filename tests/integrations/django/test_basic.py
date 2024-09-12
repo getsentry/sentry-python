@@ -139,7 +139,11 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
 
 def test_has_trace_if_performance_enabled(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=("HEAD"),
+            )
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
