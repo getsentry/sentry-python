@@ -11,6 +11,8 @@ from sentry_sdk.integrations.opentelemetry.scope import (
     PotelScope as Scope,
     new_scope,
     isolation_scope,
+    use_scope,
+    use_isolation_scope,
 )
 
 
@@ -77,6 +79,8 @@ __all__ = [
     "start_transaction",
     "trace",
     "monitor",
+    "use_scope",
+    "use_isolation_scope",
 ]
 
 
