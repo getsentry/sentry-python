@@ -146,7 +146,7 @@ def record_sql_queries(
 
     with sentry_sdk.start_span(
         op=OP.DB,
-        description=query,
+        name=query,
         origin=span_origin,
     ) as span:
         for k, v in data.items():
@@ -653,7 +653,7 @@ def start_child_span_decorator(func):
 
             with span.start_child(
                 op=OP.FUNCTION,
-                description=qualname_from_function(func),
+                name=qualname_from_function(func),
             ):
                 return await func(*args, **kwargs)
 
@@ -681,7 +681,7 @@ def start_child_span_decorator(func):
 
             with span.start_child(
                 op=OP.FUNCTION,
-                description=qualname_from_function(func),
+                name=qualname_from_function(func),
             ):
                 return func(*args, **kwargs)
 

@@ -1,6 +1,7 @@
 import uuid
 import random
 import time
+import warnings 
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context
@@ -74,7 +75,7 @@ if TYPE_CHECKING:
         """
 
         description: str
-        """A description of what operation is being performed within the span."""
+        """A description of what operation is being performed within the span. This argument is DEPRECATED. Please use the `name` parameter, instead."""
 
         status: str
         """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
@@ -98,10 +99,10 @@ if TYPE_CHECKING:
         Default "manual".
         """
 
-    class TransactionKwargs(SpanKwargs, total=False):
         name: str
-        """Identifier of the transaction. Will show up in the Sentry UI."""
+        """A string describing what operation is being performed within the span/transaction."""
 
+    class TransactionKwargs(SpanKwargs, total=False):
         source: str
         """
         A string describing the source of the transaction name. This will be used to determine the transaction's type.
@@ -232,6 +233,14 @@ class Span:
     :param op: The span's operation. A list of recommended values is available here:
         https://develop.sentry.dev/sdk/performance/span-operations/
     :param description: A description of what operation is being performed within the span.
+
+        .. deprecated:: 2.X.X
+            Please use the `name` parameter, instead.
+    :param name: A string describing what operation is being performed within the span.
+    :param hub: The hub to use for this span.
+
+        .. deprecated:: 2.0.0
+            Please use the `scope` parameter, instead.
     :param status: The span's status. Possible values are listed at
         https://develop.sentry.dev/sdk/event-payloads/span/
     :param containing_transaction: The transaction that this span belongs to.
@@ -260,6 +269,7 @@ class Span:
         "_containing_transaction",
         "scope",
         "origin",
+        "name",
     )
 
     def __init__(
@@ -276,6 +286,7 @@ class Span:
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         scope=None,  # type: Optional[sentry_sdk.Scope]
         origin=None,  # type: Optional[str]
+        name=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -284,7 +295,7 @@ class Span:
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
         self.op = op
-        self.description = description
+        self.description = name or description
         self.status = status
         self.scope = scope
         self.origin = origin or DEFAULT_SPAN_ORIGIN
@@ -380,6 +391,13 @@ class Span:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        if kwargs.get("description") is not None:
+            warnings.warn(
+                "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         kwargs.setdefault("sampled", self.sampled)
 
         child = Span(
@@ -720,7 +738,7 @@ class Transaction(Span):
         "_baggage",
     )
 
-    def __init__(
+    def __init__(  # type: ignore[misc]
         self,
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]

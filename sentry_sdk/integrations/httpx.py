@@ -53,7 +53,7 @@ def _install_httpx_client():
 
         with sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
+            name="%s %s"
             % (
                 request.method,
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
@@ -109,7 +109,7 @@ def _install_httpx_async_client():
 
         with sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
+            name="%s %s"
             % (
                 request.method,
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,

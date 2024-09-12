@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from copy import copy
 from collections import deque
 from contextlib import contextmanager
@@ -1009,6 +1010,13 @@ class Scope:
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
+        if kwargs.get("description") is not None:
+            warnings.warn(
+                "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         with new_scope():
             kwargs.setdefault("scope", self)
 

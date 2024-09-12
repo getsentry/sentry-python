@@ -132,7 +132,7 @@ def _enable_span_for_middleware(middleware_class):
 
         with sentry_sdk.start_span(
             op=OP.MIDDLEWARE_STARLETTE,
-            description=middleware_name,
+            name=middleware_name,
             origin=StarletteIntegration.origin,
         ) as middleware_span:
             middleware_span.set_tag("starlette.middleware_name", middleware_name)
@@ -142,7 +142,7 @@ def _enable_span_for_middleware(middleware_class):
                 # type: (*Any, **Any) -> Any
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
-                    description=getattr(receive, "__qualname__", str(receive)),
+                    name=getattr(receive, "__qualname__", str(receive)),
                     origin=StarletteIntegration.origin,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
@@ -157,7 +157,7 @@ def _enable_span_for_middleware(middleware_class):
                 # type: (*Any, **Any) -> Any
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLETTE_SEND,
-                    description=getattr(send, "__qualname__", str(send)),
+                    name=getattr(send, "__qualname__", str(send)),
                     origin=StarletteIntegration.origin,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)

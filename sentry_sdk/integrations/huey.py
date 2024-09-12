@@ -59,7 +59,7 @@ def patch_enqueue():
         # type: (Huey, Task) -> Optional[Union[Result, ResultGroup]]
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_HUEY,
-            description=task.name,
+            name=task.name,
             origin=HueyIntegration.origin,
         ):
             if not isinstance(task, PeriodicTask):

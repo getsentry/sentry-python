@@ -174,7 +174,7 @@ def wrap_async_view(callback):
 
         with sentry_sdk.start_span(
             op=OP.VIEW_RENDER,
-            description=request.resolver_match.view_name,
+            name=request.resolver_match.view_name,
             origin=DjangoIntegration.origin,
         ):
             return await callback(request, *args, **kwargs)
