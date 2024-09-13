@@ -228,7 +228,7 @@ class Span:
         https://develop.sentry.dev/sdk/performance/span-operations/
     :param description: A description of what operation is being performed within the span.
 
-        .. deprecated:: 2.X.X
+        .. deprecated:: 2.15.0
             Please use the `name` parameter, instead.
     :param name: A string describing what operation is being performed within the span.
     :param hub: The hub to use for this span.
