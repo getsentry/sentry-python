@@ -1,9 +1,10 @@
 import json
 import logging
+import pytest
 import threading
 from unittest import mock
 
-import pytest
+import fastapi
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -12,6 +13,10 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk.utils import parse_version
+
+
+FASTAPI_VERSION = parse_version(fastapi.__version__)
 
 
 def fastapi_app_factory():
@@ -566,7 +571,10 @@ def test_configurable_status_codes(
         assert not events
 
 
-@pytest.mark.asyncio
+@pytest.mark.skipif(
+    FASTAPI_VERSION < (0, 80),
+    reason="Requires FastAPI >= 0.80, because earlier versions do not support HTTP 'HEAD' requests",
+)
 def test_transaction_http_method_default(sentry_init, capture_events):
     """
     By default OPTIONS and HEAD requests do not create a transaction.
@@ -598,6 +606,10 @@ def test_transaction_http_method_default(sentry_init, capture_events):
     assert event["request"]["method"] == "GET"
 
 
+@pytest.mark.skipif(
+    FASTAPI_VERSION < (0, 80),
+    reason="Requires FastAPI >= 0.80, because earlier versions do not support HTTP 'HEAD' requests",
+)
 def test_transaction_http_method_custom(sentry_init, capture_events):
     # FastAPI is heavily based on Starlette so we also need
     # to enable StarletteIntegration.
