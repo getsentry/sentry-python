@@ -28,6 +28,10 @@ def fastapi_app_factory():
         capture_message("Hi")
         return {"message": "Hi"}
 
+    @app.get("/nomessage")
+    async def _nomessage():
+        return {"message": "nothing here..."}
+
     @app.get("/message/{message_id}")
     async def _message_with_id(message_id):
         capture_message("Hi")
@@ -553,3 +557,75 @@ def test_configurable_status_codes(
         assert len(events) == 1
     else:
         assert not events
+
+@pytest.mark.asyncio
+def test_transaction_http_method_default(sentry_init, client, capture_events):
+    """
+    By default OPTIONS and HEAD requests do not create a transaction.
+    """
+    # FastAPI is heavily based on Starlette so we also need
+    # to enable StarletteIntegration.
+    # In the future this will be auto enabled.
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(), 
+            FastApiIntegration(),
+        ],
+    )
+
+    app = fastapi_app_factory()
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
+
+    import ipdb; ipdb.set_trace()
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert event["request"]["method"] == "GET"
+
+
+def test_transaction_http_method_custom(sentry_init, client, capture_events):
+    # FastAPI is heavily based on Starlette so we also need
+    # to enable StarletteIntegration.
+    # In the future this will be auto enabled.
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                ),  # capitalization does not matter
+            ), 
+            FastApiIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                ),  # capitalization does not matter
+            ),
+        ],
+    )
+
+    app = fastapi_app_factory()
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
+
+    import ipdb; ipdb.set_trace()
+    assert len(events) == 2
+
+    (event1, event2) = events
+
+    assert event1["request"]["method"] == "OPTIONS"
+    assert event2["request"]["method"] == "HEAD"
