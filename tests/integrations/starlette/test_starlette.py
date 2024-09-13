@@ -1204,8 +1204,8 @@ def test_configurable_status_codes(
 
 
 @pytest.mark.skipif(
-    STARLETTE_VERSION < (0, 20),
-    reason="Requires Starlette >= 0.20, because earlier versions do not support HTTP 'HEAD' requests",
+    STARLETTE_VERSION < (0, 21),
+    reason="Requires Starlette >= 0.21, because earlier versions do not support HTTP 'HEAD' requests",
 )
 def test_transaction_http_method_default(sentry_init, capture_events):
     """
@@ -1234,8 +1234,8 @@ def test_transaction_http_method_default(sentry_init, capture_events):
 
 
 @pytest.mark.skipif(
-    STARLETTE_VERSION < (0, 20),
-    reason="Requires Starlette >= 0.20, because earlier versions do not support HTTP 'HEAD' requests",
+    STARLETTE_VERSION < (0, 21),
+    reason="Requires Starlette >= 0.21, because earlier versions do not support HTTP 'HEAD' requests",
 )
 def test_transaction_http_method_custom(sentry_init, capture_events):
     sentry_init(
