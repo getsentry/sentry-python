@@ -1,6 +1,4 @@
-import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS, SPANDATA
-from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
@@ -68,17 +66,6 @@ def _before_cursor_execute(
 
     if span is not None:
         _set_db_data(span, conn)
-        options = (
-            sentry_sdk.get_client().options["_experiments"].get("attach_explain_plans")
-        )
-        if options is not None:
-            attach_explain_plan_to_span(
-                span,
-                conn,
-                statement,
-                parameters,
-                options,
-            )
         context._sentry_sql_span = span
 
 
