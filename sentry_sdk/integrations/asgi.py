@@ -63,7 +63,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 def nullcontext():
     # type: () -> Iterator[None]
     yield
-    
+
 
 def _capture_exception(exc, mechanism_type="asgi"):
     # type: (Any, str) -> None
@@ -109,7 +109,7 @@ class SentryAsgiMiddleware:
         transaction_style="endpoint",  # type: str
         mechanism_type="asgi",  # type: str
         span_origin="manual",  # type: str
-        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE, # type: Tuple[str, ...]
+        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: Tuple[str, ...]
     ):
         # type: (...) -> None
         """
@@ -235,7 +235,7 @@ class SentryAsgiMiddleware:
                         sentry_sdk.start_transaction(
                             transaction,
                             custom_sampling_context={"asgi_scope": scope},
-                        ) 
+                        )
                         if transaction is not None
                         else nullcontext()
                     ):
@@ -244,13 +244,13 @@ class SentryAsgiMiddleware:
 
                             async def _sentry_wrapped_send(event):
                                 # type: (Dict[str, Any]) -> Any
-                                is_http_response = (
-                                    event.get("type") == "http.response.start"
-                                    and transaction is not None
-                                    and "status" in event
-                                )
-                                if is_http_response:
-                                    transaction.set_http_status(event["status"])
+                                if transaction is not None:
+                                    is_http_response = (
+                                        event.get("type") == "http.response.start"
+                                        and "status" in event
+                                    )
+                                    if is_http_response:
+                                        transaction.set_http_status(event["status"])
 
                                 return await send(event)
 

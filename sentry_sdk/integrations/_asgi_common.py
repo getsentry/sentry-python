@@ -27,6 +27,7 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "TRACE",
 )
 
+
 def _get_headers(asgi_scope):
     # type: (Any) -> Dict[str, str]
     """

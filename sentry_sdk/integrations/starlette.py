@@ -80,7 +80,7 @@ class StarletteIntegration(Integration):
         transaction_style="url",  # type: str
         failed_request_status_codes=None,  # type: Optional[list[HttpStatusCodeRange]]
         middleware_spans=True,  # type: bool
-        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE, # type: tuple[str, ...]
+        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
         # type: (...) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:

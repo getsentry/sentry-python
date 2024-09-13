@@ -144,7 +144,17 @@ def starlette_app_factory(middleware=None, debug=True):
         }
         return templates.TemplateResponse("trace_meta.html", template_context)
 
-    all_methods = ["CONNECT", "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT", "TRACE",]
+    all_methods = [
+        "CONNECT",
+        "DELETE",
+        "GET",
+        "HEAD",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PUT",
+        "TRACE",
+    ]
 
     app = starlette.applications.Starlette(
         debug=debug,
@@ -152,7 +162,7 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/some_url", _homepage),
             starlette.routing.Route("/custom_error", _custom_error),
             starlette.routing.Route("/message", _message),
-            starlette.routing.Route("/nomessage", _nomessage, methods=all_methods),            
+            starlette.routing.Route("/nomessage", _nomessage, methods=all_methods),
             starlette.routing.Route("/message/{message_id}", _message_with_id),
             starlette.routing.Route("/sync/thread_ids", _thread_ids_sync),
             starlette.routing.Route("/async/thread_ids", _thread_ids_async),
@@ -590,7 +600,7 @@ def test_user_information_transaction(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        integrations=[StarletteIntegration()],  
+        integrations=[StarletteIntegration()],
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1193,13 +1203,12 @@ def test_configurable_status_codes(
         assert not events
 
 
-
 def test_transaction_http_method_default(sentry_init, capture_events):
     """
     By default OPTIONS and HEAD requests do not create a transaction.
     """
     sentry_init(
-        traces_sample_rate=1.0, 
+        traces_sample_rate=1.0,
         integrations=[
             StarletteIntegration(),
         ],
@@ -1222,7 +1231,7 @@ def test_transaction_http_method_default(sentry_init, capture_events):
 
 def test_transaction_http_method_custom(sentry_init, capture_events):
     sentry_init(
-        traces_sample_rate=1.0, 
+        traces_sample_rate=1.0,
         integrations=[
             StarletteIntegration(
                 http_methods_to_capture=(
