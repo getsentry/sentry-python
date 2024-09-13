@@ -1203,6 +1203,7 @@ def test_configurable_status_codes(
         assert not events
 
 
+@pytest.mark.skipif(STARLETTE_VERSION < (0, 20), reason="Requires Starlette >= 0.20, because earlier versions do not support HTTP 'HEAD' requests")
 def test_transaction_http_method_default(sentry_init, capture_events):
     """
     By default OPTIONS and HEAD requests do not create a transaction.
@@ -1229,6 +1230,7 @@ def test_transaction_http_method_default(sentry_init, capture_events):
     assert event["request"]["method"] == "GET"
 
 
+@pytest.mark.skipif(STARLETTE_VERSION < (0, 20), reason="Requires Starlette >= 0.20, because earlier versions do not support HTTP 'HEAD' requests")
 def test_transaction_http_method_custom(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
