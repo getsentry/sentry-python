@@ -565,6 +565,7 @@ def test_configurable_status_codes(
     else:
         assert not events
 
+
 @pytest.mark.asyncio
 def test_transaction_http_method_default(sentry_init, capture_events):
     """
@@ -576,7 +577,7 @@ def test_transaction_http_method_default(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[
-            StarletteIntegration(), 
+            StarletteIntegration(),
             FastApiIntegration(),
         ],
     )
@@ -609,7 +610,7 @@ def test_transaction_http_method_custom(sentry_init, capture_events):
                     "OPTIONS",
                     "head",
                 ),  # capitalization does not matter
-            ), 
+            ),
             FastApiIntegration(
                 http_methods_to_capture=(
                     "OPTIONS",
@@ -628,7 +629,6 @@ def test_transaction_http_method_custom(sentry_init, capture_events):
     client.options("/nomessage")
     client.head("/nomessage")
 
-    import ipdb; ipdb.set_trace()
     assert len(events) == 2
 
     (event1, event2) = events
