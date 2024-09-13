@@ -1,7 +1,7 @@
 import uuid
 import random
 import time
-import warnings 
+import warnings
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context

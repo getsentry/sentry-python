@@ -357,9 +357,9 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
     events = capture_events()
 
     timestamps = [
-        datetime.datetime.now() - datetime.timedelta(days=10),
-        datetime.datetime.now() - datetime.timedelta(days=8),
-        datetime.datetime.now() - datetime.timedelta(days=12),
+        datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=10),
+        datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=8),
+        datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=12),
     ]
 
     for i, timestamp in enumerate(timestamps):
@@ -375,8 +375,8 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.datetime.strptime(
-            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
+        datetime.datetime.strptime(x["timestamp"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(
+            tzinfo=datetime.timezone.utc
         )
         for x in event["breadcrumbs"]["values"]
     ]
