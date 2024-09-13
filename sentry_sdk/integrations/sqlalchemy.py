@@ -1,4 +1,3 @@
-import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
