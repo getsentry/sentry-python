@@ -28,7 +28,14 @@ def fastapi_app_factory():
         capture_message("Hi")
         return {"message": "Hi"}
 
+    @app.delete("/nomessage")
     @app.get("/nomessage")
+    @app.head("/nomessage")
+    @app.options("/nomessage")
+    @app.patch("/nomessage")
+    @app.post("/nomessage")
+    @app.put("/nomessage")
+    @app.trace("/nomessage")
     async def _nomessage():
         return {"message": "nothing here..."}
 
@@ -559,7 +566,7 @@ def test_configurable_status_codes(
         assert not events
 
 @pytest.mark.asyncio
-def test_transaction_http_method_default(sentry_init, client, capture_events):
+def test_transaction_http_method_default(sentry_init, capture_events):
     """
     By default OPTIONS and HEAD requests do not create a transaction.
     """
@@ -583,7 +590,6 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     client.options("/nomessage")
     client.head("/nomessage")
 
-    import ipdb; ipdb.set_trace()
     assert len(events) == 1
 
     (event,) = events
@@ -591,7 +597,7 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     assert event["request"]["method"] == "GET"
 
 
-def test_transaction_http_method_custom(sentry_init, client, capture_events):
+def test_transaction_http_method_custom(sentry_init, capture_events):
     # FastAPI is heavily based on Starlette so we also need
     # to enable StarletteIntegration.
     # In the future this will be auto enabled.
@@ -622,7 +628,6 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     client.options("/nomessage")
     client.head("/nomessage")
 
-    import ipdb; ipdb.set_trace()
     assert len(events) == 2
 
     (event1, event2) = events
