@@ -102,7 +102,7 @@ jobs:
     needs: [build_lambda_layer, docs]
     steps:
       - name: Merge Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/merge@v4
         with:
           # Craft expects release assets to be a single artifact named after the sha.
           name: ${{ github.sha }}
