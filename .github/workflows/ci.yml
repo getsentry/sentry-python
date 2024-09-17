@@ -75,6 +75,9 @@ jobs:
           name: artifact-build_lambda_layer
           path: |
             dist/*
+          if-no-files-found: 'error'
+          # since this artifact will be merged, compression is not necessary
+          compression-level: '0'
 
   docs:
     name: Build SDK API Doc
@@ -94,8 +97,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: artifact-docs
-          path: docs/_build/gh-pages.zip
-            dist/*
+          path: |
+            docs/_build/gh-pages.zip
+          if-no-files-found: 'error'
+          # since this artifact will be merged, compression is not necessary
+          compression-level: '0'
 
   merge:
     runs-on: ubuntu-latest
