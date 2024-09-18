@@ -2,6 +2,7 @@ import logging
 import pickle
 import gzip
 import io
+import os
 import socket
 from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta, timezone
@@ -91,7 +92,7 @@ def make_client(request, capturing_server):
     def inner(**kwargs):
         return Client(
             "http://foobar@{}/132".format(capturing_server.url[len("http://") :]),
-            **kwargs
+            **kwargs,
         )
 
     return inner
@@ -176,16 +177,24 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     assert options["num_pools"] == expected_num_pools
 
 
-def test_two_way_ssl_authentication(make_client):
+@pytest.mark.parametrize("http2", [True, False])
+def test_two_way_ssl_authentication(make_client, http2):
     _experiments = {}
+    if http2:
+        _experiments["transport_http2"] = True
 
     client = make_client(_experiments=_experiments)
 
-    options = client.transport._get_pool_options(
-        [], "/path/to/cert.pem", "/path/to/key.pem"
-    )
-    assert options["cert_file"] == "/path/to/cert.pem"
-    assert options["key_file"] == "/path/to/key.pem"
+    current_dir = os.path.dirname(__file__)
+    cert_file = f"{current_dir}/test.pem"
+    key_file = f"{current_dir}/test.key"
+    options = client.transport._get_pool_options([], cert_file, key_file)
+
+    if http2:
+        assert options["ssl_context"] is not None
+    else:
+        assert options["cert_file"] == cert_file
+        assert options["key_file"] == key_file
 
 
 def test_socket_options(make_client):
@@ -208,7 +217,7 @@ def test_keep_alive_true(make_client):
     assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
 
 
-def test_keep_alive_off_by_default(make_client):
+def test_keep_alive_on_by_default(make_client):
     client = make_client()
     options = client.transport._get_pool_options([])
     assert "socket_options" not in options

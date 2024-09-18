@@ -10,4 +10,5 @@ executing
 asttokens
 responses
 pysocks
+socksio
 setuptools

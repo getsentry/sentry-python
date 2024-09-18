@@ -23,7 +23,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
-from sentry_sdk.transport import HttpTransport, make_transport
+from sentry_sdk.transport import HttpTransport, Http2Transport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
@@ -428,6 +428,7 @@ class _Client(BaseClient):
             or self.metrics_aggregator
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, HttpTransport)
+            or isinstance(self.transport, Http2Transport)
         ):
             # If we have anything on that could spawn a background thread, we
             # need to check if it's safe to use them.
