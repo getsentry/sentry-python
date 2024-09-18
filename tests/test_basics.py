@@ -397,11 +397,12 @@ def test_breadcrumbs(sentry_init, capture_events):
 def test_breadcrumb_ordering(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     timestamps = [
-        datetime.datetime.now() - datetime.timedelta(days=10),
-        datetime.datetime.now() - datetime.timedelta(days=8),
-        datetime.datetime.now() - datetime.timedelta(days=12),
+        now - datetime.timedelta(days=10),
+        now - datetime.timedelta(days=8),
+        now - datetime.timedelta(days=12),
     ]
 
     for timestamp in timestamps:
@@ -419,7 +420,7 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
     timestamps_from_event = [
         datetime.datetime.strptime(
             x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
-        )
+        ).replace(tzinfo=datetime.timezone.utc)
         for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
@@ -428,11 +429,12 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     timestamps = [
-        datetime.datetime.now() - datetime.timedelta(days=10),
-        datetime.datetime.now() - datetime.timedelta(days=8),
-        datetime.datetime.now() - datetime.timedelta(days=12),
+        now - datetime.timedelta(days=10),
+        now - datetime.timedelta(days=8),
+        now - datetime.timedelta(days=12),
     ]
 
     for i, timestamp in enumerate(timestamps):
@@ -450,7 +452,7 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
     timestamps_from_event = [
         datetime.datetime.strptime(
             x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
-        )
+        ).replace(tzinfo=datetime.timezone.utc)
         for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
