@@ -431,7 +431,6 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
 
 def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
-    sentry_sdk.set_level("warning")
     sentry_init()
     events = capture_events()
     now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
