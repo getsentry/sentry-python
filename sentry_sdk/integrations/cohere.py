@@ -26,18 +26,13 @@ try:
     from cohere import (
         ChatStreamEndEvent,
         NonStreamedChatResponse,
+        StreamedChatResponse_StreamEnd,
     )
 
     if TYPE_CHECKING:
         from cohere import StreamedChatResponse
 except ImportError:
     raise DidNotEnable("Cohere not installed")
-
-try:
-    # cohere 5.9.3+
-    from cohere import StreamEndStreamedChatResponse
-except ImportError:
-    from cohere import StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse
 
 
 COLLECTED_CHAT_PARAMS = {
@@ -194,7 +189,7 @@ def _wrap_chat(f, streaming):
                     with capture_internal_exceptions():
                         for x in old_iterator:
                             if isinstance(x, ChatStreamEndEvent) or isinstance(
-                                x, StreamEndStreamedChatResponse
+                                x, StreamedChatResponse_StreamEnd
                             ):
                                 collect_chat_response_fields(
                                     span,
