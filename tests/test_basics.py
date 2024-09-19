@@ -419,7 +419,13 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
         datetime.datetime.strptime(
-            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
+            # We do the `.replace("Z", "")` monstrosity to support Python 3.6
+            # Otherwise we could have used `%z` or just `Z` in strptime
+            # but it cannot handle both `Z` and `+00:00` (only one) so
+            # this is why we cannot have nice things.
+            # TODO: Move to `%z` once we drop Py 3.6 support
+            x["timestamp"].replace("Z", ""),
+            "%Y-%m-%dT%H:%M:%S.%f",
         ).replace(tzinfo=datetime.timezone.utc)
         for x in event["breadcrumbs"]["values"]
     ]
@@ -451,7 +457,13 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
         datetime.datetime.strptime(
-            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
+            # We do the `.replace("Z", "")` monstrosity to support Python 3.6
+            # Otherwise we could have used `%z` or just `Z` in strptime
+            # but it cannot handle both `Z` and `+00:00` (only one) so
+            # this is why we cannot have nice things.
+            # TODO: Move to `%z` once we drop Py 3.6 support
+            x["timestamp"].replace("Z", ""),
+            "%Y-%m-%dT%H:%M:%S.%f",
         ).replace(tzinfo=datetime.timezone.utc)
         for x in event["breadcrumbs"]["values"]
     ]
