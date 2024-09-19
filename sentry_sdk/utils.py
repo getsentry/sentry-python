@@ -258,7 +258,7 @@ def datetime_from_isoformat(value):
                     value = value[:tz_colon_index] + value[tz_colon_index + 1 :]
                 timestamp_format += "%z"
 
-        return datetime.strptime(value, timestamp_format)
+        return datetime.strptime(value, timestamp_format).astimezone(timezone.utc)
 
 
 def event_hint_with_exc_info(exc_info=None):
