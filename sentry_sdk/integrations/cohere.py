@@ -37,7 +37,7 @@ try:
     # cohere 5.9.3+
     from cohere import StreamEndStreamedChatResponse
 except ImportError:
-    from cohere import StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse  # type: ignore
+    from cohere import StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse
 
 
 COLLECTED_CHAT_PARAMS = {
