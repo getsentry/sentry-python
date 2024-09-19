@@ -245,7 +245,8 @@ def datetime_from_isoformat(value):
         return datetime.fromisoformat(value)
     except AttributeError:
         # py 3.6
-        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
+        iso_format = "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
+        return datetime.strptime(value, iso_format)
 
 
 def event_hint_with_exc_info(exc_info=None):
