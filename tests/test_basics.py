@@ -28,6 +28,7 @@ from sentry_sdk import (
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
     _DEFAULT_INTEGRATIONS,
+    DidNotEnable,
     Integration,
     setup_integrations,
 )
@@ -37,18 +38,6 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
-
-
-def _redis_installed():  # type: () -> bool
-    """
-    Determines whether Redis is installed.
-    """
-    try:
-        import redis  # noqa: F401
-    except ImportError:
-        return False
-
-    return True
 
 
 class NoOpIntegration(Integration):
@@ -89,20 +78,34 @@ def test_processors(sentry_init, capture_events):
     assert event["exception"]["values"][0]["value"] == "aha! whatever"
 
 
+class ModuleImportErrorSimulator:
+    def __init__(self, modules, error_cls=DidNotEnable):
+        self.modules = modules
+        self.error_cls = error_cls
+        for sys_module in list(sys.modules.keys()):
+            if any(sys_module.startswith(module) for module in modules):
+                del sys.modules[sys_module]
+
+    def find_spec(self, fullname, _path, _target=None):
+        if fullname in self.modules:
+            raise self.error_cls("Test import failure for %s" % fullname)
+
+    def __enter__(self):
+        sys.meta_path.insert(0, self)
+
+    def __exit__(self, *_args):
+        sys.meta_path.remove(self)
+
+
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
-    redis_index = _AUTO_ENABLING_INTEGRATIONS.index(
-        "sentry_sdk.integrations.redis.RedisIntegration"
-    )  # noqa: N806
 
-    sentry_init(auto_enabling_integrations=True, debug=True)
+    with ModuleImportErrorSimulator(
+        [i.rsplit(".", 1)[0] for i in _AUTO_ENABLING_INTEGRATIONS]
+    ):
+        sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
-        # Ignore redis in the test case, because it does not raise a DidNotEnable
-        # exception on import; rather, it raises the exception upon enabling.
-        if _AUTO_ENABLING_INTEGRATIONS[redis_index] == import_string:
-            continue
-
         assert any(
             record.message.startswith(
                 "Did not import default integration {}:".format(import_string)
@@ -874,9 +877,9 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
     assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"
 
 
-@pytest.mark.skipif(_redis_installed(), reason="skipping because redis is installed")
 def test_redis_disabled_when_not_installed(sentry_init):
-    sentry_init()
+    with ModuleImportErrorSimulator(["redis"], ImportError):
+        sentry_init()
 
     assert sentry_sdk.get_client().get_integration(RedisIntegration) is None
 
