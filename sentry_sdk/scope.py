@@ -1325,7 +1325,7 @@ class Scope:
 
             event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
         except Exception as err:
-            logger.debug("Error when sorting breadcrumbs", exc_info=err)
+            logger.warning("Error when sorting breadcrumbs", exc_info=err)
             pass
 
     def _apply_user_to_event(self, event, hint, options):
