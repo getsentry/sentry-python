@@ -555,9 +555,8 @@ class DjangoRequestExtractor(RequestExtractor):
         try:
             return self.request.body
         except RawPostDataException:
-            # We can't access the body anymore after the stream has been read.
-            # TODO: This is just a mitigation so that we don't break. Figure out
-            # how to prevent this from happening in the first place.
+            # We can't access the body anymore because the stream has already
+            # been read
             return None
 
     def form(self):
