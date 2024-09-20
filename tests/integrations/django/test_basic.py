@@ -756,7 +756,7 @@ def test_request_body_already_read(sentry_init, client, capture_events):
         def data(self):
             raise AttributeError
 
-    with mock.patch("django.http.request.HttpRequest", MockRequest):
+    with mock.patch("werkzeug.test.Request", MockRequest):
         response = client.post(
             reverse("post_echo"), data=b'{"hey": 42}', content_type="application/json"
         )
