@@ -3,15 +3,16 @@ import os
 import re
 import pytest
 from functools import partial
-from unittest import mock
+from unittest.mock import patch
 
 from werkzeug.test import Client
 
 from django import VERSION as DJANGO_VERSION
 from django.contrib.auth.models import User
+from django.core.handlers.wsgi import WSGIRequest
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
-from django.http.request import HttpRequest, RawPostDataException
+from django.http.request import RawPostDataException
 
 try:
     from django.urls import reverse
@@ -747,7 +748,7 @@ def test_request_body_already_read(sentry_init, client, capture_events):
 
     events = capture_events()
 
-    class MockRequest(HttpRequest):
+    class MockRequest(WSGIRequest):
         @property
         def body(self):
             raise RawPostDataException
@@ -756,7 +757,7 @@ def test_request_body_already_read(sentry_init, client, capture_events):
         def data(self):
             raise AttributeError
 
-    with mock.patch("werkzeug.test.Request", MockRequest):
+    with patch("django.core.handlers.wsgi.WSGIRequest", MockRequest):
         response = client.post(
             reverse("post_echo"), data=b'{"hey": 42}', content_type="application/json"
         )
@@ -768,7 +769,7 @@ def test_request_body_already_read(sentry_init, client, capture_events):
     (event,) = events
 
     assert event["message"] == "hi"
-    assert event["request"]["data"] == {"hey": 42}
+    assert "data" not in event["request"]
 
 
 def test_template_tracing_meta(sentry_init, client, capture_events):
