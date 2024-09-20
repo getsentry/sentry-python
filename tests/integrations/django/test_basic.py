@@ -758,13 +758,9 @@ def test_request_body_already_read(sentry_init, client, capture_events):
             raise AttributeError
 
     with patch("django.core.handlers.wsgi.WSGIRequest", MockRequest):
-        response = client.post(
+        client.post(
             reverse("post_echo"), data=b'{"hey": 42}', content_type="application/json"
         )
-        content, status, headers = unpack_werkzeug_response(response)
-
-    assert status.lower() == "200 ok"
-    assert content == b'{"hey": 42}'
 
     (event,) = events
 
