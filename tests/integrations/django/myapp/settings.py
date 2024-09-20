@@ -132,7 +132,7 @@ try:
 except (ImportError, KeyError):
     from sentry_sdk.utils import logger
 
-    logger.warn("No psycopg2 found, testing with SQLite.")
+    logger.warning("No psycopg2 found, testing with SQLite.")
 
 
 # Password validation
