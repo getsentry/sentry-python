@@ -32,7 +32,6 @@ try:
     from django.conf import settings as django_settings
     from django.core import signals
     from django.conf import settings
-    from django.http.request import RawPostDataException
 
     try:
         from django.urls import resolve
@@ -552,12 +551,7 @@ class DjangoRequestExtractor(RequestExtractor):
 
     def raw_data(self):
         # type: () -> Optional[bytes]
-        try:
-            return self.request.body
-        except RawPostDataException:
-            # We can't access the body anymore because the stream has already
-            # been read
-            return None
+        return self.request.body
 
     def form(self):
         # type: () -> QueryDict
