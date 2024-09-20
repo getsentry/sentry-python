@@ -446,7 +446,6 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
         datetime.datetime.strftime(timestamps[4], "%Y-%m-%dT%H:%M:%S.%f") + "+0000",
         datetime.datetime.strftime(timestamps[5], "%Y-%m-%dT%H:%M:%S.%f") + "+0000",
     ]
-    print(breadcrumb_timestamps)
 
     for i, timestamp in enumerate(timestamps):
         add_breadcrumb(
