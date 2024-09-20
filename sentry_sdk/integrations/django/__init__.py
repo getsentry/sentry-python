@@ -550,7 +550,7 @@ class DjangoRequestExtractor(RequestExtractor):
         return clean_cookies
 
     def raw_data(self):
-        # type: () -> Optional[bytes]
+        # type: () -> bytes
         return self.request.body
 
     def form(self):
