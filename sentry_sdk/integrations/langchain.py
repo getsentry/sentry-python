@@ -420,6 +420,8 @@ def _wrap_configure(f):
         # type: (Any, Any) -> Any
 
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
 
         with capture_internal_exceptions():
             new_callbacks = []  # type: List[BaseCallbackHandler]
