@@ -596,3 +596,24 @@ async def test_span_origin(
     (event,) = events
     assert event["contexts"]["trace"]["origin"] == "auto.http.aiohttp"
     assert event["spans"][0]["origin"] == "auto.http.aiohttp"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid_response", (None, "invalid"))
+async def test_invalid_response(
+    sentry_init, aiohttp_client, capture_events, invalid_response
+):
+    sentry_init(integrations=[AioHttpIntegration()])
+
+    async def handler(_):
+        return invalid_response
+
+    app = web.Application()
+    app.router.add_get("/", handler)
+
+    client = await aiohttp_client(app)
+
+    # Invalid response should result on a ServerDisconnectedError in the client side, not an internal server error.
+    # Important to note that the ServerDisconnectedError indicates we have no error server-side.
+    with pytest.raises(ServerDisconnectedError):
+        await client.get("/")
