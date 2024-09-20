@@ -32,6 +32,7 @@ try:
     from django.conf import settings as django_settings
     from django.core import signals
     from django.conf import settings
+    from django.http.request import RawPostDataException
 
     try:
         from django.urls import resolve
@@ -550,8 +551,14 @@ class DjangoRequestExtractor(RequestExtractor):
         return clean_cookies
 
     def raw_data(self):
-        # type: () -> bytes
-        return self.request.body
+        # type: () -> Optional[bytes]
+        try:
+            return self.request.body
+        except RawPostDataException:
+            # We can't access the body anymore after the stream has been read.
+            # TODO: This is just a mitigation so that we don't break. Figure out
+            # how to prevent this from happening in the first place.
+            return None
 
     def form(self):
         # type: () -> QueryDict
