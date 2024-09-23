@@ -5,7 +5,7 @@ import socket
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
-from typing import cast
+from typing import cast, overload
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from typing import Sequence
     from typing import Type
     from typing import Union
+    from typing import TypeVar
 
     from sentry_sdk._types import Event, Hint, SDKInfo
     from sentry_sdk.integrations import Integration
@@ -62,6 +63,7 @@ if TYPE_CHECKING:
     from sentry_sdk.session import Session
     from sentry_sdk.transport import Transport
 
+    I = TypeVar("I", bound=Integration)  # noqa: E741
 
 _client_init_debug = ContextVar("client_init_debug")
 
@@ -195,8 +197,20 @@ class BaseClient:
         # type: (*Any, **Any) -> None
         return None
 
-    def get_integration(self, *args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    if TYPE_CHECKING:
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (str) -> Optional[Integration]
+            ...
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (type[I]) -> Optional[I]
+            ...
+
+    def get_integration(self, name_or_class):
+        # type: (Union[str, type[Integration]]) -> Optional[Integration]
         return None
 
     def close(self, *args, **kwargs):
@@ -815,10 +829,22 @@ class _Client(BaseClient):
         else:
             self.session_flusher.add_session(session)
 
+    if TYPE_CHECKING:
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (str) -> Optional[Integration]
+            ...
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (type[I]) -> Optional[I]
+            ...
+
     def get_integration(
         self, name_or_class  # type: Union[str, Type[Integration]]
     ):
-        # type: (...) -> Any
+        # type: (...) -> Optional[Integration]
         """Returns the integration for this client by name or class.
         If the client does not have that integration then `None` is returned.
         """
