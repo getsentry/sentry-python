@@ -61,7 +61,7 @@ if TYPE_CHECKING:
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
-DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
+_DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
 
 
 class AioHttpIntegration(Integration):
@@ -72,7 +72,7 @@ class AioHttpIntegration(Integration):
         self,
         transaction_style="handler_name",  # type: str
         *,
-        failed_request_status_codes=DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
+        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
     ):
         # type: (...) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
