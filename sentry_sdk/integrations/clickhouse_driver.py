@@ -83,7 +83,7 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 
         span = sentry_sdk.start_span(
             op=OP.DB,
-            description=query,
+            name=query,
             origin=ClickhouseDriverIntegration.origin,
         )
 

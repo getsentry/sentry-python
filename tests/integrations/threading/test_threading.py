@@ -80,7 +80,7 @@ def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
     events = capture_events()
 
     def double(number):
-        with sentry_sdk.start_span(op="task", description=str(number)):
+        with sentry_sdk.start_span(op="task", name=str(number)):
             return number * 2
 
     with sentry_sdk.start_transaction(name="test_handles_threadpool"):

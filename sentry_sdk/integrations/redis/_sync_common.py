@@ -38,7 +38,7 @@ def patch_redis_pipeline(
 
         with sentry_sdk.start_span(
             op=OP.DB_REDIS,
-            description="redis.pipeline.execute",
+            name="redis.pipeline.execute",
             origin=SPAN_ORIGIN,
         ) as span:
             with capture_internal_exceptions():
@@ -83,7 +83,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
             cache_span = sentry_sdk.start_span(
                 op=cache_properties["op"],
-                description=cache_properties["description"],
+                name=cache_properties["description"],
                 origin=SPAN_ORIGIN,
             )
             cache_span.__enter__()
@@ -92,7 +92,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
 
         db_span = sentry_sdk.start_span(
             op=db_properties["op"],
-            description=db_properties["description"],
+            name=db_properties["description"],
             origin=SPAN_ORIGIN,
         )
         db_span.__enter__()

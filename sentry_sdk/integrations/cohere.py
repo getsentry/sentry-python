@@ -26,13 +26,18 @@ try:
     from cohere import (
         ChatStreamEndEvent,
         NonStreamedChatResponse,
-        StreamedChatResponse_StreamEnd,
     )
 
     if TYPE_CHECKING:
         from cohere import StreamedChatResponse
 except ImportError:
     raise DidNotEnable("Cohere not installed")
+
+try:
+    # cohere 5.9.3+
+    from cohere import StreamEndStreamedChatResponse
+except ImportError:
+    from cohere import StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse
 
 
 COLLECTED_CHAT_PARAMS = {
@@ -142,7 +147,7 @@ def _wrap_chat(f, streaming):
 
         span = sentry_sdk.start_span(
             op=consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
-            description="cohere.client.Chat",
+            name="cohere.client.Chat",
             origin=CohereIntegration.origin,
         )
         span.__enter__()
@@ -189,7 +194,7 @@ def _wrap_chat(f, streaming):
                     with capture_internal_exceptions():
                         for x in old_iterator:
                             if isinstance(x, ChatStreamEndEvent) or isinstance(
-                                x, StreamedChatResponse_StreamEnd
+                                x, StreamEndStreamedChatResponse
                             ):
                                 collect_chat_response_fields(
                                     span,
@@ -227,7 +232,7 @@ def _wrap_embed(f):
         # type: (*Any, **Any) -> Any
         with sentry_sdk.start_span(
             op=consts.OP.COHERE_EMBEDDINGS_CREATE,
-            description="Cohere Embedding Creation",
+            name="Cohere Embedding Creation",
             origin=CohereIntegration.origin,
         ) as span:
             integration = sentry_sdk.get_client().get_integration(CohereIntegration)

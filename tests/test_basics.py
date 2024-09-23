@@ -8,6 +8,7 @@ from collections import Counter
 
 import pytest
 from sentry_sdk.client import Client
+from sentry_sdk.utils import datetime_from_isoformat
 from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
@@ -397,11 +398,12 @@ def test_breadcrumbs(sentry_init, capture_events):
 def test_breadcrumb_ordering(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
 
     timestamps = [
-        datetime.datetime.now() - datetime.timedelta(days=10),
-        datetime.datetime.now() - datetime.timedelta(days=8),
-        datetime.datetime.now() - datetime.timedelta(days=12),
+        now - datetime.timedelta(days=10),
+        now - datetime.timedelta(days=8),
+        now - datetime.timedelta(days=12),
     ]
 
     for timestamp in timestamps:
@@ -417,10 +419,48 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.datetime.strptime(
-            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
+        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
+    ]
+    assert timestamps_from_event == sorted(timestamps)
+
+
+def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    timestamps = [
+        now - datetime.timedelta(days=10),
+        now - datetime.timedelta(days=8),
+        now.replace(microsecond=0) - datetime.timedelta(days=12),
+        now - datetime.timedelta(days=9),
+        now - datetime.timedelta(days=13),
+        now.replace(microsecond=0) - datetime.timedelta(days=11),
+    ]
+
+    breadcrumb_timestamps = [
+        timestamps[0],
+        timestamps[1].isoformat(),
+        datetime.datetime.strftime(timestamps[2], "%Y-%m-%dT%H:%M:%S") + "Z",
+        datetime.datetime.strftime(timestamps[3], "%Y-%m-%dT%H:%M:%S.%f") + "+00:00",
+        datetime.datetime.strftime(timestamps[4], "%Y-%m-%dT%H:%M:%S.%f") + "+0000",
+        datetime.datetime.strftime(timestamps[5], "%Y-%m-%dT%H:%M:%S.%f") + "-0000",
+    ]
+
+    for i, timestamp in enumerate(timestamps):
+        add_breadcrumb(
+            message="Authenticated at %s" % timestamp,
+            category="auth",
+            level="info",
+            timestamp=breadcrumb_timestamps[i],
         )
-        for x in event["breadcrumbs"]["values"]
+
+    capture_exception(ValueError())
+    (event,) = events
+
+    assert len(event["breadcrumbs"]["values"]) == len(timestamps)
+    timestamps_from_event = [
+        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 

@@ -158,7 +158,7 @@ class CommandTracer(monitoring.CommandListener):
             query = json.dumps(command, default=str)
             span = sentry_sdk.start_span(
                 op=OP.DB,
-                description=query,
+                name=query,
                 origin=PyMongoIntegration.origin,
             )
 

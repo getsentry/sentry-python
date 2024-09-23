@@ -6,7 +6,6 @@ from importlib import import_module
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
@@ -634,20 +633,6 @@ def install_sql_hook():
             span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
-            options = (
-                sentry_sdk.get_client()
-                .options["_experiments"]
-                .get("attach_explain_plans")
-            )
-            if options is not None:
-                attach_explain_plan_to_span(
-                    span,
-                    self.cursor.connection,
-                    sql,
-                    params,
-                    self.mogrify,
-                    options,
-                )
             result = real_execute(self, sql, params)
 
         with capture_internal_exceptions():
@@ -683,7 +668,7 @@ def install_sql_hook():
 
         with sentry_sdk.start_span(
             op=OP.DB,
-            description="connect",
+            name="connect",
             origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)

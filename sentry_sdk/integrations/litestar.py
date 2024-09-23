@@ -139,7 +139,7 @@ def enable_span_for_middleware(middleware):
         middleware_name = self.__class__.__name__
         with sentry_sdk.start_span(
             op=OP.MIDDLEWARE_LITESTAR,
-            description=middleware_name,
+            name=middleware_name,
             origin=LitestarIntegration.origin,
         ) as middleware_span:
             middleware_span.set_tag("litestar.middleware_name", middleware_name)
@@ -151,7 +151,7 @@ def enable_span_for_middleware(middleware):
                     return await receive(*args, **kwargs)
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_LITESTAR_RECEIVE,
-                    description=getattr(receive, "__qualname__", str(receive)),
+                    name=getattr(receive, "__qualname__", str(receive)),
                     origin=LitestarIntegration.origin,
                 ) as span:
                     span.set_tag("litestar.middleware_name", middleware_name)
@@ -168,7 +168,7 @@ def enable_span_for_middleware(middleware):
                     return await send(message)
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_LITESTAR_SEND,
-                    description=getattr(send, "__qualname__", str(send)),
+                    name=getattr(send, "__qualname__", str(send)),
                     origin=LitestarIntegration.origin,
                 ) as span:
                     span.set_tag("litestar.middleware_name", middleware_name)

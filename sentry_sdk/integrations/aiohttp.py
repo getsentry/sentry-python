@@ -139,7 +139,17 @@ class AioHttpIntegration(Integration):
                             # have no way to tell. Do not set span status.
                             reraise(*_capture_exception())
 
-                        transaction.set_http_status(response.status)
+                        try:
+                            # A valid response handler will return a valid response with a status. But, if the handler
+                            # returns an invalid response (e.g. None), the line below will raise an AttributeError.
+                            # Even though this is likely invalid, we need to handle this case to ensure we don't break
+                            # the application.
+                            response_status = response.status
+                        except AttributeError:
+                            pass
+                        else:
+                            transaction.set_http_status(response_status)
+
                         return response
 
         Application._handle = sentry_app_handle
@@ -205,7 +215,7 @@ def create_trace_config():
 
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
+            name="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin=AioHttpIntegration.origin,
         )

@@ -94,7 +94,7 @@ def _wrap_message_create(f):
 
         span = sentry_sdk.start_span(
             op=OP.ANTHROPIC_MESSAGES_CREATE,
-            description="Anthropic messages create",
+            name="Anthropic messages create",
             origin=AnthropicIntegration.origin,
         )
         span.__enter__()
