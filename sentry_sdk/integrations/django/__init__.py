@@ -411,11 +411,10 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
+@ensure_integration_enabled(DjangoIntegration)
 def _before_get_response(request):
     # type: (WSGIRequest) -> None
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-    if integration is None:
-        return
 
     _patch_drf()
 
@@ -441,10 +440,11 @@ def _attempt_resolve_again(request, scope, transaction_style):
     _set_transaction_name_and_source(scope, transaction_style, request)
 
 
+@ensure_integration_enabled(DjangoIntegration)
 def _after_get_response(request):
     # type: (WSGIRequest) -> None
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-    if integration is None or integration.transaction_style != "url":
+    if integration.transaction_style != "url":
         return
 
     scope = sentry_sdk.get_current_scope()
@@ -510,12 +510,11 @@ def _make_wsgi_request_event_processor(weak_request, integration):
     return wsgi_request_event_processor
 
 
+@ensure_integration_enabled(DjangoIntegration)
 def _got_request_exception(request=None, **kwargs):
     # type: (WSGIRequest, **Any) -> None
     client = sentry_sdk.get_client()
     integration = client.get_integration(DjangoIntegration)
-    if integration is None:
-        return
 
     if request is not None and integration.transaction_style == "url":
         scope = sentry_sdk.get_current_scope()

@@ -248,15 +248,13 @@ class NoOpMgr:
 def _wrap_task_run(f):
     # type: (F) -> F
     @wraps(f)
+    @ensure_integration_enabled(CeleryIntegration, f)
     def apply_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         # Note: kwargs can contain headers=None, so no setdefault!
         # Unsure which backend though.
-        integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
-        if integration is None:
-            return f(*args, **kwargs)
-
         kwarg_headers = kwargs.get("headers") or {}
+        integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
         propagate_traces = kwarg_headers.pop(
             "sentry-propagate-traces", integration.propagate_traces
         )

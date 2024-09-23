@@ -1,5 +1,3 @@
-import functools
-
 import sentry_sdk
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
@@ -83,12 +81,10 @@ class BottleIntegration(Integration):
 
         old_handle = Bottle._handle
 
-        @functools.wraps(old_handle)
+        @ensure_integration_enabled(BottleIntegration, old_handle)
         def _patched_handle(self, environ):
             # type: (Bottle, Dict[str, Any]) -> Any
             integration = sentry_sdk.get_client().get_integration(BottleIntegration)
-            if integration is None:
-                return old_handle(self, environ)
 
             scope = sentry_sdk.get_isolation_scope()
             scope._name = "bottle"
