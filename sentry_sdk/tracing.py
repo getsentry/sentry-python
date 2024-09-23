@@ -1268,7 +1268,7 @@ class POTelSpan:
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        self._otel_span.end()
+        self.finish()
         # XXX set status to error if unset and an exception occurred?
         context.detach(self._ctx_token)
 
@@ -1524,9 +1524,16 @@ class POTelSpan:
         # type: () -> bool
         return self._otel_span.status.code == StatusCode.OK
 
-    def finish(self, scope=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -> Optional[str]
-        pass
+    def finish(self, end_timestamp=None):
+        # type: (Optional[Union[float, datetime]]) -> Optional[str]
+        if end_timestamp is not None:
+            from sentry_sdk.integrations.opentelemetry.utils import (
+                convert_to_otel_timestamp,
+            )
+
+            self._otel_span.end(convert_to_otel_timestamp(end_timestamp))
+        else:
+            self._otel_span.end()
 
     def to_json(self):
         # type: () -> dict[str, Any]
