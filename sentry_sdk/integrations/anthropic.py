@@ -7,6 +7,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     package_version,
 )
@@ -77,11 +78,10 @@ def _calculate_token_usage(result, span):
 def _wrap_message_create(f):
     # type: (Any) -> Any
     @wraps(f)
+    @ensure_integration_enabled(AnthropicIntegration, f)
     def _sentry_patched_create(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
-
-        if integration is None or "messages" not in kwargs:
+        if "messages" not in kwargs:
             return f(*args, **kwargs)
 
         try:
@@ -105,6 +105,8 @@ def _wrap_message_create(f):
             _capture_exception(exc)
             span.__exit__(None, None, None)
             raise exc from None
+
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
 
         with capture_internal_exceptions():
             span.set_data(SPANDATA.AI_MODEL_ID, model)
