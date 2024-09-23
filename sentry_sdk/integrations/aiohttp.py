@@ -1,5 +1,6 @@
 import sys
 import weakref
+from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
@@ -173,11 +174,14 @@ class AioHttpIntegration(Integration):
 
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
+        @wraps(old_urldispatcher_resolve)
         async def sentry_urldispatcher_resolve(self, request):
             # type: (UrlDispatcher, Request) -> UrlMappingMatchInfo
             rv = await old_urldispatcher_resolve(self, request)
 
             integration = sentry_sdk.get_client().get_integration(AioHttpIntegration)
+            if integration is None:
+                return rv
 
             name = None
 

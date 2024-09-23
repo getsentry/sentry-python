@@ -220,15 +220,16 @@ def patch_exception_middleware(middleware_class):
 
                 exp = args[0]
 
-                is_http_server_error = (
-                    hasattr(exp, "status_code")
-                    and isinstance(exp.status_code, int)
-                    and _in_http_status_code_range(
-                        exp.status_code, integration.failed_request_status_codes
+                if integration is not None:
+                    is_http_server_error = (
+                        hasattr(exp, "status_code")
+                        and isinstance(exp.status_code, int)
+                        and _in_http_status_code_range(
+                            exp.status_code, integration.failed_request_status_codes
+                        )
                     )
-                )
-                if is_http_server_error:
-                    _capture_exception(exp, handled=True)
+                    if is_http_server_error:
+                        _capture_exception(exp, handled=True)
 
                 # Find a matching handler
                 old_handler = None
@@ -449,12 +450,15 @@ def patch_request_response():
 
         else:
 
-            @ensure_integration_enabled(StarletteIntegration, old_func)
+            @functools.wraps(old_func)
             def _sentry_sync_func(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 integration = sentry_sdk.get_client().get_integration(
                     StarletteIntegration
                 )
+                if integration is None:
+                    return old_func(*args, **kwargs)
+
                 sentry_scope = sentry_sdk.get_isolation_scope()
 
                 if sentry_scope.profile is not None:

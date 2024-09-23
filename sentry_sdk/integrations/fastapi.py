@@ -99,10 +99,10 @@ def patch_get_request_handler():
 
         async def _sentry_app(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            if sentry_sdk.get_client().get_integration(FastApiIntegration) is None:
+            integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
+            if integration is None:
                 return await old_app(*args, **kwargs)
 
-            integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
             request = args[0]
 
             _set_transaction_name_and_source(
