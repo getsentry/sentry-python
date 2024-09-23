@@ -443,7 +443,7 @@ def _wrap_configure(f):
                 elif isinstance(existing_callbacks, BaseCallbackHandler):
                     new_callbacks.append(existing_callbacks)
                 else:
-                    logger.warn("Unknown callback type: %s", existing_callbacks)
+                    logger.debug("Unknown callback type: %s", existing_callbacks)
 
             already_added = False
             for callback in new_callbacks:
