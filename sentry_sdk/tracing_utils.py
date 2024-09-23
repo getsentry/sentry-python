@@ -25,12 +25,13 @@ from sentry_sdk.utils import (
     _module_in_list,
 )
 
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Generator
+    from typing import Optional
     from typing import Union
 
     from types import FrameType
@@ -180,13 +181,14 @@ def _get_frame_module_abs_path(frame):
 
 
 def _should_be_included(
-    is_sentry_sdk_frame: bool,
-    namespace: Optional[str],
-    in_app_include: Optional[List[str]],
-    in_app_exclude: Optional[List[str]],
-    abs_path: Optional[str],
-    project_root: Optional[str],
-) -> bool:
+    is_sentry_sdk_frame,  # type: bool
+    namespace,  # type: Optional[str]
+    in_app_include,  # type: Optional[list[str]]
+    in_app_exclude,  # type: Optional[list[str]]
+    abs_path,  # type: Optional[str]
+    project_root,  # type: Optional[str]
+):
+    # type: (...) -> bool
     # in_app_include takes precedence over in_app_exclude
     should_be_included = _module_in_list(namespace, in_app_include)
     should_be_excluded = _is_external_source(abs_path) or _module_in_list(
