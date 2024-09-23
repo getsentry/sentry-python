@@ -152,7 +152,13 @@ class RequestExtractor:
             if not self.is_json():
                 return None
 
-            raw_data = self.raw_data()
+            try:
+                raw_data = self.raw_data()
+            except (RawPostDataException, ValueError):
+                # The body might have already been read, in which case this will
+                # fail
+                raw_data = None
+
             if raw_data is None:
                 return None
 
