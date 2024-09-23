@@ -3,6 +3,7 @@ import os
 import re
 import pytest
 from functools import partial
+from unittest.mock import patch
 
 from werkzeug.test import Client
 
@@ -10,6 +11,7 @@ from django import VERSION as DJANGO_VERSION
 from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
+from django.http.request import RawPostDataException
 
 try:
     from django.urls import reverse
@@ -20,7 +22,11 @@ import sentry_sdk
 from sentry_sdk._compat import PY310
 from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
+from sentry_sdk.integrations.django import (
+    DjangoIntegration,
+    DjangoRequestExtractor,
+    _set_db_data,
+)
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.tracing import Span
@@ -738,6 +744,26 @@ def test_read_request(sentry_init, client, capture_events):
     (event,) = events
 
     assert "data" not in event["request"]
+
+
+def test_request_body_already_read(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+
+    events = capture_events()
+
+    class MockExtractor(DjangoRequestExtractor):
+        def raw_data(self):
+            raise RawPostDataException
+
+    with patch("sentry_sdk.integrations.django.DjangoRequestExtractor", MockExtractor):
+        client.post(
+            reverse("post_echo"), data=b'{"hey": 42}', content_type="application/json"
+        )
+
+        (event,) = events
+
+        assert event["message"] == "hi"
+        assert "data" not in event["request"]
 
 
 def test_template_tracing_meta(sentry_init, client, capture_events):
