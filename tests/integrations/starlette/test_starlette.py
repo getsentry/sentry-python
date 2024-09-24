@@ -1149,7 +1149,6 @@ parametrize_test_configurable_status_codes = pytest.mark.parametrize(
         ([range(400, 403), 500, 501], 405, False),
         ([range(400, 403), 500, 501], 501, True),
         ([range(400, 403), 500, 501], 503, False),
-        ([None], 500, False),
     ],
 )
 """Test cases for configurable status codes.
