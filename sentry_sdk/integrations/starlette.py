@@ -88,9 +88,11 @@ class StarletteIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
-        self.failed_request_status_codes = failed_request_status_codes or [
-            range(500, 599)
-        ]
+        self.failed_request_status_codes = (
+            [range(500, 599)]
+            if failed_request_status_codes is None
+            else failed_request_status_codes
+        )  # type: list[HttpStatusCodeRange]
 
     @staticmethod
     def setup_once():
