@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+import warnings
 from unittest import mock
 
 import pytest
@@ -505,20 +506,28 @@ def test_transaction_name_in_middleware(
     )
 
 
-@test_starlette.parametrize_test_configurable_status_codes
-def test_configurable_status_codes(
+@test_starlette.parametrize_test_configurable_status_codes_deprecated
+def test_configurable_status_codes_deprecated(
     sentry_init,
     capture_events,
     failed_request_status_codes,
     status_code,
     expected_error,
 ):
+    with pytest.warns(DeprecationWarning):
+        starlette_integration = StarletteIntegration(
+            failed_request_status_codes=failed_request_status_codes
+        )
+
+    with pytest.warns(DeprecationWarning):
+        fast_api_integration = FastApiIntegration(
+            failed_request_status_codes=failed_request_status_codes
+        )
+
     sentry_init(
         integrations=[
-            StarletteIntegration(
-                failed_request_status_codes=failed_request_status_codes
-            ),
-            FastApiIntegration(failed_request_status_codes=failed_request_status_codes),
+            starlette_integration,
+            fast_api_integration,
         ]
     )
 
@@ -537,3 +546,36 @@ def test_configurable_status_codes(
         assert len(events) == 1
     else:
         assert not events
+
+
+@test_starlette.parametrize_test_configurable_status_codes
+def test_configurable_status_codes(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    integration_kwargs = {}
+    if failed_request_status_codes is not None:
+        integration_kwargs["failed_request_status_codes"] = failed_request_status_codes
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        starlette_integration = StarletteIntegration(**integration_kwargs)
+        fastapi_integration = FastApiIntegration(**integration_kwargs)
+
+    sentry_init(integrations=[starlette_integration, fastapi_integration])
+
+    events = capture_events()
+
+    app = FastAPI()
+
+    @app.get("/error")
+    async def _error():
+        raise HTTPException(status_code)
+
+    client = TestClient(app)
+    client.get("/error")
+
+    assert len(events) == int(expected_error)
