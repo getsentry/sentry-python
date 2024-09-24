@@ -1133,7 +1133,7 @@ def test_span_origin(sentry_init, capture_events):
         assert span["origin"] == "auto.http.starlette"
 
 
-@pytest.mark.parametrize(
+parametrize_test_configurable_status_codes = pytest.mark.parametrize(
     "failed_request_status_codes,status_code,expected_error",
     [
         (None, 500, True),
@@ -1149,9 +1149,15 @@ def test_span_origin(sentry_init, capture_events):
         ([range(400, 403), 500, 501], 405, False),
         ([range(400, 403), 500, 501], 501, True),
         ([range(400, 403), 500, 501], 503, False),
-        ([None], 500, False),
+        ([], 500, False),
     ],
 )
+"""Test cases for configurable status codes.
+Also used by the FastAPI tests.
+"""
+
+
+@parametrize_test_configurable_status_codes
 def test_configurable_status_codes(
     sentry_init,
     capture_events,

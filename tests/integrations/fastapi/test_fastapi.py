@@ -13,6 +13,8 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
+from tests.integrations.starlette import test_starlette
+
 
 def fastapi_app_factory():
     app = FastAPI()
@@ -503,25 +505,7 @@ def test_transaction_name_in_middleware(
     )
 
 
-@pytest.mark.parametrize(
-    "failed_request_status_codes,status_code,expected_error",
-    [
-        (None, 500, True),
-        (None, 400, False),
-        ([500, 501], 500, True),
-        ([500, 501], 401, False),
-        ([range(400, 499)], 401, True),
-        ([range(400, 499)], 500, False),
-        ([range(400, 499), range(500, 599)], 300, False),
-        ([range(400, 499), range(500, 599)], 403, True),
-        ([range(400, 499), range(500, 599)], 503, True),
-        ([range(400, 403), 500, 501], 401, True),
-        ([range(400, 403), 500, 501], 405, False),
-        ([range(400, 403), 500, 501], 501, True),
-        ([range(400, 403), 500, 501], 503, False),
-        ([None], 500, False),
-    ],
-)
+@test_starlette.parametrize_test_configurable_status_codes
 def test_configurable_status_codes(
     sentry_init,
     capture_events,
