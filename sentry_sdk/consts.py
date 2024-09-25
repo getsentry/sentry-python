@@ -50,7 +50,6 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
-            "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],

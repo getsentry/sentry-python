@@ -1259,7 +1259,8 @@ class Scope:
                     crumb["timestamp"] = datetime.fromisoformat(crumb["timestamp"])
 
             event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
-        except Exception:
+        except Exception as err:
+            logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
 
     def _apply_user_to_event(self, event, hint, options):

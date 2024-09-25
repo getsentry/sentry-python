@@ -5,7 +5,6 @@ from threading import Thread, current_thread
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import (
-    ensure_integration_enabled,
     event_from_exception,
     capture_internal_exceptions,
     logger,
@@ -50,10 +49,12 @@ class ThreadingIntegration(Integration):
         old_start = Thread.start
 
         @wraps(old_start)
-        @ensure_integration_enabled(ThreadingIntegration, old_start)
         def sentry_start(self, *a, **kw):
             # type: (Thread, *Any, **Any) -> Any
             integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
+            if integration is None:
+                return old_start(self, *a, **kw)
+
             if integration.propagate_scope:
                 isolation_scope = sentry_sdk.get_isolation_scope()
                 current_scope = sentry_sdk.get_current_scope()

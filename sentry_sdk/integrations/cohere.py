@@ -14,11 +14,7 @@ if TYPE_CHECKING:
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    event_from_exception,
-    ensure_integration_enabled,
-)
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 try:
     from cohere.client import Client
@@ -26,13 +22,18 @@ try:
     from cohere import (
         ChatStreamEndEvent,
         NonStreamedChatResponse,
-        StreamedChatResponse_StreamEnd,
     )
 
     if TYPE_CHECKING:
         from cohere import StreamedChatResponse
 except ImportError:
     raise DidNotEnable("Cohere not installed")
+
+try:
+    # cohere 5.9.3+
+    from cohere import StreamEndStreamedChatResponse
+except ImportError:
+    from cohere import StreamedChatResponse_StreamEnd as StreamEndStreamedChatResponse
 
 
 COLLECTED_CHAT_PARAMS = {
@@ -129,13 +130,15 @@ def _wrap_chat(f, streaming):
                 set_data_normalized(span, "ai.warnings", res.meta.warnings)
 
     @wraps(f)
-    @ensure_integration_enabled(CohereIntegration, f)
     def new_chat(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        if "message" not in kwargs:
-            return f(*args, **kwargs)
+        integration = sentry_sdk.get_client().get_integration(CohereIntegration)
 
-        if not isinstance(kwargs.get("message"), str):
+        if (
+            integration is None
+            or "message" not in kwargs
+            or not isinstance(kwargs.get("message"), str)
+        ):
             return f(*args, **kwargs)
 
         message = kwargs.get("message")
@@ -152,8 +155,6 @@ def _wrap_chat(f, streaming):
             _capture_exception(e)
             span.__exit__(None, None, None)
             raise e from None
-
-        integration = sentry_sdk.get_client().get_integration(CohereIntegration)
 
         with capture_internal_exceptions():
             if should_send_default_pii() and integration.include_prompts:
@@ -189,7 +190,7 @@ def _wrap_chat(f, streaming):
                     with capture_internal_exceptions():
                         for x in old_iterator:
                             if isinstance(x, ChatStreamEndEvent) or isinstance(
-                                x, StreamedChatResponse_StreamEnd
+                                x, StreamEndStreamedChatResponse
                             ):
                                 collect_chat_response_fields(
                                     span,
@@ -222,15 +223,17 @@ def _wrap_embed(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
 
     @wraps(f)
-    @ensure_integration_enabled(CohereIntegration, f)
     def new_embed(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(CohereIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
         with sentry_sdk.start_span(
             op=consts.OP.COHERE_EMBEDDINGS_CREATE,
             name="Cohere Embedding Creation",
             origin=CohereIntegration.origin,
         ) as span:
-            integration = sentry_sdk.get_client().get_integration(CohereIntegration)
             if "texts" in kwargs and (
                 should_send_default_pii() and integration.include_prompts
             ):

@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import threading
+import warnings
 from unittest import mock
 
 import pytest
@@ -1133,7 +1134,22 @@ def test_span_origin(sentry_init, capture_events):
         assert span["origin"] == "auto.http.starlette"
 
 
-@pytest.mark.parametrize(
+class NonIterableContainer:
+    """Wraps any container and makes it non-iterable.
+
+    Used to test backwards compatibility with our old way of defining failed_request_status_codes, which allowed
+    passing in a list of (possibly non-iterable) containers. The Python standard library does not provide any built-in
+    non-iterable containers, so we have to define our own.
+    """
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    def __contains__(self, item):
+        return item in self.inner
+
+
+parametrize_test_configurable_status_codes_deprecated = pytest.mark.parametrize(
     "failed_request_status_codes,status_code,expected_error",
     [
         (None, 500, True),
@@ -1149,23 +1165,30 @@ def test_span_origin(sentry_init, capture_events):
         ([range(400, 403), 500, 501], 405, False),
         ([range(400, 403), 500, 501], 501, True),
         ([range(400, 403), 500, 501], 503, False),
-        ([None], 500, False),
+        ([], 500, False),
+        ([NonIterableContainer(range(500, 600))], 500, True),
+        ([NonIterableContainer(range(500, 600))], 404, False),
     ],
 )
-def test_configurable_status_codes(
+"""Test cases for configurable status codes (deprecated API).
+Also used by the FastAPI tests.
+"""
+
+
+@parametrize_test_configurable_status_codes_deprecated
+def test_configurable_status_codes_deprecated(
     sentry_init,
     capture_events,
     failed_request_status_codes,
     status_code,
     expected_error,
 ):
-    sentry_init(
-        integrations=[
-            StarletteIntegration(
-                failed_request_status_codes=failed_request_status_codes
-            )
-        ]
-    )
+    with pytest.warns(DeprecationWarning):
+        starlette_integration = StarletteIntegration(
+            failed_request_status_codes=failed_request_status_codes
+        )
+
+    sentry_init(integrations=[starlette_integration])
 
     events = capture_events()
 
@@ -1185,3 +1208,59 @@ def test_configurable_status_codes(
         assert len(events) == 1
     else:
         assert not events
+
+
+parametrize_test_configurable_status_codes = pytest.mark.parametrize(
+    ("failed_request_status_codes", "status_code", "expected_error"),
+    (
+        (None, 500, True),
+        (None, 400, False),
+        ({500, 501}, 500, True),
+        ({500, 501}, 401, False),
+        ({*range(400, 500)}, 401, True),
+        ({*range(400, 500)}, 500, False),
+        ({*range(400, 600)}, 300, False),
+        ({*range(400, 600)}, 403, True),
+        ({*range(400, 600)}, 503, True),
+        ({*range(400, 403), 500, 501}, 401, True),
+        ({*range(400, 403), 500, 501}, 405, False),
+        ({*range(400, 403), 500, 501}, 501, True),
+        ({*range(400, 403), 500, 501}, 503, False),
+        (set(), 500, False),
+    ),
+)
+
+
+@parametrize_test_configurable_status_codes
+def test_configurable_status_codes(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    integration_kwargs = {}
+    if failed_request_status_codes is not None:
+        integration_kwargs["failed_request_status_codes"] = failed_request_status_codes
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        starlette_integration = StarletteIntegration(**integration_kwargs)
+
+    sentry_init(integrations=[starlette_integration])
+
+    events = capture_events()
+
+    async def _error(_):
+        raise HTTPException(status_code)
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/error", _error, methods=["GET"]),
+        ],
+    )
+
+    client = TestClient(app)
+    client.get("/error")
+
+    assert len(events) == int(expected_error)

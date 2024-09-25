@@ -152,7 +152,13 @@ class RequestExtractor:
             if not self.is_json():
                 return None
 
-            raw_data = self.raw_data()
+            try:
+                raw_data = self.raw_data()
+            except (RawPostDataException, ValueError):
+                # The body might have already been read, in which case this will
+                # fail
+                raw_data = None
+
             if raw_data is None:
                 return None
 
@@ -204,7 +210,7 @@ def _filter_headers(headers):
 
 
 def _in_http_status_code_range(code, code_ranges):
-    # type: (int, list[HttpStatusCodeRange]) -> bool
+    # type: (object, list[HttpStatusCodeRange]) -> bool
     for target in code_ranges:
         if isinstance(target, int):
             if code == target:
@@ -220,3 +226,18 @@ def _in_http_status_code_range(code, code_ranges):
             )
 
     return False
+
+
+class HttpCodeRangeContainer:
+    """
+    Wrapper to make it possible to use list[HttpStatusCodeRange] as a Container[int].
+    Used for backwards compatibility with the old `failed_request_status_codes` option.
+    """
+
+    def __init__(self, code_ranges):
+        # type: (list[HttpStatusCodeRange]) -> None
+        self._code_ranges = code_ranges
+
+    def __contains__(self, item):
+        # type: (object) -> bool
+        return _in_http_status_code_range(item, self._code_ranges)

@@ -420,6 +420,8 @@ def _wrap_configure(f):
         # type: (Any, Any) -> Any
 
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
 
         with capture_internal_exceptions():
             new_callbacks = []  # type: List[BaseCallbackHandler]
@@ -443,7 +445,7 @@ def _wrap_configure(f):
                 elif isinstance(existing_callbacks, BaseCallbackHandler):
                     new_callbacks.append(existing_callbacks)
                 else:
-                    logger.warn("Unknown callback type: %s", existing_callbacks)
+                    logger.debug("Unknown callback type: %s", existing_callbacks)
 
             already_added = False
             for callback in new_callbacks:
