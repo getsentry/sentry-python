@@ -5,7 +5,12 @@ import warnings
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context
-from opentelemetry.trace import format_trace_id, format_span_id, Span as OtelSpan
+from opentelemetry.trace import (
+    format_trace_id,
+    format_span_id,
+    Span as OtelSpan,
+    TraceState,
+)
 from opentelemetry.trace.status import StatusCode
 from opentelemetry.sdk.trace import ReadableSpan
 
@@ -1453,8 +1458,7 @@ class POTelSpan:
             serialize_trace_state,
         )
 
-        trace_state = self._otel_span.get_span_context().trace_state
-        yield BAGGAGE_HEADER_NAME, serialize_trace_state(trace_state)
+        yield BAGGAGE_HEADER_NAME, serialize_trace_state(self.trace_state)
 
     def to_traceparent(self):
         # type: () -> str
@@ -1471,10 +1475,26 @@ class POTelSpan:
 
         return traceparent
 
+    @property
+    def trace_state(self):
+        # type: () -> TraceState
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            get_trace_state,
+        )
+
+        return get_trace_state(self._otel_span)
+
     def to_baggage(self):
-        # type: () -> Optional[Baggage]
-        # TODO-neel-potel head SDK populate baggage mess
-        pass
+        # type: () -> Baggage
+        return self.get_baggage()
+
+    def get_baggage(self):
+        # type: () -> Baggage
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            baggage_from_trace_state,
+        )
+
+        return baggage_from_trace_state(self.trace_state)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -1566,10 +1586,6 @@ class POTelSpan:
 
     def set_context(self, key, value):
         # type: (str, Any) -> None
-        pass
-
-    def get_baggage(self):
-        # type: () -> Baggage
         pass
 
 
