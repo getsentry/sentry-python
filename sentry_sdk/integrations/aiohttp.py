@@ -5,7 +5,11 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import (
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    Integration,
+    DidNotEnable,
+)
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.sessions import track_session
 from sentry_sdk.integrations._wsgi_common import (
@@ -61,7 +65,6 @@ if TYPE_CHECKING:
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
-_DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
 
 
 class AioHttpIntegration(Integration):
