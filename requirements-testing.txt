@@ -11,3 +11,4 @@ asttokens
 responses
 pysocks
 setuptools
+freezegun

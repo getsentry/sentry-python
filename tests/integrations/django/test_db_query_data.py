@@ -12,6 +12,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
+from freezegun import freeze_time
 from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
@@ -348,11 +349,13 @@ def test_no_query_source_if_duration_too_short(sentry_init, client, capture_even
 
     class fake_record_sql_queries:  # noqa: N801
         def __init__(self, *args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
-                self.span = span
+            with freeze_time(datetime(2024, 1, 1, microsecond=0)):
+                with record_sql_queries(*args, **kwargs) as span:
+                    self.span = span
+                    freezer = freeze_time(datetime(2024, 1, 1, microsecond=99999))
+                    freezer.start()
 
-            self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-            self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
+                freezer.stop()
 
         def __enter__(self):
             return self.span
@@ -406,11 +409,13 @@ def test_query_source_if_duration_over_threshold(sentry_init, client, capture_ev
 
     class fake_record_sql_queries:  # noqa: N801
         def __init__(self, *args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
-                self.span = span
+            with freeze_time(datetime(2024, 1, 1, microsecond=0)):
+                with record_sql_queries(*args, **kwargs) as span:
+                    self.span = span
+                    freezer = freeze_time(datetime(2024, 1, 1, microsecond=99999))
+                    freezer.start()
 
-            self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-            self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
+                freezer.stop()
 
         def __enter__(self):
             return self.span
