@@ -41,16 +41,21 @@ def get_parent_sampled(parent_context, trace_id):
     return None
 
 
-def dropped(parent_context=None):
-    # type: (Optional[SpanContext]) -> SamplingResult
-    trace_state = parent_context.trace_state if parent_context is not None else None
-    updated_trace_context = trace_state or TraceState()
-    updated_trace_context = updated_trace_context.update(
-        SENTRY_TRACE_STATE_DROPPED, "true"
-    )
+def dropped_result(span_context):
+    # type: (SpanContext) -> SamplingResult
+    trace_state = span_context.trace_state.update(SENTRY_TRACE_STATE_DROPPED, "true")
+
     return SamplingResult(
         Decision.DROP,
-        trace_state=updated_trace_context,
+        trace_state=trace_state,
+    )
+
+
+def sampled_result(span_context):
+    # type: (SpanContext) -> SamplingResult
+    return SamplingResult(
+        Decision.RECORD_AND_SAMPLE,
+        trace_state=span_context.trace_state,
     )
 
 
@@ -68,12 +73,11 @@ class SentrySampler(Sampler):
         # type: (...) -> SamplingResult
         client = sentry_sdk.get_client()
 
-        parent_span = trace.get_current_span(parent_context)
-        parent_context = parent_span.get_span_context() if parent_span else None
+        parent_span_context = trace.get_current_span(parent_context).get_span_context()
 
         # No tracing enabled, thus no sampling
         if not has_tracing_enabled(client.options):
-            return dropped(parent_context)
+            return dropped_result(parent_span_context)
 
         sample_rate = None
 
@@ -89,14 +93,14 @@ class SentrySampler(Sampler):
                 "transaction_context": {
                     "name": name,
                 },
-                "parent_sampled": get_parent_sampled(parent_context, trace_id),
+                "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
             }
 
             sample_rate = client.options["traces_sampler"](sampling_context)
 
         else:
             # Check if there is a parent with a sampling decision
-            parent_sampled = get_parent_sampled(parent_context, trace_id)
+            parent_sampled = get_parent_sampled(parent_span_context, trace_id)
             if parent_sampled is not None:
                 sample_rate = parent_sampled
             else:
@@ -108,15 +112,16 @@ class SentrySampler(Sampler):
             logger.warning(
                 f"[Tracing] Discarding {name} because of invalid sample rate."
             )
-            return dropped(parent_context)
+            return dropped_result(parent_span_context)
 
         # Roll the dice on sample rate
         sampled = random() < float(sample_rate)
 
+        # TODO-neel-potel set sample rate as attribute for DSC
         if sampled:
-            return SamplingResult(Decision.RECORD_AND_SAMPLE)
+            return sampled_result(parent_span_context)
         else:
-            return dropped(parent_context)
+            return dropped_result(parent_span_context)
 
     def get_description(self) -> str:
         return self.__class__.__name__

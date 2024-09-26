@@ -18,6 +18,7 @@ from sentry_sdk.integrations.opentelemetry.utils import (
     convert_from_otel_timestamp,
     extract_span_attributes,
     extract_span_data,
+    get_trace_context,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,
@@ -136,26 +137,12 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if event is None:
             return None
 
-        trace_id = format_trace_id(span.context.trace_id)
-        span_id = format_span_id(span.context.span_id)
-        parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
+        span_data = extract_span_data(span)
+        (_, description, _, _, _) = span_data
 
-        (op, description, status, _, origin) = extract_span_data(span)
-
-        trace_context = {
-            "trace_id": trace_id,
-            "span_id": span_id,
-            "origin": origin or DEFAULT_SPAN_ORIGIN,
-            "op": op,
-            "status": status,
-        }  # type: dict[str, Any]
-
-        if parent_span_id:
-            trace_context["parent_span_id"] = parent_span_id
-        if span.attributes:
-            trace_context["data"] = dict(span.attributes)
-
+        trace_context = get_trace_context(span, span_data=span_data)
         contexts = {"trace": trace_context}
+
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
 

@@ -1,20 +1,24 @@
+import re
 from typing import cast
 from datetime import datetime, timezone
 
-from opentelemetry.trace import SpanKind, StatusCode
+from urllib3.util import parse_url as urlparse
+from urllib.parse import quote
+from opentelemetry.trace import Span, SpanKind, StatusCode, format_trace_id, format_span_id, TraceState
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.sdk.trace import ReadableSpan
-from sentry_sdk.consts import SPANSTATUS
-from sentry_sdk.tracing import get_span_status_from_http_code
-from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-from urllib3.util import parse_url as urlparse
 
 from sentry_sdk.utils import Dsn
+from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.tracing import get_span_status_from_http_code, DEFAULT_SPAN_ORIGIN
+from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Mapping, Sequence, Union
+    from typing import Any, Optional, Mapping, Sequence, Union, ItemsView
+    from sentry_sdk._types import OtelExtractedSpanData
 
 
 GRPC_ERROR_MAP = {
@@ -87,7 +91,7 @@ def convert_to_otel_timestamp(time):
 
 
 def extract_span_data(span):
-    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int], Optional[str]]
+    # type: (ReadableSpan) -> OtelExtractedSpanData
     op = span.name
     description = span.name
     status, http_status = extract_span_status(span)
@@ -125,7 +129,7 @@ def extract_span_data(span):
 
 
 def span_data_for_http_method(span):
-    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int], Optional[str]]
+    # type: (ReadableSpan) -> OtelExtractedSpanData
     span_attributes = span.attributes or {}
 
     op = "http"
@@ -167,7 +171,7 @@ def span_data_for_http_method(span):
 
 
 def span_data_for_db_query(span):
-    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int], Optional[str]]
+    # type: (ReadableSpan) -> OtelExtractedSpanData
     span_attributes = span.attributes or {}
 
     op = "db"
@@ -261,3 +265,65 @@ def extract_span_attributes(span, namespace):
             extracted_attrs[key] = value
 
     return extracted_attrs
+
+
+def get_trace_context(span, span_data=None):
+    # type: (ReadableSpan, Optional[OtelExtractedSpanData]) -> dict[str, Any]
+    if not span.context:
+        return {}
+
+    trace_id = format_trace_id(span.context.trace_id)
+    span_id = format_span_id(span.context.span_id)
+    parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
+
+    if span_data is None:
+        span_data = extract_span_data(span)
+
+    (op, _, status, _, origin) = span_data
+
+    trace_context = {
+        "trace_id": trace_id,
+        "span_id": span_id,
+        "parent_span_id": parent_span_id,
+        "op": op,
+        "origin": origin or DEFAULT_SPAN_ORIGIN,
+        "status": status,
+    }  # type: dict[str, Any]
+
+    if span.attributes:
+        trace_context["data"] = dict(span.attributes)
+
+    trace_context["dynamic_sampling_context"] = dsc_from_trace_state(span.context.trace_state)
+
+    # TODO-neel-potel profiler thread_id, thread_name
+
+    return trace_context
+
+
+def trace_state_from_baggage(baggage):
+    # type: (Baggage) -> TraceState
+    items = []
+    for k, v in baggage.sentry_items.items():
+        key = Baggage.SENTRY_PREFIX + quote(k)
+        val = quote(str(v))
+        items.append((key, val))
+    return TraceState(items)
+
+
+def serialize_trace_state(trace_state):
+    # type: (TraceState) -> str
+    sentry_items = []
+    for k, v in trace_state.items():
+        if Baggage.SENTRY_PREFIX_REGEX.match(k):
+            sentry_items.append((k, v))
+    return ",".join(key + "=" + value for key, value in sentry_items)
+
+
+def dsc_from_trace_state(trace_state):
+    # type: (TraceState) -> dict[str, str]
+    dsc = {}
+    for k, v in trace_state.items():
+        if Baggage.SENTRY_PREFIX_REGEX.match(k):
+            key = re.sub(Baggage.SENTRY_PREFIX_REGEX, "", k)
+            dsc[key] = v
+    return dsc
