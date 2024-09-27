@@ -89,13 +89,13 @@ jobs:
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest"
       - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
       - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
@@ -106,7 +106,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop  
+          plugin: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -184,13 +184,13 @@ jobs:
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy"
       - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
       - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
@@ -201,7 +201,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop  
+          plugin: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
