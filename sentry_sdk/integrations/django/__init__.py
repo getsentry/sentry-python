@@ -717,8 +717,18 @@ def _set_db_data(span, cursor_or_db):
         connection_params = cursor_or_db.connection.get_dsn_parameters()
     else:
         try:
-            # psycopg3
-            connection_params = cursor_or_db.connection.info.get_parameters()
+            # psycopg3, only extract needed params as get_parameters
+            # can be slow because of the additional logic to filter out default
+            # values
+            connection_params = {
+                "dbname": cursor_or_db.connection.info.dbname,
+                "port": cursor_or_db.connection.info.port,
+            }
+            # PGhost returns host or base dir of UNIX socket as an absolute path
+            # starting with /, use it only when it contains host
+            pg_host = cursor_or_db.connection.info.host
+            if pg_host and not pg_host.startswith("/"):
+                connection_params["host"] = pg_host
         except Exception:
             connection_params = db.get_connection_params()
 
