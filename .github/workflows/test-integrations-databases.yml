@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7","3.8","3.11","3.12"]
+        python-version: ["3.7","3.8","3.11","3.12","3.13"]
         os: [ubuntu-latest]
     services:
       postgres:
@@ -96,7 +96,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop  
+          plugin: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -181,7 +181,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop  
+          plugin: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
