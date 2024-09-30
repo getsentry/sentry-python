@@ -287,10 +287,13 @@ def test_proxy(monkeypatch, testcase, http2):
         assert scheme == testcase["expected_proxy_scheme"]
 
         if testcase.get("arg_proxy_headers") is not None:
-            proxy_headers = getattr(
-                client.transport._pool,
-                "proxy_headers",
-                getattr(client.transport._pool, "_proxy_headers", None),
+            proxy_headers = (
+                dict(
+                    (k.decode("ascii"), v.decode("ascii"))
+                    for k, v in client.transport._pool._proxy_headers
+                )
+                if http2
+                else client.transport._pool.proxy_headers
             )
             assert proxy_headers == testcase["arg_proxy_headers"]
 
