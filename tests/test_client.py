@@ -290,7 +290,7 @@ def test_proxy(monkeypatch, testcase, http2):
                 "proxy_headers",
                 getattr(client.transport._pool, "_proxy_headers", None),
             )
-            proxy_headers == testcase["arg_proxy_headers"]
+            assert proxy_headers == testcase["arg_proxy_headers"]
 
 
 @pytest.mark.parametrize(

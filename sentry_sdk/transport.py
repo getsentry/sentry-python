@@ -1020,7 +1020,6 @@ class Http2Transport(Transport):
                             )
                     return self._httpcore.SOCKSProxy(proxy_url=proxy, **opts)
                 except RuntimeError:
-                    use_socks_proxy = False
                     logger.warning(
                         "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support.",
                         proxy,
