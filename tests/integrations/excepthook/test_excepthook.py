@@ -54,7 +54,7 @@ def test_always_value_excepthook(tmpdir, options, transport):
     app = tmpdir.join("app.py")
     app.write(
         dedent(
-            f"""
+            """
     import sys
     from sentry_sdk import init, transport
     from sentry_sdk.integrations.excepthook import ExcepthookIntegration
@@ -76,7 +76,9 @@ def test_always_value_excepthook(tmpdir, options, transport):
     frame_value = "LOL"
 
     1/0
-    """
+    """.format(
+                transport=transport, options=options
+            )
         )
     )
 
