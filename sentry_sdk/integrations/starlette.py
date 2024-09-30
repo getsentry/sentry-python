@@ -1,13 +1,19 @@
 import asyncio
 import functools
+import warnings
+from collections.abc import Set
 from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import (
+    DidNotEnable,
+    Integration,
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+)
 from sentry_sdk.integrations._asgi_common import DEFAULT_HTTP_METHODS_TO_CAPTURE
 from sentry_sdk.integrations._wsgi_common import (
-    _in_http_status_code_range,
+    HttpCodeRangeContainer,
     _is_json_content_type,
     request_body_within_bounds,
 )
@@ -31,7 +37,7 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
+    from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
 
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
@@ -78,7 +84,7 @@ class StarletteIntegration(Integration):
     def __init__(
         self,
         transaction_style="url",  # type: str
-        failed_request_status_codes=None,  # type: Optional[list[HttpStatusCodeRange]]
+        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Union[Set[int], list[HttpStatusCodeRange], None]
         middleware_spans=True,  # type: bool
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
@@ -90,10 +96,26 @@ class StarletteIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
-        self.failed_request_status_codes = failed_request_status_codes or [
-            range(500, 599)
-        ]
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
+
+        if isinstance(failed_request_status_codes, Set):
+            self.failed_request_status_codes = (
+                failed_request_status_codes
+            )  # type: Container[int]
+        else:
+            warnings.warn(
+                "Passing a list or None for failed_request_status_codes is deprecated. "
+                "Please pass a set of int instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+            if failed_request_status_codes is None:
+                self.failed_request_status_codes = _DEFAULT_FAILED_REQUEST_STATUS_CODES
+            else:
+                self.failed_request_status_codes = HttpCodeRangeContainer(
+                    failed_request_status_codes
+                )
 
     @staticmethod
     def setup_once():
@@ -223,15 +245,14 @@ def patch_exception_middleware(middleware_class):
 
                 exp = args[0]
 
-                is_http_server_error = (
-                    hasattr(exp, "status_code")
-                    and isinstance(exp.status_code, int)
-                    and _in_http_status_code_range(
-                        exp.status_code, integration.failed_request_status_codes
+                if integration is not None:
+                    is_http_server_error = (
+                        hasattr(exp, "status_code")
+                        and isinstance(exp.status_code, int)
+                        and exp.status_code in integration.failed_request_status_codes
                     )
-                )
-                if is_http_server_error:
-                    _capture_exception(exp, handled=True)
+                    if is_http_server_error:
+                        _capture_exception(exp, handled=True)
 
                 # Find a matching handler
                 old_handler = None
@@ -457,12 +478,15 @@ def patch_request_response():
 
         else:
 
-            @ensure_integration_enabled(StarletteIntegration, old_func)
+            @functools.wraps(old_func)
             def _sentry_sync_func(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 integration = sentry_sdk.get_client().get_integration(
                     StarletteIntegration
                 )
+                if integration is None:
+                    return old_func(*args, **kwargs)
+
                 sentry_scope = sentry_sdk.get_isolation_scope()
 
                 if sentry_scope.profile is not None:

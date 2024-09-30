@@ -6,7 +6,6 @@ from importlib import import_module
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
@@ -412,10 +411,11 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-@ensure_integration_enabled(DjangoIntegration)
 def _before_get_response(request):
     # type: (WSGIRequest) -> None
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+    if integration is None:
+        return
 
     _patch_drf()
 
@@ -441,11 +441,10 @@ def _attempt_resolve_again(request, scope, transaction_style):
     _set_transaction_name_and_source(scope, transaction_style, request)
 
 
-@ensure_integration_enabled(DjangoIntegration)
 def _after_get_response(request):
     # type: (WSGIRequest) -> None
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-    if integration.transaction_style != "url":
+    if integration is None or integration.transaction_style != "url":
         return
 
     scope = sentry_sdk.get_current_scope()
@@ -511,11 +510,12 @@ def _make_wsgi_request_event_processor(weak_request, integration):
     return wsgi_request_event_processor
 
 
-@ensure_integration_enabled(DjangoIntegration)
 def _got_request_exception(request=None, **kwargs):
     # type: (WSGIRequest, **Any) -> None
     client = sentry_sdk.get_client()
     integration = client.get_integration(DjangoIntegration)
+    if integration is None:
+        return
 
     if request is not None and integration.transaction_style == "url":
         scope = sentry_sdk.get_current_scope()
@@ -634,20 +634,6 @@ def install_sql_hook():
             span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
-            options = (
-                sentry_sdk.get_client()
-                .options["_experiments"]
-                .get("attach_explain_plans")
-            )
-            if options is not None:
-                attach_explain_plan_to_span(
-                    span,
-                    self.cursor.connection,
-                    sql,
-                    params,
-                    self.mogrify,
-                    options,
-                )
             result = real_execute(self, sql, params)
 
         with capture_internal_exceptions():

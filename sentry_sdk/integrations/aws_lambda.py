@@ -1,3 +1,4 @@
+import functools
 import json
 import re
 import sys
@@ -70,7 +71,7 @@ def _wrap_init_error(init_error):
 
 def _wrap_handler(handler):
     # type: (F) -> F
-    @ensure_integration_enabled(AwsLambdaIntegration, handler)
+    @functools.wraps(handler)
     def sentry_handler(aws_event, aws_context, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
 
@@ -84,6 +85,12 @@ def _wrap_handler(handler):
         # will be the same for all events in the list, since they're all hitting
         # the lambda in the same request.)
 
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(AwsLambdaIntegration)
+
+        if integration is None:
+            return handler(aws_event, aws_context, *args, **kwargs)
+
         if isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
             batch_size = len(aws_event)
@@ -96,9 +103,6 @@ def _wrap_handler(handler):
             # headers, path, http method, etc in any case, so it's fine that
             # this is empty
             request_data = {}
-
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(AwsLambdaIntegration)
 
         configured_time = aws_context.get_remaining_time_in_millis()
 
