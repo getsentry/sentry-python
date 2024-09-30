@@ -579,7 +579,7 @@ def test_atexit(tmpdir, monkeypatch, num_messages, http2):
     app = tmpdir.join("app.py")
     app.write(
         dedent(
-            f"""
+            """
     import time
     from sentry_sdk import init, transport, capture_message
 
@@ -594,7 +594,9 @@ def test_atexit(tmpdir, monkeypatch, num_messages, http2):
 
     for _ in range({num_messages}):
         capture_message("HI")
-    """
+    """.format(
+                transport=transport, options=options, num_messages=num_messages
+            )
         )
     )
 

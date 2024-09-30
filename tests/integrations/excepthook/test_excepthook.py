@@ -16,7 +16,7 @@ def test_excepthook(tmpdir, options, transport):
     app = tmpdir.join("app.py")
     app.write(
         dedent(
-            f"""
+            """
     from sentry_sdk import init, transport
 
     def capture_envelope(self, envelope):
@@ -32,7 +32,9 @@ def test_excepthook(tmpdir, options, transport):
     frame_value = "LOL"
 
     1/0
-    """
+    """.format(
+                transport=transport, options=options
+            )
         )
     )
 
