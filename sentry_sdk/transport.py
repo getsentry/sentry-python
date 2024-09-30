@@ -711,6 +711,9 @@ class Http2Transport(Transport):
         self._discarded_events[data_category, reason] += quantity
 
     def _get_header_value(self, response, header):
+        # type: (Any, str) -> Optional[str]
+        # Cannot use `httpcore.response` for types as `httpcore` is optional
+        # and is lazily imported
         return next(
             (
                 val.decode("ascii")
@@ -721,6 +724,10 @@ class Http2Transport(Transport):
         )
 
     def _update_rate_limits(self, response):
+        # type(Any) -> None
+        # Cannot use `httpcore.response` for types as `httpcore` is optional
+        # and is lazily imported
+
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
         header = self._get_header_value(response, "x-sentry-rate-limits")
@@ -938,13 +945,13 @@ class Http2Transport(Transport):
         options = {
             "http2": True,
             "retries": 3,
-        }
+        }  # type: Dict[str, Any]
 
         socket_options = (
             self.options["socket_options"]
             if self.options["socket_options"] is not None
             else []
-        )  # type: List[Tuple[int, int, int | bytes]]
+        )
 
         used_options = {(o[0], o[1]) for o in socket_options}
         for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
@@ -990,7 +997,8 @@ class Http2Transport(Transport):
         key_file,  # type: Optional[Any]
         proxy_headers,  # type: Optional[Dict[str, str]]
     ):
-        # type: (...) -> Union[PoolManager, ProxyManager]
+        # type: (...) -> Any
+        # Cannot use `httpcore.*` for types as `httpcore` is optional and is lazily imported
         proxy = None
         no_proxy = self._in_no_proxy(parsed_dsn)
 
@@ -1024,8 +1032,8 @@ class Http2Transport(Transport):
                     )
             else:
                 return self._httpcore.HTTPProxy(proxy_url=proxy, **opts)
-        else:
-            return self._httpcore.ConnectionPool(**opts)
+
+        return self._httpcore.ConnectionPool(**opts)
 
     def capture_envelope(
         self, envelope  # type: Envelope
