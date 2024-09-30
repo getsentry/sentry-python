@@ -4,6 +4,7 @@ import gzip
 import io
 import os
 import socket
+import sys
 from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta, timezone
 from unittest import mock
