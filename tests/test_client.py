@@ -368,7 +368,7 @@ def test_socks_proxy(testcase, http2):
     assert ("socks" in str(type(client.transport._pool)).lower()) == testcase[
         "should_be_socks_proxy"
     ], f"Expected {kwargs} to result in SOCKS == {testcase[
-        "should_be_socks_proxy"
+        'should_be_socks_proxy'
     ]} but got {str(type(client.transport._pool))}"
 
 
