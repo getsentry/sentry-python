@@ -1,11 +1,8 @@
+import functools
 import sys
 
 import sentry_sdk
-from sentry_sdk.utils import (
-    ensure_integration_enabled,
-    capture_internal_exceptions,
-    event_from_exception,
-)
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -41,13 +38,13 @@ class SysExitIntegration(Integration):
         # type: () -> None
         old_exit = sys.exit  # type: Callable[[Union[str, int, None]], NoReturn]
 
-        @ensure_integration_enabled(SysExitIntegration, old_exit)
+        @functools.wraps(old_exit)
         def sentry_patched_exit(__status=0):
             # type: (Union[str, int, None]) -> NoReturn
             # @ensure_integration_enabled ensures that this is non-None
-            integration = sentry_sdk.get_client().get_integration(
-                SysExitIntegration
-            )  # type: SysExitIntegration
+            integration = sentry_sdk.get_client().get_integration(SysExitIntegration)
+            if integration is None:
+                old_exit(__status)
 
             try:
                 old_exit(__status)
@@ -60,7 +57,7 @@ class SysExitIntegration(Integration):
                         _capture_exception(e)
                 raise e
 
-        sys.exit = sentry_patched_exit  # type: ignore
+        sys.exit = sentry_patched_exit
 
 
 def _capture_exception(exc):

@@ -168,6 +168,7 @@ def assert_single_transaction_without_profile_chunks(envelopes):
     assert "profile" not in transaction["contexts"]
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "mode",
     [

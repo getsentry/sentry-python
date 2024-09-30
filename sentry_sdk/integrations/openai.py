@@ -10,7 +10,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    ensure_integration_enabled,
 )
 
 from typing import TYPE_CHECKING
@@ -113,11 +112,12 @@ def _calculate_chat_completion_usage(
 def _wrap_chat_completion_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
 
-    @ensure_integration_enabled(OpenAIIntegration, f)
+    @wraps(f)
     def new_chat_completion(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        if "messages" not in kwargs:
-            # invalid call (in all versions of openai), let it return error
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None or "messages" not in kwargs:
+            # no "messages" means invalid call (in all versions of openai), let it return error
             return f(*args, **kwargs)
 
         try:
@@ -143,8 +143,6 @@ def _wrap_chat_completion_create(f):
             _capture_exception(e)
             span.__exit__(None, None, None)
             raise e from None
-
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
 
         with capture_internal_exceptions():
             if should_send_default_pii() and integration.include_prompts:
@@ -218,15 +216,17 @@ def _wrap_embeddings_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
 
     @wraps(f)
-    @ensure_integration_enabled(OpenAIIntegration, f)
     def new_embeddings_create(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
             name="OpenAI Embedding Creation",
             origin=OpenAIIntegration.origin,
         ) as span:
-            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
             if "input" in kwargs and (
                 should_send_default_pii() and integration.include_prompts
             ):

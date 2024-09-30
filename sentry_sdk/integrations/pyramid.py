@@ -1,3 +1,4 @@
+import functools
 import os
 import sys
 import weakref
@@ -73,10 +74,12 @@ class PyramidIntegration(Integration):
 
         old_call_view = router._call_view
 
-        @ensure_integration_enabled(PyramidIntegration, old_call_view)
+        @functools.wraps(old_call_view)
         def sentry_patched_call_view(registry, request, *args, **kwargs):
             # type: (Any, Request, *Any, **Any) -> Response
             integration = sentry_sdk.get_client().get_integration(PyramidIntegration)
+            if integration is None:
+                return old_call_view(registry, request, *args, **kwargs)
 
             _set_transaction_name_and_source(
                 sentry_sdk.get_current_scope(), integration.transaction_style, request
