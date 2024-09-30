@@ -721,7 +721,8 @@ class Http2Transport(Transport):
         )
 
     def _update_rate_limits(self, response):
-        # type: (httpcore.Response) -> None
+        # type: (httpcore.Response) -> None # type: ignore
+        # Added type ignore above as `httpcore` is optional and imported lazily
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
