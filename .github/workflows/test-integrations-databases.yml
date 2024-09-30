@@ -67,27 +67,27 @@ jobs:
       - name: Test asyncpg latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest"
+          tox -f "py${{ matrix.python-version }}-asyncpg_latest"
       - name: Test clickhouse_driver latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest"
+          tox -f "py${{ matrix.python-version }}-clickhouse_driver_latest"
       - name: Test pymongo latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest"
+          tox -f "py${{ matrix.python-version }}-pymongo_latest"
       - name: Test redis latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest"
+          tox -f "py${{ matrix.python-version }}-redis_latest"
       - name: Test redis_py_cluster_legacy latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy-latest"
+          tox -f "py${{ matrix.python-version }}-redis_py_cluster_legacy_latest"
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest"
+          tox -f "py${{ matrix.python-version }}-sqlalchemy_latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -162,27 +162,27 @@ jobs:
       - name: Test asyncpg pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg"
+          tox -f "py${{ matrix.python-version }}-asyncpg"
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver"
+          tox -f "py${{ matrix.python-version }}-clickhouse_driver"
       - name: Test pymongo pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo"
+          tox -f "py${{ matrix.python-version }}-pymongo"
       - name: Test redis pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis"
+          tox -f "py${{ matrix.python-version }}-redis"
       - name: Test redis_py_cluster_legacy pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis_py_cluster_legacy"
+          tox -f "py${{ matrix.python-version }}-redis_py_cluster_legacy"
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy"
+          tox -f "py${{ matrix.python-version }}-sqlalchemy"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |

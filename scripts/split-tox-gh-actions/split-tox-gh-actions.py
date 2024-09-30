@@ -206,6 +206,10 @@ def parse_tox():
                 (raw_python_versions, framework) = line.split("-")
                 framework_versions = []
 
+            if framework.endswith("_latest"):
+                framework = framework.replace("_latest", "")
+                framework_versions = "latest"
+
             # collect python versions to test the framework in
             raw_python_versions = set(
                 raw_python_versions.replace("{", "").replace("}", "").split(",")

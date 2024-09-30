@@ -48,19 +48,19 @@ jobs:
       - name: Test boto3 latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3-latest"
+          tox -f "py${{ matrix.python-version }}-boto3_latest"
       - name: Test chalice latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice-latest"
+          tox -f "py${{ matrix.python-version }}-chalice_latest"
       - name: Test cloud_resource_context latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context-latest"
+          tox -f "py${{ matrix.python-version }}-cloud_resource_context_latest"
       - name: Test gcp latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp-latest"
+          tox -f "py${{ matrix.python-version }}-gcp_latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -116,19 +116,19 @@ jobs:
       - name: Test boto3 pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-boto3"
+          tox -f "py${{ matrix.python-version }}-boto3"
       - name: Test chalice pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-chalice"
+          tox -f "py${{ matrix.python-version }}-chalice"
       - name: Test cloud_resource_context pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cloud_resource_context"
+          tox -f "py${{ matrix.python-version }}-cloud_resource_context"
       - name: Test gcp pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gcp"
+          tox -f "py${{ matrix.python-version }}-gcp"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |

@@ -71,9 +71,9 @@
         run: |
           set -x # print commands that are executed
           {% if category == "pinned" %}
-          ./scripts/runtox.sh --exclude-latest "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
+          tox -f "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
           {% elif category == "latest" %}
-          ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}-latest"
+          tox -f "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}_latest"
           {% endif %}
       {% endfor %}
 

@@ -83,7 +83,7 @@ jobs:
       - name: Test aws_lambda pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda"
+          tox -f "py${{ matrix.python-version }}-aws_lambda"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |

@@ -34,7 +34,7 @@ test: .venv
 .PHONY: test
 
 test-all: .venv
-	@TOXPATH=$(VENV_PATH)/bin/tox sh ./scripts/runtox.sh
+	$(VENV_PATH)/bin/tox
 .PHONY: test-all
 
 check: lint test
