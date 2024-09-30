@@ -177,7 +177,9 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     assert options["num_pools"] == expected_num_pools
 
 
-@pytest.mark.parametrize("http2", [True, False])
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
 def test_two_way_ssl_authentication(make_client, http2):
     _experiments = {}
     if http2:

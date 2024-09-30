@@ -246,7 +246,9 @@ def test_transport_option(monkeypatch):
         },
     ],
 )
-@pytest.mark.parametrize("http2", [True, False])
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
 def test_proxy(monkeypatch, testcase, http2):
     if testcase["env_http_proxy"] is not None:
         monkeypatch.setenv("HTTP_PROXY", testcase["env_http_proxy"])
@@ -352,7 +354,9 @@ def test_proxy(monkeypatch, testcase, http2):
         },
     ],
 )
-@pytest.mark.parametrize("http2", [True, False])
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
 def test_socks_proxy(testcase, http2):
     kwargs = {}
 
@@ -561,7 +565,9 @@ def test_capture_event_works(sentry_init):
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
-@pytest.mark.parametrize("http2", [True, False])
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
 def test_atexit(tmpdir, monkeypatch, num_messages, http2):
     if http2:
         options = '_experiments={"transport_http2": True}'

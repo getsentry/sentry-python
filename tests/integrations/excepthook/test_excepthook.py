@@ -5,13 +5,13 @@ import subprocess
 from textwrap import dedent
 
 
-@pytest.mark.parametrize(
-    "options, transport",
-    [
-        ("", "HttpTransport"),
-        ('_experiments={"transport_http2": True}', "Http2Transport"),
-    ],
-)
+TEST_PARAMETERS = [("", "HttpTransport")]
+
+if sys.version_info >= (3, 8):
+    TEST_PARAMETERS.append(('_experiments={"transport_http2": True}', "Http2Transport"))
+
+
+@pytest.mark.parametrize("options, transport", TEST_PARAMETERS)
 def test_excepthook(tmpdir, options, transport):
     app = tmpdir.join("app.py")
     app.write(
@@ -47,13 +47,7 @@ def test_excepthook(tmpdir, options, transport):
     assert b"capture_envelope was called" in output
 
 
-@pytest.mark.parametrize(
-    "options, transport",
-    [
-        ("", "HttpTransport"),
-        ('_experiments={"transport_http2": True}', "Http2Transport"),
-    ],
-)
+@pytest.mark.parametrize("options, transport", TEST_PARAMETERS)
 def test_always_value_excepthook(tmpdir, options, transport):
     app = tmpdir.join("app.py")
     app.write(
