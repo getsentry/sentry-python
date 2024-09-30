@@ -367,9 +367,10 @@ def test_socks_proxy(testcase, http2):
     client = Client(testcase["dsn"], **kwargs)
     assert ("socks" in str(type(client.transport._pool)).lower()) == testcase[
         "should_be_socks_proxy"
-    ], f"Expected {kwargs} to result in SOCKS == {testcase[
-        'should_be_socks_proxy'
-    ]} but got {str(type(client.transport._pool))}"
+    ], (
+        f"Expected {kwargs} to result in SOCKS == {testcase['should_be_socks_proxy']}"
+        f"but got {str(type(client.transport._pool))}"
+    )
 
 
 def test_simple_transport(sentry_init):
