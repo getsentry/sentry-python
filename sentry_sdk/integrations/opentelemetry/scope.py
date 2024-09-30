@@ -4,7 +4,13 @@ from typing import cast
 from contextlib import contextmanager
 
 from opentelemetry.context import get_value, set_value, attach, detach, get_current
-from opentelemetry.trace import SpanContext, NonRecordingSpan, TraceFlags, TraceState, use_span
+from opentelemetry.trace import (
+    SpanContext,
+    NonRecordingSpan,
+    TraceFlags,
+    TraceState,
+    use_span,
+)
 
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,

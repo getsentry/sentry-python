@@ -4,7 +4,14 @@ from datetime import datetime, timezone
 
 from urllib3.util import parse_url as urlparse
 from urllib.parse import quote
-from opentelemetry.trace import Span, SpanKind, StatusCode, format_trace_id, format_span_id, TraceState
+from opentelemetry.trace import (
+    Span,
+    SpanKind,
+    StatusCode,
+    format_trace_id,
+    format_span_id,
+    TraceState,
+)
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.sdk.trace import ReadableSpan
 
@@ -293,7 +300,9 @@ def get_trace_context(span, span_data=None):
     if span.attributes:
         trace_context["data"] = dict(span.attributes)
 
-    trace_context["dynamic_sampling_context"] = dsc_from_trace_state(span.context.trace_state)
+    trace_context["dynamic_sampling_context"] = dsc_from_trace_state(
+        span.context.trace_state
+    )
 
     # TODO-neel-potel profiler thread_id, thread_name
 

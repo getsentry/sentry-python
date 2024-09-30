@@ -1453,7 +1453,7 @@ class POTelSpan:
             serialize_trace_state,
         )
 
-        trace_state  = self._otel_span.get_span_context().trace_state
+        trace_state = self._otel_span.get_span_context().trace_state
         yield BAGGAGE_HEADER_NAME, serialize_trace_state(trace_state)
 
     def to_traceparent(self):

@@ -349,8 +349,7 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.fromisoformat(x["timestamp"])
-        for x in event["breadcrumbs"]["values"]
+        datetime.fromisoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
@@ -391,8 +390,7 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.fromisoformat(x["timestamp"])
-        for x in event["breadcrumbs"]["values"]
+        datetime.fromisoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
