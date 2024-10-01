@@ -19,7 +19,7 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping, cast
 
 if TYPE_CHECKING:
     from typing import Any
@@ -349,7 +349,7 @@ class BaseHttpTransport(Transport):
                 logger.error(
                     "Unexpected status code: %s (body: %s)",
                     response.status,
-                    getattr(response, "data", getattr(response, "content")),
+                    getattr(response, "data", getattr(response, "content", None)),
                 )
                 self.on_dropped_event("status_{}".format(response.status))
                 record_loss("network_error")
@@ -523,7 +523,7 @@ class BaseHttpTransport(Transport):
         body,
         headers,
     ):
-        # type: (str, EndpointType, Any, Dict[str, str]) -> Union[urllib3.BaseHTTPResponse, httpcore.Response]
+        # type: (str, EndpointType, Any, Mapping[str, str]) -> Union[urllib3.BaseHTTPResponse, httpcore.Response]
         raise NotImplementedError()
 
     def capture_envelope(
@@ -678,8 +678,9 @@ class HttpTransport(BaseHttpTransport):
         body,
         headers,
     ):
-        # type: (str, EndpointType, Any, Dict[str, str]) -> urllib3.BaseHTTPResponse
-        return self._pool.request(
+        # type: (str, EndpointType, Any, Mapping[str, str]) -> urllib3.BaseHTTPResponse
+        pool = cast(self._pool, Union[PoolManager, ProxyManager])
+        return pool.request(
             method,
             self._auth.get_api_url(endpoint_type),
             body=body,
@@ -711,8 +712,12 @@ try:
             body,
             headers,
         ):
-            # type: (str, EndpointType, Any, Dict[str, str]) -> httpcore.Response
-            response = self._pool.request(
+            # type: (str, EndpointType, Any, Mapping[str, str]) -> httpcore.Response
+            pool = cast(
+                self._pool,
+                Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool],
+            )
+            response = pool.request(
                 method,
                 self._auth.get_api_url(endpoint_type),
                 content=body,
