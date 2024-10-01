@@ -725,7 +725,7 @@ try:
                 method,
                 self._auth.get_api_url(endpoint_type),
                 content=body,
-                headers=headers,
+                headers=headers,  # type: ignore
             )
             response.headers = response.headers
             return response
