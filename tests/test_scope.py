@@ -223,11 +223,11 @@ def test_get_client():
 def test_set_client(sentry_init):
     sentry_init()
 
-    with sentry_sdk.start_span():
-        current_client = mock.MagicMock()
-        isolation_client = mock.MagicMock()
-        global_client = mock.MagicMock()
+    current_client = mock.MagicMock()
+    isolation_client = mock.MagicMock()
+    global_client = mock.MagicMock()
 
+    with sentry_sdk.start_span():
         current_scope = sentry_sdk.get_current_scope()
         isolation_scope = sentry_sdk.get_isolation_scope()
         global_scope = sentry_sdk.get_global_scope()
