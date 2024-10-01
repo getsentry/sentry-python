@@ -117,7 +117,10 @@ def mock_transaction_envelope(span_count):
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
-@pytest.mark.parametrize("compressionlevel", (0, 9))
+@pytest.mark.parametrize("compression_level", (0, 9))
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
 def test_transport_works(
     capturing_server,
     request,
@@ -127,15 +130,22 @@ def test_transport_works(
     make_client,
     client_flush_method,
     use_pickle,
-    compressionlevel,
+    compression_level,
+    http2,
     maybe_monkeypatched_threading,
 ):
     caplog.set_level(logging.DEBUG)
+
+    experiments = {
+        "transport_zlib_compression_level": compression_level,
+    }
+
+    if http2:
+        experiments["transport_http2"] = True
+
     client = make_client(
         debug=debug,
-        _experiments={
-            "transport_zlib_compression_level": compressionlevel,
-        },
+        _experiments=experiments,
     )
 
     if use_pickle:
@@ -154,7 +164,7 @@ def test_transport_works(
     out, err = capsys.readouterr()
     assert not err and not out
     assert capturing_server.captured
-    assert capturing_server.captured[0].compressed == (compressionlevel > 0)
+    assert capturing_server.captured[0].compressed == (compression_level > 0)
 
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
