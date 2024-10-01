@@ -18,6 +18,10 @@ from sentry_sdk.integrations._asgi_common import (
     _get_request_data,
     _get_url,
 )
+from sentry_sdk.integrations._wsgi_common import (
+    DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    nullcontext,
+)
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -89,17 +93,19 @@ class SentryAsgiMiddleware:
         "transaction_style",
         "mechanism_type",
         "span_origin",
+        "http_methods_to_capture",
     )
 
     def __init__(
         self,
-        app,
-        unsafe_context_data=False,
-        transaction_style="endpoint",
-        mechanism_type="asgi",
-        span_origin="manual",
+        app,  # type: Any
+        unsafe_context_data=False,  # type: bool
+        transaction_style="endpoint",  # type: str
+        mechanism_type="asgi",  # type: str
+        span_origin="manual",  # type: str
+        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: Tuple[str, ...]
     ):
-        # type: (Any, bool, str, str, str) -> None
+        # type: (...) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -134,6 +140,7 @@ class SentryAsgiMiddleware:
         self.mechanism_type = mechanism_type
         self.span_origin = span_origin
         self.app = app
+        self.http_methods_to_capture = http_methods_to_capture
 
         if _looks_like_asgi3(app):
             self.__call__ = self._run_asgi3  # type: Callable[..., Any]
@@ -185,52 +192,59 @@ class SentryAsgiMiddleware:
                         scope,
                     )
 
-                    if ty in ("http", "websocket"):
-                        transaction = continue_trace(
-                            _get_headers(scope),
-                            op="{}.server".format(ty),
-                            name=transaction_name,
-                            source=transaction_source,
-                            origin=self.span_origin,
-                        )
+                    method = scope.get("method", "").upper()
+                    transaction = None
+                    if method in self.http_methods_to_capture:
+                        if ty in ("http", "websocket"):
+                            transaction = continue_trace(
+                                _get_headers(scope),
+                                op="{}.server".format(ty),
+                                name=transaction_name,
+                                source=transaction_source,
+                                origin=self.span_origin,
+                            )
+                            logger.debug(
+                                "[ASGI] Created transaction (continuing trace): %s",
+                                transaction,
+                            )
+                        else:
+                            transaction = Transaction(
+                                op=OP.HTTP_SERVER,
+                                name=transaction_name,
+                                source=transaction_source,
+                                origin=self.span_origin,
+                            )
+                            logger.debug(
+                                "[ASGI] Created transaction (new): %s", transaction
+                            )
+
+                        transaction.set_tag("asgi.type", ty)
                         logger.debug(
-                            "[ASGI] Created transaction (continuing trace): %s",
+                            "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
+                            transaction.name,
+                            transaction.source,
+                        )
+
+                    with (
+                        sentry_sdk.start_transaction(
                             transaction,
+                            custom_sampling_context={"asgi_scope": scope},
                         )
-                    else:
-                        transaction = Transaction(
-                            op=OP.HTTP_SERVER,
-                            name=transaction_name,
-                            source=transaction_source,
-                            origin=self.span_origin,
-                        )
-                        logger.debug(
-                            "[ASGI] Created transaction (new): %s", transaction
-                        )
-
-                    transaction.set_tag("asgi.type", ty)
-                    logger.debug(
-                        "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
-                        transaction.name,
-                        transaction.source,
-                    )
-
-                    with sentry_sdk.start_transaction(
-                        transaction,
-                        custom_sampling_context={"asgi_scope": scope},
+                        if transaction is not None
+                        else nullcontext()
                     ):
                         logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:
 
                             async def _sentry_wrapped_send(event):
                                 # type: (Dict[str, Any]) -> Any
-                                is_http_response = (
-                                    event.get("type") == "http.response.start"
-                                    and transaction is not None
-                                    and "status" in event
-                                )
-                                if is_http_response:
-                                    transaction.set_http_status(event["status"])
+                                if transaction is not None:
+                                    is_http_response = (
+                                        event.get("type") == "http.response.start"
+                                        and "status" in event
+                                    )
+                                    if is_http_response:
+                                        transaction.set_http_status(event["status"])
 
                                 return await send(event)
 
