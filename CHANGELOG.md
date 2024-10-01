@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.15.0
+
+### Various fixes & improvements
+
+- Configure HTTP methods to capture in WSGI middleware and frameworks (#3531) by @antonpirker
+- XFail one of the Lambda tests (#3592) by @antonpirker
+- allowing ASGI to use drf_request in DjangoRequestExtractor (#3572) by @PakawiNz
+- fix(tracing): Fix `add_query_source` with modules outside of project root (#3313) by @rominf
+- build(deps): bump actions/checkout from 4.1.7 to 4.2.0 (#3585) by @dependabot
+- Test more integrations on 3.13 (#3578) by @sentrivana
+- Fix trailing whitespace (#3579) by @sentrivana
+- test(aiohttp): Delete test which depends on AIOHTTP behavior (#3568) by @szokeasaurusrex
+- feat(starlette): Support new `failed_request_status_codes` (#3563) by @szokeasaurusrex
+- ref(aiohttp): Make `DEFUALT_FAILED_REQUEST_STATUS_CODES` private (#3558) by @szokeasaurusrex
+- fix(starlette): Fix `failed_request_status_codes=[]` (#3561) by @szokeasaurusrex
+- test(starlette): Remove invalid `failed_request_status_code` tests (#3560) by @szokeasaurusrex
+- test(starlette): Refactor shared test parametrization (#3562) by @szokeasaurusrex
+- feat(aiohttp): Add `failed_request_status_codes` (#3551) by @szokeasaurusrex
+- ref(client): Improve `get_integration` typing (#3550) by @szokeasaurusrex
+- test: Make import-related tests stable (#3548) by @BYK
+- fix: Fix breadcrumb timestamp casting and its tests (#3546) by @BYK
+- fix(aiohttp): Handle invalid responses (#3554) by @szokeasaurusrex
+- fix(django): Don't let RawPostDataException bubble up (#3553) by @sentrivana
+- fix: Don't use deprecated logger.warn (#3552) by @sentrivana
+- ci: update actions/upload-artifact to v4 with merge (#3545) by @joshuarli
+- tests: Fix cohere API change (#3549) by @BYK
+- fixed message (#3536) by @antonpirker
+- Removed experimental explain_plan feature. (#3534) by @antonpirker
+
+_Plus 6 more_
+
 ## 2.14.0
 
 ### Various fixes & improvements
