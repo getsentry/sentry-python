@@ -31,7 +31,6 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Tuple
     from typing import Type
-    from typing import Union
     from typing import DefaultDict
 
     from sentry_sdk._types import Event, EventDataCategory
