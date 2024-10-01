@@ -31,7 +31,7 @@
     sentry_sdk.init(
         integrations=[
             AioHttpIntegration(
-                failed_request_status_codes={403, *range(500, 599)},
+                failed_request_status_codes={403, *range(500, 600)},
             )
         ]
     )
@@ -56,7 +56,7 @@
   ```python
   sentry_sdk.init(
       integrations=StarletteIntegration(
-          failed_request_status_codes={403, *range(500, 599)},
+          failed_request_status_codes={403, *range(500, 600)},
       ),
   )
   ```
