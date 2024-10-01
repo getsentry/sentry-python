@@ -584,6 +584,8 @@ class BaseHttpTransport(Transport):
 
 
 class HttpTransport(BaseHttpTransport):
+    _pool: Union[PoolManager, ProxyManager]
+
     def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
 
@@ -679,8 +681,7 @@ class HttpTransport(BaseHttpTransport):
         headers,
     ):
         # type: (str, EndpointType, Any, Mapping[str, str]) -> urllib3.BaseHTTPResponse
-        pool = cast(self._pool, Union[PoolManager, ProxyManager])
-        return pool.request(
+        return self._pool.request(
             method,
             self._auth.get_api_url(endpoint_type),
             body=body,
@@ -693,6 +694,8 @@ try:
 
     class Http2Transport(BaseHttpTransport):
         """The HTTP2 transport based on httpcore."""
+
+        _pool: Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
 
         def _get_header_value(self, response, header):
             # type: (httpcore.Response, str) -> Optional[str]
@@ -713,11 +716,7 @@ try:
             headers,
         ):
             # type: (str, EndpointType, Any, Mapping[str, str]) -> httpcore.Response
-            pool = cast(
-                self._pool,
-                Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool],
-            )
-            response = pool.request(
+            response = self._pool.request(
                 method,
                 self._auth.get_api_url(endpoint_type),
                 content=body,
@@ -851,7 +850,7 @@ def make_transport(options):
 
     # By default, we use the http transport class
     transport_cls = (
-        Http2Transport if use_http2_transport else HttpTransport  # type: ignore[type-abstract]
+        Http2Transport if use_http2_transport else HttpTransport
     )  # type: Type[Transport]
 
     if isinstance(ref_transport, Transport):
