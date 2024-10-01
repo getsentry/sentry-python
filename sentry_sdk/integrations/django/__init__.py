@@ -529,9 +529,9 @@ class DjangoRequestExtractor(RequestExtractor):
             if drf_request is not None:
                 request = drf_request
         except AttributeError:
-            pass            
+            pass
         self.request = request
-            
+
     def env(self):
         # type: () -> Dict[str, str]
         return self.request.META
