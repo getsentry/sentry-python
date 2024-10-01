@@ -11,6 +11,7 @@ from collections import defaultdict
 from urllib.request import getproxies
 
 import urllib3
+from urllib3.poolmanager import PoolManager, ProxyManager
 import certifi
 
 import sentry_sdk
@@ -19,7 +20,7 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING, Mapping, cast
+from typing import TYPE_CHECKING, Mapping, Union
 
 if TYPE_CHECKING:
     from typing import Any
@@ -32,9 +33,6 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
     from typing import DefaultDict
-
-    from urllib3.poolmanager import PoolManager
-    from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event, EventDataCategory
 
