@@ -1,26 +1,29 @@
 import inspect
 import os
+import sentry_sdk
 import sys
 import threading
 import time
+import warnings
 from collections import defaultdict
 from unittest import mock
 
 import pytest
 
 from sentry_sdk import start_transaction
-from sentry_sdk.profiler import (
+from sentry_sdk.profiler.transaction_profiler import (
     GeventScheduler,
     Profile,
     Scheduler,
     ThreadScheduler,
+    setup_profiler,
+)
+from sentry_sdk.profiler.utils import (
     extract_frame,
     extract_stack,
     frame_id,
     get_frame_name,
-    setup_profiler,
 )
-from sentry_sdk.tracing import Transaction
 from sentry_sdk._lru_cache import LRUCache
 
 try:
@@ -49,13 +52,7 @@ def experimental_options(mode=None, sample_rate=None):
 
 @pytest.mark.parametrize(
     "mode",
-    [
-        pytest.param("foo"),
-        pytest.param(
-            "gevent",
-            marks=pytest.mark.skipif(gevent is not None, reason="gevent not enabled"),
-        ),
-    ],
+    [pytest.param("foo")],
 )
 @pytest.mark.parametrize(
     "make_options",
@@ -127,11 +124,11 @@ def test_profiler_setup_twice(make_options, teardown_profiling):
         pytest.param(non_experimental_options, id="non experimental"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profiles_sample_rate(
     sentry_init,
     capture_envelopes,
-    capture_client_reports,
+    capture_record_lost_event_calls,
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
@@ -147,9 +144,11 @@ def test_profiles_sample_rate(
     )
 
     envelopes = capture_envelopes()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
-    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
+    ):
         with start_transaction(name="profiling"):
             pass
 
@@ -161,11 +160,11 @@ def test_profiles_sample_rate(
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
     if profiles_sample_rate is None or profiles_sample_rate == 0:
-        assert reports == []
+        assert record_lost_event_calls == []
     elif profile_count:
-        assert reports == []
+        assert record_lost_event_calls == []
     else:
-        assert reports == [("sample_rate", "profile")]
+        assert record_lost_event_calls == [("sample_rate", "profile", None, 1)]
 
 
 @pytest.mark.parametrize(
@@ -200,11 +199,11 @@ def test_profiles_sample_rate(
         pytest.param(lambda _: False, 0, id="profiler sampled at False"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profiles_sampler(
     sentry_init,
     capture_envelopes,
-    capture_client_reports,
+    capture_record_lost_event_calls,
     teardown_profiling,
     profiles_sampler,
     profile_count,
@@ -216,9 +215,11 @@ def test_profiles_sampler(
     )
 
     envelopes = capture_envelopes()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
-    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
+    ):
         with start_transaction(name="profiling"):
             pass
 
@@ -230,15 +231,15 @@ def test_profiles_sampler(
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
     if profile_count:
-        assert reports == []
+        assert record_lost_event_calls == []
     else:
-        assert reports == [("sample_rate", "profile")]
+        assert record_lost_event_calls == [("sample_rate", "profile", None, 1)]
 
 
 def test_minimum_unique_samples_required(
     sentry_init,
     capture_envelopes,
-    capture_client_reports,
+    capture_record_lost_event_calls,
     teardown_profiling,
 ):
     sentry_init(
@@ -247,7 +248,7 @@ def test_minimum_unique_samples_required(
     )
 
     envelopes = capture_envelopes()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     with start_transaction(name="profiling"):
         pass
@@ -261,7 +262,7 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
-    assert reports == [("insufficient_data", "profile")]
+    assert record_lost_event_calls == [("insufficient_data", "profile", None, 1)]
 
 
 @pytest.mark.forked
@@ -631,7 +632,7 @@ def test_thread_scheduler_no_thread_on_shutdown(scheduler_class):
         pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 1)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.MAX_PROFILE_DURATION_NS", 1)
 def test_max_profile_duration_reached(scheduler_class):
     sample = [
         (
@@ -645,8 +646,7 @@ def test_max_profile_duration_reached(scheduler_class):
     ]
 
     with scheduler_class(frequency=1000) as scheduler:
-        transaction = Transaction(sampled=True)
-        with Profile(transaction, scheduler=scheduler) as profile:
+        with Profile(True, 0, scheduler=scheduler) as profile:
             # profile just started, it's active
             assert profile.active
 
@@ -793,15 +793,14 @@ sample_stacks = [
         ),
     ],
 )
-@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 5)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.MAX_PROFILE_DURATION_NS", 5)
 def test_profile_processing(
     DictionaryContaining,  # noqa: N803
     samples,
     expected,
 ):
     with NoopScheduler(frequency=1000) as scheduler:
-        transaction = Transaction(sampled=True)
-        with Profile(transaction, scheduler=scheduler) as profile:
+        with Profile(True, 0, scheduler=scheduler) as profile:
             for ts, sample in samples:
                 # force the sample to be written at a time relative to the
                 # start of the profile
@@ -816,3 +815,27 @@ def test_profile_processing(
             assert processed["frames"] == expected["frames"]
             assert processed["stacks"] == expected["stacks"]
             assert processed["samples"] == expected["samples"]
+
+
+def test_hub_backwards_compatibility(suppress_deprecation_warnings):
+    hub = sentry_sdk.Hub()
+
+    with pytest.warns(DeprecationWarning):
+        profile = Profile(True, 0, hub=hub)
+
+    with pytest.warns(DeprecationWarning):
+        assert profile.hub is hub
+
+    new_hub = sentry_sdk.Hub()
+
+    with pytest.warns(DeprecationWarning):
+        profile.hub = new_hub
+
+    with pytest.warns(DeprecationWarning):
+        assert profile.hub is new_hub
+
+
+def test_no_warning_without_hub():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        Profile(True, 0)

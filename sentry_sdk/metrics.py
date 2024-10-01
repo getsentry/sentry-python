@@ -5,6 +5,7 @@ import re
 import sys
 import threading
 import time
+import warnings
 import zlib
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -27,7 +28,8 @@ from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_TASK,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -52,6 +54,14 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricType
     from sentry_sdk._types import MetricValue
 
+
+warnings.warn(
+    "The sentry_sdk.metrics module is deprecated and will be removed in the next major release. "
+    "Sentry will reject all metrics sent after October 7, 2024. "
+    "Learn more: https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 _in_metrics = ContextVar("in_metrics", default=False)
 _set = set  # set is shadowed below
@@ -720,27 +730,25 @@ def _tags_to_dict(tags):
 
 def _get_aggregator():
     # type: () -> Optional[MetricsAggregator]
-    hub = sentry_sdk.Hub.current
-    client = hub.client
+    client = sentry_sdk.get_client()
     return (
         client.metrics_aggregator
-        if client is not None and client.metrics_aggregator is not None
+        if client.is_active() and client.metrics_aggregator is not None
         else None
     )
 
 
 def _get_aggregator_and_update_tags(key, value, unit, tags):
     # type: (str, Optional[MetricValue], MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
-    hub = sentry_sdk.Hub.current
-    client = hub.client
-    if client is None or client.metrics_aggregator is None:
+    client = sentry_sdk.get_client()
+    if not client.is_active() or client.metrics_aggregator is None:
         return None, None, tags
 
     updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
-    scope = sentry_sdk.Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     local_aggregator = None
 
     # We go with the low-level API here to access transaction information as
@@ -818,7 +826,7 @@ class _Timing:
         # type: (...) -> _Timing
         self.entered = TIMING_FUNCTIONS[self.unit]()
         self._validate_invocation("context-manager")
-        self._span = sentry_sdk.start_span(op="metric.timing", description=self.key)
+        self._span = sentry_sdk.start_span(op="metric.timing", name=self.key)
         if self.tags:
             for key, value in self.tags.items():
                 if isinstance(value, (tuple, list)):

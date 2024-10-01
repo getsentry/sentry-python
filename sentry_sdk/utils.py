@@ -11,8 +11,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
-from copy import copy
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
@@ -26,10 +25,10 @@ except ImportError:
     BaseExceptionGroup = None  # type: ignore
 
 import sentry_sdk
-import sentry_sdk.hub
 from sentry_sdk._compat import PY37
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -54,7 +53,8 @@ if TYPE_CHECKING:
         Union,
     )
 
-    import sentry_sdk.integrations
+    from gevent.hub import Hub
+
     from sentry_sdk._types import Event, ExcInfo
 
     P = ParamSpec("P")
@@ -72,17 +72,30 @@ BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
+FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
+TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
+
+
+def env_to_bool(value, *, strict=False):
+    # type: (Any, Optional[bool]) -> bool | None
+    """Casts an ENV variable value to boolean using the constants defined above.
+    In strict mode, it may return None if the value doesn't match any of the predefined values.
+    """
+    normalized = str(value).lower() if value is not None else None
+
+    if normalized in FALSY_ENV_VALUES:
+        return False
+
+    if normalized in TRUTHY_ENV_VALUES:
+        return True
+
+    return None if strict else bool(value)
+
 
 def json_dumps(data):
     # type: (Any) -> bytes
     """Serialize data into a compact JSON representation encoded as UTF-8."""
     return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
-
-
-def _get_debug_hub():
-    # type: () -> Optional[sentry_sdk.Hub]
-    # This function is replaced by debug.py
-    pass
 
 
 def get_git_revision():
@@ -152,6 +165,8 @@ def get_sdk_name(installed_integrations):
         "quart",
         "sanic",
         "starlette",
+        "litestar",
+        "starlite",
         "chalice",
         "serverless",
         "pyramid",
@@ -196,9 +211,14 @@ def capture_internal_exceptions():
 
 def capture_internal_exception(exc_info):
     # type: (ExcInfo) -> None
-    hub = _get_debug_hub()
-    if hub is not None:
-        hub._capture_internal_exception(exc_info)
+    """
+    Capture an exception that is likely caused by a bug in the SDK
+    itself.
+
+    These exceptions do not end up in Sentry and are just logged instead.
+    """
+    if sentry_sdk.get_client().is_active():
+        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
 
 def to_timestamp(value):
@@ -208,7 +228,40 @@ def to_timestamp(value):
 
 def format_timestamp(value):
     # type: (datetime) -> str
-    return value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    """Formats a timestamp in RFC 3339 format.
+
+    Any datetime objects with a non-UTC timezone are converted to UTC, so that all timestamps are formatted in UTC.
+    """
+    utctime = value.astimezone(timezone.utc)
+
+    # We use this custom formatting rather than isoformat for backwards compatibility (we have used this format for
+    # several years now), and isoformat is slightly different.
+    return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+ISO_TZ_SEPARATORS = frozenset(("+", "-"))
+
+
+def datetime_from_isoformat(value):
+    # type: (str) -> datetime
+    try:
+        result = datetime.fromisoformat(value)
+    except (AttributeError, ValueError):
+        # py 3.6
+        timestamp_format = (
+            "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
+        )
+        if value.endswith("Z"):
+            value = value[:-1] + "+0000"
+
+        if value[-6] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+            value = value[:-3] + value[-2:]
+        elif value[-5] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+
+        result = datetime.strptime(value, timestamp_format)
+    return result.astimezone(timezone.utc)
 
 
 def event_hint_with_exc_info(exc_info=None):
@@ -585,8 +638,9 @@ def serialize_frame(
     include_local_variables=True,
     include_source_context=True,
     max_value_length=None,
+    custom_repr=None,
 ):
-    # type: (FrameType, Optional[int], bool, bool, Optional[int]) -> Dict[str, Any]
+    # type: (FrameType, Optional[int], bool, bool, Optional[int], Optional[Callable[..., Optional[str]]]) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -616,7 +670,11 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = copy(frame.f_locals)
+        from sentry_sdk.serializer import serialize
+
+        rv["vars"] = serialize(
+            dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+        )
 
     return rv
 
@@ -721,10 +779,12 @@ def single_exception_from_error_tuple(
         include_local_variables = True
         include_source_context = True
         max_value_length = DEFAULT_MAX_VALUE_LENGTH  # fallback
+        custom_repr = None
     else:
         include_local_variables = client_options["include_local_variables"]
         include_source_context = client_options["include_source_context"]
         max_value_length = client_options["max_value_length"]
+        custom_repr = client_options.get("custom_repr")
 
     frames = [
         serialize_frame(
@@ -733,6 +793,7 @@ def single_exception_from_error_tuple(
             include_local_variables=include_local_variables,
             include_source_context=include_source_context,
             max_value_length=max_value_length,
+            custom_repr=custom_repr,
         )
         for tb in iter_stacks(tb)
     ]
@@ -1017,7 +1078,14 @@ def exc_info_from_error(error):
     else:
         raise ValueError("Expected Exception object to report, got %s!" % type(error))
 
-    return exc_type, exc_value, tb
+    exc_info = (exc_type, exc_value, tb)
+
+    if TYPE_CHECKING:
+        # This cast is safe because exc_type and exc_value are either both
+        # None or both not None.
+        exc_info = cast(ExcInfo, exc_info)
+
+    return exc_info
 
 
 def event_from_exception(
@@ -1042,7 +1110,7 @@ def event_from_exception(
 
 
 def _module_in_list(name, items):
-    # type: (str, Optional[List[str]]) -> bool
+    # type: (Optional[str], Optional[List[str]]) -> bool
     if name is None:
         return False
 
@@ -1057,8 +1125,11 @@ def _module_in_list(name, items):
 
 
 def _is_external_source(abs_path):
-    # type: (str) -> bool
+    # type: (Optional[str]) -> bool
     # check if frame is in 'site-packages' or 'dist-packages'
+    if abs_path is None:
+        return False
+
     external_source = (
         re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
     )
@@ -1066,8 +1137,8 @@ def _is_external_source(abs_path):
 
 
 def _is_in_project_root(abs_path, project_root):
-    # type: (str, Optional[str]) -> bool
-    if project_root is None:
+    # type: (Optional[str], Optional[str]) -> bool
+    if abs_path is None or project_root is None:
         return False
 
     # check if path is in the project root
@@ -1182,8 +1253,8 @@ def _is_contextvars_broken():
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
-        import gevent  # type: ignore
-        from gevent.monkey import is_object_patched  # type: ignore
+        import gevent
+        from gevent.monkey import is_object_patched
 
         # Get the MAJOR and MINOR version numbers of Gevent
         version_tuple = tuple(
@@ -1209,7 +1280,7 @@ def _is_contextvars_broken():
         pass
 
     try:
-        import greenlet  # type: ignore
+        import greenlet
         from eventlet.patcher import is_monkey_patched  # type: ignore
 
         greenlet_version = parse_version(greenlet.__version__)
@@ -1328,14 +1399,18 @@ def qualname_from_function(func):
 
     prefix, suffix = "", ""
 
-    if hasattr(func, "_partialmethod") and isinstance(
-        func._partialmethod, partialmethod
-    ):
-        prefix, suffix = "partialmethod(<function ", ">)"
-        func = func._partialmethod.func
-    elif isinstance(func, partial) and hasattr(func.func, "__name__"):
+    if isinstance(func, partial) and hasattr(func.func, "__name__"):
         prefix, suffix = "partial(<function ", ">)"
         func = func.func
+    else:
+        # The _partialmethod attribute of methods wrapped with partialmethod() was renamed to __partialmethod__ in CPython 3.13:
+        # https://github.com/python/cpython/pull/16600
+        partial_method = getattr(func, "_partialmethod", None) or getattr(
+            func, "__partialmethod__", None
+        )
+        if isinstance(partial_method, partialmethod):
+            prefix, suffix = "partialmethod(<function ", ">)"
+            func = partial_method.func
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
@@ -1794,12 +1869,14 @@ try:
     from gevent.monkey import is_module_patched
 except ImportError:
 
-    def get_gevent_hub():
-        # type: () -> Any
+    # it's not great that the signatures are different, get_hub can't return None
+    # consider adding an if TYPE_CHECKING to change the signature to Optional[Hub]
+    def get_gevent_hub():  # type: ignore[misc]
+        # type: () -> Optional[Hub]
         return None
 
-    def is_module_patched(*args, **kwargs):
-        # type: (*Any, **Any) -> bool
+    def is_module_patched(mod_name):
+        # type: (str) -> bool
         # unable to import from gevent means no modules have been patched
         return False
 

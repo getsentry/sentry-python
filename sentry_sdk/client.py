@@ -5,12 +5,14 @@ import socket
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
+from typing import cast, overload
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
+    ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
-    disable_capture_event,
+    env_to_bool,
     format_timestamp,
     get_sdk_name,
     get_type_name,
@@ -30,15 +32,19 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
-from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import has_profiling_enabled, Profile, setup_profiler
+from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
+from sentry_sdk.profiler.transaction_profiler import (
+    has_profiling_enabled,
+    Profile,
+    setup_profiler,
+)
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -48,14 +54,16 @@ if TYPE_CHECKING:
     from typing import Sequence
     from typing import Type
     from typing import Union
+    from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk._types import Event, Hint, SDKInfo
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.transport import Transport
 
+    I = TypeVar("I", bound=Integration)  # noqa: E741
 
 _client_init_debug = ContextVar("client_init_debug")
 
@@ -64,7 +72,7 @@ SDK_INFO = {
     "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-}
+}  # type: SDKInfo
 
 
 def _get_options(*args, **kwargs):
@@ -99,11 +107,7 @@ def _get_options(*args, **kwargs):
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
     if rv["debug"] is None:
-        rv["debug"] = os.environ.get("SENTRY_DEBUG", "False").lower() in (
-            "true",
-            "1",
-            "t",
-        )
+        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG", "False"), strict=True)
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -123,7 +127,7 @@ def _get_options(*args, **kwargs):
         rv["traces_sample_rate"] = 1.0
 
     if rv["event_scrubber"] is None:
-        rv["event_scrubber"] = EventScrubber()
+        rv["event_scrubber"] = EventScrubber(send_default_pii=rv["send_default_pii"])
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
@@ -193,8 +197,20 @@ class BaseClient:
         # type: (*Any, **Any) -> None
         return None
 
-    def get_integration(self, *args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    if TYPE_CHECKING:
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (str) -> Optional[Integration]
+            ...
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (type[I]) -> Optional[I]
+            ...
+
+    def get_integration(self, name_or_class):
+        # type: (Union[str, type[Integration]]) -> Optional[Integration]
         return None
 
     def close(self, *args, **kwargs):
@@ -266,7 +282,6 @@ class _Client(BaseClient):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
                 logger.debug("Enabled tracing for %s", function_qualname)
-
             except module_not_found_error:
                 try:
                     # Try to import a class
@@ -353,9 +368,13 @@ class _Client(BaseClient):
                     "[OTel] Enabling experimental OTel-powered performance monitoring."
                 )
                 self.options["instrumenter"] = INSTRUMENTER.OTEL
-                _DEFAULT_INTEGRATIONS.append(
-                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
-                )
+                if (
+                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
+                    not in _DEFAULT_INTEGRATIONS
+                ):
+                    _DEFAULT_INTEGRATIONS.append(
+                        "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
+                    )
 
             self.integrations = setup_integrations(
                 self.options["integrations"],
@@ -363,9 +382,20 @@ class _Client(BaseClient):
                 with_auto_enabling_integrations=self.options[
                     "auto_enabling_integrations"
                 ],
+                disabled_integrations=self.options["disabled_integrations"],
             )
 
             self.spotlight = None
+            spotlight_config = self.options.get("spotlight")
+            if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
+                spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
+                spotlight_config = env_to_bool(spotlight_env_value, strict=True)
+                self.options["spotlight"] = (
+                    spotlight_config
+                    if spotlight_config is not None
+                    else spotlight_env_value
+                )
+
             if self.options.get("spotlight"):
                 self.spotlight = setup_spotlight(self.options)
 
@@ -378,6 +408,15 @@ class _Client(BaseClient):
                     setup_profiler(self.options)
                 except Exception as e:
                     logger.debug("Can not set up profiler. (%s)", e)
+            else:
+                try:
+                    setup_continuous_profiler(
+                        self.options,
+                        sdk_info=SDK_INFO,
+                        capture_func=_capture_envelope,
+                    )
+                except Exception as e:
+                    logger.debug("Can not set up continuous profiler. (%s)", e)
 
         finally:
             _client_init_debug.set(old_debug)
@@ -431,6 +470,7 @@ class _Client(BaseClient):
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
+            spans_before = len(event.get("spans", []))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -440,9 +480,21 @@ class _Client(BaseClient):
                         "event_processor",
                         data_category=("transaction" if is_transaction else "error"),
                     )
+                    if is_transaction:
+                        self.transport.record_lost_event(
+                            "event_processor",
+                            data_category="span",
+                            quantity=spans_before + 1,  # +1 for the transaction itself
+                        )
                 return None
 
             event = event_
+
+            spans_delta = spans_before - len(event.get("spans", []))
+            if is_transaction and spans_delta > 0 and self.transport is not None:
+                self.transport.record_lost_event(
+                    "event_processor", data_category="span", quantity=spans_delta
+                )
 
         if (
             self.options["attach_stacktrace"]
@@ -488,16 +540,20 @@ class _Client(BaseClient):
 
         if event is not None:
             event_scrubber = self.options["event_scrubber"]
-            if event_scrubber and not self.options["send_default_pii"]:
+            if event_scrubber:
                 event_scrubber.scrub_event(event)
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = serialize(
-                event,
-                max_request_body_size=self.options.get("max_request_body_size"),
-                max_value_length=self.options.get("max_value_length"),
+            event = cast(
+                "Event",
+                serialize(
+                    cast("Dict[str, Any]", event),
+                    max_request_body_size=self.options.get("max_request_body_size"),
+                    max_value_length=self.options.get("max_value_length"),
+                    custom_repr=self.options.get("custom_repr"),
+                ),
             )
 
         before_send = self.options["before_send"]
@@ -524,14 +580,27 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
+            spans_before = len(event.get("spans", []))
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
                 logger.info("before send transaction dropped event")
                 if self.transport:
                     self.transport.record_lost_event(
-                        "before_send", data_category="transaction"
+                        reason="before_send", data_category="transaction"
                     )
+                    self.transport.record_lost_event(
+                        reason="before_send",
+                        data_category="span",
+                        quantity=spans_before + 1,  # +1 for the transaction itself
+                    )
+            else:
+                spans_delta = spans_before - len(new_event.get("spans", []))
+                if spans_delta > 0 and self.transport is not None:
+                    self.transport.record_lost_event(
+                        reason="before_send", data_category="span", quantity=spans_delta
+                    )
+
             event = new_event  # type: ignore
 
         return event
@@ -682,9 +751,6 @@ class _Client(BaseClient):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        if disable_capture_event.get(False):
-            return None
-
         if hint is None:
             hint = {}
         event_id = event.get("event_id")
@@ -763,10 +829,22 @@ class _Client(BaseClient):
         else:
             self.session_flusher.add_session(session)
 
+    if TYPE_CHECKING:
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (str) -> Optional[Integration]
+            ...
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (type[I]) -> Optional[I]
+            ...
+
     def get_integration(
         self, name_or_class  # type: Union[str, Type[Integration]]
     ):
-        # type: (...) -> Any
+        # type: (...) -> Optional[Integration]
         """Returns the integration for this client by name or class.
         If the client does not have that integration then `None` is returned.
         """
@@ -829,7 +907,7 @@ class _Client(BaseClient):
         self.close()
 
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a

@@ -5,10 +5,8 @@ import weakref
 from importlib import import_module
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
-from sentry_sdk.scope import Scope, add_global_event_processor, should_send_default_pii
+from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
@@ -68,6 +66,7 @@ if DJANGO_VERSION[:2] > (1, 8):
 else:
     patch_caching = None  # type: ignore
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -104,7 +103,19 @@ TRANSACTION_STYLE_VALUES = ("function_name", "url")
 
 
 class DjangoIntegration(Integration):
+    """
+    Auto instrument a Django application.
+
+    :param transaction_style: How to derive transaction names. Either `"function_name"` or `"url"`. Defaults to `"url"`.
+    :param middleware_spans: Whether to create spans for middleware. Defaults to `True`.
+    :param signals_spans: Whether to create spans for signals. Defaults to `True`.
+    :param signals_denylist: A list of signals to ignore when creating spans.
+    :param cache_spans: Whether to create spans for cache operations. Defaults to `False`.
+    """
+
     identifier = "django"
+    origin = f"auto.http.{identifier}"
+    origin_db = f"auto.db.{identifier}"
 
     transaction_style = ""
     middleware_spans = None
@@ -128,9 +139,11 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+
         self.signals_spans = signals_spans
-        self.cache_spans = cache_spans
         self.signals_denylist = signals_denylist or []
+
+        self.cache_spans = cache_spans
 
     @staticmethod
     def setup_once():
@@ -159,9 +172,12 @@ class DjangoIntegration(Integration):
 
             use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
 
-            return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                bound_old_app,
+                use_x_forwarded_for,
+                span_origin=DjangoIntegration.origin,
             )
+            return middleware(environ, start_response)
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
@@ -354,7 +370,7 @@ def _patch_django_asgi_handler():
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, WSGIRequest) -> None
+    # type: (sentry_sdk.Scope, str, WSGIRequest) -> None
     try:
         transaction_name = None
         if transaction_style == "function_name":
@@ -395,14 +411,15 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-@ensure_integration_enabled(DjangoIntegration)
 def _before_get_response(request):
     # type: (WSGIRequest) -> None
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+    if integration is None:
+        return
 
     _patch_drf()
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     # Rely on WSGI middleware to start a trace
     _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
@@ -412,7 +429,7 @@ def _before_get_response(request):
 
 
 def _attempt_resolve_again(request, scope, transaction_style):
-    # type: (WSGIRequest, Scope, str) -> None
+    # type: (WSGIRequest, sentry_sdk.Scope, str) -> None
     """
     Some django middlewares overwrite request.urlconf
     so we need to respect that contract,
@@ -424,14 +441,13 @@ def _attempt_resolve_again(request, scope, transaction_style):
     _set_transaction_name_and_source(scope, transaction_style, request)
 
 
-@ensure_integration_enabled(DjangoIntegration)
 def _after_get_response(request):
     # type: (WSGIRequest) -> None
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-    if integration.transaction_style != "url":
+    if integration is None or integration.transaction_style != "url":
         return
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     _attempt_resolve_again(request, scope, integration.transaction_style)
 
 
@@ -475,13 +491,6 @@ def _make_wsgi_request_event_processor(weak_request, integration):
             # We have a `asgi_request_event_processor` for this.
             return event
 
-        try:
-            drf_request = request._sentry_drf_request_backref()
-            if drf_request is not None:
-                request = drf_request
-        except AttributeError:
-            pass
-
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
@@ -494,14 +503,15 @@ def _make_wsgi_request_event_processor(weak_request, integration):
     return wsgi_request_event_processor
 
 
-@ensure_integration_enabled(DjangoIntegration)
 def _got_request_exception(request=None, **kwargs):
     # type: (WSGIRequest, **Any) -> None
     client = sentry_sdk.get_client()
     integration = client.get_integration(DjangoIntegration)
+    if integration is None:
+        return
 
     if request is not None and integration.transaction_style == "url":
-        scope = Scope.get_current_scope()
+        scope = sentry_sdk.get_current_scope()
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     event, hint = event_from_exception(
@@ -513,6 +523,16 @@ def _got_request_exception(request=None, **kwargs):
 
 
 class DjangoRequestExtractor(RequestExtractor):
+    def __init__(self, request):
+        # type: (Union[WSGIRequest, ASGIRequest]) -> None
+        try:
+            drf_request = request._sentry_drf_request_backref()
+            if drf_request is not None:
+                request = drf_request
+        except AttributeError:
+            pass
+        self.request = request
+
     def env(self):
         # type: () -> Dict[str, str]
         return self.request.META
@@ -609,23 +629,14 @@ def install_sql_hook():
     def execute(self, sql, params=None):
         # type: (CursorWrapper, Any, Optional[Any]) -> Any
         with record_sql_queries(
-            self.cursor, sql, params, paramstyle="format", executemany=False
+            cursor=self.cursor,
+            query=sql,
+            params_list=params,
+            paramstyle="format",
+            executemany=False,
+            span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
-            options = (
-                sentry_sdk.get_client()
-                .options["_experiments"]
-                .get("attach_explain_plans")
-            )
-            if options is not None:
-                attach_explain_plan_to_span(
-                    span,
-                    self.cursor.connection,
-                    sql,
-                    params,
-                    self.mogrify,
-                    options,
-                )
             result = real_execute(self, sql, params)
 
         with capture_internal_exceptions():
@@ -637,7 +648,12 @@ def install_sql_hook():
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
         with record_sql_queries(
-            self.cursor, sql, param_list, paramstyle="format", executemany=True
+            cursor=self.cursor,
+            query=sql,
+            params_list=param_list,
+            paramstyle="format",
+            executemany=True,
+            span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
 
@@ -654,7 +670,11 @@ def install_sql_hook():
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        with sentry_sdk.start_span(op=OP.DB, description="connect") as span:
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            name="connect",
+            origin=DjangoIntegration.origin_db,
+        ) as span:
             _set_db_data(span, self)
             return real_connect(self)
 
@@ -683,15 +703,10 @@ def _set_db_data(span, cursor_or_db):
     if is_psycopg2:
         connection_params = cursor_or_db.connection.get_dsn_parameters()
     else:
-        is_psycopg3 = (
-            hasattr(cursor_or_db, "connection")
-            and hasattr(cursor_or_db.connection, "info")
-            and hasattr(cursor_or_db.connection.info, "get_parameters")
-            and inspect.isroutine(cursor_or_db.connection.info.get_parameters)
-        )
-        if is_psycopg3:
+        try:
+            # psycopg3
             connection_params = cursor_or_db.connection.info.get_parameters()
-        else:
+        except Exception:
             connection_params = db.get_connection_params()
 
     db_name = connection_params.get("dbname") or connection_params.get("database")

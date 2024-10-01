@@ -13,7 +13,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    ensure_integration_enabled,
 )
 
 try:
@@ -26,6 +25,7 @@ except ImportError:
 
 class HuggingfaceHubIntegration(Integration):
     identifier = "huggingface_hub"
+    origin = f"auto.ai.{identifier}"
 
     def __init__(self, include_prompts=True):
         # type: (HuggingfaceHubIntegration, bool) -> None
@@ -54,9 +54,12 @@ def _capture_exception(exc):
 def _wrap_text_generation(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     @wraps(f)
-    @ensure_integration_enabled(HuggingfaceHubIntegration, f)
     def new_text_generation(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(HuggingfaceHubIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
         if "prompt" in kwargs:
             prompt = kwargs["prompt"]
         elif len(args) >= 2:
@@ -72,7 +75,8 @@ def _wrap_text_generation(f):
 
         span = sentry_sdk.start_span(
             op=consts.OP.HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE,
-            description="Text Generation",
+            name="Text Generation",
+            origin=HuggingfaceHubIntegration.origin,
         )
         span.__enter__()
         try:
@@ -81,8 +85,6 @@ def _wrap_text_generation(f):
             _capture_exception(e)
             span.__exit__(None, None, None)
             raise e from None
-
-        integration = sentry_sdk.get_client().get_integration(HuggingfaceHubIntegration)
 
         with capture_internal_exceptions():
             if should_send_default_pii() and integration.include_prompts:

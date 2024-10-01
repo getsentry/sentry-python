@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.2.0",
+    version="2.14.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -57,24 +57,16 @@ setup(
         "falcon": ["falcon>=1.4"],
         "fastapi": ["fastapi>=0.79.0"],
         "flask": ["flask>=0.11", "blinker>=1.1", "markupsafe"],
-        "grpcio": ["grpcio>=1.21.1"],
+        "grpcio": ["grpcio>=1.21.1", "protobuf>=3.8.0"],
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
         "huggingface_hub": ["huggingface_hub>=0.22"],
         "langchain": ["langchain>=0.0.210"],
+        "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
-        "opentelemetry-experimental": [
-            "opentelemetry-distro~=0.40b0",
-            "opentelemetry-instrumentation-aiohttp-client~=0.40b0",
-            "opentelemetry-instrumentation-django~=0.40b0",
-            "opentelemetry-instrumentation-fastapi~=0.40b0",
-            "opentelemetry-instrumentation-flask~=0.40b0",
-            "opentelemetry-instrumentation-requests~=0.40b0",
-            "opentelemetry-instrumentation-sqlite3~=0.40b0",
-            "opentelemetry-instrumentation-urllib~=0.40b0",
-        ],
+        "opentelemetry-experimental": ["opentelemetry-distro"],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "pymongo": ["pymongo>=3.1"],
         "pyspark": ["pyspark>=2.4.4"],
@@ -84,7 +76,12 @@ setup(
         "sqlalchemy": ["sqlalchemy>=1.2"],
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
-        "tornado": ["tornado>=5"],
+        "tornado": ["tornado>=6"],
+    },
+    entry_points={
+        "opentelemetry_propagator": [
+            "sentry=sentry_sdk.integrations.opentelemetry:SentryPropagator"
+        ]
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import format_timestamp
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional

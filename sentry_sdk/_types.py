@@ -1,7 +1,4 @@
-try:
-    from typing import TYPE_CHECKING
-except ImportError:
-    TYPE_CHECKING = False
+from typing import TYPE_CHECKING
 
 
 # Re-exported for compat, since code out there in the wild might use this variable.
@@ -9,7 +6,7 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from collections.abc import Container, MutableMapping, Sequence
 
     from datetime import datetime
 
@@ -17,7 +14,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Mapping
     from typing import NotRequired
     from typing import Optional
@@ -25,6 +21,11 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
     from typing_extensions import Literal, TypedDict
+
+    class SDKInfo(TypedDict):
+        name: str
+        version: str
+        packages: Sequence[Mapping[str, str]]
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
@@ -122,8 +123,9 @@ if TYPE_CHECKING:
         total=False,
     )
 
-    ExcInfo = Tuple[
-        Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
+    ExcInfo = Union[
+        tuple[Type[BaseException], BaseException, Optional[TracebackType]],
+        tuple[None, None, None],
     ]
 
     Hint = Dict[str, Any]
@@ -153,12 +155,15 @@ if TYPE_CHECKING:
         "session",
         "internal",
         "profile",
+        "profile_chunk",
         "metric_bucket",
         "monitor",
+        "span",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
-    ProfilerMode = Literal["sleep", "thread", "gevent", "unknown"]
+    ContinuousProfilerMode = Literal["thread", "gevent", "unknown"]
+    ProfilerMode = Union[ContinuousProfilerMode, Literal["sleep"]]
 
     # Type of the metric.
     MetricType = Literal["d", "s", "g", "c"]
@@ -171,14 +176,7 @@ if TYPE_CHECKING:
     MetricTagsInternal = Tuple[Tuple[str, str], ...]
 
     # External representation of tags as a dictionary.
-    MetricTagValue = Union[
-        str,
-        int,
-        float,
-        None,
-        List[Union[int, str, float, None]],
-        Tuple[Union[int, str, float, None], ...],
-    ]
+    MetricTagValue = Union[str, int, float, None]
     MetricTags = Mapping[str, MetricTagValue]
 
     # Value inside the generator for the metric value.
@@ -220,3 +218,5 @@ if TYPE_CHECKING:
         },
         total=False,
     )
+
+    HttpStatusCodeRange = Union[int, Container[int]]

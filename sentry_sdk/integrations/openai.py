@@ -1,24 +1,22 @@
 from functools import wraps
 
+import sentry_sdk
 from sentry_sdk import consts
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+)
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Callable, Iterator
     from sentry_sdk.tracing import Span
-
-import sentry_sdk
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import (
-    logger,
-    capture_internal_exceptions,
-    event_from_exception,
-    ensure_integration_enabled,
-)
 
 try:
     from openai.resources.chat.completions import Completions
@@ -29,40 +27,32 @@ try:
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
 
-try:
-    import tiktoken  # type: ignore
-
-    enc = tiktoken.get_encoding("cl100k_base")
-
-    def count_tokens(s):
-        # type: (str) -> int
-        return len(enc.encode_ordinary(s))
-
-    logger.debug("[OpenAI] using tiktoken to count tokens")
-except ImportError:
-    logger.info(
-        "The Sentry Python SDK requires 'tiktoken' in order to measure token usage from some OpenAI APIs"
-        "Please install 'tiktoken' if you aren't receiving token usage in Sentry."
-        "See https://docs.sentry.io/platforms/python/integrations/openai/ for more information."
-    )
-
-    def count_tokens(s):
-        # type: (str) -> int
-        return 0
-
 
 class OpenAIIntegration(Integration):
     identifier = "openai"
+    origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (OpenAIIntegration, bool) -> None
+    def __init__(self, include_prompts=True, tiktoken_encoding_name=None):
+        # type: (OpenAIIntegration, bool, Optional[str]) -> None
         self.include_prompts = include_prompts
+
+        self.tiktoken_encoding = None
+        if tiktoken_encoding_name is not None:
+            import tiktoken  # type: ignore
+
+            self.tiktoken_encoding = tiktoken.get_encoding(tiktoken_encoding_name)
 
     @staticmethod
     def setup_once():
         # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
+
+    def count_tokens(self, s):
+        # type: (OpenAIIntegration, str) -> int
+        if self.tiktoken_encoding is not None:
+            return len(self.tiktoken_encoding.encode_ordinary(s))
+        return 0
 
 
 def _capture_exception(exc):
@@ -76,9 +66,9 @@ def _capture_exception(exc):
 
 
 def _calculate_chat_completion_usage(
-    messages, response, span, streaming_message_responses=None
+    messages, response, span, streaming_message_responses, count_tokens
 ):
-    # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]]) -> None
+    # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
     completion_tokens = 0  # type: Optional[int]
     prompt_tokens = 0  # type: Optional[int]
     total_tokens = 0  # type: Optional[int]
@@ -121,12 +111,13 @@ def _calculate_chat_completion_usage(
 
 def _wrap_chat_completion_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
+
     @wraps(f)
-    @ensure_integration_enabled(OpenAIIntegration, f)
     def new_chat_completion(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        if "messages" not in kwargs:
-            # invalid call (in all versions of openai), let it return error
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None or "messages" not in kwargs:
+            # no "messages" means invalid call (in all versions of openai), let it return error
             return f(*args, **kwargs)
 
         try:
@@ -142,7 +133,8 @@ def _wrap_chat_completion_create(f):
 
         span = sentry_sdk.start_span(
             op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
-            description="Chat Completion",
+            name="Chat Completion",
+            origin=OpenAIIntegration.origin,
         )
         span.__enter__()
         try:
@@ -151,8 +143,6 @@ def _wrap_chat_completion_create(f):
             _capture_exception(e)
             span.__exit__(None, None, None)
             raise e from None
-
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
 
         with capture_internal_exceptions():
             if should_send_default_pii() and integration.include_prompts:
@@ -168,7 +158,9 @@ def _wrap_chat_completion_create(f):
                         "ai.responses",
                         list(map(lambda x: x.message, res.choices)),
                     )
-                _calculate_chat_completion_usage(messages, res, span)
+                _calculate_chat_completion_usage(
+                    messages, res, span, None, integration.count_tokens
+                )
                 span.__exit__(None, None, None)
             elif hasattr(res, "_iterator"):
                 data_buf: list[list[str]] = []  # one for each choice
@@ -203,7 +195,11 @@ def _wrap_chat_completion_create(f):
                                     span, SPANDATA.AI_RESPONSES, all_responses
                                 )
                             _calculate_chat_completion_usage(
-                                messages, res, span, all_responses
+                                messages,
+                                res,
+                                span,
+                                all_responses,
+                                integration.count_tokens,
                             )
                     span.__exit__(None, None, None)
 
@@ -211,7 +207,7 @@ def _wrap_chat_completion_create(f):
             else:
                 set_data_normalized(span, "unknown_response", True)
                 span.__exit__(None, None, None)
-            return res
+        return res
 
     return new_chat_completion
 
@@ -220,14 +216,17 @@ def _wrap_embeddings_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
 
     @wraps(f)
-    @ensure_integration_enabled(OpenAIIntegration, f)
     def new_embeddings_create(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
-            description="OpenAI Embedding Creation",
+            name="OpenAI Embedding Creation",
+            origin=OpenAIIntegration.origin,
         ) as span:
-            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
             if "input" in kwargs and (
                 should_send_default_pii() and integration.include_prompts
             ):
@@ -260,7 +259,7 @@ def _wrap_embeddings_create(f):
                     total_tokens = response.usage.total_tokens
 
             if prompt_tokens == 0:
-                prompt_tokens = count_tokens(kwargs["input"] or "")
+                prompt_tokens = integration.count_tokens(kwargs["input"] or "")
 
             record_token_usage(span, prompt_tokens, None, total_tokens or prompt_tokens)
 

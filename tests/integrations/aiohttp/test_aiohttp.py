@@ -4,9 +4,16 @@ from contextlib import suppress
 from unittest import mock
 
 import pytest
-from aiohttp import web
+from aiohttp import web, ClientSession
 from aiohttp.client import ServerDisconnectedError
 from aiohttp.web_request import Request
+from aiohttp.web_exceptions import (
+    HTTPInternalServerError,
+    HTTPNetworkAuthenticationRequired,
+    HTTPBadRequest,
+    HTTPNotFound,
+    HTTPUnavailableForLegalReasons,
+)
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
@@ -287,8 +294,8 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_even
 async def test_traces_sampler_gets_request_object_in_sampling_context(
     sentry_init,
     aiohttp_client,
-    DictionaryContaining,  # noqa:N803
-    ObjectDescribedBy,
+    DictionaryContaining,  # noqa: N803
+    ObjectDescribedBy,  # noqa: N803
 ):
     traces_sampler = mock.Mock()
     sentry_init(
@@ -567,3 +574,147 @@ async def test_outgoing_trace_headers_append_to_baggage(
             resp.request_info.headers["baggage"]
             == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
         )
+
+
+@pytest.mark.asyncio
+async def test_span_origin(
+    sentry_init,
+    aiohttp_client,
+    capture_events,
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    async def hello(request):
+        async with ClientSession() as session:
+            async with session.get("http://example.com"):
+                return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    await client.get("/")
+
+    (event,) = events
+    assert event["contexts"]["trace"]["origin"] == "auto.http.aiohttp"
+    assert event["spans"][0]["origin"] == "auto.http.aiohttp"
+
+
+@pytest.mark.parametrize(
+    ("integration_kwargs", "exception_to_raise", "should_capture"),
+    (
+        ({}, None, False),
+        ({}, HTTPBadRequest, False),
+        (
+            {},
+            HTTPUnavailableForLegalReasons(None),
+            False,
+        ),  # Highest 4xx status code (451)
+        ({}, HTTPInternalServerError, True),
+        ({}, HTTPNetworkAuthenticationRequired, True),  # Highest 5xx status code (511)
+        ({"failed_request_status_codes": set()}, HTTPInternalServerError, False),
+        (
+            {"failed_request_status_codes": set()},
+            HTTPNetworkAuthenticationRequired,
+            False,
+        ),
+        ({"failed_request_status_codes": {404, *range(500, 600)}}, HTTPNotFound, True),
+        (
+            {"failed_request_status_codes": {404, *range(500, 600)}},
+            HTTPInternalServerError,
+            True,
+        ),
+        (
+            {"failed_request_status_codes": {404, *range(500, 600)}},
+            HTTPBadRequest,
+            False,
+        ),
+    ),
+)
+@pytest.mark.asyncio
+async def test_failed_request_status_codes(
+    sentry_init,
+    aiohttp_client,
+    capture_events,
+    integration_kwargs,
+    exception_to_raise,
+    should_capture,
+):
+    sentry_init(integrations=[AioHttpIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    async def handle(_):
+        if exception_to_raise is not None:
+            raise exception_to_raise
+        else:
+            return web.Response(status=200)
+
+    app = web.Application()
+    app.router.add_get("/", handle)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+
+    expected_status = (
+        200 if exception_to_raise is None else exception_to_raise.status_code
+    )
+    assert resp.status == expected_status
+
+    if should_capture:
+        (event,) = events
+        assert event["exception"]["values"][0]["type"] == exception_to_raise.__name__
+    else:
+        assert not events
+
+
+@pytest.mark.asyncio
+async def test_failed_request_status_codes_with_returned_status(
+    sentry_init, aiohttp_client, capture_events
+):
+    """
+    Returning a web.Response with a failed_request_status_code should not be reported to Sentry.
+    """
+    sentry_init(integrations=[AioHttpIntegration(failed_request_status_codes={500})])
+    events = capture_events()
+
+    async def handle(_):
+        return web.Response(status=500)
+
+    app = web.Application()
+    app.router.add_get("/", handle)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+
+    assert resp.status == 500
+    assert not events
+
+
+@pytest.mark.asyncio
+async def test_failed_request_status_codes_non_http_exception(
+    sentry_init, aiohttp_client, capture_events
+):
+    """
+    If an exception, which is not an instance of HTTPException, is raised, it should be captured, even if
+    failed_request_status_codes is empty.
+    """
+    sentry_init(integrations=[AioHttpIntegration(failed_request_status_codes=set())])
+    events = capture_events()
+
+    async def handle(_):
+        1 / 0
+
+    app = web.Application()
+    app.router.add_get("/", handle)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+    assert resp.status == 500
+
+    (event,) = events
+    assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"

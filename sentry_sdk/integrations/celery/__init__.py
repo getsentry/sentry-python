@@ -1,10 +1,11 @@
 import sys
+from collections.abc import Mapping
 from functools import wraps
 
 import sentry_sdk
 from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -14,8 +15,6 @@ from sentry_sdk.integrations.celery.beat import (
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -23,6 +22,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     reraise,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
 
 try:
     from celery import VERSION as CELERY_VERSION  # type: ignore
+    from celery.app.task import Task  # type: ignore
     from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
         Ignore,
@@ -47,6 +49,7 @@ try:
         Retry,
         SoftTimeLimitExceeded,
     )
+    from kombu import Producer  # type: ignore
 except ImportError:
     raise DidNotEnable("Celery not installed")
 
@@ -56,6 +59,7 @@ CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 
 class CeleryIntegration(Integration):
     identifier = "celery"
+    origin = f"auto.queue.{identifier}"
 
     def __init__(
         self,
@@ -68,10 +72,9 @@ class CeleryIntegration(Integration):
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
 
-        if monitor_beat_tasks:
-            _patch_beat_apply_entry()
-            _patch_redbeat_maybe_due()
-            _setup_celery_beat_signals()
+        _patch_beat_apply_entry()
+        _patch_redbeat_maybe_due()
+        _setup_celery_beat_signals(monitor_beat_tasks)
 
     @staticmethod
     def setup_once():
@@ -81,7 +84,9 @@ class CeleryIntegration(Integration):
 
         _patch_build_tracer()
         _patch_task_apply_async()
+        _patch_celery_send_task()
         _patch_worker_exit()
+        _patch_producer_publish()
 
         # This logger logs every status of every task that ran on the worker.
         # Meaning that every task's breadcrumbs are full of stuff like "Task
@@ -97,7 +102,7 @@ class CeleryIntegration(Integration):
 def _set_status(status):
     # type: (str) -> None
     with capture_internal_exceptions():
-        scope = Scope.get_current_scope()
+        scope = sentry_sdk.get_current_scope()
         if scope.span is not None:
             scope.span.set_status(status)
 
@@ -164,11 +169,11 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
     """
     updated_headers = original_headers.copy()
     with capture_internal_exceptions():
-        headers = {}
-        if span is not None:
-            headers = dict(
-                Scope.get_current_scope().iter_trace_propagation_headers(span=span)
-            )
+        # if span is None (when the task was started by Celery Beat)
+        # this will return the trace headers from the scope.
+        headers = dict(
+            sentry_sdk.get_isolation_scope().iter_trace_propagation_headers(span=span)
+        )
 
         if monitor_beat_tasks:
             headers.update(
@@ -177,6 +182,12 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
                     % _now_seconds_since_epoch(),
                 }
             )
+
+        # Add the time the task was enqueued to the headers
+        # This is used in the consumer to calculate the latency
+        updated_headers.update(
+            {"sentry-task-enqueued-time": _now_seconds_since_epoch()}
+        )
 
         if headers:
             existing_baggage = updated_headers.get(BAGGAGE_HEADER_NAME)
@@ -234,16 +245,18 @@ class NoOpMgr:
         return None
 
 
-def _wrap_apply_async(f):
+def _wrap_task_run(f):
     # type: (F) -> F
     @wraps(f)
-    @ensure_integration_enabled(CeleryIntegration, f)
     def apply_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         # Note: kwargs can contain headers=None, so no setdefault!
         # Unsure which backend though.
-        kwarg_headers = kwargs.get("headers") or {}
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
+        kwarg_headers = kwargs.get("headers") or {}
         propagate_traces = kwarg_headers.pop(
             "sentry-propagate-traces", integration.propagate_traces
         )
@@ -251,14 +264,21 @@ def _wrap_apply_async(f):
         if not propagate_traces:
             return f(*args, **kwargs)
 
-        task = args[0]
+        if isinstance(args[0], Task):
+            task_name = args[0].name  # type: str
+        elif len(args) > 1 and isinstance(args[1], str):
+            task_name = args[1]
+        else:
+            task_name = "<unknown Celery task>"
 
-        task_started_from_beat = (
-            sentry_sdk.Scope.get_isolation_scope()._name == "celery-beat"
-        )
+        task_started_from_beat = sentry_sdk.get_isolation_scope()._name == "celery-beat"
 
         span_mgr = (
-            sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
+            sentry_sdk.start_span(
+                op=OP.QUEUE_SUBMIT_CELERY,
+                name=task_name,
+                origin=CeleryIntegration.origin,
+            )
             if not task_started_from_beat
             else NoOpMgr()
         )  # type: Union[Span, NoOpMgr]
@@ -301,9 +321,10 @@ def _wrap_tracer(task, f):
                     op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
                     source=TRANSACTION_SOURCE_TASK,
+                    origin=CeleryIntegration.origin,
                 )
                 transaction.name = task.name
-                transaction.set_status("ok")
+                transaction.set_status(SPANSTATUS.OK)
 
             if transaction is None:
                 return f(*args, **kwargs)
@@ -330,11 +351,12 @@ def _set_messaging_destination_name(task, span):
     """Set "messaging.destination.name" tag for span"""
     with capture_internal_exceptions():
         delivery_info = task.request.delivery_info
-        routing_key = delivery_info.get("routing_key")
-        if delivery_info.get("exchange") == "" and routing_key is not None:
-            # Empty exchange indicates the default exchange, meaning the tasks
-            # are sent to the queue with the same name as the routing key.
-            span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+        if delivery_info:
+            routing_key = delivery_info.get("routing_key")
+            if delivery_info.get("exchange") == "" and routing_key is not None:
+                # Empty exchange indicates the default exchange, meaning the tasks
+                # are sent to the queue with the same name as the routing key.
+                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
 
 def _wrap_task_call(task, f):
@@ -353,15 +375,33 @@ def _wrap_task_call(task, f):
         # type: (*Any, **Any) -> Any
         try:
             with sentry_sdk.start_span(
-                op=OP.QUEUE_PROCESS, description=task.name
+                op=OP.QUEUE_PROCESS,
+                name=task.name,
+                origin=CeleryIntegration.origin,
             ) as span:
                 _set_messaging_destination_name(task, span)
+
+                latency = None
+                with capture_internal_exceptions():
+                    if (
+                        task.request.headers is not None
+                        and "sentry-task-enqueued-time" in task.request.headers
+                    ):
+                        latency = _now_seconds_since_epoch() - task.request.headers.pop(
+                            "sentry-task-enqueued-time"
+                        )
+
+                if latency is not None:
+                    span.set_data(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
+
                 with capture_internal_exceptions():
                     span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+
                 with capture_internal_exceptions():
                     span.set_data(
                         SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
                     )
+
                 with capture_internal_exceptions():
                     span.set_data(
                         SPANDATA.MESSAGING_SYSTEM,
@@ -406,9 +446,14 @@ def _patch_build_tracer():
 
 def _patch_task_apply_async():
     # type: () -> None
-    from celery.app.task import Task  # type: ignore
+    Task.apply_async = _wrap_task_run(Task.apply_async)
 
-    Task.apply_async = _wrap_apply_async(Task.apply_async)
+
+def _patch_celery_send_task():
+    # type: () -> None
+    from celery import Celery
+
+    Celery.send_task = _wrap_task_run(Celery.send_task)
 
 
 def _patch_worker_exit():
@@ -433,3 +478,52 @@ def _patch_worker_exit():
                     sentry_sdk.flush()
 
     Worker.workloop = sentry_workloop
+
+
+def _patch_producer_publish():
+    # type: () -> None
+    original_publish = Producer.publish
+
+    @ensure_integration_enabled(CeleryIntegration, original_publish)
+    def sentry_publish(self, *args, **kwargs):
+        # type: (Producer, *Any, **Any) -> Any
+        kwargs_headers = kwargs.get("headers", {})
+        if not isinstance(kwargs_headers, Mapping):
+            # Ensure kwargs_headers is a Mapping, so we can safely call get().
+            # We don't expect this to happen, but it's better to be safe. Even
+            # if it does happen, only our instrumentation breaks. This line
+            # does not overwrite kwargs["headers"], so the original publish
+            # method will still work.
+            kwargs_headers = {}
+
+        task_name = kwargs_headers.get("task")
+        task_id = kwargs_headers.get("id")
+        retries = kwargs_headers.get("retries")
+
+        routing_key = kwargs.get("routing_key")
+        exchange = kwargs.get("exchange")
+
+        with sentry_sdk.start_span(
+            op=OP.QUEUE_PUBLISH,
+            name=task_name,
+            origin=CeleryIntegration.origin,
+        ) as span:
+            if task_id is not None:
+                span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
+
+            if exchange == "" and routing_key is not None:
+                # Empty exchange indicates the default exchange, meaning messages are
+                # routed to the queue with the same name as the routing key.
+                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+
+            if retries is not None:
+                span.set_data(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
+
+            with capture_internal_exceptions():
+                span.set_data(
+                    SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
+                )
+
+            return original_publish(self, *args, **kwargs)
+
+    Producer.publish = sentry_publish

@@ -4,13 +4,13 @@ import re
 import pytest
 import random
 
+import sentry_sdk
 from sentry_sdk import (
     capture_message,
-    Hub,
-    Scope,
     start_span,
     start_transaction,
 )
+from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport
 from sentry_sdk.tracing import Transaction
 
@@ -21,12 +21,12 @@ def test_basic(sentry_init, capture_events, sample_rate):
     events = capture_events()
 
     with start_transaction(name="hi") as transaction:
-        transaction.set_status("ok")
+        transaction.set_status(SPANSTATUS.OK)
         with pytest.raises(ZeroDivisionError):
-            with start_span(op="foo", description="foodesc"):
+            with start_span(op="foo", name="foodesc"):
                 1 / 0
 
-        with start_span(op="bar", description="bardesc"):
+        with start_span(op="bar", name="bardesc"):
             pass
 
     if sample_rate:
@@ -65,7 +65,9 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
         with start_span() as old_span:
             old_span.sampled = sampled
-            headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
+            headers = dict(
+                sentry_sdk.get_current_scope().iter_trace_propagation_headers(old_span)
+            )
             headers["baggage"] = (
                 "other-vendor-value-1=foo;bar;baz, "
                 "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
@@ -99,7 +101,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     with start_transaction(child_transaction):
         # change the transaction name from "WRONG" to make sure the change
         # is reflected in the final data
-        Scope.get_current_scope().transaction = "ho"
+        sentry_sdk.get_current_scope().transaction = "ho"
         capture_message("hello")
 
     # in this case the child transaction won't be captured
@@ -156,7 +158,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     assert baggage.third_party_items == ""
 
     with start_transaction(transaction):
-        with start_span(op="foo", description="foodesc"):
+        with start_span(op="foo", name="foodesc"):
             pass
 
     # finish will create a new baggage entry
@@ -209,7 +211,7 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
 
     with start_transaction(name="hi"):
         for i in range(100):
-            with start_span(op="helloworld", description="hi {}".format(i)) as span:
+            with start_span(op="helloworld", name="hi {}".format(i)) as span:
 
                 def foo():
                     pass
@@ -246,14 +248,14 @@ def test_start_span_after_finish(sentry_init, capture_events):
             pass
 
         def capture_event(self, event):
-            start_span(op="toolate", description="justdont")
+            start_span(op="toolate", name="justdont")
             pass
 
     sentry_init(traces_sample_rate=1, transport=CustomTransport())
     events = capture_events()
 
     with start_transaction(name="hi"):
-        with start_span(op="bar", description="bardesc"):
+        with start_span(op="bar", name="bardesc"):
             pass
 
     assert len(events) == 1
@@ -267,9 +269,9 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
     span = None
 
     with start_transaction(transaction):
-        with start_span(op="foo", description="foodesc") as current_span:
+        with start_span(op="foo", name="foodesc") as current_span:
             span = current_span
-            meta = Hub.current.trace_propagation_meta()
+            meta = sentry_sdk.get_current_scope().trace_propagation_meta()
 
     ind = meta.find(">") + 1
     sentry_trace, baggage = meta[:ind], meta[ind:]

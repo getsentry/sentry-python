@@ -14,6 +14,7 @@ __all__ = ["SocketIntegration"]
 
 class SocketIntegration(Integration):
     identifier = "socket"
+    origin = f"auto.socket.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -54,7 +55,8 @@ def _patch_create_connection():
 
         with sentry_sdk.start_span(
             op=OP.SOCKET_CONNECTION,
-            description=_get_span_description(address[0], address[1]),
+            name=_get_span_description(address[0], address[1]),
+            origin=SocketIntegration.origin,
         ) as span:
             span.set_data("address", address)
             span.set_data("timeout", timeout)
@@ -78,7 +80,9 @@ def _patch_getaddrinfo():
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
         with sentry_sdk.start_span(
-            op=OP.SOCKET_DNS, description=_get_span_description(host, port)
+            op=OP.SOCKET_DNS,
+            name=_get_span_description(host, port),
+            origin=SocketIntegration.origin,
         ) as span:
             span.set_data("host", host)
             span.set_data("port", port)

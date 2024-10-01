@@ -21,9 +21,11 @@ from sentry_sdk.utils import (
     to_string,
     is_sentry_url,
     _is_external_source,
+    _is_in_project_root,
     _module_in_list,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -112,6 +114,7 @@ def record_sql_queries(
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
     record_cursor_repr=False,  # type: bool
+    span_origin="manual",  # type: str
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
@@ -141,7 +144,11 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    with sentry_sdk.start_span(op=OP.DB, description=query) as span:
+    with sentry_sdk.start_span(
+        op=OP.DB,
+        name=query,
+        origin=span_origin,
+    ) as span:
         for k, v in data.items():
             span.set_data(k, v)
         yield span
@@ -163,6 +170,34 @@ def maybe_create_breadcrumbs_from_span(scope, span):
             message=span.description,
             data=span._data,
         )
+
+
+def _get_frame_module_abs_path(frame):
+    # type: (FrameType) -> Optional[str]
+    try:
+        return frame.f_code.co_filename
+    except Exception:
+        return None
+
+
+def _should_be_included(
+    is_sentry_sdk_frame,  # type: bool
+    namespace,  # type: Optional[str]
+    in_app_include,  # type: Optional[list[str]]
+    in_app_exclude,  # type: Optional[list[str]]
+    abs_path,  # type: Optional[str]
+    project_root,  # type: Optional[str]
+):
+    # type: (...) -> bool
+    # in_app_include takes precedence over in_app_exclude
+    should_be_included = _module_in_list(namespace, in_app_include)
+    should_be_excluded = _is_external_source(abs_path) or _module_in_list(
+        namespace, in_app_exclude
+    )
+    return not is_sentry_sdk_frame and (
+        should_be_included
+        or (_is_in_project_root(abs_path, project_root) and not should_be_excluded)
+    )
 
 
 def add_query_source(span):
@@ -195,10 +230,7 @@ def add_query_source(span):
     # Find the correct frame
     frame = sys._getframe()  # type: Union[FrameType, None]
     while frame is not None:
-        try:
-            abs_path = frame.f_code.co_filename
-        except Exception:
-            abs_path = ""
+        abs_path = _get_frame_module_abs_path(frame)
 
         try:
             namespace = frame.f_globals.get("__name__")  # type: Optional[str]
@@ -209,20 +241,15 @@ def add_query_source(span):
             "sentry_sdk."
         )
 
-        should_be_included = not _is_external_source(abs_path)
-        if namespace is not None:
-            if in_app_exclude and _module_in_list(namespace, in_app_exclude):
-                should_be_included = False
-            if in_app_include and _module_in_list(namespace, in_app_include):
-                # in_app_include takes precedence over in_app_exclude, so doing it
-                # at the end
-                should_be_included = True
-
-        if (
-            abs_path.startswith(project_root)
-            and should_be_included
-            and not is_sentry_sdk_frame
-        ):
+        should_be_included = _should_be_included(
+            is_sentry_sdk_frame=is_sentry_sdk_frame,
+            namespace=namespace,
+            in_app_include=in_app_include,
+            in_app_exclude=in_app_exclude,
+            abs_path=abs_path,
+            project_root=project_root,
+        )
+        if should_be_included:
             break
 
         frame = frame.f_back
@@ -245,10 +272,7 @@ def add_query_source(span):
         if namespace is not None:
             span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
 
-        try:
-            filepath = frame.f_code.co_filename
-        except Exception:
-            filepath = None
+        filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
             if namespace is not None:
                 in_app_path = filename_for_module(namespace, filepath)
@@ -487,9 +511,9 @@ class Baggage:
         third_party_items = ""
         mutable = False
 
-        client = sentry_sdk.Hub.current.client
+        client = sentry_sdk.get_client()
 
-        if client is None or scope._propagation_context is None:
+        if not client.is_active() or scope._propagation_context is None:
             return Baggage(sentry_items)
 
         options = client.options
@@ -519,7 +543,7 @@ class Baggage:
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
         """
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
         sentry_items = {}  # type: Dict[str, str]
 
         if not client.is_active():
@@ -632,8 +656,8 @@ def start_child_span_decorator(func):
             span = get_current_span()
 
             if span is None:
-                logger.warning(
-                    "Can not create a child span for %s. "
+                logger.debug(
+                    "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
                     qualname_from_function(func),
                 )
@@ -641,9 +665,14 @@ def start_child_span_decorator(func):
 
             with span.start_child(
                 op=OP.FUNCTION,
-                description=qualname_from_function(func),
+                name=qualname_from_function(func),
             ):
                 return await func(*args, **kwargs)
+
+        try:
+            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
     # Synchronous case
     else:
@@ -655,8 +684,8 @@ def start_child_span_decorator(func):
             span = get_current_span()
 
             if span is None:
-                logger.warning(
-                    "Can not create a child span for %s. "
+                logger.debug(
+                    "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
                     qualname_from_function(func),
                 )
@@ -664,9 +693,14 @@ def start_child_span_decorator(func):
 
             with span.start_child(
                 op=OP.FUNCTION,
-                description=qualname_from_function(func),
+                name=qualname_from_function(func),
             ):
                 return func(*args, **kwargs)
+
+        try:
+            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
     return func_with_tracing
 
@@ -676,7 +710,7 @@ def get_current_span(scope=None):
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
-    scope = scope or sentry_sdk.Scope.get_current_scope()
+    scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
 

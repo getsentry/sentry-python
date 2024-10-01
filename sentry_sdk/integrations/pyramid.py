@@ -1,3 +1,4 @@
+import functools
 import os
 import sys
 import weakref
@@ -6,7 +7,7 @@ import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -14,7 +15,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     reraise,
 )
-from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from pyramid.httpexceptions import HTTPException
@@ -22,6 +22,7 @@ try:
 except ImportError:
     raise DidNotEnable("Pyramid not installed")
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pyramid.response import Response
@@ -30,8 +31,8 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Optional
-    from webob.cookies import RequestCookies  # type: ignore
-    from webob.compat import cgi_FieldStorage  # type: ignore
+    from webob.cookies import RequestCookies
+    from webob.request import _FieldStorageWithFile
 
     from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import Event, EventProcessor
@@ -53,6 +54,7 @@ TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
 
 class PyramidIntegration(Integration):
     identifier = "pyramid"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -72,15 +74,17 @@ class PyramidIntegration(Integration):
 
         old_call_view = router._call_view
 
-        @ensure_integration_enabled(PyramidIntegration, old_call_view)
+        @functools.wraps(old_call_view)
         def sentry_patched_call_view(registry, request, *args, **kwargs):
             # type: (Any, Request, *Any, **Any) -> Response
             integration = sentry_sdk.get_client().get_integration(PyramidIntegration)
+            if integration is None:
+                return old_call_view(registry, request, *args, **kwargs)
 
             _set_transaction_name_and_source(
-                Scope.get_current_scope(), integration.transaction_style, request
+                sentry_sdk.get_current_scope(), integration.transaction_style, request
             )
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             scope.add_event_processor(
                 _make_event_processor(weakref.ref(request), integration)
             )
@@ -123,9 +127,11 @@ class PyramidIntegration(Integration):
                     _capture_exception(einfo)
                     reraise(*einfo)
 
-            return SentryWsgiMiddleware(sentry_patched_inner_wsgi_call)(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                sentry_patched_inner_wsgi_call,
+                span_origin=PyramidIntegration.origin,
             )
+            return middleware(environ, start_response)
 
         router.Router.__call__ = sentry_patched_wsgi_call
 
@@ -146,7 +152,7 @@ def _capture_exception(exc_info):
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Request) -> None
+    # type: (sentry_sdk.Scope, str, Request) -> None
     try:
         name_for_style = {
             "route_name": request.matched_route.name,
@@ -186,7 +192,7 @@ class PyramidRequestExtractor(RequestExtractor):
         }
 
     def files(self):
-        # type: () -> Dict[str, cgi_FieldStorage]
+        # type: () -> Dict[str, _FieldStorageWithFile]
         return {
             key: value
             for key, value in self.request.POST.items()
@@ -194,7 +200,7 @@ class PyramidRequestExtractor(RequestExtractor):
         }
 
     def size_of_file(self, postdata):
-        # type: (cgi_FieldStorage) -> int
+        # type: (_FieldStorageWithFile) -> int
         file = postdata.file
         try:
             return os.fstat(file.fileno()).st_size

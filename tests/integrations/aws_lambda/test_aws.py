@@ -36,6 +36,13 @@ from textwrap import dedent
 
 import pytest
 
+RUNTIMES_TO_TEST = [
+    "python3.8",
+    "python3.9",
+    "python3.10",
+    "python3.11",
+    "python3.12",
+]
 
 LAMBDA_PRELUDE = """
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
@@ -137,15 +144,7 @@ def lambda_client():
     return get_boto_client()
 
 
-@pytest.fixture(
-    params=[
-        "python3.8",
-        "python3.9",
-        "python3.10",
-        "python3.11",
-        "python3.12",
-    ]
-)
+@pytest.fixture(params=RUNTIMES_TO_TEST)
 def lambda_runtime(request):
     return request.param
 
@@ -331,7 +330,9 @@ def test_init_error(run_lambda_function, lambda_runtime):
         syntax_check=False,
     )
 
-    (event,) = envelope_items
+    # We just take the last one, because it could be that in the output of the Lambda
+    # invocation there is still the envelope of the previous invocation of the function.
+    event = envelope_items[-1]
     assert event["exception"]["values"][0]["value"] == "name 'func' is not defined"
 
 
@@ -554,9 +555,9 @@ def test_non_dict_event(
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     run_lambda_function,
-    DictionaryContaining,  # noqa:N803
-    ObjectDescribedBy,
-    StringContaining,
+    DictionaryContaining,  # noqa: N803
+    ObjectDescribedBy,  # noqa: N803
+    StringContaining,  # noqa: N803
 ):
     # TODO: This whole thing is a little hacky, specifically around the need to
     # get `conftest.py` code into the AWS runtime, which is why there's both
@@ -877,3 +878,22 @@ def test_basic_with_eventbridge_source(run_lambda_function):
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "Oh!"
+
+
+def test_span_origin(run_lambda_function):
+    envelope_items, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            pass
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    (event,) = envelope_items
+
+    assert event["contexts"]["trace"]["origin"] == "auto.function.aws_lambda"

@@ -4,9 +4,9 @@ import pytest
 import rq
 from fakeredis import FakeStrictRedis
 
+import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import parse_version
 
 
@@ -181,7 +181,7 @@ def test_tracing_disabled(
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    scope = Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
     queue.enqueue(crashing_job, foo=None)
     worker.work(burst=True)
 
@@ -265,3 +265,18 @@ def test_job_with_retries(sentry_init, capture_events):
     worker.work(burst=True)
 
     assert len(events) == 1
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    queue.enqueue(do_trick, "Maisey", trick="kangaroo")
+    worker.work(burst=True)
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.queue.rq"

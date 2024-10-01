@@ -9,10 +9,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy import text
 
+import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.scope import Scope
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
@@ -235,7 +235,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
 
     long_str = "x" * (DEFAULT_MAX_VALUE_LENGTH + 10)
 
-    scope = Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
 
     @scope.add_event_processor
     def processor(event, hint):
@@ -670,3 +670,23 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
             break
     else:
         raise AssertionError("No db span found")
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
+    with start_transaction(name="foo"):
+        with engine.connect() as con:
+            con.execute(text("SELECT 0"))
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.db.sqlalchemy"

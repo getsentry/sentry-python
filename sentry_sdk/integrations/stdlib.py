@@ -7,7 +7,7 @@ from http.client import HTTPConnection
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import Scope, add_global_event_processor
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -18,7 +18,8 @@ from sentry_sdk.utils import (
     safe_repr,
     parse_url,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -89,10 +90,10 @@ def _install_httplib():
 
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
+            name="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
+            origin="auto.http.stdlib.httplib",
         )
-
         span.set_data(SPANDATA.HTTP_METHOD, method)
         if parsed_url is not None:
             span.set_data("url", parsed_url.url)
@@ -102,7 +103,10 @@ def _install_httplib():
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
         if should_propagate_trace(client, real_url):
-            for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
+            for (
+                key,
+                value,
+            ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
                 logger.debug(
@@ -197,13 +201,21 @@ def _install_subprocess():
 
         env = None
 
-        with sentry_sdk.start_span(op=OP.SUBPROCESS, description=description) as span:
-            for k, v in Scope.get_current_scope().iter_trace_propagation_headers(
+        with sentry_sdk.start_span(
+            op=OP.SUBPROCESS,
+            name=description,
+            origin="auto.subprocess.stdlib.subprocess",
+        ) as span:
+            for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
                 if env is None:
                     env = _init_argument(
-                        a, kw, "env", 10, lambda x: dict(x or os.environ)
+                        a,
+                        kw,
+                        "env",
+                        10,
+                        lambda x: dict(x if x is not None else os.environ),
                     )
                 env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
@@ -222,7 +234,10 @@ def _install_subprocess():
     @ensure_integration_enabled(StdlibIntegration, old_popen_wait)
     def sentry_patched_popen_wait(self, *a, **kw):
         # type: (subprocess.Popen[Any], *Any, **Any) -> Any
-        with sentry_sdk.start_span(op=OP.SUBPROCESS_WAIT) as span:
+        with sentry_sdk.start_span(
+            op=OP.SUBPROCESS_WAIT,
+            origin="auto.subprocess.stdlib.subprocess",
+        ) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_wait(self, *a, **kw)
 
@@ -233,7 +248,10 @@ def _install_subprocess():
     @ensure_integration_enabled(StdlibIntegration, old_popen_communicate)
     def sentry_patched_popen_communicate(self, *a, **kw):
         # type: (subprocess.Popen[Any], *Any, **Any) -> Any
-        with sentry_sdk.start_span(op=OP.SUBPROCESS_COMMUNICATE) as span:
+        with sentry_sdk.start_span(
+            op=OP.SUBPROCESS_COMMUNICATE,
+            origin="auto.subprocess.stdlib.subprocess",
+        ) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_communicate(self, *a, **kw)
 

@@ -2,7 +2,6 @@ import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -11,7 +10,7 @@ from sentry_sdk.utils import (
     parse_version,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -106,7 +105,7 @@ class SentryFalconMiddleware:
         if integration is None:
             return
 
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         scope._name = "falcon"
         scope.add_event_processor(_make_request_event_processor(req, integration))
 
@@ -116,6 +115,7 @@ TRANSACTION_STYLE_VALUES = ("uri_template", "path")
 
 class FalconIntegration(Integration):
     identifier = "falcon"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -156,7 +156,8 @@ def _patch_wsgi_app():
             return original_wsgi_app(self, env, start_response)
 
         sentry_wrapped = SentryWsgiMiddleware(
-            lambda envi, start_resp: original_wsgi_app(self, envi, start_resp)
+            lambda envi, start_resp: original_wsgi_app(self, envi, start_resp),
+            span_origin=FalconIntegration.origin,
         )
 
         return sentry_wrapped(env, start_response)

@@ -2,18 +2,19 @@ from collections import OrderedDict
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name, record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.utils import logger, capture_internal_exceptions
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, List, Callable, Dict, Union, Optional
     from uuid import UUID
-from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import logger, capture_internal_exceptions
 
 try:
     from langchain_core.messages import BaseMessage
@@ -25,28 +26,6 @@ try:
     from langchain_core.agents import AgentAction, AgentFinish
 except ImportError:
     raise DidNotEnable("langchain not installed")
-
-
-try:
-    import tiktoken  # type: ignore
-
-    enc = tiktoken.get_encoding("cl100k_base")
-
-    def count_tokens(s):
-        # type: (str) -> int
-        return len(enc.encode_ordinary(s))
-
-    logger.debug("[langchain] using tiktoken to count tokens")
-except ImportError:
-    logger.info(
-        "The Sentry Python SDK requires 'tiktoken' in order to measure token usage from streaming langchain calls."
-        "Please install 'tiktoken' if you aren't receiving accurate token usage in Sentry."
-        "See https://docs.sentry.io/platforms/python/integrations/langchain/ for more information."
-    )
-
-    def count_tokens(s):
-        # type: (str) -> int
-        return 1
 
 
 DATA_FIELDS = {
@@ -73,14 +52,18 @@ NO_COLLECT_TOKEN_MODELS = [
 
 class LangchainIntegration(Integration):
     identifier = "langchain"
+    origin = f"auto.ai.{identifier}"
 
     # The most number of spans (e.g., LLM calls) that can be processed at the same time.
     max_spans = 1024
 
-    def __init__(self, include_prompts=True, max_spans=1024):
-        # type: (LangchainIntegration, bool, int) -> None
+    def __init__(
+        self, include_prompts=True, max_spans=1024, tiktoken_encoding_name=None
+    ):
+        # type: (LangchainIntegration, bool, int, Optional[str]) -> None
         self.include_prompts = include_prompts
         self.max_spans = max_spans
+        self.tiktoken_encoding_name = tiktoken_encoding_name
 
     @staticmethod
     def setup_once():
@@ -108,10 +91,22 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     max_span_map_size = 0
 
-    def __init__(self, max_span_map_size, include_prompts):
-        # type: (int, bool) -> None
+    def __init__(self, max_span_map_size, include_prompts, tiktoken_encoding_name=None):
+        # type: (int, bool, Optional[str]) -> None
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
+
+        self.tiktoken_encoding = None
+        if tiktoken_encoding_name is not None:
+            import tiktoken  # type: ignore
+
+            self.tiktoken_encoding = tiktoken.get_encoding(tiktoken_encoding_name)
+
+    def count_tokens(self, s):
+        # type: (str) -> int
+        if self.tiktoken_encoding is not None:
+            return len(self.tiktoken_encoding.encode_ordinary(s))
+        return 0
 
     def gc_span_map(self):
         # type: () -> None
@@ -151,8 +146,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
 
         if kwargs.get("op", "").startswith("ai.pipeline."):
-            if kwargs.get("description"):
-                set_ai_pipeline_name(kwargs.get("description"))
+            if kwargs.get("name"):
+                set_ai_pipeline_name(kwargs.get("name"))
             watched_span.is_pipeline = True
 
         watched_span.span.__enter__()
@@ -191,7 +186,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_RUN,
-                description=kwargs.get("name") or "Langchain LLM call",
+                name=kwargs.get("name") or "Langchain LLM call",
+                origin=LangchainIntegration.origin,
             )
             span = watched_span.span
             if should_send_default_pii() and self.include_prompts:
@@ -212,7 +208,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
-                description=kwargs.get("name") or "Langchain Chat Model",
+                name=kwargs.get("name") or "Langchain Chat Model",
+                origin=LangchainIntegration.origin,
             )
             span = watched_span.span
             model = all_params.get(
@@ -241,9 +238,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not watched_span.no_collect_tokens:
                 for list_ in messages:
                     for message in list_:
-                        self.span_map[run_id].num_prompt_tokens += count_tokens(
+                        self.span_map[run_id].num_prompt_tokens += self.count_tokens(
                             message.content
-                        ) + count_tokens(message.type)
+                        ) + self.count_tokens(message.type)
 
     def on_llm_new_token(self, token, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
@@ -254,7 +251,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span_data = self.span_map[run_id]
             if not span_data or span_data.no_collect_tokens:
                 return
-            span_data.num_completion_tokens += count_tokens(token)
+            span_data.num_completion_tokens += self.count_tokens(token)
 
     def on_llm_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
@@ -315,7 +312,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     if kwargs.get("parent_run_id") is not None
                     else OP.LANGCHAIN_PIPELINE
                 ),
-                description=kwargs.get("name") or "Chain execution",
+                name=kwargs.get("name") or "Chain execution",
+                origin=LangchainIntegration.origin,
             )
             metadata = kwargs.get("metadata")
             if metadata:
@@ -347,7 +345,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_AGENT,
-                description=action.tool or "AI tool usage",
+                name=action.tool or "AI tool usage",
+                origin=LangchainIntegration.origin,
             )
             if action.tool_input and should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
@@ -379,9 +378,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_TOOL,
-                description=serialized.get("name")
-                or kwargs.get("name")
-                or "AI tool usage",
+                name=serialized.get("name") or kwargs.get("name") or "AI tool usage",
+                origin=LangchainIntegration.origin,
             )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
@@ -422,6 +420,8 @@ def _wrap_configure(f):
         # type: (Any, Any) -> Any
 
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
 
         with capture_internal_exceptions():
             new_callbacks = []  # type: List[BaseCallbackHandler]
@@ -445,7 +445,7 @@ def _wrap_configure(f):
                 elif isinstance(existing_callbacks, BaseCallbackHandler):
                     new_callbacks.append(existing_callbacks)
                 else:
-                    logger.warn("Unknown callback type: %s", existing_callbacks)
+                    logger.debug("Unknown callback type: %s", existing_callbacks)
 
             already_added = False
             for callback in new_callbacks:
@@ -455,7 +455,9 @@ def _wrap_configure(f):
             if not already_added:
                 new_callbacks.append(
                     SentryLangchainCallback(
-                        integration.max_spans, integration.include_prompts
+                        integration.max_spans,
+                        integration.include_prompts,
+                        integration.tiktoken_encoding_name,
                     )
                 )
         return f(*args, **kwargs)

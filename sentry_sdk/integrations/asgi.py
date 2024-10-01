@@ -10,7 +10,6 @@ from copy import deepcopy
 from functools import partial
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 
@@ -19,7 +18,7 @@ from sentry_sdk.integrations._asgi_common import (
     _get_request_data,
     _get_url,
 )
-from sentry_sdk.sessions import auto_session_tracking_scope
+from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
@@ -36,6 +35,8 @@ from sentry_sdk.utils import (
     _get_installed_modules,
 )
 from sentry_sdk.tracing import Transaction
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -82,7 +83,13 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type")
+    __slots__ = (
+        "app",
+        "__call__",
+        "transaction_style",
+        "mechanism_type",
+        "span_origin",
+    )
 
     def __init__(
         self,
@@ -90,8 +97,9 @@ class SentryAsgiMiddleware:
         unsafe_context_data=False,
         transaction_style="endpoint",
         mechanism_type="asgi",
+        span_origin="manual",
     ):
-        # type: (Any, bool, str, str) -> None
+        # type: (Any, bool, str, str, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -124,6 +132,7 @@ class SentryAsgiMiddleware:
 
         self.transaction_style = transaction_style
         self.mechanism_type = mechanism_type
+        self.span_origin = span_origin
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -161,7 +170,7 @@ class SentryAsgiMiddleware:
         _asgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as sentry_scope:
-                with auto_session_tracking_scope(sentry_scope, session_mode="request"):
+                with track_session(sentry_scope, session_mode="request"):
                     sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
                     processor = partial(self.event_processor, asgi_scope=scope)
@@ -182,6 +191,7 @@ class SentryAsgiMiddleware:
                             op="{}.server".format(ty),
                             name=transaction_name,
                             source=transaction_source,
+                            origin=self.span_origin,
                         )
                         logger.debug(
                             "[ASGI] Created transaction (continuing trace): %s",
@@ -192,6 +202,7 @@ class SentryAsgiMiddleware:
                             op=OP.HTTP_SERVER,
                             name=transaction_name,
                             source=transaction_source,
+                            origin=self.span_origin,
                         )
                         logger.debug(
                             "[ASGI] Created transaction (new): %s", transaction
@@ -205,7 +216,8 @@ class SentryAsgiMiddleware:
                     )
 
                     with sentry_sdk.start_transaction(
-                        transaction, custom_sampling_context={"asgi_scope": scope}
+                        transaction,
+                        custom_sampling_context={"asgi_scope": scope},
                     ):
                         logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:

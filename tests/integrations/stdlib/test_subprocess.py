@@ -174,6 +174,19 @@ def test_subprocess_basic(
         assert sys.executable + " -c" in subprocess_init_span["description"]
 
 
+def test_subprocess_empty_env(sentry_init, monkeypatch):
+    monkeypatch.setenv("TEST_MARKER", "should_not_be_seen")
+    sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
+    with start_transaction(name="foo"):
+        args = [
+            sys.executable,
+            "-c",
+            "import os; print(os.environ.get('TEST_MARKER', None))",
+        ]
+        output = subprocess.check_output(args, env={}, universal_newlines=True)
+    assert "should_not_be_seen" not in output
+
+
 def test_subprocess_invalid_args(sentry_init):
     sentry_init(integrations=[StdlibIntegration()])
 
@@ -181,3 +194,33 @@ def test_subprocess_invalid_args(sentry_init):
         subprocess.Popen(1)
 
     assert "'int' object is not iterable" in str(excinfo.value)
+
+
+def test_subprocess_span_origin(sentry_init, capture_events):
+    sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        args = [
+            sys.executable,
+            "-c",
+            "print('hello world')",
+        ]
+        kw = {"args": args, "stdout": subprocess.PIPE}
+
+        popen = subprocess.Popen(**kw)
+        popen.communicate()
+        popen.poll()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    assert event["spans"][0]["op"] == "subprocess"
+    assert event["spans"][0]["origin"] == "auto.subprocess.stdlib.subprocess"
+
+    assert event["spans"][1]["op"] == "subprocess.communicate"
+    assert event["spans"][1]["origin"] == "auto.subprocess.stdlib.subprocess"
+
+    assert event["spans"][2]["op"] == "subprocess.wait"
+    assert event["spans"][2]["origin"] == "auto.subprocess.stdlib.subprocess"

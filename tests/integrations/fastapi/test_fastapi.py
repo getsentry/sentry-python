@@ -1,10 +1,11 @@
 import json
 import logging
 import threading
+import warnings
 from unittest import mock
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
@@ -12,6 +13,8 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
+
+from tests.integrations.starlette import test_starlette
 
 
 def fastapi_app_factory():
@@ -161,7 +164,7 @@ def test_legacy_setup(
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
     sentry_init(
         traces_sample_rate=1.0,
@@ -501,3 +504,78 @@ def test_transaction_name_in_middleware(
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source
     )
+
+
+@test_starlette.parametrize_test_configurable_status_codes_deprecated
+def test_configurable_status_codes_deprecated(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    with pytest.warns(DeprecationWarning):
+        starlette_integration = StarletteIntegration(
+            failed_request_status_codes=failed_request_status_codes
+        )
+
+    with pytest.warns(DeprecationWarning):
+        fast_api_integration = FastApiIntegration(
+            failed_request_status_codes=failed_request_status_codes
+        )
+
+    sentry_init(
+        integrations=[
+            starlette_integration,
+            fast_api_integration,
+        ]
+    )
+
+    events = capture_events()
+
+    app = FastAPI()
+
+    @app.get("/error")
+    async def _error():
+        raise HTTPException(status_code)
+
+    client = TestClient(app)
+    client.get("/error")
+
+    if expected_error:
+        assert len(events) == 1
+    else:
+        assert not events
+
+
+@test_starlette.parametrize_test_configurable_status_codes
+def test_configurable_status_codes(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    integration_kwargs = {}
+    if failed_request_status_codes is not None:
+        integration_kwargs["failed_request_status_codes"] = failed_request_status_codes
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        starlette_integration = StarletteIntegration(**integration_kwargs)
+        fastapi_integration = FastApiIntegration(**integration_kwargs)
+
+    sentry_init(integrations=[starlette_integration, fastapi_integration])
+
+    events = capture_events()
+
+    app = FastAPI()
+
+    @app.get("/error")
+    async def _error():
+        raise HTTPException(status_code)
+
+    client = TestClient(app)
+    client.get("/error")
+
+    assert len(events) == int(expected_error)

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 
 import pytest
@@ -13,50 +14,6 @@ from starlite.middleware.session.memory_backend import MemoryBackendConfig
 from starlite.testing import TestClient
 
 
-class SampleMiddleware(AbstractMiddleware):
-    async def __call__(self, scope, receive, send) -> None:
-        async def do_stuff(message):
-            if message["type"] == "http.response.start":
-                # do something here.
-                pass
-            await send(message)
-
-        await self.app(scope, receive, do_stuff)
-
-
-class SampleReceiveSendMiddleware(AbstractMiddleware):
-    async def __call__(self, scope, receive, send):
-        message = await receive()
-        assert message
-        assert message["type"] == "http.request"
-
-        send_output = await send({"type": "something-unimportant"})
-        assert send_output is None
-
-        await self.app(scope, receive, send)
-
-
-class SamplePartialReceiveSendMiddleware(AbstractMiddleware):
-    async def __call__(self, scope, receive, send):
-        message = await receive()
-        assert message
-        assert message["type"] == "http.request"
-
-        send_output = await send({"type": "something-unimportant"})
-        assert send_output is None
-
-        async def my_receive(*args, **kwargs):
-            pass
-
-        async def my_send(*args, **kwargs):
-            pass
-
-        partial_receive = functools.partial(my_receive)
-        partial_send = functools.partial(my_send)
-
-        await self.app(scope, partial_receive, partial_send)
-
-
 def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
     class MyController(Controller):
         path = "/controller"
@@ -66,7 +23,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
             raise Exception("Whoa")
 
     @get("/some_url")
-    async def homepage_handler() -> Dict[str, Any]:
+    async def homepage_handler() -> "Dict[str, Any]":
         1 / 0
         return {"status": "ok"}
 
@@ -75,12 +32,12 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
         raise Exception("Too Hot")
 
     @get("/message")
-    async def message() -> Dict[str, Any]:
+    async def message() -> "Dict[str, Any]":
         capture_message("hi")
         return {"status": "ok"}
 
     @get("/message/{message_id:str}")
-    async def message_with_id() -> Dict[str, Any]:
+    async def message_with_id() -> "Dict[str, Any]":
         capture_message("hi")
         return {"status": "ok"}
 
@@ -151,8 +108,8 @@ def test_catch_exceptions(
     assert str(exc) == expected_message
 
     (event,) = events
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "starlite"
     assert event["transaction"] == expected_tx_name
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "starlite"
 
 
 def test_middleware_spans(sentry_init, capture_events):
@@ -177,40 +134,50 @@ def test_middleware_spans(sentry_init, capture_events):
     client = TestClient(
         starlite_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
-    try:
-        client.get("/message")
-    except Exception:
-        pass
+    client.get("/message")
 
     (_, transaction_event) = events
 
-    expected = ["SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"]
+    expected = {"SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"}
+    found = set()
 
-    idx = 0
-    for span in transaction_event["spans"]:
-        if span["op"] == "middleware.starlite":
-            assert span["description"] == expected[idx]
-            assert span["tags"]["starlite.middleware_name"] == expected[idx]
-            idx += 1
+    starlite_spans = (
+        span
+        for span in transaction_event["spans"]
+        if span["op"] == "middleware.starlite"
+    )
+
+    for span in starlite_spans:
+        assert span["description"] in expected
+        assert span["description"] not in found
+        found.add(span["description"])
+        assert span["description"] == span["tags"]["starlite.middleware_name"]
 
 
 def test_middleware_callback_spans(sentry_init, capture_events):
+    class SampleMiddleware(AbstractMiddleware):
+        async def __call__(self, scope, receive, send) -> None:
+            async def do_stuff(message):
+                if message["type"] == "http.response.start":
+                    # do something here.
+                    pass
+                await send(message)
+
+            await self.app(scope, receive, do_stuff)
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
     )
-    starlette_app = starlite_app_factory(middleware=[SampleMiddleware])
+    starlite_app = starlite_app_factory(middleware=[SampleMiddleware])
     events = capture_events()
 
-    client = TestClient(starlette_app, raise_server_exceptions=False)
-    try:
-        client.get("/message")
-    except Exception:
-        pass
+    client = TestClient(starlite_app, raise_server_exceptions=False)
+    client.get("/message")
 
-    (_, transaction_event) = events
+    (_, transaction_events) = events
 
-    expected = [
+    expected_starlite_spans = [
         {
             "op": "middleware.starlite",
             "description": "SampleMiddleware",
@@ -227,47 +194,86 @@ def test_middleware_callback_spans(sentry_init, capture_events):
             "tags": {"starlite.middleware_name": "SampleMiddleware"},
         },
     ]
-    for idx, span in enumerate(transaction_event["spans"]):
-        assert span["op"] == expected[idx]["op"]
-        assert span["description"] == expected[idx]["description"]
-        assert span["tags"] == expected[idx]["tags"]
+
+    def is_matching_span(expected_span, actual_span):
+        return (
+            expected_span["op"] == actual_span["op"]
+            and expected_span["description"] == actual_span["description"]
+            and expected_span["tags"] == actual_span["tags"]
+        )
+
+    actual_starlite_spans = list(
+        span
+        for span in transaction_events["spans"]
+        if "middleware.starlite" in span["op"]
+    )
+    assert len(actual_starlite_spans) == 3
+
+    for expected_span in expected_starlite_spans:
+        assert any(
+            is_matching_span(expected_span, actual_span)
+            for actual_span in actual_starlite_spans
+        )
 
 
 def test_middleware_receive_send(sentry_init, capture_events):
+    class SampleReceiveSendMiddleware(AbstractMiddleware):
+        async def __call__(self, scope, receive, send):
+            message = await receive()
+            assert message
+            assert message["type"] == "http.request"
+
+            send_output = await send({"type": "something-unimportant"})
+            assert send_output is None
+
+            await self.app(scope, receive, send)
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
     )
-    starlette_app = starlite_app_factory(middleware=[SampleReceiveSendMiddleware])
+    starlite_app = starlite_app_factory(middleware=[SampleReceiveSendMiddleware])
 
-    client = TestClient(starlette_app, raise_server_exceptions=False)
-    try:
-        # NOTE: the assert statements checking
-        # for correct behaviour are in `SampleReceiveSendMiddleware`!
-        client.get("/message")
-    except Exception:
-        pass
+    client = TestClient(starlite_app, raise_server_exceptions=False)
+    # See SampleReceiveSendMiddleware.__call__ above for assertions of correct behavior
+    client.get("/message")
 
 
 def test_middleware_partial_receive_send(sentry_init, capture_events):
+    class SamplePartialReceiveSendMiddleware(AbstractMiddleware):
+        async def __call__(self, scope, receive, send):
+            message = await receive()
+            assert message
+            assert message["type"] == "http.request"
+
+            send_output = await send({"type": "something-unimportant"})
+            assert send_output is None
+
+            async def my_receive(*args, **kwargs):
+                pass
+
+            async def my_send(*args, **kwargs):
+                pass
+
+            partial_receive = functools.partial(my_receive)
+            partial_send = functools.partial(my_send)
+
+            await self.app(scope, partial_receive, partial_send)
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
     )
-    starlette_app = starlite_app_factory(
-        middleware=[SamplePartialReceiveSendMiddleware]
-    )
+    starlite_app = starlite_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
     events = capture_events()
 
-    client = TestClient(starlette_app, raise_server_exceptions=False)
-    try:
-        client.get("/message")
-    except Exception:
-        pass
+    client = TestClient(starlite_app, raise_server_exceptions=False)
+    # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
+    client.get("/message")
 
-    (_, transaction_event) = events
+    (_, transaction_events) = events
 
-    expected = [
+    expected_starlite_spans = [
         {
             "op": "middleware.starlite",
             "description": "SamplePartialReceiveSendMiddleware",
@@ -285,7 +291,105 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
     ]
 
-    for idx, span in enumerate(transaction_event["spans"]):
-        assert span["op"] == expected[idx]["op"]
-        assert span["description"].startswith(expected[idx]["description"])
-        assert span["tags"] == expected[idx]["tags"]
+    def is_matching_span(expected_span, actual_span):
+        return (
+            expected_span["op"] == actual_span["op"]
+            and actual_span["description"].startswith(expected_span["description"])
+            and expected_span["tags"] == actual_span["tags"]
+        )
+
+    actual_starlite_spans = list(
+        span
+        for span in transaction_events["spans"]
+        if "middleware.starlite" in span["op"]
+    )
+    assert len(actual_starlite_spans) == 3
+
+    for expected_span in expected_starlite_spans:
+        assert any(
+            is_matching_span(expected_span, actual_span)
+            for actual_span in actual_starlite_spans
+        )
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarliteIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    logging_config = LoggingMiddlewareConfig()
+    session_config = MemoryBackendConfig()
+    rate_limit_config = RateLimitConfig(rate_limit=("hour", 5))
+
+    starlite_app = starlite_app_factory(
+        middleware=[
+            session_config.middleware,
+            logging_config.middleware,
+            rate_limit_config.middleware,
+        ]
+    )
+    events = capture_events()
+
+    client = TestClient(
+        starlite_app, raise_server_exceptions=False, base_url="http://testserver.local"
+    )
+    client.get("/message")
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.starlite"
+    for span in event["spans"]:
+        assert span["origin"] == "auto.http.starlite"
+
+
+@pytest.mark.parametrize(
+    "is_send_default_pii",
+    [
+        True,
+        False,
+    ],
+    ids=[
+        "send_default_pii=True",
+        "send_default_pii=False",
+    ],
+)
+def test_starlite_scope_user_on_exception_event(
+    sentry_init, capture_exceptions, capture_events, is_send_default_pii
+):
+    class TestUserMiddleware(AbstractMiddleware):
+        async def __call__(self, scope, receive, send):
+            scope["user"] = {
+                "email": "lennon@thebeatles.com",
+                "username": "john",
+                "id": "1",
+            }
+            await self.app(scope, receive, send)
+
+    sentry_init(
+        integrations=[StarliteIntegration()], send_default_pii=is_send_default_pii
+    )
+    starlite_app = starlite_app_factory(middleware=[TestUserMiddleware])
+    exceptions = capture_exceptions()
+    events = capture_events()
+
+    # This request intentionally raises an exception
+    client = TestClient(starlite_app)
+    try:
+        client.get("/some_url")
+    except Exception:
+        pass
+
+    assert len(exceptions) == 1
+    assert len(events) == 1
+    (event,) = events
+
+    if is_send_default_pii:
+        assert "user" in event
+        assert event["user"] == {
+            "email": "lennon@thebeatles.com",
+            "username": "john",
+            "id": "1",
+        }
+    else:
+        assert "user" not in event

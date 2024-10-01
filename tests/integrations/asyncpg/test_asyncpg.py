@@ -13,7 +13,7 @@ import os
 
 
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
-PG_PORT = 5432
+PG_PORT = int(os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"))
 PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
 PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
 PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
@@ -742,3 +742,27 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
         data.get(SPANDATA.CODE_FUNCTION)
         == "test_query_source_if_duration_over_threshold"
     )
+
+
+@pytest.mark.asyncio
+async def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        conn: Connection = await connect(PG_CONNECTION_URI)
+
+        await conn.execute("SELECT 1")
+        await conn.fetchrow("SELECT 2")
+        await conn.close()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.db.asyncpg"

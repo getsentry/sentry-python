@@ -1,8 +1,9 @@
 import urllib
 
-from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -101,7 +102,7 @@ def _get_request_data(asgi_scope):
         )
 
     client = asgi_scope.get("client")
-    if client and _should_send_default_pii():
+    if client and should_send_default_pii():
         request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
 
     return request_data

@@ -1,7 +1,6 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
@@ -12,7 +11,7 @@ from sentry_sdk.utils import (
     parse_url,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -28,6 +27,7 @@ __all__ = ["HttpxIntegration"]
 
 class HttpxIntegration(Integration):
     identifier = "httpx"
+    origin = f"auto.http.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -53,11 +53,12 @@ def _install_httpx_client():
 
         with sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
+            name="%s %s"
             % (
                 request.method,
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
             ),
+            origin=HttpxIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
@@ -69,7 +70,7 @@ def _install_httpx_client():
                 for (
                     key,
                     value,
-                ) in Scope.get_current_scope().iter_trace_propagation_headers():
+                ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers():
                     logger.debug(
                         "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                             key=key, value=value, url=request.url
@@ -108,11 +109,12 @@ def _install_httpx_async_client():
 
         with sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
+            name="%s %s"
             % (
                 request.method,
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
             ),
+            origin=HttpxIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
@@ -124,7 +126,7 @@ def _install_httpx_async_client():
                 for (
                     key,
                     value,
-                ) in Scope.get_current_scope().iter_trace_propagation_headers():
+                ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers():
                     logger.debug(
                         "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                             key=key, value=value, url=request.url

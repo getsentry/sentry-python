@@ -2,11 +2,10 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
 
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -41,6 +40,7 @@ if clickhouse_driver.VERSION < (0, 2, 0):
 
 class ClickhouseDriverIntegration(Integration):
     identifier = "clickhouse_driver"
+    origin = f"auto.db.{identifier}"
 
     @staticmethod
     def setup_once() -> None:
@@ -81,7 +81,11 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
         params = args[3] if len(args) > 3 else kwargs.get("params")
 
-        span = sentry_sdk.start_span(op=OP.DB, description=query)
+        span = sentry_sdk.start_span(
+            op=OP.DB,
+            name=query,
+            origin=ClickhouseDriverIntegration.origin,
+        )
 
         connection._sentry_span = span  # type: ignore[attr-defined]
 
@@ -107,7 +111,7 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_end(*args: P.args, **kwargs: P.kwargs) -> T:
         res = f(*args, **kwargs)
         instance = args[0]
-        span = instance.connection._sentry_span  # type: ignore[attr-defined]
+        span = getattr(instance.connection, "_sentry_span", None)  # type: ignore[attr-defined]
 
         if span is not None:
             if res is not None and should_send_default_pii():
@@ -129,14 +133,15 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_send_data(*args: P.args, **kwargs: P.kwargs) -> T:
         instance = args[0]  # type: clickhouse_driver.client.Client
         data = args[2]
-        span = instance.connection._sentry_span
+        span = getattr(instance.connection, "_sentry_span", None)
 
-        _set_db_data(span, instance.connection)
+        if span is not None:
+            _set_db_data(span, instance.connection)
 
-        if should_send_default_pii():
-            db_params = span._data.get("db.params", [])
-            db_params.extend(data)
-            span.set_data("db.params", db_params)
+            if should_send_default_pii():
+                db_params = span._data.get("db.params", [])
+                db_params.extend(data)
+                span.set_data("db.params", db_params)
 
         return f(*args, **kwargs)
 

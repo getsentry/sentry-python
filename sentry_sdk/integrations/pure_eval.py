@@ -2,10 +2,11 @@ import ast
 
 import sentry_sdk
 from sentry_sdk import serializer
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import walk_exception_chain, iter_stacks
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional, Dict, Any, Tuple, List
@@ -131,7 +132,8 @@ def pure_eval_frame(frame):
     atok = source.asttokens()
 
     expressions.sort(key=closeness, reverse=True)
-    return {
+    vars = {
         atok.get_text(nodes[0]): value
         for nodes, value in expressions[: serializer.MAX_DATABAG_BREADTH]
     }
+    return serializer.serialize(vars, is_vars=True)

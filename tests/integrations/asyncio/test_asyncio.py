@@ -75,7 +75,7 @@ async def test_create_task(
     events = capture_events()
 
     with sentry_sdk.start_transaction(name="test_transaction_for_create_task"):
-        with sentry_sdk.start_span(op="root", description="not so important"):
+        with sentry_sdk.start_span(op="root", name="not so important"):
             tasks = [event_loop.create_task(foo()), event_loop.create_task(bar())]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
@@ -118,7 +118,7 @@ async def test_gather(
     events = capture_events()
 
     with sentry_sdk.start_transaction(name="test_transaction_for_gather"):
-        with sentry_sdk.start_span(op="root", description="not so important"):
+        with sentry_sdk.start_span(op="root", name="not so important"):
             await asyncio.gather(foo(), bar(), return_exceptions=True)
 
         sentry_sdk.flush()
@@ -161,7 +161,7 @@ async def test_exception(
     events = capture_events()
 
     with sentry_sdk.start_transaction(name="test_exception"):
-        with sentry_sdk.start_span(op="root", description="not so important"):
+        with sentry_sdk.start_span(op="root", name="not so important"):
             tasks = [event_loop.create_task(boom()), event_loop.create_task(bar())]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
@@ -359,3 +359,31 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
 
     assert "context" in task_factory_kwargs
     assert task_factory_kwargs["context"] == mock_context
+
+
+@minimum_python_37
+@pytest.mark.asyncio
+async def test_span_origin(
+    sentry_init,
+    capture_events,
+    event_loop,
+):
+    sentry_init(
+        integrations=[AsyncioIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="something"):
+        tasks = [
+            event_loop.create_task(foo()),
+        ]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+
+        sentry_sdk.flush()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.function.asyncio"
