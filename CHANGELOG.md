@@ -30,7 +30,7 @@
     ```python
     sentry_sdk.init(
         integrations=[
-            StarletteIntegration(
+            AioHttpIntegration(
                 failed_request_status_codes={403, *range(500, 599)},
             )
         ]
@@ -50,8 +50,8 @@
 - AIOHTTP: Handle invalid responses (#3554) by @szokeasaurusrex
 - FastAPI/Starlette: Support new `failed_request_status_codes` (#3563) by @szokeasaurusrex
 
-  The format of `failed_request_status_codes` has changed slightly from a list
-  of containers to a set:
+  The format of `failed_request_status_codes` has changed from a list
+  of integers and containers to a set:
 
   ```python
   sentry_sdk.init(
