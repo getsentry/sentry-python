@@ -3,6 +3,7 @@ import os
 import re
 import pytest
 from functools import partial
+from unittest.mock import patch
 
 from werkzeug.test import Client
 
@@ -10,6 +11,7 @@ from django import VERSION as DJANGO_VERSION
 from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
+from django.http.request import RawPostDataException
 
 try:
     from django.urls import reverse
@@ -20,7 +22,11 @@ import sentry_sdk
 from sentry_sdk._compat import PY310
 from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
+from sentry_sdk.integrations.django import (
+    DjangoIntegration,
+    DjangoRequestExtractor,
+    _set_db_data,
+)
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.tracing import Span
@@ -139,7 +145,11 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
 
 def test_has_trace_if_performance_enabled(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=("HEAD",),
+            )
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
@@ -186,7 +196,11 @@ def test_has_trace_if_performance_disabled(sentry_init, client, capture_events):
 
 def test_trace_from_headers_if_performance_enabled(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=("HEAD",),
+            )
+        ],
         traces_sample_rate=1.0,
     )
 
@@ -219,7 +233,11 @@ def test_trace_from_headers_if_performance_disabled(
     sentry_init, client, capture_events
 ):
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=("HEAD",),
+            )
+        ],
     )
 
     events = capture_events()
@@ -740,6 +758,26 @@ def test_read_request(sentry_init, client, capture_events):
     assert "data" not in event["request"]
 
 
+def test_request_body_already_read(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+
+    events = capture_events()
+
+    class MockExtractor(DjangoRequestExtractor):
+        def raw_data(self):
+            raise RawPostDataException
+
+    with patch("sentry_sdk.integrations.django.DjangoRequestExtractor", MockExtractor):
+        client.post(
+            reverse("post_echo"), data=b'{"hey": 42}', content_type="application/json"
+        )
+
+        (event,) = events
+
+        assert event["message"] == "hi"
+        assert "data" not in event["request"]
+
+
 def test_template_tracing_meta(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
@@ -1157,3 +1195,48 @@ def test_span_origin(sentry_init, client, capture_events):
             signal_span_found = True
 
     assert signal_span_found
+
+
+def test_transaction_http_method_default(sentry_init, client, capture_events):
+    """
+    By default OPTIONS and HEAD requests do not create a transaction.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
+
+    (event,) = events
+
+    assert len(events) == 1
+    assert event["request"]["method"] == "GET"
+
+
+def test_transaction_http_method_custom(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                ),  # capitalization does not matter
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
+
+    assert len(events) == 2
+
+    (event1, event2) = events
+    assert event1["request"]["method"] == "OPTIONS"
+    assert event2["request"]["method"] == "HEAD"

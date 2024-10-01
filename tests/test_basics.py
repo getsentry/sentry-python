@@ -8,6 +8,7 @@ from collections import Counter
 
 import pytest
 from sentry_sdk.client import Client
+from sentry_sdk.utils import datetime_from_isoformat
 from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
@@ -28,6 +29,7 @@ from sentry_sdk import (
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
     _DEFAULT_INTEGRATIONS,
+    DidNotEnable,
     Integration,
     setup_integrations,
 )
@@ -37,18 +39,6 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
-
-
-def _redis_installed():  # type: () -> bool
-    """
-    Determines whether Redis is installed.
-    """
-    try:
-        import redis  # noqa: F401
-    except ImportError:
-        return False
-
-    return True
 
 
 class NoOpIntegration(Integration):
@@ -89,20 +79,35 @@ def test_processors(sentry_init, capture_events):
     assert event["exception"]["values"][0]["value"] == "aha! whatever"
 
 
+class ModuleImportErrorSimulator:
+    def __init__(self, modules, error_cls=DidNotEnable):
+        self.modules = modules
+        self.error_cls = error_cls
+        for sys_module in list(sys.modules.keys()):
+            if any(sys_module.startswith(module) for module in modules):
+                del sys.modules[sys_module]
+
+    def find_spec(self, fullname, _path, _target=None):
+        if fullname in self.modules:
+            raise self.error_cls("Test import failure for %s" % fullname)
+
+    def __enter__(self):
+        # WARNING: We need to be first to avoid pytest messing with local imports
+        sys.meta_path.insert(0, self)
+
+    def __exit__(self, *_args):
+        sys.meta_path.remove(self)
+
+
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
-    redis_index = _AUTO_ENABLING_INTEGRATIONS.index(
-        "sentry_sdk.integrations.redis.RedisIntegration"
-    )  # noqa: N806
 
-    sentry_init(auto_enabling_integrations=True, debug=True)
+    with ModuleImportErrorSimulator(
+        [i.rsplit(".", 1)[0] for i in _AUTO_ENABLING_INTEGRATIONS]
+    ):
+        sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
-        # Ignore redis in the test case, because it does not raise a DidNotEnable
-        # exception on import; rather, it raises the exception upon enabling.
-        if _AUTO_ENABLING_INTEGRATIONS[redis_index] == import_string:
-            continue
-
         assert any(
             record.message.startswith(
                 "Did not import default integration {}:".format(import_string)
@@ -397,11 +402,12 @@ def test_breadcrumbs(sentry_init, capture_events):
 def test_breadcrumb_ordering(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
 
     timestamps = [
-        datetime.datetime.now() - datetime.timedelta(days=10),
-        datetime.datetime.now() - datetime.timedelta(days=8),
-        datetime.datetime.now() - datetime.timedelta(days=12),
+        now - datetime.timedelta(days=10),
+        now - datetime.timedelta(days=8),
+        now - datetime.timedelta(days=12),
     ]
 
     for timestamp in timestamps:
@@ -417,10 +423,7 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.datetime.strptime(
-            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
-        )
-        for x in event["breadcrumbs"]["values"]
+        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
@@ -428,11 +431,24 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     timestamps = [
-        datetime.datetime.now() - datetime.timedelta(days=10),
-        datetime.datetime.now() - datetime.timedelta(days=8),
-        datetime.datetime.now() - datetime.timedelta(days=12),
+        now - datetime.timedelta(days=10),
+        now - datetime.timedelta(days=8),
+        now.replace(microsecond=0) - datetime.timedelta(days=12),
+        now - datetime.timedelta(days=9),
+        now - datetime.timedelta(days=13),
+        now.replace(microsecond=0) - datetime.timedelta(days=11),
+    ]
+
+    breadcrumb_timestamps = [
+        timestamps[0],
+        timestamps[1].isoformat(),
+        datetime.datetime.strftime(timestamps[2], "%Y-%m-%dT%H:%M:%S") + "Z",
+        datetime.datetime.strftime(timestamps[3], "%Y-%m-%dT%H:%M:%S.%f") + "+00:00",
+        datetime.datetime.strftime(timestamps[4], "%Y-%m-%dT%H:%M:%S.%f") + "+0000",
+        datetime.datetime.strftime(timestamps[5], "%Y-%m-%dT%H:%M:%S.%f") + "-0000",
     ]
 
     for i, timestamp in enumerate(timestamps):
@@ -440,7 +456,7 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
             message="Authenticated at %s" % timestamp,
             category="auth",
             level="info",
-            timestamp=timestamp if i % 2 == 0 else timestamp.isoformat(),
+            timestamp=breadcrumb_timestamps[i],
         )
 
     capture_exception(ValueError())
@@ -448,10 +464,7 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.datetime.strptime(
-            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
-        )
-        for x in event["breadcrumbs"]["values"]
+        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
@@ -874,9 +887,9 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
     assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"
 
 
-@pytest.mark.skipif(_redis_installed(), reason="skipping because redis is installed")
 def test_redis_disabled_when_not_installed(sentry_init):
-    sentry_init()
+    with ModuleImportErrorSimulator(["redis"], ImportError):
+        sentry_init()
 
     assert sentry_sdk.get_client().get_integration(RedisIntegration) is None
 

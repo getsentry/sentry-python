@@ -16,6 +16,9 @@ if TYPE_CHECKING:
     from typing import Type
 
 
+_DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
+
+
 _installer_lock = Lock()
 
 # Set of all integration identifiers we have attempted to install

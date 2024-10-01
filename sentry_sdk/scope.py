@@ -968,7 +968,7 @@ class Scope:
         transaction=None,
         instrumenter=INSTRUMENTER.SENTRY,
         custom_sampling_context=None,
-        **kwargs
+        **kwargs,
     ):
         # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
@@ -1324,7 +1324,8 @@ class Scope:
                     crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
 
             event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
-        except Exception:
+        except Exception as err:
+            logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
 
     def _apply_user_to_event(self, event, hint, options):
