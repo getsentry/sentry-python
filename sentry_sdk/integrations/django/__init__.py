@@ -524,6 +524,7 @@ def _got_request_exception(request=None, **kwargs):
 
 class DjangoRequestExtractor(RequestExtractor):
     def __init__(self, request):
+        # type: (Union[WSGIRequest, ASGIRequest]) -> None
         try:
             drf_request = request._sentry_drf_request_backref()
             if drf_request is not None:
