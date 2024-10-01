@@ -11,7 +11,6 @@ from collections import defaultdict
 from urllib.request import getproxies
 
 import urllib3
-from urllib3.poolmanager import PoolManager, ProxyManager
 import certifi
 
 import sentry_sdk
@@ -20,18 +19,23 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING, Mapping, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
+    from typing import DefaultDict
     from typing import Iterable
     from typing import List
+    from typing import Mapping
     from typing import Optional
     from typing import Tuple
     from typing import Type
-    from typing import DefaultDict
+    from typing import Union
+
+    from urllib3.poolmanager import PoolManager
+    from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event, EventDataCategory
 
@@ -581,7 +585,8 @@ class BaseHttpTransport(Transport):
 
 
 class HttpTransport(BaseHttpTransport):
-    _pool: Union[PoolManager, ProxyManager]
+    if TYPE_CHECKING:
+        _pool: Union[PoolManager, ProxyManager]
 
     def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
@@ -692,7 +697,10 @@ try:
     class Http2Transport(BaseHttpTransport):
         """The HTTP2 transport based on httpcore."""
 
-        _pool: Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
+        if TYPE_CHECKING:
+            _pool: Union[
+                httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool
+            ]
 
         def _get_header_value(self, response, header):
             # type: (httpcore.Response, str) -> Optional[str]
