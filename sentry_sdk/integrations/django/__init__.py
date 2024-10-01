@@ -504,13 +504,6 @@ def _make_wsgi_request_event_processor(weak_request, integration):
             # We have a `asgi_request_event_processor` for this.
             return event
 
-        try:
-            drf_request = request._sentry_drf_request_backref()
-            if drf_request is not None:
-                request = drf_request
-        except AttributeError:
-            pass
-
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
@@ -543,6 +536,16 @@ def _got_request_exception(request=None, **kwargs):
 
 
 class DjangoRequestExtractor(RequestExtractor):
+    def __init__(self, request):
+        # type: (Union[WSGIRequest, ASGIRequest]) -> None
+        try:
+            drf_request = request._sentry_drf_request_backref()
+            if drf_request is not None:
+                request = drf_request
+        except AttributeError:
+            pass
+        self.request = request
+
     def env(self):
         # type: () -> Dict[str, str]
         return self.request.META
