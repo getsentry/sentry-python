@@ -8,10 +8,10 @@ from opentelemetry.trace import (
     SpanContext,
     NonRecordingSpan,
     TraceFlags,
-    TraceState,
     use_span,
 )
 
+from sentry_sdk.client import NonRecordingClient
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
@@ -27,8 +27,16 @@ if TYPE_CHECKING:
     from typing import Tuple, Optional, Generator, Dict, Any
     from typing_extensions import Unpack
 
+    import sentry_sdk
     from sentry_sdk._types import SamplingContext
     from sentry_sdk.tracing import TransactionKwargs
+
+
+# Holds data that will be added to **all** events sent by this process.
+# In case this is a http server (think web framework) with multiple users
+# the data will be added to events of all users.
+# Typically this is used for process wide data such as the release.
+_global_scope = None  # type: Optional[Scope]
 
 
 class PotelScope(Scope):
@@ -73,6 +81,59 @@ class PotelScope(Scope):
         """
         scopes = cls._get_scopes()
         return scopes[1] if scopes else None
+
+    @classmethod
+    def get_global_scope(cls):
+        # type: () -> Scope
+        """
+        .. versionadded:: 2.0.0
+
+        Returns the global scope.
+        """
+        global _global_scope
+        if _global_scope is None:
+            _global_scope = PotelScope(ty=ScopeType.GLOBAL)
+
+        return _global_scope
+
+    @classmethod
+    def get_client(cls):
+        # type: () -> sentry_sdk.client.BaseClient
+        """
+        .. versionadded:: 2.0.0
+
+        Returns the currently used :py:class:`sentry_sdk.Client`.
+        This checks the current scope, the isolation scope and the global scope for a client.
+        If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
+        """
+        scopes = cls._get_scopes()
+        if scopes:
+            current_scope, isolation_scope = scopes
+            try:
+                client = current_scope.client
+            except AttributeError:
+                client = None
+
+            if client is not None and client.is_active():
+                return client
+
+            try:
+                client = isolation_scope.client
+            except AttributeError:
+                client = None
+
+            if client is not None and client.is_active():
+                return client
+
+        try:
+            client = _global_scope.client  # type: ignore
+        except AttributeError:
+            client = None
+
+        if client is not None and client.is_active():
+            return client
+
+        return NonRecordingClient()
 
     @contextmanager
     def continue_trace(self, environ_or_headers):

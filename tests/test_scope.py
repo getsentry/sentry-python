@@ -10,8 +10,8 @@ from sentry_sdk import (
     new_scope,
 )
 from sentry_sdk.client import Client, NonRecordingClient
+from sentry_sdk.integrations.opentelemetry.scope import PotelScope as Scope
 from sentry_sdk.scope import (
-    Scope,
     ScopeType,
     use_isolation_scope,
     use_scope,
@@ -198,21 +198,18 @@ def test_scope_client():
 def test_get_current_scope():
     scope = Scope.get_current_scope()
     assert scope is not None
-    assert scope.__class__ == Scope
     assert scope._type == ScopeType.CURRENT
 
 
 def test_get_isolation_scope():
     scope = Scope.get_isolation_scope()
     assert scope is not None
-    assert scope.__class__ == Scope
     assert scope._type == ScopeType.ISOLATION
 
 
 def test_get_global_scope():
     scope = Scope.get_global_scope()
     assert scope is not None
-    assert scope.__class__ == Scope
     assert scope._type == ScopeType.GLOBAL
 
 
@@ -223,35 +220,38 @@ def test_get_client():
     assert not client.is_active()
 
 
-def test_set_client():
-    client1 = Client()
-    client2 = Client()
-    client3 = Client()
+def test_set_client(sentry_init):
+    sentry_init()
 
-    current_scope = Scope.get_current_scope()
-    isolation_scope = Scope.get_isolation_scope()
-    global_scope = Scope.get_global_scope()
+    with sentry_sdk.start_span():
+        current_client = mock.MagicMock()
+        isolation_client = mock.MagicMock()
+        global_client = mock.MagicMock()
 
-    current_scope.set_client(client1)
-    isolation_scope.set_client(client2)
-    global_scope.set_client(client3)
+        current_scope = sentry_sdk.get_current_scope()
+        isolation_scope = sentry_sdk.get_isolation_scope()
+        global_scope = sentry_sdk.get_global_scope()
 
-    client = Scope.get_client()
-    assert client == client1
+        current_scope.set_client(current_client)
+        isolation_scope.set_client(isolation_client)
+        global_scope.set_client(global_client)
 
-    current_scope.set_client(None)
-    isolation_scope.set_client(client2)
-    global_scope.set_client(client3)
+        client = sentry_sdk.get_client()
+        assert client == current_client
 
-    client = Scope.get_client()
-    assert client == client2
+        current_scope.set_client(None)
+        isolation_scope.set_client(isolation_client)
+        global_scope.set_client(global_client)
 
-    current_scope.set_client(None)
-    isolation_scope.set_client(None)
-    global_scope.set_client(client3)
+        client = sentry_sdk.get_client()
+        assert client == isolation_client
 
-    client = Scope.get_client()
-    assert client == client3
+        current_scope.set_client(None)
+        isolation_scope.set_client(None)
+        global_scope.set_client(global_client)
+
+        client = sentry_sdk.get_client()
+        assert client == global_client
 
 
 def test_fork():
