@@ -2,34 +2,98 @@
 
 ## 2.15.0
 
-### Various fixes & improvements
+### Integrations
 
-- Configure HTTP methods to capture in WSGI middleware and frameworks (#3531) by @antonpirker
-- XFail one of the Lambda tests (#3592) by @antonpirker
-- allowing ASGI to use drf_request in DjangoRequestExtractor (#3572) by @PakawiNz
-- fix(tracing): Fix `add_query_source` with modules outside of project root (#3313) by @rominf
-- build(deps): bump actions/checkout from 4.1.7 to 4.2.0 (#3585) by @dependabot
+- Configure HTTP methods to capture in ASGI/WSGI middleware and frameworks (#3531) by @antonpirker
+
+  We've added a new option to the Django, Flask, Starlette and FastAPI integrations called `http_methods_to_capture`. This is a configurable tuple of HTTP method verbs that should create a transaction in Sentry. The default is `("CONNECT", "DELETE", "GET", "PATCH", "POST", "PUT", "TRACE",)`. `OPTIONS` and `HEAD` are not included by default.
+
+  Here's how to use it (substitute Flask for your framework integration):
+
+  ```python
+  sentry_sdk.init(
+      integrations=[
+        FlaskIntegration(
+            http_methods_to_capture=("GET", "POST"),
+        ),
+    ],
+  )
+
+- Django: Allow ASGI to use `drf_request` in `DjangoRequestExtractor` (#3572) by @PakawiNz
+- Django: Don't let `RawPostDataException` bubble up (#3553) by @sentrivana
+- Django: Add `sync_capable` to `SentryWrappingMiddleware` (#3510) by @szokeasaurusrex
+- AIOHTTP: Add `failed_request_status_codes` (#3551) by @szokeasaurusrex
+
+  You can now define a set of integers that will determine which status codes
+  should be reported to Sentry.
+
+    ```python
+    sentry_sdk.init(
+        integrations=[
+            StarletteIntegration(
+                failed_request_status_codes={403, *range(500, 599)},
+            )
+        ]
+    )
+    ```
+
+  Examples of valid `failed_request_status_codes`:
+
+  - `{500}` will only send events on HTTP 500.
+  - `{400, *range(500, 600)}` will send events on HTTP 400 as well as the 5xx range.
+  - `{500, 503}` will send events on HTTP 500 and 503.
+  - `set()` (the empty set) will not send events for any HTTP status code.
+
+  The default is `{*range(500, 600)}`, meaning that all 5xx status codes are reported to Sentry.
+
+- AIOHTTP: Delete test which depends on AIOHTTP behavior (#3568) by @szokeasaurusrex
+- AIOHTTP: Handle invalid responses (#3554) by @szokeasaurusrex
+- FastAPI/Starlette: Support new `failed_request_status_codes` (#3563) by @szokeasaurusrex
+
+  The format of `failed_request_status_codes` has changed slightly from a list
+  of containers to a set:
+
+  ```python
+  sentry_sdk.init(
+      integrations=StarletteIntegration(
+          failed_request_status_codes={403, *range(500, 599)},
+      ),
+  )
+  ```
+
+  The old way of defining `failed_request_status_codes` will continue to work
+  for the time being. Examples of valid new-style `failed_request_status_codes`:
+
+  - `{500}` will only send events on HTTP 500.
+  - `{400, *range(500, 600)}` will send events on HTTP 400 as well as the 5xx range.
+  - `{500, 503}` will send events on HTTP 500 and 503.
+  - `set()` (the empty set) will not send events for any HTTP status code.
+
+  The default is `{*range(500, 600)}`, meaning that all 5xx status codes are reported to Sentry.
+
+- FastAPI/Starlette: Fix `failed_request_status_codes=[]` (#3561) by @szokeasaurusrex
+- FastAPI/Starlette: Remove invalid `failed_request_status_code` tests (#3560) by @szokeasaurusrex
+- FastAPI/Starlette: Refactor shared test parametrization (#3562) by @szokeasaurusrex
+
+### Miscellaneous
+
+- Deprecate `sentry_sdk.metrics` (#3512) by @szokeasaurusrex
+- Add `name` parameter to `start_span()` and deprecate `description` parameter (#3524 & #3525) by @antonpirker
+- Fix `add_query_source` with modules outside of project root (#3313) by @rominf
 - Test more integrations on 3.13 (#3578) by @sentrivana
 - Fix trailing whitespace (#3579) by @sentrivana
-- test(aiohttp): Delete test which depends on AIOHTTP behavior (#3568) by @szokeasaurusrex
-- feat(starlette): Support new `failed_request_status_codes` (#3563) by @szokeasaurusrex
-- ref(aiohttp): Make `DEFUALT_FAILED_REQUEST_STATUS_CODES` private (#3558) by @szokeasaurusrex
-- fix(starlette): Fix `failed_request_status_codes=[]` (#3561) by @szokeasaurusrex
-- test(starlette): Remove invalid `failed_request_status_code` tests (#3560) by @szokeasaurusrex
-- test(starlette): Refactor shared test parametrization (#3562) by @szokeasaurusrex
-- feat(aiohttp): Add `failed_request_status_codes` (#3551) by @szokeasaurusrex
-- ref(client): Improve `get_integration` typing (#3550) by @szokeasaurusrex
-- test: Make import-related tests stable (#3548) by @BYK
-- fix: Fix breadcrumb timestamp casting and its tests (#3546) by @BYK
-- fix(aiohttp): Handle invalid responses (#3554) by @szokeasaurusrex
-- fix(django): Don't let RawPostDataException bubble up (#3553) by @sentrivana
-- fix: Don't use deprecated logger.warn (#3552) by @sentrivana
-- ci: update actions/upload-artifact to v4 with merge (#3545) by @joshuarli
-- tests: Fix cohere API change (#3549) by @BYK
-- fixed message (#3536) by @antonpirker
-- Removed experimental explain_plan feature. (#3534) by @antonpirker
-
-_Plus 6 more_
+- Improve `get_integration` typing (#3550) by @szokeasaurusrex
+- Make import-related tests stable (#3548) by @BYK
+- Fix breadcrumb sorting (#3511) by @sentrivana
+- Fix breadcrumb timestamp casting and its tests (#3546) by @BYK
+- Don't use deprecated `logger.warn` (#3552) by @sentrivana
+- Fix Cohere API change (#3549) by @BYK
+- Fix deprecation message (#3536) by @antonpirker
+- Remove experimental `explain_plan` feature. (#3534) by @antonpirker
+- X-fail one of the Lambda tests (#3592) by @antonpirker
+- Update Codecov config (#3507) by @antonpirker
+- Update `actions/upload-artifact` to `v4` with merge (#3545) by @joshuarli
+- Bump `actions/checkout` from `4.1.7` to `4.2.0` (#3585) by @dependabot
 
 ## 2.14.0
 
@@ -78,7 +142,7 @@ _Plus 6 more_
   init_sentry()
 
   ray.init(
-      runtime_env=dict(worker_process_setup_hook=init_sentry), 
+      runtime_env=dict(worker_process_setup_hook=init_sentry),
   )
   ```
   For more information, see the documentation for the [Ray integration](https://docs.sentry.io/platforms/python/integrations/ray/).
@@ -130,7 +194,7 @@ _Plus 6 more_
   For more information, see the documentation for the [Dramatiq integration](https://docs.sentry.io/platforms/python/integrations/dramatiq/).
 
 - **New config option:** Expose `custom_repr` function that precedes `safe_repr` invocation in serializer (#3438) by @sl0thentr0py
-  
+
   See: https://docs.sentry.io/platforms/python/configuration/options/#custom-repr
 
 - Profiling: Add client SDK info to profile chunk (#3386) by @Zylphrex
