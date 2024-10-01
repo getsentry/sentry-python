@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.10","3.11","3.12"]
+        python-version: ["3.8","3.10","3.12","3.13"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -52,7 +52,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4.2.0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -80,13 +80,13 @@ jobs:
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi-latest"
       - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
       - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
@@ -97,7 +97,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop  
+          plugin: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -138,7 +138,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4.2.0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -166,13 +166,13 @@ jobs:
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi"
       - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
       - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }} 
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
@@ -183,7 +183,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop  
+          plugin: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
