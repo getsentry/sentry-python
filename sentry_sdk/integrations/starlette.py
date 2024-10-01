@@ -11,8 +11,8 @@ from sentry_sdk.integrations import (
     Integration,
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
 )
-from sentry_sdk.integrations._asgi_common import DEFAULT_HTTP_METHODS_TO_CAPTURE
 from sentry_sdk.integrations._wsgi_common import (
+    DEFAULT_HTTP_METHODS_TO_CAPTURE,
     HttpCodeRangeContainer,
     _is_json_content_type,
     request_body_within_bounds,

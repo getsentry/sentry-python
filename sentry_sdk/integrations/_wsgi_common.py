@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import json
 from copy import deepcopy
 
@@ -15,6 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
+    from typing import Iterator
     from typing import Mapping
     from typing import MutableMapping
     from typing import Optional
@@ -48,6 +50,13 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "PUT",
     "TRACE",
 )
+
+
+# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
+@contextmanager
+def nullcontext():
+    # type: () -> Iterator[None]
+    yield
 
 
 def request_body_within_bounds(client, content_length):

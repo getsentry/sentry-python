@@ -5,7 +5,6 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 """
 
 import asyncio
-from contextlib import contextmanager
 import inspect
 from copy import deepcopy
 from functools import partial
@@ -15,10 +14,13 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations._asgi_common import (
-    DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _get_headers,
     _get_request_data,
     _get_url,
+)
+from sentry_sdk.integrations._wsgi_common import (
+    DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    nullcontext,
 )
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import (
@@ -44,7 +46,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import Iterator
     from typing import Optional
     from typing import Tuple
 
@@ -56,13 +57,6 @@ _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
-
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext():
-    # type: () -> Iterator[None]
-    yield
 
 
 def _capture_exception(exc, mechanism_type="asgi"):

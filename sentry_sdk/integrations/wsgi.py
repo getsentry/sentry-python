@@ -1,5 +1,4 @@
 import sys
-from contextlib import contextmanager
 from functools import partial
 
 import sentry_sdk
@@ -10,6 +9,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
+    nullcontext,
 )
 from sentry_sdk.sessions import track_session
 from sentry_sdk.scope import use_isolation_scope
@@ -47,13 +47,6 @@ if TYPE_CHECKING:
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
-
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext():
-    # type: () -> Iterator[None]
-    yield
 
 
 def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):

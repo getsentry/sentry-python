@@ -15,19 +15,6 @@ if TYPE_CHECKING:
     from sentry_sdk.utils import AnnotatedValue
 
 
-DEFAULT_HTTP_METHODS_TO_CAPTURE = (
-    "CONNECT",
-    "DELETE",
-    "GET",
-    # "HEAD",  # do not capture HEAD requests by default
-    # "OPTIONS",  # do not capture OPTIONS requests by default
-    "PATCH",
-    "POST",
-    "PUT",
-    "TRACE",
-)
-
-
 def _get_headers(asgi_scope):
     # type: (Any) -> Dict[str, str]
     """
