@@ -11,6 +11,7 @@ from sentry_sdk.integrations import (
     Integration,
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
 )
+from sentry_sdk.integrations._asgi_common import DEFAULT_HTTP_METHODS_TO_CAPTURE
 from sentry_sdk.integrations._wsgi_common import (
     HttpCodeRangeContainer,
     _is_json_content_type,
@@ -85,6 +86,7 @@ class StarletteIntegration(Integration):
         transaction_style="url",  # type: str
         failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Union[Set[int], list[HttpStatusCodeRange], None]
         middleware_spans=True,  # type: bool
+        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
         # type: (...) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
@@ -94,6 +96,7 @@ class StarletteIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+        self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
         if isinstance(failed_request_status_codes, Set):
             self.failed_request_status_codes = (
@@ -390,6 +393,11 @@ def patch_asgi_app():
             mechanism_type=StarletteIntegration.identifier,
             transaction_style=integration.transaction_style,
             span_origin=StarletteIntegration.origin,
+            http_methods_to_capture=(
+                integration.http_methods_to_capture
+                if integration
+                else DEFAULT_HTTP_METHODS_TO_CAPTURE
+            ),
         )
 
         middleware.__call__ = middleware._run_asgi3
