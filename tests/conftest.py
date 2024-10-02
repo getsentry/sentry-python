@@ -2,6 +2,7 @@ import json
 import os
 import socket
 import warnings
+from collections import OrderedDict
 from threading import Thread
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -645,3 +646,41 @@ class ApproxDict(dict):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+
+def pytest_collection_modifyitems(config, items):
+    """
+    Rearrange test items so that forked tests come before normal tests within their respective modules.
+    Swap the last forked test with the last normal test if necessary.
+
+    Workaround to unpin pytest. See:
+    https://github.com/pytest-dev/pytest/issues/9621,
+    https://github.com/pytest-dev/pytest-forked/issues/67, and specifically:
+    https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720
+    """
+    module_states = OrderedDict()
+
+    for idx in range(len(items)):
+        item = items[idx]
+        current_module = item.module.__name__
+
+        if current_module not in module_states:
+            module_states[current_module] = {"forked": [], "normal": []}
+
+        if "forked" in item.keywords:
+            module_states[current_module]["forked"].append(idx)
+        else:
+            module_states[current_module]["normal"].append(idx)
+
+    # Swap the last forked test with the last normal test if necessary
+    for states in module_states.values():
+        if states["forked"] and states["normal"]:
+            last_forked_idx = states["forked"][-1]
+            last_normal_idx = states["normal"][-1]
+
+            if last_forked_idx > last_normal_idx:
+                # Swap the items
+                items[last_forked_idx], items[last_normal_idx] = (
+                    items[last_normal_idx],
+                    items[last_forked_idx],
+                )
