@@ -3,8 +3,6 @@ import urllib.parse
 import urllib.request
 import urllib.error
 import urllib3
-from django.http import HttpResponseServerError
-from django.conf import settings
 
 from typing import TYPE_CHECKING
 
@@ -52,38 +50,45 @@ class SpotlightClient:
             logger.warning(str(e))
 
 
-class SpotlightMiddleware:
-    def __init__(self, get_response):
-        # type: (Any, Callable[..., Any]) -> None
-        self.get_response = get_response
+try:
+    from django.http import HttpResponseServerError
+    from django.conf import settings
 
-    def __call__(self, request):
-        # type: (Any, Any) -> Any
-        return self.get_response(request)
+    class SpotlightMiddleware:
+        def __init__(self, get_response):
+            # type: (Any, Callable[..., Any]) -> None
+            self.get_response = get_response
 
-    def process_exception(self, _request, exception):
-        # type: (Any, Any, Exception) -> Optional[HttpResponseServerError]
-        if not settings.DEBUG:
-            return None
+        def __call__(self, request):
+            # type: (Any, Any) -> Any
+            return self.get_response(request)
 
-        import sentry_sdk.api
+        def process_exception(self, _request, exception):
+            # type: (Any, Any, Exception) -> Optional[HttpResponseServerError]
+            if not settings.DEBUG:
+                return None
 
-        spotlight_client = sentry_sdk.api.get_client().spotlight
-        if spotlight_client is None:
-            return None
+            import sentry_sdk.api
 
-        # Spotlight URL has a trailing `/stream` part at the end so split it off
-        spotlight_url = spotlight_client.url.rsplit("/", 1)[0]
+            spotlight_client = sentry_sdk.api.get_client().spotlight
+            if spotlight_client is None:
+                return None
 
-        try:
-            spotlight = (
-                urllib.request.urlopen(spotlight_url).read().decode("utf-8")
-            ).replace("<html>", f'<html><base href="{spotlight_url}">')
-        except urllib.error.URLError:
-            return None
-        else:
-            sentry_sdk.api.capture_exception(exception)
-            return HttpResponseServerError(spotlight)
+            # Spotlight URL has a trailing `/stream` part at the end so split it off
+            spotlight_url = spotlight_client.url.rsplit("/", 1)[0]
+
+            try:
+                spotlight = (
+                    urllib.request.urlopen(spotlight_url).read().decode("utf-8")
+                ).replace("<html>", f'<html><base href="{spotlight_url}">')
+            except urllib.error.URLError:
+                return None
+            else:
+                sentry_sdk.api.capture_exception(exception)
+                return HttpResponseServerError(spotlight)
+
+except ImportError:
+    settings = None
 
 
 def setup_spotlight(options):
@@ -98,6 +103,7 @@ def setup_spotlight(options):
     else:
         return None
 
-    settings.MIDDLEWARE.append("sentry_sdk.spotlight.SpotlightMiddleware")
+    if settings is not None:
+        settings.MIDDLEWARE.append("sentry_sdk.spotlight.SpotlightMiddleware")
 
     return SpotlightClient(url)
