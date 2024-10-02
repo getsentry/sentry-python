@@ -1,10 +1,16 @@
 import io
+import urllib.parse
+import urllib.request
+import urllib.error
 import urllib3
+from django.http import HttpResponseServerError
+from django.conf import settings
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
+    from typing import Callable
     from typing import Dict
     from typing import Optional
 
@@ -46,6 +52,40 @@ class SpotlightClient:
             logger.warning(str(e))
 
 
+class SpotlightMiddleware:
+    def __init__(self, get_response):
+        # type: (Any, Callable[..., Any]) -> None
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # type: (Any, Any) -> Any
+        return self.get_response(request)
+
+    def process_exception(self, _request, exception):
+        # type: (Any, Any, Exception) -> Optional[HttpResponseServerError]
+        if not settings.DEBUG:
+            return None
+
+        import sentry_sdk.api
+
+        spotlight_client = sentry_sdk.api.get_client().spotlight
+        if spotlight_client is None:
+            return None
+
+        # Spotlight URL has a trailing `/stream` part at the end so split it off
+        spotlight_url = spotlight_client.url.rsplit("/", 1)[0]
+
+        try:
+            spotlight = (
+                urllib.request.urlopen(spotlight_url).read().decode("utf-8")
+            ).replace("<html>", f'<html><base href="{spotlight_url}">')
+        except urllib.error.URLError:
+            return None
+        else:
+            sentry_sdk.api.capture_exception(exception)
+            return HttpResponseServerError(spotlight)
+
+
 def setup_spotlight(options):
     # type: (Dict[str, Any]) -> Optional[SpotlightClient]
 
@@ -57,5 +97,7 @@ def setup_spotlight(options):
         url = DEFAULT_SPOTLIGHT_URL
     else:
         return None
+
+    settings.MIDDLEWARE.append("sentry_sdk.spotlight.SpotlightMiddleware")
 
     return SpotlightClient(url)
