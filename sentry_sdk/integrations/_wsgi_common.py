@@ -37,6 +37,18 @@ SENSITIVE_HEADERS = tuple(
     x[len("HTTP_") :] for x in SENSITIVE_ENV_KEYS if x.startswith("HTTP_")
 )
 
+DEFAULT_HTTP_METHODS_TO_CAPTURE = (
+    "CONNECT",
+    "DELETE",
+    "GET",
+    # "HEAD",  # do not capture HEAD requests by default
+    # "OPTIONS",  # do not capture OPTIONS requests by default
+    "PATCH",
+    "POST",
+    "PUT",
+    "TRACE",
+)
+
 
 def request_body_within_bounds(client, content_length):
     # type: (Optional[sentry_sdk.client.BaseClient], int) -> bool
