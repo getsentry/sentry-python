@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
+from functools import wraps
 from threading import Lock
 
 from sentry_sdk.utils import logger
@@ -7,6 +9,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Any
     from typing import Callable
     from typing import Dict
     from typing import Iterator
@@ -203,6 +206,23 @@ class DidNotEnable(Exception):  # noqa: N818
     """
 
 
+def import_to_did_not_enable(f):
+    @wraps(f)
+    def wrapper(self, *args, **kwargs):
+        from importlib import import_module
+
+        try:
+            for import_name in self.required_imports:
+                globals()[import_name] = import_module(import_name)
+            # "f" is retrieved from the class in __init_subclass__, before being
+            # bound, so "self" is forwarded explicitly
+            return f(self, *args, **kwargs)
+        except ImportError as err:
+            raise DidNotEnable(err.msg)
+
+    return wrapper
+
+
 class Integration(ABC):
     """Baseclass for all integrations.
 
@@ -213,8 +233,20 @@ class Integration(ABC):
     install = None
     """Legacy method, do not implement."""
 
-    identifier = None  # type: str
+    identifier = ""  # type: str
     """String unique ID of integration type"""
+
+    required_imports = ()  # type: Iterable[str]
+
+    # The magic below is borrowed from https://stackoverflow.com/a/72666537/90297
+    def __init_subclass__(cls, *args, **kw):
+        # type: (Any, ...) -> None
+        super().__init_subclass__(*args, **kw)
+
+        # ^no need to juggle with binding the captured method:
+        # it will work just as any other method in the class, and
+        # `self` will be filled in by the Python runtime itself.
+        setattr(cls, "setup_once", import_to_did_not_enable(getattr(cls, "setup_once")))
 
     @staticmethod
     @abstractmethod
