@@ -1205,9 +1205,12 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     By default OPTIONS and HEAD requests do not create a transaction.
     """
     sentry_init(
-        integrations=[DjangoIntegration(
-        middleware_spans=False,
-        signals_spans=False,)],
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
@@ -1241,7 +1244,6 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     client.get(reverse("nomessage"))
     client.options(reverse("nomessage"))
     client.head(reverse("nomessage"))
-
 
     assert len(events) == 2
 
