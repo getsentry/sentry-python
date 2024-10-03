@@ -192,9 +192,6 @@ class SentryAsgiMiddleware:
 
                     method = scope.get("method", "").upper()
                     should_trace = method in self.http_methods_to_capture
-                    if not should_trace:
-                        transaction = None
-
                     with sentry_sdk.continue_trace(_get_headers(scope)):
                         with (
                             sentry_sdk.start_transaction(
