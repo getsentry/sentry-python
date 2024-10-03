@@ -727,7 +727,6 @@ try:
                 content=body,
                 headers=headers,  # type: ignore
             )
-            response.headers = response.headers
             return response
 
         def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
