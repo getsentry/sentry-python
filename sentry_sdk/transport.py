@@ -693,8 +693,21 @@ class HttpTransport(BaseHttpTransport):
 
 try:
     import httpcore
+except ImportError:
+    # Sorry, no Http2Transport for you
+    class Http2Transport(HttpTransport):
+        def __init__(
+            self, options  # type: Dict[str, Any]
+        ):
+            # type: (...) -> None
+            super().__init__(options)
+            logger.warning(
+                "You tried to use HTTP2Transport but don't have httpcore[http2] installed. Falling back to HTTPTransport."
+            )
 
-    class Http2Transport(BaseHttpTransport):
+else:
+
+    class Http2Transport(BaseHttpTransport):  # type: ignore
         """The HTTP2 transport based on httpcore."""
 
         if TYPE_CHECKING:
@@ -811,10 +824,6 @@ try:
                     return httpcore.HTTPProxy(proxy_url=proxy, **opts)
 
             return httpcore.ConnectionPool(**opts)
-
-except ImportError:
-    # Sorry, no Http2Transport for you
-    pass
 
 
 class _FunctionTransport(Transport):
