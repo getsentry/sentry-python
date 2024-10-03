@@ -4,8 +4,8 @@ This tests test for the correctness of the dynamic sampling context (DSC) in the
 The DSC is defined here:
 https://develop.sentry.dev/sdk/telemetry/traces/dynamic-sampling-context/#dsc-specification
 
-The DSC is propagated between service using a header called "baggage". 
-This is not tested in this file. 
+The DSC is propagated between service using a header called "baggage".
+This is not tested in this file.
 """
 
 import pytest
