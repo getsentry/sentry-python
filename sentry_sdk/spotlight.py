@@ -1,4 +1,5 @@
 import io
+import os
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
 
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, env_to_bool
 from sentry_sdk.envelope import Envelope
 
 
@@ -103,7 +104,9 @@ def setup_spotlight(options):
     else:
         return None
 
-    if settings is not None:
+    if settings is not None and env_to_bool(
+        os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1")
+    ):
         settings.MIDDLEWARE.append("sentry_sdk.spotlight.SpotlightMiddleware")
 
     return SpotlightClient(url)
