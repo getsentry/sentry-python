@@ -1,4 +1,4 @@
-from random import random
+import random
 
 from opentelemetry import trace
 
@@ -44,6 +44,18 @@ def get_parent_sampled(parent_context, trace_id):
 def dropped_result(span_context):
     # type: (SpanContext) -> SamplingResult
     trace_state = span_context.trace_state.update(SENTRY_TRACE_STATE_DROPPED, "true")
+
+    # Tell Sentry why we dropped the transaction/span
+    client = sentry_sdk.get_client()
+    if client.monitor and client.monitor.downsample_factor > 0:
+        reason = "backpressure"
+    else:
+        reason = "sample_rate"
+
+    client.transport.record_lost_event(reason, data_category="transaction")
+
+    # Only one span (the transaction itself) is discarded, since we did not record any spans here.
+    client.transport.record_lost_event(reason, data_category="span")
 
     return SamplingResult(
         Decision.DROP,
@@ -107,6 +119,11 @@ class SentrySampler(Sampler):
                 # Check if there is a traces_sample_rate
                 sample_rate = client.options.get("traces_sample_rate")
 
+        # Down-sample in case of back pressure monitor says so
+        # TODO: this should only be done for transactions (aka root spans)
+        if client.monitor:
+            sample_rate /= 2**client.monitor.downsample_factor
+
         # If the sample rate is invalid, drop the span
         if not is_valid_sample_rate(sample_rate, source=self.__class__.__name__):
             logger.warning(
@@ -115,7 +132,7 @@ class SentrySampler(Sampler):
             return dropped_result(parent_span_context)
 
         # Roll the dice on sample rate
-        sampled = random() < float(sample_rate)
+        sampled = random.random() < float(sample_rate)
 
         # TODO-neel-potel set sample rate as attribute for DSC
         if sampled:

@@ -78,7 +78,9 @@ def test_transaction_uses_downsampled_rate(
 
     with sentry_sdk.start_transaction(name="foobar") as transaction:
         assert transaction.sampled is False
-        assert transaction.sample_rate == 0.5
+        assert (
+            transaction.sample_rate == 0.5
+        )  # TODO: this fails until we put the sample_rate in the POTelSpan
 
     assert Counter(record_lost_event_calls) == Counter(
         [
