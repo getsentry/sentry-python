@@ -4,7 +4,7 @@ pytest-cov
 pytest-forked
 pytest-localserver
 pytest-watch
-jsonschema
+jsonschema==4.17.3
 pyrsistent
 executing
 asttokens
@@ -13,6 +13,3 @@ pysocks
 socksio
 httpcore[http2]
 setuptools
-
-# for python 3.13 nogil. dont know why
-rpds-py
