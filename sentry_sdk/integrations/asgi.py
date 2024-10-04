@@ -6,6 +6,7 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import asyncio
 import inspect
+from contextlib import nullcontext
 from copy import deepcopy
 from functools import partial
 
@@ -19,7 +20,6 @@ from sentry_sdk.integrations._asgi_common import (
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    nullcontext,
 )
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import (
