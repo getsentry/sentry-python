@@ -13,3 +13,7 @@ pysocks
 socksio
 httpcore[http2]
 setuptools
+
+# for python 3.13 nogil. dont know why
+rpds
+rpds-py
