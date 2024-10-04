@@ -624,3 +624,70 @@ async def test_async_view(sentry_init, capture_events, application):
     (event,) = events
     assert event["type"] == "transaction"
     assert event["transaction"] == "/simple_async_view"
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+async def test_transaction_http_method_default(
+    sentry_init, capture_events, application
+):
+    """
+    By default OPTIONS and HEAD requests do not create a transaction.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    comm = HttpCommunicator(application, "GET", "/simple_async_view")
+    await comm.get_response()
+    await comm.wait()
+
+    comm = HttpCommunicator(application, "OPTIONS", "/simple_async_view")
+    await comm.get_response()
+    await comm.wait()
+
+    comm = HttpCommunicator(application, "HEAD", "/simple_async_view")
+    await comm.get_response()
+    await comm.wait()
+
+    (event,) = events
+
+    assert len(events) == 1
+    assert event["request"]["method"] == "GET"
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+async def test_transaction_http_method_custom(sentry_init, capture_events, application):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                ),  # capitalization does not matter
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    comm = HttpCommunicator(application, "GET", "/simple_async_view")
+    await comm.get_response()
+    await comm.wait()
+
+    comm = HttpCommunicator(application, "OPTIONS", "/simple_async_view")
+    await comm.get_response()
+    await comm.wait()
+
+    comm = HttpCommunicator(application, "HEAD", "/simple_async_view")
+    await comm.get_response()
+    await comm.wait()
+
+    assert len(events) == 2
+
+    (event1, event2) = events
+    assert event1["request"]["method"] == "OPTIONS"
+    assert event2["request"]["method"] == "HEAD"
