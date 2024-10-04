@@ -19,13 +19,12 @@ import urllib3
 import certifi
 
 import sentry_sdk
-from sentry_sdk._types import EventDataCategory
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -44,7 +43,7 @@ if TYPE_CHECKING:
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk._types import Event
+    from sentry_sdk._types import Event, EventDataCategory
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
@@ -181,7 +180,6 @@ def _parse_rate_limits(header, now=None):
 
             retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
-                category = cast(EventDataCategory, category)
                 if category == "metric_bucket":
                     try:
                         namespaces = parameters[4].split(";")
@@ -189,10 +187,10 @@ def _parse_rate_limits(header, now=None):
                         namespaces = []
 
                     if not namespaces or "custom" in namespaces:
-                        yield category, retry_after
+                        yield category, retry_after  # type: ignore
 
                 else:
-                    yield category, retry_after
+                    yield category, retry_after  # type: ignore
         except (LookupError, ValueError):
             continue
 
