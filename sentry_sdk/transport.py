@@ -19,6 +19,7 @@ import urllib3
 import certifi
 
 import sentry_sdk
+from sentry_sdk._types import EventDataCategory
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
@@ -43,7 +44,7 @@ if TYPE_CHECKING:
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk._types import Event, EventDataCategory
+    from sentry_sdk._types import Event
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
