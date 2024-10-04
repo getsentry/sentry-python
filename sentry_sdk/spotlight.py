@@ -89,7 +89,9 @@ try:
                         "<html>",
                         (
                             f'<html><base href="{spotlight_url}">'
-                            f'<script>window.__spotlight = {{ initOptions: {{ startFrom: "/errors/{ event_id }" }}}};</script>'
+                            '<script>window.__spotlight = {{ initOptions: {{ startFrom: "/errors/{event_id}" }}}};</script>'.format(
+                                event_id=event_id
+                            )
                         ),
                     )
                 )
