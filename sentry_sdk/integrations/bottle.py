@@ -30,7 +30,6 @@ try:
         Bottle,
         Route,
         request as bottle_request,
-        HTTPResponse,
         __version__ as BOTTLE_VERSION,
     )
 except ImportError:
@@ -114,8 +113,6 @@ class BottleIntegration(Integration):
 
                 try:
                     res = prepared_callback(*args, **kwargs)
-                except HTTPResponse:
-                    raise
                 except Exception as exception:
                     event, hint = event_from_exception(
                         exception,
