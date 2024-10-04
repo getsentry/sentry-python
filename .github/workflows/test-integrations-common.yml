@@ -40,13 +40,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - uses: actions/setup-python@v5
-        if: "!endsWith(matrix.python-version, '-dev')"
+        if: "!endsWith(matrix.python-version, '13')"
         with:
           python-version: ${{ matrix.python-version }}
       - uses: deadsnakes/action@v3.2.0
-        if: endsWith(matrix.python-version, '-dev')
+        if: endsWith(matrix.python-version, '13')
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}-dev
           nogil: true
       - name: Setup Test Env
         run: |
