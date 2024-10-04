@@ -11,7 +11,7 @@ from collections import defaultdict
 from urllib.request import getproxies
 
 try:
-    import brotli
+    import brotli  # type: ignore
 except ImportError:
     brotli = None
 
@@ -24,7 +24,7 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from typing import Any
@@ -176,10 +176,11 @@ def _parse_rate_limits(header, now=None):
     for limit in header.split(","):
         try:
             parameters = limit.strip().split(":")
-            retry_after, categories = parameters[:2]
+            retry_after_val, categories = parameters[:2]
 
-            retry_after = now + timedelta(seconds=int(retry_after))
+            retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
+                category = cast(EventDataCategory, category)
                 if category == "metric_bucket":
                     try:
                         namespaces = parameters[4].split(";")
@@ -580,7 +581,7 @@ class BaseHttpTransport(Transport):
         timeout,
         callback=None,
     ):
-        # type: (Self, float, Optional[Callable]) -> None
+        # type: (Self, float, Optional[Callable[[int, float], None]]) -> None
         logger.debug("Flushing HTTP transport")
 
         if timeout > 0:
