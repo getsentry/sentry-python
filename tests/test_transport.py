@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
+import brotli
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
@@ -54,8 +55,12 @@ class CapturingServer(WSGIServer):
         """
         request = Request(environ)
         event = envelope = None
-        if request.headers.get("content-encoding") == "gzip":
+        content_encoding = request.headers.get("content-encoding")
+        if content_encoding == "gzip":
             rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
+            compressed = True
+        elif content_encoding == "br":
+            rdr = io.BytesIO(brotli.decompress(request.data))
             compressed = True
         else:
             rdr = io.BytesIO(request.data)
@@ -117,7 +122,8 @@ def mock_transaction_envelope(span_count):
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
-@pytest.mark.parametrize("compression_level", (0, 9))
+@pytest.mark.parametrize("compression_level", (0, 9, None))
+@pytest.mark.parametrize("compression_algo", ("gzip", "br", None))
 @pytest.mark.parametrize(
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
@@ -131,14 +137,18 @@ def test_transport_works(
     client_flush_method,
     use_pickle,
     compression_level,
+    compression_algo,
     http2,
     maybe_monkeypatched_threading,
 ):
     caplog.set_level(logging.DEBUG)
 
-    experiments = {
-        "transport_zlib_compression_level": compression_level,
-    }
+    experiments = {}
+    if compression_level is not None:
+        experiments["transport_compression_level"] = compression_level
+
+    if compression_algo is not None:
+        experiments["transport_compression_algo"] = compression_algo
 
     if http2:
         experiments["transport_http2"] = True
@@ -164,7 +174,11 @@ def test_transport_works(
     out, err = capsys.readouterr()
     assert not err and not out
     assert capturing_server.captured
-    assert capturing_server.captured[0].compressed == (compression_level > 0)
+    assert (
+        capturing_server.captured[0].compressed == (compression_level is None)
+        or (compression_level > 0)
+        or (compression_algo is None)
+    )
 
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 

@@ -10,6 +10,11 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from urllib.request import getproxies
 
+try:
+    import brotli
+except ImportError:
+    brotli = None
+
 import urllib3
 import certifi
 
@@ -217,13 +222,6 @@ class BaseHttpTransport(Transport):
         )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
         self._last_client_report_sent = time.time()
 
-        compression_level = options.get("_experiments", {}).get(
-            "transport_zlib_compression_level"
-        )
-        self._compression_level = (
-            9 if compression_level is None else int(compression_level)
-        )
-
         self._pool = self._make_pool(
             self.parsed_dsn,
             http_proxy=options["http_proxy"],
@@ -236,6 +234,35 @@ class BaseHttpTransport(Transport):
 
         # Backwards compatibility for deprecated `self.hub_class` attribute
         self._hub_cls = sentry_sdk.Hub
+
+        experiments = options.get("_experiments", {})
+        compression_level = experiments.get(
+            "transport_compression_level",
+            experiments.get("transport_zlib_compression_level"),
+        )
+        compression_algo = experiments.get(
+            "transport_compression_algo", "br" if brotli is not None else "gzip"
+        )
+        if compression_algo == "br" and brotli is None:
+            logger.warning(
+                "You asked for brotli compression without the Brotli module, falling back to gzip -9"
+            )
+            compression_algo = "gzip"
+            compression_level = None
+
+        self._compression_algo = compression_algo
+        if compression_level is not None:
+            self._compression_level = compression_level
+        elif compression_algo == "gzip":
+            self._compression_level = 9
+        elif compression_algo == "br":
+            self._compression_level = 4
+        else:
+            logger.warning(
+                "Unknown compression algo %s, disabling compression", compression_algo
+            )
+            self._compression_level = 0
+            self._compression_algo = None
 
     def record_lost_event(
         self,
@@ -458,14 +485,7 @@ class BaseHttpTransport(Transport):
         if client_report_item is not None:
             envelope.items.append(client_report_item)
 
-        body = io.BytesIO()
-        if self._compression_level == 0:
-            envelope.serialize_into(body)
-        else:
-            with gzip.GzipFile(
-                fileobj=body, mode="w", compresslevel=self._compression_level
-            ) as f:
-                envelope.serialize_into(f)
+        content_encoding, body = self._serialize_envelope(envelope)
 
         assert self.parsed_dsn is not None
         logger.debug(
@@ -478,8 +498,8 @@ class BaseHttpTransport(Transport):
         headers = {
             "Content-Type": "application/x-sentry-envelope",
         }
-        if self._compression_level > 0:
-            headers["Content-Encoding"] = "gzip"
+        if content_encoding:
+            headers["Content-Encoding"] = content_encoding
 
         self._send_request(
             body.getvalue(),
@@ -488,6 +508,28 @@ class BaseHttpTransport(Transport):
             envelope=envelope,
         )
         return None
+
+    def _serialize_envelope(self, envelope):
+        # type: (..., Envelope) -> tuple[Optional[str], io.BytesIO]
+        content_encoding = None
+        body = io.BytesIO()
+        if self._compression_level == 0 or self._compression_algo is None:
+            envelope.serialize_into(body)
+        else:
+            content_encoding = self._compression_algo
+            if self._compression_algo == "br" and brotli is not None:
+                body.write(
+                    brotli.compress(
+                        envelope.serialize(), quality=self._compression_level
+                    )
+                )
+            else:  # assume gzip as we sanitize the algo value in init
+                with gzip.GzipFile(
+                    fileobj=body, mode="w", compresslevel=self._compression_level
+                ) as f:
+                    envelope.serialize_into(f)
+
+        return content_encoding, body
 
     def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
