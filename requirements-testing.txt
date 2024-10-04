@@ -4,7 +4,7 @@ pytest-cov
 pytest-forked
 pytest-localserver
 pytest-watch
-jsonschema==4.17.3
+jsonschema<=4.17.3
 pyrsistent
 executing
 asttokens
