@@ -66,19 +66,19 @@ jobs:
       - name: Test django latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-django-latest"
+          tox -f "py${{ matrix.python-version }}-django_latest"
       - name: Test flask latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-flask-latest"
+          tox -f "py${{ matrix.python-version }}-flask_latest"
       - name: Test starlette latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlette-latest"
+          tox -f "py${{ matrix.python-version }}-starlette_latest"
       - name: Test fastapi latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi-latest"
+          tox -f "py${{ matrix.python-version }}-fastapi_latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -152,19 +152,19 @@ jobs:
       - name: Test django pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django"
+          tox -f "py${{ matrix.python-version }}-django"
       - name: Test flask pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-flask"
+          tox -f "py${{ matrix.python-version }}-flask"
       - name: Test starlette pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlette"
+          tox -f "py${{ matrix.python-version }}-starlette"
       - name: Test fastapi pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi"
+          tox -f "py${{ matrix.python-version }}-fastapi"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |

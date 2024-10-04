@@ -48,23 +48,23 @@ jobs:
       - name: Test loguru latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru-latest"
+          tox -f "py${{ matrix.python-version }}-loguru_latest"
       - name: Test opentelemetry latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry-latest"
+          tox -f "py${{ matrix.python-version }}-opentelemetry_latest"
       - name: Test potel latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-potel-latest"
+          tox -f "py${{ matrix.python-version }}-potel_latest"
       - name: Test pure_eval latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval-latest"
+          tox -f "py${{ matrix.python-version }}-pure_eval_latest"
       - name: Test trytond latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest"
+          tox -f "py${{ matrix.python-version }}-trytond_latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -120,23 +120,23 @@ jobs:
       - name: Test loguru pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru"
+          tox -f "py${{ matrix.python-version }}-loguru"
       - name: Test opentelemetry pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry"
+          tox -f "py${{ matrix.python-version }}-opentelemetry"
       - name: Test potel pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-potel"
+          tox -f "py${{ matrix.python-version }}-potel"
       - name: Test pure_eval pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pure_eval"
+          tox -f "py${{ matrix.python-version }}-pure_eval"
       - name: Test trytond pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond"
+          tox -f "py${{ matrix.python-version }}-trytond"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |

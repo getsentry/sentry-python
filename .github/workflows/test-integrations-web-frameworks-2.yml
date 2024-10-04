@@ -48,43 +48,43 @@ jobs:
       - name: Test aiohttp latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-aiohttp-latest"
+          tox -f "py${{ matrix.python-version }}-aiohttp_latest"
       - name: Test asgi latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-asgi-latest"
+          tox -f "py${{ matrix.python-version }}-asgi_latest"
       - name: Test bottle latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-bottle-latest"
+          tox -f "py${{ matrix.python-version }}-bottle_latest"
       - name: Test falcon latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-falcon-latest"
+          tox -f "py${{ matrix.python-version }}-falcon_latest"
       - name: Test litestar latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-litestar-latest"
+          tox -f "py${{ matrix.python-version }}-litestar_latest"
       - name: Test pyramid latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pyramid-latest"
+          tox -f "py${{ matrix.python-version }}-pyramid_latest"
       - name: Test quart latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-quart-latest"
+          tox -f "py${{ matrix.python-version }}-quart_latest"
       - name: Test sanic latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-sanic-latest"
+          tox -f "py${{ matrix.python-version }}-sanic_latest"
       - name: Test starlite latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlite-latest"
+          tox -f "py${{ matrix.python-version }}-starlite_latest"
       - name: Test tornado latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-tornado-latest"
+          tox -f "py${{ matrix.python-version }}-tornado_latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -140,43 +140,43 @@ jobs:
       - name: Test aiohttp pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aiohttp"
+          tox -f "py${{ matrix.python-version }}-aiohttp"
       - name: Test asgi pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asgi"
+          tox -f "py${{ matrix.python-version }}-asgi"
       - name: Test bottle pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-bottle"
+          tox -f "py${{ matrix.python-version }}-bottle"
       - name: Test falcon pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-falcon"
+          tox -f "py${{ matrix.python-version }}-falcon"
       - name: Test litestar pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-litestar"
+          tox -f "py${{ matrix.python-version }}-litestar"
       - name: Test pyramid pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pyramid"
+          tox -f "py${{ matrix.python-version }}-pyramid"
       - name: Test quart pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-quart"
+          tox -f "py${{ matrix.python-version }}-quart"
       - name: Test sanic pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sanic"
+          tox -f "py${{ matrix.python-version }}-sanic"
       - name: Test starlite pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlite"
+          tox -f "py${{ matrix.python-version }}-starlite"
       - name: Test tornado pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-tornado"
+          tox -f "py${{ matrix.python-version }}-tornado"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |

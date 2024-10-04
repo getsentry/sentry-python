@@ -48,23 +48,23 @@ jobs:
       - name: Test anthropic latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-anthropic-latest"
+          tox -f "py${{ matrix.python-version }}-anthropic_latest"
       - name: Test cohere latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere-latest"
+          tox -f "py${{ matrix.python-version }}-cohere_latest"
       - name: Test langchain latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-latest"
+          tox -f "py${{ matrix.python-version }}-langchain_latest"
       - name: Test openai latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-latest"
+          tox -f "py${{ matrix.python-version }}-openai_latest"
       - name: Test huggingface_hub latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub-latest"
+          tox -f "py${{ matrix.python-version }}-huggingface_hub_latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -120,23 +120,23 @@ jobs:
       - name: Test anthropic pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-anthropic"
+          tox -f "py${{ matrix.python-version }}-anthropic"
       - name: Test cohere pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cohere"
+          tox -f "py${{ matrix.python-version }}-cohere"
       - name: Test langchain pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain"
+          tox -f "py${{ matrix.python-version }}-langchain"
       - name: Test openai pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai"
+          tox -f "py${{ matrix.python-version }}-openai"
       - name: Test huggingface_hub pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huggingface_hub"
+          tox -f "py${{ matrix.python-version }}-huggingface_hub"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |

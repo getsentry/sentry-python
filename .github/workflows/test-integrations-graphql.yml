@@ -48,19 +48,19 @@ jobs:
       - name: Test ariadne latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-ariadne-latest"
+          tox -f "py${{ matrix.python-version }}-ariadne_latest"
       - name: Test gql latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gql-latest"
+          tox -f "py${{ matrix.python-version }}-gql_latest"
       - name: Test graphene latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-graphene-latest"
+          tox -f "py${{ matrix.python-version }}-graphene_latest"
       - name: Test strawberry latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-strawberry-latest"
+          tox -f "py${{ matrix.python-version }}-strawberry_latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -116,19 +116,19 @@ jobs:
       - name: Test ariadne pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-ariadne"
+          tox -f "py${{ matrix.python-version }}-ariadne"
       - name: Test gql pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gql"
+          tox -f "py${{ matrix.python-version }}-gql"
       - name: Test graphene pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-graphene"
+          tox -f "py${{ matrix.python-version }}-graphene"
       - name: Test strawberry pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-strawberry"
+          tox -f "py${{ matrix.python-version }}-strawberry"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
