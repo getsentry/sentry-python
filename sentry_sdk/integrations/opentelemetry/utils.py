@@ -15,6 +15,7 @@ from opentelemetry.trace import (
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.sdk.trace import ReadableSpan
 
+import sentry_sdk
 from sentry_sdk.utils import Dsn
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.tracing import get_span_status_from_http_code, DEFAULT_SPAN_ORIGIN
@@ -24,7 +25,7 @@ from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Mapping, Sequence, Union, ItemsView
+    from typing import Any, Optional, Mapping, Sequence, Union
     from sentry_sdk._types import OtelExtractedSpanData
 
 
@@ -300,9 +301,8 @@ def get_trace_context(span, span_data=None):
     if span.attributes:
         trace_context["data"] = dict(span.attributes)
 
-    trace_context["dynamic_sampling_context"] = dsc_from_trace_state(
-        span.context.trace_state
-    )
+    trace_state = get_trace_state(span)
+    trace_context["dynamic_sampling_context"] = dsc_from_trace_state(trace_state)
 
     # TODO-neel-potel profiler thread_id, thread_name
 
@@ -317,6 +317,11 @@ def trace_state_from_baggage(baggage):
         val = quote(str(v))
         items.append((key, val))
     return TraceState(items)
+
+
+def baggage_from_trace_state(trace_state):
+    # type: (TraceState) -> Baggage
+    return Baggage(dsc_from_trace_state(trace_state))
 
 
 def serialize_trace_state(trace_state):
@@ -336,3 +341,55 @@ def dsc_from_trace_state(trace_state):
             key = re.sub(Baggage.SENTRY_PREFIX_REGEX, "", k)
             dsc[key] = v
     return dsc
+
+
+def has_incoming_trace(trace_state):
+    # type: (TraceState) -> bool
+    """
+    The existence a sentry-trace_id in the baggage implies we continued an upstream trace.
+    """
+    return (Baggage.SENTRY_PREFIX + "trace_id") in trace_state
+
+
+def get_trace_state(span):
+    # type: (Union[Span, ReadableSpan]) -> TraceState
+    """
+    Get the existing trace_state with sentry items
+    or populate it if we are the head SDK.
+    """
+    span_context = span.get_span_context()
+    if not span_context:
+        return TraceState()
+
+    trace_state = span_context.trace_state
+
+    if has_incoming_trace(trace_state):
+        return trace_state
+    else:
+        client = sentry_sdk.get_client()
+        if not client.is_active():
+            return trace_state
+
+        options = client.options or {}
+
+        trace_state = trace_state.update(
+            Baggage.SENTRY_PREFIX + "trace_id", format_trace_id(span_context.trace_id)
+        )
+
+        if options.get("environment"):
+            trace_state = trace_state.update(
+                Baggage.SENTRY_PREFIX + "environment", options["environment"]
+            )
+
+        if options.get("release"):
+            trace_state = trace_state.update(
+                Baggage.SENTRY_PREFIX + "release", options["release"]
+            )
+
+        if options.get("dsn"):
+            trace_state = trace_state.update(
+                Baggage.SENTRY_PREFIX + "public_key", Dsn(options["dsn"]).public_key
+            )
+
+        # TODO-neel-potel head dsc transaction name
+        return trace_state
