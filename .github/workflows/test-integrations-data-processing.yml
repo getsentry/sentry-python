@@ -39,6 +39,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
+      - uses: actions/setup-python@v5
+        if: "!endsWith(matrix.python-version, '-dev')"
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: deadsnakes/action@v3.2.0
+        if: endsWith(matrix.python-version, '-dev')
+        with:
+          python-version: ${{ matrix.python-version }}
+          nogil: true
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
@@ -125,6 +134,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
+      - uses: actions/setup-python@v5
+        if: "!endsWith(matrix.python-version, '-dev')"
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: deadsnakes/action@v3.2.0
+        if: endsWith(matrix.python-version, '-dev')
+        with:
+          python-version: ${{ matrix.python-version }}
+          nogil: true
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env

@@ -50,6 +50,17 @@
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
+{% raw %}          
+      - uses: actions/setup-python@v5
+        if: "!endsWith(matrix.python-version, '-dev')"
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: deadsnakes/action@v3.2.0
+        if: endsWith(matrix.python-version, '-dev')
+        with:
+          python-version: ${{ matrix.python-version }}
+          nogil: true
+{% endraw %}
       {% if needs_clickhouse %}
       - uses: getsentry/action-clickhouse-in-ci@v1
       {% endif %}
