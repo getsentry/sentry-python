@@ -3,6 +3,7 @@ import io
 import os
 import gzip
 import socket
+import ssl
 import time
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -24,13 +25,14 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
+    from typing import DefaultDict
     from typing import Iterable
     from typing import List
+    from typing import Mapping
     from typing import Optional
     from typing import Tuple
     from typing import Type
     from typing import Union
-    from typing import DefaultDict
 
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
@@ -193,8 +195,8 @@ def _parse_rate_limits(header, now=None):
             continue
 
 
-class HttpTransport(Transport):
-    """The default HTTP transport."""
+class BaseHttpTransport(Transport):
+    """The base HTTP transport."""
 
     def __init__(
         self, options  # type: Dict[str, Any]
@@ -208,19 +210,19 @@ class HttpTransport(Transport):
         self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[Optional[EventDataCategory], datetime]
+        # We only use this Retry() class for the `get_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
         self._discarded_events = defaultdict(
             int
         )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
         self._last_client_report_sent = time.time()
 
-        compresslevel = options.get("_experiments", {}).get(
+        compression_level = options.get("_experiments", {}).get(
             "transport_zlib_compression_level"
         )
-        self._compresslevel = 9 if compresslevel is None else int(compresslevel)
-
-        num_pools = options.get("_experiments", {}).get("transport_num_pools")
-        self._num_pools = 2 if num_pools is None else int(num_pools)
+        self._compression_level = (
+            9 if compression_level is None else int(compression_level)
+        )
 
         self._pool = self._make_pool(
             self.parsed_dsn,
@@ -269,12 +271,16 @@ class HttpTransport(Transport):
 
         self._discarded_events[data_category, reason] += quantity
 
+    def _get_header_value(self, response, header):
+        # type: (Any, str) -> Optional[str]
+        return response.headers.get(header)
+
     def _update_rate_limits(self, response):
-        # type: (urllib3.BaseHTTPResponse) -> None
+        # type: (Union[urllib3.BaseHTTPResponse, httpcore.Response]) -> None
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
-        header = response.headers.get("x-sentry-rate-limits")
+        header = self._get_header_value(response, "x-sentry-rate-limits")
         if header:
             logger.warning("Rate-limited via x-sentry-rate-limits")
             self._disabled_until.update(_parse_rate_limits(header))
@@ -284,8 +290,14 @@ class HttpTransport(Transport):
         # sentries if a proxy in front wants to globally slow things down.
         elif response.status == 429:
             logger.warning("Rate-limited via 429")
+            retry_after_value = self._get_header_value(response, "Retry-After")
+            retry_after = (
+                self._retry.parse_retry_after(retry_after_value)
+                if retry_after_value is not None
+                else None
+            ) or 60
             self._disabled_until[None] = datetime.now(timezone.utc) + timedelta(
-                seconds=self._retry.get_retry_after(response) or 60
+                seconds=retry_after
             )
 
     def _send_request(
@@ -312,11 +324,11 @@ class HttpTransport(Transport):
             }
         )
         try:
-            response = self._pool.request(
+            response = self._request(
                 "POST",
-                str(self._auth.get_api_url(endpoint_type)),
-                body=body,
-                headers=headers,
+                endpoint_type,
+                body,
+                headers,
             )
         except Exception:
             self.on_dropped_event("network")
@@ -338,7 +350,7 @@ class HttpTransport(Transport):
                 logger.error(
                     "Unexpected status code: %s (body: %s)",
                     response.status,
-                    response.data,
+                    getattr(response, "data", getattr(response, "content", None)),
                 )
                 self.on_dropped_event("status_{}".format(response.status))
                 record_loss("network_error")
@@ -447,11 +459,11 @@ class HttpTransport(Transport):
             envelope.items.append(client_report_item)
 
         body = io.BytesIO()
-        if self._compresslevel == 0:
+        if self._compression_level == 0:
             envelope.serialize_into(body)
         else:
             with gzip.GzipFile(
-                fileobj=body, mode="w", compresslevel=self._compresslevel
+                fileobj=body, mode="w", compresslevel=self._compression_level
             ) as f:
                 envelope.serialize_into(f)
 
@@ -466,7 +478,7 @@ class HttpTransport(Transport):
         headers = {
             "Content-Type": "application/x-sentry-envelope",
         }
-        if self._compresslevel > 0:
+        if self._compression_level > 0:
             headers["Content-Encoding"] = "gzip"
 
         self._send_request(
@@ -479,39 +491,7 @@ class HttpTransport(Transport):
 
     def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
-        options = {
-            "num_pools": self._num_pools,
-            "cert_reqs": "CERT_REQUIRED",
-        }
-
-        socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
-
-        if self.options["socket_options"] is not None:
-            socket_options = self.options["socket_options"]
-
-        if self.options["keep_alive"]:
-            if socket_options is None:
-                socket_options = []
-
-            used_options = {(o[0], o[1]) for o in socket_options}
-            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
-                if (default_option[0], default_option[1]) not in used_options:
-                    socket_options.append(default_option)
-
-        if socket_options is not None:
-            options["socket_options"] = socket_options
-
-        options["ca_certs"] = (
-            ca_certs  # User-provided bundle from the SDK init
-            or os.environ.get("SSL_CERT_FILE")
-            or os.environ.get("REQUESTS_CA_BUNDLE")
-            or certifi.where()
-        )
-
-        options["cert_file"] = cert_file or os.environ.get("CLIENT_CERT_FILE")
-        options["key_file"] = key_file or os.environ.get("CLIENT_KEY_FILE")
-
-        return options
+        raise NotImplementedError()
 
     def _in_no_proxy(self, parsed_dsn):
         # type: (Dsn) -> bool
@@ -534,44 +514,18 @@ class HttpTransport(Transport):
         key_file,  # type: Optional[Any]
         proxy_headers,  # type: Optional[Dict[str, str]]
     ):
-        # type: (...) -> Union[PoolManager, ProxyManager]
-        proxy = None
-        no_proxy = self._in_no_proxy(parsed_dsn)
+        # type: (...) -> Union[PoolManager, ProxyManager, httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
+        raise NotImplementedError()
 
-        # try HTTPS first
-        if parsed_dsn.scheme == "https" and (https_proxy != ""):
-            proxy = https_proxy or (not no_proxy and getproxies().get("https"))
-
-        # maybe fallback to HTTP proxy
-        if not proxy and (http_proxy != ""):
-            proxy = http_proxy or (not no_proxy and getproxies().get("http"))
-
-        opts = self._get_pool_options(ca_certs, cert_file, key_file)
-
-        if proxy:
-            if proxy_headers:
-                opts["proxy_headers"] = proxy_headers
-
-            if proxy.startswith("socks"):
-                use_socks_proxy = True
-                try:
-                    # Check if PySocks depencency is available
-                    from urllib3.contrib.socks import SOCKSProxyManager
-                except ImportError:
-                    use_socks_proxy = False
-                    logger.warning(
-                        "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
-                        proxy,
-                    )
-
-                if use_socks_proxy:
-                    return SOCKSProxyManager(proxy, **opts)
-                else:
-                    return urllib3.PoolManager(**opts)
-            else:
-                return urllib3.ProxyManager(proxy, **opts)
-        else:
-            return urllib3.PoolManager(**opts)
+    def _request(
+        self,
+        method,
+        endpoint_type,
+        body,
+        headers,
+    ):
+        # type: (str, EndpointType, Any, Mapping[str, str]) -> Union[urllib3.BaseHTTPResponse, httpcore.Response]
+        raise NotImplementedError()
 
     def capture_envelope(
         self, envelope  # type: Envelope
@@ -630,6 +584,248 @@ class HttpTransport(Transport):
         self._hub_cls = value
 
 
+class HttpTransport(BaseHttpTransport):
+    if TYPE_CHECKING:
+        _pool: Union[PoolManager, ProxyManager]
+
+    def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
+
+        num_pools = self.options.get("_experiments", {}).get("transport_num_pools")
+        options = {
+            "num_pools": 2 if num_pools is None else int(num_pools),
+            "cert_reqs": "CERT_REQUIRED",
+        }
+
+        socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
+
+        if self.options["socket_options"] is not None:
+            socket_options = self.options["socket_options"]
+
+        if self.options["keep_alive"]:
+            if socket_options is None:
+                socket_options = []
+
+            used_options = {(o[0], o[1]) for o in socket_options}
+            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+                if (default_option[0], default_option[1]) not in used_options:
+                    socket_options.append(default_option)
+
+        if socket_options is not None:
+            options["socket_options"] = socket_options
+
+        options["ca_certs"] = (
+            ca_certs  # User-provided bundle from the SDK init
+            or os.environ.get("SSL_CERT_FILE")
+            or os.environ.get("REQUESTS_CA_BUNDLE")
+            or certifi.where()
+        )
+
+        options["cert_file"] = cert_file or os.environ.get("CLIENT_CERT_FILE")
+        options["key_file"] = key_file or os.environ.get("CLIENT_KEY_FILE")
+
+        return options
+
+    def _make_pool(
+        self,
+        parsed_dsn,  # type: Dsn
+        http_proxy,  # type: Optional[str]
+        https_proxy,  # type: Optional[str]
+        ca_certs,  # type: Optional[Any]
+        cert_file,  # type: Optional[Any]
+        key_file,  # type: Optional[Any]
+        proxy_headers,  # type: Optional[Dict[str, str]]
+    ):
+        # type: (...) -> Union[PoolManager, ProxyManager]
+        proxy = None
+        no_proxy = self._in_no_proxy(parsed_dsn)
+
+        # try HTTPS first
+        if parsed_dsn.scheme == "https" and (https_proxy != ""):
+            proxy = https_proxy or (not no_proxy and getproxies().get("https"))
+
+        # maybe fallback to HTTP proxy
+        if not proxy and (http_proxy != ""):
+            proxy = http_proxy or (not no_proxy and getproxies().get("http"))
+
+        opts = self._get_pool_options(ca_certs, cert_file, key_file)
+
+        if proxy:
+            if proxy_headers:
+                opts["proxy_headers"] = proxy_headers
+
+            if proxy.startswith("socks"):
+                use_socks_proxy = True
+                try:
+                    # Check if PySocks dependency is available
+                    from urllib3.contrib.socks import SOCKSProxyManager
+                except ImportError:
+                    use_socks_proxy = False
+                    logger.warning(
+                        "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
+                        proxy,
+                    )
+
+                if use_socks_proxy:
+                    return SOCKSProxyManager(proxy, **opts)
+                else:
+                    return urllib3.PoolManager(**opts)
+            else:
+                return urllib3.ProxyManager(proxy, **opts)
+        else:
+            return urllib3.PoolManager(**opts)
+
+    def _request(
+        self,
+        method,
+        endpoint_type,
+        body,
+        headers,
+    ):
+        # type: (str, EndpointType, Any, Mapping[str, str]) -> urllib3.BaseHTTPResponse
+        return self._pool.request(
+            method,
+            self._auth.get_api_url(endpoint_type),
+            body=body,
+            headers=headers,
+        )
+
+
+try:
+    import httpcore
+except ImportError:
+    # Sorry, no Http2Transport for you
+    class Http2Transport(HttpTransport):
+        def __init__(
+            self, options  # type: Dict[str, Any]
+        ):
+            # type: (...) -> None
+            super().__init__(options)
+            logger.warning(
+                "You tried to use HTTP2Transport but don't have httpcore[http2] installed. Falling back to HTTPTransport."
+            )
+
+else:
+
+    class Http2Transport(BaseHttpTransport):  # type: ignore
+        """The HTTP2 transport based on httpcore."""
+
+        if TYPE_CHECKING:
+            _pool: Union[
+                httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool
+            ]
+
+        def _get_header_value(self, response, header):
+            # type: (httpcore.Response, str) -> Optional[str]
+            return next(
+                (
+                    val.decode("ascii")
+                    for key, val in response.headers
+                    if key.decode("ascii").lower() == header
+                ),
+                None,
+            )
+
+        def _request(
+            self,
+            method,
+            endpoint_type,
+            body,
+            headers,
+        ):
+            # type: (str, EndpointType, Any, Mapping[str, str]) -> httpcore.Response
+            response = self._pool.request(
+                method,
+                self._auth.get_api_url(endpoint_type),
+                content=body,
+                headers=headers,  # type: ignore
+            )
+            return response
+
+        def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
+            # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
+            options = {
+                "http2": True,
+                "retries": 3,
+            }  # type: Dict[str, Any]
+
+            socket_options = (
+                self.options["socket_options"]
+                if self.options["socket_options"] is not None
+                else []
+            )
+
+            used_options = {(o[0], o[1]) for o in socket_options}
+            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+                if (default_option[0], default_option[1]) not in used_options:
+                    socket_options.append(default_option)
+
+            options["socket_options"] = socket_options
+
+            ssl_context = ssl.create_default_context()
+            ssl_context.load_verify_locations(
+                ca_certs  # User-provided bundle from the SDK init
+                or os.environ.get("SSL_CERT_FILE")
+                or os.environ.get("REQUESTS_CA_BUNDLE")
+                or certifi.where()
+            )
+            cert_file = cert_file or os.environ.get("CLIENT_CERT_FILE")
+            key_file = key_file or os.environ.get("CLIENT_KEY_FILE")
+            if cert_file is not None:
+                ssl_context.load_cert_chain(cert_file, key_file)
+
+            options["ssl_context"] = ssl_context
+
+            return options
+
+        def _make_pool(
+            self,
+            parsed_dsn,  # type: Dsn
+            http_proxy,  # type: Optional[str]
+            https_proxy,  # type: Optional[str]
+            ca_certs,  # type: Optional[Any]
+            cert_file,  # type: Optional[Any]
+            key_file,  # type: Optional[Any]
+            proxy_headers,  # type: Optional[Dict[str, str]]
+        ):
+            # type: (...) -> Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
+            proxy = None
+            no_proxy = self._in_no_proxy(parsed_dsn)
+
+            # try HTTPS first
+            if parsed_dsn.scheme == "https" and (https_proxy != ""):
+                proxy = https_proxy or (not no_proxy and getproxies().get("https"))
+
+            # maybe fallback to HTTP proxy
+            if not proxy and (http_proxy != ""):
+                proxy = http_proxy or (not no_proxy and getproxies().get("http"))
+
+            opts = self._get_pool_options(ca_certs, cert_file, key_file)
+
+            if proxy:
+                if proxy_headers:
+                    opts["proxy_headers"] = proxy_headers
+
+                if proxy.startswith("socks"):
+                    try:
+                        if "socket_options" in opts:
+                            socket_options = opts.pop("socket_options")
+                            if socket_options:
+                                logger.warning(
+                                    "You have defined socket_options but using a SOCKS proxy which doesn't support these. We'll ignore socket_options."
+                                )
+                        return httpcore.SOCKSProxy(proxy_url=proxy, **opts)
+                    except RuntimeError:
+                        logger.warning(
+                            "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support.",
+                            proxy,
+                        )
+                else:
+                    return httpcore.HTTPProxy(proxy_url=proxy, **opts)
+
+            return httpcore.ConnectionPool(**opts)
+
+
 class _FunctionTransport(Transport):
     """
     DEPRECATED: Users wishing to provide a custom transport should subclass
@@ -663,8 +859,12 @@ def make_transport(options):
     # type: (Dict[str, Any]) -> Optional[Transport]
     ref_transport = options["transport"]
 
+    use_http2_transport = options.get("_experiments", {}).get("transport_http2", False)
+
     # By default, we use the http transport class
-    transport_cls = HttpTransport  # type: Type[Transport]
+    transport_cls = (
+        Http2Transport if use_http2_transport else HttpTransport
+    )  # type: Type[Transport]
 
     if isinstance(ref_transport, Transport):
         return ref_transport
