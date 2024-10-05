@@ -2,7 +2,7 @@ from collections import Counter
 from unittest import mock
 
 import pytest
-from werkzeug.test import Client
+from werkzeug.test import Client, EnvironBuilder
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -133,6 +133,49 @@ def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
     assert exc["type"] == "KeyboardInterrupt"
     assert exc["value"] == ""
     assert event["level"] == "error"
+
+
+def test_stopiteration_is_not_ignored(sentry_init, capture_events, request):
+    sentry_init(send_default_pii=True)
+
+    def exiting_app(environ, start_response):
+        raise StopIteration()
+
+    app = SentryWsgiMiddleware(exiting_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(StopIteration):
+        client.get("/")
+
+    (event,) = events
+
+    assert "exception" in event
+    exc = event["exception"]["values"][-1]
+    assert exc["type"] == "StopIteration"
+    assert exc["value"] == ""
+    assert event["level"] == "error"
+
+
+def test_stopiteration_is_ignored_for_gunicorn(sentry_init, capture_events, request):
+    sentry_init(send_default_pii=True)
+
+    def exiting_app(environ, start_response):
+        raise StopIteration()
+
+    app = SentryWsgiMiddleware(exiting_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(StopIteration):
+        builder = EnvironBuilder(
+            "/", environ_base={"SERVER_SOFTWARE": "gunicorn/23.0.0"}
+        )
+        request = builder.get_request()
+        builder.close()
+        client.open(request)
+
+    assert len(events) == 0
 
 
 def test_transaction_with_error(

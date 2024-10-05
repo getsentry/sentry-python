@@ -134,6 +134,11 @@ class SentryWsgiMiddleware:
                                     _sentry_start_response, start_response, transaction
                                 ),
                             )
+                        except StopIteration:
+                            if "gunicorn" in environ.get("SERVER_SOFTWARE", ""):
+                                raise
+                            else:
+                                reraise(*_capture_exception())
                         except BaseException:
                             reraise(*_capture_exception())
         finally:
