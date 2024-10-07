@@ -174,11 +174,18 @@ def test_transport_works(
     out, err = capsys.readouterr()
     assert not err and not out
     assert capturing_server.captured
-    assert (
-        capturing_server.captured[0].compressed == (compression_level is None)
-        or (compression_level > 0)
-        or (compression_algo is None)
+    should_compress = (
+        (
+            compression_level is None
+        )  # default is to compress with bortli if available, gzip otherwise
+        or (
+            compression_level > 0
+        )  # setting compression level to 0 means don't compress
+        or (
+            compression_algo is None
+        )  # if we couldn't resolve to a known algo, we don't compress
     )
+    assert capturing_server.captured[0].compressed == should_compress
 
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
