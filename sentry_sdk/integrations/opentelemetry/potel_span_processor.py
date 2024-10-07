@@ -59,11 +59,12 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if is_sentry_span(span):
             return
 
-        if span.parent and not span.parent.is_remote:
-            self._children_spans[span.parent.span_id].append(span)
-        else:
+        is_root_span = not (span.parent and not span.parent.is_remote)
+        if is_root_span:
             # if have a root span ending, we build a transaction and send it
             self._flush_root_span(span)
+        else:
+            self._children_spans[span.parent.span_id].append(span)
 
     # TODO-neel-potel not sure we need a clear like JS
     def shutdown(self):

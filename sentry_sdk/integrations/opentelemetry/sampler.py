@@ -54,17 +54,19 @@ def dropped_result(span_context, attributes, sample_rate=None):
     if sample_rate:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
-    # Tell Sentry why we dropped the transaction/span
-    client = sentry_sdk.get_client()
-    if client.monitor and client.monitor.downsample_factor > 0:
-        reason = "backpressure"
-    else:
-        reason = "sample_rate"
+    is_root_span = not (span_context.is_valid and not span_context.is_remote)
+    if is_root_span:
+        # Tell Sentry why we dropped the transaction/root-span
+        client = sentry_sdk.get_client()
+        if client.monitor and client.monitor.downsample_factor > 0:
+            reason = "backpressure"
+        else:
+            reason = "sample_rate"
 
-    client.transport.record_lost_event(reason, data_category="transaction")
+        client.transport.record_lost_event(reason, data_category="transaction")
 
-    # Only one span (the transaction itself) is discarded, since we did not record any spans here.
-    client.transport.record_lost_event(reason, data_category="span")
+        # Only one span (the transaction itself) is discarded, since we did not record any spans here.
+        client.transport.record_lost_event(reason, data_category="span")
 
     return SamplingResult(
         Decision.DROP,
