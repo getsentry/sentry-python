@@ -1,4 +1,5 @@
 from opentelemetry.context import create_key
+from sentry_sdk.tracing_utils import Baggage
 
 
 # propagation keys
@@ -11,7 +12,8 @@ SENTRY_FORK_ISOLATION_SCOPE_KEY = create_key("sentry_fork_isolation_scope")
 SENTRY_USE_CURRENT_SCOPE_KEY = create_key("sentry_use_current_scope")
 SENTRY_USE_ISOLATION_SCOPE_KEY = create_key("sentry_use_isolation_scope")
 
-SENTRY_TRACE_STATE_DROPPED = "sentry_dropped"
+TRACESTATE_SAMPLED_KEY = Baggage.SENTRY_PREFIX + "sampled"
+TRACESTATE_SAMPLE_RATE_KEY = Baggage.SENTRY_PREFIX + "sample_rate"
 
 OTEL_SENTRY_CONTEXT = "otel"
 SPAN_ORIGIN = "auto.otel"

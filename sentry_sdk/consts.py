@@ -57,6 +57,7 @@ if TYPE_CHECKING:
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
+            "transport_http2": Optional[bool],
         },
         total=False,
     )
@@ -552,4 +553,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.14.0"
+VERSION = "2.15.0"

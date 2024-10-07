@@ -244,7 +244,10 @@ def test_transport_option(monkeypatch):
         },
     ],
 )
-def test_proxy(monkeypatch, testcase):
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
+def test_proxy(monkeypatch, testcase, http2):
     if testcase["env_http_proxy"] is not None:
         monkeypatch.setenv("HTTP_PROXY", testcase["env_http_proxy"])
     if testcase["env_https_proxy"] is not None:
@@ -253,6 +256,9 @@ def test_proxy(monkeypatch, testcase):
         monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
 
     kwargs = {}
+
+    if http2:
+        kwargs["_experiments"] = {"transport_http2": True}
 
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
@@ -263,13 +269,31 @@ def test_proxy(monkeypatch, testcase):
 
     client = Client(testcase["dsn"], **kwargs)
 
+    proxy = getattr(
+        client.transport._pool,
+        "proxy",
+        getattr(client.transport._pool, "_proxy_url", None),
+    )
     if testcase["expected_proxy_scheme"] is None:
-        assert client.transport._pool.proxy is None
+        assert proxy is None
     else:
-        assert client.transport._pool.proxy.scheme == testcase["expected_proxy_scheme"]
+        scheme = (
+            proxy.scheme.decode("ascii")
+            if isinstance(proxy.scheme, bytes)
+            else proxy.scheme
+        )
+        assert scheme == testcase["expected_proxy_scheme"]
 
         if testcase.get("arg_proxy_headers") is not None:
-            assert client.transport._pool.proxy_headers == testcase["arg_proxy_headers"]
+            proxy_headers = (
+                dict(
+                    (k.decode("ascii"), v.decode("ascii"))
+                    for k, v in client.transport._pool._proxy_headers
+                )
+                if http2
+                else client.transport._pool.proxy_headers
+            )
+            assert proxy_headers == testcase["arg_proxy_headers"]
 
 
 @pytest.mark.parametrize(
@@ -279,60 +303,66 @@ def test_proxy(monkeypatch, testcase):
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "http://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.poolmanager.ProxyManager'>",
+            "should_be_socks_proxy": False,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "socks4a://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "socks4://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "socks5h://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "socks5://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": None,
             "arg_https_proxy": "socks4a://localhost/123",
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": None,
             "arg_https_proxy": "socks4://localhost/123",
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": None,
             "arg_https_proxy": "socks5h://localhost/123",
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": None,
             "arg_https_proxy": "socks5://localhost/123",
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
     ],
 )
-def test_socks_proxy(testcase):
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
+def test_socks_proxy(testcase, http2):
     kwargs = {}
+
+    if http2:
+        kwargs["_experiments"] = {"transport_http2": True}
 
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
@@ -340,7 +370,12 @@ def test_socks_proxy(testcase):
         kwargs["https_proxy"] = testcase["arg_https_proxy"]
 
     client = Client(testcase["dsn"], **kwargs)
-    assert str(type(client.transport._pool)) == testcase["expected_proxy_class"]
+    assert ("socks" in str(type(client.transport._pool)).lower()) == testcase[
+        "should_be_socks_proxy"
+    ], (
+        f"Expected {kwargs} to result in SOCKS == {testcase['should_be_socks_proxy']}"
+        f"but got {str(type(client.transport._pool))}"
+    )
 
 
 def test_simple_transport(sentry_init):
@@ -531,7 +566,17 @@ def test_capture_event_works(sentry_init):
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
-def test_atexit(tmpdir, monkeypatch, num_messages):
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
+def test_atexit(tmpdir, monkeypatch, num_messages, http2):
+    if http2:
+        options = '_experiments={"transport_http2": True}'
+        transport = "Http2Transport"
+    else:
+        options = ""
+        transport = "HttpTransport"
+
     app = tmpdir.join("app.py")
     app.write(
         dedent(
@@ -545,13 +590,13 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
         message = event.get("message", "")
         print(message)
 
-    transport.HttpTransport.capture_envelope = capture_envelope
-    init("http://foobar@localhost/123", shutdown_timeout={num_messages})
+    transport.{transport}.capture_envelope = capture_envelope
+    init("http://foobar@localhost/123", shutdown_timeout={num_messages}, {options})
 
     for _ in range({num_messages}):
         capture_message("HI")
     """.format(
-                num_messages=num_messages
+                transport=transport, options=options, num_messages=num_messages
             )
         )
     )
