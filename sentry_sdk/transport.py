@@ -234,8 +234,16 @@ class BaseHttpTransport(Transport):
             experiments.get("transport_zlib_compression_level"),
         )
         compression_algo = experiments.get(
-            "transport_compression_algo", "br" if brotli is not None else "gzip"
+            "transport_compression_algo",
+            (
+                "gzip"
+                # if only compression level is set, assume gzip for backwards compatibility
+                # if we don't have brotli available, fallback to gzip
+                if compression_level is not None or brotli is None
+                else "br"
+            ),
         )
+
         if compression_algo == "br" and brotli is None:
             logger.warning(
                 "You asked for brotli compression without the Brotli module, falling back to gzip -9"
@@ -243,19 +251,21 @@ class BaseHttpTransport(Transport):
             compression_algo = "gzip"
             compression_level = None
 
-        self._compression_algo = compression_algo
-        if compression_level is not None:
-            self._compression_level = compression_level
-        elif compression_algo == "gzip":
-            self._compression_level = 9
-        elif compression_algo == "br":
-            self._compression_level = 4
-        else:
+        if compression_algo not in ("br", "gzip"):
             logger.warning(
                 "Unknown compression algo %s, disabling compression", compression_algo
             )
             self._compression_level = 0
             self._compression_algo = None
+        else:
+            self._compression_algo = compression_algo
+
+        if compression_level is not None:
+            self._compression_level = compression_level
+        elif self._compression_algo == "gzip":
+            self._compression_level = 9
+        elif self._compression_algo == "br":
+            self._compression_level = 4
 
     def record_lost_event(
         self,
