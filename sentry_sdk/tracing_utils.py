@@ -536,7 +536,7 @@ class Baggage:
             sentry_items["public_key"] = Dsn(options["dsn"]).public_key
 
         if options.get("traces_sample_rate"):
-            sentry_items["sample_rate"] = options["traces_sample_rate"]
+            sentry_items["sample_rate"] = str(options["traces_sample_rate"])
 
         return Baggage(sentry_items, third_party_items, mutable)
 

@@ -1,4 +1,5 @@
 import random
+from typing import cast
 
 from opentelemetry import trace
 
@@ -6,13 +7,17 @@ from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace.span import TraceState
 
 import sentry_sdk
-from sentry_sdk.integrations.opentelemetry.consts import SENTRY_TRACE_STATE_DROPPED
 from sentry_sdk.tracing_utils import has_tracing_enabled
 from sentry_sdk.utils import is_valid_sample_rate, logger
+from sentry_sdk.integrations.opentelemetry.consts import (
+    TRACESTATE_SAMPLED_KEY,
+    TRACESTATE_SAMPLE_RATE_KEY,
+)
 
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Optional, Sequence, Union
     from opentelemetry.context import Context
     from opentelemetry.trace import Link, SpanKind
     from opentelemetry.trace.span import SpanContext
@@ -32,18 +37,22 @@ def get_parent_sampled(parent_context, trace_id):
         if parent_context.trace_flags.sampled:
             return True
 
-        dropped = parent_context.trace_state.get(SENTRY_TRACE_STATE_DROPPED) == "true"
-        if dropped:
+        dsc_sampled = parent_context.trace_state.get(TRACESTATE_SAMPLED_KEY)
+        if dsc_sampled == "true":
+            return True
+        elif dsc_sampled == "false":
             return False
-
-        # TODO-anton: fall back to sampling decision in DSC (for this die DSC needs to be set in the trace_state)
 
     return None
 
 
-def dropped_result(span_context):
-    # type: (SpanContext) -> SamplingResult
-    trace_state = span_context.trace_state.update(SENTRY_TRACE_STATE_DROPPED, "true")
+def dropped_result(span_context, attributes, sample_rate=None):
+    # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
+    # note that trace_state.add will NOT overwrite existing entries
+    # so these will only be added the first time in a root span sampling decision
+    trace_state = span_context.trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
+    if sample_rate:
+        trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     # Tell Sentry why we dropped the transaction/span
     client = sentry_sdk.get_client()
@@ -59,15 +68,23 @@ def dropped_result(span_context):
 
     return SamplingResult(
         Decision.DROP,
+        attributes=attributes,
         trace_state=trace_state,
     )
 
 
-def sampled_result(span_context):
-    # type: (SpanContext) -> SamplingResult
+def sampled_result(span_context, attributes, sample_rate):
+    # type: (SpanContext, Attributes, float) -> SamplingResult
+    # note that trace_state.add will NOT overwrite existing entries
+    # so these will only be added the first time in a root span sampling decision
+    trace_state = span_context.trace_state.add(TRACESTATE_SAMPLED_KEY, "true").add(
+        TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate)
+    )
+
     return SamplingResult(
         Decision.RECORD_AND_SAMPLE,
-        trace_state=span_context.trace_state,
+        attributes=attributes,
+        trace_state=trace_state,
     )
 
 
@@ -89,7 +106,7 @@ class SentrySampler(Sampler):
 
         # No tracing enabled, thus no sampling
         if not has_tracing_enabled(client.options):
-            return dropped_result(parent_span_context)
+            return dropped_result(parent_span_context, attributes)
 
         sample_rate = None
 
@@ -129,16 +146,16 @@ class SentrySampler(Sampler):
             logger.warning(
                 f"[Tracing] Discarding {name} because of invalid sample rate."
             )
-            return dropped_result(parent_span_context)
+            return dropped_result(parent_span_context, attributes)
 
         # Roll the dice on sample rate
-        sampled = random.random() < float(sample_rate)
+        sample_rate = float(cast("Union[bool, float, int]", sample_rate))
+        sampled = random.random() < sample_rate
 
-        # TODO-neel-potel set sample rate as attribute for DSC
         if sampled:
-            return sampled_result(parent_span_context)
+            return sampled_result(parent_span_context, attributes, sample_rate)
         else:
-            return dropped_result(parent_span_context)
+            return dropped_result(parent_span_context, attributes, sample_rate)
 
     def get_description(self) -> str:
         return self.__class__.__name__

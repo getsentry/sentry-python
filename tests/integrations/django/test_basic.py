@@ -1113,6 +1113,9 @@ def test_csrf(sentry_init, client):
     assert content == b"ok"
 
 
+# This test is forked because it doesn't clean up after itself properly and makes
+# other tests fail to resolve routes
+@pytest.mark.forked
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 def test_custom_urlconf_middleware(
     settings, sentry_init, client, capture_events, render_span_tree
@@ -1202,14 +1205,19 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     By default OPTIONS and HEAD requests do not create a transaction.
     """
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get(reverse("nomessage"))
+    client.options(reverse("nomessage"))
+    client.head(reverse("nomessage"))
 
     (event,) = events
 
@@ -1225,18 +1233,71 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
                     "OPTIONS",
                     "head",
                 ),  # capitalization does not matter
+                middleware_spans=False,
+                signals_spans=False,
             )
         ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get(reverse("nomessage"))
+    client.options(reverse("nomessage"))
+    client.head(reverse("nomessage"))
 
     assert len(events) == 2
 
     (event1, event2) = events
     assert event1["request"]["method"] == "OPTIONS"
     assert event2["request"]["method"] == "HEAD"
+
+
+def test_ensures_spotlight_middleware_when_spotlight_is_enabled(sentry_init, settings):
+    """
+    Test that ensures if Spotlight is enabled, relevant SpotlightMiddleware
+    is added to middleware list in settings.
+    """
+    original_middleware = frozenset(settings.MIDDLEWARE)
+
+    sentry_init(integrations=[DjangoIntegration()], spotlight=True)
+
+    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
+
+    assert "sentry_sdk.spotlight.SpotlightMiddleware" in added
+
+
+def test_ensures_no_spotlight_middleware_when_env_killswitch_is_false(
+    monkeypatch, sentry_init, settings
+):
+    """
+    Test that ensures if Spotlight is enabled, but is set to a falsy value
+    the relevant SpotlightMiddleware is NOT added to middleware list in settings.
+    """
+    monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "no")
+
+    original_middleware = frozenset(settings.MIDDLEWARE)
+
+    sentry_init(integrations=[DjangoIntegration()], spotlight=True)
+
+    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
+
+    assert "sentry_sdk.spotlight.SpotlightMiddleware" not in added
+
+
+def test_ensures_no_spotlight_middleware_when_no_spotlight(
+    monkeypatch, sentry_init, settings
+):
+    """
+    Test that ensures if Spotlight is not enabled
+    the relevant SpotlightMiddleware is NOT added to middleware list in settings.
+    """
+    # We should NOT have the middleware even if the env var is truthy if Spotlight is off
+    monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "1")
+
+    original_middleware = frozenset(settings.MIDDLEWARE)
+
+    sentry_init(integrations=[DjangoIntegration()], spotlight=False)
+
+    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
+
+    assert "sentry_sdk.spotlight.SpotlightMiddleware" not in added

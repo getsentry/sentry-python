@@ -1,4 +1,5 @@
 import sys
+from contextlib import nullcontext
 from functools import partial
 
 import sentry_sdk
@@ -106,27 +107,31 @@ class SentryWsgiMiddleware:
                         )
 
                     method = environ.get("REQUEST_METHOD", "").upper()
-                    if method in self.http_methods_to_capture:
-                        with sentry_sdk.continue_trace(environ):
-                            with sentry_sdk.start_transaction(
+                    should_trace = method in self.http_methods_to_capture
+                    with sentry_sdk.continue_trace(environ):
+                        with (
+                            sentry_sdk.start_transaction(
                                 environ,
                                 op=OP.HTTP_SERVER,
                                 name="generic WSGI request",
                                 source=TRANSACTION_SOURCE_ROUTE,
                                 origin=self.span_origin,
                                 custom_sampling_context={"wsgi_environ": environ},
-                            ) as transaction:
-                                try:
-                                    response = self.app(
-                                        environ,
-                                        partial(
-                                            _sentry_start_response,
-                                            start_response,
-                                            transaction,
-                                        ),
-                                    )
-                                except BaseException:
-                                    reraise(*_capture_exception())
+                            )
+                            if should_trace
+                            else nullcontext()
+                        ) as transaction:
+                            try:
+                                response = self.app(
+                                    environ,
+                                    partial(
+                                        _sentry_start_response,
+                                        start_response,
+                                        transaction,
+                                    ),
+                                )
+                            except BaseException:
+                                reraise(*_capture_exception())
 
         finally:
             _wsgi_middleware_applied.set(False)

@@ -57,6 +57,7 @@ if TYPE_CHECKING:
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
+            "transport_http2": Optional[bool],
         },
         total=False,
     )

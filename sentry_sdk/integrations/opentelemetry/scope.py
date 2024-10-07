@@ -8,7 +8,6 @@ from opentelemetry.trace import (
     SpanContext,
     NonRecordingSpan,
     TraceFlags,
-    TraceState,
     use_span,
 )
 

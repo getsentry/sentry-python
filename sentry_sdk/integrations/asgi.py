@@ -6,6 +6,7 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import asyncio
 import inspect
+from contextlib import nullcontext
 from copy import deepcopy
 from functools import partial
 
@@ -190,9 +191,10 @@ class SentryAsgiMiddleware:
                     )
 
                     method = scope.get("method", "").upper()
-                    if method in self.http_methods_to_capture:
-                        with sentry_sdk.continue_trace(_get_headers(scope)):
-                            with sentry_sdk.start_transaction(
+                    should_trace = method in self.http_methods_to_capture
+                    with sentry_sdk.continue_trace(_get_headers(scope)):
+                        with (
+                            sentry_sdk.start_transaction(
                                 op=(
                                     OP.WEBSOCKET_SERVER
                                     if ty == "websocket"
@@ -202,37 +204,42 @@ class SentryAsgiMiddleware:
                                 source=transaction_source,
                                 origin=self.span_origin,
                                 custom_sampling_context={"asgi_scope": scope},
-                            ) as transaction:
+                            )
+                            if should_trace
+                            else nullcontext()
+                        ) as transaction:
+                            if transaction is not None:
                                 logger.debug(
                                     "[ASGI] Started transaction: %s", transaction
                                 )
                                 transaction.set_tag("asgi.type", ty)
-                                try:
+                            try:
 
-                                    async def _sentry_wrapped_send(event):
-                                        # type: (Dict[str, Any]) -> Any
-                                        is_http_response = (
-                                            event.get("type") == "http.response.start"
-                                            and "status" in event
-                                        )
-                                        if is_http_response:
-                                            transaction.set_http_status(event["status"])
-
-                                        return await send(event)
-
-                                    if asgi_version == 2:
-                                        return await self.app(scope)(
-                                            receive, _sentry_wrapped_send
-                                        )
-                                    else:
-                                        return await self.app(
-                                            scope, receive, _sentry_wrapped_send
-                                        )
-                                except Exception as exc:
-                                    _capture_exception(
-                                        exc, mechanism_type=self.mechanism_type
+                                async def _sentry_wrapped_send(event):
+                                    # type: (Dict[str, Any]) -> Any
+                                    is_http_response = (
+                                        event.get("type") == "http.response.start"
+                                        and transaction is not None
+                                        and "status" in event
                                     )
-                                    raise exc from None
+                                    if is_http_response:
+                                        transaction.set_http_status(event["status"])
+
+                                    return await send(event)
+
+                                if asgi_version == 2:
+                                    return await self.app(scope)(
+                                        receive, _sentry_wrapped_send
+                                    )
+                                else:
+                                    return await self.app(
+                                        scope, receive, _sentry_wrapped_send
+                                    )
+                            except Exception as exc:
+                                _capture_exception(
+                                    exc, mechanism_type=self.mechanism_type
+                                )
+                                raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
 
