@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
+    from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
@@ -138,6 +139,8 @@ class BaseClient:
 
     The basic definition of a client that is used for sending data to Sentry.
     """
+
+    spotlight = None  # type: Optional[SpotlightClient]
 
     def __init__(self, options=None):
         # type: (Optional[Dict[str, Any]]) -> None
@@ -337,7 +340,6 @@ class _Client(BaseClient):
                 disabled_integrations=self.options["disabled_integrations"],
             )
 
-            self.spotlight = None
             spotlight_config = self.options.get("spotlight")
             if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
                 spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
