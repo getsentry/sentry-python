@@ -717,10 +717,12 @@ def get_error_message(exc_value):
         getattr(exc_value, "message", "")
         or getattr(exc_value, "detail", "")
         or safe_str(exc_value)
-    )
-    notes = getattr(exc_value, "__notes__", [])
-    if notes:
-        value = "\n".join([value] + [safe_str(note) for note in notes])
+    )  # type: str
+
+    notes = getattr(exc_value, "__notes__", None)  # type: object
+    if isinstance(notes, list) and len(notes) > 0:
+        value += "\n" + "\n".join(note for note in notes if isinstance(note, str))
+
     return value
 
 
