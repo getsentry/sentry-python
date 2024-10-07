@@ -23,7 +23,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
-from sentry_sdk.transport import HttpTransport, make_transport
+from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
+    from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
@@ -152,6 +153,8 @@ class BaseClient:
 
     The basic definition of a client that is used for sending data to Sentry.
     """
+
+    spotlight = None  # type: Optional[SpotlightClient]
 
     def __init__(self, options=None):
         # type: (Optional[Dict[str, Any]]) -> None
@@ -385,7 +388,6 @@ class _Client(BaseClient):
                 disabled_integrations=self.options["disabled_integrations"],
             )
 
-            self.spotlight = None
             spotlight_config = self.options.get("spotlight")
             if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
                 spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
@@ -427,7 +429,7 @@ class _Client(BaseClient):
             self.monitor
             or self.metrics_aggregator
             or has_profiling_enabled(self.options)
-            or isinstance(self.transport, HttpTransport)
+            or isinstance(self.transport, BaseHttpTransport)
         ):
             # If we have anything on that could spawn a background thread, we
             # need to check if it's safe to use them.
