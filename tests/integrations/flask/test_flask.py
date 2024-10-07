@@ -47,6 +47,10 @@ def app():
         capture_message("hi")
         return "ok"
 
+    @app.route("/nomessage")
+    def nohi():
+        return "ok"
+
     @app.route("/message/<int:message_id>")
     def hi_with_id(message_id):
         capture_message("hi again")
@@ -962,3 +966,71 @@ def test_span_origin(sentry_init, app, capture_events):
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
+
+
+def test_transaction_http_method_default(
+    sentry_init,
+    app,
+    capture_events,
+):
+    """
+    By default OPTIONS and HEAD requests do not create a transaction.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[flask_sentry.FlaskIntegration()],
+    )
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.get("/nomessage")
+    assert response.status_code == 200
+
+    response = client.options("/nomessage")
+    assert response.status_code == 200
+
+    response = client.head("/nomessage")
+    assert response.status_code == 200
+
+    (event,) = events
+
+    assert len(events) == 1
+    assert event["request"]["method"] == "GET"
+
+
+def test_transaction_http_method_custom(
+    sentry_init,
+    app,
+    capture_events,
+):
+    """
+    Configure FlaskIntegration to ONLY capture OPTIONS and HEAD requests.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            flask_sentry.FlaskIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                )  # capitalization does not matter
+            )  # case does not matter
+        ],
+    )
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.get("/nomessage")
+    assert response.status_code == 200
+
+    response = client.options("/nomessage")
+    assert response.status_code == 200
+
+    response = client.head("/nomessage")
+    assert response.status_code == 200
+
+    assert len(events) == 2
+
+    (event1, event2) = events
+    assert event1["request"]["method"] == "OPTIONS"
+    assert event2["request"]["method"] == "HEAD"
