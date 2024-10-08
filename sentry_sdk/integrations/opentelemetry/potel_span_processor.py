@@ -138,10 +138,13 @@ class PotelSentrySpanProcessor(SpanProcessor):
             return None
 
         span_data = extract_span_data(span)
-        (_, description, _, _, _) = span_data
+        (_, description, _, http_status, _) = span_data
 
         trace_context = get_trace_context(span, span_data=span_data)
         contexts = {"trace": trace_context}
+
+        if http_status:
+            contexts["response"] = {"status_code": http_status}
 
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
