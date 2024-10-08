@@ -18,6 +18,11 @@ class EndpointType(Enum):
     ENVELOPE = "envelope"
 
 
+class CompressionAlgo(Enum):
+    GZIP = "gzip"
+    BROTLI = "br"
+
+
 if TYPE_CHECKING:
     import sentry_sdk
 
@@ -59,6 +64,8 @@ if TYPE_CHECKING:
             "continuous_profiling_mode": Optional[ContinuousProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
+            "transport_compression_level": Optional[int],
+            "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "enable_metrics": Optional[bool],
