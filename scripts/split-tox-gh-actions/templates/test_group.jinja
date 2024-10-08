@@ -39,7 +39,7 @@
     {% endif %}
 
     steps:
-      - uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4.2.0
       {% if needs_github_secrets %}
       {% raw %}
         with:
@@ -78,26 +78,26 @@
       {% endfor %}
 
       - name: Generate coverage XML (Python 3.6)
-        if: {% raw %}${{ !cancelled() && matrix.python-version == '3.6' }}{% endraw %} 
+        if: {% raw %}${{ !cancelled() && matrix.python-version == '3.6' }}{% endraw %}
         run: |
           export COVERAGE_RCFILE=.coveragerc36
           coverage combine .coverage-sentry-*
           coverage xml --ignore-errors
 
       - name: Generate coverage XML
-        if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %} 
+        if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        uses: codecov/codecov-action@v4.5.0
+        uses: codecov/codecov-action@v4.6.0
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop  
+          plugin: noop
           verbose: true
 
       - name: Upload test results to Codecov
