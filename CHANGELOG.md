@@ -42,10 +42,10 @@
   ```python
   sentry_sdk.init(
       integrations=[
-        DjangoIntegration(
-            http_methods_to_capture=("GET", "POST"),
-        ),
-    ],
+          DjangoIntegration(
+              http_methods_to_capture=("GET", "POST"),
+          ),
+      ],
   )
   ```
 
@@ -53,14 +53,14 @@
 
 - Add 3.13 to setup.py (#3574) by @sentrivana
 - Add 3.13 to basepython (#3589) by @sentrivana
-- Fix type of sample_rate in DSC (and add explanatory tests) (#3603) by @antonpirker
+- Fix type of `sample_rate` in DSC (and add explanatory tests) (#3603) by @antonpirker
 - Add `httpcore` based `HTTP2Transport` (#3588) by @BYK
 - Add opportunistic Brotli compression (#3612) by @BYK
 - Add `__notes__` support (#3620) by @szokeasaurusrex
 - Remove useless makefile targets (#3604) by @antonpirker
 - Simplify tox version spec (#3609) by @sentrivana
 - Consolidate contributing docs (#3606) by @antonpirker
-- Bump codecov/codecov-action from 4.5.0 to 4.6.0 (#3617) by @dependabot
+- Bump `codecov/codecov-action` from `4.5.0` to `4.6.0` (#3617) by @dependabot
 
 ## 2.15.0
 
