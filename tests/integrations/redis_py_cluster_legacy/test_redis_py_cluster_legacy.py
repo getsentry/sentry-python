@@ -95,12 +95,10 @@ def test_rediscluster_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
+    assert span["data"]["redis.commands.count"] == 3
+    assert span["data"]["redis.commands.first_ten"] == expected_first_ten
     assert span["data"] == ApproxDict(
         {
-            "redis.commands": {
-                "count": 3,
-                "first_ten": expected_first_ten,
-            },
             SPANDATA.DB_SYSTEM: "redis",
             SPANDATA.DB_NAME: "1",
             SPANDATA.SERVER_ADDRESS: "localhost",
@@ -158,12 +156,11 @@ def test_db_connection_attributes_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
+    assert span["data"]["redis.commands.count"] == 1
+    assert span["data"]["redis.commands.first_ten"] == ["GET 'foo'"]
+
     assert span["data"] == ApproxDict(
         {
-            "redis.commands": {
-                "count": 1,
-                "first_ten": ["GET 'foo'"],
-            },
             SPANDATA.DB_SYSTEM: "redis",
             SPANDATA.DB_NAME: "1",
             SPANDATA.SERVER_ADDRESS: "localhost",

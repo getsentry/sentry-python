@@ -120,13 +120,8 @@ def _set_pipeline_data(
         command = get_command_args_fn(arg)
         commands.append(_get_safe_command(command[0], command[1:]))
 
-    span.set_data(
-        "redis.commands",
-        {
-            "count": len(command_stack),
-            "first_ten": commands,
-        },
-    )
+    span.set_data("redis.commands.count", len(command_stack))
+    span.set_data("redis.commands.first_ten", commands)
 
 
 def _set_client_data(span, is_cluster, name, *args):
