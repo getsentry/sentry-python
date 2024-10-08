@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.16.0
+
+### Various fixes & improvements
+
+- Remove flaky test (#3626) by @sentrivana
+- Add 3.13 to setup.py (#3574) by @sentrivana
+- Add 3.13 to basepython (#3589) by @sentrivana
+- feat(bottle): Add `failed_request_status_codes` (#3618) by @szokeasaurusrex
+- feat: Add opportunistic Brotli compression (#3612) by @BYK
+- fix(django): improve getting psycopg3 connection info (#3580) by @nijel
+- feat: Add `__notes__` support (#3620) by @szokeasaurusrex
+- fix: Open relevant error when SpotlightMiddleware is on (#3614) by @BYK
+- build(deps): bump codecov/codecov-action from 4.5.0 to 4.6.0 (#3617) by @dependabot
+- feat(django): Add SpotlightMiddleware when Spotlight is enabled (#3600) by @BYK
+- feat: Add httpcore based HTTP2Transport (#3588) by @BYK
+- Add http_methods_to_capture to ASGI Django (#3607) by @sentrivana
+- ref(bottle): Delete never-reached code (#3605) by @szokeasaurusrex
+- Remove useless makefile targets (#3604) by @antonpirker
+- Simplify tox version spec (#3609) by @sentrivana
+- Consolidate contributing docs (#3606) by @antonpirker
+- Fix type of sample_rate in DSC (and add explanatory tests) (#3603) by @antonpirker
+
 ## 2.15.0
 
 ### Integrations
