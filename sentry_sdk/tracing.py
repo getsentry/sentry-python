@@ -1504,6 +1504,7 @@ class POTelSpan:
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
+        # TODO-neel-potel we cannot add dicts here
         self.set_attribute(key, value)
 
     def set_attribute(self, key, value):
@@ -1582,11 +1583,12 @@ class POTelSpan:
         # type: () -> Optional[ProfileContext]
         pass
 
-    # transaction/root span methods
-
     def set_context(self, key, value):
         # type: (str, Any) -> None
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+        # TODO-neel-potel we cannot add dicts here
+
+        self.set_attribute(f"{SentrySpanAttribute.CONTEXT}.{key}", value)
 
 
 if TYPE_CHECKING:

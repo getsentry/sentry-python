@@ -208,6 +208,9 @@ def extract_span_status(span):
                 if inferred_status:
                     return (inferred_status, http_status)
 
+            if http_status is not None:
+                return (inferred_status, http_status)
+
             if (
                 status.description is not None
                 and status.description in GRPC_ERROR_MAP.values()
