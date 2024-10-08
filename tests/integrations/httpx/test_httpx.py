@@ -61,8 +61,13 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_outgoing_trace_headers(sentry_init, httpx_client):
-    sentry_init(traces_sample_rate=1.0, integrations=[HttpxIntegration()])
+def test_outgoing_trace_headers(sentry_init, httpx_client, capture_envelopes):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[HttpxIntegration()],
+    )
+
+    envelopes = capture_envelopes()
 
     url = "http://example.com/"
     responses.add(responses.GET, url, status=200)
@@ -79,26 +84,33 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
         else:
             response = httpx_client.get(url)
 
-        request_span = transaction._span_recorder.spans[-1]
-        assert response.request.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
+    envelope = envelopes[0]
+    transaction = envelope.get_transaction_event()
+    request_span = transaction["spans"][-1]
+
+    assert response.request.headers[
+        "sentry-trace"
+    ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+        trace_id=transaction["contexts"]["trace"]["trace_id"],
+        parent_span_id=request_span["span_id"],
+        sampled=1,
+    )
 
 
 @pytest.mark.parametrize(
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_outgoing_trace_headers_append_to_baggage(sentry_init, httpx_client):
+def test_outgoing_trace_headers_append_to_baggage(
+    sentry_init, httpx_client, capture_envelopes
+):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
+
+    envelopes = capture_envelopes()
 
     url = "http://example.com/"
     responses.add(responses.GET, url, status=200)
@@ -115,18 +127,21 @@ def test_outgoing_trace_headers_append_to_baggage(sentry_init, httpx_client):
         else:
             response = httpx_client.get(url, headers={"baGGage": "custom=data"})
 
-        request_span = transaction._span_recorder.spans[-1]
-        assert response.request.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
-        assert (
-            response.request.headers["baggage"]
-            == "custom=data,sentry-trace_id=01234567890123456789012345678901,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
-        )
+    envelope = envelopes[0]
+    transaction = envelope.get_transaction_event()
+    request_span = transaction["spans"][-1]
+
+    assert response.request.headers[
+        "sentry-trace"
+    ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+        trace_id=transaction["contexts"]["trace"]["trace_id"],
+        parent_span_id=request_span["span_id"],
+        sampled=1,
+    )
+    assert (
+        response.request.headers["baggage"]
+        == "custom=data,sentry-trace_id=01234567890123456789012345678901,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
+    )
 
 
 @pytest.mark.parametrize(

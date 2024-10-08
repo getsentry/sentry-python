@@ -130,7 +130,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     )
 
 
-def test_outgoing_trace_headers(sentry_init, monkeypatch):
+def test_outgoing_trace_headers(sentry_init, monkeypatch, capture_envelopes):
     # HTTPSConnection.send is passed a string containing (among other things)
     # the headers on the request. Mock it so we can check the headers, and also
     # so it doesn't try to actually talk to the internet.
@@ -138,6 +138,8 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
     monkeypatch.setattr(HTTPSConnection, "send", mock_send)
 
     sentry_init(traces_sample_rate=1.0)
+
+    envelopes = capture_envelopes()
 
     headers = {}
     headers["baggage"] = (
@@ -163,25 +165,28 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
                 key, val = line.split(": ")
                 request_headers[key] = val
 
-        request_span = transaction._span_recorder.spans[-1]
-        expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
-        assert request_headers["sentry-trace"] == expected_sentry_trace
+    envelope = envelopes[0]
+    transaction = envelope.get_transaction_event()
+    request_span = transaction["spans"][-1]
 
-        expected_outgoing_baggage = (
-            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
-            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-            "sentry-sample_rate=0.01337,"
-            "sentry-user_id=Am%C3%A9lie"
-        )
+    expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
+        trace_id=transaction["contexts"]["trace"]["trace_id"],
+        parent_span_id=request_span["span_id"],
+        sampled=1,
+    )
+    assert request_headers["sentry-trace"] == expected_sentry_trace
 
-        assert request_headers["baggage"] == expected_outgoing_baggage
+    expected_outgoing_baggage = (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337,"
+        "sentry-user_id=Am%C3%A9lie"
+    )
+
+    assert request_headers["baggage"] == expected_outgoing_baggage
 
 
-def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
+def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch, capture_envelopes):
     # HTTPSConnection.send is passed a string containing (among other things)
     # the headers on the request. Mock it so we can check the headers, and also
     # so it doesn't try to actually talk to the internet.
@@ -192,6 +197,9 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
     monkeypatch.setattr(random, "random", lambda: 0.1)
 
     sentry_init(traces_sample_rate=0.5, release="foo")
+
+    envelopes = capture_envelopes()
+
     transaction = Transaction.continue_from_headers({})
 
     with start_transaction(transaction=transaction, name="Head SDK tx") as transaction:
@@ -204,23 +212,26 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
                 key, val = line.split(": ")
                 request_headers[key] = val
 
-        request_span = transaction._span_recorder.spans[-1]
-        expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
-        assert request_headers["sentry-trace"] == expected_sentry_trace
+    envelope = envelopes[0]
+    transaction = envelope.get_transaction_event()
+    request_span = transaction["spans"][-1]
 
-        expected_outgoing_baggage = (
-            "sentry-trace_id=%s,"
-            "sentry-environment=production,"
-            "sentry-release=foo,"
-            "sentry-sample_rate=0.5,"
-            "sentry-sampled=%s"
-        ) % (transaction.trace_id, "true" if transaction.sampled else "false")
+    expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
+        trace_id=transaction["contexts"]["trace"]["trace_id"],
+        parent_span_id=request_span["span_id"],
+        sampled=1,
+    )
+    assert request_headers["sentry-trace"] == expected_sentry_trace
 
-        assert request_headers["baggage"] == expected_outgoing_baggage
+    expected_outgoing_baggage = (
+        "sentry-trace_id=%s,"
+        "sentry-environment=production,"
+        "sentry-release=foo,"
+        "sentry-sample_rate=0.5,"
+        "sentry-sampled=%s"
+    ) % (transaction.trace_id, "true" if transaction.sampled else "false")
+
+    assert request_headers["baggage"] == expected_outgoing_baggage
 
 
 @pytest.mark.parametrize(
