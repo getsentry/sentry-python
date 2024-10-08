@@ -713,17 +713,21 @@ def get_errno(exc_value):
 
 def get_error_message(exc_value):
     # type: (Optional[BaseException]) -> str
-    value = (
+    message = (
         getattr(exc_value, "message", "")
         or getattr(exc_value, "detail", "")
         or safe_str(exc_value)
     )  # type: str
 
+    # __notes__ should be a list of strings when notes are added
+    # via add_note, but can be anything else if __notes__ is set
+    # directly. We only support strings in __notes__, since that
+    # is the correct use.
     notes = getattr(exc_value, "__notes__", None)  # type: object
     if isinstance(notes, list) and len(notes) > 0:
-        value += "\n" + "\n".join(note for note in notes if isinstance(note, str))
+        message += "\n" + "\n".join(note for note in notes if isinstance(note, str))
 
-    return value
+    return message
 
 
 def single_exception_from_error_tuple(
