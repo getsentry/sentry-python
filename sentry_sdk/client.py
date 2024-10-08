@@ -753,18 +753,16 @@ class _Client(BaseClient):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        if hint is None:
-            hint = {}
-        event_id = event.get("event_id")
         hint = dict(hint or ())  # type: Hint
 
-        if event_id is None:
-            event["event_id"] = event_id = uuid.uuid4().hex
         if not self._should_capture(event, hint, scope):
             return None
 
         profile = event.pop("profile", None)
 
+        event_id = event.get("event_id")
+        if event_id is None:
+            event["event_id"] = event_id = uuid.uuid4().hex
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -812,15 +810,16 @@ class _Client(BaseClient):
         for attachment in attachments or ():
             envelope.add_item(attachment.to_envelope_item())
 
+        return_value = None
         if self.spotlight:
             self.spotlight.capture_envelope(envelope)
+            return_value = event_id
 
-        if self.transport is None:
-            return None
+        if self.transport is not None:
+            self.transport.capture_envelope(envelope)
+            return_value = event_id
 
-        self.transport.capture_envelope(envelope)
-
-        return event_id
+        return return_value
 
     def capture_session(
         self, session  # type: Session
