@@ -19,7 +19,7 @@ import sentry_sdk
 from sentry_sdk.utils import Dsn
 from sentry_sdk.consts import SPANSTATUS, OP
 from sentry_sdk.tracing import get_span_status_from_http_code, DEFAULT_SPAN_ORIGIN
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing_utils import Baggage, LOW_QUALITY_TRANSACTION_SOURCES
 from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -96,6 +96,16 @@ def convert_to_otel_timestamp(time):
     if isinstance(time, datetime):
         return int(time.timestamp() * 1e9)
     return int(time * 1e9)
+
+
+def extract_transaction_name_source(span):
+    # type: (ReadableSpan) -> tuple[Optional[str], Optional[str]]
+    if not span.attributes:
+        return (None, None)
+    return (
+        cast("Optional[str]", span.attributes.get(SentrySpanAttribute.NAME)),
+        cast("Optional[str]", span.attributes.get(SentrySpanAttribute.SOURCE)),
+    )
 
 
 def extract_span_data(span):
@@ -394,5 +404,27 @@ def get_trace_state(span):
                 Baggage.SENTRY_PREFIX + "public_key", Dsn(options["dsn"]).public_key
             )
 
-        # TODO-neel-potel head dsc transaction name
+        # we cannot access the root span in most cases here, so we HAVE to rely on the
+        # scopes to carry the correct transaction name/source.
+        # IDEALLY we will always move to using the isolation scope here
+        # but our integrations do all kinds of stuff with both isolation and current
+        # so I am keeping both for now as a best attempt solution till we get to a better state.
+        isolation_scope = sentry_sdk.get_isolation_scope()
+        current_scope = sentry_sdk.get_current_scope()
+        if (
+            current_scope.transaction_name
+            and current_scope.transaction_source not in LOW_QUALITY_TRANSACTION_SOURCES
+        ):
+            trace_state = trace_state.update(
+                Baggage.SENTRY_PREFIX + "transaction", current_scope.transaction_name
+            )
+        elif (
+            isolation_scope.transaction_name
+            and isolation_scope.transaction_source
+            not in LOW_QUALITY_TRANSACTION_SOURCES
+        ):
+            trace_state = trace_state.update(
+                Baggage.SENTRY_PREFIX + "transaction", isolation_scope.transaction_name
+            )
+
         return trace_state
