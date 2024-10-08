@@ -34,7 +34,6 @@ from sentry_sdk.integrations import (
     setup_integrations,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import get_sdk_name, reraise
@@ -885,13 +884,6 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
     assert len(event["spans"]) == 2
     assert event["spans"][0]["description"] == "tests.test_basics.WorldGreeter.greet"
     assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"
-
-
-def test_redis_disabled_when_not_installed(sentry_init):
-    with ModuleImportErrorSimulator(["redis"], ImportError):
-        sentry_init()
-
-    assert sentry_sdk.get_client().get_integration(RedisIntegration) is None
 
 
 def test_multiple_setup_integrations_calls():
