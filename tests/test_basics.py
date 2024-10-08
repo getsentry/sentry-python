@@ -999,3 +999,46 @@ def test_hub_current_deprecation_warning():
 def test_hub_main_deprecation_warnings():
     with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
         Hub.main
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="add_note() not supported")
+def test_notes(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+    try:
+        e = ValueError("aha!")
+        e.add_note("Test 123")
+        e.add_note("another note")
+        raise e
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    assert event["exception"]["values"][0]["value"] == "aha!\nTest 123\nanother note"
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="add_note() not supported")
+def test_notes_safe_str(sentry_init, capture_events):
+    class Note2:
+        def __repr__(self):
+            raise TypeError
+
+        def __str__(self):
+            raise TypeError
+
+    sentry_init()
+    events = capture_events()
+    try:
+        e = ValueError("aha!")
+        e.add_note("note 1")
+        e.__notes__.append(Note2())  # type: ignore
+        e.add_note("note 3")
+        e.__notes__.append(2)  # type: ignore
+        raise e
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    assert event["exception"]["values"][0]["value"] == "aha!\nnote 1\nnote 3"
