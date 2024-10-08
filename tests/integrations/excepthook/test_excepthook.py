@@ -5,7 +5,14 @@ import subprocess
 from textwrap import dedent
 
 
-def test_excepthook(tmpdir):
+TEST_PARAMETERS = [("", "HttpTransport")]
+
+if sys.version_info >= (3, 8):
+    TEST_PARAMETERS.append(('_experiments={"transport_http2": True}', "Http2Transport"))
+
+
+@pytest.mark.parametrize("options, transport", TEST_PARAMETERS)
+def test_excepthook(tmpdir, options, transport):
     app = tmpdir.join("app.py")
     app.write(
         dedent(
@@ -18,14 +25,16 @@ def test_excepthook(tmpdir):
         if event is not None:
             print(event)
 
-    transport.HttpTransport.capture_envelope = capture_envelope
+    transport.{transport}.capture_envelope = capture_envelope
 
-    init("http://foobar@localhost/123")
+    init("http://foobar@localhost/123", {options})
 
     frame_value = "LOL"
 
     1/0
-    """
+    """.format(
+                transport=transport, options=options
+            )
         )
     )
 
@@ -40,7 +49,8 @@ def test_excepthook(tmpdir):
     assert b"capture_envelope was called" in output
 
 
-def test_always_value_excepthook(tmpdir):
+@pytest.mark.parametrize("options, transport", TEST_PARAMETERS)
+def test_always_value_excepthook(tmpdir, options, transport):
     app = tmpdir.join("app.py")
     app.write(
         dedent(
@@ -55,17 +65,20 @@ def test_always_value_excepthook(tmpdir):
         if event is not None:
             print(event)
 
-    transport.HttpTransport.capture_envelope = capture_envelope
+    transport.{transport}.capture_envelope = capture_envelope
 
     sys.ps1 = "always_value_test"
     init("http://foobar@localhost/123",
-        integrations=[ExcepthookIntegration(always_run=True)]
+        integrations=[ExcepthookIntegration(always_run=True)],
+        {options}
     )
 
     frame_value = "LOL"
 
     1/0
-    """
+    """.format(
+                transport=transport, options=options
+            )
         )
     )
 
