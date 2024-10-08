@@ -165,7 +165,7 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch, capture_envelopes):
                 key, val = line.split(": ")
                 request_headers[key] = val
 
-    envelope = envelopes[0]
+    (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
     request_span = transaction["spans"][-1]
 
@@ -212,7 +212,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch, capture_envel
                 key, val = line.split(": ")
                 request_headers[key] = val
 
-    envelope = envelopes[0]
+    (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
     request_span = transaction["spans"][-1]
 

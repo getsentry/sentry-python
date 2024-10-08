@@ -84,7 +84,7 @@ def test_outgoing_trace_headers(sentry_init, httpx_client, capture_envelopes):
         else:
             response = httpx_client.get(url)
 
-    envelope = envelopes[0]
+    (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
     request_span = transaction["spans"][-1]
 
@@ -127,7 +127,7 @@ def test_outgoing_trace_headers_append_to_baggage(
         else:
             response = httpx_client.get(url, headers={"baGGage": "custom=data"})
 
-    envelope = envelopes[0]
+    (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
     request_span = transaction["spans"][-1]
 

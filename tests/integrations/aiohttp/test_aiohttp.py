@@ -541,7 +541,7 @@ async def test_outgoing_trace_headers(
         client = await aiohttp_client(raw_server)
         resp = await client.get("/")
 
-    envelope = envelopes[0]
+    (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
     request_span = transaction["spans"][-1]
 
