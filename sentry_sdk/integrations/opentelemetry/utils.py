@@ -17,7 +17,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 
 import sentry_sdk
 from sentry_sdk.utils import Dsn
-from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.consts import SPANSTATUS, OP
 from sentry_sdk.tracing import get_span_status_from_http_code, DEFAULT_SPAN_ORIGIN
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
@@ -182,7 +182,7 @@ def span_data_for_db_query(span):
     # type: (ReadableSpan) -> OtelExtractedSpanData
     span_attributes = span.attributes or {}
 
-    op = "db"
+    op = span_attributes.get(SentrySpanAttribute.OP, OP.DB)
 
     statement = span_attributes.get(SpanAttributes.DB_STATEMENT, None)
     statement = cast("Optional[str]", statement)
