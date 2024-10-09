@@ -91,7 +91,7 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 
         _set_db_data(span, connection)
 
-        span.set_data("query", query)
+        span.set_data("db.query.text", query)
 
         if query_id:
             span.set_data("db.query_id", query_id)
@@ -118,9 +118,16 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
                 span.set_data("db.result", res)
 
             with capture_internal_exceptions():
-                span.scope.add_breadcrumb(
-                    message=span._data.pop("query"), category="query", data=span._data
-                )
+                query = span._get_attribute("db.query.text")
+                data = {}
+                for attr in ("db.query_id", "db.params", "db.result"):
+                    if span._get_attribute(attr):
+                        data[attr] = span._get_attribute(attr)
+
+                if query:
+                    sentry_sdk.add_breadcrumb(
+                        message=query, category="query", data=data
+                    )
 
             span.finish()
 
@@ -139,7 +146,7 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
             _set_db_data(span, instance.connection)
 
             if should_send_default_pii():
-                db_params = span._data.get("db.params", [])
+                db_params = span._get_attribute("db.params") or []
                 db_params.extend(data)
                 span.set_data("db.params", db_params)
 
