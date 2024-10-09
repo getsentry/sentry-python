@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 class RedisIntegration(Integration):
     identifier = "redis"
 
+    required_imports = ("redis",)
+
     def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE, cache_prefixes=None):
         # type: (int, Optional[list[str]]) -> None
         self.max_data_size = max_data_size
@@ -23,10 +25,7 @@ class RedisIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        try:
-            from redis import StrictRedis, client
-        except ImportError:
-            raise DidNotEnable("Redis client not installed")
+        from redis import StrictRedis, client
 
         _patch_redis(StrictRedis, client)
         _patch_redis_cluster()
