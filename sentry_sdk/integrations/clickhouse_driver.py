@@ -118,7 +118,7 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
                 span.set_data("db.result", res)
 
             with capture_internal_exceptions():
-                query = span._get_attribute("db.query.text")
+                query = span.get_attribute("db.query.text")
                 data = {}
                 for attr in (
                     "db.query_id",
@@ -129,8 +129,8 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
                     "server.address",
                     "server.port",
                 ):
-                    if span._get_attribute(attr):
-                        data[attr] = span._get_attribute(attr)
+                    if span.get_attribute(attr):
+                        data[attr] = span.get_attribute(attr)
 
                 if query:
                     sentry_sdk.add_breadcrumb(
@@ -154,7 +154,7 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
             _set_db_data(span, instance.connection)
 
             if should_send_default_pii():
-                db_params = span._get_attribute("db.params") or []
+                db_params = span.get_attribute("db.params") or []
                 db_params.extend(data)
                 span.set_data("db.params", db_params)
 
