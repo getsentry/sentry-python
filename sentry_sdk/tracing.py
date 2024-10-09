@@ -1586,6 +1586,7 @@ class POTelSpan:
     def set_context(self, key, value):
         # type: (str, Any) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
         # TODO-neel-potel we cannot add dicts here
 
         self.set_attribute(f"{SentrySpanAttribute.CONTEXT}.{key}", value)
