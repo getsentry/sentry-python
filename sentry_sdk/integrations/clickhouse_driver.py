@@ -120,7 +120,15 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
             with capture_internal_exceptions():
                 query = span._get_attribute("db.query.text")
                 data = {}
-                for attr in ("db.query_id", "db.params", "db.result"):
+                for attr in (
+                    "db.query_id",
+                    "db.params",
+                    "db.result",
+                    "db.system",
+                    "db.user",
+                    "server.address",
+                    "server.port",
+                ):
                     if span._get_attribute(attr):
                         data[attr] = span._get_attribute(attr)
 
