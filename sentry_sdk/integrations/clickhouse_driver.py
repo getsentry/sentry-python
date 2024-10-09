@@ -91,13 +91,14 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 
         _set_db_data(span, connection)
 
-        span.set_data("db.query.text", query)
+        if should_send_default_pii():
+            span.set_data("db.query.text", query)
 
         if query_id:
             span.set_data("db.query_id", query_id)
 
         if params and should_send_default_pii():
-            span.set_data("db.params", params)
+            span.set_data("db.params", str(params))
 
         # run the original code
         ret = f(*args, **kwargs)
@@ -115,24 +116,24 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
         if span is not None:
             if res is not None and should_send_default_pii():
-                span.set_data("db.result", res)
+                span.set_data("db.result", str(res))
 
             with capture_internal_exceptions():
                 query = span.get_attribute("db.query.text")
-                data = {}
-                for attr in (
-                    "db.query_id",
-                    "db.params",
-                    "db.result",
-                    "db.system",
-                    "db.user",
-                    "server.address",
-                    "server.port",
-                ):
-                    if span.get_attribute(attr):
-                        data[attr] = span.get_attribute(attr)
-
                 if query:
+                    data = {}
+                    for attr in (
+                        "db.query_id",
+                        "db.params",
+                        "db.result",
+                        "db.system",
+                        "db.user",
+                        "server.address",
+                        "server.port",
+                    ):
+                        if span.get_attribute(attr):
+                            data[attr] = span.get_attribute(attr)
+
                     sentry_sdk.add_breadcrumb(
                         message=query, category="query", data=data
                     )
