@@ -10,6 +10,11 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from urllib.request import getproxies
 
+try:
+    import brotli  # type: ignore
+except ImportError:
+    brotli = None
+
 import urllib3
 import certifi
 
@@ -29,6 +34,7 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Mapping
     from typing import Optional
+    from typing import Self
     from typing import Tuple
     from typing import Type
     from typing import Union
@@ -61,20 +67,16 @@ class Transport(ABC):
 
     parsed_dsn = None  # type: Optional[Dsn]
 
-    def __init__(
-        self, options=None  # type: Optional[Dict[str, Any]]
-    ):
-        # type: (...) -> None
+    def __init__(self, options=None):
+        # type: (Self, Optional[Dict[str, Any]]) -> None
         self.options = options
         if options and options["dsn"] is not None and options["dsn"]:
             self.parsed_dsn = Dsn(options["dsn"])
         else:
             self.parsed_dsn = None
 
-    def capture_event(
-        self, event  # type: Event
-    ):
-        # type: (...) -> None
+    def capture_event(self, event):
+        # type: (Self, Event) -> None
         """
         DEPRECATED: Please use capture_envelope instead.
 
@@ -93,25 +95,23 @@ class Transport(ABC):
         self.capture_envelope(envelope)
 
     @abstractmethod
-    def capture_envelope(
-        self, envelope  # type: Envelope
-    ):
-        # type: (...) -> None
+    def capture_envelope(self, envelope):
+        # type: (Self, Envelope) -> None
         """
         Send an envelope to Sentry.
 
         Envelopes are a data container format that can hold any type of data
         submitted to Sentry. We use it to send all event data (including errors,
-        transactions, crons checkins, etc.) to Sentry.
+        transactions, crons check-ins, etc.) to Sentry.
         """
         pass
 
     def flush(
         self,
-        timeout,  # type: float
-        callback=None,  # type: Optional[Any]
+        timeout,
+        callback=None,
     ):
-        # type: (...) -> None
+        # type: (Self, float, Optional[Any]) -> None
         """
         Wait `timeout` seconds for the current events to be sent out.
 
@@ -121,7 +121,7 @@ class Transport(ABC):
         return None
 
     def kill(self):
-        # type: () -> None
+        # type: (Self) -> None
         """
         Forcefully kills the transport.
 
@@ -156,11 +156,11 @@ class Transport(ABC):
         return None
 
     def is_healthy(self):
-        # type: () -> bool
+        # type: (Self) -> bool
         return True
 
     def __del__(self):
-        # type: () -> None
+        # type: (Self) -> None
         try:
             self.kill()
         except Exception:
@@ -168,16 +168,16 @@ class Transport(ABC):
 
 
 def _parse_rate_limits(header, now=None):
-    # type: (Any, Optional[datetime]) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]
+    # type: (str, Optional[datetime]) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]
     if now is None:
         now = datetime.now(timezone.utc)
 
     for limit in header.split(","):
         try:
             parameters = limit.strip().split(":")
-            retry_after, categories = parameters[:2]
+            retry_after_val, categories = parameters[:2]
 
-            retry_after = now + timedelta(seconds=int(retry_after))
+            retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
                 yield category, retry_after
         except (LookupError, ValueError):
@@ -187,10 +187,8 @@ def _parse_rate_limits(header, now=None):
 class BaseHttpTransport(Transport):
     """The base HTTP transport."""
 
-    def __init__(
-        self, options  # type: Dict[str, Any]
-    ):
-        # type: (...) -> None
+    def __init__(self, options):
+        # type: (Self, Dict[str, Any]) -> None
         from sentry_sdk.consts import VERSION
 
         Transport.__init__(self, options)
@@ -206,13 +204,6 @@ class BaseHttpTransport(Transport):
         )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
         self._last_client_report_sent = time.time()
 
-        compression_level = options.get("_experiments", {}).get(
-            "transport_zlib_compression_level"
-        )
-        self._compression_level = (
-            9 if compression_level is None else int(compression_level)
-        )
-
         self._pool = self._make_pool(
             self.parsed_dsn,
             http_proxy=options["http_proxy"],
@@ -222,6 +213,45 @@ class BaseHttpTransport(Transport):
             key_file=options["key_file"],
             proxy_headers=options["proxy_headers"],
         )
+
+        experiments = options.get("_experiments", {})
+        compression_level = experiments.get(
+            "transport_compression_level",
+            experiments.get("transport_zlib_compression_level"),
+        )
+        compression_algo = experiments.get(
+            "transport_compression_algo",
+            (
+                "gzip"
+                # if only compression level is set, assume gzip for backwards compatibility
+                # if we don't have brotli available, fallback to gzip
+                if compression_level is not None or brotli is None
+                else "br"
+            ),
+        )
+
+        if compression_algo == "br" and brotli is None:
+            logger.warning(
+                "You asked for brotli compression without the Brotli module, falling back to gzip -9"
+            )
+            compression_algo = "gzip"
+            compression_level = None
+
+        if compression_algo not in ("br", "gzip"):
+            logger.warning(
+                "Unknown compression algo %s, disabling compression", compression_algo
+            )
+            self._compression_level = 0
+            self._compression_algo = None
+        else:
+            self._compression_algo = compression_algo
+
+        if compression_level is not None:
+            self._compression_level = compression_level
+        elif self._compression_algo == "gzip":
+            self._compression_level = 9
+        elif self._compression_algo == "br":
+            self._compression_level = 4
 
     def record_lost_event(
         self,
@@ -258,11 +288,11 @@ class BaseHttpTransport(Transport):
         self._discarded_events[data_category, reason] += quantity
 
     def _get_header_value(self, response, header):
-        # type: (Any, str) -> Optional[str]
+        # type: (Self, Any, str) -> Optional[str]
         return response.headers.get(header)
 
     def _update_rate_limits(self, response):
-        # type: (Union[urllib3.BaseHTTPResponse, httpcore.Response]) -> None
+        # type: (Self, Union[urllib3.BaseHTTPResponse, httpcore.Response]) -> None
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
@@ -288,12 +318,12 @@ class BaseHttpTransport(Transport):
 
     def _send_request(
         self,
-        body,  # type: bytes
-        headers,  # type: Dict[str, str]
-        endpoint_type=EndpointType.ENVELOPE,  # type: EndpointType
-        envelope=None,  # type: Optional[Envelope]
+        body,
+        headers,
+        endpoint_type=EndpointType.ENVELOPE,
+        envelope=None,
     ):
-        # type: (...) -> None
+        # type: (Self, bytes, Dict[str, str], EndpointType, Optional[Envelope]) -> None
 
         def record_loss(reason):
             # type: (str) -> None
@@ -343,12 +373,12 @@ class BaseHttpTransport(Transport):
         finally:
             response.close()
 
-    def on_dropped_event(self, reason):
-        # type: (str) -> None
+    def on_dropped_event(self, _reason):
+        # type: (Self, str) -> None
         return None
 
     def _fetch_pending_client_report(self, force=False, interval=60):
-        # type: (bool, int) -> Optional[Item]
+        # type: (Self, bool, int) -> Optional[Item]
         if not self.options["send_client_reports"]:
             return None
 
@@ -379,7 +409,7 @@ class BaseHttpTransport(Transport):
         )
 
     def _flush_client_reports(self, force=False):
-        # type: (bool) -> None
+        # type: (Self, bool) -> None
         client_report = self._fetch_pending_client_report(force=force, interval=60)
         if client_report is not None:
             self.capture_envelope(Envelope(items=[client_report]))
@@ -394,23 +424,21 @@ class BaseHttpTransport(Transport):
         return _disabled(category) or _disabled(None)
 
     def _is_rate_limited(self):
-        # type: () -> bool
+        # type: (Self) -> bool
         return any(
             ts > datetime.now(timezone.utc) for ts in self._disabled_until.values()
         )
 
     def _is_worker_full(self):
-        # type: () -> bool
+        # type: (Self) -> bool
         return self._worker.full()
 
     def is_healthy(self):
-        # type: () -> bool
+        # type: (Self) -> bool
         return not (self._is_worker_full() or self._is_rate_limited())
 
-    def _send_envelope(
-        self, envelope  # type: Envelope
-    ):
-        # type: (...) -> None
+    def _send_envelope(self, envelope):
+        # type: (Self, Envelope) -> None
 
         # remove all items from the envelope which are over quota
         new_items = []
@@ -438,14 +466,7 @@ class BaseHttpTransport(Transport):
         if client_report_item is not None:
             envelope.items.append(client_report_item)
 
-        body = io.BytesIO()
-        if self._compression_level == 0:
-            envelope.serialize_into(body)
-        else:
-            with gzip.GzipFile(
-                fileobj=body, mode="w", compresslevel=self._compression_level
-            ) as f:
-                envelope.serialize_into(f)
+        content_encoding, body = self._serialize_envelope(envelope)
 
         assert self.parsed_dsn is not None
         logger.debug(
@@ -458,8 +479,8 @@ class BaseHttpTransport(Transport):
         headers = {
             "Content-Type": "application/x-sentry-envelope",
         }
-        if self._compression_level > 0:
-            headers["Content-Encoding"] = "gzip"
+        if content_encoding:
+            headers["Content-Encoding"] = content_encoding
 
         self._send_request(
             body.getvalue(),
@@ -469,12 +490,34 @@ class BaseHttpTransport(Transport):
         )
         return None
 
+    def _serialize_envelope(self, envelope):
+        # type: (Self, Envelope) -> tuple[Optional[str], io.BytesIO]
+        content_encoding = None
+        body = io.BytesIO()
+        if self._compression_level == 0 or self._compression_algo is None:
+            envelope.serialize_into(body)
+        else:
+            content_encoding = self._compression_algo
+            if self._compression_algo == "br" and brotli is not None:
+                body.write(
+                    brotli.compress(
+                        envelope.serialize(), quality=self._compression_level
+                    )
+                )
+            else:  # assume gzip as we sanitize the algo value in init
+                with gzip.GzipFile(
+                    fileobj=body, mode="w", compresslevel=self._compression_level
+                ) as f:
+                    envelope.serialize_into(f)
+
+        return content_encoding, body
+
     def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
+        # type: (Self, Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
         raise NotImplementedError()
 
     def _in_no_proxy(self, parsed_dsn):
-        # type: (Dsn) -> bool
+        # type: (Self, Dsn) -> bool
         no_proxy = getproxies().get("no")
         if not no_proxy:
             return False
@@ -504,7 +547,7 @@ class BaseHttpTransport(Transport):
         body,
         headers,
     ):
-        # type: (str, EndpointType, Any, Mapping[str, str]) -> Union[urllib3.BaseHTTPResponse, httpcore.Response]
+        # type: (Self, str, EndpointType, Any, Mapping[str, str]) -> Union[urllib3.BaseHTTPResponse, httpcore.Response]
         raise NotImplementedError()
 
     def capture_envelope(
@@ -524,10 +567,10 @@ class BaseHttpTransport(Transport):
 
     def flush(
         self,
-        timeout,  # type: float
-        callback=None,  # type: Optional[Any]
+        timeout,
+        callback=None,
     ):
-        # type: (...) -> None
+        # type: (Self, float, Optional[Callable[[int, float], None]]) -> None
         logger.debug("Flushing HTTP transport")
 
         if timeout > 0:
@@ -535,7 +578,7 @@ class BaseHttpTransport(Transport):
             self._worker.flush(timeout, callback)
 
     def kill(self):
-        # type: () -> None
+        # type: (Self) -> None
         logger.debug("Killing HTTP transport")
         self._worker.kill()
 
@@ -545,7 +588,7 @@ class HttpTransport(BaseHttpTransport):
         _pool: Union[PoolManager, ProxyManager]
 
     def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
+        # type: (Self, Any, Any, Any) -> Dict[str, Any]
 
         num_pools = self.options.get("_experiments", {}).get("transport_num_pools")
         options = {
@@ -587,9 +630,9 @@ class HttpTransport(BaseHttpTransport):
         parsed_dsn,  # type: Dsn
         http_proxy,  # type: Optional[str]
         https_proxy,  # type: Optional[str]
-        ca_certs,  # type: Optional[Any]
-        cert_file,  # type: Optional[Any]
-        key_file,  # type: Optional[Any]
+        ca_certs,  # type: Any
+        cert_file,  # type: Any
+        key_file,  # type: Any
         proxy_headers,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
@@ -638,7 +681,7 @@ class HttpTransport(BaseHttpTransport):
         body,
         headers,
     ):
-        # type: (str, EndpointType, Any, Mapping[str, str]) -> urllib3.BaseHTTPResponse
+        # type: (Self, str, EndpointType, Any, Mapping[str, str]) -> urllib3.BaseHTTPResponse
         return self._pool.request(
             method,
             self._auth.get_api_url(endpoint_type),
@@ -652,10 +695,8 @@ try:
 except ImportError:
     # Sorry, no Http2Transport for you
     class Http2Transport(HttpTransport):
-        def __init__(
-            self, options  # type: Dict[str, Any]
-        ):
-            # type: (...) -> None
+        def __init__(self, options):
+            # type: (Self, Dict[str, Any]) -> None
             super().__init__(options)
             logger.warning(
                 "You tried to use HTTP2Transport but don't have httpcore[http2] installed. Falling back to HTTPTransport."
@@ -672,7 +713,7 @@ else:
             ]
 
         def _get_header_value(self, response, header):
-            # type: (httpcore.Response, str) -> Optional[str]
+            # type: (Self, httpcore.Response, str) -> Optional[str]
             return next(
                 (
                     val.decode("ascii")
@@ -689,7 +730,7 @@ else:
             body,
             headers,
         ):
-            # type: (str, EndpointType, Any, Mapping[str, str]) -> httpcore.Response
+            # type: (Self, str, EndpointType, Any, Mapping[str, str]) -> httpcore.Response
             response = self._pool.request(
                 method,
                 self._auth.get_api_url(endpoint_type),
@@ -699,7 +740,7 @@ else:
             return response
 
         def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
-            # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
+            # type: (Any, Any, Any) -> Dict[str, Any]
             options = {
                 "http2": True,
                 "retries": 3,
@@ -739,9 +780,9 @@ else:
             parsed_dsn,  # type: Dsn
             http_proxy,  # type: Optional[str]
             https_proxy,  # type: Optional[str]
-            ca_certs,  # type: Optional[Any]
-            cert_file,  # type: Optional[Any]
-            key_file,  # type: Optional[Any]
+            ca_certs,  # type: Any
+            cert_file,  # type: Any
+            key_file,  # type: Any
             proxy_headers,  # type: Optional[Dict[str, str]]
         ):
             # type: (...) -> Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]

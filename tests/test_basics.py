@@ -30,7 +30,6 @@ from sentry_sdk.integrations import (
     setup_integrations,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import get_sdk_name, reraise
@@ -748,13 +747,6 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
     assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"
 
 
-def test_redis_disabled_when_not_installed(sentry_init):
-    with ModuleImportErrorSimulator(["redis"], ImportError):
-        sentry_init()
-
-    assert sentry_sdk.get_client().get_integration(RedisIntegration) is None
-
-
 def test_multiple_setup_integrations_calls():
     first_call_return = setup_integrations([NoOpIntegration()], with_defaults=False)
     assert first_call_return == {NoOpIntegration.identifier: NoOpIntegration()}
@@ -842,3 +834,46 @@ def test_last_event_id_scope(sentry_init):
     # Should not crash
     with isolation_scope() as scope:
         assert scope.last_event_id() is None
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="add_note() not supported")
+def test_notes(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+    try:
+        e = ValueError("aha!")
+        e.add_note("Test 123")
+        e.add_note("another note")
+        raise e
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    assert event["exception"]["values"][0]["value"] == "aha!\nTest 123\nanother note"
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="add_note() not supported")
+def test_notes_safe_str(sentry_init, capture_events):
+    class Note2:
+        def __repr__(self):
+            raise TypeError
+
+        def __str__(self):
+            raise TypeError
+
+    sentry_init()
+    events = capture_events()
+    try:
+        e = ValueError("aha!")
+        e.add_note("note 1")
+        e.__notes__.append(Note2())  # type: ignore
+        e.add_note("note 3")
+        e.__notes__.append(2)  # type: ignore
+        raise e
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    assert event["exception"]["values"][0]["value"] == "aha!\nnote 1\nnote 3"
