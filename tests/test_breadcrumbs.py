@@ -4,14 +4,14 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 
 
-def test_breadcrumbs(sentry_init, capture_envelopes):
+def test_breadcrumbs(sentry_init, capture_events):
     """
     This test illustrates how breadcrumbs are added to the error event when an error occurs
     """
     sentry_init(
         traces_sample_rate=1.0,
     )
-    envelopes = capture_envelopes()
+    events = capture_events()
 
     add_breadcrumbs_kwargs = {
         "type": "navigation",
@@ -64,9 +64,7 @@ def test_breadcrumbs(sentry_init, capture_envelopes):
                     except ZeroDivisionError as ex:
                         sentry_sdk.capture_exception(ex)
 
-    (error_envelope, transaction_envelope) = envelopes
-    error = error_envelope.get_event()
-    transaction = transaction_envelope.get_transaction_event()
+    (error, ) = events
 
     breadcrumbs = error["breadcrumbs"]["values"]
 
