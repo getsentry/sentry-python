@@ -1,3 +1,5 @@
+import json
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -92,13 +94,13 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
         _set_db_data(span, connection)
 
         if should_send_default_pii():
-            span.set_data("db.query.text", query)
+            span.set_attribute("db.query.text", query)
 
         if query_id:
-            span.set_data("db.query_id", query_id)
+            span.set_attribute("db.query_id", query_id)
 
         if params and should_send_default_pii():
-            span.set_data("db.params", str(params))
+            span.set_attribute("db.params", json.dumps(params))
 
         # run the original code
         ret = f(*args, **kwargs)
@@ -116,7 +118,7 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
         if span is not None:
             if res is not None and should_send_default_pii():
-                span.set_data("db.result", str(res))
+                span.set_attribute("db.result", str(res))
 
             with capture_internal_exceptions():
                 query = span.get_attribute("db.query.text")
@@ -155,9 +157,9 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
             _set_db_data(span, instance.connection)
 
             if should_send_default_pii():
-                db_params = span.get_attribute("db.params") or []
+                db_params = json.loads(span.get_attribute("db.params") or "[]")
                 db_params.extend(data)
-                span.set_data("db.params", db_params)
+                span.set_attribute("db.params", json.dumps(db_params))
 
         return f(*args, **kwargs)
 
@@ -167,8 +169,8 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
 def _set_db_data(
     span: Span, connection: clickhouse_driver.connection.Connection
 ) -> None:
-    span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
-    span.set_data(SPANDATA.SERVER_ADDRESS, connection.host)
-    span.set_data(SPANDATA.SERVER_PORT, connection.port)
-    span.set_data(SPANDATA.DB_NAME, connection.database)
-    span.set_data(SPANDATA.DB_USER, connection.user)
+    span.set_attribute(SPANDATA.DB_SYSTEM, "clickhouse")
+    span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
+    span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
+    span.set_attribute(SPANDATA.DB_NAME, connection.database)
+    span.set_attribute(SPANDATA.DB_USER, connection.user)

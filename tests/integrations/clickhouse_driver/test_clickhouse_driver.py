@@ -5,6 +5,8 @@ docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=2
 ```
 """
 
+import json
+
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 
@@ -181,7 +183,7 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": str([[170], [200]]),
+                "db.params": json.dumps([[170], [200]]),
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -430,7 +432,7 @@ def test_clickhouse_client_spans_with_pii(
                 "db.name": "",
                 "db.user": "default",
                 "db.query.text": "INSERT INTO test (x) VALUES",
-                "db.params": str([{"x": 100}]),
+                "db.params": json.dumps([{"x": 100}]),
                 "server.address": "localhost",
                 "server.port": 9000,
             },
@@ -466,7 +468,7 @@ def test_clickhouse_client_spans_with_pii(
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
-                "db.params": str({"minv": 150}),
+                "db.params": json.dumps({"minv": 150}),
                 "db.query.text": "SELECT sum(x) FROM test WHERE x > 150",
                 "db.result": str([(370,)]),
                 "server.address": "localhost",
@@ -646,7 +648,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": str([{"x": 100}]),
+                "db.params": json.dumps([{"x": 100}]),
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -659,7 +661,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": str([[170], [200]]),
+                "db.params": json.dumps([[170], [200]]),
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -672,7 +674,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": str({"minv": 150}),
+                "db.params": json.dumps({"minv": 150}),
                 "db.result": str([[["370"]], [["'sum(x)'", "'Int64'"]]]),
             },
             "message": "SELECT sum(x) FROM test WHERE x > 150",
@@ -905,7 +907,7 @@ def test_clickhouse_dbapi_spans_with_pii(
                 "db.name": "",
                 "db.user": "default",
                 "db.query.text": "INSERT INTO test (x) VALUES",
-                "db.params": str([{"x": 100}]),
+                "db.params": json.dumps([{"x": 100}]),
                 "server.address": "localhost",
                 "server.port": 9000,
             },
@@ -924,7 +926,7 @@ def test_clickhouse_dbapi_spans_with_pii(
                 "db.name": "",
                 "db.user": "default",
                 "db.query.text": "INSERT INTO test (x) VALUES",
-                "db.params": str([[170], [200]]),
+                "db.params": json.dumps([[170], [200]]),
                 "server.address": "localhost",
                 "server.port": 9000,
             },
@@ -943,7 +945,7 @@ def test_clickhouse_dbapi_spans_with_pii(
                 "db.name": "",
                 "db.user": "default",
                 "db.query.text": "SELECT sum(x) FROM test WHERE x > 150",
-                "db.params": str({"minv": 150}),
+                "db.params": json.dumps({"minv": 150}),
                 "db.result": str(([(370,)], [("sum(x)", "Int64")])),
                 "server.address": "localhost",
                 "server.port": 9000,
