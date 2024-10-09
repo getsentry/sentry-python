@@ -168,23 +168,29 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
             name="connect",
             origin=AsyncPGIntegration.origin,
         ) as span:
-            span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+            span_data = {
+                SPANDATA.DB_SYSTEM: "postgresql",
+                SPANDATA.DB_NAME: database,
+                SPANDATA.DB_USER: user,
+            }
             addr = kwargs.get("addr")
             if addr:
                 try:
-                    span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-                    span.set_data(SPANDATA.SERVER_PORT, addr[1])
+                    span_data[SPANDATA.SERVER_ADDRESS] = addr[0]
+                    span_data[SPANDATA.SERVER_PORT] = addr[1]
                 except IndexError:
                     pass
-            span.set_data(SPANDATA.DB_NAME, database)
-            span.set_data(SPANDATA.DB_USER, user)
+
+            for k, v in span_data.items():
+                span.set_data(k, v)
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
-                    message="connect", 
-                    category="query", 
-                    data=span._data,
+                    message="connect",
+                    category="query",
+                    data=span_data,
                 )
+
             res = await f(*args, **kwargs)
 
         return res
