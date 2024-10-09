@@ -89,7 +89,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         assert breadcrumbs[i]["timestamp"] == mock.ANY
 
     # Check automatic redis breadcrumbs
-    assert breadcrumbs[3]["message"] == f"span3"
+    assert breadcrumbs[3]["message"] == "span3"
     assert breadcrumbs[3]["type"] == "redis"
     assert breadcrumbs[3]["category"] == "redis"
     assert "level" not in breadcrumbs[3]
@@ -113,7 +113,7 @@ def test_breadcrumbs(sentry_init, capture_events):
     assert breadcrumbs[4]["timestamp"] == mock.ANY
 
     # Check automatic subprocess breadcrumbs
-    assert breadcrumbs[5]["message"] == f"span5"
+    assert breadcrumbs[5]["message"] == "span5"
     assert breadcrumbs[5]["type"] == "subprocess"
     assert breadcrumbs[5]["category"] == "subprocess"
     assert "level" not in breadcrumbs[5]
@@ -126,7 +126,7 @@ def test_breadcrumbs(sentry_init, capture_events):
     assert breadcrumbs[5]["timestamp"] == mock.ANY
 
     # Check for custom breadcrumbs on span6
-    assert breadcrumbs[6]["message"] == f"breadcrumb6"
+    assert breadcrumbs[6]["message"] == "breadcrumb6"
     assert breadcrumbs[6]["type"] == "navigation"
     assert breadcrumbs[6]["category"] == "unit_tests.breadcrumbs"
     assert breadcrumbs[6]["level"] == "fatal"
