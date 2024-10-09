@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
+    get_current_thread_meta,
     is_sentry_url,
     logger,
     safe_repr,
@@ -225,6 +226,24 @@ def _install_subprocess():
             rv = old_popen_init(self, *a, **kw)
 
             span.set_tag("subprocess.pid", self.pid)
+
+            with capture_internal_exceptions():
+                thread_id, thread_name = get_current_thread_meta()
+                breadcrumb_data = {
+                    "subprocess.pid": self.pid,
+                    "thread.id": thread_id,
+                    "thread.name": thread_name,
+                }
+                if cwd:
+                    breadcrumb_data["subprocess.cwd"] = cwd
+
+                sentry_sdk.add_breadcrumb(
+                    type="subprocess",
+                    category="subprocess",
+                    message=description,
+                    data=breadcrumb_data,
+                )
+
             return rv
 
     subprocess.Popen.__init__ = sentry_patched_popen_init  # type: ignore
