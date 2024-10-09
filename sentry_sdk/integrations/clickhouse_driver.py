@@ -119,8 +119,8 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
             with capture_internal_exceptions():
                 span.scope.add_breadcrumb(
-                    message=span._data.pop("query"), 
-                    category="query", 
+                    message=span._data.pop("query"),
+                    category="query",
                     data=span._data,
                 )
 

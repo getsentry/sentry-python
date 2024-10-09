@@ -33,7 +33,9 @@ def test_breadcrumbs(sentry_init, capture_envelopes):
             sentry_sdk.add_breadcrumb(message="breadcrumb1", **add_breadcrumbs_kwargs)
 
             with sentry_sdk.start_span(name="span2", op="function"):
-                sentry_sdk.add_breadcrumb(message="breadcrumb2", **add_breadcrumbs_kwargs)
+                sentry_sdk.add_breadcrumb(
+                    message="breadcrumb2", **add_breadcrumbs_kwargs
+                )
 
                 # Spans that create breadcrumbs automatically
                 with sentry_sdk.start_span(name="span3", op=OP.DB_REDIS) as span3:
@@ -49,14 +51,16 @@ def test_breadcrumbs(sentry_init, capture_envelopes):
                     span5.set_tag("span5_tag", "tag on the subprocess span")
 
                 with sentry_sdk.start_span(name="span6", op="function") as span6:
-                    # This data on the span is not added to custom breadcrumbs. 
+                    # This data on the span is not added to custom breadcrumbs.
                     # Data from the span is only added to automatic breadcrumbs shown above
                     span6.set_data("span6_data", "data on span6")
                     span6.set_tag("span6_tag", "tag on the span6")
-                    sentry_sdk.add_breadcrumb(message="breadcrumb6", **add_breadcrumbs_kwargs)
+                    sentry_sdk.add_breadcrumb(
+                        message="breadcrumb6", **add_breadcrumbs_kwargs
+                    )
 
                     try:
-                        1/0 
+                        1 / 0
                     except ZeroDivisionError as ex:
                         sentry_sdk.capture_exception(ex)
 
@@ -96,7 +100,7 @@ def test_breadcrumbs(sentry_init, capture_envelopes):
         "span3_tag": "tag on the redis span",
     }
     assert breadcrumbs[3]["timestamp"] == mock.ANY
-    
+
     # Check automatic http.client breadcrumbs
     assert "message" not in breadcrumbs[4]
     assert breadcrumbs[4]["type"] == "http"
