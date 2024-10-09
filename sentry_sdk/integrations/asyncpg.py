@@ -181,7 +181,9 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
-                    message="connect", category="query", data=span._data
+                    message="connect", 
+                    category="query", 
+                    data=span._data,
                 )
             res = await f(*args, **kwargs)
 
