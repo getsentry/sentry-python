@@ -64,7 +64,7 @@ def test_breadcrumbs(sentry_init, capture_events):
                     except ZeroDivisionError as ex:
                         sentry_sdk.capture_exception(ex)
 
-    (error, ) = events
+    (error,) = events
 
     breadcrumbs = error["breadcrumbs"]["values"]
 
