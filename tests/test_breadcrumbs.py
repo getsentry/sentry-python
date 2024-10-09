@@ -65,6 +65,10 @@ def test_breadcrumbs(sentry_init, capture_envelopes):
     transaction = transaction_envelope.get_transaction_event()
 
     breadcrumbs = error["breadcrumbs"]["values"]
+
+    for crumb in breadcrumbs:
+        print(crumb)
+
     assert len(breadcrumbs) == 7
 
     # Check for my custom breadcrumbs
