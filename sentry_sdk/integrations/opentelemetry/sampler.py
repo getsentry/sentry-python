@@ -1,5 +1,5 @@
+import random
 from typing import cast
-from random import random
 
 from opentelemetry import trace
 
@@ -53,6 +53,20 @@ def dropped_result(span_context, attributes, sample_rate=None):
     trace_state = span_context.trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
     if sample_rate:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+
+    is_root_span = not (span_context.is_valid and not span_context.is_remote)
+    if is_root_span:
+        # Tell Sentry why we dropped the transaction/root-span
+        client = sentry_sdk.get_client()
+        if client.monitor and client.monitor.downsample_factor > 0:
+            reason = "backpressure"
+        else:
+            reason = "sample_rate"
+
+        client.transport.record_lost_event(reason, data_category="transaction")
+
+        # Only one span (the transaction itself) is discarded, since we did not record any spans here.
+        client.transport.record_lost_event(reason, data_category="span")
 
     return SamplingResult(
         Decision.DROP,
@@ -124,6 +138,11 @@ class SentrySampler(Sampler):
                 # Check if there is a traces_sample_rate
                 sample_rate = client.options.get("traces_sample_rate")
 
+        # Down-sample in case of back pressure monitor says so
+        # TODO: this should only be done for transactions (aka root spans)
+        if client.monitor:
+            sample_rate /= 2**client.monitor.downsample_factor
+
         # If the sample rate is invalid, drop the span
         if not is_valid_sample_rate(sample_rate, source=self.__class__.__name__):
             logger.warning(
@@ -133,7 +152,7 @@ class SentrySampler(Sampler):
 
         # Roll the dice on sample rate
         sample_rate = float(cast("Union[bool, float, int]", sample_rate))
-        sampled = random() < sample_rate
+        sampled = random.random() < sample_rate
 
         if sampled:
             return sampled_result(parent_span_context, attributes, sample_rate)
