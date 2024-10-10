@@ -126,10 +126,10 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
                     for attr in (
                         "db.params",
                         "db.result",
-                        "db.system",
-                        "db.user",
-                        "server.address",
-                        "server.port",
+                        SPANDATA.DB_SYSTEM,
+                        SPANDATA.DB_USER,
+                        SPANDATA.SERVER_ADDRESS,
+                        SPANDATA.SERVER_PORT,
                     ):
                         if span.get_attribute(attr):
                             data[attr] = span.get_attribute(attr)
