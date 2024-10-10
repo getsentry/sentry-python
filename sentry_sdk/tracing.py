@@ -1400,12 +1400,18 @@ class POTelSpan:
     @property
     def source(self):
         # type: () -> str
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        return (
+            self._get_attribute(SentrySpanAttribute.SOURCE) or TRANSACTION_SOURCE_CUSTOM
+        )
 
     @source.setter
     def source(self, value):
         # type: (str) -> None
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        self._otel_span.set_attribute(SentrySpanAttribute.SOURCE, value)
 
     @property
     def start_timestamp(self):
