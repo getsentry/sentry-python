@@ -40,7 +40,6 @@ class AsyncPGIntegration(Integration):
         asyncpg.Connection.execute = _wrap_execute(
             asyncpg.Connection.execute,
         )
-
         asyncpg.Connection._execute = _wrap_connection_method(
             asyncpg.Connection._execute
         )

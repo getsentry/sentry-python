@@ -10,14 +10,6 @@ The tests use the following credentials to establish a database connection.
 """
 
 import os
-
-
-PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
-PG_PORT = int(os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"))
-PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
-PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
-PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
-
 import datetime
 from contextlib import contextmanager
 from unittest import mock
@@ -35,9 +27,16 @@ from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
 
 
+PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+PG_PORT = int(os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"))
+PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
+PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
+PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
+
 PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(
     PG_USER, PG_PASSWORD, PG_HOST, PG_NAME
 )
+
 CRUMBS_CONNECT = {
     "category": "query",
     "data": ApproxDict(
@@ -317,18 +316,16 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             ("Alice", "pw", datetime.date(1990, 12, 25)),
         ],
     )
-    #
+
     async with conn.transaction():
         # Postgres requires non-scrollable cursors to be created
         # and used in a transaction.
         cur = await conn.cursor(
             "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
         )
-        record = await cur.fetchrow()
-        print(record)
+        await cur.fetchrow()
         while await cur.forward(1):
-            record = await cur.fetchrow()
-            print(record)
+            await cur.fetchrow()
 
     await conn.close()
 
@@ -388,8 +385,8 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
 
     stmt = await conn.prepare("SELECT * FROM users WHERE name = $1")
 
-    print(await stmt.fetchval("Bob"))
-    print(await stmt.fetchval("Alice"))
+    await stmt.fetchval("Bob")
+    await stmt.fetchval("Alice")
 
     await conn.close()
 
