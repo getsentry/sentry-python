@@ -74,6 +74,7 @@ async def _clean_pg():
 async def test_connect(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -84,7 +85,7 @@ async def test_connect(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -96,6 +97,7 @@ async def test_connect(sentry_init, capture_events) -> None:
 async def test_execute(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -123,7 +125,7 @@ async def test_execute(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -161,6 +163,7 @@ async def test_execute(sentry_init, capture_events) -> None:
 async def test_execute_many(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -179,7 +182,7 @@ async def test_execute_many(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -199,6 +202,7 @@ async def test_execute_many(sentry_init, capture_events) -> None:
 async def test_record_params(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration(record_params=True)],
+        traces_sample_rate=1.0,
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -216,7 +220,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -239,6 +243,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
 async def test_cursor(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -265,7 +270,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -303,6 +308,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
 async def test_cursor_manual(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -331,7 +337,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -369,6 +375,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
 async def test_prepared_stmt(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -418,6 +425,7 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
 async def test_connection_pool(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
         _experiments={"record_sql_params": True},
     )
     events = capture_events()

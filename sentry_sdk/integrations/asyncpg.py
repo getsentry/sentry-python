@@ -147,7 +147,7 @@ def _wrap_cursor_creation(f: Callable[..., T]) -> Callable[..., T]:
         ) as span:
             _set_db_data(span, args[0])
             res = f(*args, **kwargs)
-            span.set_attribute("db.cursor", res)
+            span.set_attribute("db.cursor", str(res))
 
         return res
 
