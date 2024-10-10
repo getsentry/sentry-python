@@ -21,13 +21,11 @@ from sentry_sdk import (
     capture_message,
     isolation_scope,
     get_isolation_scope,
-    Hub,
 )
-from sentry_sdk.envelope import Envelope, Item, parse_json
+from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     _parse_rate_limits,
-    HttpTransport,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
@@ -582,135 +580,6 @@ def test_complex_limits_without_data_category(
     client.flush()
 
     assert len(capturing_server.captured) == 0
-
-
-@pytest.mark.parametrize("response_code", [200, 429])
-def test_metric_bucket_limits(capturing_server, response_code, make_client):
-    client = make_client()
-    capturing_server.respond_with(
-        code=response_code,
-        headers={
-            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded:custom"
-        },
-    )
-
-    envelope = Envelope()
-    envelope.add_item(Item(payload=b"{}", type="statsd"))
-    client.transport.capture_envelope(envelope)
-    client.flush()
-
-    assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/envelope/"
-    capturing_server.clear_captured()
-
-    assert set(client.transport._disabled_until) == set(["metric_bucket"])
-
-    client.transport.capture_envelope(envelope)
-    client.capture_event({"type": "transaction"})
-    client.flush()
-
-    assert len(capturing_server.captured) == 2
-
-    envelope = capturing_server.captured[0].envelope
-    assert envelope.items[0].type == "transaction"
-    envelope = capturing_server.captured[1].envelope
-    assert envelope.items[0].type == "client_report"
-    report = parse_json(envelope.items[0].get_bytes())
-    assert report["discarded_events"] == [
-        {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
-    ]
-
-
-@pytest.mark.parametrize("response_code", [200, 429])
-def test_metric_bucket_limits_with_namespace(
-    capturing_server, response_code, make_client
-):
-    client = make_client()
-    capturing_server.respond_with(
-        code=response_code,
-        headers={
-            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded:foo"
-        },
-    )
-
-    envelope = Envelope()
-    envelope.add_item(Item(payload=b"{}", type="statsd"))
-    client.transport.capture_envelope(envelope)
-    client.flush()
-
-    assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/envelope/"
-    capturing_server.clear_captured()
-
-    assert set(client.transport._disabled_until) == set([])
-
-    client.transport.capture_envelope(envelope)
-    client.capture_event({"type": "transaction"})
-    client.flush()
-
-    assert len(capturing_server.captured) == 2
-
-    envelope = capturing_server.captured[0].envelope
-    assert envelope.items[0].type == "statsd"
-    envelope = capturing_server.captured[1].envelope
-    assert envelope.items[0].type == "transaction"
-
-
-@pytest.mark.parametrize("response_code", [200, 429])
-def test_metric_bucket_limits_with_all_namespaces(
-    capturing_server, response_code, make_client
-):
-    client = make_client()
-    capturing_server.respond_with(
-        code=response_code,
-        headers={
-            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded"
-        },
-    )
-
-    envelope = Envelope()
-    envelope.add_item(Item(payload=b"{}", type="statsd"))
-    client.transport.capture_envelope(envelope)
-    client.flush()
-
-    assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/envelope/"
-    capturing_server.clear_captured()
-
-    assert set(client.transport._disabled_until) == set(["metric_bucket"])
-
-    client.transport.capture_envelope(envelope)
-    client.capture_event({"type": "transaction"})
-    client.flush()
-
-    assert len(capturing_server.captured) == 2
-
-    envelope = capturing_server.captured[0].envelope
-    assert envelope.items[0].type == "transaction"
-    envelope = capturing_server.captured[1].envelope
-    assert envelope.items[0].type == "client_report"
-    report = parse_json(envelope.items[0].get_bytes())
-    assert report["discarded_events"] == [
-        {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
-    ]
-
-
-def test_hub_cls_backwards_compat():
-    class TestCustomHubClass(Hub):
-        pass
-
-    transport = HttpTransport(
-        defaultdict(lambda: None, {"dsn": "https://123abc@example.com/123"})
-    )
-
-    with pytest.deprecated_call():
-        assert transport.hub_cls is Hub
-
-    with pytest.deprecated_call():
-        transport.hub_cls = TestCustomHubClass
-
-    with pytest.deprecated_call():
-        assert transport.hub_cls is TestCustomHubClass
 
 
 @pytest.mark.parametrize("quantity", (1, 2, 10))

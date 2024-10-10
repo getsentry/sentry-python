@@ -1,21 +1,18 @@
-import datetime
 import importlib
 import logging
 import os
 import sys
 import time
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 
 import pytest
-from sentry_sdk.client import Client
-from sentry_sdk.utils import datetime_from_isoformat
 from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
 import sentry_sdk.scope
 from sentry_sdk import (
     get_client,
-    push_scope,
     capture_event,
     capture_exception,
     capture_message,
@@ -24,7 +21,6 @@ from sentry_sdk import (
     add_breadcrumb,
     isolation_scope,
     new_scope,
-    Hub,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
@@ -298,76 +294,6 @@ def test_breadcrumb_arguments(sentry_init, capture_events):
     add_breadcrumb(crumb=dict(foo=42))
 
 
-def test_push_scope(sentry_init, capture_events, suppress_deprecation_warnings):
-    sentry_init()
-    events = capture_events()
-
-    with push_scope() as scope:
-        scope.level = "warning"
-        try:
-            1 / 0
-        except Exception as e:
-            capture_exception(e)
-
-    (event,) = events
-
-    assert event["level"] == "warning"
-    assert "exception" in event
-
-
-def test_push_scope_null_client(
-    sentry_init, capture_events, suppress_deprecation_warnings
-):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    sentry_init()
-    events = capture_events()
-
-    Hub.current.bind_client(None)
-
-    with push_scope() as scope:
-        scope.level = "warning"
-        try:
-            1 / 0
-        except Exception as e:
-            capture_exception(e)
-
-    assert len(events) == 0
-
-
-@pytest.mark.skip(
-    reason="This test is not valid anymore, because push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
-)
-@pytest.mark.parametrize("null_client", (True, False))
-def test_push_scope_callback(sentry_init, null_client, capture_events):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    sentry_init()
-
-    if null_client:
-        Hub.current.bind_client(None)
-
-    outer_scope = Hub.current.scope
-
-    calls = []
-
-    @push_scope
-    def _(scope):
-        assert scope is Hub.current.scope
-        assert scope is not outer_scope
-        calls.append(1)
-
-    # push_scope always needs to execute the callback regardless of
-    # client state, because that actually runs usercode in it, not
-    # just scope config code
-    assert calls == [1]
-
-    # Assert scope gets popped correctly
-    assert Hub.current.scope is outer_scope
-
-
 def test_breadcrumbs(sentry_init, capture_events):
     sentry_init(max_breadcrumbs=10)
     events = capture_events()
@@ -401,12 +327,12 @@ def test_breadcrumbs(sentry_init, capture_events):
 def test_breadcrumb_ordering(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
-    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
 
     timestamps = [
-        now - datetime.timedelta(days=10),
-        now - datetime.timedelta(days=8),
-        now - datetime.timedelta(days=12),
+        now - timedelta(days=10),
+        now - timedelta(days=8),
+        now - timedelta(days=12),
     ]
 
     for timestamp in timestamps:
@@ -422,7 +348,7 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
+        datetime.fromisoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
@@ -430,24 +356,24 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.now(timezone.utc)
 
     timestamps = [
-        now - datetime.timedelta(days=10),
-        now - datetime.timedelta(days=8),
-        now.replace(microsecond=0) - datetime.timedelta(days=12),
-        now - datetime.timedelta(days=9),
-        now - datetime.timedelta(days=13),
-        now.replace(microsecond=0) - datetime.timedelta(days=11),
+        now - timedelta(days=10),
+        now - timedelta(days=8),
+        now.replace(microsecond=0) - timedelta(days=12),
+        now - timedelta(days=9),
+        now - timedelta(days=13),
+        now.replace(microsecond=0) - timedelta(days=11),
     ]
 
     breadcrumb_timestamps = [
         timestamps[0],
         timestamps[1].isoformat(),
-        datetime.datetime.strftime(timestamps[2], "%Y-%m-%dT%H:%M:%S") + "Z",
-        datetime.datetime.strftime(timestamps[3], "%Y-%m-%dT%H:%M:%S.%f") + "+00:00",
-        datetime.datetime.strftime(timestamps[4], "%Y-%m-%dT%H:%M:%S.%f") + "+0000",
-        datetime.datetime.strftime(timestamps[5], "%Y-%m-%dT%H:%M:%S.%f") + "-0000",
+        datetime.strftime(timestamps[2], "%Y-%m-%dT%H:%M:%S") + "Z",
+        datetime.strftime(timestamps[3], "%Y-%m-%dT%H:%M:%S.%f") + "+00:00",
+        datetime.strftime(timestamps[4], "%Y-%m-%dT%H:%M:%S.%f") + "+0000",
+        datetime.strftime(timestamps[5], "%Y-%m-%dT%H:%M:%S.%f") + "-0000",
     ]
 
     for i, timestamp in enumerate(timestamps):
@@ -463,7 +389,7 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
+        datetime.fromisoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
@@ -576,71 +502,6 @@ def test_integrations(
     assert {
         type(integration) for integration in get_client().integrations.values()
     } == expected_integrations
-
-
-@pytest.mark.skip(
-    reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed"
-)
-def test_client_initialized_within_scope(sentry_init, caplog):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    caplog.set_level(logging.WARNING)
-
-    sentry_init()
-
-    with push_scope():
-        Hub.current.bind_client(Client())
-
-    (record,) = (x for x in caplog.records if x.levelname == "WARNING")
-
-    assert record.msg.startswith("init() called inside of pushed scope.")
-
-
-@pytest.mark.skip(
-    reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
-)
-def test_scope_leaks_cleaned_up(sentry_init, caplog):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    caplog.set_level(logging.WARNING)
-
-    sentry_init()
-
-    old_stack = list(Hub.current._stack)
-
-    with push_scope():
-        push_scope()
-
-    assert Hub.current._stack == old_stack
-
-    (record,) = (x for x in caplog.records if x.levelname == "WARNING")
-
-    assert record.message.startswith("Leaked 1 scopes:")
-
-
-@pytest.mark.skip(
-    reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed"
-)
-def test_scope_popped_too_soon(sentry_init, caplog):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    caplog.set_level(logging.ERROR)
-
-    sentry_init()
-
-    old_stack = list(Hub.current._stack)
-
-    with push_scope():
-        Hub.current.pop_scope_unsafe()
-
-    assert Hub.current._stack == old_stack
-
-    (record,) = (x for x in caplog.records if x.levelname == "ERROR")
-
-    assert record.message == ("Scope popped too soon. Popped 1 scopes too many.")
 
 
 def test_scope_event_processor_order(sentry_init, capture_events):
@@ -973,24 +834,6 @@ def test_last_event_id_scope(sentry_init):
     # Should not crash
     with isolation_scope() as scope:
         assert scope.last_event_id() is None
-
-
-def test_hub_constructor_deprecation_warning():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
-        Hub()
-
-
-def test_hub_current_deprecation_warning():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning) as warning_records:
-        Hub.current
-
-    # Make sure we only issue one deprecation warning
-    assert len(warning_records) == 1
-
-
-def test_hub_main_deprecation_warnings():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
-        Hub.main
 
 
 @pytest.mark.skipif(sys.version_info < (3, 11), reason="add_note() not supported")

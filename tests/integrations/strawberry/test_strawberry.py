@@ -10,10 +10,6 @@ from unittest import mock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from flask import Flask
-from strawberry.extensions.tracing import (
-    SentryTracingExtension,
-    SentryTracingExtensionSync,
-)
 from strawberry.fastapi import GraphQLRouter
 from strawberry.flask.views import GraphQLView
 
@@ -141,24 +137,6 @@ def test_infer_execution_type_from_installed_packages_sync(sentry_init):
     ):
         schema = strawberry.Schema(Query)
         assert SentrySyncExtension in schema.extensions
-
-
-def test_replace_existing_sentry_async_extension(sentry_init):
-    sentry_init(integrations=[StrawberryIntegration()])
-
-    schema = strawberry.Schema(Query, extensions=[SentryTracingExtension])
-    assert SentryTracingExtension not in schema.extensions
-    assert SentrySyncExtension not in schema.extensions
-    assert SentryAsyncExtension in schema.extensions
-
-
-def test_replace_existing_sentry_sync_extension(sentry_init):
-    sentry_init(integrations=[StrawberryIntegration()])
-
-    schema = strawberry.Schema(Query, extensions=[SentryTracingExtensionSync])
-    assert SentryTracingExtensionSync not in schema.extensions
-    assert SentryAsyncExtension not in schema.extensions
-    assert SentrySyncExtension in schema.extensions
 
 
 @parameterize_strawberry_test

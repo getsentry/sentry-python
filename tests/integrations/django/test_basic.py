@@ -1113,6 +1113,9 @@ def test_csrf(sentry_init, client):
     assert content == b"ok"
 
 
+# This test is forked because it doesn't clean up after itself properly and makes
+# other tests fail to resolve routes
+@pytest.mark.forked
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 def test_custom_urlconf_middleware(
     settings, sentry_init, client, capture_events, render_span_tree
@@ -1202,14 +1205,19 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     By default OPTIONS and HEAD requests do not create a transaction.
     """
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get(reverse("nomessage"))
+    client.options(reverse("nomessage"))
+    client.head(reverse("nomessage"))
 
     (event,) = events
 
@@ -1225,15 +1233,17 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
                     "OPTIONS",
                     "head",
                 ),  # capitalization does not matter
+                middleware_spans=False,
+                signals_spans=False,
             )
         ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get(reverse("nomessage"))
+    client.options(reverse("nomessage"))
+    client.head(reverse("nomessage"))
 
     assert len(events) == 2
 

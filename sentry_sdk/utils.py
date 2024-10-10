@@ -25,7 +25,6 @@ except ImportError:
     BaseExceptionGroup = None  # type: ignore
 
 import sentry_sdk
-from sentry_sdk._compat import PY37
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 from typing import TYPE_CHECKING
@@ -51,7 +50,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from gevent.hub import Hub
+    from gevent.hub import Hub as GeventHub
 
     from sentry_sdk._types import Event, ExcInfo
 
@@ -235,31 +234,6 @@ def format_timestamp(value):
     # We use this custom formatting rather than isoformat for backwards compatibility (we have used this format for
     # several years now), and isoformat is slightly different.
     return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-ISO_TZ_SEPARATORS = frozenset(("+", "-"))
-
-
-def datetime_from_isoformat(value):
-    # type: (str) -> datetime
-    try:
-        result = datetime.fromisoformat(value)
-    except (AttributeError, ValueError):
-        # py 3.6
-        timestamp_format = (
-            "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
-        )
-        if value.endswith("Z"):
-            value = value[:-1] + "+0000"
-
-        if value[-6] in ISO_TZ_SEPARATORS:
-            timestamp_format += "%z"
-            value = value[:-3] + value[-2:]
-        elif value[-5] in ISO_TZ_SEPARATORS:
-            timestamp_format += "%z"
-
-        result = datetime.strptime(value, timestamp_format)
-    return result.astimezone(timezone.utc)
 
 
 def event_hint_with_exc_info(exc_info=None):
@@ -1349,27 +1323,13 @@ def _get_contextvars():
     See https://docs.sentry.io/platforms/python/contextvars/ for more information.
     """
     if not _is_contextvars_broken():
-        # aiocontextvars is a PyPI package that ensures that the contextvars
-        # backport (also a PyPI package) works with asyncio under Python 3.6
-        #
-        # Import it if available.
-        if sys.version_info < (3, 7):
-            # `aiocontextvars` is absolutely required for functional
-            # contextvars on Python 3.6.
-            try:
-                from aiocontextvars import ContextVar
+        # On Python 3.7+ contextvars are functional.
+        try:
+            from contextvars import ContextVar
 
-                return True, ContextVar
-            except ImportError:
-                pass
-        else:
-            # On Python 3.7 contextvars are functional.
-            try:
-                from contextvars import ContextVar
-
-                return True, ContextVar
-            except ImportError:
-                pass
+            return True, ContextVar
+        except ImportError:
+            pass
 
     # Fall back to basic thread-local usage.
 
@@ -1795,19 +1755,6 @@ def ensure_integration_enabled(
     return patcher
 
 
-if PY37:
-
-    def nanosecond_time():
-        # type: () -> int
-        return time.perf_counter_ns()
-
-else:
-
-    def nanosecond_time():
-        # type: () -> int
-        return int(time.perf_counter() * 1e9)
-
-
 def now():
     # type: () -> float
     return time.perf_counter()
@@ -1819,9 +1766,9 @@ try:
 except ImportError:
 
     # it's not great that the signatures are different, get_hub can't return None
-    # consider adding an if TYPE_CHECKING to change the signature to Optional[Hub]
+    # consider adding an if TYPE_CHECKING to change the signature to Optional[GeventHub]
     def get_gevent_hub():  # type: ignore[misc]
-        # type: () -> Optional[Hub]
+        # type: () -> Optional[GeventHub]
         return None
 
     def is_module_patched(mod_name):
