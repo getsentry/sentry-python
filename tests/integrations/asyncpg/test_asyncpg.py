@@ -264,7 +264,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
         async for record in conn.cursor(
             "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
         ):
-            print(record)
+            pass
 
     await conn.close()
 

@@ -4,7 +4,7 @@ import os
 import re
 import sys
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import quote, unquote
 import uuid
@@ -209,14 +209,17 @@ def add_query_source(span):
     if not client.is_active():
         return
 
-    if span.timestamp is None or span.start_timestamp is None:
+    if span.start_timestamp is None:
         return
 
     should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
-    duration = span.timestamp - span.start_timestamp
+    # We assume here that the span is just ending now. We can't use
+    # the actual end timestamp of the span because the span can't be
+    # finished in order to set any attributes on it.
+    duration = datetime.now(tz=timezone.utc) - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 
