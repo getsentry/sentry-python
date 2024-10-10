@@ -1,5 +1,3 @@
-import json
-
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -100,7 +98,8 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
             span.set_attribute("db.query_id", query_id)
 
         if params and should_send_default_pii():
-            span.set_attribute("db.params", json.dumps(params))
+            connection._sentry_db_params = params
+            span.set_attribute("db.params", str(params))
 
         # run the original code
         ret = f(*args, **kwargs)
@@ -157,9 +156,11 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
             _set_db_data(span, instance.connection)
 
             if should_send_default_pii():
-                db_params = json.loads(span.get_attribute("db.params") or "[]")
+                db_params = (
+                    getattr(instance.connection, "_sentry_db_params", None) or []
+                )
                 db_params.extend(data)
-                span.set_attribute("db.params", json.dumps(db_params))
+                span.set_attribute("db.params", str(db_params))
 
         return f(*args, **kwargs)
 
