@@ -133,13 +133,13 @@ def record_sql_queries(
 
     data = {}
     if params_list is not None:
-        data["db.params"] = params_list
+        data["db.params"] = str(params_list)
     if paramstyle is not None:
-        data["db.paramstyle"] = paramstyle
+        data["db.paramstyle"] = str(paramstyle)
     if executemany:
         data["db.executemany"] = True
     if record_cursor_repr and cursor is not None:
-        data["db.cursor"] = cursor
+        data["db.cursor"] = str(cursor)
 
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
