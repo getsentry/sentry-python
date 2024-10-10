@@ -21,6 +21,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Removed
 
+- Spans no longer have a `description`. Use `name` instead.
 - Dropped support for Python 3.6.
 - `sentry_sdk.metrics` and associated metrics APIs have been removed as Sentry no longer accepts metrics data in this form. See https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics
 - The experimental options `enable_metrics`, `before_emit_metric` and `metric_code_locations` have been removed.
