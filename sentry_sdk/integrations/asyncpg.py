@@ -148,7 +148,7 @@ def _wrap_cursor_creation(f: Callable[..., T]) -> Callable[..., T]:
         ) as span:
             _set_db_data(span, args[0])
             res = f(*args, **kwargs)
-            span.set_data("db.cursor", res)
+            span.set_attribute("db.cursor", res)
 
         return res
 
@@ -168,21 +168,37 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
             name="connect",
             origin=AsyncPGIntegration.origin,
         ) as span:
-            span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+            span.set_attribute(SPANDATA.DB_SYSTEM, "postgresql")
             addr = kwargs.get("addr")
             if addr:
                 try:
-                    span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-                    span.set_data(SPANDATA.SERVER_PORT, addr[1])
+                    span.set_attribute(SPANDATA.SERVER_ADDRESS, addr[0])
+                    span.set_attribute(SPANDATA.SERVER_PORT, addr[1])
                 except IndexError:
                     pass
-            span.set_data(SPANDATA.DB_NAME, database)
-            span.set_data(SPANDATA.DB_USER, user)
+
+            span.set_attribute(SPANDATA.DB_NAME, database)
+            span.set_attribute(SPANDATA.DB_USER, user)
 
             with capture_internal_exceptions():
+                data = {}
+                for attr in (
+                    "db.cursor",
+                    "db.params",
+                    "db.paramstyle",
+                    SPANDATA.DB_NAME,
+                    SPANDATA.DB_SYSTEM,
+                    SPANDATA.DB_USER,
+                    SPANDATA.SERVER_ADDRESS,
+                    SPANDATA.SERVER_PORT,
+                ):
+                    if span._get_attribute(attr):
+                        data[attr] = span._get_attribute(attr)
+
                 sentry_sdk.add_breadcrumb(
-                    message="connect", category="query", data=span._data
+                    message="connect", category="query", data=data
                 )
+
             res = await f(*args, **kwargs)
 
         return res
@@ -191,20 +207,20 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
 
 
 def _set_db_data(span: Span, conn: Any) -> None:
-    span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+    span.set_attribute(SPANDATA.DB_SYSTEM, "postgresql")
 
     addr = conn._addr
     if addr:
         try:
-            span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-            span.set_data(SPANDATA.SERVER_PORT, addr[1])
+            span.set_attribute(SPANDATA.SERVER_ADDRESS, addr[0])
+            span.set_attribute(SPANDATA.SERVER_PORT, addr[1])
         except IndexError:
             pass
 
     database = conn._params.database
     if database:
-        span.set_data(SPANDATA.DB_NAME, database)
+        span.set_attribute(SPANDATA.DB_NAME, database)
 
     user = conn._params.user
     if user:
-        span.set_data(SPANDATA.DB_USER, user)
+        span.set_attribute(SPANDATA.DB_USER, user)
