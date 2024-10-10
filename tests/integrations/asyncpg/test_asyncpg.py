@@ -20,7 +20,7 @@ import pytest_asyncio
 from asyncpg import connect, Connection
 from freezegun import freeze_time
 
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message, start_span
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import record_sql_queries
@@ -498,7 +498,7 @@ async def test_query_source_disabled(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -537,7 +537,7 @@ async def test_query_source_enabled(
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -570,7 +570,7 @@ async def test_query_source(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -622,7 +622,7 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
 
     from asyncpg_helpers.helpers import execute_query_in_connection
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await execute_query_in_connection(
@@ -666,7 +666,7 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         @contextmanager
@@ -716,7 +716,7 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         @contextmanager
@@ -781,7 +781,7 @@ async def test_span_origin(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction"):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute("SELECT 1")
