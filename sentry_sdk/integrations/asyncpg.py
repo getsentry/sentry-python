@@ -191,8 +191,8 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
                     SPANDATA.SERVER_ADDRESS,
                     SPANDATA.SERVER_PORT,
                 ):
-                    if span._get_attribute(attr):
-                        data[attr] = span._get_attribute(attr)
+                    if span.get_attribute(attr):
+                        data[attr] = span.get_attribute(attr)
 
                 sentry_sdk.add_breadcrumb(
                     message="connect", category="query", data=data
