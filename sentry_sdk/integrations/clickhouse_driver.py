@@ -124,7 +124,6 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
                 if query:
                     data = {}
                     for attr in (
-                        "db.query_id",
                         "db.params",
                         "db.result",
                         "db.system",
