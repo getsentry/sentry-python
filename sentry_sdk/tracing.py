@@ -1273,8 +1273,10 @@ class POTelSpan:
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        if value is not None:
+            self.set_status(SPANSTATUS.INTERNAL_ERROR)
+
         self.finish()
-        # XXX set status to error if unset and an exception occurred?
         context.detach(self._ctx_token)
 
     def _get_attribute(self, name):
