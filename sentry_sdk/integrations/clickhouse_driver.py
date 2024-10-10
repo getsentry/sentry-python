@@ -161,6 +161,10 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
                 )
                 db_params.extend(data)
                 span.set_attribute("db.params", str(db_params))
+                try:
+                    del instance.connection._sentry_db_params
+                except AttributeError:
+                    pass
 
         return f(*args, **kwargs)
 
