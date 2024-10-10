@@ -1279,18 +1279,12 @@ class POTelSpan:
         self.finish()
         context.detach(self._ctx_token)
 
-    def _get_attribute(self, name):
-        # type: (str) -> Optional[Any]
-        if not isinstance(self._otel_span, ReadableSpan):
-            return None
-        return self._otel_span.attributes.get(name)
-
     @property
     def description(self):
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._get_attribute(SentrySpanAttribute.DESCRIPTION)
+        return self.get_attribute(SentrySpanAttribute.DESCRIPTION)
 
     @description.setter
     def description(self, value):
@@ -1305,7 +1299,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._get_attribute(SentrySpanAttribute.ORIGIN)
+        return self.get_attribute(SentrySpanAttribute.ORIGIN)
 
     @origin.setter
     def origin(self, value):
@@ -1378,7 +1372,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._get_attribute(SentrySpanAttribute.OP)
+        return self.get_attribute(SentrySpanAttribute.OP)
 
     @op.setter
     def op(self, value):
@@ -1393,7 +1387,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._get_attribute(SentrySpanAttribute.NAME)
+        return self.get_attribute(SentrySpanAttribute.NAME)
 
     @name.setter
     def name(self, value):
@@ -1508,6 +1502,12 @@ class POTelSpan:
         # type: (str, Any) -> None
         # TODO-neel-potel we cannot add dicts here
         self.set_attribute(key, value)
+
+    def get_attribute(self, name):
+        # type: (str) -> Optional[Any]
+        if not isinstance(self._otel_span, ReadableSpan):
+            return None
+        return self._otel_span.attributes.get(name)
 
     def set_attribute(self, key, value):
         # type: (str, Any) -> None
