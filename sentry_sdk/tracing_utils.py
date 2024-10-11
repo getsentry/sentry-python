@@ -216,9 +216,9 @@ def add_query_source(span):
     if not should_add_query_source:
         return
 
-    # We assume here that the span is just ending now. We can't use
-    # the actual end timestamp of the span because the span can't be
-    # finished in order to set any attributes on it.
+    # We assume here that the query is just ending now. We can't use
+    # the actual end timestamp of the span because in OTel the span
+    # can't be finished in order to set any attributes on it.
     duration = datetime.now(tz=timezone.utc) - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold

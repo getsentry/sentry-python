@@ -679,24 +679,21 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
-            with freeze_time(datetime.datetime(2024, 1, 1, microsecond=0)):
+            with freeze_time(datetime.datetime(2024, 1, 1, microsecond=99999)):
                 with record_sql_queries(*args, **kwargs) as span:
-                    freezer = freeze_time(
-                        datetime.datetime(2024, 1, 1, microsecond=99999)
-                    )
-                    freezer.start()
-
-                freezer.stop()
-
-                yield span
+                    yield span
 
         with mock.patch(
-            "sentry_sdk.integrations.asyncpg.record_sql_queries",
-            fake_record_sql_queries,
+            "sentry_sdk.tracing.POTelSpan.start_timestamp",
+            datetime.datetime(2024, 1, 1, microsecond=0, tzinfo=datetime.timezone.utc),
         ):
-            await conn.execute(
-                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-            )
+            with mock.patch(
+                "sentry_sdk.integrations.asyncpg.record_sql_queries",
+                fake_record_sql_queries,
+            ):
+                await conn.execute(
+                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+                )
 
         await conn.close()
 
@@ -729,24 +726,21 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
-            with freeze_time(datetime.datetime(2024, 1, 1, microsecond=0)):
+            with freeze_time(datetime.datetime(2024, 1, 1, microsecond=100001)):
                 with record_sql_queries(*args, **kwargs) as span:
-                    freezer = freeze_time(
-                        datetime.datetime(2024, 1, 1, microsecond=100001)
-                    )
-                    freezer.start()
-
-                freezer.stop()
-
-                yield span
+                    yield span
 
         with mock.patch(
-            "sentry_sdk.integrations.asyncpg.record_sql_queries",
-            fake_record_sql_queries,
+            "sentry_sdk.tracing.POTelSpan.start_timestamp",
+            datetime.datetime(2024, 1, 1, microsecond=0, tzinfo=datetime.timezone.utc),
         ):
-            await conn.execute(
-                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-            )
+            with mock.patch(
+                "sentry_sdk.integrations.asyncpg.record_sql_queries",
+                fake_record_sql_queries,
+            ):
+                await conn.execute(
+                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+                )
 
         await conn.close()
 
