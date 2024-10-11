@@ -21,22 +21,18 @@ class OpenFeatureIntegration(Integration):
     thread-local state to be serialized and sent off in the error payload.
     """
 
-    def __init__(self):
-        # type: (int) -> None
-        # Store the error processor on the current scope. If its forked
-        # (i.e. threads are spawned) the callback will be copied to the
-        # new Scope.
+    @staticmethod
+    def setup_once():
+        def error_processor(event, exc_info):
+            scope = sentry_sdk.get_current_scope()
+            event["contexts"]["flags"] = {"values": scope.flags.get()}
+            return event
+
         scope = sentry_sdk.get_current_scope()
-        scope.add_error_processor(self.error_processor)
+        scope.add_error_processor(error_processor)
 
         # Register the hook within the global openfeature hooks list.
         api.add_hooks(hooks=[OpenFeatureHook()])
-
-    def error_processor(self, event, exc_info):
-        event["contexts"]["flags"] = {
-            "values": sentry_sdk.get_current_scope().flags.get()
-        }
-        return event
 
 
 class OpenFeatureHook(Hook):
