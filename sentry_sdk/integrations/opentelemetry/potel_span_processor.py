@@ -18,6 +18,7 @@ from sentry_sdk.integrations.opentelemetry.utils import (
     convert_from_otel_timestamp,
     extract_span_attributes,
     extract_span_data,
+    extract_transaction_name_source,
     get_trace_context,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
@@ -137,6 +138,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if event is None:
             return None
 
+        transaction_name, transaction_source = extract_transaction_name_source(span)
         span_data = extract_span_data(span)
         (_, description, _, http_status, _) = span_data
 
@@ -152,9 +154,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
         event.update(
             {
                 "type": "transaction",
-                "transaction": description,
-                # TODO-neel-potel tx source based on integration
-                "transaction_info": {"source": "custom"},
+                "transaction": transaction_name or description,
+                "transaction_info": {"source": transaction_source or "custom"},
                 "contexts": contexts,
             }
         )
