@@ -273,7 +273,7 @@ def test_breadcrumb_no_operation_name(
 
 
 @parameterize_strawberry_test
-def test_capture_transaction_on_error(
+def test_capture_root_span_on_error(
     request,
     sentry_init,
     capture_events,
@@ -300,14 +300,14 @@ def test_capture_transaction_on_error(
     client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 2
-    (_, transaction_event) = events
+    (_, root_span_event) = events
 
-    assert transaction_event["transaction"] == "ErrorQuery"
-    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
-    assert transaction_event["spans"]
+    assert root_span_event["transaction"] == "ErrorQuery"
+    assert root_span_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
+    assert root_span_event["spans"]
 
     query_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_QUERY
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_QUERY
     ]
     assert len(query_spans) == 1, "exactly one query span expected"
     query_span = query_spans[0]
@@ -318,7 +318,7 @@ def test_capture_transaction_on_error(
     assert query_span["data"]["graphql.resource_name"]
 
     parse_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
     ]
     assert len(parse_spans) == 1, "exactly one parse span expected"
     parse_span = parse_spans[0]
@@ -326,7 +326,7 @@ def test_capture_transaction_on_error(
     assert parse_span["description"] == "parsing"
 
     validate_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
     ]
     assert len(validate_spans) == 1, "exactly one validate span expected"
     validate_span = validate_spans[0]
@@ -334,7 +334,7 @@ def test_capture_transaction_on_error(
     assert validate_span["description"] == "validation"
 
     resolve_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
     ]
     assert len(resolve_spans) == 1, "exactly one resolve span expected"
     resolve_span = resolve_spans[0]
@@ -351,7 +351,7 @@ def test_capture_transaction_on_error(
 
 
 @parameterize_strawberry_test
-def test_capture_transaction_on_success(
+def test_capture_root_span_on_success(
     request,
     sentry_init,
     capture_events,
@@ -377,14 +377,14 @@ def test_capture_transaction_on_success(
     client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
 
     assert len(events) == 1
-    (transaction_event,) = events
+    (root_span_event,) = events
 
-    assert transaction_event["transaction"] == "GreetingQuery"
-    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
-    assert transaction_event["spans"]
+    assert root_span_event["root_span"] == "GreetingQuery"
+    assert root_span_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
+    assert root_span_event["spans"]
 
     query_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_QUERY
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_QUERY
     ]
     assert len(query_spans) == 1, "exactly one query span expected"
     query_span = query_spans[0]
@@ -395,7 +395,7 @@ def test_capture_transaction_on_success(
     assert query_span["data"]["graphql.resource_name"]
 
     parse_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
     ]
     assert len(parse_spans) == 1, "exactly one parse span expected"
     parse_span = parse_spans[0]
@@ -403,7 +403,7 @@ def test_capture_transaction_on_success(
     assert parse_span["description"] == "parsing"
 
     validate_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
     ]
     assert len(validate_spans) == 1, "exactly one validate span expected"
     validate_span = validate_spans[0]
@@ -411,7 +411,7 @@ def test_capture_transaction_on_success(
     assert validate_span["description"] == "validation"
 
     resolve_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
     ]
     assert len(resolve_spans) == 1, "exactly one resolve span expected"
     resolve_span = resolve_spans[0]
@@ -428,7 +428,7 @@ def test_capture_transaction_on_success(
 
 
 @parameterize_strawberry_test
-def test_transaction_no_operation_name(
+def test_root_span_no_operation_name(
     request,
     sentry_init,
     capture_events,
@@ -454,17 +454,17 @@ def test_transaction_no_operation_name(
     client.post("/graphql", json={"query": query})
 
     assert len(events) == 1
-    (transaction_event,) = events
+    (root_span_event,) = events
 
     if async_execution:
-        assert transaction_event["transaction"] == "/graphql"
+        assert root_span_event["transaction"] == "/graphql"
     else:
-        assert transaction_event["transaction"] == "graphql_view"
+        assert root_span_event["transaction"] == "graphql_view"
 
-    assert transaction_event["spans"]
+    assert root_span_event["spans"]
 
     query_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_QUERY
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_QUERY
     ]
     assert len(query_spans) == 1, "exactly one query span expected"
     query_span = query_spans[0]
@@ -475,7 +475,7 @@ def test_transaction_no_operation_name(
     assert query_span["data"]["graphql.resource_name"]
 
     parse_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
     ]
     assert len(parse_spans) == 1, "exactly one parse span expected"
     parse_span = parse_spans[0]
@@ -483,7 +483,7 @@ def test_transaction_no_operation_name(
     assert parse_span["description"] == "parsing"
 
     validate_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
     ]
     assert len(validate_spans) == 1, "exactly one validate span expected"
     validate_span = validate_spans[0]
@@ -491,7 +491,7 @@ def test_transaction_no_operation_name(
     assert validate_span["description"] == "validation"
 
     resolve_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
     ]
     assert len(resolve_spans) == 1, "exactly one resolve span expected"
     resolve_span = resolve_spans[0]
@@ -508,7 +508,7 @@ def test_transaction_no_operation_name(
 
 
 @parameterize_strawberry_test
-def test_transaction_mutation(
+def test_root_span_mutation(
     request,
     sentry_init,
     capture_events,
@@ -534,14 +534,14 @@ def test_transaction_mutation(
     client.post("/graphql", json={"query": query})
 
     assert len(events) == 1
-    (transaction_event,) = events
+    (root_span_event,) = events
 
-    assert transaction_event["transaction"] == "Change"
-    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_MUTATION
-    assert transaction_event["spans"]
+    assert root_span_event["transaction"] == "Change"
+    assert root_span_event["contexts"]["trace"]["op"] == OP.GRAPHQL_MUTATION
+    assert root_span_event["spans"]
 
     query_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_MUTATION
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_MUTATION
     ]
     assert len(query_spans) == 1, "exactly one mutation span expected"
     query_span = query_spans[0]
@@ -552,7 +552,7 @@ def test_transaction_mutation(
     assert query_span["data"]["graphql.resource_name"]
 
     parse_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
     ]
     assert len(parse_spans) == 1, "exactly one parse span expected"
     parse_span = parse_spans[0]
@@ -560,7 +560,7 @@ def test_transaction_mutation(
     assert parse_span["description"] == "parsing"
 
     validate_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
     ]
     assert len(validate_spans) == 1, "exactly one validate span expected"
     validate_span = validate_spans[0]
@@ -568,7 +568,7 @@ def test_transaction_mutation(
     assert validate_span["description"] == "validation"
 
     resolve_spans = [
-        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
+        span for span in root_span_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
     ]
     assert len(resolve_spans) == 1, "exactly one resolve span expected"
     resolve_span = resolve_spans[0]
