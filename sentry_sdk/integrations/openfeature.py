@@ -15,11 +15,6 @@ except ImportError:
 
 
 class OpenFeatureIntegration(Integration):
-    """
-    Bridges the sentry and openfeature sdks. Thread-local data is expected to
-    flow from openfeature to the integration before the sentry-sdk requests the
-    thread-local state to be serialized and sent off in the error payload.
-    """
 
     @staticmethod
     def setup_once():
