@@ -13,8 +13,15 @@ from anthropic.types.message_start_event import MessageStartEvent
 from sentry_sdk.utils import package_version
 
 try:
+    from anthropic.types import InputJSONDelta
+except ImportError:
+    try:
+        from anthropic.types import InputJsonDelta as InputJSONDelta
+    except ImportError:
+        pass
+
+try:
     # 0.27+
-    from anthropic.types import InputJsonDelta
     from anthropic.types.raw_message_delta_event import Delta
     from anthropic.types.tool_use_block import ToolUseBlock
 except ImportError:
@@ -210,7 +217,7 @@ def test_streaming_create_message(
 
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 27),
-    reason="Versions <0.27.0 do not include InputJsonDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
+    reason="Versions <0.27.0 do not include InputJSONDelta, which was introduced in >=0.27.0 along with a new message delta type for tool calling.",
 )
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -248,32 +255,32 @@ def test_streaming_create_message_with_input_json_delta(
             ),
         ),
         ContentBlockDeltaEvent(
-            delta=InputJsonDelta(partial_json="", type="input_json_delta"),
+            delta=InputJSONDelta(partial_json="", type="input_json_delta"),
             index=0,
             type="content_block_delta",
         ),
         ContentBlockDeltaEvent(
-            delta=InputJsonDelta(partial_json="{'location':", type="input_json_delta"),
+            delta=InputJSONDelta(partial_json="{'location':", type="input_json_delta"),
             index=0,
             type="content_block_delta",
         ),
         ContentBlockDeltaEvent(
-            delta=InputJsonDelta(partial_json=" 'S", type="input_json_delta"),
+            delta=InputJSONDelta(partial_json=" 'S", type="input_json_delta"),
             index=0,
             type="content_block_delta",
         ),
         ContentBlockDeltaEvent(
-            delta=InputJsonDelta(partial_json="an ", type="input_json_delta"),
+            delta=InputJSONDelta(partial_json="an ", type="input_json_delta"),
             index=0,
             type="content_block_delta",
         ),
         ContentBlockDeltaEvent(
-            delta=InputJsonDelta(partial_json="Francisco, C", type="input_json_delta"),
+            delta=InputJSONDelta(partial_json="Francisco, C", type="input_json_delta"),
             index=0,
             type="content_block_delta",
         ),
         ContentBlockDeltaEvent(
-            delta=InputJsonDelta(partial_json="A'}", type="input_json_delta"),
+            delta=InputJSONDelta(partial_json="A'}", type="input_json_delta"),
             index=0,
             type="content_block_delta",
         ),
@@ -325,8 +332,8 @@ def test_streaming_create_message_with_input_json_delta(
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
         assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"text": "{'location': 'San Francisco, CA'}", "type": "text"}
-        ]
+            {"text": "", "type": "text"}
+        ]  # we do not record InputJSONDelta because it could contain PII
 
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
