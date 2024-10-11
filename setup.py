@@ -78,6 +78,7 @@ setup(
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
         "tornado": ["tornado>=6"],
+        "openfeature": ["openfeature-sdk>=0.7.3"],
     },
     entry_points={
         "opentelemetry_propagator": [
