@@ -74,7 +74,7 @@ def _calculate_token_usage(result, span):
 
 
 def _get_responses(content):
-    # type: (list[Any]) -> dict[str, Any]
+    # type: (list[Any]) -> list[dict[str, Any]]
     """Get JSON of a Anthropic responses."""
     responses = []
     for item in content:
