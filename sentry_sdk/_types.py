@@ -128,6 +128,9 @@ if TYPE_CHECKING:
         tuple[None, None, None],
     ]
 
+    Flag = TypedDict("Flag", {"flag": str, "result": bool})
+    Flags = list[Flag]
+
     Hint = Dict[str, Any]
 
     Breadcrumb = Dict[str, Any]
