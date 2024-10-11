@@ -51,10 +51,10 @@ def dropped_result(span_context, attributes, sample_rate=None):
     # these will only be added the first time in a root span sampling decision
     trace_state = span_context.trace_state
 
-    if TRACESTATE_SAMPLED_KEY not in span_context.trace_state.keys():
+    if TRACESTATE_SAMPLED_KEY not in span_context.trace_state:
         trace_state = span_context.trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
 
-    if sample_rate and TRACESTATE_SAMPLE_RATE_KEY not in trace_state.keys():
+    if sample_rate and TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     return SamplingResult(
@@ -69,9 +69,9 @@ def sampled_result(span_context, attributes, sample_rate):
     # these will only be added the first time in a root span sampling decision
     trace_state = span_context.trace_state
 
-    if TRACESTATE_SAMPLED_KEY not in trace_state.keys():
+    if TRACESTATE_SAMPLED_KEY not in trace_state:
         trace_state = span_context.trace_state.add(TRACESTATE_SAMPLED_KEY, "true")
-    if TRACESTATE_SAMPLE_RATE_KEY not in trace_state.keys():
+    if TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     return SamplingResult(
