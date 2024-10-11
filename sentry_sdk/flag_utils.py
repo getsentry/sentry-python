@@ -1,23 +1,6 @@
+from copy import copy
+
 import itertools
-
-
-class FlagManager:
-    """
-    Right now this is just an interface for the buffer but it might contain
-    thread-local state handling in the future.
-    """
-
-    def __init__(self, capacity):
-        # type: (int) -> None
-        self.buffer = FlagBuffer(capacity)
-
-    def get_flags(self):
-        # type: () -> list[dict]
-        return self.buffer.serialize()
-
-    def set_flag(self, flag, result):
-        # type: (str, bool) -> None
-        self.buffer.insert(flag, result)
 
 
 class FlagBuffer:
@@ -32,7 +15,28 @@ class FlagBuffer:
     def index(self):
         return self.ip % self.capacity
 
-    def insert(self, flag, result):
+    def clear(self):
+        self.buffer = []
+        self.ip = 0
+
+    def copy(self):
+        # type: () -> FlagBuffer
+        buffer = FlagBuffer(capacity=self.capacity)
+        buffer.buffer = copy(self.buffer)
+        buffer.ip = self.ip
+        return buffer
+
+    def get(self):
+        # type: () -> list[dict]
+        if self.ip >= self.capacity:
+            iterator = itertools.chain(
+                range(self.index, self.capacity), range(0, self.index)
+            )
+            return [self.buffer[i].asdict for i in iterator]
+        else:
+            return [flag.asdict for flag in self.buffer]
+
+    def set(self, flag, result):
         # type: (str, bool) -> None
         flag_ = Flag(flag, result)
 
@@ -42,16 +46,6 @@ class FlagBuffer:
             self.buffer.append(flag_)
 
         self.ip += 1
-
-    def serialize(self):
-        # type: () -> list[dict]
-        if self.ip >= self.capacity:
-            iterator = itertools.chain(
-                range(self.index, self.capacity), range(0, self.index)
-            )
-            return [self.buffer[i].asdict for i in iterator]
-        else:
-            return [flag.asdict for flag in self.buffer]
 
 
 class Flag:

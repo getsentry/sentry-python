@@ -11,6 +11,7 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
+from sentry_sdk.flag_utils import FlagBuffer
 from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
@@ -192,6 +193,7 @@ class Scope:
         "client",
         "_type",
         "_last_event_id",
+        "_flags",
     )
 
     def __init__(self, ty=None, client=None):
@@ -248,6 +250,10 @@ class Scope:
         rv._profile = self._profile
 
         rv._last_event_id = self._last_event_id
+
+        # TODO: Do I need to target `self.flags`? I don't want to create an instance
+        # before I copy but I guess theres no harm.
+        rv._flags = self._flags.copy()
 
         return rv
 
@@ -685,6 +691,7 @@ class Scope:
 
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id = None  # type: Optional[str]
+        self._flags = None
 
     @_attr_setter
     def level(self, value):
@@ -1545,6 +1552,13 @@ class Scope:
             self._name,
             self._type,
         )
+
+    @property
+    def flags(self):
+        # type: () -> FlagBuffer
+        if self._flags is None:
+            self._flags = FlagBuffer(capacity=50)
+        self._flags
 
 
 @contextmanager
