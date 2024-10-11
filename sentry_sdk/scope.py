@@ -1556,7 +1556,7 @@ class Scope:
         # type: () -> FlagBuffer
         if self._flags is None:
             self._flags = FlagBuffer(capacity=100)
-        self._flags
+        return self._flags
 
 
 @contextmanager
