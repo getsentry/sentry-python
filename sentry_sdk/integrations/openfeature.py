@@ -11,7 +11,7 @@ try:
         from openfeature.flag_evaluation import FlagEvaluationDetails
         from openfeature.hook import HookContext, HookHints
 except ImportError:
-    raise DidNotEnable("Starlette is not installed")
+    raise DidNotEnable("OpenFeature is not installed")
 
 
 class OpenFeatureIntegration(Integration):
