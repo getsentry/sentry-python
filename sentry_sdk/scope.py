@@ -251,9 +251,7 @@ class Scope:
 
         rv._last_event_id = self._last_event_id
 
-        # TODO: Do I need to target `self.flags`? I don't want to create an instance
-        # before I copy but I guess theres no harm.
-        rv._flags = self._flags.copy()
+        rv._flags = self.flags.copy()
 
         return rv
 
@@ -1557,7 +1555,7 @@ class Scope:
     def flags(self):
         # type: () -> FlagBuffer
         if self._flags is None:
-            self._flags = FlagBuffer(capacity=50)
+            self._flags = FlagBuffer(capacity=100)
         self._flags
 
 
