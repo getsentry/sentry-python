@@ -170,24 +170,21 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
             },
         )
 
-        span = sentry_sdk.get_current_span()
-        if span:
-            self.graphql_span = span.start_child(
-                op=op,
-                name=description,
-                origin=StrawberryIntegration.origin,
-            )
-        else:
-            self.graphql_span = sentry_sdk.start_span(
-                op=op,
-                name=description,
-                origin=StrawberryIntegration.origin,
-            )
+        self.graphql_span = sentry_sdk.start_span(
+            op=op,
+            name=description,
+            origin=StrawberryIntegration.origin,
+        )
 
-        self.graphql_span.set_data("graphql.operation.type", operation_type)
-        self.graphql_span.set_data("graphql.operation.name", self._operation_name)
-        self.graphql_span.set_data("graphql.document", self.execution_context.query)
-        self.graphql_span.set_data("graphql.resource_name", self._resource_name)
+        self.graphql_span.set_attribute("graphql.operation.type", operation_type)
+        if self._operation_name is not None:
+            self.graphql_span.set_attribute(
+                "graphql.operation.name", self._operation_name
+            )
+        self.graphql_span.set_attribute(
+            "graphql.document", self.execution_context.query
+        )
+        self.graphql_span.set_attribute("graphql.resource_name", self._resource_name)
 
         yield
 
@@ -201,7 +198,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
     def on_validate(self):
         # type: () -> Generator[None, None, None]
-        self.validation_span = self.graphql_span.start_child(
+        self.validation_span = sentry_sdk.start_span(
             op=OP.GRAPHQL_VALIDATE,
             name="validation",
             origin=StrawberryIntegration.origin,
@@ -213,7 +210,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
     def on_parse(self):
         # type: () -> Generator[None, None, None]
-        self.parsing_span = self.graphql_span.start_child(
+        self.parsing_span = sentry_sdk.start_span(
             op=OP.GRAPHQL_PARSE,
             name="parsing",
             origin=StrawberryIntegration.origin,
@@ -243,15 +240,15 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        with self.graphql_span.start_child(
+        with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
         ) as span:
-            span.set_data("graphql.field_name", info.field_name)
-            span.set_data("graphql.parent_type", info.parent_type.name)
-            span.set_data("graphql.field_path", field_path)
-            span.set_data("graphql.path", ".".join(map(str, info.path.as_list())))
+            span.set_attribute("graphql.field_name", info.field_name)
+            span.set_attribute("graphql.parent_type", info.parent_type.name)
+            span.set_attribute("graphql.field_path", field_path)
+            span.set_attribute("graphql.path", ".".join(map(str, info.path.as_list())))
 
             return await self._resolve(_next, root, info, *args, **kwargs)
 
@@ -264,15 +261,15 @@ class SentrySyncExtension(SentryAsyncExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        with self.graphql_span.start_child(
+        with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
         ) as span:
-            span.set_data("graphql.field_name", info.field_name)
-            span.set_data("graphql.parent_type", info.parent_type.name)
-            span.set_data("graphql.field_path", field_path)
-            span.set_data("graphql.path", ".".join(map(str, info.path.as_list())))
+            span.set_attribute("graphql.field_name", info.field_name)
+            span.set_attribute("graphql.parent_type", info.parent_type.name)
+            span.set_attribute("graphql.field_path", field_path)
+            span.set_attribute("graphql.path", ".".join(map(str, info.path.as_list())))
 
             return _next(root, info, *args, **kwargs)
 
