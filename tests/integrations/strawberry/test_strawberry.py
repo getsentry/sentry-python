@@ -379,7 +379,7 @@ def test_capture_root_span_on_success(
     assert len(events) == 1
     (root_span_event,) = events
 
-    assert root_span_event["root_span"] == "GreetingQuery"
+    assert root_span_event["transaction"] == "GreetingQuery"
     assert root_span_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
     assert root_span_event["spans"]
 
