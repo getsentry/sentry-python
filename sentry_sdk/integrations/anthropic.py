@@ -90,6 +90,10 @@ def _get_responses(content):
 
 def _sentry_patched_create_common(f, *args, **kwargs):
     # type: (Any, *Any, **Any) -> Any
+    integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+    if integration is None:
+        return f(*args, **kwargs)
+
     if "messages" not in kwargs:
         return f(*args, **kwargs)
 
@@ -114,8 +118,6 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         _capture_exception(exc)
         span.__exit__(None, None, None)
         raise exc from None
-
-    integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
 
     with capture_internal_exceptions():
         span.set_data(SPANDATA.AI_MODEL_ID, model)

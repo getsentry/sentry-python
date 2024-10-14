@@ -116,6 +116,10 @@ def _calculate_chat_completion_usage(
 
 def _new_chat_completion_common(f, *args, **kwargs):
     # type: (Any, *Any, **Any) -> Any
+    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    if integration is None:
+        return f(*args, **kwargs)
+
     if "messages" not in kwargs:
         # invalid call (in all versions of openai), let it return error
         return f(*args, **kwargs)
@@ -143,8 +147,6 @@ def _new_chat_completion_common(f, *args, **kwargs):
         _capture_exception(e)
         span.__exit__(None, None, None)
         raise e from None
-
-    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
 
     with capture_internal_exceptions():
         if should_send_default_pii() and integration.include_prompts:
@@ -271,12 +273,15 @@ def _wrap_async_chat_completion_create(f):
 
 def _new_embeddings_create_common(f, *args, **kwargs):
     # type: (Any, *Any, **Any) -> Any
+    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    if integration is None:
+        return f(*args, **kwargs)
+
     with sentry_sdk.start_span(
         op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
         description="OpenAI Embedding Creation",
         origin=OpenAIIntegration.origin,
     ) as span:
-        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if "input" in kwargs and (
             should_send_default_pii() and integration.include_prompts
         ):
