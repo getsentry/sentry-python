@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from copy import copy
 from collections import deque
 from contextlib import contextmanager
@@ -30,6 +31,7 @@ from sentry_sdk.utils import (
     capture_internal_exception,
     capture_internal_exceptions,
     ContextVar,
+    datetime_from_isoformat,
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
@@ -966,7 +968,7 @@ class Scope:
         transaction=None,
         instrumenter=INSTRUMENTER.SENTRY,
         custom_sampling_context=None,
-        **kwargs
+        **kwargs,
     ):
         # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
@@ -1066,6 +1068,13 @@ class Scope:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        if kwargs.get("description") is not None:
+            warnings.warn(
+                "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         with new_scope():
             kwargs.setdefault("scope", self)
 
@@ -1307,7 +1316,17 @@ class Scope:
         event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
             self._breadcrumbs
         )
-        event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+
+        # Attempt to sort timestamps
+        try:
+            for crumb in event["breadcrumbs"]["values"]:
+                if isinstance(crumb["timestamp"], str):
+                    crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
+
+            event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+        except Exception as err:
+            logger.debug("Error when sorting breadcrumbs", exc_info=err)
+            pass
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None

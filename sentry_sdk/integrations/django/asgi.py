@@ -90,13 +90,15 @@ def patch_django_asgi_handler_impl(cls):
 
     async def sentry_patched_asgi_handler(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
-        if sentry_sdk.get_client().get_integration(DjangoIntegration) is None:
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+        if integration is None:
             return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
             old_app.__get__(self, cls),
             unsafe_context_data=True,
             span_origin=DjangoIntegration.origin,
+            http_methods_to_capture=integration.http_methods_to_capture,
         )._run_asgi3
 
         return await middleware(scope, receive, send)
@@ -142,13 +144,15 @@ def patch_channels_asgi_handler_impl(cls):
 
         async def sentry_patched_asgi_handler(self, receive, send):
             # type: (Any, Any, Any) -> Any
-            if sentry_sdk.get_client().get_integration(DjangoIntegration) is None:
+            integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+            if integration is None:
                 return await old_app(self, receive, send)
 
             middleware = SentryAsgiMiddleware(
                 lambda _scope: old_app.__get__(self, cls),
                 unsafe_context_data=True,
                 span_origin=DjangoIntegration.origin,
+                http_methods_to_capture=integration.http_methods_to_capture,
             )
 
             return await middleware(self.scope)(receive, send)
@@ -174,7 +178,7 @@ def wrap_async_view(callback):
 
         with sentry_sdk.start_span(
             op=OP.VIEW_RENDER,
-            description=request.resolver_match.view_name,
+            name=request.resolver_match.view_name,
             origin=DjangoIntegration.origin,
         ):
             return await callback(request, *args, **kwargs)

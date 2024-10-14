@@ -35,7 +35,7 @@ def patch_views():
         # type: (SimpleTemplateResponse) -> Any
         with sentry_sdk.start_span(
             op=OP.VIEW_RESPONSE_RENDER,
-            description="serialize response",
+            name="serialize response",
             origin=DjangoIntegration.origin,
         ):
             return old_render(self)
@@ -84,7 +84,7 @@ def _wrap_sync_view(callback):
 
         with sentry_sdk.start_span(
             op=OP.VIEW_RENDER,
-            description=request.resolver_match.view_name,
+            name=request.resolver_match.view_name,
             origin=DjangoIntegration.origin,
         ):
             return callback(request, *args, **kwargs)

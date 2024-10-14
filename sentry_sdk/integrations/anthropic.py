@@ -1,4 +1,5 @@
 from functools import wraps
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
@@ -7,12 +8,9 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    ensure_integration_enabled,
     event_from_exception,
     package_version,
 )
-
-from typing import TYPE_CHECKING
 
 try:
     from anthropic.resources import Messages, AsyncMessages
@@ -75,6 +73,21 @@ def _calculate_token_usage(result, span):
     record_token_usage(span, input_tokens, output_tokens, total_tokens)
 
 
+def _get_responses(content):
+    # type: (list[Any]) -> list[dict[str, Any]]
+    """Get JSON of a Anthropic responses."""
+    responses = []
+    for item in content:
+        if hasattr(item, "text"):
+            responses.append(
+                {
+                    "type": item.type,
+                    "text": item.text,
+                }
+            )
+    return responses
+
+
 def _sentry_patched_create_common(f, *args, **kwargs):
     # type: (Any, *Any, **Any) -> Any
     if "messages" not in kwargs:
@@ -111,18 +124,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
             span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
         if hasattr(result, "content"):
             if should_send_default_pii() and integration.include_prompts:
-                span.set_data(
-                    SPANDATA.AI_RESPONSES,
-                    list(
-                        map(
-                            lambda message: {
-                                "type": message.type,
-                                "text": message.text,
-                            },
-                            result.content,
-                        )
-                    ),
-                )
+                span.set_data(SPANDATA.AI_RESPONSES, _get_responses(result.content))
             _calculate_token_usage(result, span)
             span.__exit__(None, None, None)
         elif hasattr(result, "_iterator"):
@@ -196,10 +198,9 @@ def _wrap_message_create(f):
 
     return _sentry_patched_create_sync
 
-
+  
 def _wrap_async_message_create(f):
     # type: (Any) -> Any
-
     async def _execute_async(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _sentry_patched_create_common(f, *args, **kwargs)
@@ -216,9 +217,13 @@ def _wrap_async_message_create(f):
             return e.value
 
     @wraps(f)
-    @ensure_integration_enabled(AnthropicIntegration, f)
     async def _sentry_patched_create_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+        
+        if integration is None or "messages" not in kwargs:
+            return f(*args, **kwargs)
+        
         return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_create_async

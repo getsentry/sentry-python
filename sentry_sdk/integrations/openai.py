@@ -10,7 +10,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    ensure_integration_enabled,
 )
 
 from typing import TYPE_CHECKING
@@ -47,10 +46,11 @@ class OpenAIIntegration(Integration):
     def setup_once():
         # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
+        Embeddings.create = _wrap_embeddings_create(Embeddings.create)
+
         AsyncCompletions.create = _wrap_async_chat_completion_create(
             AsyncCompletions.create
         )
-        Embeddings.create = _wrap_embeddings_create(Embeddings.create)
         AsyncEmbeddings.create = _wrap_async_embeddings_create(AsyncEmbeddings.create)
 
     def count_tokens(self, s):
@@ -237,7 +237,6 @@ def _wrap_chat_completion_create(f):
 
 def _wrap_async_chat_completion_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
-
     async def _execute_async(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _new_chat_completion_common(f, *args, **kwargs)
@@ -283,6 +282,7 @@ def _new_embeddings_create_common(f, *args, **kwargs):
                 set_data_normalized(span, "ai.input_messages", kwargs["input"])
         if "model" in kwargs:
             set_data_normalized(span, "ai.model_id", kwargs["model"])
+
         try:
             response = yield f, args, kwargs
         except Exception as e:
@@ -311,7 +311,6 @@ def _new_embeddings_create_common(f, *args, **kwargs):
 
 def _wrap_embeddings_create(f):
     # type: (Any) -> Any
-
     def _execute_sync(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         gen = _new_embeddings_create_common(f, *args, **kwargs)

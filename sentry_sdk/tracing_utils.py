@@ -146,7 +146,7 @@ def record_sql_queries(
 
     with sentry_sdk.start_span(
         op=OP.DB,
-        description=query,
+        name=query,
         origin=span_origin,
     ) as span:
         for k, v in data.items():
@@ -178,6 +178,26 @@ def _get_frame_module_abs_path(frame):
         return frame.f_code.co_filename
     except Exception:
         return None
+
+
+def _should_be_included(
+    is_sentry_sdk_frame,  # type: bool
+    namespace,  # type: Optional[str]
+    in_app_include,  # type: Optional[list[str]]
+    in_app_exclude,  # type: Optional[list[str]]
+    abs_path,  # type: Optional[str]
+    project_root,  # type: Optional[str]
+):
+    # type: (...) -> bool
+    # in_app_include takes precedence over in_app_exclude
+    should_be_included = _module_in_list(namespace, in_app_include)
+    should_be_excluded = _is_external_source(abs_path) or _module_in_list(
+        namespace, in_app_exclude
+    )
+    return not is_sentry_sdk_frame and (
+        should_be_included
+        or (_is_in_project_root(abs_path, project_root) and not should_be_excluded)
+    )
 
 
 def add_query_source(span):
@@ -221,19 +241,15 @@ def add_query_source(span):
             "sentry_sdk."
         )
 
-        # in_app_include takes precedence over in_app_exclude
-        should_be_included = (
-            not (
-                _is_external_source(abs_path)
-                or _module_in_list(namespace, in_app_exclude)
-            )
-        ) or _module_in_list(namespace, in_app_include)
-
-        if (
-            _is_in_project_root(abs_path, project_root)
-            and should_be_included
-            and not is_sentry_sdk_frame
-        ):
+        should_be_included = _should_be_included(
+            is_sentry_sdk_frame=is_sentry_sdk_frame,
+            namespace=namespace,
+            in_app_include=in_app_include,
+            in_app_exclude=in_app_exclude,
+            abs_path=abs_path,
+            project_root=project_root,
+        )
+        if should_be_included:
             break
 
         frame = frame.f_back
@@ -516,7 +532,7 @@ class Baggage:
             sentry_items["public_key"] = Dsn(options["dsn"]).public_key
 
         if options.get("traces_sample_rate"):
-            sentry_items["sample_rate"] = options["traces_sample_rate"]
+            sentry_items["sample_rate"] = str(options["traces_sample_rate"])
 
         return Baggage(sentry_items, third_party_items, mutable)
 
@@ -649,7 +665,7 @@ def start_child_span_decorator(func):
 
             with span.start_child(
                 op=OP.FUNCTION,
-                description=qualname_from_function(func),
+                name=qualname_from_function(func),
             ):
                 return await func(*args, **kwargs)
 
@@ -677,7 +693,7 @@ def start_child_span_decorator(func):
 
             with span.start_child(
                 op=OP.FUNCTION,
-                description=qualname_from_function(func),
+                name=qualname_from_function(func),
             ):
                 return func(*args, **kwargs)
 

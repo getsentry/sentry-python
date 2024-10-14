@@ -18,6 +18,11 @@ class EndpointType(Enum):
     ENVELOPE = "envelope"
 
 
+class CompressionAlgo(Enum):
+    GZIP = "gzip"
+    BROTLI = "br"
+
+
 if TYPE_CHECKING:
     import sentry_sdk
 
@@ -53,14 +58,16 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
-            "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
             "continuous_profiling_mode": Optional[ContinuousProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
+            "transport_compression_level": Optional[int],
+            "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
+            "transport_http2": Optional[bool],
             "enable_metrics": Optional[bool],
             "before_emit_metric": Optional[
                 Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
@@ -567,4 +574,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.13.0"
+VERSION = "2.16.0"

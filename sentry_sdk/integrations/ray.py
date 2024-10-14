@@ -88,7 +88,7 @@ def _patch_ray_remote():
             """
             with sentry_sdk.start_span(
                 op=OP.QUEUE_SUBMIT_RAY,
-                description=qualname_from_function(f),
+                name=qualname_from_function(f),
                 origin=RayIntegration.origin,
             ) as span:
                 tracing = {

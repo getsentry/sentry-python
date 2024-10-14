@@ -248,13 +248,15 @@ class NoOpMgr:
 def _wrap_task_run(f):
     # type: (F) -> F
     @wraps(f)
-    @ensure_integration_enabled(CeleryIntegration, f)
     def apply_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         # Note: kwargs can contain headers=None, so no setdefault!
         # Unsure which backend though.
-        kwarg_headers = kwargs.get("headers") or {}
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
+        kwarg_headers = kwargs.get("headers") or {}
         propagate_traces = kwarg_headers.pop(
             "sentry-propagate-traces", integration.propagate_traces
         )
@@ -274,7 +276,7 @@ def _wrap_task_run(f):
         span_mgr = (
             sentry_sdk.start_span(
                 op=OP.QUEUE_SUBMIT_CELERY,
-                description=task_name,
+                name=task_name,
                 origin=CeleryIntegration.origin,
             )
             if not task_started_from_beat
@@ -374,7 +376,7 @@ def _wrap_task_call(task, f):
         try:
             with sentry_sdk.start_span(
                 op=OP.QUEUE_PROCESS,
-                description=task.name,
+                name=task.name,
                 origin=CeleryIntegration.origin,
             ) as span:
                 _set_messaging_destination_name(task, span)
@@ -503,7 +505,7 @@ def _patch_producer_publish():
 
         with sentry_sdk.start_span(
             op=OP.QUEUE_PUBLISH,
-            description=task_name,
+            name=task_name,
             origin=CeleryIntegration.origin,
         ) as span:
             if task_id is not None:

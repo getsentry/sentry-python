@@ -52,7 +52,7 @@ def _patch_cache_method(cache, method_name, address, port):
 
         with sentry_sdk.start_span(
             op=op,
-            description=description,
+            name=description,
             origin=DjangoIntegration.origin,
         ) as span:
             value = original_method(*args, **kwargs)

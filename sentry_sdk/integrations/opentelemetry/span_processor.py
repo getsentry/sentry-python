@@ -147,7 +147,7 @@ class SentrySpanProcessor(SpanProcessor):
         if sentry_parent_span:
             sentry_span = sentry_parent_span.start_child(
                 span_id=trace_data["span_id"],
-                description=otel_span.name,
+                name=otel_span.name,
                 start_timestamp=start_timestamp,
                 instrumenter=INSTRUMENTER.OTEL,
                 origin=SPAN_ORIGIN,
