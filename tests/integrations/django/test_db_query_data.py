@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from contextlib import contextmanager
 from datetime import datetime
 from unittest import mock
 
@@ -15,7 +16,7 @@ except ImportError:
 from freezegun import freeze_time
 from werkzeug.test import Client
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_transaction, start_span
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
@@ -347,29 +348,24 @@ def test_no_query_source_if_duration_too_short(sentry_init, client, capture_even
 
     events = capture_events()
 
-    class fake_record_sql_queries:  # noqa: N801
-        def __init__(self, *args, **kwargs):
-            with freeze_time(datetime(2024, 1, 1, microsecond=0)):
-                with record_sql_queries(*args, **kwargs) as span:
-                    self.span = span
-                    freezer = freeze_time(datetime(2024, 1, 1, microsecond=99999))
-                    freezer.start()
+    def fake_start_span(*args, **kwargs):  # noqa: N801
+        with freeze_time(datetime(2024, 1, 1, microsecond=0)):
+            return start_span(*args, **kwargs)
 
-                freezer.stop()
+    @contextmanager
+    def fake_record_sql_queries(*args, **kwargs):  # noqa: N801
+        with freeze_time(datetime(2024, 1, 1, microsecond=99999)):
+            with record_sql_queries(*args, **kwargs) as span:
+                yield span
 
-        def __enter__(self):
-            return self.span
-
-        def __exit__(self, type, value, traceback):
-            pass
-
-    with mock.patch(
-        "sentry_sdk.integrations.django.record_sql_queries",
-        fake_record_sql_queries,
-    ):
-        _, status, _ = unpack_werkzeug_response(
-            client.get(reverse("postgres_select_orm"))
-        )
+    with mock.patch("sentry_sdk.start_span", fake_start_span):
+        with mock.patch(
+            "sentry_sdk.integrations.django.record_sql_queries",
+            fake_record_sql_queries,
+        ):
+            _, status, _ = unpack_werkzeug_response(
+                client.get(reverse("postgres_select_orm"))
+            )
 
     assert status == "200 OK"
 
@@ -407,29 +403,24 @@ def test_query_source_if_duration_over_threshold(sentry_init, client, capture_ev
 
     events = capture_events()
 
-    class fake_record_sql_queries:  # noqa: N801
-        def __init__(self, *args, **kwargs):
-            with freeze_time(datetime(2024, 1, 1, microsecond=0)):
-                with record_sql_queries(*args, **kwargs) as span:
-                    self.span = span
-                    freezer = freeze_time(datetime(2024, 1, 1, microsecond=99999))
-                    freezer.start()
+    def fake_start_span(*args, **kwargs):  # noqa: N801
+        with freeze_time(datetime(2024, 1, 1, microsecond=0)):
+            return start_span(*args, **kwargs)
 
-                freezer.stop()
+    @contextmanager
+    def fake_record_sql_queries(*args, **kwargs):  # noqa: N801
+        with freeze_time(datetime(2024, 1, 1, microsecond=100001)):
+            with record_sql_queries(*args, **kwargs) as span:
+                yield span
 
-        def __enter__(self):
-            return self.span
-
-        def __exit__(self, type, value, traceback):
-            pass
-
-    with mock.patch(
-        "sentry_sdk.integrations.django.record_sql_queries",
-        fake_record_sql_queries,
-    ):
-        _, status, _ = unpack_werkzeug_response(
-            client.get(reverse("postgres_select_orm"))
-        )
+    with mock.patch("sentry_sdk.start_span", fake_start_span):
+        with mock.patch(
+            "sentry_sdk.integrations.django.record_sql_queries",
+            fake_record_sql_queries,
+        ):
+            _, status, _ = unpack_werkzeug_response(
+                client.get(reverse("postgres_select_orm"))
+            )
 
     assert status == "200 OK"
 
