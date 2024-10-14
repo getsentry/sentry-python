@@ -8,7 +8,6 @@ from unittest.mock import patch
 from werkzeug.test import Client
 
 from django import VERSION as DJANGO_VERSION
-from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
@@ -288,6 +287,9 @@ def test_user_captured(sentry_init, client, capture_events):
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
+
+    from django.contrib.auth.models import User
+
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
 
     try:
@@ -927,6 +929,11 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         client.get(url)
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
+
+        render_span = next(
+            span for span in transaction["spans"] if span["op"] == "template.render"
+        )
+        assert "context.user_age" in render_span["data"]
 
 
 if DJANGO_VERSION >= (1, 10):
