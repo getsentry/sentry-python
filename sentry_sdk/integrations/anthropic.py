@@ -147,7 +147,8 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                             elif event.type == "content_block_start":
                                 pass
                             elif event.type == "content_block_delta":
-                                content_blocks.append(event.delta.text)
+                                if hasattr(event.delta, "text"):
+                                    content_blocks.append(event.delta.text)
                             elif event.type == "content_block_stop":
                                 pass
                             elif event.type == "message_delta":
