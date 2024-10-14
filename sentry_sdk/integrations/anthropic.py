@@ -191,14 +191,17 @@ def _wrap_message_create(f):
             return e.value
 
     @wraps(f)
-    @ensure_integration_enabled(AnthropicIntegration, f)
     def _sentry_patched_create_sync(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
+        if integration is None or "messages" not in kwargs:
+            return f(*args, **kwargs)
+
         return _execute_sync(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
 
-  
+
 def _wrap_async_message_create(f):
     # type: (Any) -> Any
     async def _execute_async(f, *args, **kwargs):
@@ -220,10 +223,9 @@ def _wrap_async_message_create(f):
     async def _sentry_patched_create_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
-        
         if integration is None or "messages" not in kwargs:
-            return f(*args, **kwargs)
-        
+            return await f(*args, **kwargs)
+
         return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_create_async

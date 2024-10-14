@@ -227,9 +227,13 @@ def _wrap_chat_completion_create(f):
             return e.value
 
     @wraps(f)
-    @ensure_integration_enabled(OpenAIIntegration, f)
     def _sentry_patched_create_sync(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None or "messages" not in kwargs:
+            # no "messages" means invalid call (in all versions of openai), let it return error
+            return f(*args, **kwargs)
+
         return _execute_sync(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
@@ -253,9 +257,13 @@ def _wrap_async_chat_completion_create(f):
             return e.value
 
     @wraps(f)
-    @ensure_integration_enabled(OpenAIIntegration, f)
     async def _sentry_patched_create_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None or "messages" not in kwargs:
+            # no "messages" means invalid call (in all versions of openai), let it return error
+            return await f(*args, **kwargs)
+
         return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_create_async
@@ -327,9 +335,12 @@ def _wrap_embeddings_create(f):
             return e.value
 
     @wraps(f)
-    @ensure_integration_enabled(OpenAIIntegration, f)
     def _sentry_patched_create_sync(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
         return _execute_sync(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
@@ -353,9 +364,12 @@ def _wrap_async_embeddings_create(f):
             return e.value
 
     @wraps(f)
-    @ensure_integration_enabled(OpenAIIntegration, f)
     async def _sentry_patched_create_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None:
+            return await f(*args, **kwargs)
+
         return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_create_async
