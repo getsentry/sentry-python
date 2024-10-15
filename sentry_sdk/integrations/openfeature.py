@@ -35,10 +35,10 @@ class OpenFeatureIntegration(Integration):
         api.add_hooks(hooks=[OpenFeatureHook()])
 
 
-class OpenFeatureHook(Hook):  # type: ignore
+class OpenFeatureHook(Hook):
 
     def after(self, hook_context, details, hints):
-        # type: (HookContext, FlagEvaluationDetails, HookHints) -> None
+        # type: (HookContext, FlagEvaluationDetails[bool], HookHints) -> None
         if isinstance(details.value, bool):
             flags = sentry_sdk.get_current_scope().flags
             flags.set(details.flag_key, details.value)
