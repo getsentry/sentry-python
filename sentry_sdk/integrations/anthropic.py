@@ -1,4 +1,5 @@
 from functools import wraps
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
@@ -10,8 +11,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
 )
-
-from typing import TYPE_CHECKING
 
 try:
     from anthropic.resources import Messages
@@ -74,6 +73,21 @@ def _calculate_token_usage(result, span):
     record_token_usage(span, input_tokens, output_tokens, total_tokens)
 
 
+def _get_responses(content):
+    # type: (list[Any]) -> list[dict[str, Any]]
+    """Get JSON of a Anthropic responses."""
+    responses = []
+    for item in content:
+        if hasattr(item, "text"):
+            responses.append(
+                {
+                    "type": item.type,
+                    "text": item.text,
+                }
+            )
+    return responses
+
+
 def _wrap_message_create(f):
     # type: (Any) -> Any
     @wraps(f)
@@ -113,18 +127,7 @@ def _wrap_message_create(f):
                 span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
             if hasattr(result, "content"):
                 if should_send_default_pii() and integration.include_prompts:
-                    span.set_data(
-                        SPANDATA.AI_RESPONSES,
-                        list(
-                            map(
-                                lambda message: {
-                                    "type": message.type,
-                                    "text": message.text,
-                                },
-                                result.content,
-                            )
-                        ),
-                    )
+                    span.set_data(SPANDATA.AI_RESPONSES, _get_responses(result.content))
                 _calculate_token_usage(result, span)
                 span.__exit__(None, None, None)
             elif hasattr(result, "_iterator"):
@@ -145,7 +148,8 @@ def _wrap_message_create(f):
                                 elif event.type == "content_block_start":
                                     pass
                                 elif event.type == "content_block_delta":
-                                    content_blocks.append(event.delta.text)
+                                    if hasattr(event.delta, "text"):
+                                        content_blocks.append(event.delta.text)
                                 elif event.type == "content_block_stop":
                                     pass
                                 elif event.type == "message_delta":
