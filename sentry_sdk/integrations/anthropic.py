@@ -154,12 +154,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     )
     span.__enter__()
 
-    try:
-        result = yield f, args, kwargs
-    except Exception as exc:
-        _capture_exception(exc)
-        span.__exit__(None, None, None)
-        raise exc from None
+    result = yield f, args, kwargs
 
     # add data to span and finish it
     messages = list(kwargs["messages"])
@@ -242,7 +237,12 @@ def _wrap_message_create(f):
             return e.value
 
         try:
-            result = f(*args, **kwargs)
+            try:
+                result = f(*args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                raise exc from None
+
             return gen.send(result)
         except StopIteration as e:
             return e.value
@@ -270,7 +270,12 @@ def _wrap_message_create_async(f):
             return await e.value
 
         try:
-            result = await f(*args, **kwargs)
+            try:
+                result = await f(*args, **kwargs)
+            except Exception as exc:
+                _capture_exception(exc)
+                raise exc from None
+
             return gen.send(result)
         except StopIteration as e:
             return e.value
