@@ -138,7 +138,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
         watched_span = None  # type: Optional[WatchedSpan]
         if parent_id:
-            parent_span = self.span_map[parent_id]  # type: Optional[WatchedSpan]
+            parent_span = self.span_map.get(parent_id)  # type: Optional[WatchedSpan]
             if parent_span:
                 watched_span = WatchedSpan(parent_span.span.start_child(**kwargs))
                 parent_span.children.append(watched_span)
