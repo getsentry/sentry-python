@@ -141,12 +141,8 @@ def _new_chat_completion_common(f, *args, **kwargs):
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
-    try:
-        res = yield f, args, kwargs
-    except Exception as e:
-        _capture_exception(e)
-        span.__exit__(None, None, None)
-        raise e from None
+
+    res = yield f, args, kwargs
 
     with capture_internal_exceptions():
         if should_send_default_pii() and integration.include_prompts:
@@ -223,7 +219,12 @@ def _wrap_chat_completion_create(f):
             return e.value
 
         try:
-            result = f(*args, **kwargs)
+            try:
+                result = f(*args, **kwargs)
+            except Exception as e:
+                _capture_exception(e)
+                raise e from None
+
             return gen.send(result)
         except StopIteration as e:
             return e.value
@@ -253,7 +254,12 @@ def _wrap_async_chat_completion_create(f):
             return await e.value
 
         try:
-            result = await f(*args, **kwargs)
+            try:
+                result = await f(*args, **kwargs)
+            except Exception as e:
+                _capture_exception(e)
+                raise e from None
+
             return gen.send(result)
         except StopIteration as e:
             return e.value
@@ -334,7 +340,12 @@ def _wrap_embeddings_create(f):
             return e.value
 
         try:
-            result = f(*args, **kwargs)
+            try:
+                result = f(*args, **kwargs)
+            except Exception as e:
+                _capture_exception(e)
+                raise e from None
+
             return gen.send(result)
         except StopIteration as e:
             return e.value
@@ -363,7 +374,12 @@ def _wrap_async_embeddings_create(f):
             return await e.value
 
         try:
-            result = await f(*args, **kwargs)
+            try:
+                result = await f(*args, **kwargs)
+            except Exception as e:
+                _capture_exception(e)
+                raise e from None
+
             return gen.send(result)
         except StopIteration as e:
             return e.value
