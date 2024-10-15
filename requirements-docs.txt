@@ -1,5 +1,5 @@
 gevent
 shibuya
-sphinx==8.1.3
+sphinx
 sphinx-autodoc-typehints[type_comments]>=1.8.0
 typing-extensions

@@ -8,6 +8,8 @@ import sphinx.builders.html
 import sphinx.builders.latex
 import sphinx.builders.texinfo
 import sphinx.builders.text
+import sphinx.domains.c  # noqa: F401
+import sphinx.domains.cpp  # noqa: F401
 import sphinx.ext.autodoc  # noqa: F401
 import urllib3.exceptions  # noqa: F401
 
