@@ -45,7 +45,7 @@ class AnthropicIntegration(Integration):
             raise DidNotEnable("anthropic 0.16 or newer required.")
 
         Messages.create = _wrap_message_create(Messages.create)
-        AsyncMessages.create = _wrap_async_message_create(AsyncMessages.create)
+        AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
 
 
 def _capture_exception(exc):
@@ -254,7 +254,7 @@ def _wrap_message_create(f):
     return _sentry_patched_create_sync
 
 
-def _wrap_async_message_create(f):
+def _wrap_message_create_async(f):
     # type: (Any) -> Any
     async def _execute_async(f, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
