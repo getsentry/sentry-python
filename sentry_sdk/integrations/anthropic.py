@@ -21,7 +21,7 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Iterator
+    from typing import Any, Iterator, AsyncIterator
     from sentry_sdk.tracing import Span
 
 
@@ -140,8 +140,8 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         elif hasattr(result, "_iterator"):
             old_iterator = result._iterator
 
-            async def async_new_iterator():
-                # type: () -> Iterator[MessageStreamEvent]
+            async def new_iterator_async():
+                # type: () -> AsyncIterator[MessageStreamEvent]
                 input_tokens = 0
                 output_tokens = 0
                 content_blocks = []
@@ -214,7 +214,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 span.__exit__(None, None, None)
 
             if str(type(result._iterator)) == "<class 'async_generator'>":
-                result._iterator = async_new_iterator()
+                result._iterator = new_iterator_async()
             else:
                 result._iterator = new_iterator()
 
