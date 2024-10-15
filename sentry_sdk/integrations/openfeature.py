@@ -35,7 +35,7 @@ class OpenFeatureIntegration(Integration):
         api.add_hooks(hooks=[OpenFeatureHook()])
 
 
-class OpenFeatureHook(Hook):
+class OpenFeatureHook(Hook):  # type: ignore
 
     def after(self, hook_context, details, hints):
         # type: (HookContext, FlagEvaluationDetails, HookHints) -> None
