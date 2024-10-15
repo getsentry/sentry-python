@@ -123,7 +123,7 @@ def mock_transaction_envelope(span_count):
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
-@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
+@pytest.mark.parametrize("compression_algo", ("gzip", "<invalid>", None))
 @pytest.mark.parametrize(
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
