@@ -125,7 +125,7 @@ def setup_integrations(
     with_auto_enabling_integrations=False,
     disabled_integrations=None,
 ):
-    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Union[type, Integration]]]) -> Dict[str, Integration]
+    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Union[type[Integration], Integration]]]) -> Dict[str, Integration]
     """
     Given a list of integration instances, this installs them all.
 
