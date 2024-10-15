@@ -92,7 +92,7 @@ def _get_responses(content):
 
 def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
     """
-    Count token usage and collect content blocks from the AI stream.
+    Count token usage and collect content blocks from the AI streaming response.
     """
     with capture_internal_exceptions():
         if hasattr(event, "type"):
@@ -115,7 +115,7 @@ def _add_ai_data_to_span(
     span, integration, content_blocks, input_tokens, output_tokens
 ):
     """
-    Add token usage and content blocks to the span.
+    Add token usage and content blocks from the AI streaming response to the span.
     """
     with capture_internal_exceptions():
         if should_send_default_pii() and integration.include_prompts:
@@ -174,6 +174,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
             _calculate_token_usage(result, span)
             span.__exit__(None, None, None)
 
+        # Streaming response
         elif hasattr(result, "_iterator"):
             old_iterator = result._iterator
 
