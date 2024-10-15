@@ -689,7 +689,7 @@ class Scope:
 
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id = None  # type: Optional[str]
-        self._flags = None
+        self._flags = None  # type: Optional[FlagBuffer]
 
     @_attr_setter
     def level(self, value):

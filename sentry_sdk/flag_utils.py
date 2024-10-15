@@ -1,6 +1,12 @@
 from copy import copy
+from typing import TYPE_CHECKING
 
 import itertools
+
+if TYPE_CHECKING:
+    from typing import TypedDict
+
+    FlagData = TypedDict("FlagData", {"flag": str, "result": bool})
 
 
 class FlagBuffer:
@@ -13,9 +19,11 @@ class FlagBuffer:
 
     @property
     def index(self):
+        # type: () -> int
         return self.ip % self.capacity
 
     def clear(self):
+        # type: () -> None
         self.buffer = []
         self.ip = 0
 
@@ -27,7 +35,7 @@ class FlagBuffer:
         return buffer
 
     def get(self):
-        # type: () -> list[dict]
+        # type: () -> list[FlagData]
         if self.ip >= self.capacity:
             iterator = itertools.chain(
                 range(self.index, self.capacity), range(0, self.index)
@@ -58,5 +66,5 @@ class Flag:
 
     @property
     def asdict(self):
-        # type: () -> dict
+        # type: () -> FlagData
         return {"flag": self.flag, "result": self.result}
