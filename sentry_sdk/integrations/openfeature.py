@@ -6,12 +6,12 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 try:
     from openfeature import api
     from openfeature.hook import Hook
-    from sentry_sdk._types import Event, ExcInfo
-    from typing import Optional
 
     if TYPE_CHECKING:
         from openfeature.flag_evaluation import FlagEvaluationDetails
         from openfeature.hook import HookContext, HookHints
+        from sentry_sdk._types import Event, ExcInfo
+        from typing import Optional
 except ImportError:
     raise DidNotEnable("OpenFeature is not installed")
 
