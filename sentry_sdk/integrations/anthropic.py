@@ -91,7 +91,7 @@ def _get_responses(content):
 
 
 def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
-    # type: (MessageStreamEvent, int, int, list[str]) -> None
+    # type: (MessageStreamEvent, int, int, list[str]) -> tuple[int, int, list[str]]
     """
     Count token usage and collect content blocks from the AI streaming response.
     """
@@ -111,7 +111,8 @@ def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
             elif event.type == "message_delta":
                 output_tokens += event.usage.output_tokens
 
-    return input_tokens, output_tokens, content_blocks                
+    return input_tokens, output_tokens, content_blocks
+
 
 def _add_ai_data_to_span(
     span, integration, input_tokens, output_tokens, content_blocks
@@ -188,7 +189,9 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 content_blocks = []  # type: list[str]
 
                 for event in old_iterator:
-                    input_tokens, output_tokens, content_blocks = _collect_ai_data(event, input_tokens, output_tokens, content_blocks)
+                    input_tokens, output_tokens, content_blocks = _collect_ai_data(
+                        event, input_tokens, output_tokens, content_blocks
+                    )
                     if event.type != "message_stop":
                         yield event
 
@@ -204,7 +207,9 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 content_blocks = []  # type: list[str]
 
                 async for event in old_iterator:
-                    input_tokens, output_tokens, content_blocks = _collect_ai_data(event, input_tokens, output_tokens, content_blocks)
+                    input_tokens, output_tokens, content_blocks = _collect_ai_data(
+                        event, input_tokens, output_tokens, content_blocks
+                    )
                     if event.type != "message_stop":
                         yield event
 
