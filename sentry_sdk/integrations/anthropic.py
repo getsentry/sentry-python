@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 )
 
 try:
-    from anthropic.resources import Messages, AsyncMessages
+    from anthropic.resources import AsyncMessages, Messages
 
     if TYPE_CHECKING:
         from anthropic.types import MessageStreamEvent
@@ -21,7 +21,7 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Iterator, AsyncIterator
+    from typing import Any, AsyncIterator, Iterator
     from sentry_sdk.tracing import Span
 
 
@@ -91,6 +91,7 @@ def _get_responses(content):
 
 
 def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
+    # type: (MessageStreamEvent, int, int, list[str]) -> None
     """
     Count token usage and collect content blocks from the AI streaming response.
     """
@@ -112,8 +113,9 @@ def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
 
 
 def _add_ai_data_to_span(
-    span, integration, content_blocks, input_tokens, output_tokens
+    span, integration, input_tokens, output_tokens, content_blocks
 ):
+    # type: (Span, AnthropicIntegration, int, int, list[str]) -> None
     """
     Add token usage and content blocks from the AI streaming response to the span.
     """
@@ -182,7 +184,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 # type: () -> Iterator[MessageStreamEvent]
                 input_tokens = 0
                 output_tokens = 0
-                content_blocks = []
+                content_blocks = []  # type: list[str]
 
                 for event in old_iterator:
                     _collect_ai_data(event, input_tokens, output_tokens, content_blocks)
@@ -190,7 +192,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                         yield event
 
                 _add_ai_data_to_span(
-                    span, integration, content_blocks, input_tokens, output_tokens
+                    span, integration, input_tokens, output_tokens, content_blocks
                 )
                 span.__exit__(None, None, None)
 
@@ -198,7 +200,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 # type: () -> AsyncIterator[MessageStreamEvent]
                 input_tokens = 0
                 output_tokens = 0
-                content_blocks = []
+                content_blocks = []  # type: list[str]
 
                 async for event in old_iterator:
                     _collect_ai_data(event, input_tokens, output_tokens, content_blocks)
@@ -206,7 +208,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                         yield event
 
                 _add_ai_data_to_span(
-                    span, integration, content_blocks, input_tokens, output_tokens
+                    span, integration, input_tokens, output_tokens, content_blocks
                 )
                 span.__exit__(None, None, None)
 
