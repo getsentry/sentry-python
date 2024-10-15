@@ -1,5 +1,14 @@
 from unittest import mock
 
+try:
+    from unittest.mock import AsyncMock
+except ImportError:
+
+    class AsyncMock(mock.MagicMock):
+        async def __call__(self, *args, **kwargs):
+            return super(AsyncMock, self).__call__(*args, **kwargs)
+
+
 import pytest
 from anthropic import AsyncAnthropic, Anthropic, AnthropicError, AsyncStream, Stream
 from anthropic.types import MessageDeltaUsage, TextDelta, Usage
@@ -140,7 +149,7 @@ async def test_nonstreaming_create_message_async(
     )
     events = capture_events()
     client = AsyncAnthropic(api_key="z")
-    client.messages._post = mock.AsyncMock(return_value=EXAMPLE_MESSAGE)
+    client.messages._post = AsyncMock(return_value=EXAMPLE_MESSAGE)
 
     messages = [
         {
@@ -344,7 +353,7 @@ async def test_streaming_create_message_async(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = mock.AsyncMock(return_value=returned_stream)
+    client.messages._post = AsyncMock(return_value=returned_stream)
 
     messages = [
         {
@@ -611,7 +620,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         send_default_pii=send_default_pii,
     )
     events = capture_events()
-    client.messages._post = mock.AsyncMock(return_value=returned_stream)
+    client.messages._post = AsyncMock(return_value=returned_stream)
 
     messages = [
         {
@@ -683,7 +692,7 @@ async def test_exception_message_create_async(sentry_init, capture_events):
     events = capture_events()
 
     client = AsyncAnthropic(api_key="z")
-    client.messages._post = mock.AsyncMock(
+    client.messages._post = AsyncMock(
         side_effect=AnthropicError("API rate limit reached")
     )
     with pytest.raises(AnthropicError):
@@ -732,7 +741,7 @@ async def test_span_origin_async(sentry_init, capture_events):
     events = capture_events()
 
     client = AsyncAnthropic(api_key="z")
-    client.messages._post = mock.AsyncMock(return_value=EXAMPLE_MESSAGE)
+    client.messages._post = AsyncMock(return_value=EXAMPLE_MESSAGE)
 
     messages = [
         {
