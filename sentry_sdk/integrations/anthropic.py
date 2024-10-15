@@ -90,6 +90,8 @@ def _get_responses(content):
 
 def _sentry_patched_create_common(f, *args, **kwargs):
     # type: (Any, *Any, **Any) -> Any
+
+    # check requirements
     integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
     if integration is None:
         return f(*args, **kwargs)
@@ -102,9 +104,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     except TypeError:
         return f(*args, **kwargs)
 
-    messages = list(kwargs["messages"])
-    model = kwargs.get("model")
-
+    # start span
     span = sentry_sdk.start_span(
         op=OP.ANTHROPIC_MESSAGES_CREATE,
         description="Anthropic messages create",
@@ -112,6 +112,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     )
     span.__enter__()
 
+    # yield generator
     try:
         result = yield f, args, kwargs
     except Exception as exc:
@@ -119,18 +120,62 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         span.__exit__(None, None, None)
         raise exc from None
 
+    # add data to span and finish it
+    messages = list(kwargs["messages"])
+    model = kwargs.get("model")
+
     with capture_internal_exceptions():
         span.set_data(SPANDATA.AI_MODEL_ID, model)
         span.set_data(SPANDATA.AI_STREAMING, False)
+
         if should_send_default_pii() and integration.include_prompts:
             span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
+            
         if hasattr(result, "content"):
             if should_send_default_pii() and integration.include_prompts:
                 span.set_data(SPANDATA.AI_RESPONSES, _get_responses(result.content))
             _calculate_token_usage(result, span)
             span.__exit__(None, None, None)
+
         elif hasattr(result, "_iterator"):
             old_iterator = result._iterator
+
+            async def async_new_iterator():
+                # type: () -> Iterator[MessageStreamEvent]
+                input_tokens = 0
+                output_tokens = 0
+                content_blocks = []
+                with capture_internal_exceptions():
+                    async for event in old_iterator:
+                        if hasattr(event, "type"):
+                            if event.type == "message_start":
+                                usage = event.message.usage
+                                input_tokens += usage.input_tokens
+                                output_tokens += usage.output_tokens
+                            elif event.type == "content_block_start":
+                                pass
+                            elif event.type == "content_block_delta":
+                                if hasattr(event.delta, "text"):
+                                    content_blocks.append(event.delta.text)
+                            elif event.type == "content_block_stop":
+                                pass
+                            elif event.type == "message_delta":
+                                output_tokens += event.usage.output_tokens
+                            elif event.type == "message_stop":
+                                continue
+
+                        yield event
+
+                    if should_send_default_pii() and integration.include_prompts:
+                        complete_message = "".join(content_blocks)
+                        span.set_data(
+                            SPANDATA.AI_RESPONSES,
+                            [{"type": "text", "text": complete_message}],
+                        )
+                    total_tokens = input_tokens + output_tokens
+                    record_token_usage(span, input_tokens, output_tokens, total_tokens)
+                    span.set_data(SPANDATA.AI_STREAMING, True)
+                span.__exit__(None, None, None)
 
             def new_iterator():
                 # type: () -> Iterator[MessageStreamEvent]
@@ -168,7 +213,11 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     span.set_data(SPANDATA.AI_STREAMING, True)
                 span.__exit__(None, None, None)
 
-            result._iterator = new_iterator()
+            if str(type(result._iterator)) == "<class 'async_generator'>":
+                result._iterator = async_new_iterator()
+            else:
+                result._iterator = new_iterator()
+
         else:
             span.set_data("unknown_response", True)
             span.__exit__(None, None, None)
