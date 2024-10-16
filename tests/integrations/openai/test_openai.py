@@ -457,6 +457,61 @@ async def test_embeddings_create_async(
     assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
 
 
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [(True, True), (True, False), (False, True), (False, False)],
+)
+def test_embeddings_create_raises_error(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+
+    client.embeddings._post = mock.Mock(
+        side_effect=OpenAIError("API rate limit reached")
+    )
+
+    with pytest.raises(OpenAIError):
+        client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+    (event,) = events
+    assert event["level"] == "error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [(True, True), (True, False), (False, True), (False, False)],
+)
+async def test_embeddings_create_raises_error_async(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+
+    client.embeddings._post = AsyncMock(
+        side_effect=OpenAIError("API rate limit reached")
+    )
+
+    with pytest.raises(OpenAIError):
+        await client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+    (event,) = events
+    assert event["level"] == "error"
+
+
 def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
     sentry_init(
         integrations=[OpenAIIntegration()],

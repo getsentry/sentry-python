@@ -339,11 +339,7 @@ def _new_embeddings_create_common(f, *args, **kwargs):
         if "model" in kwargs:
             set_data_normalized(span, "ai.model_id", kwargs["model"])
 
-        try:
-            response = yield f, args, kwargs
-        except Exception as e:
-            _capture_exception(e)
-            raise e from None
+        response = yield f, args, kwargs
 
         prompt_tokens = 0
         total_tokens = 0
