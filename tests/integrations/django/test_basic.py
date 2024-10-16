@@ -8,7 +8,6 @@ from unittest.mock import patch
 from werkzeug.test import Client
 
 from django import VERSION as DJANGO_VERSION
-from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
@@ -288,6 +287,9 @@ def test_user_captured(sentry_init, client, capture_events):
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
+
+    from django.contrib.auth.models import User
+
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
 
     try:
@@ -374,7 +376,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
         crumb = event["breadcrumbs"]["values"][-1]
 
         assert crumb["message"] == "SELECT count(*) FROM people_person WHERE foo = %s"
-        assert crumb["data"]["db.params"] == [123]
+        assert crumb["data"]["db.params"] == "[123]"
 
 
 @pytest.mark.forked
@@ -409,7 +411,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
     )
-    assert crumb["data"]["db.params"] == {"my_foo": 10}
+    assert crumb["data"]["db.params"] == str({"my_foo": 10})
 
 
 @pytest.mark.forked
@@ -471,7 +473,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     (event,) = events
     crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
-    assert crumb["data"]["db.params"] == {"my_param": 10}
+    assert crumb["data"]["db.params"] == str({"my_param": 10})
 
 
 @pytest.mark.forked
@@ -524,7 +526,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
         {
             "category": "query",
             "data": {
-                "db.params": {"first_var": "fizz", "second_var": "not a date"},
+                "db.params": str({"first_var": "fizz", "second_var": "not a date"}),
                 "db.paramstyle": "format",
             },
             "message": 'insert into my_test_table ("foo", "bar") values (%(first_var)s, '
@@ -927,6 +929,11 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         client.get(url)
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
+
+        render_span = next(
+            span for span in transaction["spans"] if span["op"] == "template.render"
+        )
+        assert "context.user_age" in render_span["data"]
 
 
 if DJANGO_VERSION >= (1, 10):
