@@ -66,6 +66,7 @@ setup(
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
+        "openfeature": ["openfeature-sdk>=0.7.3"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": ["opentelemetry-distro"],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
@@ -78,7 +79,6 @@ setup(
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
         "tornado": ["tornado>=6"],
-        "openfeature": ["openfeature-sdk>=0.7.3"],
     },
     entry_points={
         "opentelemetry_propagator": [
