@@ -828,9 +828,9 @@ def test_calculate_chat_completion_usage_d():
     response.usage.prompt_tokens = 20
     response.usage.total_tokens = 20
     response.choices = [
-        mock.MagicMock(messge="one"),
-        mock.MagicMock(messge="two"),
-        mock.MagicMock(messge="three"),
+        mock.MagicMock(message="one"),
+        mock.MagicMock(message="two"),
+        mock.MagicMock(message="three"),
     ]
     messages = []
     streaming_message_responses = []
