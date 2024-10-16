@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
 
-from sentry_sdk.utils import logger, env_to_bool
+from sentry_sdk.utils import logger, env_to_bool, capture_internal_exceptions
 from sentry_sdk.envelope import Envelope
 
 
@@ -120,13 +120,11 @@ def setup_spotlight(options):
         and settings.DEBUG
         and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1"))
     ):
-        try:
+        with capture_internal_exceptions():
             middleware = settings.MIDDLEWARE
             if DJANGO_SPOTLIGHT_MIDDLEWARE_PATH not in middleware:
                 settings.MIDDLEWARE = type(middleware)(
                     chain(middleware, (DJANGO_SPOTLIGHT_MIDDLEWARE_PATH,))
                 )
-        except Exception as err:
-            logger.error("Cannot inject Spotlight middleware", exc_info=err)
 
     return SpotlightClient(url)
