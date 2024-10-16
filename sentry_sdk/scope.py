@@ -251,7 +251,7 @@ class Scope:
 
         rv._last_event_id = self._last_event_id
 
-        rv._flags = self.flags.copy()
+        rv._flags = copy(self._flags)
 
         return rv
 

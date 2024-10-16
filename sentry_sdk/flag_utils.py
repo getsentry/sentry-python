@@ -27,7 +27,7 @@ class FlagBuffer:
         self.buffer = []
         self.ip = 0
 
-    def copy(self):
+    def __copy__(self):
         # type: () -> FlagBuffer
         buffer = FlagBuffer(capacity=self.capacity)
         buffer.buffer = copy(self.buffer)
@@ -63,6 +63,9 @@ class Flag:
         # type: (str, bool) -> None
         self.flag = flag
         self.result = result
+
+    def __copy__(self):
+        return Flag(self.flag, self.result)
 
     @property
     def asdict(self):
