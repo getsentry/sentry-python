@@ -7,7 +7,10 @@ from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as Delta
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
 from sentry_sdk import start_transaction
-from sentry_sdk.integrations.openai import OpenAIIntegration
+from sentry_sdk.integrations.openai import (
+    OpenAIIntegration,
+    _calculate_chat_completion_usage,
+)
 
 from unittest import mock  # python 3.3 and above
 
@@ -737,3 +740,124 @@ async def test_span_origin_embeddings_async(sentry_init, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.ai.openai"
+
+
+def test_calculate_chat_completion_usage_a():
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.completion_tokens = 10
+    response.usage.prompt_tokens = 20
+    response.usage.total_tokens = 30
+    messages = []
+    streaming_message_responses = []
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_chat_completion_usage(
+            messages, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(span, 20, 10, 30)
+
+
+def test_calculate_chat_completion_usage_b():
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.completion_tokens = 10
+    response.usage.total_tokens = 10
+    messages = [
+        {"content": "one"},
+        {"content": "two"},
+        {"content": "three"},
+    ]
+    streaming_message_responses = []
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_chat_completion_usage(
+            messages, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(span, 11, 10, 10)
+
+
+def test_calculate_chat_completion_usage_c():
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.prompt_tokens = 20
+    response.usage.total_tokens = 20
+    messages = []
+    streaming_message_responses = [
+        "one",
+        "two",
+        "three",
+    ]
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_chat_completion_usage(
+            messages, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(span, 20, 11, 20)
+
+
+def test_calculate_chat_completion_usage_d():
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    response.usage = mock.MagicMock()
+    response.usage.prompt_tokens = 20
+    response.usage.total_tokens = 20
+    response.choices = [
+        mock.MagicMock(messge="one"),
+        mock.MagicMock(messge="two"),
+        mock.MagicMock(messge="three"),
+    ]
+    messages = []
+    streaming_message_responses = []
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_chat_completion_usage(
+            messages, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(span, 20, None, 20)
+
+
+def test_calculate_chat_completion_usage_e():
+    span = mock.MagicMock()
+
+    def count_tokens(msg):
+        return len(str(msg))
+
+    response = mock.MagicMock()
+    messages = []
+    streaming_message_responses = None
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.record_token_usage"
+    ) as mock_record_token_usage:
+        _calculate_chat_completion_usage(
+            messages, response, span, streaming_message_responses, count_tokens
+        )
+        mock_record_token_usage.assert_called_once_with(span, None, None, None)
