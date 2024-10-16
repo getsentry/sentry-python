@@ -15,7 +15,7 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Iterable, List, Optional, Callable, Iterator
+    from typing import Any, Iterable, List, Optional, Callable, AsyncIterator, Iterator
     from sentry_sdk.tracing import Span
 
 try:
@@ -165,7 +165,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
         elif hasattr(res, "_iterator"):
             data_buf: list[list[str]] = []  # one for each choice
 
-            old_iterator = res._iterator  # type: Iterator[ChatCompletionChunk]
+            old_iterator = res._iterator
 
             def new_iterator():
                 # type: () -> Iterator[ChatCompletionChunk]
@@ -200,7 +200,44 @@ def _new_chat_completion_common(f, *args, **kwargs):
                         )
                 span.__exit__(None, None, None)
 
-            res._iterator = new_iterator()
+            async def new_iterator_async():
+                # type: () -> AsyncIterator[ChatCompletionChunk]
+                with capture_internal_exceptions():
+                    async for x in old_iterator:
+                        if hasattr(x, "choices"):
+                            choice_index = 0
+                            for choice in x.choices:
+                                if hasattr(choice, "delta") and hasattr(
+                                    choice.delta, "content"
+                                ):
+                                    content = choice.delta.content
+                                    if len(data_buf) <= choice_index:
+                                        data_buf.append([])
+                                    data_buf[choice_index].append(content or "")
+                                choice_index += 1
+                        yield x
+                    if len(data_buf) > 0:
+                        all_responses = list(
+                            map(lambda chunk: "".join(chunk), data_buf)
+                        )
+                        if should_send_default_pii() and integration.include_prompts:
+                            set_data_normalized(
+                                span, SPANDATA.AI_RESPONSES, all_responses
+                            )
+                        _calculate_chat_completion_usage(
+                            messages,
+                            res,
+                            span,
+                            all_responses,
+                            integration.count_tokens,
+                        )
+                span.__exit__(None, None, None)
+
+            if str(type(res._iterator)) == "<class 'async_generator'>":
+                res._iterator = new_iterator_async()
+            else:
+                res._iterator = new_iterator()
+
         else:
             set_data_normalized(span, "unknown_response", True)
             span.__exit__(None, None, None)
