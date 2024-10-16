@@ -65,6 +65,7 @@ class Flag:
         self.result = result
 
     def __copy__(self):
+        # type: () -> Flag
         return Flag(self.flag, self.result)
 
     @property
