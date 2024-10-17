@@ -37,15 +37,6 @@ from sentry_sdk.utils import (
     AnnotatedValue,
 )
 
-try:
-    import asyncio
-
-    from aiohttp import __version__ as AIOHTTP_VERSION
-    from aiohttp import ClientSession, TraceConfig
-    from aiohttp.web import Application, HTTPException, UrlDispatcher
-except ImportError:
-    raise DidNotEnable("AIOHTTP not installed")
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -70,6 +61,7 @@ TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
     origin = f"auto.http.{identifier}"
+    required_imports = ("asyncio", "aiohttp", "aiohttp.web")
 
     def __init__(
         self,
@@ -89,6 +81,9 @@ class AioHttpIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        from aiohttp import __version__ as AIOHTTP_VERSION
+        from aiohttp.web import Application
 
         version = parse_version(AIOHTTP_VERSION)
 
@@ -142,7 +137,7 @@ class AioHttpIntegration(Integration):
                     ):
                         try:
                             response = await old_handle(self, request)
-                        except HTTPException as e:
+                        except aiohttp.web.HTTPException as e:
                             transaction.set_http_status(e.status_code)
 
                             if (
@@ -175,11 +170,11 @@ class AioHttpIntegration(Integration):
 
         Application._handle = sentry_app_handle
 
-        old_urldispatcher_resolve = UrlDispatcher.resolve
+        old_urldispatcher_resolve = aiohttp.web.UrlDispatcher.resolve
 
         @wraps(old_urldispatcher_resolve)
         async def sentry_urldispatcher_resolve(self, request):
-            # type: (UrlDispatcher, Request) -> UrlMappingMatchInfo
+            # type: (aiohttp.web.UrlDispatcher, Request) -> UrlMappingMatchInfo
             rv = await old_urldispatcher_resolve(self, request)
 
             integration = sentry_sdk.get_client().get_integration(AioHttpIntegration)
