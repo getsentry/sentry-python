@@ -491,6 +491,8 @@ def patch_request_response():
 
                 if sentry_scope.profile is not None:
                     sentry_scope.profile.update_active_thread_id()
+                if sentry_scope.transaction is not None:
+                    sentry_scope.transaction.update_active_thread()
 
                 request = args[0]
 
