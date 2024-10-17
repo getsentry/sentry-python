@@ -31,13 +31,18 @@ try:
     from strawberry import Schema
     from strawberry.extensions import SchemaExtension  # type: ignore
     from strawberry.extensions.tracing.utils import should_skip_tracing as strawberry_should_skip_tracing  # type: ignore
+    from strawberry.http import async_base_view, sync_base_view  # type: ignore
+except ImportError:
+    raise DidNotEnable("strawberry-graphql is not installed")
+
+try:
     from strawberry.extensions.tracing import (  # type: ignore
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
-    from strawberry.http import async_base_view, sync_base_view  # type: ignore
 except ImportError:
-    raise DidNotEnable("strawberry-graphql is not installed")
+    StrawberrySentryAsyncExtension = None
+    StrawberrySentrySyncExtension = None
 
 from typing import TYPE_CHECKING
 
