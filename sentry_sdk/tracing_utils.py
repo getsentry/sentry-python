@@ -1,13 +1,14 @@
 import contextlib
 import inspect
+import json
 import os
 import re
 import sys
+import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import quote, unquote
-import uuid
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -133,13 +134,13 @@ def record_sql_queries(
 
     data = {}
     if params_list is not None:
-        data["db.params"] = str(params_list)
+        data["db.params"] = json.dumps(params_list)
     if paramstyle is not None:
-        data["db.paramstyle"] = str(paramstyle)
+        data["db.paramstyle"] = json.dumps(paramstyle)
     if executemany:
         data["db.executemany"] = True
     if record_cursor_repr and cursor is not None:
-        data["db.cursor"] = str(cursor)
+        data["db.cursor"] = json.dumps(cursor)
 
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)

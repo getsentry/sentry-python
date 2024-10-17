@@ -5,6 +5,8 @@ docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=2
 ```
 """
 
+import json
+
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 
@@ -16,7 +18,7 @@ EXPECT_PARAMS_IN_SELECT = True
 if clickhouse_driver.VERSION < (0, 2, 6):
     EXPECT_PARAMS_IN_SELECT = False
 
-PARAMS_SERIALIZER = str
+PARAMS_SERIALIZER = json.dumps
 
 
 def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:

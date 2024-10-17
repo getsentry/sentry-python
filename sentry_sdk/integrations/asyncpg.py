@@ -1,5 +1,6 @@
 from __future__ import annotations
 import contextlib
+import json
 from typing import Any, TypeVar, Callable, Awaitable, Iterator
 
 import sentry_sdk
@@ -147,7 +148,7 @@ def _wrap_cursor_creation(f: Callable[..., T]) -> Callable[..., T]:
         ) as span:
             _set_db_data(span, args[0])
             res = f(*args, **kwargs)
-            span.set_attribute("db.cursor", str(res))
+            span.set_attribute("db.cursor", json.dumps(res))
 
         return res
 
