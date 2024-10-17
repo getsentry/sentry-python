@@ -14,11 +14,6 @@ import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
-try:
-    import gevent
-except ImportError:
-    gevent = None
-
 import sentry_sdk
 from sentry_sdk import (
     Client,
