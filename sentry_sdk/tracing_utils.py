@@ -1,6 +1,5 @@
 import contextlib
 import inspect
-import json
 import os
 import re
 import sys
@@ -24,6 +23,7 @@ from sentry_sdk.utils import (
     _is_external_source,
     _is_in_project_root,
     _module_in_list,
+    _serialize_span_attribute,
 )
 
 from typing import TYPE_CHECKING
@@ -134,13 +134,13 @@ def record_sql_queries(
 
     data = {}
     if params_list is not None:
-        data["db.params"] = json.dumps(params_list)
+        data["db.params"] = _serialize_span_attribute(params_list)
     if paramstyle is not None:
-        data["db.paramstyle"] = json.dumps(paramstyle)
+        data["db.paramstyle"] = _serialize_span_attribute(paramstyle)
     if executemany:
         data["db.executemany"] = True
     if record_cursor_repr and cursor is not None:
-        data["db.cursor"] = json.dumps(cursor)
+        data["db.cursor"] = _serialize_span_attribute(cursor)
 
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)

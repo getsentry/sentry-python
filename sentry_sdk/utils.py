@@ -1843,10 +1843,10 @@ def _serialize_span_attribute(value):
         return value
 
     # lists are allowed too, as long as they don't mix types
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         for type_ in (int, str, float, bool):
             if all(isinstance(item, type_) for item in value):
-                return value
+                return list(value)
 
     # if this is anything else, just try to coerce to string
     # we prefer json.dumps since this makes things like dictionaries display
