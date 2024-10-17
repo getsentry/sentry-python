@@ -21,7 +21,7 @@ def _get_headers(asgi_scope):
     Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
     """
     headers = {}  # type: Dict[str, str]
-    for raw_key, raw_value in asgi_scope["headers"]:
+    for raw_key, raw_value in asgi_scope.get("headers", {}):
         key = raw_key.decode("latin-1")
         value = raw_value.decode("latin-1")
         if key in headers:

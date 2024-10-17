@@ -8,7 +8,6 @@ from unittest.mock import patch
 from werkzeug.test import Client
 
 from django import VERSION as DJANGO_VERSION
-from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
@@ -288,6 +287,9 @@ def test_user_captured(sentry_init, client, capture_events):
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
+
+    from django.contrib.auth.models import User
+
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
 
     try:
@@ -409,7 +411,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
     )
-    assert crumb["data"]["db.params"] == {"my_foo": 10}
+    assert crumb["data"]["db.params"] == '{"my_foo": 10}'
 
 
 @pytest.mark.forked
@@ -471,7 +473,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     (event,) = events
     crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
-    assert crumb["data"]["db.params"] == {"my_param": 10}
+    assert crumb["data"]["db.params"] == '{"my_param": 10}'
 
 
 @pytest.mark.forked
@@ -524,7 +526,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
         {
             "category": "query",
             "data": {
-                "db.params": {"first_var": "fizz", "second_var": "not a date"},
+                "db.params": '{"first_var": "fizz", "second_var": "not a date"}',
                 "db.paramstyle": "format",
             },
             "message": 'insert into my_test_table ("foo", "bar") values (%(first_var)s, '
@@ -928,6 +930,11 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
 
+        render_span = next(
+            span for span in transaction["spans"] if span["op"] == "template.render"
+        )
+        assert "context.user_age" in render_span["data"]
+
 
 if DJANGO_VERSION >= (1, 10):
     EXPECTED_MIDDLEWARE_SPANS = """\
@@ -1113,6 +1120,9 @@ def test_csrf(sentry_init, client):
     assert content == b"ok"
 
 
+# This test is forked because it doesn't clean up after itself properly and makes
+# other tests fail to resolve routes
+@pytest.mark.forked
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 def test_custom_urlconf_middleware(
     settings, sentry_init, client, capture_events, render_span_tree
@@ -1202,14 +1212,19 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     By default OPTIONS and HEAD requests do not create a transaction.
     """
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get(reverse("nomessage"))
+    client.options(reverse("nomessage"))
+    client.head(reverse("nomessage"))
 
     (event,) = events
 
@@ -1225,15 +1240,17 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
                     "OPTIONS",
                     "head",
                 ),  # capitalization does not matter
+                middleware_spans=False,
+                signals_spans=False,
             )
         ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get(reverse("nomessage"))
+    client.options(reverse("nomessage"))
+    client.head(reverse("nomessage"))
 
     assert len(events) == 2
 

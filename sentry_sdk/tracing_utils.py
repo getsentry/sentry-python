@@ -3,11 +3,11 @@ import inspect
 import os
 import re
 import sys
+import uuid
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from urllib.parse import quote, unquote
-import uuid
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -23,6 +23,7 @@ from sentry_sdk.utils import (
     _is_external_source,
     _is_in_project_root,
     _module_in_list,
+    _serialize_span_attribute,
 )
 
 from typing import TYPE_CHECKING
@@ -114,7 +115,7 @@ def record_sql_queries(
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
     record_cursor_repr=False,  # type: bool
-    span_origin="manual",  # type: str
+    span_origin=None,  # type: Optional[str]
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
@@ -133,13 +134,13 @@ def record_sql_queries(
 
     data = {}
     if params_list is not None:
-        data["db.params"] = params_list
+        data["db.params"] = _serialize_span_attribute(params_list)
     if paramstyle is not None:
-        data["db.paramstyle"] = paramstyle
+        data["db.paramstyle"] = _serialize_span_attribute(paramstyle)
     if executemany:
         data["db.executemany"] = True
     if record_cursor_repr and cursor is not None:
-        data["db.cursor"] = cursor
+        data["db.cursor"] = _serialize_span_attribute(cursor)
 
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
@@ -209,14 +210,17 @@ def add_query_source(span):
     if not client.is_active():
         return
 
-    if span.timestamp is None or span.start_timestamp is None:
+    if span.start_timestamp is None:
         return
 
     should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
-    duration = span.timestamp - span.start_timestamp
+    # We assume here that the query is just ending now. We can't use
+    # the actual end timestamp of the span because in OTel the span
+    # can't be finished in order to set any attributes on it.
+    duration = datetime.now(tz=timezone.utc) - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 
@@ -353,7 +357,7 @@ class PropagationContext:
         "_span_id",
         "parent_span_id",
         "parent_sampled",
-        "dynamic_sampling_context",
+        "baggage",
     )
 
     def __init__(
@@ -362,7 +366,7 @@ class PropagationContext:
         span_id=None,  # type: Optional[str]
         parent_span_id=None,  # type: Optional[str]
         parent_sampled=None,  # type: Optional[bool]
-        dynamic_sampling_context=None,  # type: Optional[Dict[str, str]]
+        baggage=None,  # type: Optional[Baggage]
     ):
         # type: (...) -> None
         self._trace_id = trace_id
@@ -380,8 +384,13 @@ class PropagationContext:
         Important when the parent span originated in an upstream service,
         because we watn to sample the whole trace, or nothing from the trace."""
 
-        self.dynamic_sampling_context = dynamic_sampling_context
-        """Data that is used for dynamic sampling decisions."""
+        self.baggage = baggage
+        """Baggage object used for dynamic sampling decisions."""
+
+    @property
+    def dynamic_sampling_context(self):
+        # type: () -> Optional[Dict[str, str]]
+        return self.baggage.dynamic_sampling_context() if self.baggage else None
 
     @classmethod
     def from_incoming_data(cls, incoming_data):
@@ -392,9 +401,7 @@ class PropagationContext:
         baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
         if baggage_header:
             propagation_context = PropagationContext()
-            propagation_context.dynamic_sampling_context = Baggage.from_incoming_header(
-                baggage_header
-            ).dynamic_sampling_context()
+            propagation_context.baggage = Baggage.from_incoming_header(baggage_header)
 
         sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
         if sentry_trace_header:
@@ -447,11 +454,12 @@ class PropagationContext:
 
     def __repr__(self):
         # type: (...) -> str
-        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} dynamic_sampling_context={}>".format(
+        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} baggage={} dynamic_sampling_context={}>".format(
             self._trace_id,
             self._span_id,
             self.parent_span_id,
             self.parent_sampled,
+            self.baggage,
             self.dynamic_sampling_context,
         )
 
@@ -706,7 +714,7 @@ def start_child_span_decorator(func):
 
 
 def get_current_span(scope=None):
-    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[sentry_sdk.tracing.Span]
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -721,6 +729,3 @@ from sentry_sdk.tracing import (
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span

@@ -18,7 +18,6 @@ except ImportError:
 import urllib3
 import certifi
 
-import sentry_sdk
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
@@ -180,17 +179,7 @@ def _parse_rate_limits(header, now=None):
 
             retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
-                if category == "metric_bucket":
-                    try:
-                        namespaces = parameters[4].split(";")
-                    except IndexError:
-                        namespaces = []
-
-                    if not namespaces or "custom" in namespaces:
-                        yield category, retry_after  # type: ignore
-
-                else:
-                    yield category, retry_after  # type: ignore
+                yield category, retry_after
         except (LookupError, ValueError):
             continue
 
@@ -224,9 +213,6 @@ class BaseHttpTransport(Transport):
             key_file=options["key_file"],
             proxy_headers=options["proxy_headers"],
         )
-
-        # Backwards compatibility for deprecated `self.hub_class` attribute
-        self._hub_cls = sentry_sdk.Hub
 
         experiments = options.get("_experiments", {})
         compression_level = experiments.get(
@@ -432,12 +418,6 @@ class BaseHttpTransport(Transport):
         # type: (str) -> bool
         def _disabled(bucket):
             # type: (Any) -> bool
-
-            # The envelope item type used for metrics is statsd
-            # whereas the rate limit category is metric_bucket
-            if bucket == "statsd":
-                bucket = "metric_bucket"
-
             ts = self._disabled_until.get(bucket)
             return ts is not None and ts > datetime.now(timezone.utc)
 
@@ -464,7 +444,7 @@ class BaseHttpTransport(Transport):
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
-                if item.data_category in ("transaction", "error", "default", "statsd"):
+                if item.data_category in ("transaction", "error", "default"):
                     self.on_dropped_event("self_rate_limits")
                 self.record_lost_event("ratelimit_backoff", item=item)
             else:
@@ -601,30 +581,6 @@ class BaseHttpTransport(Transport):
         # type: (Self) -> None
         logger.debug("Killing HTTP transport")
         self._worker.kill()
-
-    @staticmethod
-    def _warn_hub_cls():
-        # type: () -> None
-        """Convenience method to warn users about the deprecation of the `hub_cls` attribute."""
-        warnings.warn(
-            "The `hub_cls` attribute is deprecated and will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-    @property
-    def hub_cls(self):
-        # type: (Self) -> type[sentry_sdk.Hub]
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        return self._hub_cls
-
-    @hub_cls.setter
-    def hub_cls(self, value):
-        # type: (Self, type[sentry_sdk.Hub]) -> None
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        self._hub_cls = value
 
 
 class HttpTransport(BaseHttpTransport):
