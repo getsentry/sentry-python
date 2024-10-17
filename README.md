@@ -8,8 +8,6 @@ Ah, it looks like I missed the **Resources** section in the enhanced version. I'
 
 _Bad software is everywhere, and we're all tired of it. Let's be real – as devs, we've all dealt with that one bug that crashes everything at the worst possible moment. Enter **Sentry**, where the mission is simple: help developers write better software faster, so we can get back to actually enjoying building stuff!_
 
-If you vibe with this mission, [<kbd>**check out our open positions**</kbd>](https://sentry.io/careers/) and join the crew!
-
 # Official Sentry SDK for Python 🚀
 
 [![Build Status](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml/badge.svg)](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml)
@@ -67,7 +65,7 @@ If you’re hungry for more details on advanced usage, integrations, and customi
 - [API Reference](https://getsentry.github.io/sentry-python/)
   
 ### Migrating from `raven-python`? 🐦➡️🦸
-If you’re still using `raven-python` (RIP 🪦), we’ve made the migration to the new Sentry SDK super smooth. [Check out this guide](https://docs.sentry.io/platforms/python/migration/) to switch things over seamlessly.
+If you’re still using `raven-python`, we’ve made the migration to the new Sentry SDK super smooth. [Check out this guide](https://docs.sentry.io/platforms/python/migration/) to switch things over seamlessly.
 
 ## Integrations 💥
 
