@@ -14,6 +14,11 @@ import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
 import sentry_sdk
 from sentry_sdk import (
     Client,
@@ -126,7 +131,11 @@ def mock_transaction_envelope(span_count):
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize(
     "compression_algo",
-    ("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None),
+    (
+        ("gzip", "br", "<invalid>", None)
+        if PY37 or gevent is None
+        else ("gzip", "<invalid>", None)
+    ),
 )
 @pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works(
