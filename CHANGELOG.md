@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.17.0
+
+### Various fixes & improvements
+
+- Fix flaky transport test (#3666) by @sentrivana
+- Add support for async calls in Anthropic and OpenAI integration (#3497) by @vetyy
+- fix(spotlight): More defensive Django spotlight middleware injection (#3665) by @BYK
+- Allow custom transaction names in asgi (#3664) by @sl0thentr0py
+- tests: Falcon RC1 (#3662) by @sentrivana
+- build(deps): Remove pin on sphinx (#3650) by @dependabot
+- build(deps): bump actions/checkout from 4.2.0 to 4.2.1 (#3651) by @dependabot
+- fix(langchain): handle case when parent span wasn't traced (#3656) by @rbasoalto
+- Fix mypy (#3657) by @sentrivana
+- Fix Anthropic integration when using tool calls (#3615) by @kwnath
+- Test with newer Falcon version (#3653) by @sentrivana
+- feat(falcon): Run test suite with Falcon 4.0.0b3 (#3644) by @sentrivana
+- Remove ensure_integration_enabled_async (#3632) by @sentrivana
+
 ## 2.16.0
 
 ### Integrations
