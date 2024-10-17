@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.16.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.17.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=36d120a7" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=83eaa723" />
     <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,7 +64,8 @@ data-aria-dark="Switch to auto color mode">
 </ul>
 
         </div>
-      </div></div>
+      </div>
+    </div>
   </aside>
   <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
   <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
@@ -290,12 +291,16 @@ to customize the breadcrumbs that are emitted.</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.bind_client">
 <span class="sig-name descname"><span class="pre">bind_client</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.bind_client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.bind_client" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.set_client" title="sentry_sdk.Scope.set_client"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_client()</span></code></a> instead.</p>
 </div>
-<p>Binds a new client to the hub.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+<p>Binds a new client to the hub.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -417,51 +422,72 @@ Please use <a class="reference internal" href="api.html#sentry_sdk.api.get_clien
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.continue_trace">
 <span class="sig-name descname"><span class="pre">continue_trace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environ_or_headers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.continue_trace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.continue_trace" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.continue_trace" title="sentry_sdk.Scope.continue_trace"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.continue_trace()</span></code></a> instead.</p>
 </div>
-<p>Sets the propagation context from environment or headers and returns a transaction.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></span></p>
+<p>Sets the propagation context from environment or headers and returns a transaction.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.end_session">
 <span class="sig-name descname"><span class="pre">end_session</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.end_session"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.end_session" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.end_session" title="sentry_sdk.Scope.end_session"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.end_session()</span></code></a> instead.</p>
 </div>
-<p>Ends the current session if there is one.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+<p>Ends the current session if there is one.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.flush">
 <span class="sig-name descname"><span class="pre">flush</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.flush" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.client._Client.flush" title="sentry_sdk.client._Client.flush"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.client._Client.flush()</span></code></a> instead.</p>
 </div>
-<p>Alias for <a class="reference internal" href="#sentry_sdk.client._Client.flush" title="sentry_sdk.client._Client.flush"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.client._Client.flush()</span></code></a>
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+<p>Alias for <a class="reference internal" href="#sentry_sdk.client._Client.flush" title="sentry_sdk.client._Client.flush"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.client._Client.flush()</span></code></a></p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.get_baggage">
 <span class="sig-name descname"><span class="pre">get_baggage</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.get_baggage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.get_baggage" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.get_baggage" title="sentry_sdk.Scope.get_baggage"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.get_baggage()</span></code></a> instead.</p>
 </div>
-<p>Returns Baggage either from the active span or from the scope.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+<p>Returns Baggage either from the active span or from the scope.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.get_integration">
 <span class="sig-name descname"><span class="pre">get_integration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name_or_class</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.get_integration"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.get_integration" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.client._Client.get_integration" title="sentry_sdk.client._Client.get_integration"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.client._Client.get_integration()</span></code></a> instead.</p>
 </div>
@@ -469,32 +495,39 @@ Please use <a class="reference internal" href="#sentry_sdk.client._Client.get_in
 is no client bound or the client does not have that integration
 then <cite>None</cite> is returned.</p>
 <p>If the return value is not <cite>None</cite> the hub is guaranteed to have a
-client attached.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span></p>
+client attached.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.get_traceparent">
 <span class="sig-name descname"><span class="pre">get_traceparent</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.get_traceparent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.get_traceparent" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.get_traceparent" title="sentry_sdk.Scope.get_traceparent"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.get_traceparent()</span></code></a> instead.</p>
 </div>
-<p>Returns the traceparent either from the active span or from the scope.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+<p>Returns the traceparent either from the active span or from the scope.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.iter_trace_propagation_headers">
 <span class="sig-name descname"><span class="pre">iter_trace_propagation_headers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">span</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.iter_trace_propagation_headers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.iter_trace_propagation_headers" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generator</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.iter_trace_propagation_headers" title="sentry_sdk.Scope.iter_trace_propagation_headers"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.iter_trace_propagation_headers()</span></code></a> instead.</p>
 </div>
 <p>Return HTTP headers which allow propagation of trace data. Data taken
 from the span representing the request, if available, or the current
-span on the scope if not.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generator</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span></p>
+span on the scope if not.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -510,12 +543,16 @@ span on the scope if not.
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.pop_scope_unsafe">
 <span class="sig-name descname"><span class="pre">pop_scope_unsafe</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.pop_scope_unsafe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.pop_scope_unsafe" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Client" title="sentry_sdk.client.Client"><code class="xref py py-class docutils literal notranslate"><span class="pre">Client</span></code></a>], <a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>]</span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.</p>
 </div>
 <p>Pops a scope layer from the stack.</p>
-<p>Try to use the context manager <a class="reference internal" href="#sentry_sdk.Hub.push_scope" title="sentry_sdk.Hub.push_scope"><code class="xref py py-meth docutils literal notranslate"><span class="pre">push_scope()</span></code></a> instead.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Client" title="sentry_sdk.client.Client"><code class="xref py py-class docutils literal notranslate"><span class="pre">Client</span></code></a>], <a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>]</span></p>
+<p>Try to use the context manager <a class="reference internal" href="#sentry_sdk.Hub.push_scope" title="sentry_sdk.Hub.push_scope"><code class="xref py py-meth docutils literal notranslate"><span class="pre">push_scope()</span></code></a> instead.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -543,25 +580,33 @@ be used to pop the scope again.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.resume_auto_session_tracking">
 <span class="sig-name descname"><span class="pre">resume_auto_session_tracking</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.resume_auto_session_tracking"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.resume_auto_session_tracking" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.resume_auto_session_tracking" title="sentry_sdk.Scope.resume_auto_session_tracking"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.resume_auto_session_tracking()</span></code></a> instead.</p>
 </div>
 <p>Resumes automatic session tracking for the current scope if
 disabled earlier.  This requires that generally automatic session
-tracking is enabled.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+tracking is enabled.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.run">
 <span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.run" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.TypeVar" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TypeVar</span></code></a>(<code class="docutils literal notranslate"><span class="pre">T</span></code>)</span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.</p>
 </div>
 <p>Runs a callback in the context of the hub.  Alternatively the
-with statement can be used on the hub directly.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.TypeVar" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TypeVar</span></code></a>(<code class="docutils literal notranslate"><span class="pre">T</span></code>)</span></p>
+with statement can be used on the hub directly.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -576,18 +621,27 @@ Returns the current scope on the hub.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.start_session">
 <span class="sig-name descname"><span class="pre">start_session</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">session_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'application'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_session"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.start_session" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.start_session" title="sentry_sdk.Scope.start_session"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.start_session()</span></code></a> instead.</p>
 </div>
-<p>Starts a new session.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+<p>Starts a new session.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.start_span">
 <span class="sig-name descname"><span class="pre">start_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrumenter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sentry'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.start_span" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.start_span" title="sentry_sdk.Scope.start_span"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.start_span()</span></code></a> instead.</p>
 </div>
@@ -600,14 +654,18 @@ integrations start a transaction at the appropriate time, for example
 for every incoming HTTP request. Use
 <code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.start_transaction()</span></code> to start a new transaction when
 one is not already in progress.</p>
-<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span</span></code></a>.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a></span></p>
+<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span</span></code></a>.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.start_transaction">
 <span class="sig-name descname"><span class="pre">start_transaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transaction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">instrumenter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sentry'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_sampling_context</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_transaction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.start_transaction" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">NoOpSpan</span></code>]</span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.start_transaction" title="sentry_sdk.Scope.start_transaction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.start_transaction()</span></code></a> instead.</p>
 </div>
@@ -625,33 +683,40 @@ finished at the end of the <cite>with</cite> block. If not using context manager
 call the <cite>.finish()</cite> method.</p>
 <p>When the transaction is finished, it will be sent to Sentry with all its
 finished child spans.</p>
-<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction</span></code></a>.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">NoOpSpan</span></code>]</span></p>
+<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction</span></code></a>.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.stop_auto_session_tracking">
 <span class="sig-name descname"><span class="pre">stop_auto_session_tracking</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.stop_auto_session_tracking"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.stop_auto_session_tracking" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.stop_auto_session_tracking" title="sentry_sdk.Scope.stop_auto_session_tracking"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.stop_auto_session_tracking()</span></code></a> instead.</p>
 </div>
 <p>Stops automatic session tracking.</p>
 <p>This temporarily session tracking for the current scope when called.
-To resume session tracking call <cite>resume_auto_session_tracking</cite>.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+To resume session tracking call <cite>resume_auto_session_tracking</cite>.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.trace_propagation_meta">
 <span class="sig-name descname"><span class="pre">trace_propagation_meta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">span</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.trace_propagation_meta"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.trace_propagation_meta" title="Link to this definition">¶</a></dt>
-<dd><div class="deprecated">
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+<div class="deprecated">
 <p><span class="versionmodified deprecated">Deprecated since version 2.0.0: </span>This function is deprecated and will be removed in a future release.
 Please use <a class="reference internal" href="#sentry_sdk.Scope.trace_propagation_meta" title="sentry_sdk.Scope.trace_propagation_meta"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.trace_propagation_meta()</span></code></a> instead.</p>
 </div>
 <p>Return meta tags which should be injected into HTML templates
-to allow propagation of trace information.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+to allow propagation of trace information.</p>
 </dd></dl>
 
 </dd></dl>
@@ -861,11 +926,15 @@ The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exc
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.fork">
 <span class="sig-name descname"><span class="pre">fork</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.fork"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.fork" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
-<p>Returns a fork of this scope.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span></p>
+<p>Returns a fork of this scope.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -896,23 +965,31 @@ currently active span or the scopes Propagation Context.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.get_client">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_client</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.get_client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.get_client" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.client.BaseClient" title="sentry_sdk.client.BaseClient"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseClient</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>Returns the currently used <a class="reference internal" href="#sentry_sdk.Client" title="sentry_sdk.Client"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.Client</span></code></a>.
 This checks the current scope, the isolation scope and the global scope for a client.
-If no client is available a <a class="reference internal" href="#sentry_sdk.client.NonRecordingClient" title="sentry_sdk.client.NonRecordingClient"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.client.NonRecordingClient</span></code></a> is returned.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.client.BaseClient" title="sentry_sdk.client.BaseClient"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseClient</span></code></a></span></p>
+If no client is available a <a class="reference internal" href="#sentry_sdk.client.NonRecordingClient" title="sentry_sdk.client.NonRecordingClient"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.client.NonRecordingClient</span></code></a> is returned.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.get_current_scope">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_current_scope</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.get_current_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.get_current_scope" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
-<p>Returns the current scope.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span></p>
+<p>Returns the current scope.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -930,21 +1007,29 @@ If not existing, creates a new one.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.get_global_scope">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_global_scope</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.get_global_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.get_global_scope" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
-<p>Returns the global scope.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span></p>
+<p>Returns the global scope.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.get_isolation_scope">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_isolation_scope</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.get_isolation_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.get_isolation_scope" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
-<p>Returns the isolation scope.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span></p>
+<p>Returns the isolation scope.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -997,8 +1082,13 @@ If no span is given, the trace data is taken from the scope.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.last_event_id">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">last_event_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.last_event_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.last_event_id" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.2.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.2.0.</span></p>
 </div>
 <p>Returns event ID of the event most recently captured by the isolation scope, or None if no event
 has been captured. We do not consider events that are dropped, e.g. by a before_send hook.
@@ -1006,8 +1096,7 @@ Transactions also are not considered events in this context.</p>
 <p>The event corresponding to the returned event ID is NOT guaranteed to actually be sent to Sentry;
 whether the event is sent depends on the transport. The event could be sent later or not at all.
 Even a sent event could fail to arrive in Sentry due to network issues, exhausted quotas, or
-various other reasons.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+various other reasons.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -1099,7 +1188,7 @@ tracking is enabled.</p>
 <dt class="sig sig-object py" id="sentry_sdk.Scope.set_client">
 <span class="sig-name descname"><span class="pre">set_client</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">client</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_client" title="Link to this definition">¶</a></dt>
 <dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>Sets the client for this scope.</p>
 <dl class="field-list simple">
@@ -1127,13 +1216,17 @@ If <cite>None</cite> the client of the scope will be replaced by a <code class="
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.set_current_scope">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_current_scope</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new_current_scope</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_current_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_current_scope" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>Sets the given scope as the new current scope overwriting the existing current scope.
 :type new_current_scope: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span>
-:param new_current_scope: The scope to set as the new current scope.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+:param new_current_scope: The scope to set as the new current scope.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1150,13 +1243,17 @@ If <cite>None</cite> the client of the scope will be replaced by a <code class="
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.set_isolation_scope">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_isolation_scope</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new_isolation_scope</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_isolation_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_isolation_scope" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>Sets the given scope as the new isolation scope overwriting the existing isolation scope.
 :type new_isolation_scope: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a></span>
-:param new_isolation_scope: The scope to set as the new isolation scope.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+:param new_isolation_scope: The scope to set as the new isolation scope.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1391,17 +1488,21 @@ to allow propagation of trace information.</p>
 <dt class="sig sig-object py" id="sentry_sdk.client.BaseClient">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.client.</span></span><span class="sig-name descname"><span class="pre">BaseClient</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/client.html#BaseClient"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.client.BaseClient" title="Link to this definition">¶</a></dt>
 <dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>The basic definition of a client that is used for sending data to Sentry.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.client.BaseClient.is_active">
 <span class="sig-name descname"><span class="pre">is_active</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/client.html#BaseClient.is_active"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.client.BaseClient.is_active" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
-<p>Returns whether the client is active (able to send data to Sentry)
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+<p>Returns whether the client is active (able to send data to Sentry)</p>
 </dd></dl>
 
 </dd></dl>
@@ -1410,7 +1511,7 @@ to allow propagation of trace information.</p>
 <dt class="sig sig-object py" id="sentry_sdk.client.NonRecordingClient">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.client.</span></span><span class="sig-name descname"><span class="pre">NonRecordingClient</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/client.html#NonRecordingClient"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.client.NonRecordingClient" title="Link to this definition">¶</a></dt>
 <dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.</p>
 </dd></dl>
@@ -1494,21 +1595,29 @@ If the client does not have that integration then <cite>None</cite> is returned.
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.client._Client.is_active">
 <span class="sig-name descname"><span class="pre">is_active</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/client.html#_Client.is_active"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.client._Client.is_active" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
-<p>Returns whether the client is active (able to send data to Sentry)
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+<p>Returns whether the client is active (able to send data to Sentry)</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.client._Client.should_send_default_pii">
 <span class="sig-name descname"><span class="pre">should_send_default_pii</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/client.html#_Client.should_send_default_pii"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.client._Client.should_send_default_pii" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
-<p>Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+<p>Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.</p>
 </dd></dl>
 
 </dd></dl>
@@ -2056,8 +2165,8 @@ each envelope may have at most one Item with type “event” or “transaction�
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=981cb1a1"></script>
-      <script src="_static/doctools.js?v=888ff710"></script>
+      <script src="_static/documentation_options.js?v=e9c9fbf8"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="_static/shibuya.js?v=c5fc9e80"></script></body>
+      <script src="_static/shibuya.js?v=e2e99575"></script></body>
 </html>

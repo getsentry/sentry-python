@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Top Level API - sentry-python 2.16.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Top Level API - sentry-python 2.17.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=36d120a7" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=83eaa723" />
     <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -64,7 +64,8 @@ data-aria-dark="Switch to auto color mode">
 </ul>
 
         </div>
-      </div></div>
+      </div>
+    </div>
   </aside>
   <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
   <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
@@ -431,14 +432,18 @@ available arguments.</p></li>
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.is_initialized">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">is_initialized</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#is_initialized"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.is_initialized" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>Returns whether Sentry has been initialized or not.</p>
 <p>If a client is available and the client is active
 (meaning it is configured to send data) then
-Sentry is initialized.
-:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+Sentry is initialized.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -447,7 +452,7 @@ Sentry is initialized.
 <dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.get_client" title="sentry_sdk.Scope.get_client"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.get_client()</span></code></a>
 :rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="apidocs.html#sentry_sdk.client.BaseClient" title="sentry_sdk.client.BaseClient"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseClient</span></code></a></span></p>
 <div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>Returns the currently used <a class="reference internal" href="apidocs.html#sentry_sdk.Client" title="sentry_sdk.Client"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.Client</span></code></a>.
 This checks the current scope, the isolation scope and the global scope for a client.
@@ -496,8 +501,13 @@ be used to pop the scope again.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.new_scope">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">new_scope</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#new_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.new_scope" title="Link to this definition">¶</a></dt>
-<dd><div class="versionadded">
-<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generator</span></code></a>[<a class="reference internal" href="apidocs.html#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span></p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.0.0.</span></p>
 </div>
 <p>Context manager that forks the current scope and runs the wrapped code in it.
 After the wrapped code is executed, the original scope is restored.</p>
@@ -511,11 +521,6 @@ After the wrapped code is executed, the original scope is restored.</p>
 </span><span data-line="7"><span class="n">sentry_sdk</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="s2">&quot;hello, again&quot;</span><span class="p">)</span> <span class="c1"># will NOT include `color` tag.</span>
 </span></pre></div>
 </div>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generator</span></code></a>[<a class="reference internal" href="apidocs.html#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span></p>
-</dd>
-</dl>
 </dd></dl>
 
 </section>
@@ -564,8 +569,8 @@ After the wrapped code is executed, the original scope is restored.</p>
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=981cb1a1"></script>
-      <script src="_static/doctools.js?v=888ff710"></script>
+      <script src="_static/documentation_options.js?v=e9c9fbf8"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="_static/shibuya.js?v=c5fc9e80"></script></body>
+      <script src="_static/shibuya.js?v=e2e99575"></script></body>
 </html>
