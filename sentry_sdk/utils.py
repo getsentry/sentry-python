@@ -24,8 +24,6 @@ except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
 
-from opentelemetry.util.types import AttributeValue
-
 import sentry_sdk
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
@@ -53,6 +51,7 @@ if TYPE_CHECKING:
     )
 
     from gevent.hub import Hub as GeventHub
+    from opentelemetry.util.types import AttributeValue
 
     from sentry_sdk._types import Event, ExcInfo
 
