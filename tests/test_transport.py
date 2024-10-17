@@ -14,6 +14,11 @@ import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
 import sentry_sdk
 from sentry_sdk import (
     Client,
@@ -23,6 +28,7 @@ from sentry_sdk import (
     get_isolation_scope,
     Hub,
 )
+from sentry_sdk._compat import PY37, PY38
 from sentry_sdk.envelope import Envelope, Item, parse_json
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
@@ -123,10 +129,15 @@ def mock_transaction_envelope(span_count):
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
-@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
 @pytest.mark.parametrize(
-    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+    "compression_algo",
+    (
+        ("gzip", "br", "<invalid>", None)
+        if PY37 or gevent is None
+        else ("gzip", "<invalid>", None)
+    ),
 )
+@pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works(
     capturing_server,
     request,
