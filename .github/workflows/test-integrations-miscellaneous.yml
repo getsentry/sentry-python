@@ -49,6 +49,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru-latest"
+      - name: Test openfeature latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openfeature-latest"
       - name: Test opentelemetry latest
         run: |
           set -x # print commands that are executed
@@ -121,6 +125,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru"
+      - name: Test openfeature pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openfeature"
       - name: Test opentelemetry pinned
         run: |
           set -x # print commands that are executed
