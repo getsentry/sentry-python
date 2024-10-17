@@ -1247,6 +1247,7 @@ def test_ensures_spotlight_middleware_when_spotlight_is_enabled(sentry_init, set
     Test that ensures if Spotlight is enabled, relevant SpotlightMiddleware
     is added to middleware list in settings.
     """
+    settings.DEBUG = True
     original_middleware = frozenset(settings.MIDDLEWARE)
 
     sentry_init(integrations=[DjangoIntegration()], spotlight=True)
@@ -1263,6 +1264,7 @@ def test_ensures_no_spotlight_middleware_when_env_killswitch_is_false(
     Test that ensures if Spotlight is enabled, but is set to a falsy value
     the relevant SpotlightMiddleware is NOT added to middleware list in settings.
     """
+    settings.DEBUG = True
     monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "no")
 
     original_middleware = frozenset(settings.MIDDLEWARE)
@@ -1281,6 +1283,8 @@ def test_ensures_no_spotlight_middleware_when_no_spotlight(
     Test that ensures if Spotlight is not enabled
     the relevant SpotlightMiddleware is NOT added to middleware list in settings.
     """
+    settings.DEBUG = True
+
     # We should NOT have the middleware even if the env var is truthy if Spotlight is off
     monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "1")
 
