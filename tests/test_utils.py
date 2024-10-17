@@ -904,6 +904,11 @@ def test_format_timestamp_naive():
     assert re.fullmatch(timestamp_regex, format_timestamp(datetime_object))
 
 
+class NoStr:
+    def __str__(self):
+        1 / 0
+
+
 @pytest.mark.parametrize(
     ("value", "result"),
     (
@@ -923,6 +928,7 @@ def test_format_timestamp_naive():
         ),
         (datetime(2024, 1, 1), "2024-01-01 00:00:00"),
         (("meow", "purr"), ["meow", "purr"]),
+        (NoStr(), None),
     ),
 )
 def test_serialize_span_attribute(value, result):

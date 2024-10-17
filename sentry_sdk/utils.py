@@ -1835,7 +1835,7 @@ def get_current_thread_meta(thread=None):
 
 
 def _serialize_span_attribute(value):
-    # type: (Any) -> AttributeValue
+    # type: (Any) -> Optional[AttributeValue]
     """Serialize an object so that it's OTel-compatible and displays nicely in Sentry."""
     # check for allowed primitives
     if isinstance(value, (int, str, float, bool)):
@@ -1853,4 +1853,7 @@ def _serialize_span_attribute(value):
     try:
         return json.dumps(value)
     except TypeError:
-        return str(value)
+        try:
+            return str(value)
+        except Exception:
+            return None
