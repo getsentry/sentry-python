@@ -171,6 +171,8 @@ def wrap_async_view(callback):
         sentry_scope = sentry_sdk.get_isolation_scope()
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
+        if sentry_scope.transaction is not None:
+            sentry_scope.transaction.update_active_thread()
 
         with sentry_sdk.start_span(
             op=OP.VIEW_RENDER,
