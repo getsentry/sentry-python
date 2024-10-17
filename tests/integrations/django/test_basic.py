@@ -376,7 +376,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
         crumb = event["breadcrumbs"]["values"][-1]
 
         assert crumb["message"] == "SELECT count(*) FROM people_person WHERE foo = %s"
-        assert crumb["data"]["db.params"] == "[123]"
+        assert crumb["data"]["db.params"] == [123]
 
 
 @pytest.mark.forked
@@ -411,7 +411,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
     )
-    assert crumb["data"]["db.params"] == str({"my_foo": 10})
+    assert crumb["data"]["db.params"] == '{"my_foo": 10}'
 
 
 @pytest.mark.forked
@@ -473,7 +473,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     (event,) = events
     crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
-    assert crumb["data"]["db.params"] == str({"my_param": 10})
+    assert crumb["data"]["db.params"] == '{"my_param": 10}'
 
 
 @pytest.mark.forked
@@ -526,7 +526,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
         {
             "category": "query",
             "data": {
-                "db.params": str({"first_var": "fizz", "second_var": "not a date"}),
+                "db.params": '{"first_var": "fizz", "second_var": "not a date"}',
                 "db.paramstyle": "format",
             },
             "message": 'insert into my_test_table ("foo", "bar") values (%(first_var)s, '
