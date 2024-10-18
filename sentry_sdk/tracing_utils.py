@@ -191,11 +191,12 @@ def _should_be_included(
     # type: (...) -> bool
     # in_app_include takes precedence over in_app_exclude
     should_be_included = _module_in_list(namespace, in_app_include)
-    should_be_excluded = _is_external_source(abs_path) or _module_in_list(
-        namespace, in_app_exclude
+    should_be_excluded = (
+        _is_external_source(abs_path)
+        or _module_in_list(namespace, in_app_exclude) is not None
     )
     return not is_sentry_sdk_frame and (
-        should_be_included
+        should_be_included is not None
         or (_is_in_project_root(abs_path, project_root) and not should_be_excluded)
     )
 

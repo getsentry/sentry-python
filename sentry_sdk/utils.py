@@ -1042,12 +1042,14 @@ def set_in_app_in_frames(frames, in_app_exclude, in_app_include, project_root=No
         module = frame.get("module")
 
         # check if module in frame is in the list of modules to include
-        if _module_in_list(module, in_app_include):
+        include_pattern_matched = _module_in_list(module, in_app_include)
+        if include_pattern_matched:
             frame["in_app"] = True
+            frame["in_app_include_used"] = include_pattern_matched
             continue
 
         # check if module in frame is in the list of modules to exclude
-        if _module_in_list(module, in_app_exclude):
+        if _module_in_list(module, in_app_exclude) is not None:
             frame["in_app"] = False
             continue
 
@@ -1118,18 +1120,18 @@ def event_from_exception(
 
 
 def _module_in_list(name, items):
-    # type: (Optional[str], Optional[List[str]]) -> bool
+    # type: (Optional[str], Optional[List[str]]) -> Optional[str]
     if name is None:
-        return False
+        return None
 
     if not items:
-        return False
+        return None
 
     for item in items:
         if item == name or name.startswith(item + "."):
-            return True
+            return item
 
-    return False
+    return None
 
 
 def _is_external_source(abs_path):

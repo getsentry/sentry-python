@@ -239,6 +239,7 @@ def test_parse_invalid_dsn(dsn):
                 "module": "fastapi.routing",
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
                 "in_app": True,
+                "in_app_include_used": "fastapi",
             },
         ],
         [
@@ -280,6 +281,7 @@ def test_parse_invalid_dsn(dsn):
                 "module": "fastapi.routing",
                 "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
                 "in_app": True,
+                "in_app_include_used": "fastapi",
             },
         ],
         [
@@ -420,6 +422,7 @@ def test_parse_invalid_dsn(dsn):
             {
                 "module": "fastapi.routing",
                 "in_app": True,
+                "in_app_include_used": "fastapi",
             },
         ],
         [
@@ -461,6 +464,7 @@ def test_parse_invalid_dsn(dsn):
                 "module": "main",
                 "abs_path": "/home/ubuntu/fastapi/main.py",
                 "in_app": True,
+                "in_app_include_used": "main",
             },
         ],
         [
