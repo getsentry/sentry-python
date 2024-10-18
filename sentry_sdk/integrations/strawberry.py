@@ -188,11 +188,12 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         yield
 
-        transaction = self.graphql_span.containing_transaction
-        if transaction and self.execution_context.operation_name:
-            transaction.name = self.execution_context.operation_name
-            transaction.source = TRANSACTION_SOURCE_COMPONENT
-            transaction.op = op
+        if self.execution_context.operation_name:
+            isolation_scope = sentry_sdk.get_isolation_scope()
+            isolation_scope.set_transaction_name(
+                self.execution_context.operation_name,
+                source=TRANSACTION_SOURCE_COMPONENT,
+            )
 
         self.graphql_span.finish()
 
@@ -242,7 +243,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
-            name="resolving {}".format(field_path),
+            name=f"resolving {field_path}",
             origin=StrawberryIntegration.origin,
         ) as span:
             span.set_attribute("graphql.field_name", info.field_name)
@@ -263,7 +264,7 @@ class SentrySyncExtension(SentryAsyncExtension):
 
         with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
-            name="resolving {}".format(field_path),
+            name=f"resolving {field_path}",
             origin=StrawberryIntegration.origin,
         ) as span:
             span.set_attribute("graphql.field_name", info.field_name)
