@@ -738,7 +738,7 @@ def single_exception_from_error_tuple(
     exception_id=None,  # type: Optional[int]
     parent_id=None,  # type: Optional[int]
     source=None,  # type: Optional[str]
-    full_stack=None, 
+    full_stack=None,
 ):
     # type: (...) -> Dict[str, Any]
     """
@@ -813,6 +813,50 @@ def single_exception_from_error_tuple(
         # elements of frames list look like this:
         # {'filename': 'main.py', 'abs_path': '/Users/antonpirker/code/testing-sentry/test-plain-python-missing-stack-frames/main.py', 'function': 'foo', 'module': '__main__', 'lineno': 19, 'pre_context': ['    foo()', '', '', 'def foo():', '    try:'], 'context_line': '        bar()', 'post_context': ['    except Exception as e:', '        capture_exception(e)', '', '', 'def bar():'], 'vars': {'e': "Exception('1 some exception')"}}
         # elements of full_stack are instances of type FrameSummary
+
+        full_stack.reverse()
+        frames.reverse()
+
+        for stackframe in full_stack:
+            stackframe_id = {
+                "filename": stackframe.filename,
+                "line": stackframe.line,
+                "lineno": stackframe.lineno,
+                "name": stackframe.name,
+            }
+
+            found = False
+            for frame in frames:
+                frame_id = {
+                    "filename": frame["abs_path"],
+                    "line": frame["context_line"],
+                    "lineno": frame["lineno"],
+                    "name": frame["function"],
+                }
+
+                if stackframe_id == frame_id:
+                    found = True
+                    break
+
+            if not found:
+                frames.append(
+                    {
+                        "filename": os.path.basename(stackframe.filename),
+                        "abs_path": stackframe.filename,
+                        "function": stackframe.name,
+                        "module": None,
+                        "lineno": stackframe.lineno,
+                        "pre_context": [],
+                        "context_line": stackframe.line,
+                        "post_context": [],
+                        "vars": {},
+                    }
+                )
+
+        frames.reverse()
+        from pprint import pprint
+
+        pprint(frames)
         exception_value["stacktrace"] = {"frames": frames}
 
     return exception_value
@@ -986,10 +1030,10 @@ def exceptions_from_error_tuple(
             exceptions.append(
                 single_exception_from_error_tuple(
                     exc_type=exc_type,
-                    exc_value=exc_value, 
-                    tb=tb, 
-                    client_options=client_options, 
-                    mechanism=mechanism, 
+                    exc_value=exc_value,
+                    tb=tb,
+                    client_options=client_options,
+                    mechanism=mechanism,
                     full_stack=full_stack,
                 )
             )
