@@ -741,6 +741,16 @@ class Scope:
         if source:
             self._transaction_info["source"] = source
 
+    @property
+    def transaction_name(self):
+        # type: () -> Optional[str]
+        return self._transaction
+
+    @property
+    def transaction_source(self):
+        # type: () -> Optional[str]
+        return self._transaction_info.get("source")
+
     @_attr_setter
     def user(self, value):
         # type: (Optional[Dict[str, Any]]) -> None

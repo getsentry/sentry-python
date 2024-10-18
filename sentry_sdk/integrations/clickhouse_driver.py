@@ -3,7 +3,11 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
+from sentry_sdk.utils import (
+    _serialize_span_attribute,
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+)
 
 from typing import TYPE_CHECKING, TypeVar
 
@@ -99,7 +103,7 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 
         if params and should_send_default_pii():
             connection._sentry_db_params = params
-            span.set_attribute("db.params", str(params))
+            span.set_attribute("db.params", _serialize_span_attribute(params))
 
         # run the original code
         ret = f(*args, **kwargs)
@@ -117,7 +121,7 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
         if span is not None:
             if res is not None and should_send_default_pii():
-                span.set_attribute("db.result", str(res))
+                span.set_attribute("db.result", _serialize_span_attribute(res))
 
             with capture_internal_exceptions():
                 query = span.get_attribute("db.query.text")
@@ -159,7 +163,7 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
                     getattr(instance.connection, "_sentry_db_params", None) or []
                 )
                 db_params.extend(data)
-                span.set_attribute("db.params", str(db_params))
+                span.set_attribute("db.params", _serialize_span_attribute(db_params))
                 try:
                     del instance.connection._sentry_db_params
                 except AttributeError:

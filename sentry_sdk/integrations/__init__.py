@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Set
     from typing import Type
+    from typing import Union
 
 
 _DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
@@ -125,7 +126,7 @@ def setup_integrations(
     with_auto_enabling_integrations=False,
     disabled_integrations=None,
 ):
-    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Integration]]) -> Dict[str, Integration]
+    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Union[type[Integration], Integration]]]) -> Dict[str, Integration]
     """
     Given a list of integration instances, this installs them all.
 
