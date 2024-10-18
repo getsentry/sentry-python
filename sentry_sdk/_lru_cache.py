@@ -62,6 +62,8 @@ Agreement.
 
 """
 
+from copy import copy
+
 SENTINEL = object()
 
 
@@ -88,6 +90,13 @@ class LRUCache:
         self.root[:] = [self.root, self.root, None, None]
 
         self.hits = self.misses = 0
+
+    def __copy__(self):
+        cache = LRUCache(self.max_size)
+        cache.full = self.full
+        cache.cache = copy(self.cache)
+        cache.root = copy(self.root)
+        return cache
 
     def set(self, key, value):
         link = self.cache.get(key, SENTINEL)
@@ -154,3 +163,11 @@ class LRUCache:
         self.hits += 1
 
         return link[VALUE]
+
+    def get_all(self):
+        nodes = []
+        node = self.root[NEXT]
+        while node is not self.root:
+            nodes.append((node[KEY], node[VALUE]))
+            node = node[NEXT]
+        return nodes

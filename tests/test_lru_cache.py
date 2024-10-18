@@ -35,3 +35,26 @@ def test_cache_eviction():
     cache.set(4, 4)
     assert cache.get(3) is None
     assert cache.get(4) == 4
+
+
+def test_cache_miss():
+    cache = LRUCache(1)
+    assert cache.get(0) is None
+
+
+def test_cache_set_overwrite():
+    cache = LRUCache(3)
+    cache.set(0, 0)
+    cache.set(0, 1)
+    assert cache.get(0) == 1
+
+
+def test_cache_get_all():
+    cache = LRUCache(3)
+    cache.set(0, 0)
+    cache.set(1, 1)
+    cache.set(2, 2)
+    cache.set(3, 3)
+    assert cache.get_all() == [(1, 1), (2, 2), (3, 3)]
+    cache.get(1)
+    assert cache.get_all() == [(2, 2), (3, 3), (1, 1)]
