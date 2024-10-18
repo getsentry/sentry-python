@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
+import traceback
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
 try:
@@ -737,6 +738,7 @@ def single_exception_from_error_tuple(
     exception_id=None,  # type: Optional[int]
     parent_id=None,  # type: Optional[int]
     source=None,  # type: Optional[str]
+    full_stack=None, 
 ):
     # type: (...) -> Dict[str, Any]
     """
@@ -807,6 +809,10 @@ def single_exception_from_error_tuple(
     ]
 
     if frames:
+        # TODO: insert missing frames from full_stack into frames
+        # elements of frames list look like this:
+        # {'filename': 'main.py', 'abs_path': '/Users/antonpirker/code/testing-sentry/test-plain-python-missing-stack-frames/main.py', 'function': 'foo', 'module': '__main__', 'lineno': 19, 'pre_context': ['    foo()', '', '', 'def foo():', '    try:'], 'context_line': '        bar()', 'post_context': ['    except Exception as e:', '        capture_exception(e)', '', '', 'def bar():'], 'vars': {'e': "Exception('1 some exception')"}}
+        # elements of full_stack are instances of type FrameSummary
         exception_value["stacktrace"] = {"frames": frames}
 
     return exception_value
@@ -953,6 +959,7 @@ def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
+    full_stack=None,
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
@@ -970,6 +977,7 @@ def exceptions_from_error_tuple(
             mechanism=mechanism,
             exception_id=0,
             parent_id=0,
+            full_stack=full_stack,
         )
 
     else:
@@ -977,7 +985,12 @@ def exceptions_from_error_tuple(
         for exc_type, exc_value, tb in walk_exception_chain(exc_info):
             exceptions.append(
                 single_exception_from_error_tuple(
-                    exc_type, exc_value, tb, client_options, mechanism
+                    exc_type=exc_type,
+                    exc_value=exc_value, 
+                    tb=tb, 
+                    client_options=client_options, 
+                    mechanism=mechanism, 
+                    full_stack=full_stack,
                 )
             )
 
@@ -1104,12 +1117,13 @@ def event_from_exception(
     # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+    full_stack = traceback.extract_stack()
     return (
         {
             "level": "error",
             "exception": {
                 "values": exceptions_from_error_tuple(
-                    exc_info, client_options, mechanism
+                    exc_info, client_options, mechanism, full_stack
                 )
             },
         },
