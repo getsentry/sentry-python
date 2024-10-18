@@ -2,7 +2,8 @@
   <img src="https://sentry-brand.storage.googleapis.com/github-banners/github-sdk-python.png" alt="Sentry for Python">
 </a>
 
-Bad software is everywhere, and developers often deal with bugs that crash systems at the worst possible moments. Enter **Sentry**: our mission is to help developers write better software faster, so you can focus on building.
+
+_Bad software is everywhere, and we're tired of it. Sentry is on a mission to help developers write better software faster, so we can get back to enjoying technology. If you want to join us, [<kbd>**check out our open positions**</kbd>](https://sentry.io/careers/)_.
 
 # Official Sentry SDK for Python
 
@@ -10,7 +11,7 @@ Bad software is everywhere, and developers often deal with bugs that crash syste
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 [![Discord](https://img.shields.io/discord/621778831602221064)](https://discord.gg/cWnMQeA)
 
-Welcome to the official Python SDK for **[Sentry](http://sentry.io/)**! If you care about tracking down every error and performance bottleneck in your app, you're in the right place.
+Welcome to the official Python SDK for **[Sentry](http://sentry.io/)**!
 
 ## Getting Started
 
@@ -34,11 +35,11 @@ sentry_sdk.init(
 
     # Set traces_sample_rate to 1.0 to capture 100%
     # of transactions for performance monitoring.
-    traces_sample_rate=1.0,  # Adjust this based on your performance needs
+    traces_sample_rate=1.0,
 )
 ```
 
-With this configuration, Sentry will monitor for exceptions and performance issues in the background while you continue coding. Adjust the `traces_sample_rate` to fine-tune performance monitoring.
+With this configuration, Sentry will monitor for exceptions and performance issues.
 
 ### Quick Usage Example
 
@@ -58,18 +59,15 @@ For more details on advanced usage, integrations, and customization, check out t
 - [Official SDK Docs](https://docs.sentry.io/platforms/python/)
 - [API Reference](https://getsentry.github.io/sentry-python/)
 
-### Migrating from `raven-python`?  
-If you’re still using `raven-python`, migrating to the new Sentry SDK is smooth. [Check out this guide](https://docs.sentry.io/platforms/python/migration/) for details.
-
 ## Integrations
 
-Sentry integrates with several popular Python libraries and frameworks, including:
+Sentry integrates with many popular Python libraries and frameworks, including:
 
-- [Django](https://docs.sentry.io/platforms/python/integrations/django/) – Full support for error and performance tracking.
-- [Flask](https://docs.sentry.io/platforms/python/integrations/flask/) – Flask-specific error handling.
-- [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/) – FastAPI support.
-- [Celery](https://docs.sentry.io/platforms/python/integrations/celery/) – Monitoring distributed tasks.
-- [AWS Lambda](https://docs.sentry.io/platforms/python/integrations/aws-lambda/) – Support for serverless applications.
+- [Django](https://docs.sentry.io/platforms/python/integrations/django/)
+- [Flask](https://docs.sentry.io/platforms/python/integrations/flask/)
+- [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/)
+- [Celery](https://docs.sentry.io/platforms/python/integrations/celery/)
+- [AWS Lambda](https://docs.sentry.io/platforms/python/integrations/aws-lambda/)
 
 Want more? [Check out the full list of integrations](https://docs.sentry.io/platforms/python/integrations/).
 
@@ -95,21 +93,16 @@ For details on how to contribute, please check out [CONTRIBUTING.md](CONTRIBUTIN
 
 ## Need Help?
 
-If you encounter issues, don’t hesitate to reach out to our community for support:
-
-- **[Sentry Discord Community](https://discord.com/invite/Ww9hbqr)** – A helpful community is ready to assist.
-- **[Stack Overflow](http://stackoverflow.com/questions/tagged/sentry)** – A great place for asking questions.
-- **[Sentry Forum](https://forum.sentry.io/c/sdks)** – Share ideas and get advice.
+If you encounter issues or need help setting up or configuring the SDK, don’t hesitate to reach out to the [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr). There is a ton of great people there ready to help!
 
 ## Resources
 
 Here are additional resources to help you make the most of Sentry:
 
 - [![Documentation](https://img.shields.io/badge/documentation-sentry.io-green.svg)](https://docs.sentry.io/quickstart/) – Official documentation to get started.
-- [![Forum](https://img.shields.io/badge/forum-sentry-green.svg)](https://forum.sentry.io/c/sdks) – Forums for in-depth discussions.
-- [![Stack Overflow](https://img.shields.io/badge/stack%20overflow-sentry-green.svg)](http://stackoverflow.com/questions/tagged/sentry) – Ask questions here.
 - [![Discord](https://img.shields.io/discord/621778831602221064)](https://discord.gg/Ww9hbqr) – Join our Discord community.
-- [![Twitter Follow](https://img.shields.io/twitter/follow/getsentry?label=getsentry&style=social)](https://twitter.com/intent/follow?screen_name=getsentry) – Follow us on Twitter for updates.
+- [![Twitter Follow](https://img.shields.io/twitter/follow/getsentry?label=getsentry&style=social)](https://twitter.com/intent/follow?screen_name=getsentry) – Follow us on X (Twitter) for updates.
+- [![Stack Overflow](https://img.shields.io/badge/stack%20overflow-sentry-green.svg)](http://stackoverflow.com/questions/tagged/sentry) – Questions and answers related to Sentry.
 
 ## License
 
@@ -117,12 +110,8 @@ The SDK is open-source and available under the MIT license. Check out the [LICEN
 
 ---
 
-Thanks to all the contributors who have made the Sentry Python SDK great!
+Thanks to everyone who has helped improve the SDK!
 
 <a href="https://github.com/getsentry/sentry-python/graphs/contributors">
   <img src="https://contributors-img.web.app/image?repo=getsentry/sentry-python" />
 </a>
-
----
-
-Keep writing better code and let Sentry handle the errors.
