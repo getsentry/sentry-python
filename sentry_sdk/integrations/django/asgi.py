@@ -172,6 +172,10 @@ def wrap_async_view(callback):
     @functools.wraps(callback)
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
+        current_scope = sentry_sdk.get_current_scope()
+        if current_scope.transaction is not None:
+            current_scope.transaction.update_active_thread()
+
         sentry_scope = sentry_sdk.get_isolation_scope()
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
