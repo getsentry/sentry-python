@@ -10,4 +10,7 @@ executing
 asttokens
 responses
 pysocks
+socksio
+httpcore[http2]
 setuptools
+Brotli

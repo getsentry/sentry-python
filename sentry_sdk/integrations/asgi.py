@@ -28,6 +28,7 @@ from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
     TRANSACTION_SOURCE_URL,
     TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_CUSTOM,
 )
 from sentry_sdk.utils import (
     ContextVar,
@@ -274,6 +275,7 @@ class SentryAsgiMiddleware:
         ].get("source") in [
             TRANSACTION_SOURCE_COMPONENT,
             TRANSACTION_SOURCE_ROUTE,
+            TRANSACTION_SOURCE_CUSTOM,
         ]
         if not already_set:
             name, source = self._get_transaction_name_and_source(
