@@ -1161,7 +1161,14 @@ def event_from_exception(
     # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+    # TODO: do not use extract_stack() but get the real stack frames (instead of summaries with extract_stack)
+    # to get all the information about the frames
     full_stack = traceback.extract_stack()
+
+    # TODO: add an option "add_full_stack" to the client options to add the full stack to the event (defaults to True)
+    
+    # TODO: add an option "max_stack_frames" to the client options to limit the number of stack frames (defaults to 50?)
+
     return (
         {
             "level": "error",
