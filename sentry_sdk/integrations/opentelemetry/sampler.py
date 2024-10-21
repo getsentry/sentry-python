@@ -48,10 +48,13 @@ def get_parent_sampled(parent_context, trace_id):
 
 def dropped_result(span_context, attributes, sample_rate=None):
     # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
-    # note that trace_state.add will NOT overwrite existing entries
-    # so these will only be added the first time in a root span sampling decision
-    trace_state = span_context.trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
-    if sample_rate:
+    # these will only be added the first time in a root span sampling decision
+    trace_state = span_context.trace_state
+
+    if TRACESTATE_SAMPLED_KEY not in trace_state:
+        trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
+
+    if sample_rate and TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     return SamplingResult(
@@ -63,11 +66,13 @@ def dropped_result(span_context, attributes, sample_rate=None):
 
 def sampled_result(span_context, attributes, sample_rate):
     # type: (SpanContext, Attributes, float) -> SamplingResult
-    # note that trace_state.add will NOT overwrite existing entries
-    # so these will only be added the first time in a root span sampling decision
-    trace_state = span_context.trace_state.add(TRACESTATE_SAMPLED_KEY, "true").add(
-        TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate)
-    )
+    # these will only be added the first time in a root span sampling decision
+    trace_state = span_context.trace_state
+
+    if TRACESTATE_SAMPLED_KEY not in trace_state:
+        trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "true")
+    if TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
+        trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     return SamplingResult(
         Decision.RECORD_AND_SAMPLE,

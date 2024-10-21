@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     )
 
     from gevent.hub import Hub as GeventHub
+    from opentelemetry.util.types import AttributeValue
 
     from sentry_sdk._types import Event, ExcInfo
 
@@ -1831,3 +1832,28 @@ def get_current_thread_meta(thread=None):
 
     # we've tried everything, time to give up
     return None, None
+
+
+def _serialize_span_attribute(value):
+    # type: (Any) -> Optional[AttributeValue]
+    """Serialize an object so that it's OTel-compatible and displays nicely in Sentry."""
+    # check for allowed primitives
+    if isinstance(value, (int, str, float, bool)):
+        return value
+
+    # lists are allowed too, as long as they don't mix types
+    if isinstance(value, (list, tuple)):
+        for type_ in (int, str, float, bool):
+            if all(isinstance(item, type_) for item in value):
+                return list(value)
+
+    # if this is anything else, just try to coerce to string
+    # we prefer json.dumps since this makes things like dictionaries display
+    # nicely in the UI
+    try:
+        return json.dumps(value)
+    except TypeError:
+        try:
+            return str(value)
+        except Exception:
+            return None

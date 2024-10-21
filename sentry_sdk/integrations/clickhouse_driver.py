@@ -3,7 +3,11 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
+from sentry_sdk.utils import (
+    _serialize_span_attribute,
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+)
 
 from typing import TYPE_CHECKING, TypeVar
 
@@ -91,13 +95,15 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 
         _set_db_data(span, connection)
 
-        span.set_data("query", query)
+        if should_send_default_pii():
+            span.set_attribute("db.query.text", query)
 
         if query_id:
-            span.set_data("db.query_id", query_id)
+            span.set_attribute("db.query_id", query_id)
 
         if params and should_send_default_pii():
-            span.set_data("db.params", params)
+            connection._sentry_db_params = params
+            span.set_attribute("db.params", _serialize_span_attribute(params))
 
         # run the original code
         ret = f(*args, **kwargs)
@@ -115,14 +121,26 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
         if span is not None:
             if res is not None and should_send_default_pii():
-                span.set_data("db.result", res)
+                span.set_attribute("db.result", _serialize_span_attribute(res))
 
             with capture_internal_exceptions():
-                span.scope.add_breadcrumb(
-                    message=span._data.pop("query"),
-                    category="query",
-                    data=span._data,
-                )
+                query = span.get_attribute("db.query.text")
+                if query:
+                    data = {}
+                    for attr in (
+                        "db.params",
+                        "db.result",
+                        SPANDATA.DB_SYSTEM,
+                        SPANDATA.DB_USER,
+                        SPANDATA.SERVER_ADDRESS,
+                        SPANDATA.SERVER_PORT,
+                    ):
+                        if span.get_attribute(attr):
+                            data[attr] = span.get_attribute(attr)
+
+                    sentry_sdk.add_breadcrumb(
+                        message=query, category="query", data=data
+                    )
 
             span.finish()
 
@@ -141,9 +159,15 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
             _set_db_data(span, instance.connection)
 
             if should_send_default_pii():
-                db_params = span._data.get("db.params", [])
+                db_params = (
+                    getattr(instance.connection, "_sentry_db_params", None) or []
+                )
                 db_params.extend(data)
-                span.set_data("db.params", db_params)
+                span.set_attribute("db.params", _serialize_span_attribute(db_params))
+                try:
+                    del instance.connection._sentry_db_params
+                except AttributeError:
+                    pass
 
         return f(*args, **kwargs)
 
@@ -153,8 +177,8 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
 def _set_db_data(
     span: Span, connection: clickhouse_driver.connection.Connection
 ) -> None:
-    span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
-    span.set_data(SPANDATA.SERVER_ADDRESS, connection.host)
-    span.set_data(SPANDATA.SERVER_PORT, connection.port)
-    span.set_data(SPANDATA.DB_NAME, connection.database)
-    span.set_data(SPANDATA.DB_USER, connection.user)
+    span.set_attribute(SPANDATA.DB_SYSTEM, "clickhouse")
+    span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
+    span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
+    span.set_attribute(SPANDATA.DB_NAME, connection.database)
+    span.set_attribute(SPANDATA.DB_USER, connection.user)
