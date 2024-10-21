@@ -278,14 +278,14 @@ def test_http2_with_https_dsn(make_client):
     client = make_client(_experiments={"transport_http2": True})
     client.transport.parsed_dsn.scheme = "https"
     options = client.transport._get_pool_options()
-    assert options["http2"] == True
+    assert options["http2"] is True
 
 
 def test_no_http2_with_http_dsn(make_client):
     client = make_client(_experiments={"transport_http2": True})
     client.transport.parsed_dsn.scheme = "http"
     options = client.transport._get_pool_options()
-    assert options["http2"] == False
+    assert options["http2"] is False
 
 
 def test_socket_options_override_keep_alive(make_client):
