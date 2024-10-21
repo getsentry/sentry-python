@@ -274,6 +274,7 @@ def test_keep_alive_on_by_default(make_client):
     assert "socket_options" not in options
 
 
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_http2_with_https_dsn(make_client):
     client = make_client(_experiments={"transport_http2": True})
     client.transport.parsed_dsn.scheme = "https"
@@ -281,6 +282,7 @@ def test_http2_with_https_dsn(make_client):
     assert options["http2"] is True
 
 
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_no_http2_with_http_dsn(make_client):
     client = make_client(_experiments={"transport_http2": True})
     client.transport.parsed_dsn.scheme = "http"
