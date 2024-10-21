@@ -18,7 +18,8 @@ from sentry_sdk.utils import logger
 try:
     from opentelemetry import trace
     from opentelemetry.propagate import set_global_textmap
-    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.trace import Span as AbstractSpan
+    from opentelemetry.sdk.trace import TracerProvider, Span, ReadableSpan
 except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
@@ -26,6 +27,11 @@ try:
     from opentelemetry.instrumentation.django import DjangoInstrumentor  # type: ignore[import-not-found]
 except ImportError:
     DjangoInstrumentor = None
+
+from sentry_sdk._types import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Union, Any
 
 
 CONFIGURABLE_INSTRUMENTATIONS = {
@@ -45,9 +51,38 @@ class OpenTelemetryIntegration(Integration):
         )
 
         _setup_sentry_tracing()
+        _patch_readable_span()
         # _setup_instrumentors()
 
         logger.debug("[OTel] Finished setting up OpenTelemetry integration")
+
+
+def _patch_readable_span():
+    # type: () -> None
+    """
+    We need to pass through sentry specific metadata/objects from Span to ReadableSpan
+    to work with them consistently in the SpanProcessor.
+    """
+
+    @property
+    def sentry_meta(self):
+        # type: (Union[AbstractSpan, Span, ReadableSpan]) -> dict[str, Any]
+        if not getattr(self, "_sentry_meta", None):
+            self._sentry_meta = {}
+        return self._sentry_meta
+
+    AbstractSpan.sentry_meta = sentry_meta
+    ReadableSpan.sentry_meta = sentry_meta
+
+    old_readable_span = Span._readable_span
+
+    def sentry_patched_readable_span(self):
+        # type: (Span) -> ReadableSpan
+        readable_span = old_readable_span(self)
+        readable_span._sentry_meta = self._sentry_meta
+        return readable_span
+
+    Span._readable_span = sentry_patched_readable_span
 
 
 def _setup_sentry_tracing():
