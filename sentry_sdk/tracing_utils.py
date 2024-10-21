@@ -157,18 +157,17 @@ def record_sql_queries(
 
 def maybe_create_breadcrumbs_from_span(scope, span):
     # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
-
     if span.op == OP.DB_REDIS:
         scope.add_breadcrumb(
-            message=span.description, type="redis", category="redis", data=span._tags
+            message=span.description,
+            type="redis",
+            category="redis",
+            data=span._tags,
         )
     elif span.op == OP.HTTP_CLIENT:
-        scope.add_breadcrumb(type="http", category="httplib", data=span._data)
-    elif span.op == "subprocess":
         scope.add_breadcrumb(
-            type="subprocess",
-            category="subprocess",
-            message=span.description,
+            type="http",
+            category="httplib",
             data=span._data,
         )
 
