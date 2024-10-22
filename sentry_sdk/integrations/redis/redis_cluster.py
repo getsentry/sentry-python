@@ -35,8 +35,8 @@ def _get_async_cluster_db_data(async_redis_cluster_instance):
         return {}
 
 
-def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
-    # type: (Span, AsyncClusterPipeline[Any]) -> dict[str, Any]
+def _get_async_cluster_pipeline_db_data(async_redis_cluster_pipeline_instance):
+    # type: (AsyncClusterPipeline[Any]) -> dict[str, Any]
     with capture_internal_exceptions():
         return _get_async_cluster_db_data(
             # the AsyncClusterPipeline has always had a `_client` attr but it is private so potentially problematic and mypy
@@ -98,5 +98,5 @@ def _patch_redis_cluster():
             async_cluster.ClusterPipeline,
             is_cluster=True,
             get_command_args_fn=_parse_rediscluster_command,
-            get_db_data_fn=_set_async_cluster_pipeline_db_data,
+            get_db_data_fn=_get_async_cluster_pipeline_db_data,
         )
