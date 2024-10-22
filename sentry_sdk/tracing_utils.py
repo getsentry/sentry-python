@@ -157,13 +157,8 @@ def record_sql_queries(
 
 def maybe_create_breadcrumbs_from_span(scope, span):
     # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
-    if span.op == OP.DB_REDIS:
-        scope.add_breadcrumb(
-            message=span.description,
-            type="redis",
-            category="redis",
-            data=span._tags,
-        )
+    # TODO: can be removed when POtelSpan replaces Span
+    pass
 
 
 def _get_frame_module_abs_path(frame):
