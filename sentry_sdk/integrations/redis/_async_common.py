@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 def patch_redis_async_pipeline(
     pipeline_cls, is_cluster, get_command_args_fn, get_db_data_fn
 ):
-    # type: (Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]], bool, Any, Callable[[Span, Any], None]) -> None
+    # type: (Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]], bool, Any, Callable[[Any], dict[str, Any]]) -> None
     old_execute = pipeline_cls.execute
 
     from sentry_sdk.integrations.redis import RedisIntegration
@@ -47,7 +47,9 @@ def patch_redis_async_pipeline(
                     is_cluster=is_cluster,
                     get_command_args_fn=get_command_args_fn,
                     is_transaction=False if is_cluster else self.is_transaction,
-                    command_stack=self._command_stack if is_cluster else self.command_stack,
+                    command_stack=(
+                        self._command_stack if is_cluster else self.command_stack
+                    ),
                 )
                 _update_span(span, span_data, pipeline_data)
 
@@ -57,7 +59,7 @@ def patch_redis_async_pipeline(
 
 
 def patch_redis_async_client(cls, is_cluster, get_db_data_fn):
-    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None]) -> None
+    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Any], dict[str, Any]]) -> None
     old_execute_command = cls.execute_command
 
     from sentry_sdk.integrations.redis import RedisIntegration

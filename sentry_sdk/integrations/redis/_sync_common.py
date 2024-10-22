@@ -27,7 +27,7 @@ def patch_redis_pipeline(
     get_command_args_fn,
     get_db_data_fn,
 ):
-    # type: (Any, bool, Any, Callable[[Span, Any], None]) -> None
+    # type: (Any, bool, Any, Callable[[Any], dict[str, Any]]) -> None
     old_execute = pipeline_cls.execute
 
     from sentry_sdk.integrations.redis import RedisIntegration
@@ -36,7 +36,6 @@ def patch_redis_pipeline(
         # type: (Any, *Any, **Any) -> Any
         if sentry_sdk.get_client().get_integration(RedisIntegration) is None:
             return old_execute(self, *args, **kwargs)
-
 
         with sentry_sdk.start_span(
             op=OP.DB_REDIS,
@@ -59,7 +58,7 @@ def patch_redis_pipeline(
 
 
 def patch_redis_client(cls, is_cluster, get_db_data_fn):
-    # type: (Any, bool, Callable[[Span, Any], None]) -> None
+    # type: (Any, bool, Callable[[Any], dict[str, Any]]) -> None
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
@@ -100,7 +99,7 @@ def patch_redis_client(cls, is_cluster, get_db_data_fn):
         db_span.__enter__()
 
         db_span_data = get_db_data_fn(self)
-        db_client_span_data = _get_client_data(db_span, is_cluster, name, *args)
+        db_client_span_data = _get_client_data(is_cluster, name, *args)
         _update_span(db_span, db_span_data, db_client_span_data)
 
         value = old_execute_command(self, name, *args, **kwargs)

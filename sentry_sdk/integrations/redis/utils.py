@@ -124,14 +124,12 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
-def _get_pipeline_data(
-    is_cluster, get_command_args_fn, is_transaction, command_stack
-):
+def _get_pipeline_data(is_cluster, get_command_args_fn, is_transaction, command_stack):
     # type: (bool, Any, bool, Sequence[Any]) -> dict[str, Any]
     data = {
         "redis.is_cluster": is_cluster,
         "redis.transaction": is_transaction,
-    }
+    }  # type: dict[str, Any]
 
     commands = []
     for i, arg in enumerate(command_stack):
@@ -151,7 +149,8 @@ def _get_client_data(is_cluster, name, *args):
     # type: (bool, str, *Any) -> dict[str, Any]
     data = {
         "redis.is_cluster": is_cluster,
-    }
+    }  # type: dict[str, Any]
+
     if name:
         data["redis.command"] = name
         data[SPANDATA.DB_OPERATION] = name
