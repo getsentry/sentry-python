@@ -28,7 +28,7 @@ def test_no_cache_basic(sentry_init, capture_events):
         connection.get("mycachekey")
 
     (event,) = events
-    spans = event["spans"]
+    spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
     assert len(spans) == 1
     assert spans[0]["op"] == "db.redis"
 
@@ -53,7 +53,7 @@ def test_cache_basic(sentry_init, capture_events):
         connection.mget("mycachekey1", "mycachekey2")
 
     (event,) = events
-    spans = event["spans"]
+    spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
     assert len(spans) == 9
 
     # no cache support for hget command
@@ -96,7 +96,8 @@ def test_cache_keys(sentry_init, capture_events):
         connection.get("bl")
 
     (event,) = events
-    spans = event["spans"]
+    spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
+
     assert len(spans) == 6
     assert spans[0]["op"] == "db.redis"
     assert spans[0]["description"] == "GET 'somethingelse'"
@@ -133,7 +134,7 @@ def test_cache_data(sentry_init, capture_events):
         connection.get("mycachekey")
 
     (event,) = events
-    spans = event["spans"]
+    spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
 
     assert len(spans) == 6
 
@@ -222,7 +223,7 @@ def test_cache_prefixes(sentry_init, capture_events):
 
     (event,) = events
 
-    spans = event["spans"]
+    spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
     assert len(spans) == 13  # 8 db spans + 5 cache spans
 
     cache_spans = [span for span in spans if span["op"] == "cache.get"]

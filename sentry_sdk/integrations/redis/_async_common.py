@@ -100,7 +100,9 @@ def patch_redis_async_client(cls, is_cluster, get_db_data_fn):
         db_span_data = get_db_data_fn(self)
         db_client_span_data = _get_client_data(is_cluster, name, *args)
         _update_span(db_span, db_span_data, db_client_span_data)
-        _create_breadcrumb(db_properties["op"], db_span_data, db_client_span_data)
+        _create_breadcrumb(
+            db_properties["description"], db_span_data, db_client_span_data
+        )
 
         value = await old_execute_command(self, name, *args, **kwargs)
 

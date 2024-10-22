@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 TAG_KEYS = [
-    "redis.commands",
+    "redis.command",
     "redis.is_cluster",
     "redis.key",
     "redis.transaction",
@@ -42,17 +42,19 @@ def _update_span(span, *data_bags):
 def _create_breadcrumb(message, *data_bags):
     # type: (str, *dict[str, Any]) -> None
     """
-    Create a breadcrumb containing the data from the given data bags.
+    Create a breadcrumb containing the tags data from the given data bags.
     """
-    combined_data = {}
+    data = {}
     for data in data_bags:
-        combined_data.update(data)
+        for key, value in data.items():
+            if key in TAG_KEYS:
+                data[key] = value
 
     sentry_sdk.add_breadcrumb(
         message=message,
         type="redis",
         category="redis",
-        data=combined_data,
+        data=data,
     )
 
 
