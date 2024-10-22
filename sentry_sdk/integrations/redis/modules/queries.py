@@ -43,8 +43,8 @@ def _get_db_span_description(integration, command_name, args):
     return description
 
 
-def _get_connection_data(span, connection_params):
-    # type: (Span, dict[str, Any]) -> None
+def _get_connection_data(connection_params):
+    # type: (dict[str, Any]) -> dict[str, Any]
     data = {
         SPANDATA.DB_SYSTEM: "redis",
     }
@@ -64,9 +64,9 @@ def _get_connection_data(span, connection_params):
     return data
 
 
-def _set_db_data(span, redis_instance):
-    # type: (Span, Redis[Any]) -> None
+def _get_db_data(redis_instance):
+    # type: (Redis[Any]) -> dict[str, Any]
     try:
-        _get_connection_data(span, redis_instance.connection_pool.connection_kwargs)
+        return _get_connection_data(redis_instance.connection_pool.connection_kwargs)
     except AttributeError:
-        pass  # connections_kwargs may be missing in some cases
+        return {}  # connections_kwargs may be missing in some cases

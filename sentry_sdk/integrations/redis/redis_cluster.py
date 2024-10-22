@@ -67,13 +67,13 @@ def _patch_redis_cluster():
         patch_redis_client(
             RedisCluster,
             is_cluster=True,
-            set_db_data_fn=_set_cluster_db_data,
+            get_db_data_fn=_set_cluster_db_data,
         )
         patch_redis_pipeline(
             cluster.ClusterPipeline,
             is_cluster=True,
             get_command_args_fn=_parse_rediscluster_command,
-            set_db_data_fn=_set_cluster_db_data,
+            get_db_data_fn=_set_cluster_db_data,
         )
 
     try:
@@ -89,11 +89,11 @@ def _patch_redis_cluster():
         patch_redis_async_client(
             async_cluster.RedisCluster,
             is_cluster=True,
-            set_db_data_fn=_set_async_cluster_db_data,
+            get_db_data_fn=_set_async_cluster_db_data,
         )
         patch_redis_async_pipeline(
             async_cluster.ClusterPipeline,
             is_cluster=True,
             get_command_args_fn=_parse_rediscluster_command,
-            set_db_data_fn=_set_async_cluster_pipeline_db_data,
+            get_db_data_fn=_set_async_cluster_pipeline_db_data,
         )
