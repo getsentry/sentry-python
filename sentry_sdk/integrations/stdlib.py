@@ -137,11 +137,7 @@ def _install_httplib():
 
         rv = real_getresponse(self, *args, **kwargs)
 
-        span.set_http_status(int(rv.status))
-        span.set_data("reason", rv.reason)
-        span.finish()
-
-        span_data = getattr(self, "_sentrysdk_span_data", None)
+        span_data = getattr(self, "_sentrysdk_span_data", {})
         span_data[SPANDATA.HTTP_STATUS_CODE] = int(rv.status)
         span_data["reason"] = rv.reason
 
@@ -150,6 +146,10 @@ def _install_httplib():
             category="httplib",
             data=span_data,
         )
+
+        span.set_http_status(int(rv.status))
+        span.set_data("reason", rv.reason)
+        span.finish()
 
         return rv
 

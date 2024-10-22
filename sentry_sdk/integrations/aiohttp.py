@@ -271,12 +271,7 @@ def create_trace_config():
         if trace_config_ctx.span is None:
             return
 
-        span = trace_config_ctx.span
-        span.set_http_status(int(params.response.status))
-        span.set_data("reason", params.response.reason)
-        span.finish()
-
-        span_data = trace_config_ctx.span_data
+        span_data = trace_config_ctx.span_data or {}
         span_data[SPANDATA.HTTP_STATUS_CODE] = int(params.response.status)
         span_data["reason"] = params.response.reason
 
@@ -285,6 +280,11 @@ def create_trace_config():
             category="httplib",
             data=span_data,
         )
+
+        span = trace_config_ctx.span
+        span.set_http_status(int(params.response.status))
+        span.set_data("reason", params.response.reason)
+        span.finish()
 
     trace_config = TraceConfig()
 
