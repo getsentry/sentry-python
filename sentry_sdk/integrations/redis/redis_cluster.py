@@ -26,18 +26,19 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def _set_async_cluster_db_data(span, async_redis_cluster_instance):
-    # type: (Span, AsyncRedisCluster[Any]) -> None
+def _get_async_cluster_db_data(async_redis_cluster_instance):
+    # type: (AsyncRedisCluster[Any]) -> dict[str, Any]
     default_node = async_redis_cluster_instance.get_default_node()
     if default_node is not None and default_node.connection_kwargs is not None:
-        _get_connection_data(span, default_node.connection_kwargs)
+        return _get_connection_data(default_node.connection_kwargs)
+    else:
+        return {}
 
 
 def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
-    # type: (Span, AsyncClusterPipeline[Any]) -> None
+    # type: (Span, AsyncClusterPipeline[Any]) -> dict[str, Any]
     with capture_internal_exceptions():
-        _set_async_cluster_db_data(
-            span,
+        return _get_async_cluster_db_data(
             # the AsyncClusterPipeline has always had a `_client` attr but it is private so potentially problematic and mypy
             # does not recognize it - see https://github.com/redis/redis-py/blame/v5.0.0/redis/asyncio/cluster.py#L1386
             async_redis_cluster_pipeline_instance._client,  # type: ignore[attr-defined]
@@ -91,7 +92,7 @@ def _patch_redis_cluster():
         patch_redis_async_client(
             async_cluster.RedisCluster,
             is_cluster=True,
-            get_db_data_fn=_set_async_cluster_db_data,
+            get_db_data_fn=_get_async_cluster_db_data,
         )
         patch_redis_async_pipeline(
             async_cluster.ClusterPipeline,
