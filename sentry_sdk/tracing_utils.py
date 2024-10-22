@@ -164,12 +164,6 @@ def maybe_create_breadcrumbs_from_span(scope, span):
             category="redis",
             data=span._tags,
         )
-    elif span.op == OP.HTTP_CLIENT:
-        scope.add_breadcrumb(
-            type="http",
-            category="httplib",
-            data=span._data,
-        )
 
 
 def _get_frame_module_abs_path(frame):
