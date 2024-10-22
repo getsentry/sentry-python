@@ -9,7 +9,7 @@ from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
 )
-from sentry_sdk.integrations.redis.modules.queries import _set_db_data_on_span
+from sentry_sdk.integrations.redis.modules.queries import _get_connection_data
 from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 
 from sentry_sdk.utils import capture_internal_exceptions
@@ -30,7 +30,7 @@ def _set_async_cluster_db_data(span, async_redis_cluster_instance):
     # type: (Span, AsyncRedisCluster[Any]) -> None
     default_node = async_redis_cluster_instance.get_default_node()
     if default_node is not None and default_node.connection_kwargs is not None:
-        _set_db_data_on_span(span, default_node.connection_kwargs)
+        _get_connection_data(span, default_node.connection_kwargs)
 
 
 def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
@@ -53,7 +53,7 @@ def _set_cluster_db_data(span, redis_cluster_instance):
             "host": default_node.host,
             "port": default_node.port,
         }
-        _set_db_data_on_span(span, connection_params)
+        _get_connection_data(span, connection_params)
 
 
 def _patch_redis_cluster():
