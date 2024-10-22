@@ -8,7 +8,7 @@ from sentry_sdk.integrations.redis.modules.caches import (
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
     _set_client_data,
-    _set_pipeline_data,
+    _get_pipeline_data,
 )
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
@@ -44,12 +44,11 @@ def patch_redis_pipeline(
         ) as span:
             with capture_internal_exceptions():
                 span_data = get_db_data_fn(self)
-                _set_pipeline_data(
-                    span,
-                    is_cluster,
-                    get_command_args_fn,
-                    False if is_cluster else self.transaction,
-                    self.command_stack,
+                pipeline_data = _get_pipeline_data(
+                    is_cluster=is_cluster,
+                    get_command_args_fn=get_command_args_fn,
+                    is_transaction=False if is_cluster else self.transaction,
+                    command_stack=self.command_stack,
                 )
 
             return old_execute(self, *args, **kwargs)

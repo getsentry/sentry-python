@@ -105,12 +105,14 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
-def _set_pipeline_data(
-    span, is_cluster, get_command_args_fn, is_transaction, command_stack
+def _get_pipeline_data(
+    is_cluster, get_command_args_fn, is_transaction, command_stack
 ):
-    # type: (Span, bool, Any, bool, Sequence[Any]) -> None
-    span.set_tag("redis.is_cluster", is_cluster)
-    span.set_tag("redis.transaction", is_transaction)
+    # type: (bool, Any, bool, Sequence[Any]) -> dict[str, Any]
+    data = {
+        "redis.is_cluster": is_cluster,
+        "redis.transaction": is_transaction,
+    }
 
     commands = []
     for i, arg in enumerate(command_stack):
@@ -120,8 +122,10 @@ def _set_pipeline_data(
         command = get_command_args_fn(arg)
         commands.append(_get_safe_command(command[0], command[1:]))
 
-    span.set_data("redis.commands.count", len(command_stack))
-    span.set_data("redis.commands.first_ten", commands)
+    data["redis.commands.count"] = len(command_stack)
+    data["redis.commands.first_ten"] = commands
+
+    return data
 
 
 def _set_client_data(span, is_cluster, name, *args):
