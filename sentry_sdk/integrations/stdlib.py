@@ -95,11 +95,17 @@ def _install_httplib():
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin="auto.http.stdlib.httplib",
         )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
+
+        data = {
+            SPANDATA.HTTP_METHOD: method,
+        }
         if parsed_url is not None:
-            span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            data["url"] = parsed_url.url
+            data[SPANDATA.HTTP_QUERY] = parsed_url.query
+            data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
+        for key, value in data.items():
+            span.set_data(key, value)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
@@ -118,6 +124,7 @@ def _install_httplib():
                 self.putheader(key, value)
 
         self._sentrysdk_span = span  # type: ignore[attr-defined]
+        self._sentrysdk_span_data = data  # type: ignore[attr-defined]
 
         return rv
 
@@ -133,6 +140,16 @@ def _install_httplib():
         span.set_http_status(int(rv.status))
         span.set_data("reason", rv.reason)
         span.finish()
+
+        span_data = getattr(self, "_sentrysdk_span_data", None)
+        span_data[SPANDATA.HTTP_STATUS_CODE] = int(rv.status)
+        span_data["reason"] = rv.reason
+
+        sentry_sdk.add_breadcrumb(
+            type="http",
+            category="httplib",
+            data=span_data,
+        )
 
         return rv
 
