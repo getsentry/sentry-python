@@ -1326,8 +1326,12 @@ class POTelSpan:
     @property
     def root_span(self):
         # type: () -> Optional[POTelSpan]
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            get_sentry_meta,
+        )
+
         root_otel_span = cast(
-            "Optional[OtelSpan]", self._otel_span.sentry_meta.get("root_span", None)
+            "Optional[OtelSpan]", get_sentry_meta(self._otel_span, "root_span")
         )
         return POTelSpan(otel_span=root_otel_span) if root_otel_span else None
 

@@ -20,6 +20,8 @@ from sentry_sdk.integrations.opentelemetry.utils import (
     extract_span_data,
     extract_transaction_name_source,
     get_trace_context,
+    get_sentry_meta,
+    set_sentry_meta,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,
@@ -85,12 +87,11 @@ class PotelSentrySpanProcessor(SpanProcessor):
         """
         if parent_span != INVALID_SPAN and not parent_span.get_span_context().is_remote:
             # child span points to parent's root or parent
-            span.sentry_meta["root_span"] = parent_span.sentry_meta.get(
-                "root_span", parent_span
-            )
+            parent_root_span = get_sentry_meta(parent_span, "root_span")
+            set_sentry_meta(span, "root_span", parent_root_span or parent_span)
         else:
             # root span points to itself
-            span.sentry_meta["root_span"] = span
+            set_sentry_meta(span, "root_span", span)
 
     def _flush_root_span(self, span):
         # type: (ReadableSpan) -> None

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from urllib3.util import parse_url as urlparse
 from urllib.parse import quote
 from opentelemetry.trace import (
-    Span,
+    Span as AbstractSpan,
     SpanKind,
     StatusCode,
     format_trace_id,
@@ -365,7 +365,7 @@ def has_incoming_trace(trace_state):
 
 
 def get_trace_state(span):
-    # type: (Union[Span, ReadableSpan]) -> TraceState
+    # type: (Union[AbstractSpan, ReadableSpan]) -> TraceState
     """
     Get the existing trace_state with sentry items
     or populate it if we are the head SDK.
@@ -404,27 +404,31 @@ def get_trace_state(span):
                 Baggage.SENTRY_PREFIX + "public_key", Dsn(options["dsn"]).public_key
             )
 
-        # we cannot access the root span in most cases here, so we HAVE to rely on the
-        # scopes to carry the correct transaction name/source.
-        # IDEALLY we will always move to using the isolation scope here
-        # but our integrations do all kinds of stuff with both isolation and current
-        # so I am keeping both for now as a best attempt solution till we get to a better state.
-        isolation_scope = sentry_sdk.get_isolation_scope()
-        current_scope = sentry_sdk.get_current_scope()
-        if (
-            current_scope.transaction_name
-            and current_scope.transaction_source not in LOW_QUALITY_TRANSACTION_SOURCES
-        ):
-            trace_state = trace_state.update(
-                Baggage.SENTRY_PREFIX + "transaction", current_scope.transaction_name
-            )
-        elif (
-            isolation_scope.transaction_name
-            and isolation_scope.transaction_source
-            not in LOW_QUALITY_TRANSACTION_SOURCES
-        ):
-            trace_state = trace_state.update(
-                Baggage.SENTRY_PREFIX + "transaction", isolation_scope.transaction_name
+        root_span = get_sentry_meta(span, "root_span")
+        if root_span and isinstance(root_span, ReadableSpan):
+            transaction_name, transaction_source = extract_transaction_name_source(
+                root_span
             )
 
+            if (
+                transaction_name
+                and transaction_source not in LOW_QUALITY_TRANSACTION_SOURCES
+            ):
+                trace_state = trace_state.update(
+                    Baggage.SENTRY_PREFIX + "transaction", transaction_name
+                )
+
         return trace_state
+
+
+def get_sentry_meta(span, key):
+    # type: (Union[AbstractSpan, ReadableSpan], str) -> Any
+    sentry_meta = getattr(span, "_sentry_meta", None)
+    return sentry_meta.get(key) if sentry_meta else None
+
+
+def set_sentry_meta(span, key, value):
+    # type: (Union[AbstractSpan, ReadableSpan], str, Any) -> None
+    sentry_meta = getattr(span, "_sentry_meta", {})
+    sentry_meta[key] = value
+    span._sentry_meta = sentry_meta
