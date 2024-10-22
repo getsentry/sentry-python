@@ -3,7 +3,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
 from sentry_sdk.integrations.redis.modules.caches import (
     _compile_cache_span_properties,
-    _set_cache_data,
+    _get_cache_data,
 )
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
@@ -105,7 +105,7 @@ def patch_redis_client(cls, is_cluster, get_db_data_fn):
         db_span.__exit__(None, None, None)
 
         if cache_span:
-            _set_cache_data(cache_span, self, cache_properties, value)
+            cache_span_data = _get_cache_data(self, cache_properties, value)
             cache_span.__exit__(None, None, None)
 
         return value
