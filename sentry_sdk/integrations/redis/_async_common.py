@@ -12,7 +12,6 @@ from sentry_sdk.integrations.redis.utils import (
     _get_pipeline_data,
     _update_span,
 )
-from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 from typing import TYPE_CHECKING

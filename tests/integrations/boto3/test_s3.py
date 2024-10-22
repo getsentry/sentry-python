@@ -45,7 +45,7 @@ def test_breadcrumb(sentry_init, capture_events):
 
     try:
         s3 = session.resource("s3")
-        with sentry_sdk.start_transaction() as transaction, MockResponse(
+        with sentry_sdk.start_transaction(), MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
             bucket = s3.Bucket("bucket")
