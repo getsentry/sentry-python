@@ -128,16 +128,20 @@ def _get_pipeline_data(
     return data
 
 
-def _set_client_data(span, is_cluster, name, *args):
-    # type: (Span, bool, str, *Any) -> None
-    span.set_tag("redis.is_cluster", is_cluster)
+def _get_client_data(is_cluster, name, *args):
+    # type: (bool, str, *Any) -> dict[str, Any]
+    data = {
+        "redis.is_cluster": is_cluster,
+    }
     if name:
-        span.set_tag("redis.command", name)
-        span.set_tag(SPANDATA.DB_OPERATION, name)
+        data["redis.command"] = name
+        data[SPANDATA.DB_OPERATION] = name
 
     if name and args:
         name_low = name.lower()
         if (name_low in _SINGLE_KEY_COMMANDS) or (
             name_low in _MULTI_KEY_COMMANDS and len(args) == 1
         ):
-            span.set_tag("redis.key", args[0])
+            data["redis.key"] = args[0]
+
+    return data

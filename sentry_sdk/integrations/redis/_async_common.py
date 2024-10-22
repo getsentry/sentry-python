@@ -7,7 +7,7 @@ from sentry_sdk.integrations.redis.modules.caches import (
 )
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
-    _set_client_data,
+    _get_client_data,
     _get_pipeline_data,
 )
 from sentry_sdk.tracing import Span
@@ -92,7 +92,7 @@ def patch_redis_async_client(cls, is_cluster, get_db_data_fn):
         db_span.__enter__()
 
         db_span_data = get_db_data_fn(self)
-        _set_client_data(db_span, is_cluster, name, *args)
+        db_client_span_data = _get_client_data(db_span, is_cluster, name, *args)
 
         value = await old_execute_command(self, name, *args, **kwargs)
 
