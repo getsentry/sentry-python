@@ -5,6 +5,8 @@ import urllib.request
 import urllib.error
 import urllib3
 
+from itertools import chain
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -13,11 +15,12 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
 
-from sentry_sdk.utils import logger, env_to_bool
+from sentry_sdk.utils import logger, env_to_bool, capture_internal_exceptions
 from sentry_sdk.envelope import Envelope
 
 
 DEFAULT_SPOTLIGHT_URL = "http://localhost:8969/stream"
+DJANGO_SPOTLIGHT_MIDDLEWARE_PATH = "sentry_sdk.spotlight.SpotlightMiddleware"
 
 
 class SpotlightClient:
@@ -112,9 +115,16 @@ def setup_spotlight(options):
     else:
         return None
 
-    if settings is not None and env_to_bool(
-        os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1")
+    if (
+        settings is not None
+        and settings.DEBUG
+        and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1"))
     ):
-        settings.MIDDLEWARE.append("sentry_sdk.spotlight.SpotlightMiddleware")
+        with capture_internal_exceptions():
+            middleware = settings.MIDDLEWARE
+            if DJANGO_SPOTLIGHT_MIDDLEWARE_PATH not in middleware:
+                settings.MIDDLEWARE = type(middleware)(
+                    chain(middleware, (DJANGO_SPOTLIGHT_MIDDLEWARE_PATH,))
+                )
 
     return SpotlightClient(url)
