@@ -44,8 +44,8 @@ def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_insta
         )
 
 
-def _set_cluster_db_data(span, redis_cluster_instance):
-    # type: (Span, RedisCluster[Any]) -> None
+def _get_cluster_db_data(redis_cluster_instance):
+    # type: (RedisCluster[Any]) -> dict[str, Any]
     default_node = redis_cluster_instance.get_default_node()
 
     if default_node is not None:
@@ -53,7 +53,9 @@ def _set_cluster_db_data(span, redis_cluster_instance):
             "host": default_node.host,
             "port": default_node.port,
         }
-        _get_connection_data(span, connection_params)
+        return _get_connection_data(connection_params)
+    else:
+        return {}
 
 
 def _patch_redis_cluster():
@@ -67,13 +69,13 @@ def _patch_redis_cluster():
         patch_redis_client(
             RedisCluster,
             is_cluster=True,
-            get_db_data_fn=_set_cluster_db_data,
+            get_db_data_fn=_get_cluster_db_data,
         )
         patch_redis_pipeline(
             cluster.ClusterPipeline,
             is_cluster=True,
             get_command_args_fn=_parse_rediscluster_command,
-            get_db_data_fn=_set_cluster_db_data,
+            get_db_data_fn=_get_cluster_db_data,
         )
 
     try:
