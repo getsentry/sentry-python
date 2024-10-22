@@ -18,23 +18,21 @@ except ImportError:
     raise DidNotEnable("LaunchDarkly is not installed")
 
 
+def _get_ldclient():
+    # type: () -> LDClient
+    try:
+        client = ldclient.get()
+    except Exception as exc:
+        sentry_sdk.capture_exception(exc)
+        raise DidNotEnable("Failed to find LaunchDarkly client instance. " + str(exc))
+
+    if client and client.is_initialized():
+        return client
+    raise DidNotEnable("LaunchDarkly client is not initialized")
+
+
 class LaunchDarklyIntegration(Integration):
     identifier = "launchdarkly"
-
-    @staticmethod
-    def get_ldclient():
-        # type: () -> LDClient
-        try:
-            client = ldclient.get()
-        except Exception as exc:
-            sentry_sdk.capture_exception(exc)
-            raise DidNotEnable(
-                "Failed to find LaunchDarkly client instance. " + str(exc)
-            )
-
-        if client and client.is_initialized():
-            return client
-        raise DidNotEnable("LaunchDarkly client is not initialized")
 
     @staticmethod
     def setup_once():
@@ -49,7 +47,7 @@ class LaunchDarklyIntegration(Integration):
         scope.add_error_processor(error_processor)
 
         # Register the hook with the global launchdarkly client.
-        client = LaunchDarklyIntegration.get_ldclient()
+        client = _get_ldclient()
         client.add_hook(LaunchDarklyHook())
 
 
