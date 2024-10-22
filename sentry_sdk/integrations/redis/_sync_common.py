@@ -7,6 +7,7 @@ from sentry_sdk.integrations.redis.modules.caches import (
 )
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
+    _create_breadcrumb,
     _get_client_data,
     _get_pipeline_data,
     _update_span,
@@ -51,6 +52,7 @@ def patch_redis_pipeline(
                     command_stack=self.command_stack,
                 )
                 _update_span(span, span_data, pipeline_data)
+                _create_breadcrumb("redis.pipeline.execute", span_data, pipeline_data)
 
             return old_execute(self, *args, **kwargs)
 
@@ -101,6 +103,7 @@ def patch_redis_client(cls, is_cluster, get_db_data_fn):
         db_span_data = get_db_data_fn(self)
         db_client_span_data = _get_client_data(is_cluster, name, *args)
         _update_span(db_span, db_span_data, db_client_span_data)
+        _create_breadcrumb(db_properties["op"], db_span_data, db_client_span_data)
 
         value = old_execute_command(self, name, *args, **kwargs)
 

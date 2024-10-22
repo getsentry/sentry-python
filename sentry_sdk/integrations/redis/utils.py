@@ -1,3 +1,4 @@
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,
@@ -27,12 +28,32 @@ TAG_KEYS = [
 
 def _update_span(span, *data_bags):
     # type: (Span, *dict[str, Any]) -> None
+    """
+    Set tags and data on the given span to data from the given data bags.
+    """
     for data in data_bags:
         for key, value in data.items():
             if key in TAG_KEYS:
                 span.set_tag(key, value)
             else:
                 span.set_data(key, value)
+
+
+def _create_breadcrumb(message, *data_bags):
+    # type: (str, *dict[str, Any]) -> None
+    """
+    Create a breadcrumb containing the data from the given data bags.
+    """
+    combined_data = {}
+    for data in data_bags:
+        combined_data.update(data)
+
+    sentry_sdk.add_breadcrumb(
+        message=message,
+        type="redis",
+        category="redis",
+        data=combined_data,
+    )
 
 
 def _get_safe_command(name, args):
