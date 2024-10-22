@@ -16,6 +16,25 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
+TAG_KEYS = [
+    "redis.commands",
+    "redis.is_cluster",
+    "redis.key",
+    "redis.transaction",
+    SPANDATA.DB_OPERATION,
+]
+
+
+def _update_span(span, *data_bags):
+    # type: (Span, *dict[str, Any]) -> None
+    for data in data_bags:
+        for key, value in data.items():
+            if key in TAG_KEYS:
+                span.set_tag(key, value)
+            else:
+                span.set_data(key, value)
+
+
 def _get_safe_command(name, args):
     # type: (str, Sequence[Any]) -> str
     command_parts = [name]

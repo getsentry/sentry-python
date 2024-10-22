@@ -9,6 +9,7 @@ from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_prope
 from sentry_sdk.integrations.redis.utils import (
     _get_client_data,
     _get_pipeline_data,
+    _update_span,
 )
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
@@ -48,6 +49,7 @@ def patch_redis_async_pipeline(
                     is_transaction=False if is_cluster else self.is_transaction,
                     command_stack=self._command_stack if is_cluster else self.command_stack,
                 )
+                _update_span(span, span_data, pipeline_data)
 
             return await old_execute(self, *args, **kwargs)
 
@@ -92,7 +94,8 @@ def patch_redis_async_client(cls, is_cluster, get_db_data_fn):
         db_span.__enter__()
 
         db_span_data = get_db_data_fn(self)
-        db_client_span_data = _get_client_data(db_span, is_cluster, name, *args)
+        db_client_span_data = _get_client_data(is_cluster, name, *args)
+        _update_span(db_span, db_span_data, db_client_span_data)
 
         value = await old_execute_command(self, name, *args, **kwargs)
 
@@ -100,6 +103,7 @@ def patch_redis_async_client(cls, is_cluster, get_db_data_fn):
 
         if cache_span:
             cache_span_data = _get_cache_data(self, cache_properties, value)
+            _update_span(cache_span, cache_span_data)
             cache_span.__exit__(None, None, None)
 
         return value
