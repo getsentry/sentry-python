@@ -1327,8 +1327,7 @@ class POTelSpan:
     def root_span(self):
         # type: () -> Optional[POTelSpan]
         root_otel_span = cast(
-            "Optional[OtelSpan]",
-            getattr(self._otel_span, "_sentry_root_otel_span", None),
+            "Optional[OtelSpan]", self._otel_span.sentry_meta.get("root_span", None)
         )
         return POTelSpan(otel_span=root_otel_span) if root_otel_span else None
 
