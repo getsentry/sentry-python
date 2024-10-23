@@ -1,4 +1,5 @@
 from functools import wraps
+import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -74,9 +75,9 @@ def _calculate_token_usage(result, span):
 
 
 def _get_responses(content):
-    # type: (list[Any]) -> list[dict[str, Any]]
+    # type: (list[Any]) -> str
     """
-    Get JSON of a Anthropic responses.
+    Get Anthropic responses as serialized JSON.
     """
     responses = []
     for item in content:
@@ -87,7 +88,7 @@ def _get_responses(content):
                     "text": item.text,
                 }
             )
-    return responses
+    return json.dumps(responses)
 
 
 def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
@@ -126,7 +127,7 @@ def _add_ai_data_to_span(
             complete_message = "".join(content_blocks)
             span.set_data(
                 SPANDATA.AI_RESPONSES,
-                [{"type": "text", "text": complete_message}],
+                json.dumps([{"type": "text", "text": complete_message}]),
             )
         total_tokens = input_tokens + output_tokens
         record_token_usage(span, input_tokens, output_tokens, total_tokens)
@@ -165,7 +166,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         span.set_data(SPANDATA.AI_STREAMING, False)
 
         if should_send_default_pii() and integration.include_prompts:
-            span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
+            span.set_data(SPANDATA.AI_INPUT_MESSAGES, json.dumps(messages))
 
         if hasattr(result, "content"):
             if should_send_default_pii() and integration.include_prompts:
