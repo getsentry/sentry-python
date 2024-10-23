@@ -166,7 +166,9 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         span.set_data(SPANDATA.AI_STREAMING, False)
 
         if should_send_default_pii() and integration.include_prompts:
-            span.set_data(SPANDATA.AI_INPUT_MESSAGES, _serialize_span_attribute(messages))
+            span.set_data(
+                SPANDATA.AI_INPUT_MESSAGES, _serialize_span_attribute(messages)
+            )
 
         if hasattr(result, "content"):
             if should_send_default_pii() and integration.include_prompts:
