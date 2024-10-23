@@ -5,11 +5,11 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 
 try:
     import ldclient
-    from ldclient.hook import Hook
+    from ldclient.hook import Hook, Metadata
 
     if TYPE_CHECKING:
         from ldclient import LDClient
-        from ldclient.hook import EvaluationSeriesContext, Metadata
+        from ldclient.hook import EvaluationSeriesContext
         from ldclient.evaluation import EvaluationDetail
 
         from sentry_sdk._types import Event, ExcInfo
@@ -24,7 +24,7 @@ def _get_ldclient():
         client = ldclient.get()
     except Exception as exc:
         sentry_sdk.capture_exception(exc)
-        raise DidNotEnable("Failed to find LaunchDarkly client instance. " + str(exc))
+        raise DidNotEnable("Error getting LaunchDarkly client. " + str(exc))
 
     if client and client.is_initialized():
         return client
