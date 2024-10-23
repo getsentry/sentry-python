@@ -46,10 +46,10 @@ def get_parent_sampled(parent_context, trace_id):
     return None
 
 
-def dropped_result(span_context, attributes, sample_rate=None):
+def dropped_result(parent_span_context, attributes, sample_rate=None):
     # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
     # these will only be added the first time in a root span sampling decision
-    trace_state = span_context.trace_state
+    trace_state = parent_span_context.trace_state
 
     if TRACESTATE_SAMPLED_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
@@ -57,7 +57,7 @@ def dropped_result(span_context, attributes, sample_rate=None):
     if sample_rate and TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
-    is_root_span = not (span_context.is_valid and not span_context.is_remote)
+    is_root_span = not (parent_span_context.is_valid and not parent_span_context.is_remote)
     if is_root_span:
         # Tell Sentry why we dropped the transaction/root-span
         client = sentry_sdk.get_client()

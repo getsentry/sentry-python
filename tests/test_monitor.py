@@ -55,7 +55,7 @@ def test_monitor_unhealthy(sentry_init):
         assert monitor.downsample_factor == (i + 1 if i < 10 else 10)
 
 
-def test_transaction_uses_downsampled_rate(
+def test_transaction_uses_downsample_rate(
     sentry_init, capture_envelopes, capture_record_lost_event_calls, monkeypatch
 ):
     sentry_init(
