@@ -136,6 +136,12 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
             span.finish()
 
+            try:
+                del connection._sentry_db_data
+                del connection._sentry_span
+            except AttributeError:
+                pass
+
         return res
 
     return _inner_end
@@ -143,25 +149,20 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
 def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_send_data(*args: P.args, **kwargs: P.kwargs) -> T:
-        instance = args[0]  # type: clickhouse_driver.client.Client
+        connection = args[0].connection
         db_params_data = args[2]
-        span = getattr(instance.connection, "_sentry_span", None)
+        span = getattr(connection, "_sentry_span", None)
 
         if span is not None:
-            data = _get_db_data(instance.connection)
+            data = _get_db_data(connection)
             _set_on_span(span, data)
 
             if should_send_default_pii():
-                db_params = (
-                    getattr(instance.connection, "_sentry_db_data", {}).get("db.params")
-                    or []
-                )
+                saved_db_data = getattr(connection, "_sentry_db_data", {})
+                db_params = saved_db_data.get("db.params") or []
                 db_params.extend(db_params_data)
+                saved_db_data["db.params"] = db_params
                 span.set_attribute("db.params", _serialize_span_attribute(db_params))
-                try:
-                    del instance.connection._sentry_db_data
-                except AttributeError:
-                    pass
 
         return f(*args, **kwargs)
 
