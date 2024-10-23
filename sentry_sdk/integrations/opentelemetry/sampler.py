@@ -143,17 +143,17 @@ class SentrySampler(Sampler):
                 # Check if there is a traces_sample_rate
                 sample_rate = client.options.get("traces_sample_rate")
 
-        # Down-sample in case of back pressure monitor says so
-        # TODO: this should only be done for transactions (aka root spans)
-        if client.monitor:
-            sample_rate /= 2**client.monitor.downsample_factor
-
         # If the sample rate is invalid, drop the span
         if not is_valid_sample_rate(sample_rate, source=self.__class__.__name__):
             logger.warning(
                 f"[Tracing] Discarding {name} because of invalid sample rate."
             )
             return dropped_result(parent_span_context, attributes)
+
+        # Down-sample in case of back pressure monitor says so
+        # TODO: this should only be done for transactions (aka root spans)
+        if client.monitor:
+            sample_rate /= 2**client.monitor.downsample_factor
 
         # Roll the dice on sample rate
         sample_rate = float(cast("Union[bool, float, int]", sample_rate))
