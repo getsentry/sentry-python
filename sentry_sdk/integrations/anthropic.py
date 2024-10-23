@@ -75,9 +75,9 @@ def _calculate_token_usage(result, span):
 
 
 def _get_responses(content):
-    # type: (list[Any]) -> str
+    # type: (list[Any]) -> list[dict[str, Any]]
     """
-    Get Anthropic responses as serialized JSON.
+    Get Anthropic responses as JSON.
     """
     responses = []
     for item in content:
@@ -88,7 +88,7 @@ def _get_responses(content):
                     "text": item.text,
                 }
             )
-    return _serialize_span_attribute(responses)
+    return responses
 
 
 def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
@@ -172,7 +172,10 @@ def _sentry_patched_create_common(f, *args, **kwargs):
 
         if hasattr(result, "content"):
             if should_send_default_pii() and integration.include_prompts:
-                span.set_data(SPANDATA.AI_RESPONSES, _get_responses(result.content))
+                span.set_data(
+                    SPANDATA.AI_RESPONSES,
+                    _serialize_span_attribute(_get_responses(result.content)),
+                )
             _calculate_token_usage(result, span)
             span.__exit__(None, None, None)
 
