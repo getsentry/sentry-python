@@ -1541,19 +1541,6 @@ class POTelSpan:
             f"{SentrySpanAttribute.MEASUREMENT}.{name}", (str(value), unit)
         )
 
-    def set_thread(self, thread_id, thread_name):
-        # type: (Optional[int], Optional[str]) -> None
-        if thread_id is not None:
-            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
-
-            if thread_name is not None:
-                self.set_data(SPANDATA.THREAD_NAME, thread_name)
-
-    def set_profiler_id(self, profiler_id):
-        # type: (Optional[str]) -> None
-        if profiler_id is not None:
-            self.set_data(SPANDATA.PROFILER_ID, profiler_id)
-
     def set_http_status(self, http_status):
         # type: (int) -> None
         self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
@@ -1576,6 +1563,7 @@ class POTelSpan:
 
     def to_json(self):
         # type: () -> dict[str, Any]
+        # TODO-neel-potel for sampling context
         pass
 
     def get_trace_context(self):
@@ -1588,10 +1576,6 @@ class POTelSpan:
         )
 
         return get_trace_context(self._otel_span)
-
-    def get_profile_context(self):
-        # type: () -> Optional[ProfileContext]
-        pass
 
     def set_context(self, key, value):
         # type: (str, Any) -> None
