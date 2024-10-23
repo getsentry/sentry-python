@@ -123,9 +123,8 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
             data = getattr(connection, "_sentry_db_data", {})
 
             if res is not None and should_send_default_pii():
-                serialized_result = _serialize_span_attribute(res)
-                data["db.result"] = serialized_result
-                span.set_attribute("db.result", serialized_result)
+                data["db.result"] = res
+                span.set_attribute("db.result", _serialize_span_attribute(res))
 
             with capture_internal_exceptions():
                 query = data.pop("db.query.text", None)
