@@ -125,7 +125,7 @@ GROUPS = {
         "tornado",
     ],
     "Miscellaneous": [
-        "ldclient",
+        "launchdarkly",
         "loguru",
         "openfeature",
         "opentelemetry",
