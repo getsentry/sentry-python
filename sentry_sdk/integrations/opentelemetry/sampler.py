@@ -128,6 +128,7 @@ class SentrySampler(Sampler):
         has_traces_sampler = callable(client.options.get("traces_sampler"))
         if has_traces_sampler:
             # TODO-anton: Make proper sampling_context
+            # TODO-neel-potel: Make proper sampling_context
             sampling_context = {
                 "transaction_context": {
                     "name": name,

@@ -1549,10 +1549,10 @@ class POTelSpan:
             if thread_name is not None:
                 self.set_data(SPANDATA.THREAD_NAME, thread_name)
 
-    def set_profiler_id(self, profiler_id):
-        # type: (Optional[str]) -> None
-        if profiler_id is not None:
-            self.set_data(SPANDATA.PROFILER_ID, profiler_id)
+    def update_active_thread(self):
+        # type: () -> None
+        thread_id, thread_name = get_current_thread_meta()
+        self.set_thread(thread_id, thread_name)
 
     def set_http_status(self, http_status):
         # type: (int) -> None
@@ -1576,6 +1576,7 @@ class POTelSpan:
 
     def to_json(self):
         # type: () -> dict[str, Any]
+        # TODO-neel-potel for sampling context
         pass
 
     def get_trace_context(self):
@@ -1588,10 +1589,6 @@ class POTelSpan:
         )
 
         return get_trace_context(self._otel_span)
-
-    def get_profile_context(self):
-        # type: () -> Optional[ProfileContext]
-        pass
 
     def set_context(self, key, value):
         # type: (str, Any) -> None
