@@ -9,7 +9,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
 )
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -93,17 +93,17 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 
         connection._sentry_span = span  # type: ignore[attr-defined]
 
-        _set_db_data(span, connection)
-
-        if should_send_default_pii():
-            span.set_attribute("db.query.text", query)
+        data = _get_db_data(connection)
+        data["db.query.text"] = query
 
         if query_id:
-            span.set_attribute("db.query_id", query_id)
+            data["db.query_id"] = query_id
 
         if params and should_send_default_pii():
-            connection._sentry_db_params = params
-            span.set_attribute("db.params", _serialize_span_attribute(params))
+            data["db.params"] = params
+
+        connection._sentry_db_data = data  # type: ignore[attr-defined]
+        _set_on_span(span, data)
 
         # run the original code
         ret = f(*args, **kwargs)
@@ -116,28 +116,20 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_end(*args: P.args, **kwargs: P.kwargs) -> T:
         res = f(*args, **kwargs)
-        instance = args[0]
-        span = getattr(instance.connection, "_sentry_span", None)  # type: ignore[attr-defined]
+        connection = args[0].connection
 
+        span = getattr(connection, "_sentry_span", None)  # type: ignore[attr-defined]
         if span is not None:
+            data = getattr(connection, "_sentry_db_data", {})
+
             if res is not None and should_send_default_pii():
-                span.set_attribute("db.result", _serialize_span_attribute(res))
+                serialized_result = _serialize_span_attribute(res)
+                data["db.result"] = serialized_result
+                span.set_attribute("db.result", serialized_result)
 
             with capture_internal_exceptions():
-                query = span.get_attribute("db.query.text")
+                query = data.pop("db.query.text", None)
                 if query:
-                    data = {}
-                    for attr in (
-                        "db.params",
-                        "db.result",
-                        SPANDATA.DB_SYSTEM,
-                        SPANDATA.DB_USER,
-                        SPANDATA.SERVER_ADDRESS,
-                        SPANDATA.SERVER_PORT,
-                    ):
-                        if span.get_attribute(attr):
-                            data[attr] = span.get_attribute(attr)
-
                     sentry_sdk.add_breadcrumb(
                         message=query, category="query", data=data
                     )
@@ -152,20 +144,22 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_send_data(*args: P.args, **kwargs: P.kwargs) -> T:
         instance = args[0]  # type: clickhouse_driver.client.Client
-        data = args[2]
+        db_params_data = args[2]
         span = getattr(instance.connection, "_sentry_span", None)
 
         if span is not None:
-            _set_db_data(span, instance.connection)
+            data = _get_db_data(instance.connection)
+            _set_on_span(span, data)
 
             if should_send_default_pii():
                 db_params = (
-                    getattr(instance.connection, "_sentry_db_params", None) or []
+                    getattr(instance.connection, "_sentry_db_data", {}).get("db.params")
+                    or []
                 )
-                db_params.extend(data)
+                db_params.extend(db_params_data)
                 span.set_attribute("db.params", _serialize_span_attribute(db_params))
                 try:
-                    del instance.connection._sentry_db_params
+                    del instance.connection._sentry_db_data
                 except AttributeError:
                     pass
 
@@ -174,11 +168,16 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     return _inner_send_data
 
 
-def _set_db_data(
-    span: Span, connection: clickhouse_driver.connection.Connection
-) -> None:
-    span.set_attribute(SPANDATA.DB_SYSTEM, "clickhouse")
-    span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
-    span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
-    span.set_attribute(SPANDATA.DB_NAME, connection.database)
-    span.set_attribute(SPANDATA.DB_USER, connection.user)
+def _get_db_data(connection: clickhouse_driver.connection.Connection) -> dict[str, str]:
+    return {
+        SPANDATA.DB_SYSTEM: "clickhouse",
+        SPANDATA.SERVER_ADDRESS: connection.host,
+        SPANDATA.SERVER_PORT: connection.port,
+        SPANDATA.DB_NAME: connection.database,
+        SPANDATA.DB_USER: connection.user,
+    }
+
+
+def _set_on_span(span: Span, data: dict[str, Any]):
+    for key, value in data.items():
+        span.set_attribute(key, _serialize_span_attribute(value))
