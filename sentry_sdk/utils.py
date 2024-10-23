@@ -30,8 +30,6 @@ from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
-
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -53,6 +51,7 @@ if TYPE_CHECKING:
     )
 
     from gevent.hub import Hub as GeventHub
+    from opentelemetry.util.types import AttributeValue
 
     from sentry_sdk._types import Event, ExcInfo
 
@@ -687,11 +686,21 @@ def get_errno(exc_value):
 
 def get_error_message(exc_value):
     # type: (Optional[BaseException]) -> str
-    return (
+    message = (
         getattr(exc_value, "message", "")
         or getattr(exc_value, "detail", "")
         or safe_str(exc_value)
-    )
+    )  # type: str
+
+    # __notes__ should be a list of strings when notes are added
+    # via add_note, but can be anything else if __notes__ is set
+    # directly. We only support strings in __notes__, since that
+    # is the correct use.
+    notes = getattr(exc_value, "__notes__", None)  # type: object
+    if isinstance(notes, list) and len(notes) > 0:
+        message += "\n" + "\n".join(note for note in notes if isinstance(note, str))
+
+    return message
 
 
 def single_exception_from_error_tuple(
@@ -1681,12 +1690,6 @@ def _no_op(*_a, **_k):
     pass
 
 
-async def _no_op_async(*_a, **_k):
-    # type: (*Any, **Any) -> None
-    """No-op function for ensure_integration_enabled_async."""
-    pass
-
-
 if TYPE_CHECKING:
 
     @overload
@@ -1746,59 +1749,6 @@ def ensure_integration_enabled(
             return sentry_patched_function(*args, **kwargs)
 
         if original_function is _no_op:
-            return wraps(sentry_patched_function)(runner)
-
-        return wraps(original_function)(runner)
-
-    return patcher
-
-
-if TYPE_CHECKING:
-
-    # mypy has some trouble with the overloads, hence the ignore[no-overload-impl]
-    @overload  # type: ignore[no-overload-impl]
-    def ensure_integration_enabled_async(
-        integration,  # type: type[sentry_sdk.integrations.Integration]
-        original_function,  # type: Callable[P, Awaitable[R]]
-    ):
-        # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
-        ...
-
-    @overload
-    def ensure_integration_enabled_async(
-        integration,  # type: type[sentry_sdk.integrations.Integration]
-    ):
-        # type: (...) -> Callable[[Callable[P, Awaitable[None]]], Callable[P, Awaitable[None]]]
-        ...
-
-
-# The ignore[no-redef] also needed because mypy is struggling with these overloads.
-def ensure_integration_enabled_async(  # type: ignore[no-redef]
-    integration,  # type: type[sentry_sdk.integrations.Integration]
-    original_function=_no_op_async,  # type: Union[Callable[P, Awaitable[R]], Callable[P, Awaitable[None]]]
-):
-    # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
-    """
-    Version of `ensure_integration_enabled` for decorating async functions.
-
-    Please refer to the `ensure_integration_enabled` documentation for more information.
-    """
-
-    if TYPE_CHECKING:
-        # Type hint to ensure the default function has the right typing. The overloads
-        # ensure the default _no_op function is only used when R is None.
-        original_function = cast(Callable[P, Awaitable[R]], original_function)
-
-    def patcher(sentry_patched_function):
-        # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
-        async def runner(*args: "P.args", **kwargs: "P.kwargs"):
-            # type: (...) -> R
-            if sentry_sdk.get_client().get_integration(integration) is None:
-                return await original_function(*args, **kwargs)
-
-            return await sentry_patched_function(*args, **kwargs)
-
-        if original_function is _no_op_async:
             return wraps(sentry_patched_function)(runner)
 
         return wraps(original_function)(runner)
@@ -1882,3 +1832,28 @@ def get_current_thread_meta(thread=None):
 
     # we've tried everything, time to give up
     return None, None
+
+
+def _serialize_span_attribute(value):
+    # type: (Any) -> Optional[AttributeValue]
+    """Serialize an object so that it's OTel-compatible and displays nicely in Sentry."""
+    # check for allowed primitives
+    if isinstance(value, (int, str, float, bool)):
+        return value
+
+    # lists are allowed too, as long as they don't mix types
+    if isinstance(value, (list, tuple)):
+        for type_ in (int, str, float, bool):
+            if all(isinstance(item, type_) for item in value):
+                return list(value)
+
+    # if this is anything else, just try to coerce to string
+    # we prefer json.dumps since this makes things like dictionaries display
+    # nicely in the UI
+    try:
+        return json.dumps(value)
+    except TypeError:
+        try:
+            return str(value)
+        except Exception:
+            return None

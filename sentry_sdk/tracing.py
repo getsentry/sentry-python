@@ -1273,22 +1273,18 @@ class POTelSpan:
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        self.finish()
-        # XXX set status to error if unset and an exception occurred?
-        context.detach(self._ctx_token)
+        if value is not None:
+            self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
-    def _get_attribute(self, name):
-        # type: (str) -> Optional[Any]
-        if not isinstance(self._otel_span, ReadableSpan):
-            return None
-        return self._otel_span.attributes.get(name)
+        self.finish()
+        context.detach(self._ctx_token)
 
     @property
     def description(self):
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._get_attribute(SentrySpanAttribute.DESCRIPTION)
+        return self.get_attribute(SentrySpanAttribute.DESCRIPTION)
 
     @description.setter
     def description(self, value):
@@ -1296,14 +1292,14 @@ class POTelSpan:
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         if value is not None:
-            self._otel_span.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
+            self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
 
     @property
     def origin(self):
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._get_attribute(SentrySpanAttribute.ORIGIN)
+        return self.get_attribute(SentrySpanAttribute.ORIGIN)
 
     @origin.setter
     def origin(self, value):
@@ -1311,7 +1307,7 @@ class POTelSpan:
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         if value is not None:
-            self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, value)
+            self.set_attribute(SentrySpanAttribute.ORIGIN, value)
 
     @property
     def containing_transaction(self):
@@ -1330,9 +1326,12 @@ class POTelSpan:
     @property
     def root_span(self):
         # type: () -> Optional[POTelSpan]
+        from sentry_sdk.integrations.opentelemetry.utils import (
+            get_sentry_meta,
+        )
+
         root_otel_span = cast(
-            "Optional[OtelSpan]",
-            getattr(self._otel_span, "_sentry_root_otel_span", None),
+            "Optional[OtelSpan]", get_sentry_meta(self._otel_span, "root_span")
         )
         return POTelSpan(otel_span=root_otel_span) if root_otel_span else None
 
@@ -1376,7 +1375,7 @@ class POTelSpan:
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._get_attribute(SentrySpanAttribute.OP)
+        return self.get_attribute(SentrySpanAttribute.OP)
 
     @op.setter
     def op(self, value):
@@ -1384,14 +1383,14 @@ class POTelSpan:
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         if value is not None:
-            self._otel_span.set_attribute(SentrySpanAttribute.OP, value)
+            self.set_attribute(SentrySpanAttribute.OP, value)
 
     @property
     def name(self):
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        return self._get_attribute(SentrySpanAttribute.NAME)
+        return self.get_attribute(SentrySpanAttribute.NAME)
 
     @name.setter
     def name(self, value):
@@ -1399,17 +1398,23 @@ class POTelSpan:
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         if value is not None:
-            self._otel_span.set_attribute(SentrySpanAttribute.NAME, value)
+            self.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property
     def source(self):
         # type: () -> str
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        return (
+            self.get_attribute(SentrySpanAttribute.SOURCE) or TRANSACTION_SOURCE_CUSTOM
+        )
 
     @source.setter
     def source(self, value):
         # type: (str) -> None
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        self.set_attribute(SentrySpanAttribute.SOURCE, value)
 
     @property
     def start_timestamp(self):
@@ -1504,7 +1509,14 @@ class POTelSpan:
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
+        # TODO-neel-potel we cannot add dicts here
         self.set_attribute(key, value)
+
+    def get_attribute(self, name):
+        # type: (str) -> Optional[Any]
+        if not isinstance(self._otel_span, ReadableSpan):
+            return None
+        return self._otel_span.attributes.get(name)
 
     def set_attribute(self, key, value):
         # type: (str, Any) -> None
@@ -1582,11 +1594,13 @@ class POTelSpan:
         # type: () -> Optional[ProfileContext]
         pass
 
-    # transaction/root span methods
-
     def set_context(self, key, value):
         # type: (str, Any) -> None
-        pass
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        # TODO-neel-potel we cannot add dicts here
+
+        self.set_attribute(f"{SentrySpanAttribute.CONTEXT}.{key}", value)
 
 
 if TYPE_CHECKING:

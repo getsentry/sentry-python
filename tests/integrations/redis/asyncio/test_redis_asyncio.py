@@ -65,12 +65,10 @@ async def test_async_redis_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
+    assert span["data"]["redis.commands.count"] == 3
+    assert span["data"]["redis.commands.first_ten"] == expected_first_ten
     assert span["data"] == ApproxDict(
         {
-            "redis.commands": {
-                "count": 3,
-                "first_ten": expected_first_ten,
-            },
             SPANDATA.DB_SYSTEM: "redis",
             SPANDATA.DB_NAME: "0",
             SPANDATA.SERVER_ADDRESS: connection.connection_pool.connection_kwargs.get(

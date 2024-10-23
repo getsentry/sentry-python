@@ -1,5 +1,83 @@
 # Changelog
 
+## 2.17.0
+
+### Various fixes & improvements
+
+- Add support for async calls in Anthropic and OpenAI integration (#3497) by @vetyy
+- Allow custom transaction names in ASGI (#3664) by @sl0thentr0py
+- Langchain: Handle case when parent span wasn't traced (#3656) by @rbasoalto
+- Fix Anthropic integration when using tool calls (#3615) by @kwnath
+- More defensive Django Spotlight middleware injection (#3665) by @BYK
+- Remove `ensure_integration_enabled_async` (#3632) by @sentrivana
+- Test with newer Falcon version (#3644, #3653, #3662) by @sentrivana
+- Fix mypy (#3657) by @sentrivana
+- Fix flaky transport test (#3666) by @sentrivana
+- Remove pin on `sphinx` (#3650) by @sentrivana
+- Bump `actions/checkout` from `4.2.0` to `4.2.1` (#3651) by @dependabot
+
+## 2.16.0
+
+### Integrations
+
+- Bottle: Add `failed_request_status_codes` (#3618) by @szokeasaurusrex
+
+  You can now define a set of integers that will determine which status codes
+  should be reported to Sentry.
+
+    ```python
+    sentry_sdk.init(
+        integrations=[
+            BottleIntegration(
+                failed_request_status_codes={403, *range(500, 600)},
+            )
+        ]
+    )
+    ```
+
+  Examples of valid `failed_request_status_codes`:
+
+  - `{500}` will only send events on HTTP 500.
+  - `{400, *range(500, 600)}` will send events on HTTP 400 as well as the 5xx range.
+  - `{500, 503}` will send events on HTTP 500 and 503.
+  - `set()` (the empty set) will not send events for any HTTP status code.
+
+  The default is `{*range(500, 600)}`, meaning that all 5xx status codes are reported to Sentry.
+
+- Bottle: Delete never-reached code (#3605) by @szokeasaurusrex
+- Redis: Remove flaky test (#3626) by @sentrivana
+- Django: Improve getting `psycopg3` connection info (#3580) by @nijel
+- Django: Add `SpotlightMiddleware` when Spotlight is enabled (#3600) by @BYK
+- Django: Open relevant error when `SpotlightMiddleware` is on (#3614) by @BYK
+- Django: Support `http_methods_to_capture` in ASGI Django (#3607) by @sentrivana
+
+  ASGI Django now also supports the `http_methods_to_capture` integration option. This is a configurable tuple of HTTP method verbs that should create a transaction in Sentry. The default is `("CONNECT", "DELETE", "GET", "PATCH", "POST", "PUT", "TRACE",)`. `OPTIONS` and `HEAD` are not included by default.
+
+  Here's how to use it:
+
+  ```python
+  sentry_sdk.init(
+      integrations=[
+          DjangoIntegration(
+              http_methods_to_capture=("GET", "POST"),
+          ),
+      ],
+  )
+  ```
+
+### Miscellaneous
+
+- Add 3.13 to setup.py (#3574) by @sentrivana
+- Add 3.13 to basepython (#3589) by @sentrivana
+- Fix type of `sample_rate` in DSC (and add explanatory tests) (#3603) by @antonpirker
+- Add `httpcore` based `HTTP2Transport` (#3588) by @BYK
+- Add opportunistic Brotli compression (#3612) by @BYK
+- Add `__notes__` support (#3620) by @szokeasaurusrex
+- Remove useless makefile targets (#3604) by @antonpirker
+- Simplify tox version spec (#3609) by @sentrivana
+- Consolidate contributing docs (#3606) by @antonpirker
+- Bump `codecov/codecov-action` from `4.5.0` to `4.6.0` (#3617) by @dependabot
+
 ## 2.15.0
 
 ### Integrations
@@ -18,6 +96,7 @@
         ),
     ],
   )
+  ```
 
 - Django: Allow ASGI to use `drf_request` in `DjangoRequestExtractor` (#3572) by @PakawiNz
 - Django: Don't let `RawPostDataException` bubble up (#3553) by @sentrivana

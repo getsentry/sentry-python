@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     T = TypeVar("T")
 
 
+PY38 = sys.version_info[0] == 3 and sys.version_info[1] >= 8
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
 

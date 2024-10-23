@@ -55,7 +55,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
     assert request["url"] == "http://{host}/".format(host=host)
     assert request["headers"] == {
         "Accept": "*/*",
-        "Accept-Encoding": "gzip, deflate",
+        "Accept-Encoding": mock.ANY,
         "Host": host,
         "User-Agent": request["headers"]["User-Agent"],
         "baggage": mock.ANY,
@@ -517,11 +517,15 @@ async def test_crumb_capture(
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_client):
+async def test_outgoing_trace_headers(
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_envelopes
+):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
     )
+
+    envelopes = capture_envelopes()
 
     async def handler(request):
         return web.Response(text="OK")
@@ -536,15 +540,18 @@ async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_c
     ) as transaction:
         client = await aiohttp_client(raw_server)
         resp = await client.get("/")
-        request_span = transaction._span_recorder.spans[-1]
 
-        assert resp.request_info.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
+    (envelope,) = envelopes
+    transaction = envelope.get_transaction_event()
+    request_span = transaction["spans"][-1]
+
+    assert resp.request_info.headers[
+        "sentry-trace"
+    ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+        trace_id=transaction["contexts"]["trace"]["trace_id"],
+        parent_span_id=request_span["span_id"],
+        sampled=1,
+    )
 
 
 @pytest.mark.asyncio

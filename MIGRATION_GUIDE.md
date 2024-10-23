@@ -17,9 +17,12 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
 - A `Profile` object does not have a `.hub` property anymore.
 - `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
+- Redis integration: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
+- clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 
 ### Removed
 
+- Spans no longer have a `description`. Use `name` instead.
 - Dropped support for Python 3.6.
 - `sentry_sdk.metrics` and associated metrics APIs have been removed as Sentry no longer accepts metrics data in this form. See https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics
 - The experimental options `enable_metrics`, `before_emit_metric` and `metric_code_locations` have been removed.

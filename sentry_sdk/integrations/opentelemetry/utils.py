@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from urllib3.util import parse_url as urlparse
 from urllib.parse import quote
 from opentelemetry.trace import (
-    Span,
+    Span as AbstractSpan,
     SpanKind,
     StatusCode,
     format_trace_id,
@@ -17,9 +17,9 @@ from opentelemetry.sdk.trace import ReadableSpan
 
 import sentry_sdk
 from sentry_sdk.utils import Dsn
-from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.consts import SPANSTATUS, OP
 from sentry_sdk.tracing import get_span_status_from_http_code, DEFAULT_SPAN_ORIGIN
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing_utils import Baggage, LOW_QUALITY_TRANSACTION_SOURCES
 from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -96,6 +96,16 @@ def convert_to_otel_timestamp(time):
     if isinstance(time, datetime):
         return int(time.timestamp() * 1e9)
     return int(time * 1e9)
+
+
+def extract_transaction_name_source(span):
+    # type: (ReadableSpan) -> tuple[Optional[str], Optional[str]]
+    if not span.attributes:
+        return (None, None)
+    return (
+        cast("Optional[str]", span.attributes.get(SentrySpanAttribute.NAME)),
+        cast("Optional[str]", span.attributes.get(SentrySpanAttribute.SOURCE)),
+    )
 
 
 def extract_span_data(span):
@@ -182,7 +192,7 @@ def span_data_for_db_query(span):
     # type: (ReadableSpan) -> OtelExtractedSpanData
     span_attributes = span.attributes or {}
 
-    op = "db"
+    op = span_attributes.get(SentrySpanAttribute.OP, OP.DB)
 
     statement = span_attributes.get(SpanAttributes.DB_STATEMENT, None)
     statement = cast("Optional[str]", statement)
@@ -207,6 +217,9 @@ def extract_span_status(span):
             if status.description is None:
                 if inferred_status:
                     return (inferred_status, http_status)
+
+            if http_status is not None:
+                return (inferred_status, http_status)
 
             if (
                 status.description is not None
@@ -352,7 +365,7 @@ def has_incoming_trace(trace_state):
 
 
 def get_trace_state(span):
-    # type: (Union[Span, ReadableSpan]) -> TraceState
+    # type: (Union[AbstractSpan, ReadableSpan]) -> TraceState
     """
     Get the existing trace_state with sentry items
     or populate it if we are the head SDK.
@@ -391,5 +404,31 @@ def get_trace_state(span):
                 Baggage.SENTRY_PREFIX + "public_key", Dsn(options["dsn"]).public_key
             )
 
-        # TODO-neel-potel head dsc transaction name
+        root_span = get_sentry_meta(span, "root_span")
+        if root_span and isinstance(root_span, ReadableSpan):
+            transaction_name, transaction_source = extract_transaction_name_source(
+                root_span
+            )
+
+            if (
+                transaction_name
+                and transaction_source not in LOW_QUALITY_TRANSACTION_SOURCES
+            ):
+                trace_state = trace_state.update(
+                    Baggage.SENTRY_PREFIX + "transaction", transaction_name
+                )
+
         return trace_state
+
+
+def get_sentry_meta(span, key):
+    # type: (Union[AbstractSpan, ReadableSpan], str) -> Any
+    sentry_meta = getattr(span, "_sentry_meta", None)
+    return sentry_meta.get(key) if sentry_meta else None
+
+
+def set_sentry_meta(span, key, value):
+    # type: (Union[AbstractSpan, ReadableSpan], str, Any) -> None
+    sentry_meta = getattr(span, "_sentry_meta", {})
+    sentry_meta[key] = value
+    span._sentry_meta = sentry_meta

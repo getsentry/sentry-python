@@ -30,14 +30,13 @@ from sentry_sdk.utils import (
     _get_installed_modules,
     _generate_installed_modules,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
+    _serialize_span_attribute,
 )
 
 
 class TestIntegration(Integration):
     """
-    Test integration for testing ensure_integration_enabled and
-    ensure_integration_enabled_async decorators.
+    Test integration for testing ensure_integration_enabled decorator.
     """
 
     identifier = "test"
@@ -733,90 +732,6 @@ def test_ensure_integration_enabled_no_original_function_disabled(sentry_init):
     assert patched_function.__name__ == "function_to_patch"
 
 
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_integration_enabled(sentry_init):
-    # Setup variables and functions for the test
-    async def original_function():
-        return "original"
-
-    async def function_to_patch():
-        return "patched"
-
-    sentry_init(integrations=[TestIntegration()])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(
-        TestIntegration, original_function
-    )(function_to_patch)
-
-    assert await patched_function() == "patched"
-    assert patched_function.__name__ == "original_function"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_integration_disabled(sentry_init):
-    # Setup variables and functions for the test
-    async def original_function():
-        return "original"
-
-    async def function_to_patch():
-        return "patched"
-
-    sentry_init(integrations=[])  # TestIntegration is disabled
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(
-        TestIntegration, original_function
-    )(function_to_patch)
-
-    assert await patched_function() == "original"
-    assert patched_function.__name__ == "original_function"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_no_original_function_enabled(
-    sentry_init,
-):
-    shared_variable = "original"
-
-    async def function_to_patch():
-        nonlocal shared_variable
-        shared_variable = "patched"
-
-    sentry_init(integrations=[TestIntegration])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(TestIntegration)(
-        function_to_patch
-    )
-    await patched_function()
-
-    assert shared_variable == "patched"
-    assert patched_function.__name__ == "function_to_patch"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_no_original_function_disabled(
-    sentry_init,
-):
-    shared_variable = "original"
-
-    async def function_to_patch():
-        nonlocal shared_variable
-        shared_variable = "patched"
-
-    sentry_init(integrations=[])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(TestIntegration)(
-        function_to_patch
-    )
-    await patched_function()
-
-    assert shared_variable == "original"
-    assert patched_function.__name__ == "function_to_patch"
-
-
 @pytest.mark.parametrize(
     "delta,expected_milliseconds",
     [
@@ -987,3 +902,34 @@ def test_format_timestamp_naive():
     # Ensure that some timestamp is returned, without error. We currently treat these as local time, but this is an
     # implementation detail which we should not assert here.
     assert re.fullmatch(timestamp_regex, format_timestamp(datetime_object))
+
+
+class NoStr:
+    def __str__(self):
+        1 / 0
+
+
+@pytest.mark.parametrize(
+    ("value", "result"),
+    (
+        ("meow", "meow"),
+        (1, 1),
+        (47.0, 47.0),
+        (True, True),
+        (["meow", "bark"], ["meow", "bark"]),
+        ([True, False], [True, False]),
+        ([1, 2, 3], [1, 2, 3]),
+        ([46.5, 47.0, 47.5], [46.5, 47.0, 47.5]),
+        (["meow", 47], '["meow", 47]'),  # mixed types not allowed in a list
+        (None, "null"),
+        (
+            {"cat": "meow", "dog": ["bark", "woof"]},
+            '{"cat": "meow", "dog": ["bark", "woof"]}',
+        ),
+        (datetime(2024, 1, 1), "2024-01-01 00:00:00"),
+        (("meow", "purr"), ["meow", "purr"]),
+        (NoStr(), None),
+    ),
+)
+def test_serialize_span_attribute(value, result):
+    assert _serialize_span_attribute(value) == result

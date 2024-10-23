@@ -6,7 +6,7 @@ from opentelemetry.trace import (
     format_span_id,
     get_current_span,
     INVALID_SPAN,
-    Span as TraceApiSpan,
+    Span as AbstractSpan,
 )
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
@@ -18,7 +18,10 @@ from sentry_sdk.integrations.opentelemetry.utils import (
     convert_from_otel_timestamp,
     extract_span_attributes,
     extract_span_data,
+    extract_transaction_name_source,
     get_trace_context,
+    get_sentry_meta,
+    set_sentry_meta,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,
@@ -78,19 +81,18 @@ class PotelSentrySpanProcessor(SpanProcessor):
         return True
 
     def _add_root_span(self, span, parent_span):
-        # type: (Span, TraceApiSpan) -> None
+        # type: (Span, AbstractSpan) -> None
         """
         This is required to make POTelSpan.root_span work
         since we can't traverse back to the root purely with otel efficiently.
         """
         if parent_span != INVALID_SPAN and not parent_span.get_span_context().is_remote:
             # child span points to parent's root or parent
-            span._sentry_root_otel_span = getattr(
-                parent_span, "_sentry_root_otel_span", parent_span
-            )
+            parent_root_span = get_sentry_meta(parent_span, "root_span")
+            set_sentry_meta(span, "root_span", parent_root_span or parent_span)
         else:
             # root span points to itself
-            span._sentry_root_otel_span = span
+            set_sentry_meta(span, "root_span", span)
 
     def _flush_root_span(self, span):
         # type: (ReadableSpan) -> None
@@ -138,11 +140,15 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if event is None:
             return None
 
+        transaction_name, transaction_source = extract_transaction_name_source(span)
         span_data = extract_span_data(span)
-        (_, description, _, _, _) = span_data
+        (_, description, _, http_status, _) = span_data
 
         trace_context = get_trace_context(span, span_data=span_data)
         contexts = {"trace": trace_context}
+
+        if http_status:
+            contexts["response"] = {"status_code": http_status}
 
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
@@ -150,9 +156,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
         event.update(
             {
                 "type": "transaction",
-                "transaction": description,
-                # TODO-neel-potel tx source based on integration
-                "transaction_info": {"source": "custom"},
+                "transaction": transaction_name or description,
+                "transaction_info": {"source": transaction_source or "custom"},
                 "contexts": contexts,
             }
         )

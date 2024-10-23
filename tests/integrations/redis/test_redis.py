@@ -72,17 +72,15 @@ def test_redis_pipeline(
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
     assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
-    assert span["data"]["redis.commands"] == {
-        "count": 3,
-        "first_ten": expected_first_ten,
-    }
+    assert span["data"]["redis.commands.count"] == 3
+    assert span["data"]["redis.commands.first_ten"] == expected_first_ten
     assert span["tags"] == {
         "redis.transaction": is_transaction,
         "redis.is_cluster": False,
     }
 
 
-def test_sensitive_data(sentry_init, capture_events):
+def test_sensitive_data(sentry_init, capture_events, render_span_tree):
     # fakeredis does not support the AUTH command, so we need to mock it
     with mock.patch(
         "sentry_sdk.integrations.redis.utils._COMMANDS_INCLUDING_SENSITIVE_DATA",
@@ -102,12 +100,16 @@ def test_sensitive_data(sentry_init, capture_events):
             )  # because fakeredis does not support AUTH we use GET instead
 
         (event,) = events
-        spans = event["spans"]
-        assert spans[0]["op"] == "db.redis"
-        assert spans[0]["description"] == "GET [Filtered]"
+        assert (
+            render_span_tree(event)
+            == """\
+- op="": description=null
+  - op="db.redis": description="GET [Filtered]"\
+"""
+        )
 
 
-def test_pii_data_redacted(sentry_init, capture_events):
+def test_pii_data_redacted(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
@@ -122,15 +124,19 @@ def test_pii_data_redacted(sentry_init, capture_events):
         connection.delete("somekey1", "somekey2")
 
     (event,) = events
-    spans = event["spans"]
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' [Filtered]"
-    assert spans[1]["description"] == "SET 'somekey2' [Filtered]"
-    assert spans[2]["description"] == "GET 'somekey2'"
-    assert spans[3]["description"] == "DEL 'somekey1' [Filtered]"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="": description=null
+  - op="db.redis": description="SET 'somekey1' [Filtered]"
+  - op="db.redis": description="SET 'somekey2' [Filtered]"
+  - op="db.redis": description="GET 'somekey2'"
+  - op="db.redis": description="DEL 'somekey1' [Filtered]"\
+"""
+    )
 
 
-def test_pii_data_sent(sentry_init, capture_events):
+def test_pii_data_sent(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
@@ -146,15 +152,19 @@ def test_pii_data_sent(sentry_init, capture_events):
         connection.delete("somekey1", "somekey2")
 
     (event,) = events
-    spans = event["spans"]
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' 'my secret string1'"
-    assert spans[1]["description"] == "SET 'somekey2' 'my secret string2'"
-    assert spans[2]["description"] == "GET 'somekey2'"
-    assert spans[3]["description"] == "DEL 'somekey1' 'somekey2'"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="": description=null
+  - op="db.redis": description="SET 'somekey1' 'my secret string1'"
+  - op="db.redis": description="SET 'somekey2' 'my secret string2'"
+  - op="db.redis": description="GET 'somekey2'"
+  - op="db.redis": description="DEL 'somekey1' 'somekey2'"\
+"""
+    )
 
 
-def test_data_truncation(sentry_init, capture_events):
+def test_data_truncation(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
@@ -170,15 +180,17 @@ def test_data_truncation(sentry_init, capture_events):
         connection.set("somekey2", short_string)
 
     (event,) = events
-    spans = event["spans"]
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' '%s..." % (
-        long_string[: 1024 - len("...") - len("SET 'somekey1' '")],
+    assert (
+        render_span_tree(event)
+        == f"""\
+- op="": description=null
+  - op="db.redis": description="SET 'somekey1' '{long_string[: 1024 - len("...") - len("SET 'somekey1' '")]}..."
+  - op="db.redis": description="SET 'somekey2' 'bbbbbbbbbb'"\
+"""
     )
-    assert spans[1]["description"] == "SET 'somekey2' '%s'" % (short_string,)
 
 
-def test_data_truncation_custom(sentry_init, capture_events):
+def test_data_truncation_custom(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[RedisIntegration(max_data_size=30)],
         traces_sample_rate=1.0,
@@ -194,12 +206,14 @@ def test_data_truncation_custom(sentry_init, capture_events):
         connection.set("somekey2", short_string)
 
     (event,) = events
-    spans = event["spans"]
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' '%s..." % (
-        long_string[: 30 - len("...") - len("SET 'somekey1' '")],
+    assert (
+        render_span_tree(event)
+        == f"""\
+- op="": description=null
+  - op="db.redis": description="SET 'somekey1' '{long_string[: 30 - len("...") - len("SET 'somekey1' '")]}..."
+  - op="db.redis": description="SET 'somekey2' '{short_string}'"\
+"""
     )
-    assert spans[1]["description"] == "SET 'somekey2' '%s'" % (short_string,)
 
 
 def test_breadcrumbs(sentry_init, capture_events):
