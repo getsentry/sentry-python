@@ -11,6 +11,7 @@ from ldclient.config import Config
 from ldclient.context import Context
 from ldclient.integrations.test_data import TestData
 
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
 
 # Ref: https://docs.launchdarkly.com/sdk/features/test-data-sources#python
@@ -95,3 +96,23 @@ def test_launchdarkly_integration_asyncio(sentry_init):
     results = asyncio.run(runner()).result()
     assert results[0] == ["hello", "world"]
     assert results[1] == ["hello", "other"]
+
+
+def test_launchdarkly_integration_did_not_enable(monkeypatch):
+    # Client is not passed in and set_config wasn't called.
+    # Bad practice to access internals like this. TODO: can skip this test, or remove this case entirely (force user to pass in a client instance).
+    ldclient._reset_client()
+    try:
+        ldclient.__lock.lock()
+        ldclient.__config = None
+    finally:
+        ldclient.__lock.unlock()
+
+    with pytest.raises(DidNotEnable):
+        LaunchDarklyIntegration()
+
+    # Client not initialized.
+    client = LDClient(config=Config("sdk-key"))
+    monkeypatch.setattr(client, "is_initialized", lambda: False)
+    with pytest.raises(DidNotEnable):
+        LaunchDarklyIntegration(client=client)

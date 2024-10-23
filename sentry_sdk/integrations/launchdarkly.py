@@ -25,12 +25,14 @@ class LaunchDarklyIntegration(Integration):
         # type: (LDClient | None) -> None
         if client is None:
             try:
-                client = ldclient.get()  # global singleton
+                client = (
+                    ldclient.get()
+                )  # global singleton. Fails if set_config hasn't been called.
             except Exception as exc:
                 raise DidNotEnable("Error getting LaunchDarkly client. " + repr(exc))
 
         if not client.is_initialized():
-            raise DidNotEnable("LaunchDarkly client is not initialized")
+            raise DidNotEnable("LaunchDarkly client is not initialized.")
 
         # Register the flag collection hook with the given client.
         client.add_hook(LaunchDarklyHook())
@@ -53,7 +55,7 @@ class LaunchDarklyHook(Hook):
     @property
     def metadata(self):
         # type: () -> Metadata
-        return Metadata(name="sentry-on-error-hook")
+        return Metadata(name="sentry-feature-flag-recorder")
 
     def after_evaluation(self, series_context, data, detail):
         # type: (EvaluationSeriesContext, dict[Any, Any], EvaluationDetail) -> dict[Any, Any]
