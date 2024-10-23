@@ -14,9 +14,6 @@ from ldclient.integrations.test_data import TestData
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
 
-# Ref: https://docs.launchdarkly.com/sdk/features/test-data-sources#python
-# https://launchdarkly-python-sdk.readthedocs.io/en/latest/api-testing.html#ldclient.integrations.test_data.TestData
-
 
 @pytest.mark.parametrize(
     "use_global_client",
