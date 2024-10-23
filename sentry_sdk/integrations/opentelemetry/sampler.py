@@ -1,5 +1,5 @@
+import random
 from typing import cast
-from random import random
 
 from opentelemetry import trace
 
@@ -46,16 +46,32 @@ def get_parent_sampled(parent_context, trace_id):
     return None
 
 
-def dropped_result(span_context, attributes, sample_rate=None):
+def dropped_result(parent_span_context, attributes, sample_rate=None):
     # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
     # these will only be added the first time in a root span sampling decision
-    trace_state = span_context.trace_state
+    trace_state = parent_span_context.trace_state
 
     if TRACESTATE_SAMPLED_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
 
     if sample_rate and TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+
+    is_root_span = not (
+        parent_span_context.is_valid and not parent_span_context.is_remote
+    )
+    if is_root_span:
+        # Tell Sentry why we dropped the transaction/root-span
+        client = sentry_sdk.get_client()
+        if client.monitor and client.monitor.downsample_factor > 0:
+            reason = "backpressure"
+        else:
+            reason = "sample_rate"
+
+        client.transport.record_lost_event(reason, data_category="transaction")
+
+        # Only one span (the transaction itself) is discarded, since we did not record any spans here.
+        client.transport.record_lost_event(reason, data_category="span")
 
     return SamplingResult(
         Decision.DROP,
@@ -136,9 +152,14 @@ class SentrySampler(Sampler):
             )
             return dropped_result(parent_span_context, attributes)
 
+        # Down-sample in case of back pressure monitor says so
+        # TODO: this should only be done for transactions (aka root spans)
+        if client.monitor:
+            sample_rate /= 2**client.monitor.downsample_factor
+
         # Roll the dice on sample rate
         sample_rate = float(cast("Union[bool, float, int]", sample_rate))
-        sampled = random() < sample_rate
+        sampled = random.random() < sample_rate
 
         if sampled:
             return sampled_result(parent_span_context, attributes, sample_rate)
