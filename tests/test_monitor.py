@@ -94,10 +94,10 @@ def test_transaction_uses_downsample_rate(
     assert Counter(record_lost_event_calls) == Counter(
         [
             (
-                "backpressure", 
-                "transaction", 
-                None, 
-                1, 
+                "backpressure",
+                "transaction",
+                None,
+                1,
             ),
             (
                 "backpressure",

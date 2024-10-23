@@ -57,7 +57,9 @@ def dropped_result(parent_span_context, attributes, sample_rate=None):
     if sample_rate and TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
-    is_root_span = not (parent_span_context.is_valid and not parent_span_context.is_remote)
+    is_root_span = not (
+        parent_span_context.is_valid and not parent_span_context.is_remote
+    )
     if is_root_span:
         # Tell Sentry why we dropped the transaction/root-span
         client = sentry_sdk.get_client()
