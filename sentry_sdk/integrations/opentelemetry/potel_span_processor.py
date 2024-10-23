@@ -62,7 +62,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
         if is_sentry_span(span):
             return
 
-        is_root_span = not (span.parent and not span.parent.is_remote)
+        is_root_span = not span.parent or span.parent.is_remote
         if is_root_span:
             # if have a root span ending, we build a transaction and send it
             self._flush_root_span(span)
