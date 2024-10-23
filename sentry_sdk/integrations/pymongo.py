@@ -163,10 +163,6 @@ class CommandTracer(monitoring.CommandListener):
             )
 
             for tag, value in tags.items():
-                # set the tag for backwards-compatibility.
-                # TODO: remove the set_tag call in the next major release!
-                span.set_tag(tag, value)
-
                 span.set_data(tag, value)
 
             for key, value in data.items():
