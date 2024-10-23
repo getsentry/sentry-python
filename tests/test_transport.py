@@ -205,7 +205,7 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
 
     client = make_client(_experiments=_experiments)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["num_pools"] == expected_num_pools
 
 
@@ -217,12 +217,15 @@ def test_two_way_ssl_authentication(make_client, http2):
     if http2:
         _experiments["transport_http2"] = True
 
-    client = make_client(_experiments=_experiments)
-
     current_dir = os.path.dirname(__file__)
     cert_file = f"{current_dir}/test.pem"
     key_file = f"{current_dir}/test.key"
-    options = client.transport._get_pool_options([], cert_file, key_file)
+    client = make_client(
+        cert_file=cert_file,
+        key_file=key_file,
+        _experiments=_experiments,
+    )
+    options = client.transport._get_pool_options()
 
     if http2:
         assert options["ssl_context"] is not None
@@ -240,21 +243,37 @@ def test_socket_options(make_client):
 
     client = make_client(socket_options=socket_options)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["socket_options"] == socket_options
 
 
 def test_keep_alive_true(make_client):
     client = make_client(keep_alive=True)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
 
 
 def test_keep_alive_on_by_default(make_client):
     client = make_client()
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert "socket_options" not in options
+
+
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_http2_with_https_dsn(make_client):
+    client = make_client(_experiments={"transport_http2": True})
+    client.transport.parsed_dsn.scheme = "https"
+    options = client.transport._get_pool_options()
+    assert options["http2"] is True
+
+
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_no_http2_with_http_dsn(make_client):
+    client = make_client(_experiments={"transport_http2": True})
+    client.transport.parsed_dsn.scheme = "http"
+    options = client.transport._get_pool_options()
+    assert options["http2"] is False
 
 
 def test_socket_options_override_keep_alive(make_client):
@@ -266,7 +285,7 @@ def test_socket_options_override_keep_alive(make_client):
 
     client = make_client(socket_options=socket_options, keep_alive=False)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["socket_options"] == socket_options
 
 
@@ -278,7 +297,7 @@ def test_socket_options_merge_with_keep_alive(make_client):
 
     client = make_client(socket_options=socket_options, keep_alive=True)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     try:
         assert options["socket_options"] == [
             (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
@@ -300,7 +319,7 @@ def test_socket_options_override_defaults(make_client):
     # socket option defaults, so we need to set this and not ignore it.
     client = make_client(socket_options=[])
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["socket_options"] == []
 
 

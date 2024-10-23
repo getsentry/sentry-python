@@ -24,6 +24,15 @@ from sentry_sdk.integrations.strawberry import (
 )
 from tests.conftest import ApproxDict
 
+try:
+    from strawberry.extensions.tracing import (
+        SentryTracingExtension,
+        SentryTracingExtensionSync,
+    )
+except ImportError:
+    SentryTracingExtension = None
+    SentryTracingExtensionSync = None
+
 parameterize_strawberry_test = pytest.mark.parametrize(
     "client_factory,async_execution,framework_integrations",
     (
@@ -137,6 +146,32 @@ def test_infer_execution_type_from_installed_packages_sync(sentry_init):
     ):
         schema = strawberry.Schema(Query)
         assert SentrySyncExtension in schema.extensions
+
+
+@pytest.mark.skipif(
+    SentryTracingExtension is None,
+    reason="SentryTracingExtension no longer available in this Strawberry version",
+)
+def test_replace_existing_sentry_async_extension(sentry_init):
+    sentry_init(integrations=[StrawberryIntegration()])
+
+    schema = strawberry.Schema(Query, extensions=[SentryTracingExtension])
+    assert SentryTracingExtension not in schema.extensions
+    assert SentrySyncExtension not in schema.extensions
+    assert SentryAsyncExtension in schema.extensions
+
+
+@pytest.mark.skipif(
+    SentryTracingExtensionSync is None,
+    reason="SentryTracingExtensionSync no longer available in this Strawberry version",
+)
+def test_replace_existing_sentry_sync_extension(sentry_init):
+    sentry_init(integrations=[StrawberryIntegration()])
+
+    schema = strawberry.Schema(Query, extensions=[SentryTracingExtensionSync])
+    assert SentryTracingExtensionSync not in schema.extensions
+    assert SentryAsyncExtension not in schema.extensions
+    assert SentrySyncExtension in schema.extensions
 
 
 @parameterize_strawberry_test

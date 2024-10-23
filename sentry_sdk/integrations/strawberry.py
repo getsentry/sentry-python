@@ -35,6 +35,15 @@ try:
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
+try:
+    from strawberry.extensions.tracing import (  # type: ignore
+        SentryTracingExtension as StrawberrySentryAsyncExtension,
+        SentryTracingExtensionSync as StrawberrySentrySyncExtension,
+    )
+except ImportError:
+    StrawberrySentryAsyncExtension = None
+    StrawberrySentrySyncExtension = None
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
