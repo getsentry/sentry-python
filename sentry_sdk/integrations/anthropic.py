@@ -1,5 +1,4 @@
 from functools import wraps
-import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -8,6 +7,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
+    _serialize_span_attribute,
     capture_internal_exceptions,
     event_from_exception,
     package_version,
@@ -88,7 +88,7 @@ def _get_responses(content):
                     "text": item.text,
                 }
             )
-    return json.dumps(responses)
+    return _serialize_span_attribute(responses)
 
 
 def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
@@ -127,7 +127,7 @@ def _add_ai_data_to_span(
             complete_message = "".join(content_blocks)
             span.set_data(
                 SPANDATA.AI_RESPONSES,
-                json.dumps([{"type": "text", "text": complete_message}]),
+                _serialize_span_attribute([{"type": "text", "text": complete_message}]),
             )
         total_tokens = input_tokens + output_tokens
         record_token_usage(span, input_tokens, output_tokens, total_tokens)
@@ -166,7 +166,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         span.set_data(SPANDATA.AI_STREAMING, False)
 
         if should_send_default_pii() and integration.include_prompts:
-            span.set_data(SPANDATA.AI_INPUT_MESSAGES, json.dumps(messages))
+            span.set_data(SPANDATA.AI_INPUT_MESSAGES, _serialize_span_attribute(messages))
 
         if hasattr(result, "content"):
             if should_send_default_pii() and integration.include_prompts:
