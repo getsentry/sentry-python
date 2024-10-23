@@ -178,11 +178,6 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
             _set_on_span(span, data)
 
             with capture_internal_exceptions():
-                # XXX
-                #    "db.cursor",
-                #    "db.params",
-                #    "db.paramstyle",
-
                 sentry_sdk.add_breadcrumb(
                     message="connect", category="query", data=data
                 )
