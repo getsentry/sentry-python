@@ -869,3 +869,11 @@ def test_last_event_id_cleared(sentry_init):
     Scope.get_isolation_scope().clear()
 
     assert Scope.last_event_id() is None, "last_event_id should be cleared"
+
+
+def test_transaction_info_default_is_none(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+
+    scope = sentry_sdk.get_current_scope()
+
+    assert scope._transaction_info is None
