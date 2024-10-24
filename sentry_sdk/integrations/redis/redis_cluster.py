@@ -23,7 +23,6 @@ if TYPE_CHECKING:
         RedisCluster as AsyncRedisCluster,
         ClusterPipeline as AsyncClusterPipeline,
     )
-    from sentry_sdk.tracing import Span
 
 
 def _get_async_cluster_db_data(async_redis_cluster_instance):

@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.tracing import Span
     from typing import Any, Optional
 
 
