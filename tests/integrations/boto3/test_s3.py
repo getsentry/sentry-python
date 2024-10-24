@@ -39,6 +39,37 @@ def test_basic(sentry_init, capture_events):
     assert span["description"] == "aws.s3.ListObjects"
 
 
+def test_breadcrumb(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, integrations=[Boto3Integration()])
+    events = capture_events()
+
+    try:
+        s3 = session.resource("s3")
+        with sentry_sdk.start_transaction(), MockResponse(
+            s3.meta.client, 200, {}, read_fixture("s3_list.xml")
+        ):
+            bucket = s3.Bucket("bucket")
+            # read bucket (this makes http request)
+            [obj for obj in bucket.objects.all()]
+            1 / 0
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+
+    (_, event) = events
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb == {
+        "type": "http",
+        "category": "httplib",
+        "data": {
+            "http.method": "GET",
+            "aws.request.url": "https://bucket.s3.amazonaws.com/",
+            "http.query": "encoding-type=url",
+            "http.fragment": "",
+        },
+        "timestamp": mock.ANY,
+    }
+
+
 def test_streaming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, integrations=[Boto3Integration()])
     events = capture_events()

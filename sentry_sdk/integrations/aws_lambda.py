@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from os import environ
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
@@ -146,34 +145,31 @@ def _wrap_handler(handler):
             if not isinstance(headers, dict):
                 headers = {}
 
-            transaction = continue_trace(
-                headers,
-                op=OP.FUNCTION_AWS,
-                name=aws_context.function_name,
-                source=TRANSACTION_SOURCE_COMPONENT,
-                origin=AwsLambdaIntegration.origin,
-            )
-            with sentry_sdk.start_transaction(
-                transaction,
-                custom_sampling_context={
-                    "aws_event": aws_event,
-                    "aws_context": aws_context,
-                },
-            ):
-                try:
-                    return handler(aws_event, aws_context, *args, **kwargs)
-                except Exception:
-                    exc_info = sys.exc_info()
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "aws_lambda", "handled": False},
-                    )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
-                    reraise(*exc_info)
-                finally:
-                    if timeout_thread:
-                        timeout_thread.stop()
+            with sentry_sdk.continue_trace(headers):
+                with sentry_sdk.start_transaction(
+                    op=OP.FUNCTION_AWS,
+                    name=aws_context.function_name,
+                    source=TRANSACTION_SOURCE_COMPONENT,
+                    origin=AwsLambdaIntegration.origin,
+                    custom_sampling_context={
+                        "aws_event": aws_event,
+                        "aws_context": aws_context,
+                    },
+                ):
+                    try:
+                        return handler(aws_event, aws_context, *args, **kwargs)
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        sentry_event, hint = event_from_exception(
+                            exc_info,
+                            client_options=client.options,
+                            mechanism={"type": "aws_lambda", "handled": False},
+                        )
+                        sentry_sdk.capture_event(sentry_event, hint=hint)
+                        reraise(*exc_info)
+                    finally:
+                        if timeout_thread:
+                            timeout_thread.stop()
 
     return sentry_handler  # type: ignore
 
@@ -216,77 +212,44 @@ class AwsLambdaIntegration(Integration):
             )
             return
 
-        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")  # Python 3.6
+        lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
+            lambda_bootstrap.LambdaRuntimeClient.post_init_error
+        )
 
-        if pre_37:
-            old_handle_event_request = lambda_bootstrap.handle_event_request
+        old_handle_event_request = lambda_bootstrap.handle_event_request
 
-            def sentry_handle_event_request(request_handler, *args, **kwargs):
-                # type: (Any, *Any, **Any) -> Any
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_event_request(request_handler, *args, **kwargs)
+        def sentry_handle_event_request(  # type: ignore
+            lambda_runtime_client, request_handler, *args, **kwargs
+        ):
+            request_handler = _wrap_handler(request_handler)
+            return old_handle_event_request(
+                lambda_runtime_client, request_handler, *args, **kwargs
+            )
 
-            lambda_bootstrap.handle_event_request = sentry_handle_event_request
+        lambda_bootstrap.handle_event_request = sentry_handle_event_request
 
-            old_handle_http_request = lambda_bootstrap.handle_http_request
+        # Patch the runtime client to drain the queue. This should work
+        # even when the SDK is initialized inside of the handler
 
-            def sentry_handle_http_request(request_handler, *args, **kwargs):
-                # type: (Any, *Any, **Any) -> Any
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_http_request(request_handler, *args, **kwargs)
-
-            lambda_bootstrap.handle_http_request = sentry_handle_http_request
-
-            # Patch to_json to drain the queue. This should work even when the
-            # SDK is initialized inside of the handler
-
-            old_to_json = lambda_bootstrap.to_json
-
-            def sentry_to_json(*args, **kwargs):
+        def _wrap_post_function(f):
+            # type: (F) -> F
+            def inner(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 _drain_queue()
-                return old_to_json(*args, **kwargs)
+                return f(*args, **kwargs)
 
-            lambda_bootstrap.to_json = sentry_to_json
-        else:
-            lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
-                lambda_bootstrap.LambdaRuntimeClient.post_init_error
+            return inner  # type: ignore
+
+        lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = (
+            _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
             )
-
-            old_handle_event_request = lambda_bootstrap.handle_event_request
-
-            def sentry_handle_event_request(  # type: ignore
-                lambda_runtime_client, request_handler, *args, **kwargs
-            ):
-                request_handler = _wrap_handler(request_handler)
-                return old_handle_event_request(
-                    lambda_runtime_client, request_handler, *args, **kwargs
-                )
-
-            lambda_bootstrap.handle_event_request = sentry_handle_event_request
-
-            # Patch the runtime client to drain the queue. This should work
-            # even when the SDK is initialized inside of the handler
-
-            def _wrap_post_function(f):
-                # type: (F) -> F
-                def inner(*args, **kwargs):
-                    # type: (*Any, **Any) -> Any
-                    _drain_queue()
-                    return f(*args, **kwargs)
-
-                return inner  # type: ignore
-
-            lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = (
-                _wrap_post_function(
-                    lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
-                )
+        )
+        lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = (
+            _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
             )
-            lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = (
-                _wrap_post_function(
-                    lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
-                )
-            )
+        )
 
 
 def get_lambda_bootstrap():

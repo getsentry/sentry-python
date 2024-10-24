@@ -21,7 +21,7 @@ FAKEREDIS_VERSION = parse_version(fakeredis.__version__)
 
 
 @pytest.mark.asyncio
-async def test_no_cache_basic(sentry_init, capture_events):
+async def test_no_cache_basic(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[
             RedisIntegration(),
@@ -35,13 +35,17 @@ async def test_no_cache_basic(sentry_init, capture_events):
         await connection.get("myasynccachekey")
 
     (event,) = events
-    spans = event["spans"]
-    assert len(spans) == 1
-    assert spans[0]["op"] == "db.redis"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="": description=null
+  - op="db.redis": description="GET 'myasynccachekey'"\
+"""
+    )
 
 
 @pytest.mark.asyncio
-async def test_cache_basic(sentry_init, capture_events):
+async def test_cache_basic(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -57,15 +61,18 @@ async def test_cache_basic(sentry_init, capture_events):
         await connection.get("myasynccachekey")
 
     (event,) = events
-    spans = event["spans"]
-    assert len(spans) == 2
-
-    assert spans[0]["op"] == "cache.get"
-    assert spans[1]["op"] == "db.redis"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="": description=null
+  - op="cache.get": description="myasynccachekey"
+    - op="db.redis": description="GET 'myasynccachekey'"\
+"""
+    )
 
 
 @pytest.mark.asyncio
-async def test_cache_keys(sentry_init, capture_events):
+async def test_cache_keys(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -84,23 +91,18 @@ async def test_cache_keys(sentry_init, capture_events):
         await connection.get("abl")
 
     (event,) = events
-    spans = event["spans"]
-    assert len(spans) == 6
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "GET 'asomethingelse'"
-
-    assert spans[1]["op"] == "cache.get"
-    assert spans[1]["description"] == "ablub"
-    assert spans[2]["op"] == "db.redis"
-    assert spans[2]["description"] == "GET 'ablub'"
-
-    assert spans[3]["op"] == "cache.get"
-    assert spans[3]["description"] == "ablubkeything"
-    assert spans[4]["op"] == "db.redis"
-    assert spans[4]["description"] == "GET 'ablubkeything'"
-
-    assert spans[5]["op"] == "db.redis"
-    assert spans[5]["description"] == "GET 'abl'"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="": description=null
+  - op="db.redis": description="GET 'asomethingelse'"
+  - op="cache.get": description="ablub"
+    - op="db.redis": description="GET 'ablub'"
+  - op="cache.get": description="ablubkeything"
+    - op="db.redis": description="GET 'ablubkeything'"
+  - op="db.redis": description="GET 'abl'"\
+"""
+    )
 
 
 @pytest.mark.asyncio
@@ -122,7 +124,7 @@ async def test_cache_data(sentry_init, capture_events):
         await connection.get("myasynccachekey")
 
     (event,) = events
-    spans = event["spans"]
+    spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
 
     assert len(spans) == 6
 

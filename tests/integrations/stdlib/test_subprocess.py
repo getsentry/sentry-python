@@ -3,10 +3,11 @@ import platform
 import subprocess
 import sys
 from collections.abc import Mapping
+from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_exception, capture_message, start_transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from tests.conftest import ApproxDict
 
@@ -224,3 +225,37 @@ def test_subprocess_span_origin(sentry_init, capture_events):
 
     assert event["spans"][2]["op"] == "subprocess.wait"
     assert event["spans"][2]["origin"] == "auto.subprocess.stdlib.subprocess"
+
+
+def test_subprocess_breadcrumb(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    args = [
+        sys.executable,
+        "-c",
+        "print('hello world')",
+    ]
+    popen = subprocess.Popen(args)
+    popen.communicate()
+    popen.poll()
+
+    try:
+        1 / 0
+    except ZeroDivisionError as ex:
+        capture_exception(ex)
+
+    (event,) = events
+    breadcrumbs = event["breadcrumbs"]["values"]
+    assert len(breadcrumbs) == 1
+
+    (crumb,) = breadcrumbs
+    assert crumb["type"] == "subprocess"
+    assert crumb["category"] == "subprocess"
+    assert crumb["message"] == " ".join(args)
+    assert crumb["timestamp"] == mock.ANY
+    assert crumb["data"] == {
+        "subprocess.pid": popen.pid,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }

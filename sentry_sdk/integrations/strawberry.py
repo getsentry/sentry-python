@@ -114,14 +114,6 @@ def _patch_schema_init():
                 "False" if should_use_async_extension else "True",
             )
 
-        # remove the built in strawberry sentry extension, if present
-        extensions = [
-            extension
-            for extension in extensions
-            if extension
-            not in (StrawberrySentryAsyncExtension, StrawberrySentrySyncExtension)
-        ]
-
         # add our extension
         extensions.append(
             SentryAsyncExtension if should_use_async_extension else SentrySyncExtension
@@ -422,11 +414,6 @@ def _make_response_event_processor(response_data):
 
 def _guess_if_using_async(extensions):
     # type: (List[SchemaExtension]) -> bool
-    if StrawberrySentryAsyncExtension in extensions:
-        return True
-    elif StrawberrySentrySyncExtension in extensions:
-        return False
-
     return bool(
         {"starlette", "starlite", "litestar", "fastapi"} & set(_get_installed_modules())
     )

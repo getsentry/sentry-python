@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
+    get_current_thread_meta,
     is_sentry_url,
     logger,
     safe_repr,
@@ -94,11 +95,17 @@ def _install_httplib():
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin="auto.http.stdlib.httplib",
         )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
+
+        data = {
+            SPANDATA.HTTP_METHOD: method,
+        }
         if parsed_url is not None:
-            span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            data["url"] = parsed_url.url
+            data[SPANDATA.HTTP_QUERY] = parsed_url.query
+            data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
+        for key, value in data.items():
+            span.set_data(key, value)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
@@ -117,6 +124,7 @@ def _install_httplib():
                 self.putheader(key, value)
 
         self._sentrysdk_span = span  # type: ignore[attr-defined]
+        self._sentrysdk_span_data = data  # type: ignore[attr-defined]
 
         return rv
 
@@ -128,6 +136,16 @@ def _install_httplib():
             return real_getresponse(self, *args, **kwargs)
 
         rv = real_getresponse(self, *args, **kwargs)
+
+        span_data = getattr(self, "_sentrysdk_span_data", {})
+        span_data[SPANDATA.HTTP_STATUS_CODE] = int(rv.status)
+        span_data["reason"] = rv.reason
+
+        sentry_sdk.add_breadcrumb(
+            type="http",
+            category="httplib",
+            data=span_data,
+        )
 
         span.set_http_status(int(rv.status))
         span.set_data("reason", rv.reason)
@@ -225,6 +243,24 @@ def _install_subprocess():
             rv = old_popen_init(self, *a, **kw)
 
             span.set_tag("subprocess.pid", self.pid)
+
+            with capture_internal_exceptions():
+                thread_id, thread_name = get_current_thread_meta()
+                breadcrumb_data = {
+                    "subprocess.pid": self.pid,
+                    "thread.id": thread_id,
+                    "thread.name": thread_name,
+                }
+                if cwd:
+                    breadcrumb_data["subprocess.cwd"] = cwd
+
+                sentry_sdk.add_breadcrumb(
+                    type="subprocess",
+                    category="subprocess",
+                    message=description,
+                    data=breadcrumb_data,
+                )
+
             return rv
 
     subprocess.Popen.__init__ = sentry_patched_popen_init  # type: ignore

@@ -55,13 +55,15 @@ def test_monitor_unhealthy(sentry_init):
         assert monitor.downsample_factor == (i + 1 if i < 10 else 10)
 
 
-def test_transaction_uses_downsampled_rate(
-    sentry_init, capture_record_lost_event_calls, monkeypatch
+def test_transaction_uses_downsample_rate(
+    sentry_init, capture_envelopes, capture_record_lost_event_calls, monkeypatch
 ):
     sentry_init(
         traces_sample_rate=1.0,
         transport=UnhealthyTestTransport(),
     )
+
+    envelopes = capture_envelopes()
 
     record_lost_event_calls = capture_record_lost_event_calls()
 
@@ -77,13 +79,32 @@ def test_transaction_uses_downsampled_rate(
     assert monitor.downsample_factor == 1
 
     with sentry_sdk.start_transaction(name="foobar") as transaction:
+        with sentry_sdk.start_span(name="foospan"):
+            with sentry_sdk.start_span(name="foospan2"):
+                with sentry_sdk.start_span(name="foospan3"):
+                    ...
+
         assert transaction.sampled is False
-        assert transaction.sample_rate == 0.5
+        assert (
+            transaction.sample_rate == 0.5
+        )  # TODO: this fails until we put the sample_rate in the POTelSpan
+
+    assert len(envelopes) == 0
 
     assert Counter(record_lost_event_calls) == Counter(
         [
-            ("backpressure", "transaction", None, 1),
-            ("backpressure", "span", None, 1),
+            (
+                "backpressure",
+                "transaction",
+                None,
+                1,
+            ),
+            (
+                "backpressure",
+                "span",
+                None,
+                1,
+            ),  # Only one span (the transaction itself) is counted, since we did not record any spans in the first place.
         ]
     )
 

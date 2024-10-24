@@ -3,7 +3,6 @@ import contextlib
 from inspect import iscoroutinefunction
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
@@ -115,22 +114,19 @@ def _handle_request_impl(self):
         processor = _make_event_processor(weak_handler)
         scope.add_event_processor(processor)
 
-        transaction = continue_trace(
-            headers,
-            op=OP.HTTP_SERVER,
-            # Like with all other integrations, this is our
-            # fallback transaction in case there is no route.
-            # sentry_urldispatcher_resolve is responsible for
-            # setting a transaction name later.
-            name="generic Tornado request",
-            source=TRANSACTION_SOURCE_ROUTE,
-            origin=TornadoIntegration.origin,
-        )
-
-        with sentry_sdk.start_transaction(
-            transaction, custom_sampling_context={"tornado_request": self.request}
-        ):
-            yield
+        with sentry_sdk.continue_trace(headers):
+            with sentry_sdk.start_transaction(
+                op=OP.HTTP_SERVER,
+                # Like with all other integrations, this is our
+                # fallback transaction in case there is no route.
+                # sentry_urldispatcher_resolve is responsible for
+                # setting a transaction name later.
+                name="generic Tornado request",
+                source=TRANSACTION_SOURCE_ROUTE,
+                origin=TornadoIntegration.origin,
+                custom_sampling_context={"tornado_request": self.request},
+            ):
+                yield
 
 
 @ensure_integration_enabled(TornadoIntegration)
