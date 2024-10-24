@@ -23,11 +23,15 @@ class LaunchDarklyIntegration(Integration):
 
     def __init__(self, client=None):
         # type: (LDClient | None) -> None
+        """
+        @param client    An initialized LDClient instance. If a client is not provided, this integration will attempt to
+                         use the shared global instance. This will fail if ldclient.set_config() hasn't been called.
+
+        Docs reference: https://docs.launchdarkly.com/sdk/server-side/python
+        """
         if client is None:
             try:
-                client = (
-                    ldclient.get()
-                )  # global singleton. Fails if set_config hasn't been called.
+                client = ldclient.get()  # global singleton.
             except Exception as exc:
                 raise DidNotEnable("Error getting LaunchDarkly client. " + repr(exc))
 
