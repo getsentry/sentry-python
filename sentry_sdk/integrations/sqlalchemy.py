@@ -31,7 +31,6 @@ class SqlalchemyIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         version = parse_version(SQLALCHEMY_VERSION)
 
         if version is None:
@@ -72,6 +71,11 @@ def _before_cursor_execute(
 @ensure_integration_enabled(SqlalchemyIntegration)
 def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     # type: (Any, Any, Any, Any, Any, *Any) -> None
+    span = getattr(context, "_sentry_sql_span", None)  # type: Optional[Span]
+    if span is not None:
+        with capture_internal_exceptions():
+            add_query_source(span)
+
     ctx_mgr = getattr(
         context, "_sentry_sql_span_manager", None
     )  # type: Optional[ContextManager[Any]]
@@ -79,11 +83,6 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     if ctx_mgr is not None:
         context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
-
-    span = getattr(context, "_sentry_sql_span", None)  # type: Optional[Span]
-    if span is not None:
-        with capture_internal_exceptions():
-            add_query_source(span)
 
 
 def _handle_error(context, *args):
