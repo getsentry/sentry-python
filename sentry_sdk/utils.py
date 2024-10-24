@@ -819,10 +819,10 @@ def single_exception_from_error_tuple(
 
         for stackframe in full_stack:
             stackframe_id = {
-                "filename": stackframe.filename,
-                "line": stackframe.line,
-                "lineno": stackframe.lineno,
-                "name": stackframe.name,
+                "filename": stackframe["abs_path"],
+                "line": stackframe["context_line"],
+                "lineno": stackframe["lineno"],
+                "name": stackframe["function"],
             }
 
             found = False
@@ -839,19 +839,7 @@ def single_exception_from_error_tuple(
                     break
 
             if not found:
-                frames.append(
-                    {
-                        "filename": os.path.basename(stackframe.filename),
-                        "abs_path": stackframe.filename,
-                        "function": stackframe.name,
-                        "module": None,
-                        "lineno": stackframe.lineno,
-                        "pre_context": [],
-                        "context_line": stackframe.line,
-                        "post_context": [],
-                        "vars": {},
-                    }
-                )
+                frames.append(stackframe)
 
         frames.reverse()
         from pprint import pprint
@@ -1153,6 +1141,42 @@ def exc_info_from_error(error):
     return exc_info
 
 
+def get_full_stack():
+    # type: () -> List[Dict[str, Any]]
+    """
+    Returns a serialized representation of the full stack from the first frame that is not in sentry_sdk.
+    """
+    try:
+        # Raise an exception to capture the current stack
+        raise Exception
+    except:
+        # Get the current stack frame
+        _, _, tb = sys.exc_info()
+
+    # Get the frame one level up (skipping this function's frame)
+    frame = tb.tb_frame.f_back
+
+    stack_info = []
+
+    # Walk up the stack
+    while frame:
+        in_sdk = False
+        try:
+            if "sentry_sdk" in frame.f_code.co_filename:
+                in_sdk = True
+        except Exception:
+            pass
+
+        if not in_sdk:
+            stack_info.append(serialize_frame(frame))
+
+        frame = frame.f_back
+
+    stack_info.reverse()
+
+    return stack_info
+
+
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
     client_options=None,  # type: Optional[Dict[str, Any]]
@@ -1161,12 +1185,10 @@ def event_from_exception(
     # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
-    # TODO: do not use extract_stack() but get the real stack frames (instead of summaries with extract_stack)
-    # to get all the information about the frames
-    full_stack = traceback.extract_stack()
+    full_stack = get_full_stack()
 
     # TODO: add an option "add_full_stack" to the client options to add the full stack to the event (defaults to True)
-    
+
     # TODO: add an option "max_stack_frames" to the client options to limit the number of stack frames (defaults to 50?)
 
     return (
