@@ -19,7 +19,7 @@ from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
-from sentry_sdk.utils import package_version
+from sentry_sdk.utils import _serialize_span_attribute, package_version
 
 try:
     from anthropic.types import InputJSONDelta
@@ -115,10 +115,10 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
-        assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"type": "text", "text": "Hi, I'm Claude."}
-        ]
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+            [{"type": "text", "text": "Hi, I'm Claude."}]
+        )
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
@@ -183,10 +183,10 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
-        assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"type": "text", "text": "Hi, I'm Claude."}
-        ]
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+            [{"type": "text", "text": "Hi, I'm Claude."}]
+        )
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
@@ -282,10 +282,10 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
-        assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"type": "text", "text": "Hi! I'm Claude!"}
-        ]
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+            [{"type": "text", "text": "Hi! I'm Claude!"}]
+        )
 
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
@@ -385,10 +385,10 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
-        assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"type": "text", "text": "Hi! I'm Claude!"}
-        ]
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+            [{"type": "text", "text": "Hi! I'm Claude!"}]
+        )
 
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
@@ -515,10 +515,10 @@ def test_streaming_create_message_with_input_json_delta(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
-        assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"text": "", "type": "text"}
-        ]  # we do not record InputJSONDelta because it could contain PII
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+            [{"type": "text", "text": ""}]
+        )  # we do not record InputJSONDelta because it could contain PII
 
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
@@ -652,10 +652,10 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
-        assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"text": "", "type": "text"}
-        ]  # we do not record InputJSONDelta because it could contain PII
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+            [{"type": "text", "text": ""}]
+        )  # we do not record InputJSONDelta because it could contain PII
 
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
