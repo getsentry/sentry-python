@@ -45,6 +45,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test launchdarkly latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-launchdarkly-latest"
       - name: Test loguru latest
         run: |
           set -x # print commands that are executed
@@ -121,6 +125,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test launchdarkly pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-launchdarkly"
       - name: Test loguru pinned
         run: |
           set -x # print commands that are executed
