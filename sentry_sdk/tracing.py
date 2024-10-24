@@ -326,8 +326,7 @@ class Span:
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
 
-        thread_id, thread_name = get_current_thread_meta()
-        self.set_thread(thread_id, thread_name)
+        self.update_active_thread()
         self.set_profiler_id(get_profiler_id())
 
     # TODO this should really live on the Transaction class rather than the Span
@@ -711,6 +710,11 @@ class Span:
         return {
             "profiler_id": profiler_id,
         }
+
+    def update_active_thread(self):
+        # type: () -> None
+        thread_id, thread_name = get_current_thread_meta()
+        self.set_thread(thread_id, thread_name)
 
 
 class Transaction(Span):
