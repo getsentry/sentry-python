@@ -51,7 +51,7 @@ def _before_cursor_execute(
     conn, cursor, statement, parameters, context, executemany, *args
 ):
     # type: (Any, Any, Any, Any, Any, bool, *Any) -> None
-    ctx_mgr = record_sql_queries(
+    record_sql_queries_ctx_mngr = record_sql_queries(
         cursor,
         statement,
         parameters,
@@ -59,9 +59,9 @@ def _before_cursor_execute(
         executemany=executemany,
         span_origin=SqlalchemyIntegration.origin,
     )
-    context._sentry_sql_span_manager = ctx_mgr
+    context._sentry_sql_span_manager = record_sql_queries_ctx_mngr
 
-    span = ctx_mgr.__enter__()
+    span = record_sql_queries_ctx_mngr.__enter__()
 
     if span is not None:
         _set_db_data(span, conn)
@@ -76,13 +76,13 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
         with capture_internal_exceptions():
             add_query_source(span)
 
-    ctx_mgr = getattr(
+    record_sql_queries_ctx_mngr = getattr(
         context, "_sentry_sql_span_manager", None
     )  # type: Optional[ContextManager[Any]]
 
-    if ctx_mgr is not None:
+    if record_sql_queries_ctx_mngr is not None:
         context._sentry_sql_span_manager = None
-        ctx_mgr.__exit__(None, None, None)
+        record_sql_queries_ctx_mngr.__exit__(None, None, None)
 
 
 def _handle_error(context, *args):
@@ -99,13 +99,13 @@ def _handle_error(context, *args):
     # _after_cursor_execute does not get called for crashing SQL stmts. Judging
     # from SQLAlchemy codebase it does seem like any error coming into this
     # handler is going to be fatal.
-    ctx_mgr = getattr(
+    record_sql_queries_ctx_mngr = getattr(
         execution_context, "_sentry_sql_span_manager", None
     )  # type: Optional[ContextManager[Any]]
 
-    if ctx_mgr is not None:
+    if record_sql_queries_ctx_mngr is not None:
         execution_context._sentry_sql_span_manager = None
-        ctx_mgr.__exit__(None, None, None)
+        record_sql_queries_ctx_mngr.__exit__(None, None, None)
 
 
 # See: https://docs.sqlalchemy.org/en/20/dialects/index.html

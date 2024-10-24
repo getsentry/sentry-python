@@ -1,4 +1,5 @@
 import os
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from unittest import mock
 
@@ -552,17 +553,11 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
         bob = Person(name="Bob")
         session.add(bob)
 
-        class fake_record_sql_queries:  # noqa: N801
-            def __init__(self, *args, **kwargs):
-                with freeze_time(datetime(2024, 1, 1, microsecond=99999)):
-                    with record_sql_queries(*args, **kwargs) as span:
-                        self.span = span
-
-            def __enter__(self):
-                return self.span
-
-            def __exit__(self, type, value, traceback):
-                pass
+        @contextmanager
+        def fake_record_sql_queries(*args, **kwargs):  # noqa: N801
+            with freeze_time(datetime(2024, 1, 1, microsecond=99999)):
+                with record_sql_queries(*args, **kwargs) as span:
+                    yield span
 
         with mock.patch(
             "sentry_sdk.tracing.POTelSpan.start_timestamp",
@@ -620,17 +615,11 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
         bob = Person(name="Bob")
         session.add(bob)
 
-        class fake_record_sql_queries:  # noqa: N801
-            def __init__(self, *args, **kwargs):
-                with freeze_time(datetime(2024, 1, 1, microsecond=100001)):
-                    with record_sql_queries(*args, **kwargs) as span:
-                        self.span = span
-
-            def __enter__(self):
-                return self.span
-
-            def __exit__(self, type, value, traceback):
-                pass
+        @contextmanager
+        def fake_record_sql_queries(*args, **kwargs):  # noqa: N801
+            with freeze_time(datetime(2024, 1, 1, microsecond=100001)):
+                with record_sql_queries(*args, **kwargs) as span:
+                    yield span
 
         with mock.patch(
             "sentry_sdk.tracing.POTelSpan.start_timestamp",
