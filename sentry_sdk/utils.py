@@ -738,7 +738,7 @@ def single_exception_from_error_tuple(
     exception_id=None,  # type: Optional[int]
     parent_id=None,  # type: Optional[int]
     source=None,  # type: Optional[str]
-    full_stack=None,
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Dict[str, Any]
     """
@@ -809,43 +809,34 @@ def single_exception_from_error_tuple(
     ]
 
     if frames:
-        # TODO: insert missing frames from full_stack into frames
-        # elements of frames list look like this:
-        # {'filename': 'main.py', 'abs_path': '/Users/antonpirker/code/testing-sentry/test-plain-python-missing-stack-frames/main.py', 'function': 'foo', 'module': '__main__', 'lineno': 19, 'pre_context': ['    foo()', '', '', 'def foo():', '    try:'], 'context_line': '        bar()', 'post_context': ['    except Exception as e:', '        capture_exception(e)', '', '', 'def bar():'], 'vars': {'e': "Exception('1 some exception')"}}
-        # elements of full_stack are instances of type FrameSummary
-
-        full_stack.reverse()
-        frames.reverse()
-
-        for stackframe in full_stack:
-            stackframe_id = {
-                "filename": stackframe["abs_path"],
-                "line": stackframe["context_line"],
-                "lineno": stackframe["lineno"],
-                "name": stackframe["function"],
+        if not full_stack:
+            new_frames = frames
+        else:
+            # Add the missing frames from full_stack
+            frame_ids = {
+                (
+                    frame["abs_path"],
+                    frame["context_line"],
+                    frame["lineno"],
+                    frame["function"],
+                )
+                for frame in frames
             }
 
-            found = False
-            for frame in frames:
-                frame_id = {
-                    "filename": frame["abs_path"],
-                    "line": frame["context_line"],
-                    "lineno": frame["lineno"],
-                    "name": frame["function"],
-                }
+            new_frames = [
+                stackframe
+                for stackframe in full_stack
+                if (
+                    stackframe["abs_path"],
+                    stackframe["context_line"],
+                    stackframe["lineno"],
+                    stackframe["function"],
+                )
+                not in frame_ids
+            ]
+            new_frames.extend(frames)
 
-                if stackframe_id == frame_id:
-                    found = True
-                    break
-
-            if not found:
-                frames.append(stackframe)
-
-        frames.reverse()
-        from pprint import pprint
-
-        pprint(frames)
-        exception_value["stacktrace"] = {"frames": frames}
+        exception_value["stacktrace"] = {"frames": new_frames}
 
     return exception_value
 
@@ -900,6 +891,7 @@ def exceptions_from_error(
     exception_id=0,  # type: int
     parent_id=0,  # type: int
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
@@ -919,6 +911,7 @@ def exceptions_from_error(
         exception_id=exception_id,
         parent_id=parent_id,
         source=source,
+        full_stack=full_stack,
     )
     exceptions = [parent]
 
@@ -944,6 +937,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__cause__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -965,6 +959,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__context__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -981,6 +976,7 @@ def exceptions_from_error(
                 exception_id=exception_id,
                 parent_id=parent_id,
                 source="exceptions[%s]" % idx,
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -991,7 +987,7 @@ def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
-    full_stack=None,
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
@@ -1154,6 +1150,9 @@ def get_full_stack():
         _, _, tb = sys.exc_info()
 
     # Get the frame one level up (skipping this function's frame)
+    if tb is None:
+        return []
+
     frame = tb.tb_frame.f_back
 
     stack_info = []
