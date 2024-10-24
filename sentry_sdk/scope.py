@@ -11,7 +11,8 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.flag_utils import FlagBuffer, DEFAULT_FLAG_CAPACITY
+
+# from sentry_sdk.flag_utils import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
@@ -193,7 +194,7 @@ class Scope:
         "client",
         "_type",
         "_last_event_id",
-        "_flags",
+        # "_flags",
     )
 
     def __init__(self, ty=None, client=None):
@@ -251,7 +252,7 @@ class Scope:
 
         rv._last_event_id = self._last_event_id
 
-        rv._flags = copy(self._flags)
+        # rv._flags = copy(self._flags)
 
         return rv
 
@@ -689,7 +690,7 @@ class Scope:
 
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id = None  # type: Optional[str]
-        self._flags = None  # type: Optional[FlagBuffer]
+        # self._flags = None  # type: Optional[FlagBuffer]
 
     @_attr_setter
     def level(self, value):
@@ -1551,16 +1552,16 @@ class Scope:
             self._type,
         )
 
-    @property
-    def flags(self):
-        # type: () -> FlagBuffer
-        if self._flags is None:
-            max_flags = (
-                self.get_client().options["_experiments"].get("max_flags")
-                or DEFAULT_FLAG_CAPACITY
-            )
-            self._flags = FlagBuffer(capacity=max_flags)
-        return self._flags
+    # @property
+    # def flags(self):
+    #     # type: () -> FlagBuffer
+    #     if self._flags is None:
+    #         max_flags = (
+    #             self.get_client().options["_experiments"].get("max_flags")
+    #             or DEFAULT_FLAG_CAPACITY
+    #         )
+    #         self._flags = FlagBuffer(capacity=max_flags)
+    #     return self._flags
 
 
 @contextmanager

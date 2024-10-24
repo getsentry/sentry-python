@@ -1,10 +1,63 @@
 import asyncio
 import concurrent.futures as cf
+
 import sentry_sdk
 
 from openfeature import api
 from openfeature.provider.in_memory_provider import InMemoryFlag, InMemoryProvider
 from sentry_sdk.integrations.openfeature import OpenFeatureIntegration
+
+
+def test_openfeature_integration_flags_on_integration(sentry_init, capture_events):
+    sentry_init(integrations=[OpenFeatureIntegration()])
+
+    flags = {
+        "hello": InMemoryFlag("on", {"on": True, "off": False}),
+        "world": InMemoryFlag("off", {"on": True, "off": False}),
+    }
+    api.set_provider(InMemoryProvider(flags))
+
+    client = api.get_client()
+    client.get_boolean_value("hello", default_value=False)
+    client.get_boolean_value("world", default_value=False)
+    client.get_boolean_value("other", default_value=True)
+
+    events = capture_events()
+
+    sentry_sdk.capture_exception(Exception("test"))
+
+    (event,) = events
+
+    assert event["contexts"]["flags"]["values"] == [
+        {"flag": "hello", "result": True},
+        {"flag": "world", "result": False},
+        {"flag": "other", "result": True},
+    ]
+
+
+def test_openfeature_integration_max_flags(sentry_init, capture_events):
+    sentry_init(integrations=[OpenFeatureIntegration(max_flags=2)])
+
+    flags = {
+        "hello": InMemoryFlag("on", {"on": True, "off": False}),
+        "world": InMemoryFlag("off", {"on": True, "off": False}),
+    }
+    api.set_provider(InMemoryProvider(flags))
+
+    client = api.get_client()
+    client.get_boolean_value("hello", default_value=False)
+    client.get_boolean_value("world", default_value=False)
+    client.get_boolean_value("other", default_value=True)
+
+    events = capture_events()
+
+    sentry_sdk.capture_exception(Exception("test"))
+
+    (event,) = events
+    assert event["contexts"]["flags"]["values"] == [
+        {"flag": "world", "result": False},
+        {"flag": "other", "result": True},
+    ]
 
 
 def test_openfeature_integration(sentry_init):

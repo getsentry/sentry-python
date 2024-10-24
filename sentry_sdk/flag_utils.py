@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     FlagData = TypedDict("FlagData", {"flag": str, "result": bool})
 
 
-DEFAULT_FLAG_CAPACITY = 100
+# DEFAULT_FLAG_CAPACITY = 100
 
 
 class FlagBuffer:
