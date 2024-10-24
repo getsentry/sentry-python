@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
+import traceback
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
 try:
@@ -737,6 +738,7 @@ def single_exception_from_error_tuple(
     exception_id=None,  # type: Optional[int]
     parent_id=None,  # type: Optional[int]
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Dict[str, Any]
     """
@@ -807,7 +809,34 @@ def single_exception_from_error_tuple(
     ]
 
     if frames:
-        exception_value["stacktrace"] = {"frames": frames}
+        if not full_stack:
+            new_frames = frames
+        else:
+            # Add the missing frames from full_stack
+            frame_ids = {
+                (
+                    frame["abs_path"],
+                    frame["context_line"],
+                    frame["lineno"],
+                    frame["function"],
+                )
+                for frame in frames
+            }
+
+            new_frames = [
+                stackframe
+                for stackframe in full_stack
+                if (
+                    stackframe["abs_path"],
+                    stackframe["context_line"],
+                    stackframe["lineno"],
+                    stackframe["function"],
+                )
+                not in frame_ids
+            ]
+            new_frames.extend(frames)
+
+        exception_value["stacktrace"] = {"frames": new_frames}
 
     return exception_value
 
@@ -862,6 +891,7 @@ def exceptions_from_error(
     exception_id=0,  # type: int
     parent_id=0,  # type: int
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
@@ -881,6 +911,7 @@ def exceptions_from_error(
         exception_id=exception_id,
         parent_id=parent_id,
         source=source,
+        full_stack=full_stack,
     )
     exceptions = [parent]
 
@@ -906,6 +937,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__cause__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -927,6 +959,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__context__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -943,6 +976,7 @@ def exceptions_from_error(
                 exception_id=exception_id,
                 parent_id=parent_id,
                 source="exceptions[%s]" % idx,
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -953,6 +987,7 @@ def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
@@ -970,6 +1005,7 @@ def exceptions_from_error_tuple(
             mechanism=mechanism,
             exception_id=0,
             parent_id=0,
+            full_stack=full_stack,
         )
 
     else:
@@ -977,7 +1013,12 @@ def exceptions_from_error_tuple(
         for exc_type, exc_value, tb in walk_exception_chain(exc_info):
             exceptions.append(
                 single_exception_from_error_tuple(
-                    exc_type, exc_value, tb, client_options, mechanism
+                    exc_type=exc_type,
+                    exc_value=exc_value,
+                    tb=tb,
+                    client_options=client_options,
+                    mechanism=mechanism,
+                    full_stack=full_stack,
                 )
             )
 
@@ -1096,6 +1137,45 @@ def exc_info_from_error(error):
     return exc_info
 
 
+def get_full_stack():
+    # type: () -> List[Dict[str, Any]]
+    """
+    Returns a serialized representation of the full stack from the first frame that is not in sentry_sdk.
+    """
+    try:
+        # Raise an exception to capture the current stack
+        raise Exception
+    except:
+        # Get the current stack frame
+        _, _, tb = sys.exc_info()
+
+    # Get the frame one level up (skipping this function's frame)
+    if tb is None:
+        return []
+
+    frame = tb.tb_frame.f_back
+
+    stack_info = []
+
+    # Walk up the stack
+    while frame:
+        in_sdk = False
+        try:
+            if "sentry_sdk" in frame.f_code.co_filename:
+                in_sdk = True
+        except Exception:
+            pass
+
+        if not in_sdk:
+            stack_info.append(serialize_frame(frame))
+
+        frame = frame.f_back
+
+    stack_info.reverse()
+
+    return stack_info
+
+
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
     client_options=None,  # type: Optional[Dict[str, Any]]
@@ -1104,12 +1184,18 @@ def event_from_exception(
     # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+    full_stack = get_full_stack()
+
+    # TODO: add an option "add_full_stack" to the client options to add the full stack to the event (defaults to True)
+
+    # TODO: add an option "max_stack_frames" to the client options to limit the number of stack frames (defaults to 50?)
+
     return (
         {
             "level": "error",
             "exception": {
                 "values": exceptions_from_error_tuple(
-                    exc_info, client_options, mechanism
+                    exc_info, client_options, mechanism, full_stack
                 )
             },
         },
