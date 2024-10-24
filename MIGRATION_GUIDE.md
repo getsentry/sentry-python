@@ -10,6 +10,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ### Changed
 
 - The SDK now supports Python 3.7 and higher.
+- Transaction names can no longer contain commas and equals signs. If present, these characters will be stripped.
 - `sentry_sdk.start_span` now only takes keyword arguments.
 - `sentry_sdk.start_span` no longer takes an explicit `span` argument.
 - The `Span()` constructor does not accept a `hub` parameter anymore.

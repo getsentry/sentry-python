@@ -1,3 +1,5 @@
+import re
+
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
@@ -72,8 +74,8 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
     assert insert_fail["data"]["db.operation"] == "insert"
 
     assert find["description"].startswith('{"find')
-    assert insert_success["description"].startswith('{"insert')
-    assert insert_fail["description"].startswith('{"insert')
+    assert re.match("^{['\"]insert.*", insert_success["description"])
+    assert re.match("^{['\"]insert.*", insert_fail["description"])
 
     assert find["data"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
     assert insert_success["data"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
@@ -119,7 +121,11 @@ def test_breadcrumbs(
     )  # force query execution
     capture_message("hi")
 
-    (event,) = events
+    if traces_sample_rate:
+        event = events[1]
+    else:
+        event = events[0]
+
     (crumb,) = event["breadcrumbs"]["values"]
 
     assert crumb["category"] == "query"

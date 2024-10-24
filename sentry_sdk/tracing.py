@@ -1189,11 +1189,6 @@ class POTelSpan:
     OTel span wrapper providing compatibility with the old span interface.
     """
 
-    # XXX Maybe it makes sense to repurpose the existing Span class for this.
-    # For now I'm keeping this class separate to have a clean slate.
-
-    # XXX The wrapper itself should have as little state as possible
-
     def __init__(
         self,
         *,
@@ -1225,14 +1220,14 @@ class POTelSpan:
                 # OTel timestamps have nanosecond precision
                 start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
-            self._otel_span = tracer.start_span(
-                name or description or op or "", start_time=start_timestamp
-            )
+            span_name = self._sanitize_name(name or description or op or "")
+            self._otel_span = tracer.start_span(span_name, start_time=start_timestamp)
 
             self.origin = origin or DEFAULT_SPAN_ORIGIN
             self.op = op
             self.description = description
-            self.name = name
+            self.name = span_name
+
             if status is not None:
                 self.set_status(status)
 
@@ -1601,6 +1596,10 @@ class POTelSpan:
         # TODO-neel-potel we cannot add dicts here
 
         self.set_attribute(f"{SentrySpanAttribute.CONTEXT}.{key}", value)
+
+    def _sanitize_name(self, name):
+        """No commas and equals allowed in tracestate."""
+        return name.replace(",", "").replace("=", "")
 
 
 if TYPE_CHECKING:
