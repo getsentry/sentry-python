@@ -14,8 +14,6 @@ from ldclient.integrations.test_data import TestData
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
 
-# Docs reference: https://launchdarkly-python-sdk.readthedocs.io/en/latest/api-testing.html#ldclient.integrations.test_data.TestData
-
 
 @pytest.mark.parametrize(
     "use_global_client",
@@ -55,16 +53,16 @@ def test_launchdarkly_integration_threaded(sentry_init):
     context = Context.create("user1")
 
     def task(flag_key):
-        # Create a new isolation scope for the thread. This means the evaluations in each task are captured separately.
+        # Creates a new isolation scope for the thread.
+        # This means the evaluations in each task are captured separately.
         with sentry_sdk.isolation_scope():
             client.variation(flag_key, context, False)
             return [f["flag"] for f in sentry_sdk.get_current_scope().flags.get()]
 
     td.update(td.flag("hello").variation_for_all(True))
     td.update(td.flag("world").variation_for_all(False))
-    client.variation(
-        "hello", context, False
-    )  # Captured before splitting isolation scopes.
+    # Capture an eval before we split isolation scopes.
+    client.variation("hello", context, False)
 
     with cf.ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(task, ["world", "other"]))
@@ -99,7 +97,8 @@ def test_launchdarkly_integration_asyncio(sentry_init):
 
 def test_launchdarkly_integration_did_not_enable(monkeypatch):
     # Client is not passed in and set_config wasn't called.
-    # Bad practice to access internals like this. TODO: can skip this test, or remove this case entirely (force user to pass in a client instance).
+    # TODO: Bad practice to access internals like this. We can skip this test, or remove this
+    #  case entirely (force user to pass in a client instance).
     ldclient._reset_client()
     try:
         ldclient.__lock.lock()
