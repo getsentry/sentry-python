@@ -21,7 +21,8 @@ except ImportError:
     raise DidNotEnable("Anthropic not installed")
 
 if TYPE_CHECKING:
-    pass
+    from typing import Any, AsyncIterator, Iterator
+    from sentry_sdk.tracing import Span
 
 
 class AnthropicIntegration(Integration):
