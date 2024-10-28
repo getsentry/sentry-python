@@ -17,7 +17,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 
 import sentry_sdk
 from sentry_sdk.utils import Dsn
-from sentry_sdk.consts import SPANSTATUS, OP
+from sentry_sdk.consts import SPANSTATUS, OP, SPANDATA
 from sentry_sdk.tracing import get_span_status_from_http_code, DEFAULT_SPAN_ORIGIN
 from sentry_sdk.tracing_utils import Baggage, LOW_QUALITY_TRANSACTION_SOURCES
 from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
@@ -432,3 +432,15 @@ def set_sentry_meta(span, key, value):
     sentry_meta = getattr(span, "_sentry_meta", {})
     sentry_meta[key] = value
     span._sentry_meta = sentry_meta
+
+
+def get_profile_context(span):
+    # type: (ReadableSpan) -> Optional[dict[str, str]]
+    if not span.attributes:
+        return None
+
+    profiler_id = cast("Optional[str]", span.attributes.get(SPANDATA.PROFILER_ID))
+    if profiler_id is None:
+        return None
+
+    return {"profiler_id": profiler_id}
