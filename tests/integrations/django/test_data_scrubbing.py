@@ -82,3 +82,10 @@ def test_scrub_django_custom_session_cookies_filtered(
         "csrf_secret": "[Filtered]",
         "foo": "bar",
     }
+
+
+def test_placeholder():
+    """Forked test cannot be last in a module.
+    See https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720.
+    """
+    assert True

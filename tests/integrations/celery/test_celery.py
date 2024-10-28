@@ -831,3 +831,10 @@ def test_send_task_wrapped(
     assert span["description"] == "very_creative_task_name"
     assert span["op"] == "queue.submit.celery"
     assert span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
+
+
+def test_placeholder():
+    """Forked test cannot be last in a module.
+    See https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720.
+    """
+    assert True

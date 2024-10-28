@@ -203,3 +203,10 @@ def test_ray_actor():
             == client_transaction["contexts"]["trace"]["trace_id"]
             == client_transaction["contexts"]["trace"]["trace_id"]
         )
+
+
+def test_placeholder():
+    """Forked test cannot be last in a module.
+    See https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720.
+    """
+    assert True

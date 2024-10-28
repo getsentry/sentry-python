@@ -151,3 +151,10 @@ def test_beat_task_crons_error(celery_init, capture_envelopes):
     assert check_in["type"] == "check_in"
     assert check_in["monitor_slug"] == "failure_from_beat"
     assert check_in["status"] == "error"
+
+
+def test_placeholder():
+    """Forked test cannot be last in a module.
+    See https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720.
+    """
+    assert True

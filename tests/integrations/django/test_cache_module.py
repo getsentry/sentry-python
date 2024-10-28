@@ -626,3 +626,10 @@ def test_span_origin_cache(sentry_init, client, capture_events, use_django_cachi
             cache_span_found = True
 
     assert cache_span_found
+
+
+def test_placeholder():
+    """Forked test cannot be last in a module.
+    See https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720.
+    """
+    assert True

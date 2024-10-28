@@ -45,3 +45,10 @@ def test_integration_not_enabled_if_option_is_missing(sentry_init, reset_integra
     ):
         sentry_init()
         mocked_setup_once.assert_not_called()
+
+
+def test_placeholder():
+    """Forked test cannot be last in a module.
+    See https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720.
+    """
+    assert True

@@ -969,3 +969,10 @@ def test_disable_metrics_for_old_python_with_gevent(
 
     assert sentry_sdk.get_client().metrics_aggregator is None
     assert not envelopes
+
+
+def test_placeholder():
+    """Forked test cannot be last in a module.
+    See https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720.
+    """
+    assert True
