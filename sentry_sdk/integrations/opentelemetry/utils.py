@@ -386,22 +386,24 @@ def get_trace_state(span):
         options = client.options or {}
 
         trace_state = trace_state.update(
-            Baggage.SENTRY_PREFIX + "trace_id", format_trace_id(span_context.trace_id)
+            Baggage.SENTRY_PREFIX + "trace_id",
+            quote(format_trace_id(span_context.trace_id)),
         )
 
         if options.get("environment"):
             trace_state = trace_state.update(
-                Baggage.SENTRY_PREFIX + "environment", options["environment"]
+                Baggage.SENTRY_PREFIX + "environment", quote(options["environment"])
             )
 
         if options.get("release"):
             trace_state = trace_state.update(
-                Baggage.SENTRY_PREFIX + "release", options["release"]
+                Baggage.SENTRY_PREFIX + "release", quote(options["release"])
             )
 
         if options.get("dsn"):
             trace_state = trace_state.update(
-                Baggage.SENTRY_PREFIX + "public_key", Dsn(options["dsn"]).public_key
+                Baggage.SENTRY_PREFIX + "public_key",
+                quote(Dsn(options["dsn"]).public_key),
             )
 
         root_span = get_sentry_meta(span, "root_span")
@@ -415,7 +417,7 @@ def get_trace_state(span):
                 and transaction_source not in LOW_QUALITY_TRANSACTION_SOURCES
             ):
                 trace_state = trace_state.update(
-                    Baggage.SENTRY_PREFIX + "transaction", transaction_name
+                    Baggage.SENTRY_PREFIX + "transaction", quote(transaction_name)
                 )
 
         return trace_state
