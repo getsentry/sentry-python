@@ -1224,7 +1224,7 @@ class POTelSpan:
                 # OTel timestamps have nanosecond precision
                 start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
-            span_name = self._sanitize_name(name or description or op or "")
+            span_name = name or description or op or ""
             self._otel_span = tracer.start_span(span_name, start_time=start_timestamp)
 
             self.origin = origin or DEFAULT_SPAN_ORIGIN
@@ -1597,10 +1597,6 @@ class POTelSpan:
         # TODO-neel-potel we cannot add dicts here
 
         self.set_attribute(f"{SentrySpanAttribute.CONTEXT}.{key}", value)
-
-    def _sanitize_name(self, name):
-        """No commas and equals allowed in tracestate."""
-        return name.replace(",", "").replace("=", "")
 
 
 if TYPE_CHECKING:
