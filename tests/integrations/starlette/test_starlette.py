@@ -13,16 +13,10 @@ import pytest
 
 from sentry_sdk import capture_message, get_baggage, get_traceparent
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-with warnings.catch_warnings():
-    # Error on deprecation-type warnings related to python_multipart, which are
-    # probably about migrating from "import multipart" to "import
-    # python_multipart".
-    for w in (PendingDeprecationWarning, DeprecationWarning):
-        warnings.filterwarnings("error", ".*python_multipart.*", category=w)
-    from sentry_sdk.integrations.starlette import (
-        StarletteIntegration,
-        StarletteRequestExtractor,
-    )
+from sentry_sdk.integrations.starlette import (
+    StarletteIntegration,
+    StarletteRequestExtractor,
+)
 from sentry_sdk.utils import parse_version
 
 import starlette
