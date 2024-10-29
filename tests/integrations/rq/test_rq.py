@@ -35,7 +35,6 @@ def _patch_rq_get_server_version(monkeypatch):
 
 
 def crashing_job(foo):
-    print("RUNNING CRASHING JOB")
     1 / 0
 
 
