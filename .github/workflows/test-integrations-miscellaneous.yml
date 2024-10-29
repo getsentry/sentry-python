@@ -165,7 +165,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Miscellaneous tests passed
+    name: All pinned Miscellaneous tests passed
     needs: test-miscellaneous-pinned
     # Always run this, even if a dependent job failed
     if: always()
