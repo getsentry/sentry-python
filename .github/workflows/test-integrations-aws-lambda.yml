@@ -112,7 +112,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All AWS Lambda tests passed
+    name: All pinned AWS Lambda tests passed
     needs: test-aws_lambda-pinned
     # Always run this, even if a dependent job failed
     if: always()
