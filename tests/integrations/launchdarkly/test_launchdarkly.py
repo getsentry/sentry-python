@@ -34,6 +34,8 @@ def test_launchdarkly_integration(sentry_init):
         {"flag": "other", "result": False},
     ]
 
+    ldclient._reset_client()
+
 
 def test_launchdarkly_integration_threaded(sentry_init):
     td = TestData.data_source()
@@ -59,6 +61,8 @@ def test_launchdarkly_integration_threaded(sentry_init):
     assert results[0] == ["hello", "world"]
     assert results[1] == ["hello", "other"]
 
+    ldclient._reset_client()
+
 
 def test_launchdarkly_integration_asyncio(sentry_init):
     """Assert concurrently evaluated flags do not pollute one another."""
@@ -82,3 +86,5 @@ def test_launchdarkly_integration_asyncio(sentry_init):
     results = asyncio.run(runner()).result()
     assert results[0] == ["hello", "world"]
     assert results[1] == ["hello", "other"]
+
+    ldclient._reset_client()
