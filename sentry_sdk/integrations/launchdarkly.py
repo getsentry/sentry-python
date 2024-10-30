@@ -40,12 +40,14 @@ class LaunchDarklyIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        integration = sentry_sdk.get_client().get_integration(LaunchDarklyIntegration)
+        if integration is None:
+            raise DidNotEnable("LaunchDarkly client is not initialized.")
+
         scope = sentry_sdk.get_current_scope()
         scope.add_error_processor(flag_error_processor)
-
         # Register the flag collection hook with the LD client.
-        client = sentry_sdk.get_client().get_integration(LaunchDarklyIntegration).client
-        client.add_hook(LaunchDarklyHook())
+        integration.client.add_hook(LaunchDarklyHook())
 
 
 class LaunchDarklyHook(Hook):
