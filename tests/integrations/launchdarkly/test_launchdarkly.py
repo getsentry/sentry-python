@@ -28,7 +28,7 @@ def test_launchdarkly_integration(sentry_init, use_global_client):
         client = ldclient.get()
     else:
         client = LDClient(config=config)
-        sentry_init(integrations=[LaunchDarklyIntegration(client=client)])
+        sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
 
     # Set test values
     td.update(td.flag("hello").variation_for_all(True))
@@ -49,7 +49,7 @@ def test_launchdarkly_integration(sentry_init, use_global_client):
 def test_launchdarkly_integration_threaded(sentry_init):
     td = TestData.data_source()
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
-    sentry_init(integrations=[LaunchDarklyIntegration(client=client)])
+    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
     context = Context.create("user1")
 
     def task(flag_key):
@@ -75,7 +75,7 @@ def test_launchdarkly_integration_asyncio(sentry_init):
     """Assert concurrently evaluated flags do not pollute one another."""
     td = TestData.data_source()
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
-    sentry_init(integrations=[LaunchDarklyIntegration(client=client)])
+    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
     context = Context.create("user1")
 
     async def task(flag_key):
@@ -113,4 +113,4 @@ def test_launchdarkly_integration_did_not_enable(monkeypatch):
     client = LDClient(config=Config("sdk-key"))
     monkeypatch.setattr(client, "is_initialized", lambda: False)
     with pytest.raises(DidNotEnable):
-        LaunchDarklyIntegration(client=client)
+        LaunchDarklyIntegration(ld_client=client)
