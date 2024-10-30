@@ -14,4 +14,3 @@ socksio
 httpcore[http2]
 setuptools
 Brotli
-launchdarkly-server-sdk
