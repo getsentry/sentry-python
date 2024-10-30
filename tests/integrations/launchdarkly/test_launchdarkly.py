@@ -4,31 +4,20 @@ import concurrent.futures as cf
 import ldclient
 
 import sentry_sdk
-import pytest
 
-from ldclient import LDClient
 from ldclient.config import Config
 from ldclient.context import Context
 from ldclient.integrations.test_data import TestData
 
-from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
 
 
-@pytest.mark.parametrize(
-    "use_global_client",
-    (False, True),
-)
-def test_launchdarkly_integration(sentry_init, use_global_client):
+def test_launchdarkly_integration(sentry_init):
     td = TestData.data_source()
     config = Config("sdk-key", update_processor_class=td)
-    if use_global_client:
-        ldclient.set_config(config)
-        sentry_init(integrations=[LaunchDarklyIntegration()])
-        client = ldclient.get()
-    else:
-        client = LDClient(config=config)
-        sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+    ldclient.set_config(config)
+    client = ldclient.get()
+    sentry_init(integrations=[LaunchDarklyIntegration()])
 
     # Set test values
     td.update(td.flag("hello").variation_for_all(True))
@@ -48,8 +37,8 @@ def test_launchdarkly_integration(sentry_init, use_global_client):
 
 def test_launchdarkly_integration_threaded(sentry_init):
     td = TestData.data_source()
-    client = LDClient(config=Config("sdk-key", update_processor_class=td))
-    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+    client = ldclient.get()
+    sentry_init(integrations=[LaunchDarklyIntegration()])
     context = Context.create("user1")
 
     def task(flag_key):
@@ -74,8 +63,8 @@ def test_launchdarkly_integration_threaded(sentry_init):
 def test_launchdarkly_integration_asyncio(sentry_init):
     """Assert concurrently evaluated flags do not pollute one another."""
     td = TestData.data_source()
-    client = LDClient(config=Config("sdk-key", update_processor_class=td))
-    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+    client = ldclient.get()
+    sentry_init(integrations=[LaunchDarklyIntegration()])
     context = Context.create("user1")
 
     async def task(flag_key):
@@ -93,24 +82,3 @@ def test_launchdarkly_integration_asyncio(sentry_init):
     results = asyncio.run(runner()).result()
     assert results[0] == ["hello", "world"]
     assert results[1] == ["hello", "other"]
-
-
-def test_launchdarkly_integration_did_not_enable(monkeypatch):
-    # Client is not passed in and set_config wasn't called.
-    # TODO: Bad practice to access internals like this. We can skip this test, or remove this
-    #  case entirely (force user to pass in a client instance).
-    ldclient._reset_client()
-    try:
-        ldclient.__lock.lock()
-        ldclient.__config = None
-    finally:
-        ldclient.__lock.unlock()
-
-    with pytest.raises(DidNotEnable):
-        LaunchDarklyIntegration()
-
-    # Client not initialized.
-    client = LDClient(config=Config("sdk-key"))
-    monkeypatch.setattr(client, "is_initialized", lambda: False)
-    with pytest.raises(DidNotEnable):
-        LaunchDarklyIntegration(ld_client=client)

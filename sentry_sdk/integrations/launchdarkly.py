@@ -9,7 +9,6 @@ try:
     from ldclient.hook import Hook, Metadata
 
     if TYPE_CHECKING:
-        from ldclient import LDClient
         from ldclient.hook import EvaluationSeriesContext
         from ldclient.evaluation import EvaluationDetail
 
@@ -21,14 +20,11 @@ except ImportError:
 class LaunchDarklyIntegration(Integration):
     identifier = "launchdarkly"
 
-    def __init__(self, ld_client=None):
-        # type: (LDClient | None) -> None
-        """
-        :param client: An initialized LDClient instance. If a client is not provided, this
-            integration will attempt to use the shared global instance.
-        """
+    @staticmethod
+    def setup_once():
+        # type: () -> None
         try:
-            client = ld_client or ldclient.get()
+            client = ldclient.get()
         except Exception as exc:
             raise DidNotEnable("Error getting LaunchDarkly client. " + repr(exc))
 
@@ -38,9 +34,6 @@ class LaunchDarklyIntegration(Integration):
         # Register the flag collection hook with the LD client.
         client.add_hook(LaunchDarklyHook())
 
-    @staticmethod
-    def setup_once():
-        # type: () -> None
         scope = sentry_sdk.get_current_scope()
         scope.add_error_processor(flag_error_processor)
 
