@@ -1,10 +1,12 @@
 from copy import copy
 from typing import TYPE_CHECKING
 
+import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
 
 if TYPE_CHECKING:
-    from typing import TypedDict
+    from typing import TypedDict, Optional
+    from sentry_sdk._types import Event, ExcInfo
 
     FlagData = TypedDict("FlagData", {"flag": str, "result": bool})
 
@@ -36,3 +38,10 @@ class FlagBuffer:
     def set(self, flag, result):
         # type: (str, bool) -> None
         self.buffer.set(flag, result)
+
+
+def flag_error_processor(event, exc_info):
+    # type: (Event, ExcInfo) -> Optional[Event]
+    scope = sentry_sdk.get_current_scope()
+    event["contexts"]["flags"] = {"values": scope.flags.get()}
+    return event

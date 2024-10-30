@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.flag_utils import flag_error_processor
 
 try:
     import ldclient
@@ -12,8 +13,7 @@ try:
         from ldclient.hook import EvaluationSeriesContext
         from ldclient.evaluation import EvaluationDetail
 
-        from sentry_sdk._types import Event, ExcInfo
-        from typing import Any, Optional
+        from typing import Any
 except ImportError:
     raise DidNotEnable("LaunchDarkly is not installed")
 
@@ -21,39 +21,31 @@ except ImportError:
 class LaunchDarklyIntegration(Integration):
     identifier = "launchdarkly"
 
-    def __init__(self, client=None):
+    def __init__(self, ld_client=None):
         # type: (LDClient | None) -> None
         """
         :param client: An initialized LDClient instance. If a client is not provided, this
             integration will attempt to use the shared global instance.
         """
-        if client is None:
-            try:
-                client = ldclient.get()  # global singleton.
-            except Exception as exc:
-                raise DidNotEnable("Error getting LaunchDarkly client. " + repr(exc))
+        try:
+            client = ld_client or ldclient.get()
+        except Exception as exc:
+            raise DidNotEnable("Error getting LaunchDarkly client. " + repr(exc))
 
         if not client.is_initialized():
             raise DidNotEnable("LaunchDarkly client is not initialized.")
-        self.ld_client = client
+
+        self.client = client
 
     @staticmethod
     def setup_once():
         # type: () -> None
-        def error_processor(event, _exc_info):
-            # type: (Event, ExcInfo) -> Optional[Event]
-            scope = sentry_sdk.get_current_scope()
-            event["contexts"]["flags"] = {"values": scope.flags.get()}
-            return event
-
         scope = sentry_sdk.get_current_scope()
-        scope.add_error_processor(error_processor)
+        scope.add_error_processor(flag_error_processor)
 
         # Register the flag collection hook with the LD client.
-        ld_client = (
-            sentry_sdk.get_client().get_integration(LaunchDarklyIntegration).ld_client
-        )
-        ld_client.add_hook(LaunchDarklyHook())
+        client = sentry_sdk.get_client().get_integration(LaunchDarklyIntegration).client
+        client.add_hook(LaunchDarklyHook())
 
 
 class LaunchDarklyHook(Hook):
@@ -70,6 +62,6 @@ class LaunchDarklyHook(Hook):
             flags.set(series_context.key, detail.value)
         return data
 
-    def before_evaluation(self, _series_context, data):
+    def before_evaluation(self, series_context, data):
         # type: (EvaluationSeriesContext, dict[Any, Any]) -> dict[Any, Any]
         return data  # No-op.

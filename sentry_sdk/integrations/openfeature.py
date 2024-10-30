@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.flag_utils import flag_error_processor
 
 try:
     from openfeature import api
@@ -10,8 +11,6 @@ try:
     if TYPE_CHECKING:
         from openfeature.flag_evaluation import FlagEvaluationDetails
         from openfeature.hook import HookContext, HookHints
-        from sentry_sdk._types import Event, ExcInfo
-        from typing import Optional
 except ImportError:
     raise DidNotEnable("OpenFeature is not installed")
 
@@ -22,14 +21,8 @@ class OpenFeatureIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        def error_processor(event, exc_info):
-            # type: (Event, ExcInfo) -> Optional[Event]
-            scope = sentry_sdk.get_current_scope()
-            event["contexts"]["flags"] = {"values": scope.flags.get()}
-            return event
-
         scope = sentry_sdk.get_current_scope()
-        scope.add_error_processor(error_processor)
+        scope.add_error_processor(flag_error_processor)
 
         # Register the hook within the global openfeature hooks list.
         api.add_hooks(hooks=[OpenFeatureHook()])
