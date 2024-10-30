@@ -125,6 +125,7 @@ GROUPS = {
         "tornado",
     ],
     "Miscellaneous": [
+        "launchdarkly",
         "loguru",
         "openfeature",
         "opentelemetry",
