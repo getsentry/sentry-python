@@ -831,3 +831,11 @@ def test_send_task_wrapped(
     assert span["description"] == "very_creative_task_name"
     assert span["op"] == "queue.submit.celery"
     assert span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
+
+
+@pytest.mark.skip(reason="placeholder so that forked test does not come last")
+def test_placeholder():
+    """Forked tests must not come last in the module.
+    See https://github.com/pytest-dev/pytest-forked/issues/67#issuecomment-1964718720.
+    """
+    pass
