@@ -615,8 +615,6 @@ class Scope:
         If no span is given, the trace data is taken from the scope.
         """
         client = self.get_client()
-        if not client.options.get("propagate_traces"):
-            return
 
         span = kwargs.pop("span", None)
         span = span or self.span
