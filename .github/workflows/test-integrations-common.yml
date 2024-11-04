@@ -77,7 +77,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Common tests passed
+    name: All pinned Common tests passed
     needs: test-common-pinned
     # Always run this, even if a dependent job failed
     if: always()

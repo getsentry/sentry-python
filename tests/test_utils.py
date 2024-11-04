@@ -69,8 +69,8 @@ def _normalize_distribution_name(name):
         ),  # UTC time
         (
             "2021-01-01T00:00:00.000000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # No TZ -- assume UTC
+            datetime(2021, 1, 1).astimezone(timezone.utc),
+        ),  # No TZ -- assume local but convert to UTC
         (
             "2021-01-01T00:00:00Z",
             datetime(2021, 1, 1, tzinfo=timezone.utc),
