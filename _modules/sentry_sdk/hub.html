@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.hub - sentry-python 2.17.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.hub - sentry-python 2.18.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
@@ -208,7 +208,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="101">        <span class="n">rv</span> <span class="o">=</span> <span class="n">_local</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 </span><span data-line="102">        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="103">            <span class="k">with</span> <span class="n">_suppress_hub_deprecation_warning</span><span class="p">():</span>
-</span><span data-line="104">                <span class="c1"># This will raise a deprecation warning; supress it since we already warned above.</span>
+</span><span data-line="104">                <span class="c1"># This will raise a deprecation warning; suppress it since we already warned above.</span>
 </span><span data-line="105">                <span class="n">rv</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">(</span><span class="n">GLOBAL_HUB</span><span class="p">)</span>
 </span><span data-line="106">            <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">rv</span><span class="p">)</span>
 </span><span data-line="107">        <span class="k">return</span> <span class="n">rv</span>
@@ -946,7 +946,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=e9c9fbf8"></script>
+      <script src="../../_static/documentation_options.js?v=5fda547c"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=e2e99575"></script></body>
