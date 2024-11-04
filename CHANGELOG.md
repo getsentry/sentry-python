@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.18.0
+
+### Various fixes & improvements
+
+- Add LaunchDarkly and OpenFeature integration (#3648) by @cmanallen
+- docs(hub): Correct typo in a comment (#3726) by @szokeasaurusrex
+- fix(tracing): End http.client span on timeout (#3723) by @Zylphrex
+- test: Fix UTC assuming test (#3722) by @BYK
+- fix(http2): Check for h2 existence (#3690) by @BYK
+- fix(profiling): Use `type()` instead when extracting frames (#3716) by @Zylphrex
+- test(tornado): Unpin `pytest` for `tornado-latest` tests (#3714) by @szokeasaurusrex
+- fix(starlette): Prefer python_multipart import over multipart (#3710) by @musicinmybrain
+- test(redis): Install `pytest-asyncio` for `redis` tests (Python 3.12-13) (#3706) by @szokeasaurusrex
+- ci: Clarify that only pinned tests are required (#3713) by @szokeasaurusrex
+- test(rq): Remove accidentally-committed print (#3712) by @szokeasaurusrex
+- test: Disable broken RQ test in newly-released RQ 2.0 (#3708) by @szokeasaurusrex
+- test(tox): Unpin `pytest` for `celery` tests (#3701) by @szokeasaurusrex
+- test(tox): Unpin `pytest` on Python 3.8+ `gevent` tests (#3700) by @szokeasaurusrex
+- ci(tox): Unpin `pytest` for Python 3.8+ `common` tests (#3697) by @szokeasaurusrex
+- ci: Run license compliance action on all PRs (#3699) by @szokeasaurusrex
+- ci: Run CodeQL action on all PRs (#3698) by @szokeasaurusrex
+- build: Remove pytest pin in requirements-devenv.txt (#3696) by @szokeasaurusrex
+- ci(tox): Exclude fakeredis 2.26.0 on py3.6 and 3.7 (#3695) by @szokeasaurusrex
+- fix(profiling): Update active thread for asgi (#3669) by @Zylphrex
+- tests: Test with Falcon 4.0 (#3684) by @sentrivana
+- fix(HTTP2Transport): Only enable HTTP2 when DSN is HTTPS (#3678) by @BYK
+- fix(strawberry): prepare for upstream extension removal (#3649) by @DoctorJohn
+- docs(sdk): Enhance README with improved clarity and developer-friendly examples (#3667) by @UTSAVS26
+
 ## 2.17.0
 
 ### Various fixes & improvements
