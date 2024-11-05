@@ -157,7 +157,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Networking tests passed
+    name: All pinned Networking tests passed
     needs: test-networking-pinned
     # Always run this, even if a dependent job failed
     if: always()

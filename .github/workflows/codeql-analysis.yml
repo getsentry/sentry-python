@@ -17,12 +17,14 @@ on:
       - master
       - sentry-sdk-2.0
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches:
-      - master
-      - sentry-sdk-2.0
   schedule:
     - cron: '18 18 * * 3'
+
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

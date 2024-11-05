@@ -157,7 +157,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All GraphQL tests passed
+    name: All pinned GraphQL tests passed
     needs: test-graphql-pinned
     # Always run this, even if a dependent job failed
     if: always()

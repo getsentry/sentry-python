@@ -193,7 +193,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Data Processing tests passed
+    name: All pinned Data Processing tests passed
     needs: test-data_processing-pinned
     # Always run this, even if a dependent job failed
     if: always()

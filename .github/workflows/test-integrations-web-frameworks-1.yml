@@ -193,7 +193,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Web Frameworks 1 tests passed
+    name: All pinned Web Frameworks 1 tests passed
     needs: test-web_frameworks_1-pinned
     # Always run this, even if a dependent job failed
     if: always()

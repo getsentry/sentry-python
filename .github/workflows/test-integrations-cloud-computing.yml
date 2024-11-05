@@ -157,7 +157,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Cloud Computing tests passed
+    name: All pinned Cloud Computing tests passed
     needs: test-cloud_computing-pinned
     # Always run this, even if a dependent job failed
     if: always()

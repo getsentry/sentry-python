@@ -211,7 +211,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Databases tests passed
+    name: All pinned Databases tests passed
     needs: test-databases-pinned
     # Always run this, even if a dependent job failed
     if: always()
