@@ -18,6 +18,7 @@ import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
+    _serialize_span_attribute,
     get_current_thread_meta,
     is_valid_sample_rate,
     logger,
@@ -1519,7 +1520,7 @@ class POTelSpan:
 
     def set_attribute(self, key, value):
         # type: (str, Any) -> None
-        self._otel_span.set_attribute(key, value)
+        self._otel_span.set_attribute(key, _serialize_span_attribute(value))
 
     def set_status(self, status):
         # type: (str) -> None
