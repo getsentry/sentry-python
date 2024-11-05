@@ -56,8 +56,9 @@ def test_nonstreaming_chat(
     assert span["data"]["ai.model_id"] == "some-model"
 
     if send_default_pii and include_prompts:
-        assert "some context" in span["data"]["ai.input_messages"][0]["content"]
-        assert "hello" in span["data"]["ai.input_messages"][1]["content"]
+        input_messages = json.loads(span["data"]["ai.input_messages"])
+        assert "some context" in input_messages[0]["content"]
+        assert "hello" in input_messages[1]["content"]
         assert "the model response" in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
@@ -127,8 +128,9 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
     assert span["data"]["ai.model_id"] == "some-model"
 
     if send_default_pii and include_prompts:
-        assert "some context" in span["data"]["ai.input_messages"][0]["content"]
-        assert "hello" in span["data"]["ai.input_messages"][1]["content"]
+        input_messages = json.loads(span["data"]["ai.input_messages"])
+        assert "some context" in input_messages[0]["content"]
+        assert "hello" in input_messages[1]["content"]
         assert "the model response" in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
@@ -150,7 +152,7 @@ def test_bad_chat(sentry_init, capture_events):
     with pytest.raises(httpx.HTTPError):
         client.chat(model="some-model", message="hello")
 
-    (event,) = events
+    (event, _) = events
     assert event["level"] == "error"
 
 
