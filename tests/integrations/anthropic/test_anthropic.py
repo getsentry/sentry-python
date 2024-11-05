@@ -115,7 +115,9 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
+            messages
+        )
         assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
             [{"type": "text", "text": "Hi, I'm Claude."}]
         )
@@ -183,7 +185,9 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
+            messages
+        )
         assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
             [{"type": "text", "text": "Hi, I'm Claude."}]
         )
@@ -282,7 +286,9 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
+            messages
+        )
         assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
             [{"type": "text", "text": "Hi! I'm Claude!"}]
         )
@@ -385,7 +391,9 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
+            messages
+        )
         assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
             [{"type": "text", "text": "Hi! I'm Claude!"}]
         )
@@ -515,7 +523,9 @@ def test_streaming_create_message_with_input_json_delta(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
+            messages
+        )
         assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
             [{"type": "text", "text": ""}]
         )  # we do not record InputJSONDelta because it could contain PII
@@ -652,7 +662,9 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(messages)
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
+            messages
+        )
         assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
             [{"type": "text", "text": ""}]
         )  # we do not record InputJSONDelta because it could contain PII
