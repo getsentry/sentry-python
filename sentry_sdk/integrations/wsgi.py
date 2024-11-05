@@ -98,7 +98,9 @@ class SentryWsgiMiddleware:
         _wsgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as scope:
-                scope.set_transaction_name(DEFAULT_TRANSACTION_NAME, source=TRANSACTION_SOURCE_ROUTE)
+                scope.set_transaction_name(
+                    DEFAULT_TRANSACTION_NAME, source=TRANSACTION_SOURCE_ROUTE
+                )
 
                 with track_session(scope, session_mode="request"):
                     with capture_internal_exceptions():

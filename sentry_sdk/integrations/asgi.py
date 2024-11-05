@@ -176,6 +176,18 @@ class SentryAsgiMiddleware:
         _asgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as sentry_scope:
+                (
+                    transaction_name,
+                    transaction_source,
+                ) = self._get_transaction_name_and_source(
+                    self.transaction_style,
+                    scope,
+                )
+                sentry_scope.set_transaction_name(
+                    transaction_name,
+                    source=transaction_source,
+                )
+
                 with track_session(sentry_scope, session_mode="request"):
                     sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
@@ -183,19 +195,12 @@ class SentryAsgiMiddleware:
                     sentry_scope.add_event_processor(processor)
 
                     ty = scope["type"]
-                    (
-                        transaction_name,
-                        transaction_source,
-                    ) = self._get_transaction_name_and_source(
-                        self.transaction_style,
-                        scope,
-                    )
 
                     method = scope.get("method", "").upper()
                     should_trace = method in self.http_methods_to_capture
                     with sentry_sdk.continue_trace(_get_headers(scope)):
                         with (
-                            sentry_sdk.start_transaction(
+                            sentry_sdk.start_span(
                                 op=(
                                     OP.WEBSOCKET_SERVER
                                     if ty == "websocket"
@@ -251,13 +256,18 @@ class SentryAsgiMiddleware:
         event["request"] = deepcopy(request_data)
 
         # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
-        already_set = event["transaction"] != _DEFAULT_TRANSACTION_NAME and event[
-            "transaction_info"
-        ].get("source") in [
-            TRANSACTION_SOURCE_COMPONENT,
-            TRANSACTION_SOURCE_ROUTE,
-            TRANSACTION_SOURCE_CUSTOM,
-        ]
+        already_set = (
+            "transaction" in event
+            and event["transaction"] != _DEFAULT_TRANSACTION_NAME
+            and "transaction_info" in event
+            and "source" in event["transaction_info"]
+            and event["transaction_info"]["source"]
+            in [
+                TRANSACTION_SOURCE_COMPONENT,
+                TRANSACTION_SOURCE_ROUTE,
+                TRANSACTION_SOURCE_CUSTOM,
+            ]
+        )
         if not already_set:
             name, source = self._get_transaction_name_and_source(
                 self.transaction_style, asgi_scope

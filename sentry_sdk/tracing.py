@@ -683,9 +683,9 @@ class Span:
             rv["status"] = self.status
 
         if self.containing_transaction:
-            rv["dynamic_sampling_context"] = (
-                self.containing_transaction.get_baggage().dynamic_sampling_context()
-            )
+            rv[
+                "dynamic_sampling_context"
+            ] = self.containing_transaction.get_baggage().dynamic_sampling_context()
 
         data = {}
 
@@ -1203,6 +1203,7 @@ class POTelSpan:
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
+        source=TRANSACTION_SOURCE_CUSTOM,  # type: str
         otel_span=None,  # type: Optional[OtelSpan]
         **_,  # type: dict[str, object]
     ):
@@ -1232,6 +1233,7 @@ class POTelSpan:
             self.op = op
             self.description = description
             self.name = span_name
+            self.source = source
 
             if status is not None:
                 self.set_status(status)
