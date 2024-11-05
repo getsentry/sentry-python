@@ -1,6 +1,5 @@
 # Sentry SDK Migration Guide
 
-
 ## Upgrading to 3.0
 
 Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of what's changed. Looking for a more digestible summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x) with the most common migration patterns.
@@ -19,11 +18,14 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
 - Redis integration: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
+- `sentry_sdk.init` now returns `None` instead of a context manager.
 
 ### Removed
 
 - Spans no longer have a `description`. Use `name` instead.
 - Dropped support for Python 3.6.
+- The PyMongo integration no longer sets tags. The data is still accessible via span attributes.
+- The PyMongo integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
 - `sentry_sdk.metrics` and associated metrics APIs have been removed as Sentry no longer accepts metrics data in this form. See https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics
 - The experimental options `enable_metrics`, `before_emit_metric` and `metric_code_locations` have been removed.
 - When setting span status, the HTTP status code is no longer automatically added as a tag.
@@ -37,7 +39,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `span.containing_transaction` has been removed. Use `span.root_span` instead.
 - `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.
 - `PropagationContext` constructor no longer takes a `dynamic_sampling_context` but takes a `baggage` object instead.
-
 
 ### Deprecated
 

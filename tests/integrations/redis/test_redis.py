@@ -186,7 +186,7 @@ def test_data_truncation(sentry_init, capture_events, render_span_tree):
 - op="": description=null
   - op="db.redis": description="SET 'somekey1' '{long_string[: 1024 - len("...") - len("SET 'somekey1' '")]}..."
   - op="db.redis": description="SET 'somekey2' 'bbbbbbbbbb'"\
-"""
+"""  # noqa:  E221
     )
 
 
@@ -212,7 +212,7 @@ def test_data_truncation_custom(sentry_init, capture_events, render_span_tree):
 - op="": description=null
   - op="db.redis": description="SET 'somekey1' '{long_string[: 30 - len("...") - len("SET 'somekey1' '")]}..."
   - op="db.redis": description="SET 'somekey2' '{short_string}'"\
-"""
+"""  # noqa:  E221
     )
 
 

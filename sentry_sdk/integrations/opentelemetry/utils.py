@@ -17,7 +17,7 @@ from opentelemetry.sdk.trace import ReadableSpan
 
 import sentry_sdk
 from sentry_sdk.utils import Dsn
-from sentry_sdk.consts import SPANSTATUS, OP
+from sentry_sdk.consts import SPANSTATUS, OP, SPANDATA
 from sentry_sdk.tracing import get_span_status_from_http_code, DEFAULT_SPAN_ORIGIN
 from sentry_sdk.tracing_utils import Baggage, LOW_QUALITY_TRANSACTION_SOURCES
 from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
@@ -386,22 +386,24 @@ def get_trace_state(span):
         options = client.options or {}
 
         trace_state = trace_state.update(
-            Baggage.SENTRY_PREFIX + "trace_id", format_trace_id(span_context.trace_id)
+            Baggage.SENTRY_PREFIX + "trace_id",
+            quote(format_trace_id(span_context.trace_id)),
         )
 
         if options.get("environment"):
             trace_state = trace_state.update(
-                Baggage.SENTRY_PREFIX + "environment", options["environment"]
+                Baggage.SENTRY_PREFIX + "environment", quote(options["environment"])
             )
 
         if options.get("release"):
             trace_state = trace_state.update(
-                Baggage.SENTRY_PREFIX + "release", options["release"]
+                Baggage.SENTRY_PREFIX + "release", quote(options["release"])
             )
 
         if options.get("dsn"):
             trace_state = trace_state.update(
-                Baggage.SENTRY_PREFIX + "public_key", Dsn(options["dsn"]).public_key
+                Baggage.SENTRY_PREFIX + "public_key",
+                quote(Dsn(options["dsn"]).public_key),
             )
 
         root_span = get_sentry_meta(span, "root_span")
@@ -415,7 +417,7 @@ def get_trace_state(span):
                 and transaction_source not in LOW_QUALITY_TRANSACTION_SOURCES
             ):
                 trace_state = trace_state.update(
-                    Baggage.SENTRY_PREFIX + "transaction", transaction_name
+                    Baggage.SENTRY_PREFIX + "transaction", quote(transaction_name)
                 )
 
         return trace_state
@@ -432,3 +434,15 @@ def set_sentry_meta(span, key, value):
     sentry_meta = getattr(span, "_sentry_meta", {})
     sentry_meta[key] = value
     span._sentry_meta = sentry_meta
+
+
+def get_profile_context(span):
+    # type: (ReadableSpan) -> Optional[dict[str, str]]
+    if not span.attributes:
+        return None
+
+    profiler_id = cast("Optional[str]", span.attributes.get(SPANDATA.PROFILER_ID))
+    if profiler_id is None:
+        return None
+
+    return {"profiler_id": profiler_id}

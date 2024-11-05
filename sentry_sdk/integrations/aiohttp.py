@@ -229,11 +229,17 @@ def create_trace_config():
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin=AioHttpIntegration.origin,
         )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
+
+        data = {
+            SPANDATA.HTTP_METHOD: method,
+        }
         if parsed_url is not None:
-            span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            data["url"] = parsed_url.url
+            data[SPANDATA.HTTP_QUERY] = parsed_url.query
+            data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
+        for key, value in data.items():
+            span.set_data(key, value)
 
         client = sentry_sdk.get_client()
 
@@ -258,11 +264,22 @@ def create_trace_config():
                     params.headers[key] = value
 
         trace_config_ctx.span = span
+        trace_config_ctx.span_data = data
 
     async def on_request_end(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
         if trace_config_ctx.span is None:
             return
+
+        span_data = trace_config_ctx.span_data or {}
+        span_data[SPANDATA.HTTP_STATUS_CODE] = int(params.response.status)
+        span_data["reason"] = params.response.reason
+
+        sentry_sdk.add_breadcrumb(
+            type="http",
+            category="httplib",
+            data=span_data,
+        )
 
         span = trace_config_ctx.span
         span.set_http_status(int(params.response.status))

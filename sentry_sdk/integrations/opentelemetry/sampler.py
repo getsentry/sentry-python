@@ -68,10 +68,11 @@ def dropped_result(parent_span_context, attributes, sample_rate=None):
         else:
             reason = "sample_rate"
 
-        client.transport.record_lost_event(reason, data_category="transaction")
+        if client.transport and has_tracing_enabled(client.options):
+            client.transport.record_lost_event(reason, data_category="transaction")
 
-        # Only one span (the transaction itself) is discarded, since we did not record any spans here.
-        client.transport.record_lost_event(reason, data_category="span")
+            # Only one span (the transaction itself) is discarded, since we did not record any spans here.
+            client.transport.record_lost_event(reason, data_category="span")
 
     return SamplingResult(
         Decision.DROP,
@@ -127,6 +128,7 @@ class SentrySampler(Sampler):
         has_traces_sampler = callable(client.options.get("traces_sampler"))
         if has_traces_sampler:
             # TODO-anton: Make proper sampling_context
+            # TODO-neel-potel: Make proper sampling_context
             sampling_context = {
                 "transaction_context": {
                     "name": name,

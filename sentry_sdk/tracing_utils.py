@@ -157,12 +157,8 @@ def record_sql_queries(
 
 def maybe_create_breadcrumbs_from_span(scope, span):
     # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
-    if span.op == OP.HTTP_CLIENT:
-        scope.add_breadcrumb(
-            type="http",
-            category="httplib",
-            data=span._data,
-        )
+    # TODO: can be removed when POtelSpan replaces Span
+    pass
 
 
 def _get_frame_module_abs_path(frame):
