@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from typing import Any
 
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import _serialize_span_attribute, logger
+from sentry_sdk.utils import logger
 
 
 def _normalize_data(data):
@@ -29,4 +29,4 @@ def _normalize_data(data):
 def set_data_normalized(span, key, value):
     # type: (Span, str, Any) -> None
     normalized = _normalize_data(value)
-    span.set_data(key, _serialize_span_attribute(normalized))
+    span.set_data(key, normalized)
