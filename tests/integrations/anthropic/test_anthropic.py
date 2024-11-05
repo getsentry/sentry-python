@@ -667,6 +667,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"]["ai.streaming"] is True
 
 
+@pytest.mark.forked
 def test_exception_message_create(sentry_init, capture_events):
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
