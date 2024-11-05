@@ -46,6 +46,8 @@ if TYPE_CHECKING:
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
+DEFAULT_TRANSACTION_NAME = "generic WSGI request"
+
 
 def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
     # type: (str, str, str) -> str
@@ -96,6 +98,8 @@ class SentryWsgiMiddleware:
         _wsgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as scope:
+                scope.set_transaction_name(DEFAULT_TRANSACTION_NAME, source=TRANSACTION_SOURCE_ROUTE)
+
                 with track_session(scope, session_mode="request"):
                     with capture_internal_exceptions():
                         scope.clear_breadcrumbs()
@@ -105,15 +109,13 @@ class SentryWsgiMiddleware:
                                 environ, self.use_x_forwarded_for
                             )
                         )
-
                     method = environ.get("REQUEST_METHOD", "").upper()
                     should_trace = method in self.http_methods_to_capture
                     with sentry_sdk.continue_trace(environ):
                         with (
-                            sentry_sdk.start_transaction(
-                                environ,
+                            sentry_sdk.start_span(
                                 op=OP.HTTP_SERVER,
-                                name="generic WSGI request",
+                                name=DEFAULT_TRANSACTION_NAME,
                                 source=TRANSACTION_SOURCE_ROUTE,
                                 origin=self.span_origin,
                                 custom_sampling_context={"wsgi_environ": environ},

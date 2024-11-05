@@ -234,7 +234,7 @@ def extract_span_status(span):
         return (inferred_status, http_status)
 
     if status and status.status_code == StatusCode.UNSET:
-        return (SPANSTATUS.OK, None)
+        return (None, None)
     else:
         return (SPANSTATUS.UNKNOWN_ERROR, None)
 
@@ -308,8 +308,10 @@ def get_trace_context(span, span_data=None):
         "parent_span_id": parent_span_id,
         "op": op,
         "origin": origin or DEFAULT_SPAN_ORIGIN,
-        "status": status,
     }  # type: dict[str, Any]
+
+    if status:
+        trace_context["status"] = status
 
     if span.attributes:
         trace_context["data"] = dict(span.attributes)

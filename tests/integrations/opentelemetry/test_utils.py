@@ -16,54 +16,54 @@ from sentry_sdk.integrations.opentelemetry.utils import (
     [
         (
             "OTel Span Blank",
-            Status(StatusCode.UNSET),  # Unset defaults to OK
+            Status(StatusCode.UNSET),
             {},
             {
                 "op": "OTel Span Blank",
                 "description": "OTel Span Blank",
-                "status": "ok",
+                "status": None,
                 "http_status_code": None,
                 "origin": None,
             },
         ),
         (
             "OTel Span RPC",
-            Status(StatusCode.UNSET),  # Unset defaults to OK
+            Status(StatusCode.UNSET),
             {
                 "rpc.service": "myservice.EchoService",
             },
             {
                 "op": "rpc",
                 "description": "OTel Span RPC",
-                "status": "ok",
+                "status": None,
                 "http_status_code": None,
                 "origin": None,
             },
         ),
         (
             "OTel Span Messaging",
-            Status(StatusCode.UNSET),  # Unset defaults to OK
+            Status(StatusCode.UNSET),
             {
                 "messaging.system": "rabbitmq",
             },
             {
                 "op": "message",
                 "description": "OTel Span Messaging",
-                "status": "ok",
+                "status": None,
                 "http_status_code": None,
                 "origin": None,
             },
         ),
         (
             "OTel Span FaaS",
-            Status(StatusCode.UNSET),  # Unset defaults to OK
+            Status(StatusCode.UNSET),
             {
                 "faas.trigger": "pubsub",
             },
             {
                 "op": "pubsub",
                 "description": "OTel Span FaaS",
-                "status": "ok",
+                "status": None,
                 "http_status_code": None,
                 "origin": None,
             },
@@ -241,13 +241,13 @@ def test_span_data_for_db_query():
         ),
         (
             SpanKind.SERVER,
-            Status(StatusCode.UNSET),  # Unset defaults to OK
+            Status(StatusCode.UNSET),
             {
                 "http.method": "POST",
                 "http.route": "/some/route",
             },
             {
-                "status": "ok",
+                "status": None,
                 "http_status_code": None,
             },
         ),
@@ -336,15 +336,15 @@ def test_span_data_for_db_query():
             SpanKind.SERVER,
             Status(
                 StatusCode.ERROR, "I'm a teapot"
-            ),  # Error status with unknown description is an unknown error
+            ),
             {
                 "http.method": "POST",
                 "http.route": "/some/route",
                 "http.response.status_code": 418,
             },
             {
-                "status": "unknown_error",
-                "http_status_code": None,
+                "status": "invalid_argument",
+                "http_status_code": 418,
             },
         ),
         (
