@@ -135,7 +135,7 @@ def test_bad_chat_completion(sentry_init, capture_events):
     with pytest.raises(OverloadedError):
         client.text_generation(prompt="hello")
 
-    (event,) = events
+    (event, _) = events
     assert event["level"] == "error"
 
 
