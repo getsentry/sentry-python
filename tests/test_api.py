@@ -1,6 +1,7 @@
 import pytest
 from unittest import mock
 
+import sentry_sdk
 from sentry_sdk import (
     capture_exception,
     continue_trace,
@@ -195,3 +196,19 @@ def test_push_scope_deprecation():
     with pytest.warns(DeprecationWarning):
         with push_scope():
             ...
+
+
+def test_init_context_manager_deprecation():
+    with pytest.warns(DeprecationWarning):
+        with sentry_sdk.init():
+            ...
+
+
+def test_init_enter_deprecation():
+    with pytest.warns(DeprecationWarning):
+        sentry_sdk.init().__enter__()
+
+
+def test_init_exit_deprecation():
+    with pytest.warns(DeprecationWarning):
+        sentry_sdk.init().__exit__(None, None, None)

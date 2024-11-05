@@ -1,3 +1,5 @@
+import warnings
+
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -9,16 +11,35 @@ if TYPE_CHECKING:
 
 
 class _InitGuard:
+    _CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE = (
+        "Using the return value of sentry_sdk.init as a context manager "
+        "and manually calling the __enter__ and __exit__ methods on the "
+        "return value are deprecated. We are no longer maintaining this "
+        "functionality, and we will remove it in the next major release."
+    )
+
     def __init__(self, client):
         # type: (sentry_sdk.Client) -> None
         self._client = client
 
     def __enter__(self):
         # type: () -> _InitGuard
+        warnings.warn(
+            self._CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE,
+            stacklevel=2,
+            category=DeprecationWarning,
+        )
+
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None
+        warnings.warn(
+            self._CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE,
+            stacklevel=2,
+            category=DeprecationWarning,
+        )
+
         c = self._client
         if c is not None:
             c.close()
