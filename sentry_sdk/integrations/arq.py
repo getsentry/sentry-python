@@ -198,6 +198,17 @@ def patch_create_worker():
         # type: (*Any, **Any) -> Worker
         settings_cls = args[0]
 
+        if isinstance(settings_cls, dict):
+            if "functions" in settings_cls:
+                settings_cls["functions"] = [
+                    _get_arq_function(func) for func in settings_cls["functions"]
+                ]
+            if "cron_jobs" in settings_cls:
+                settings_cls["cron_jobs"] = [
+                    _get_arq_cron_job(cron_job)
+                    for cron_job in settings_cls["cron_jobs"]
+                ]
+
         if hasattr(settings_cls, "functions"):
             settings_cls.functions = [
                 _get_arq_function(func) for func in settings_cls.functions
