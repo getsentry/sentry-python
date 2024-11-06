@@ -1,6 +1,4 @@
 import asyncio
-from typing import Any
-
 import pytest
 
 from sentry_sdk import get_client, start_transaction
@@ -112,19 +110,19 @@ def init_arq_with_dict_settings(sentry_init):
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
 
-        WorkerSettings: dict[str, Any] = {
+        worker_settings = {
             "functions": cls_functions,
             "cron_jobs": cls_cron_jobs,
             "redis_pool": pool,
             "allow_abort_jobs": allow_abort_jobs_,
         }
 
-        if not WorkerSettings["functions"]:
-            del WorkerSettings["functions"]
-        if not WorkerSettings["cron_jobs"]:
-            del WorkerSettings["cron_jobs"]
+        if not worker_settings["functions"]:
+            del worker_settings["functions"]
+        if not worker_settings["cron_jobs"]:
+            del worker_settings["cron_jobs"]
 
-        worker = arq.worker.create_worker(WorkerSettings, **kwargs)
+        worker = arq.worker.create_worker(worker_settings, **kwargs)
 
         return pool, worker
 
