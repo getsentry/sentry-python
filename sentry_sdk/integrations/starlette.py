@@ -65,7 +65,12 @@ except ImportError:
 
 try:
     # Optional dependency of Starlette to parse form data.
-    import multipart  # type: ignore
+    try:
+        # python-multipart 0.0.13 and later
+        import python_multipart as multipart  # type: ignore
+    except ImportError:
+        # python-multipart 0.0.12 and earlier
+        import multipart  # type: ignore
 except ImportError:
     multipart = None
 
