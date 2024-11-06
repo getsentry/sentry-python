@@ -135,7 +135,7 @@ def init_arq_with_dict_settings(sentry_init):
 @pytest.mark.parametrize(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
-async def test_job_result(init_arq_settings: str, request):
+async def test_job_result(init_arq_settings, request):
     async def increase(ctx, num):
         return num + 1
 
