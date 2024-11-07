@@ -135,21 +135,23 @@ def _install_httplib():
         if span is None:
             return real_getresponse(self, *args, **kwargs)
 
-        rv = real_getresponse(self, *args, **kwargs)
+        try:
+            rv = real_getresponse(self, *args, **kwargs)
 
-        span_data = getattr(self, "_sentrysdk_span_data", {})
-        span_data[SPANDATA.HTTP_STATUS_CODE] = int(rv.status)
-        span_data["reason"] = rv.reason
+            span_data = getattr(self, "_sentrysdk_span_data", {})
+            span_data[SPANDATA.HTTP_STATUS_CODE] = int(rv.status)
+            span_data["reason"] = rv.reason
 
-        sentry_sdk.add_breadcrumb(
-            type="http",
-            category="httplib",
-            data=span_data,
-        )
+            sentry_sdk.add_breadcrumb(
+                type="http",
+                category="httplib",
+                data=span_data,
+            )
 
-        span.set_http_status(int(rv.status))
-        span.set_data("reason", rv.reason)
-        span.finish()
+            span.set_http_status(int(rv.status))
+            span.set_data("reason", rv.reason)
+        finally:
+            span.finish()
 
         return rv
 

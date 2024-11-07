@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import urllib.parse
 import urllib.request
@@ -108,11 +109,10 @@ def setup_spotlight(options):
 
     url = options.get("spotlight")
 
-    if isinstance(url, str):
-        pass
-    elif url is True:
+    if url is True:
         url = DEFAULT_SPOTLIGHT_URL
-    else:
+
+    if not isinstance(url, str):
         return None
 
     if (
@@ -126,5 +126,9 @@ def setup_spotlight(options):
                 settings.MIDDLEWARE = type(middleware)(
                     chain(middleware, (DJANGO_SPOTLIGHT_MIDDLEWARE_PATH,))
                 )
+                logging.info("Enabled Spotlight integration for Django")
 
-    return SpotlightClient(url)
+    client = SpotlightClient(url)
+    logging.info("Enabled Spotlight at %s", url)
+
+    return client

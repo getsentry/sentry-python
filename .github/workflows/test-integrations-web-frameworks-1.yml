@@ -48,7 +48,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -124,7 +124,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -173,7 +173,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Web Frameworks 1 tests passed
+    name: All pinned Web Frameworks 1 tests passed
     needs: test-web_frameworks_1-pinned
     # Always run this, even if a dependent job failed
     if: always()

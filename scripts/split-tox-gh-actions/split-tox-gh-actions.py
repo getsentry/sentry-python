@@ -125,7 +125,9 @@ GROUPS = {
         "tornado",
     ],
     "Miscellaneous": [
+        "launchdarkly",
         "loguru",
+        "openfeature",
         "opentelemetry",
         "potel",
         "pure_eval",
