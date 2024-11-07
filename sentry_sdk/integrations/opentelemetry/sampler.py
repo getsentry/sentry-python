@@ -129,10 +129,14 @@ class SentrySampler(Sampler):
         # Traces_sampler is responsible to check parent sampled to have full transactions.
         has_traces_sampler = callable(client.options.get("traces_sampler"))
         if has_traces_sampler:
-            attributes[SentrySpanAttribute.PARENT_SAMPLED] = get_parent_sampled(
-                parent_span_context, trace_id
-            )
-            sample_rate = client.options["traces_sampler"](attributes)
+            sampling_context = {
+                "transaction_context": {
+                    "name": name,
+                    "op": attributes.get("op"),
+                },
+                "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
+            }
+            sample_rate = client.options["traces_sampler"](sampling_context)
 
         else:
             # Check if there is a parent with a sampling decision
