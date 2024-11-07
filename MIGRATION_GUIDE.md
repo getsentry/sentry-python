@@ -19,7 +19,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Redis integration: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
-- The sampling context accessible in `traces_sampler` has changed. It now contains all span attributes. The original `sampling_context["transaction_context"]["name"]` and `sampling_context["transaction_context"]["op"]` are now accessible as `sampling_context["sentry_name"]` and `sampling_context["sentry_op"]`, respectively.
+- The sampling context accessible in `traces_sampler` has changed. The original `sampling_context["transaction_context"]["name"]` and `sampling_context["transaction_context"]["op"]` are now accessible as `sampling_context["sentry_name"]` and `sampling_context["sentry_op"]`, respectively.
 
 ### Removed
 
