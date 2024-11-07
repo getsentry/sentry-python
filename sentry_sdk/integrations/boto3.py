@@ -72,6 +72,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
         op=OP.HTTP_CLIENT,
         name=description,
         origin=Boto3Integration.origin,
+        only_if_parent=True,
     )
 
     data = {

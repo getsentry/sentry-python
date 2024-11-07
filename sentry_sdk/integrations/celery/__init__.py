@@ -495,6 +495,7 @@ def _patch_producer_publish():
             op=OP.QUEUE_PUBLISH,
             name=task_name,
             origin=CeleryIntegration.origin,
+            only_if_parent=True,
         ) as span:
             if task_id is not None:
                 span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)

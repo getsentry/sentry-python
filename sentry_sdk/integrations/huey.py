@@ -61,6 +61,7 @@ def patch_enqueue():
             op=OP.QUEUE_SUBMIT_HUEY,
             name=task.name,
             origin=HueyIntegration.origin,
+            only_if_parent=True,
         ):
             if not isinstance(task, PeriodicTask):
                 # Attach trace propagation data to task kwargs. We do
