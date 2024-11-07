@@ -123,7 +123,9 @@ class PotelScope(Scope):
 
     def start_span(self, custom_sampling_context=None, **kwargs):
         # type: (Optional[SamplingContext], Any) -> POTelSpan
-        return POTelSpan(**kwargs, scope=self)
+        return POTelSpan(
+            **kwargs, custom_sampling_context=custom_sampling_context, scope=self
+        )
 
 
 _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)

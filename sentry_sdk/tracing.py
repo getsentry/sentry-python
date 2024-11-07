@@ -41,6 +41,8 @@ if TYPE_CHECKING:
 
     from typing_extensions import TypedDict, Unpack
 
+    from opentelemetry.utils import types as OTelSpanAttributes
+
     P = ParamSpec("P")
     R = TypeVar("R")
 
@@ -683,9 +685,9 @@ class Span:
             rv["status"] = self.status
 
         if self.containing_transaction:
-            rv[
-                "dynamic_sampling_context"
-            ] = self.containing_transaction.get_baggage().dynamic_sampling_context()
+            rv["dynamic_sampling_context"] = (
+                self.containing_transaction.get_baggage().dynamic_sampling_context()
+            )
 
         data = {}
 
@@ -1200,10 +1202,12 @@ class POTelSpan:
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
+        sampled=None,  # type: Optional[bool]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
+        attributes=None,  # type: OTelSpanAttributes
         otel_span=None,  # type: Optional[OtelSpan]
         **_,  # type: dict[str, object]
     ):
@@ -1218,6 +1222,7 @@ class POTelSpan:
         if otel_span is not None:
             self._otel_span = otel_span
         else:
+            from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
             from sentry_sdk.integrations.opentelemetry.utils import (
                 convert_to_otel_timestamp,
             )
@@ -1227,12 +1232,20 @@ class POTelSpan:
                 start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
             span_name = name or description or op or ""
-            self._otel_span = tracer.start_span(span_name, start_time=start_timestamp)
+
+            # Prepopulate some attrs to be accessible in traces_sampler
+            attributes = attributes or {}
+            attributes[SentrySpanAttribute.NAME] = span_name
+            attributes[SentrySpanAttribute.OP] = op
+            if sampled is not None:
+                attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
+
+            self._otel_span = tracer.start_span(
+                span_name, start_time=start_timestamp, attributes=attributes
+            )
 
             self.origin = origin or DEFAULT_SPAN_ORIGIN
-            self.op = op
             self.description = description
-            self.name = span_name
             self.source = source
 
             if status is not None:

@@ -30,3 +30,5 @@ class SentrySpanAttribute:
     NAME = "sentry.name"
     SOURCE = "sentry.source"
     CONTEXT = "sentry.context"
+    CUSTOM_SAMPLED = "sentry.custom_sampled"
+    PARENT_SAMPLED = "sentry.parent_sampled"

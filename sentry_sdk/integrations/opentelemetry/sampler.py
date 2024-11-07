@@ -2,7 +2,6 @@ import random
 from typing import cast
 
 from opentelemetry import trace
-
 from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace.span import TraceState
 
@@ -12,6 +11,7 @@ from sentry_sdk.utils import is_valid_sample_rate, logger
 from sentry_sdk.integrations.opentelemetry.consts import (
     TRACESTATE_SAMPLED_KEY,
     TRACESTATE_SAMPLE_RATE_KEY,
+    SentrySpanAttribute,
 )
 
 from typing import TYPE_CHECKING
@@ -118,25 +118,21 @@ class SentrySampler(Sampler):
         if not has_tracing_enabled(client.options):
             return dropped_result(parent_span_context, attributes)
 
-        sample_rate = None
+        # Explicit sampled value provided at start_span
+        if attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED) is not None:
+            sample_rate = float(attributes[SentrySpanAttribute.CUSTOM_SAMPLED])
+            return sampled_result(parent_span_context, attributes, sample_rate)
 
-        # Check if sampled=True was passed to start_transaction
-        # TODO-anton: Do we want to keep the start_transaction(sampled=True) thing?
+        sample_rate = None
 
         # Check if there is a traces_sampler
         # Traces_sampler is responsible to check parent sampled to have full transactions.
         has_traces_sampler = callable(client.options.get("traces_sampler"))
         if has_traces_sampler:
-            # TODO-anton: Make proper sampling_context
-            # TODO-neel-potel: Make proper sampling_context
-            sampling_context = {
-                "transaction_context": {
-                    "name": name,
-                },
-                "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
-            }
-
-            sample_rate = client.options["traces_sampler"](sampling_context)
+            attributes[SentrySpanAttribute.PARENT_SAMPLED] = get_parent_sampled(
+                parent_span_context, trace_id
+            )
+            sample_rate = client.options["traces_sampler"](attributes)
 
         else:
             # Check if there is a parent with a sampling decision
