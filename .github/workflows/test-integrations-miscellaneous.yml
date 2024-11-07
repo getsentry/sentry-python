@@ -34,7 +34,7 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -45,10 +45,18 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test launchdarkly latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-launchdarkly-latest"
       - name: Test loguru latest
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru-latest"
+      - name: Test openfeature latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openfeature-latest"
       - name: Test opentelemetry latest
         run: |
           set -x # print commands that are executed
@@ -106,7 +114,7 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -117,10 +125,18 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test launchdarkly pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-launchdarkly"
       - name: Test loguru pinned
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru"
+      - name: Test openfeature pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openfeature"
       - name: Test opentelemetry pinned
         run: |
           set -x # print commands that are executed
