@@ -1233,7 +1233,7 @@ class POTelSpan:
 
             span_name = name or description or op or ""
 
-            # Prepopulate some attrs to be accessible in traces_sampler
+            # Prepopulate some attrs so that they're accessible in traces_sampler
             attributes = attributes or {}
             attributes[SentrySpanAttribute.OP] = op
             if sampled is not None:
