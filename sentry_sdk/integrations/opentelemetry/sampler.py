@@ -136,6 +136,7 @@ class SentrySampler(Sampler):
                 },
                 "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
             }
+            sampling_context.update(attributes)
             sample_rate = client.options["traces_sampler"](sampling_context)
 
         else:
