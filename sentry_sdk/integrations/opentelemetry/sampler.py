@@ -132,7 +132,7 @@ class SentrySampler(Sampler):
             sampling_context = {
                 "transaction_context": {
                     "name": name,
-                    "op": attributes.get("op"),
+                    "op": attributes.get(SentrySpanAttribute.OP),
                 },
                 "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
             }
