@@ -5,6 +5,7 @@ import urllib.parse
 import urllib.request
 import urllib.error
 import urllib3
+import sys
 
 from itertools import chain, product
 
@@ -22,6 +23,9 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 from sentry_sdk.envelope import Envelope
+
+
+logger = logging.getLogger("spotlight")
 
 
 DEFAULT_SPOTLIGHT_URL = "http://localhost:8969/stream"
@@ -112,21 +116,14 @@ try:
                     spotlight_js_url,
                     method="HEAD",
                 )
-                status_code = urllib.request.urlopen(req).status
-                if status_code >= 200 and status_code < 400:
-                    self._spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
-                        spotlight_js_url
-                    )
-                else:
-                    sentry_logger.debug(
-                        "Could not get Spotlight JS from %s (status: %s), SpotlightMiddleware will not be useful.",
-                        spotlight_js_url,
-                        status_code,
-                    )
-                    self._spotlight_script = None
+                urllib.request.urlopen(req)
+                self._spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
+                    spotlight_js_url
+                )
             except urllib.error.URLError as err:
                 sentry_logger.debug(
-                    "Cannot get Spotlight JS to inject. SpotlightMiddleware will not be very useful.",
+                    "Cannot get Spotlight JS to inject at %s. SpotlightMiddleware will not be very useful.",
+                    spotlight_js_url,
                     exc_info=err,
                 )
                 self._spotlight_script = None
@@ -204,6 +201,10 @@ except ImportError:
 
 def setup_spotlight(options):
     # type: (Dict[str, Any]) -> Optional[SpotlightClient]
+    _handler = logging.StreamHandler(sys.stderr)
+    _handler.setFormatter(logging.Formatter(" [spotlight] %(levelname)s: %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
 
     url = options.get("spotlight")
 
@@ -225,9 +226,9 @@ def setup_spotlight(options):
                 settings.MIDDLEWARE = type(middleware)(
                     chain(middleware, (DJANGO_SPOTLIGHT_MIDDLEWARE_PATH,))
                 )
-                logging.info("Enabled Spotlight integration for Django")
+                logger.info("Enabled Spotlight integration for Django")
 
     client = SpotlightClient(url)
-    logging.info("Enabled Spotlight at %s", url)
+    logger.info("Enabled Spotlight using sidecar at %s", url)
 
     return client
