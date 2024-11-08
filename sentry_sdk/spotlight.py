@@ -85,8 +85,7 @@ try:
     ]
 
     class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
-        __spotlight_script: Optional[str] = None
-        _spotlight_url: str
+        __spotlight_script = None  # type: Optional[str]
 
         def __init__(self, get_response):
             # type: (Self, Callable[..., HttpResponse]) -> None
