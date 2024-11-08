@@ -6,7 +6,7 @@ import urllib.request
 import urllib.error
 import urllib3
 
-from itertools import chain
+from itertools import chain, product
 
 from typing import TYPE_CHECKING
 
@@ -16,7 +16,11 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
 
-from sentry_sdk.utils import logger, env_to_bool, capture_internal_exceptions
+from sentry_sdk.utils import (
+    logger as sentry_logger,
+    env_to_bool,
+    capture_internal_exceptions,
+)
 from sentry_sdk.envelope import Envelope
 
 
@@ -34,7 +38,7 @@ class SpotlightClient:
     def capture_envelope(self, envelope):
         # type: (Envelope) -> None
         if self.tries > 3:
-            logger.warning(
+            sentry_logger.warning(
                 "Too many errors sending to Spotlight, stop sending events there."
             )
             return
@@ -52,50 +56,144 @@ class SpotlightClient:
             req.close()
         except Exception as e:
             self.tries += 1
-            logger.warning(str(e))
+            sentry_logger.warning(str(e))
 
 
 try:
-    from django.http import HttpResponseServerError
+    from typing import Self, Optional
+
+    from django.utils.deprecation import MiddlewareMixin
+    from django.http import HttpResponseServerError, HttpResponse, HttpRequest
     from django.conf import settings
 
-    class SpotlightMiddleware:
+    SPOTLIGHT_JS_ENTRY_PATH = "/assets/main.js"
+    SPOTLIGHT_JS_SNIPPET_PATTERN = (
+        '<script type="module" crossorigin src="{}"></script>'
+    )
+    SPOTLIGHT_ERROR_PAGE_SNIPPET = (
+        '<html><base href="{spotlight_url}">\n'
+        '<script>window.__spotlight = {{ initOptions: {{ fullPage: true, startFrom: "/errors/{event_id}" }}}};</script>\n'
+    )
+    CHARSET_PREFIX = "charset="
+    BODY_CLOSE_TAG = "</body>"
+    BODY_CLOSE_TAG_POSSIBILITIES = [
+        "".join(l)
+        for l in product(*zip(BODY_CLOSE_TAG.upper(), BODY_CLOSE_TAG.lower()))
+    ]
+
+    class SpotlightMiddleware(MiddlewareMixin):
+        _spotlight_script: Optional[str]
+        _spotlight_url: str
+
         def __init__(self, get_response):
-            # type: (Any, Callable[..., Any]) -> None
-            self.get_response = get_response
-
-        def __call__(self, request):
-            # type: (Any, Any) -> Any
-            return self.get_response(request)
-
-        def process_exception(self, _request, exception):
-            # type: (Any, Any, Exception) -> Optional[HttpResponseServerError]
-            if not settings.DEBUG:
-                return None
+            # type: (Self, Callable[..., HttpResponse]) -> None
+            super().__init__(get_response)
 
             import sentry_sdk.api
 
+            self.sentry_sdk = sentry_sdk.api
+
             spotlight_client = sentry_sdk.api.get_client().spotlight
             if spotlight_client is None:
+                sentry_logger.warning(
+                    "Cannot find Spotlight client from SpotlightMiddleware, disabling the middleware."
+                )
                 return None
-
             # Spotlight URL has a trailing `/stream` part at the end so split it off
-            spotlight_url = spotlight_client.url.rsplit("/", 1)[0]
+            spotlight_url = self._spotlight_url = urllib.parse.urljoin(
+                spotlight_client.url, "../"
+            )
 
             try:
-                spotlight = urllib.request.urlopen(spotlight_url).read().decode("utf-8")
+                spotlight_js_url = urllib.parse.urljoin(
+                    spotlight_url, SPOTLIGHT_JS_ENTRY_PATH
+                )
+                req = urllib.request.Request(
+                    spotlight_js_url,
+                    method="HEAD",
+                )
+                status_code = urllib.request.urlopen(req).status
+                if status_code >= 200 and status_code < 400:
+                    self._spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
+                        spotlight_js_url
+                    )
+                else:
+                    sentry_logger.debug(
+                        "Could not get Spotlight JS from %s (status: %s), SpotlightMiddleware will not be useful.",
+                        spotlight_js_url,
+                        status_code,
+                    )
+                    self._spotlight_script = None
+            except urllib.error.URLError as err:
+                sentry_logger.debug(
+                    "Cannot get Spotlight JS to inject. SpotlightMiddleware will not be very useful.",
+                    exc_info=err,
+                )
+                self._spotlight_script = None
+
+        def process_response(self, _request, response):
+            # type: (Self, HttpRequest, HttpResponse) -> Optional[HttpResponse]
+            content_type_header = tuple(
+                p.strip()
+                for p in response.headers.get("Content-Type", "").lower().split(";")
+            )
+            content_type = content_type_header[0]
+            if len(content_type_header) > 1 and content_type_header[1].startswith(
+                CHARSET_PREFIX
+            ):
+                encoding = content_type_header[1][len(CHARSET_PREFIX) :]
+            else:
+                encoding = "utf-8"
+
+            if (
+                self._spotlight_script is not None
+                and not response.streaming
+                and content_type == "text/html"
+            ):
+                content_length = len(response.content)
+                injection = self._spotlight_script.encode(encoding)
+                injection_site = next(
+                    (
+                        idx
+                        for idx in (
+                            response.content.rfind(body_variant.encode(encoding))
+                            for body_variant in BODY_CLOSE_TAG_POSSIBILITIES
+                        )
+                        if idx > -1
+                    ),
+                    content_length,
+                )
+
+                # This approach works even when we don't have a `</body>` tag
+                response.content = (
+                    response.content[:injection_site]
+                    + injection
+                    + response.content[injection_site:]
+                )
+
+                if response.has_header("Content-Length"):
+                    response.headers["Content-Length"] = content_length + len(injection)
+
+            return response
+
+        def process_exception(self, _request, exception):
+            # type: (Self, HttpRequest, Exception) -> Optional[HttpResponseServerError]
+            if not settings.DEBUG:
+                return None
+
+            try:
+                spotlight = (
+                    urllib.request.urlopen(self._spotlight_url).read().decode("utf-8")
+                )
             except urllib.error.URLError:
                 return None
             else:
-                event_id = sentry_sdk.api.capture_exception(exception)
+                event_id = self.sentry_sdk.capture_exception(exception)
                 return HttpResponseServerError(
                     spotlight.replace(
                         "<html>",
-                        (
-                            f'<html><base href="{spotlight_url}">'
-                            '<script>window.__spotlight = {{ initOptions: {{ startFrom: "/errors/{event_id}" }}}};</script>'.format(
-                                event_id=event_id
-                            )
+                        SPOTLIGHT_ERROR_PAGE_SNIPPET.format(
+                            spotlight_url=self._spotlight_url, event_id=event_id
                         ),
                     )
                 )
@@ -119,6 +217,7 @@ def setup_spotlight(options):
         settings is not None
         and settings.DEBUG
         and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1"))
+        and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_MIDDLEWARE", "1"))
     ):
         with capture_internal_exceptions():
             middleware = settings.MIDDLEWARE
