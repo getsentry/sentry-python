@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Optional
+    from typing import Self
 
 from sentry_sdk.utils import (
     logger as sentry_logger,
@@ -64,8 +65,6 @@ class SpotlightClient:
 
 
 try:
-    from typing import Self, Optional
-
     from django.utils.deprecation import MiddlewareMixin
     from django.http import HttpResponseServerError, HttpResponse, HttpRequest
     from django.conf import settings
