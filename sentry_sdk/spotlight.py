@@ -81,8 +81,8 @@ try:
     CHARSET_PREFIX = "charset="
     BODY_CLOSE_TAG = "</body>"
     BODY_CLOSE_TAG_POSSIBILITIES = [
-        "".join(l)
-        for l in product(*zip(BODY_CLOSE_TAG.upper(), BODY_CLOSE_TAG.lower()))
+        "".join(chars)
+        for chars in product(*zip(BODY_CLOSE_TAG.upper(), BODY_CLOSE_TAG.lower()))
     ]
 
     class SpotlightMiddleware(MiddlewareMixin):
