@@ -86,7 +86,7 @@ try:
     ]
 
     class SpotlightMiddleware(MiddlewareMixin):
-        _spotlight_script: Optional[str]
+        __spotlight_script: Optional[str] = None
         _spotlight_url: str
 
         def __init__(self, get_response):
@@ -104,29 +104,32 @@ try:
                 )
                 return None
             # Spotlight URL has a trailing `/stream` part at the end so split it off
-            spotlight_url = self._spotlight_url = urllib.parse.urljoin(
-                spotlight_client.url, "../"
-            )
+            self._spotlight_url = urllib.parse.urljoin(spotlight_client.url, "../")
 
-            try:
-                spotlight_js_url = urllib.parse.urljoin(
-                    spotlight_url, SPOTLIGHT_JS_ENTRY_PATH
-                )
-                req = urllib.request.Request(
-                    spotlight_js_url,
-                    method="HEAD",
-                )
-                urllib.request.urlopen(req)
-                self._spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
-                    spotlight_js_url
-                )
-            except urllib.error.URLError as err:
-                sentry_logger.debug(
-                    "Cannot get Spotlight JS to inject at %s. SpotlightMiddleware will not be very useful.",
-                    spotlight_js_url,
-                    exc_info=err,
-                )
-                self._spotlight_script = None
+        @property
+        def spotlight_script(self):
+            # type: (Self) -> Optional[str]
+            if self.__spotlight_script is None:
+                try:
+                    spotlight_js_url = urllib.parse.urljoin(
+                        self._spotlight_url, SPOTLIGHT_JS_ENTRY_PATH
+                    )
+                    req = urllib.request.Request(
+                        spotlight_js_url,
+                        method="HEAD",
+                    )
+                    urllib.request.urlopen(req)
+                    self.__spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
+                        spotlight_js_url
+                    )
+                except urllib.error.URLError as err:
+                    sentry_logger.debug(
+                        "Cannot get Spotlight JS to inject at %s. SpotlightMiddleware will not be very useful.",
+                        spotlight_js_url,
+                        exc_info=err,
+                    )
+
+            return self.__spotlight_script
 
         def process_response(self, _request, response):
             # type: (Self, HttpRequest, HttpResponse) -> Optional[HttpResponse]
@@ -143,12 +146,12 @@ try:
                 encoding = "utf-8"
 
             if (
-                self._spotlight_script is not None
+                self.spotlight_script is not None
                 and not response.streaming
                 and content_type == "text/html"
             ):
                 content_length = len(response.content)
-                injection = self._spotlight_script.encode(encoding)
+                injection = self.spotlight_script.encode(encoding)
                 injection_site = next(
                     (
                         idx
