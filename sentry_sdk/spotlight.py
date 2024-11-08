@@ -84,7 +84,7 @@ try:
         for chars in product(*zip(BODY_CLOSE_TAG.upper(), BODY_CLOSE_TAG.lower()))
     ]
 
-    class SpotlightMiddleware(MiddlewareMixin):
+    class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
         __spotlight_script: Optional[str] = None
         _spotlight_url: str
 
