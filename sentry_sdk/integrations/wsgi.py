@@ -134,12 +134,17 @@ class SentryWsgiMiddleware:
                                     _sentry_start_response, start_response, transaction
                                 ),
                             )
+                            if hasattr(response, "__iter__"):
+                                scoped_response = _ScopedResponse(scope, response)
+                                for it in scoped_response:
+                                    yield it
                         except BaseException:
                             reraise(*_capture_exception())
         finally:
             _wsgi_middleware_applied.set(False)
 
-        return _ScopedResponse(scope, response)
+        if not hasattr(response, "__iter__"):
+            return _ScopedResponse(scope, response)
 
 
 def _sentry_start_response(  # type: ignore
