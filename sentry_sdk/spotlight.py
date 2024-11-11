@@ -78,11 +78,11 @@ try:
         '<script>window.__spotlight = {{ initOptions: {{ fullPage: true, startFrom: "/errors/{event_id}" }}}};</script>\n'
     )
     CHARSET_PREFIX = "charset="
-    BODY_CLOSE_TAG = "</body>"
-    BODY_CLOSE_TAG_POSSIBILITIES = [
-        "".join(chars)
-        for chars in product(*zip(BODY_CLOSE_TAG.upper(), BODY_CLOSE_TAG.lower()))
-    ]
+    BODY_TAG_NAME = "body"
+    BODY_CLOSE_TAG_POSSIBILITIES = tuple(
+        "</{}>".format("".join(chars))
+        for chars in product(*zip(BODY_TAG_NAME.upper(), BODY_TAG_NAME.lower()))
+    )
 
     class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
         __spotlight_script = None  # type: Optional[str]
