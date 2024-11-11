@@ -166,7 +166,8 @@ def patch_execute():
                     source=TRANSACTION_SOURCE_TASK,
                     origin=HueyIntegration.origin,
                 ) as transaction:
+                    return_value = old_execute(self, task, timestamp)
                     transaction.set_status(SPANSTATUS.OK)
-                    return old_execute(self, task, timestamp)
+                    return return_value
 
     Huey._execute = _sentry_execute

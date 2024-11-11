@@ -1541,13 +1541,17 @@ class POTelSpan:
     def set_status(self, status):
         # type: (str) -> None
         if status == SPANSTATUS.OK:
-            otel_status = StatusCode.OK
-            otel_description = None
+            # Do not set status if it's already set.
+            # We would override an error status with OK.
+            if self._otel_span.status.status_code == StatusCode.UNSET:
+                self._otel_span.set_status(StatusCode.OK, None)
         else:
-            otel_status = StatusCode.ERROR
-            otel_description = status
+            # OpenTelemetry does not allow setting and error status
+            # if the span is already set to OK
+            if self._otel_span.status.status_code == StatusCode.OK:
+                return
 
-        self._otel_span.set_status(otel_status, otel_description)
+            self._otel_span.set_status(StatusCode.ERROR, status)
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
