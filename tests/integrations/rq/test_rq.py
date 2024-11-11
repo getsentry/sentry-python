@@ -46,6 +46,7 @@ def do_trick(dog, trick):
     return "{}, can you {}? Good dog!".format(dog, trick)
 
 
+@pytest.mark.forked
 def test_basic(sentry_init, capture_events):
     sentry_init(integrations=[RqIntegration()])
     events = capture_events()
@@ -78,6 +79,7 @@ def test_basic(sentry_init, capture_events):
         assert "started_at" in extra
 
 
+@pytest.mark.forked
 def test_transport_shutdown(sentry_init, capture_events_forksafe):
     sentry_init(integrations=[RqIntegration()])
 
@@ -96,6 +98,7 @@ def test_transport_shutdown(sentry_init, capture_events_forksafe):
     assert exception["type"] == "ZeroDivisionError"
 
 
+@pytest.mark.forked
 def test_transaction_with_error(
     sentry_init, capture_events, DictionaryContaining  # noqa:N803
 ):
@@ -131,6 +134,7 @@ def test_transaction_with_error(
     )
 
 
+@pytest.mark.forked
 def test_error_has_trace_context_if_tracing_disabled(
     sentry_init,
     capture_events,
@@ -149,6 +153,7 @@ def test_error_has_trace_context_if_tracing_disabled(
     assert error_event["contexts"]["trace"]
 
 
+@pytest.mark.forked
 def test_tracing_enabled(
     sentry_init,
     capture_events,
@@ -171,6 +176,7 @@ def test_tracing_enabled(
     assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
 
 
+@pytest.mark.forked
 def test_tracing_disabled(
     sentry_init,
     capture_events,
@@ -251,6 +257,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
 
+@pytest.mark.forked
 @pytest.mark.skipif(
     parse_version(rq.__version__) < (1, 5), reason="At least rq-1.5 required"
 )
