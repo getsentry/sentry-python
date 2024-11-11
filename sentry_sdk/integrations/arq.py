@@ -5,7 +5,7 @@ from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -36,6 +36,8 @@ if TYPE_CHECKING:
     from arq.worker import Function
 
 ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
+
+DEFAULT_TRANSACTION_NAME = "unknown arq task"
 
 
 class ArqIntegration(Integration):
@@ -101,18 +103,20 @@ def patch_run_job():
 
         with sentry_sdk.isolation_scope() as scope:
             scope._name = "arq"
+            scope.set_transaction_name(
+                DEFAULT_TRANSACTION_NAME, source=TRANSACTION_SOURCE_TASK,
+            )
             scope.clear_breadcrumbs()
 
-            transaction = Transaction(
-                name="unknown arq task",
-                status="ok",
+            with sentry_sdk.start_span(
                 op=OP.QUEUE_TASK_ARQ,
+                name=DEFAULT_TRANSACTION_NAME,
                 source=TRANSACTION_SOURCE_TASK,
                 origin=ArqIntegration.origin,
-            )
-
-            with sentry_sdk.start_transaction(transaction):
-                return await old_run_job(self, job_id, score)
+            ) as span:
+                return_value = await old_run_job(self, job_id, score)
+                span.set_status(SPANSTATUS.OK)
+                return return_value
 
     Worker.run_job = _sentry_run_job
 
