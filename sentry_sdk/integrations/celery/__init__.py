@@ -308,6 +308,7 @@ def _wrap_tracer(task, f):
             scope._name = "celery"
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
+            scope.set_transaction_name(task.name, source=TRANSACTION_SOURCE_TASK)
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
