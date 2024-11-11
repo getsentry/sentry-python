@@ -314,7 +314,7 @@ def _wrap_tracer(task, f):
             # something such as attribute access can fail.
             headers = args[3].get("headers") or {}
             with sentry_sdk.continue_trace(headers):
-                with sentry_sdk.start_transaction(
+                with sentry_sdk.start_span(
                     op=OP.QUEUE_TASK_CELERY,
                     name=task.name,
                     source=TRANSACTION_SOURCE_TASK,
@@ -329,8 +329,9 @@ def _wrap_tracer(task, f):
                         }
                     },
                 ) as transaction:
+                    return_value = f(*args, **kwargs)
                     transaction.set_status(SPANSTATUS.OK)
-                    return f(*args, **kwargs)
+                    return return_value
 
     return _inner  # type: ignore
 

@@ -126,7 +126,7 @@ def test_simple_with_performance(capture_events, init_celery, celery_invocation)
         foo = 42  # noqa
         return x / y
 
-    with start_transaction(op="unit test transaction") as transaction:
+    with sentry_sdk.start_span(op="unit test transaction") as transaction:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
@@ -195,7 +195,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
 
     events = capture_events()
 
-    with start_transaction(name="submission") as transaction:
+    with sentry_sdk.start_span(name="submission") as transaction:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     if task_fails:
@@ -275,7 +275,7 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with start_transaction() as transaction:
+    with sentry_sdk.start_span() as transaction:
         dummy_task.delay()
 
     (event,) = events
@@ -350,7 +350,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
         runs.append(1)
         1 / 0
 
-    with start_transaction(name="submit_celery"):
+    with sentry_sdk.start_span(name="submit_celery"):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
@@ -468,7 +468,7 @@ def test_abstract_task(capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
@@ -509,7 +509,7 @@ def test_baggage_propagation(init_celery):
     def dummy_task(self, x, y):
         return _get_headers(self)
 
-    with start_transaction() as transaction:
+    with sentry_sdk.start_span() as transaction:
         result = dummy_task.apply_async(
             args=(1, 0),
             headers={"baggage": "custom=value"},
@@ -541,7 +541,7 @@ def test_sentry_propagate_traces_override(init_celery):
         trace_id = get_current_span().trace_id
         return trace_id
 
-    with start_transaction() as transaction:
+    with sentry_sdk.start_span() as transaction:
         transaction_trace_id = transaction.trace_id
 
         # should propagate trace
@@ -709,7 +709,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
     @celery.task()
     def task(): ...
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         task.apply_async()
 
     (event,) = events
@@ -772,7 +772,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
     @celery.task()
     def task(): ...
 
-    with start_transaction(name="custom_transaction"):
+    with sentry_sdk.start_span(name="custom_transaction"):
         task.apply_async()
 
     (event,) = events
