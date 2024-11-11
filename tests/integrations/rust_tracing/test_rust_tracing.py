@@ -61,9 +61,11 @@ class FakeRustTracing:
         self.layer.on_record(str(span_id), """{"version": "memoized"}""", state)
 
 
-def test_on_new_span_on_close(sentry_init, reset_integrations, capture_events):
+def test_on_new_span_on_close(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
-    integration = RustTracingIntegration("test", rust_tracing.set_layer_impl)
+    integration = RustTracingIntegration(
+        "test_on_new_span_on_close", rust_tracing.set_layer_impl
+    )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     events = capture_events()
@@ -84,7 +86,7 @@ def test_on_new_span_on_close(sentry_init, reset_integrations, capture_events):
     # Ensure the span metadata is wired up
     span = event["spans"][0]
     assert span["op"] == "native_extension"
-    assert span["origin"] == "auto.native_extension.test"
+    assert span["origin"] == "auto.native_extension.test_on_new_span_on_close"
     assert span["description"] == "_bindings::fibonacci"
 
     # Ensure the span was opened/closed appropriately
@@ -98,9 +100,11 @@ def test_on_new_span_on_close(sentry_init, reset_integrations, capture_events):
     assert data["version"] is None
 
 
-def test_nested_on_new_span_on_close(sentry_init, reset_integrations, capture_events):
+def test_nested_on_new_span_on_close(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
-    integration = RustTracingIntegration("test", rust_tracing.set_layer_impl)
+    integration = RustTracingIntegration(
+        "test_nested_on_new_span_on_close", rust_tracing.set_layer_impl
+    )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     events = capture_events()
@@ -138,10 +142,15 @@ def test_nested_on_new_span_on_close(sentry_init, reset_integrations, capture_ev
     # Ensure the span metadata is wired up for all spans
     first_span, second_span = event["spans"]
     assert first_span["op"] == "native_extension"
-    assert first_span["origin"] == "auto.native_extension.test"
+    assert (
+        first_span["origin"] == "auto.native_extension.test_nested_on_new_span_on_close"
+    )
     assert first_span["description"] == "_bindings::fibonacci"
     assert second_span["op"] == "native_extension"
-    assert second_span["origin"] == "auto.native_extension.test"
+    assert (
+        second_span["origin"]
+        == "auto.native_extension.test_nested_on_new_span_on_close"
+    )
     assert second_span["description"] == "_bindings::fibonacci"
 
     # Ensure the spans were opened/closed appropriately
@@ -162,9 +171,11 @@ def test_nested_on_new_span_on_close(sentry_init, reset_integrations, capture_ev
     assert second_span_data["version"] is None
 
 
-def test_on_new_span_without_transaction(sentry_init, reset_integrations):
+def test_on_new_span_without_transaction(sentry_init):
     rust_tracing = FakeRustTracing()
-    integration = RustTracingIntegration("test", rust_tracing.set_layer_impl)
+    integration = RustTracingIntegration(
+        "test_on_new_span_without_transaction", rust_tracing.set_layer_impl
+    )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     assert sentry_sdk.get_current_span() is None
@@ -176,10 +187,12 @@ def test_on_new_span_without_transaction(sentry_init, reset_integrations):
     assert current_span.containing_transaction is None
 
 
-def test_on_event_exception(sentry_init, reset_integrations, capture_events):
+def test_on_event_exception(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, event_type_mapping=_test_event_type_mapping
+        "test_on_event_exception",
+        rust_tracing.set_layer_impl,
+        event_type_mapping=_test_event_type_mapping,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -210,10 +223,12 @@ def test_on_event_exception(sentry_init, reset_integrations, capture_events):
     assert field_context["message"] == "Getting the 10th fibonacci number"
 
 
-def test_on_event_breadcrumb(sentry_init, reset_integrations, capture_events):
+def test_on_event_breadcrumb(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, event_type_mapping=_test_event_type_mapping
+        "test_on_event_breadcrumb",
+        rust_tracing.set_layer_impl,
+        event_type_mapping=_test_event_type_mapping,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -239,10 +254,12 @@ def test_on_event_breadcrumb(sentry_init, reset_integrations, capture_events):
     assert breadcrumbs[0]["type"] == "default"
 
 
-def test_on_event_event(sentry_init, reset_integrations, capture_events):
+def test_on_event_event(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, event_type_mapping=_test_event_type_mapping
+        "test_on_event_event",
+        rust_tracing.set_layer_impl,
+        event_type_mapping=_test_event_type_mapping,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -274,10 +291,12 @@ def test_on_event_event(sentry_init, reset_integrations, capture_events):
     assert field_context["message"] == "Getting the 10th fibonacci number"
 
 
-def test_on_event_ignored(sentry_init, reset_integrations, capture_events):
+def test_on_event_ignored(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, event_type_mapping=_test_event_type_mapping
+        "test_on_event_ignored",
+        rust_tracing.set_layer_impl,
+        event_type_mapping=_test_event_type_mapping,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -298,7 +317,7 @@ def test_on_event_ignored(sentry_init, reset_integrations, capture_events):
     assert "message" not in tx
 
 
-def test_span_filter(sentry_init, reset_integrations, capture_events):
+def test_span_filter(sentry_init, capture_events):
     def span_filter(metadata: Dict[str, object]) -> bool:
         return RustTracingLevel(metadata.get("level")) in (
             RustTracingLevel.Error,
@@ -309,7 +328,7 @@ def test_span_filter(sentry_init, reset_integrations, capture_events):
 
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, span_filter=span_filter
+        "test_span_filter", rust_tracing.set_layer_impl, span_filter=span_filter
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -338,9 +357,9 @@ def test_span_filter(sentry_init, reset_integrations, capture_events):
     assert event["spans"][0]["data"]["index"] == 10
 
 
-def test_record(sentry_init, reset_integrations):
+def test_record(sentry_init):
     rust_tracing = FakeRustTracing()
-    integration = RustTracingIntegration("test", rust_tracing.set_layer_impl)
+    integration = RustTracingIntegration("test_record", rust_tracing.set_layer_impl)
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     with start_transaction():
@@ -355,14 +374,16 @@ def test_record(sentry_init, reset_integrations):
         assert span_after_record["data"]["version"] == "memoized"
 
 
-def test_record_in_ignored_span(sentry_init, reset_integrations):
+def test_record_in_ignored_span(sentry_init):
     def span_filter(metadata: Dict[str, object]) -> bool:
         # Just ignore Trace
         return RustTracingLevel(metadata.get("level")) != RustTracingLevel.Trace
 
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, span_filter=span_filter
+        "test_record_in_ignored_span",
+        rust_tracing.set_layer_impl,
+        span_filter=span_filter,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 

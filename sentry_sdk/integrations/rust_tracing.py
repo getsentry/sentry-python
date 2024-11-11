@@ -226,38 +226,34 @@ class RustTracingLayer:
             sentry_span.set_data(key, value)
 
 
-def _create_integration(
-    identifier: str,
-    initializer: Callable[[RustTracingLayer], None],
-    event_type_mapping: Callable[
-        [Dict[str, Any]], EventTypeMapping
-    ] = default_event_type_mapping,
-    span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
-) -> object:
+class RustTracingIntegration(Integration):
     """
-    Each native extension used by a project requires its own integration, but
-    `sentry_sdk` does not expect multiple instances of the same integration. To
-    work around that, invoking `RustTracingIntegration()` actually calls this
-    factory function which creates a unique anonymous class and returns an
-    instance of it.
-    """
-    origin = f"auto.native_extension.{identifier}"
-    tracing_layer = RustTracingLayer(origin, event_type_mapping, span_filter)
+    Ingests tracing data from a Rust native extension's `tracing` instrumentation.
 
+    If a project uses more than one Rust native extension, each one will need
+    its own instance of `RustTracingIntegration` with an initializer function
+    specific to that extension.
+
+    Since all of the setup for this integration requires instance-specific state
+    which is not available in `setup_once()`, setup instead happens in `__init__()`.
+    """
+
+    def __init__(
+        self,
+        identifier: str,
+        initializer: Callable[[RustTracingLayer], None],
+        event_type_mapping: Callable[
+            [Dict[str, Any]], EventTypeMapping
+        ] = default_event_type_mapping,
+        span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
+    ):
+        self.identifier = identifier
+
+        origin = f"auto.native_extension.{identifier}"
+        self.tracing_layer = RustTracingLayer(origin, event_type_mapping, span_filter)
+
+        initializer(self.tracing_layer)
+
+    @staticmethod
     def setup_once() -> None:
-        initializer(tracing_layer)
-
-    anonymous_class = type(
-        "",
-        (Integration,),
-        {
-            "identifier": identifier,
-            "setup_once": setup_once,
-            "tracing_layer": tracing_layer,
-        },
-    )
-    anonymous_class_instance = anonymous_class()
-    return anonymous_class_instance
-
-
-RustTracingIntegration = _create_integration
+        pass
