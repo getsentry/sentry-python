@@ -10,6 +10,20 @@ from sentry_sdk.integrations.rust_tracing import (
 from sentry_sdk import start_transaction, capture_message
 
 
+def _test_event_type_mapping(metadata: dict[str, object]) -> EventTypeMapping:
+    level = RustTracingLevel(metadata.get("level"))
+    if level == RustTracingLevel.Error:
+        return EventTypeMapping.Exc
+    elif level in (RustTracingLevel.Warn, RustTracingLevel.Info):
+        return EventTypeMapping.Breadcrumb
+    elif level == RustTracingLevel.Debug:
+        return EventTypeMapping.Event
+    elif level == RustTracingLevel.Trace:
+        return EventTypeMapping.Ignore
+    else:
+        return EventTypeMapping.Ignore
+
+
 class FakeRustTracing:
     # Parameters: `level`, `index`
     span_template = Template(
@@ -162,20 +176,9 @@ def test_on_new_span_without_transaction(sentry_init, reset_integrations):
 
 
 def test_on_event_exception(sentry_init, reset_integrations, capture_events):
-    def event_type_mapping(metadata: dict) -> EventTypeMapping:
-        match RustTracingLevel(metadata.get("level")):
-            case RustTracingLevel.Error:
-                return EventTypeMapping.Exc
-            case RustTracingLevel.Warn | RustTracingLevel.Info:
-                return EventTypeMapping.Breadcrumb
-            case RustTracingLevel.Debug:
-                return EventTypeMapping.Event
-            case RustTracingLevel.Trace:
-                return EventTypeMapping.Ignore
-
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, event_type_mapping=event_type_mapping
+        "test", rust_tracing.set_layer_impl, event_type_mapping=_test_event_type_mapping
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -207,20 +210,9 @@ def test_on_event_exception(sentry_init, reset_integrations, capture_events):
 
 
 def test_on_event_breadcrumb(sentry_init, reset_integrations, capture_events):
-    def event_type_mapping(metadata: dict) -> EventTypeMapping:
-        match RustTracingLevel(metadata.get("level")):
-            case RustTracingLevel.Error:
-                return EventTypeMapping.Exc
-            case RustTracingLevel.Warn | RustTracingLevel.Info:
-                return EventTypeMapping.Breadcrumb
-            case RustTracingLevel.Debug:
-                return EventTypeMapping.Event
-            case RustTracingLevel.Trace:
-                return EventTypeMapping.Ignore
-
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, event_type_mapping=event_type_mapping
+        "test", rust_tracing.set_layer_impl, event_type_mapping=_test_event_type_mapping
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -247,20 +239,9 @@ def test_on_event_breadcrumb(sentry_init, reset_integrations, capture_events):
 
 
 def test_on_event_event(sentry_init, reset_integrations, capture_events):
-    def event_type_mapping(metadata: dict) -> EventTypeMapping:
-        match RustTracingLevel(metadata.get("level")):
-            case RustTracingLevel.Error:
-                return EventTypeMapping.Exc
-            case RustTracingLevel.Warn | RustTracingLevel.Info:
-                return EventTypeMapping.Breadcrumb
-            case RustTracingLevel.Debug:
-                return EventTypeMapping.Event
-            case RustTracingLevel.Trace:
-                return EventTypeMapping.Ignore
-
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, event_type_mapping=event_type_mapping
+        "test", rust_tracing.set_layer_impl, event_type_mapping=_test_event_type_mapping
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -293,20 +274,9 @@ def test_on_event_event(sentry_init, reset_integrations, capture_events):
 
 
 def test_on_event_ignored(sentry_init, reset_integrations, capture_events):
-    def event_type_mapping(metadata: dict) -> EventTypeMapping:
-        match RustTracingLevel(metadata.get("level")):
-            case RustTracingLevel.Error:
-                return EventTypeMapping.Exc
-            case RustTracingLevel.Warn | RustTracingLevel.Info:
-                return EventTypeMapping.Breadcrumb
-            case RustTracingLevel.Debug:
-                return EventTypeMapping.Event
-            case RustTracingLevel.Trace:
-                return EventTypeMapping.Ignore
-
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test", rust_tracing.set_layer_impl, event_type_mapping=event_type_mapping
+        "test", rust_tracing.set_layer_impl, event_type_mapping=_test_event_type_mapping
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -328,7 +298,7 @@ def test_on_event_ignored(sentry_init, reset_integrations, capture_events):
 
 
 def test_span_filter(sentry_init, reset_integrations, capture_events):
-    def span_filter(metadata: dict) -> bool:
+    def span_filter(metadata: dict[str, object]) -> bool:
         return RustTracingLevel(metadata.get("level")) in (
             RustTracingLevel.Error,
             RustTracingLevel.Warn,
@@ -385,7 +355,7 @@ def test_record(sentry_init, reset_integrations):
 
 
 def test_record_in_ignored_span(sentry_init, reset_integrations):
-    def span_filter(metadata: dict) -> bool:
+    def span_filter(metadata: dict[str, object]) -> bool:
         # Just ignore Trace
         return RustTracingLevel(metadata.get("level")) != RustTracingLevel.Trace
 
