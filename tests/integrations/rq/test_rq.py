@@ -5,7 +5,6 @@ import rq
 from fakeredis import FakeStrictRedis
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import parse_version
 
@@ -164,16 +163,14 @@ def test_tracing_enabled(
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    with start_transaction(op="rq transaction") as transaction:
-        queue.enqueue(crashing_job, foo=None)
-        worker.work(burst=True)
+    queue.enqueue(crashing_job, foo=None)
+    worker.work(burst=True)
 
-    error_event, envelope, _ = events
+    error_event, transaction = events
 
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-    assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-
-    assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
+    assert transaction["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert transaction["contexts"]["trace"] == error_event["contexts"]["trace"]
 
 
 @pytest.mark.forked
