@@ -58,15 +58,18 @@ class EventTypeMapping(Enum):
 
 def tracing_level_to_sentry_level(level):
     # type: (str) -> sentry_sdk._types.LogLevelStr
-    match RustTracingLevel(level):
-        case RustTracingLevel.Trace | RustTracingLevel.Debug:
-            return "debug"
-        case RustTracingLevel.Info:
-            return "info"
-        case RustTracingLevel.Warn:
-            return "warning"
-        case RustTracingLevel.Error:
-            return "error"
+    level = RustTracingLevel(level)
+    if level in (RustTracingLevel.Trace, RustTracingLevel.Debug):
+        return "debug"
+    elif level == RustTracingLevel.Info:
+        return "info"
+    elif level == RustTracingLevel.Warn:
+        return "warning"
+    elif level == RustTracingLevel.Error:
+        return "error"
+    else:
+        # Better this than crashing
+        return "info"
 
 
 def extract_contexts(event: dict[str, Any]) -> dict[str, Any]:
@@ -127,13 +130,15 @@ def default_span_filter(metadata: dict[str, Any]) -> bool:
 
 
 def default_event_type_mapping(metadata: dict[str, Any]) -> EventTypeMapping:
-    match RustTracingLevel(metadata.get("level")):
-        case RustTracingLevel.Error:
-            return EventTypeMapping.Exc
-        case RustTracingLevel.Warn | RustTracingLevel.Info:
-            return EventTypeMapping.Breadcrumb
-        case RustTracingLevel.Debug | RustTracingLevel.Trace:
-            return EventTypeMapping.Ignore
+    level = RustTracingLevel(metadata.get("level"))
+    if level == RustTracingLevel.Error:
+        return EventTypeMapping.Exc
+    elif level in (RustTracingLevel.Warn, RustTracingLevel.Info):
+        return EventTypeMapping.Breadcrumb
+    elif level in (RustTracingLevel.Debug, RustTracingLevel.Trace):
+        return EventTypeMapping.Ignore
+    else:
+        return EventTypeMapping.Ignore
 
 
 class RustTracingLayer:
@@ -154,15 +159,14 @@ class RustTracingLayer:
         metadata = deserialized_event.get("metadata", {})
 
         event_type = self.event_type_mapping(metadata)
-        match event_type:
-            case EventTypeMapping.Ignore:
-                return
-            case EventTypeMapping.Exc:
-                process_exception(deserialized_event)
-            case EventTypeMapping.Breadcrumb:
-                process_breadcrumb(deserialized_event)
-            case EventTypeMapping.Event:
-                process_event(deserialized_event)
+        if event_type == EventTypeMapping.Ignore:
+            return
+        elif event_type == EventTypeMapping.Exc:
+            process_exception(deserialized_event)
+        elif event_type == EventTypeMapping.Breadcrumb:
+            process_breadcrumb(deserialized_event)
+        elif event_type == EventTypeMapping.Event:
+            process_event(deserialized_event)
 
     def on_new_span(self, attrs: str, span_id: str) -> TraceState:
         attrs = json.loads(attrs)
