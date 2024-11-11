@@ -32,21 +32,21 @@ Each native extension requires its own integration.
 
 import json
 from enum import Enum, auto
-from typing import Any, Callable, Final, Tuple, Optional
+from typing import Any, Callable, Dict, Tuple, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.tracing import Span as SentrySpan
 
-TraceState = Optional[Tuple[SentrySpan | None, SentrySpan]]
+TraceState = Optional[Tuple[Optional[SentrySpan], SentrySpan]]
 
 
 class RustTracingLevel(Enum):
-    Trace: Final[str] = "TRACE"
-    Debug: Final[str] = "DEBUG"
-    Info: Final[str] = "INFO"
-    Warn: Final[str] = "WARN"
-    Error: Final[str] = "ERROR"
+    Trace: str = "TRACE"
+    Debug: str = "DEBUG"
+    Info: str = "INFO"
+    Warn: str = "WARN"
+    Error: str = "ERROR"
 
 
 class EventTypeMapping(Enum):
@@ -72,7 +72,7 @@ def tracing_level_to_sentry_level(level):
         return "info"
 
 
-def extract_contexts(event: dict[str, Any]) -> dict[str, Any]:
+def extract_contexts(event: Dict[str, Any]) -> Dict[str, Any]:
     metadata = event.get("metadata", {})
     contexts = {}
 
@@ -92,7 +92,7 @@ def extract_contexts(event: dict[str, Any]) -> dict[str, Any]:
     return contexts
 
 
-def process_event(event: dict[str, Any]) -> None:
+def process_event(event: Dict[str, Any]) -> None:
     metadata = event.get("metadata", {})
 
     logger = metadata.get("target")
@@ -110,18 +110,18 @@ def process_event(event: dict[str, Any]) -> None:
     sentry_sdk.capture_event(sentry_event)
 
 
-def process_exception(event: dict[str, Any]) -> None:
+def process_exception(event: Dict[str, Any]) -> None:
     process_event(event)
 
 
-def process_breadcrumb(event: dict[str, Any]) -> None:
+def process_breadcrumb(event: Dict[str, Any]) -> None:
     level = tracing_level_to_sentry_level(event.get("metadata", {}).get("level"))
     message = event.get("message")
 
     sentry_sdk.add_breadcrumb(level=level, message=message)
 
 
-def default_span_filter(metadata: dict[str, Any]) -> bool:
+def default_span_filter(metadata: Dict[str, Any]) -> bool:
     return RustTracingLevel(metadata.get("level")) in (
         RustTracingLevel.Error,
         RustTracingLevel.Warn,
@@ -129,7 +129,7 @@ def default_span_filter(metadata: dict[str, Any]) -> bool:
     )
 
 
-def default_event_type_mapping(metadata: dict[str, Any]) -> EventTypeMapping:
+def default_event_type_mapping(metadata: Dict[str, Any]) -> EventTypeMapping:
     level = RustTracingLevel(metadata.get("level"))
     if level == RustTracingLevel.Error:
         return EventTypeMapping.Exc
@@ -146,9 +146,9 @@ class RustTracingLayer:
         self,
         origin: str,
         event_type_mapping: Callable[
-            [dict[str, Any]], EventTypeMapping
+            [Dict[str, Any]], EventTypeMapping
         ] = default_event_type_mapping,
-        span_filter: Callable[[dict[str, Any]], bool] = default_span_filter,
+        span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
     ):
         self.origin = origin
         self.event_type_mapping = event_type_mapping
@@ -230,9 +230,9 @@ def _create_integration(
     identifier: str,
     initializer: Callable[[RustTracingLayer], None],
     event_type_mapping: Callable[
-        [dict[str, Any]], EventTypeMapping
+        [Dict[str, Any]], EventTypeMapping
     ] = default_event_type_mapping,
-    span_filter: Callable[[dict[str, Any]], bool] = default_span_filter,
+    span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
 ) -> object:
     """
     Each native extension used by a project requires its own integration, but

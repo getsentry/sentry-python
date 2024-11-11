@@ -1,4 +1,5 @@
 from string import Template
+from typing import Dict
 
 import sentry_sdk
 from sentry_sdk.integrations.rust_tracing import (
@@ -10,7 +11,7 @@ from sentry_sdk.integrations.rust_tracing import (
 from sentry_sdk import start_transaction, capture_message
 
 
-def _test_event_type_mapping(metadata: dict[str, object]) -> EventTypeMapping:
+def _test_event_type_mapping(metadata: Dict[str, object]) -> EventTypeMapping:
     level = RustTracingLevel(metadata.get("level"))
     if level == RustTracingLevel.Error:
         return EventTypeMapping.Exc
@@ -298,7 +299,7 @@ def test_on_event_ignored(sentry_init, reset_integrations, capture_events):
 
 
 def test_span_filter(sentry_init, reset_integrations, capture_events):
-    def span_filter(metadata: dict[str, object]) -> bool:
+    def span_filter(metadata: Dict[str, object]) -> bool:
         return RustTracingLevel(metadata.get("level")) in (
             RustTracingLevel.Error,
             RustTracingLevel.Warn,
@@ -355,7 +356,7 @@ def test_record(sentry_init, reset_integrations):
 
 
 def test_record_in_ignored_span(sentry_init, reset_integrations):
-    def span_filter(metadata: dict[str, object]) -> bool:
+    def span_filter(metadata: Dict[str, object]) -> bool:
         # Just ignore Trace
         return RustTracingLevel(metadata.get("level")) != RustTracingLevel.Trace
 
