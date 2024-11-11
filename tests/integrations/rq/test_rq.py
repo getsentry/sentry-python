@@ -5,7 +5,6 @@ import rq
 from fakeredis import FakeStrictRedis
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import parse_version
 
@@ -46,6 +45,7 @@ def do_trick(dog, trick):
     return "{}, can you {}? Good dog!".format(dog, trick)
 
 
+@pytest.mark.forked
 def test_basic(sentry_init, capture_events):
     sentry_init(integrations=[RqIntegration()])
     events = capture_events()
@@ -78,6 +78,7 @@ def test_basic(sentry_init, capture_events):
         assert "started_at" in extra
 
 
+@pytest.mark.forked
 def test_transport_shutdown(sentry_init, capture_events_forksafe):
     sentry_init(integrations=[RqIntegration()])
 
@@ -96,6 +97,7 @@ def test_transport_shutdown(sentry_init, capture_events_forksafe):
     assert exception["type"] == "ZeroDivisionError"
 
 
+@pytest.mark.forked
 def test_transaction_with_error(
     sentry_init, capture_events, DictionaryContaining  # noqa:N803
 ):
@@ -131,6 +133,7 @@ def test_transaction_with_error(
     )
 
 
+@pytest.mark.forked
 def test_error_has_trace_context_if_tracing_disabled(
     sentry_init,
     capture_events,
@@ -149,6 +152,7 @@ def test_error_has_trace_context_if_tracing_disabled(
     assert error_event["contexts"]["trace"]
 
 
+@pytest.mark.forked
 def test_tracing_enabled(
     sentry_init,
     capture_events,
@@ -159,18 +163,17 @@ def test_tracing_enabled(
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    with start_transaction(op="rq transaction") as transaction:
-        queue.enqueue(crashing_job, foo=None)
-        worker.work(burst=True)
+    queue.enqueue(crashing_job, foo=None)
+    worker.work(burst=True)
 
-    error_event, envelope, _ = events
+    error_event, transaction = events
 
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-    assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert transaction["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert transaction["contexts"]["trace"] == error_event["contexts"]["trace"]
 
-    assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
 
-
+@pytest.mark.forked
 def test_tracing_disabled(
     sentry_init,
     capture_events,
@@ -251,6 +254,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
 
+@pytest.mark.forked
 @pytest.mark.skipif(
     parse_version(rq.__version__) < (1, 5), reason="At least rq-1.5 required"
 )
