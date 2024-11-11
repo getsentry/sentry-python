@@ -104,7 +104,8 @@ def patch_run_job():
         with sentry_sdk.isolation_scope() as scope:
             scope._name = "arq"
             scope.set_transaction_name(
-                DEFAULT_TRANSACTION_NAME, source=TRANSACTION_SOURCE_TASK,
+                DEFAULT_TRANSACTION_NAME,
+                source=TRANSACTION_SOURCE_TASK,
             )
             scope.clear_breadcrumbs()
 
