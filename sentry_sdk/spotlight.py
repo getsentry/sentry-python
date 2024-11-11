@@ -95,7 +95,7 @@ try:
 
             self.sentry_sdk = sentry_sdk.api
 
-            spotlight_client = sentry_sdk.api.get_client().spotlight
+            spotlight_client = self.sentry_sdk.get_client().spotlight
             if spotlight_client is None:
                 sentry_logger.warning(
                     "Cannot find Spotlight client from SpotlightMiddleware, disabling the middleware."
