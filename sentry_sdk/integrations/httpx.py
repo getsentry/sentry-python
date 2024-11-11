@@ -59,6 +59,7 @@ def _install_httpx_client():
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
             ),
             origin=HttpxIntegration.origin,
+            only_if_parent=True,
         ) as span:
             data = {
                 SPANDATA.HTTP_METHOD: request.method,
@@ -129,6 +130,7 @@ def _install_httpx_async_client():
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
             ),
             origin=HttpxIntegration.origin,
+            only_if_parent=True,
         ) as span:
             data = {
                 SPANDATA.HTTP_METHOD: request.method,

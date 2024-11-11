@@ -41,6 +41,7 @@ def patch_redis_pipeline(
             op=OP.DB_REDIS,
             name="redis.pipeline.execute",
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         ) as span:
             with capture_internal_exceptions():
                 span_data = get_db_data_fn(self)

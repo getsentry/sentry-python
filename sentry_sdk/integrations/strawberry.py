@@ -191,6 +191,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
                 op=op,
                 name=description,
                 origin=StrawberryIntegration.origin,
+                only_if_parent=True,
             )
 
         self.graphql_span.set_data("graphql.operation.type", operation_type)
