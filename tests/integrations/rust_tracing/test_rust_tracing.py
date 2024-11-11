@@ -85,8 +85,8 @@ def test_on_new_span_on_close(sentry_init, capture_events):
 
     # Ensure the span metadata is wired up
     span = event["spans"][0]
-    assert span["op"] == "native_extension"
-    assert span["origin"] == "auto.native_extension.test_on_new_span_on_close"
+    assert span["op"] == "function"
+    assert span["origin"] == "auto.function.rust_tracing.test_on_new_span_on_close"
     assert span["description"] == "_bindings::fibonacci"
 
     # Ensure the span was opened/closed appropriately
@@ -141,15 +141,16 @@ def test_nested_on_new_span_on_close(sentry_init, capture_events):
 
     # Ensure the span metadata is wired up for all spans
     first_span, second_span = event["spans"]
-    assert first_span["op"] == "native_extension"
+    assert first_span["op"] == "function"
     assert (
-        first_span["origin"] == "auto.native_extension.test_nested_on_new_span_on_close"
+        first_span["origin"]
+        == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
     )
     assert first_span["description"] == "_bindings::fibonacci"
-    assert second_span["op"] == "native_extension"
+    assert second_span["op"] == "function"
     assert (
         second_span["origin"]
-        == "auto.native_extension.test_nested_on_new_span_on_close"
+        == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
     )
     assert second_span["description"] == "_bindings::fibonacci"
 
@@ -214,12 +215,12 @@ def test_on_event_exception(sentry_init, capture_events):
     assert exc["message"] == "Getting the 10th fibonacci number"
     assert exc["breadcrumbs"]["values"] == []
 
-    location_context = exc["contexts"]["Rust Tracing Location"]
+    location_context = exc["contexts"]["rust_tracing_location"]
     assert location_context["module_path"] == "_bindings"
     assert location_context["file"] == "src/lib.rs"
     assert location_context["line"] == 23
 
-    field_context = exc["contexts"]["Rust Tracing Fields"]
+    field_context = exc["contexts"]["rust_tracing_fields"]
     assert field_context["message"] == "Getting the 10th fibonacci number"
 
 
@@ -282,12 +283,12 @@ def test_on_event_event(sentry_init, capture_events):
     assert event["message"] == "Getting the 10th fibonacci number"
     assert event["breadcrumbs"]["values"] == []
 
-    location_context = event["contexts"]["Rust Tracing Location"]
+    location_context = event["contexts"]["rust_tracing_location"]
     assert location_context["module_path"] == "_bindings"
     assert location_context["file"] == "src/lib.rs"
     assert location_context["line"] == 23
 
-    field_context = event["contexts"]["Rust Tracing Fields"]
+    field_context = event["contexts"]["rust_tracing_fields"]
     assert field_context["message"] == "Getting the 10th fibonacci number"
 
 

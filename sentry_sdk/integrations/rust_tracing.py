@@ -18,7 +18,7 @@ Usage in Python would then look like:
 sentry_sdk.init(
     dsn=sentry_dsn,
     integrations=[
-        SentryIntegrationFactory.create(
+        RustTracingIntegration(
             "demo_rust_extension",
             demo_rust_extension.initialize_tracing,
             event_type_mapping=event_type_mapping,
@@ -81,13 +81,13 @@ def extract_contexts(event: Dict[str, Any]) -> Dict[str, Any]:
         if field in metadata:
             location[field] = metadata[field]
     if len(location) > 0:
-        contexts["Rust Tracing Location"] = location
+        contexts["rust_tracing_location"] = location
 
     fields = {}
     for field in metadata.get("fields", []):
         fields[field] = event.get(field)
     if len(fields) > 0:
-        contexts["Rust Tracing Fields"] = fields
+        contexts["rust_tracing_fields"] = fields
 
     return contexts
 
@@ -189,7 +189,7 @@ class RustTracingLayer:
             sentry_span_name = "<unknown>"
 
         kwargs = {
-            "op": "native_extension",
+            "op": "function",
             "name": sentry_span_name,
             "origin": self.origin,
         }
@@ -249,7 +249,7 @@ class RustTracingIntegration(Integration):
     ):
         self.identifier = identifier
 
-        origin = f"auto.native_extension.{identifier}"
+        origin = f"auto.function.rust_tracing.{identifier}"
         self.tracing_layer = RustTracingLayer(origin, event_type_mapping, span_filter)
 
         initializer(self.tracing_layer)
