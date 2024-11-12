@@ -195,12 +195,12 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
 
     events = capture_events()
 
-    with sentry_sdk.start_span(name="submission") as transaction:
+    with sentry_sdk.start_span(name="submission") as span:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     if task_fails:
         error_event = events.pop(0)
-        assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
         assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
     execution_event, submission_event = events
@@ -211,8 +211,8 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert submission_event["transaction_info"] == {"source": "custom"}
 
     assert execution_event["type"] == submission_event["type"] == "transaction"
-    assert execution_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert submission_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert execution_event["contexts"]["trace"]["trace_id"] == span.trace_id
+    assert submission_event["contexts"]["trace"]["trace_id"] == span.trace_id
 
     if task_fails:
         assert execution_event["contexts"]["trace"]["status"] == "internal_error"
@@ -223,7 +223,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert (
         execution_event["spans"][0].items()
         >= {
-            "trace_id": str(transaction.trace_id),
+            "trace_id": str(span.trace_id),
             "same_process_as_parent": True,
             "op": "queue.process",
             "description": "dummy_task",
@@ -241,7 +241,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "span_id": submission_event["spans"][0]["span_id"],
             "start_timestamp": submission_event["spans"][0]["start_timestamp"],
             "timestamp": submission_event["spans"][0]["timestamp"],
-            "trace_id": str(transaction.trace_id),
+            "trace_id": str(span.trace_id),
         }
     ]
 
