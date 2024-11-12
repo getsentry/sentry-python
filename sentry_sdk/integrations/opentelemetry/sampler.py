@@ -114,6 +114,8 @@ class SentrySampler(Sampler):
 
         parent_span_context = trace.get_current_span(parent_context).get_span_context()
 
+        attributes = attributes or {}
+
         # No tracing enabled, thus no sampling
         if not has_tracing_enabled(client.options):
             return dropped_result(parent_span_context, attributes)
