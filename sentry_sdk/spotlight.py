@@ -85,7 +85,7 @@ try:
     )
 
     class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
-        __spotlight_script = None  # type: Optional[str]
+        _spotlight_script = None  # type: Optional[str]
 
         def __init__(self, get_response):
             # type: (Self, Callable[..., HttpResponse]) -> None
@@ -107,7 +107,7 @@ try:
         @property
         def spotlight_script(self):
             # type: (Self) -> Optional[str]
-            if self.__spotlight_script is None:
+            if self._spotlight_script is None:
                 try:
                     spotlight_js_url = urllib.parse.urljoin(
                         self._spotlight_url, SPOTLIGHT_JS_ENTRY_PATH
@@ -117,7 +117,7 @@ try:
                         method="HEAD",
                     )
                     urllib.request.urlopen(req)
-                    self.__spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
+                    self._spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
                         spotlight_js_url
                     )
                 except urllib.error.URLError as err:
@@ -127,7 +127,7 @@ try:
                         exc_info=err,
                     )
 
-            return self.__spotlight_script
+            return self._spotlight_script
 
         def process_response(self, _request, response):
             # type: (Self, HttpRequest, HttpResponse) -> Optional[HttpResponse]
