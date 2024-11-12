@@ -57,6 +57,7 @@ def _patch_create_connection():
             op=OP.SOCKET_CONNECTION,
             name=_get_span_description(address[0], address[1]),
             origin=SocketIntegration.origin,
+            only_if_parent=True,
         ) as span:
             span.set_data("address", address)
             span.set_data("timeout", timeout)
@@ -83,6 +84,7 @@ def _patch_getaddrinfo():
             op=OP.SOCKET_DNS,
             name=_get_span_description(host, port),
             origin=SocketIntegration.origin,
+            only_if_parent=True,
         ) as span:
             span.set_data("host", host)
             span.set_data("port", port)

@@ -94,6 +94,7 @@ def _install_httplib():
             name="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin="auto.http.stdlib.httplib",
+            only_if_parent=True,
         )
 
         data = {
@@ -225,6 +226,7 @@ def _install_subprocess():
             op=OP.SUBPROCESS,
             name=description,
             origin="auto.subprocess.stdlib.subprocess",
+            only_if_parent=True,
         ) as span:
             for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
@@ -275,6 +277,7 @@ def _install_subprocess():
         with sentry_sdk.start_span(
             op=OP.SUBPROCESS_WAIT,
             origin="auto.subprocess.stdlib.subprocess",
+            only_if_parent=True,
         ) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_wait(self, *a, **kw)
@@ -289,6 +292,7 @@ def _install_subprocess():
         with sentry_sdk.start_span(
             op=OP.SUBPROCESS_COMMUNICATE,
             origin="auto.subprocess.stdlib.subprocess",
+            only_if_parent=True,
         ) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_communicate(self, *a, **kw)

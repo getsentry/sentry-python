@@ -334,9 +334,7 @@ def test_span_data_for_db_query():
         ),
         (
             SpanKind.SERVER,
-            Status(
-                StatusCode.ERROR, "I'm a teapot"
-            ),
+            Status(StatusCode.ERROR, "I'm a teapot"),
             {
                 "http.method": "POST",
                 "http.route": "/some/route",
