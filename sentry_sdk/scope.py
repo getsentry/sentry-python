@@ -497,7 +497,11 @@ class Scope:
         client = self.get_client()
 
         # If we have an active span, return traceparent from there
-        if has_tracing_enabled(client.options) and self.span is not None:
+        if (
+            has_tracing_enabled(client.options)
+            and self.span is not None
+            and self.span.is_valid
+        ):
             return self.span.to_traceparent()
 
         # If this scope has a propagation context, return traceparent from there
@@ -521,7 +525,11 @@ class Scope:
         client = self.get_client()
 
         # If we have an active span, return baggage from there
-        if has_tracing_enabled(client.options) and self.span is not None:
+        if (
+            has_tracing_enabled(client.options)
+            and self.span is not None
+            and self.span.is_valid
+        ):
             return self.span.to_baggage()
 
         # If this scope has a propagation context, return baggage from there
@@ -610,7 +618,7 @@ class Scope:
         span = kwargs.pop("span", None)
         span = span or self.span
 
-        if has_tracing_enabled(client.options) and span is not None:
+        if has_tracing_enabled(client.options) and span is not None and span.is_valid:
             for header in span.iter_headers():
                 yield header
         else:
@@ -1311,7 +1319,11 @@ class Scope:
 
         # Add "trace" context
         if contexts.get("trace") is None:
-            if has_tracing_enabled(options) and self._span is not None:
+            if (
+                has_tracing_enabled(options)
+                and self._span is not None
+                and self._span.is_valid
+            ):
                 contexts["trace"] = self._span.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()

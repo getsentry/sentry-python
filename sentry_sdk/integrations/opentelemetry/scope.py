@@ -125,8 +125,17 @@ class PotelScope(Scope):
         return POTelSpan(**kwargs, scope=self)
 
 
-_INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
-_INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
+_INITIAL_CURRENT_SCOPE = None
+_INITIAL_ISOLATION_SCOPE = None
+
+
+def _setup_initial_scopes():
+    global _INITIAL_CURRENT_SCOPE, _INITIAL_ISOLATION_SCOPE
+    _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
+    _INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
+
+
+_setup_initial_scopes()
 
 
 @contextmanager

@@ -108,11 +108,9 @@ class RqIntegration(Integration):
         @ensure_integration_enabled(RqIntegration, old_enqueue_job)
         def sentry_patched_enqueue_job(self, job, **kwargs):
             # type: (Queue, Any, **Any) -> Any
-            scope = sentry_sdk.get_current_scope()
-            if scope.span is not None:
-                job.meta["_sentry_trace_headers"] = dict(
-                    scope.iter_trace_propagation_headers()
-                )
+            job.meta["_sentry_trace_headers"] = dict(
+                sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+            )
 
             return old_enqueue_job(self, job, **kwargs)
 
