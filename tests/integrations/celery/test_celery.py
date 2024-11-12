@@ -7,7 +7,7 @@ from celery import Celery, VERSION
 from celery.bin import worker
 
 import sentry_sdk
-from sentry_sdk import start_transaction, get_current_span
+from sentry_sdk import get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
@@ -220,16 +220,12 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
         assert execution_event["contexts"]["trace"]["status"] == "ok"
 
     assert len(execution_event["spans"]) == 1
-    assert (
-        execution_event["spans"][0].items()
-        >= {
-            "trace_id": str(span.trace_id),
-            "same_process_as_parent": True,
-            "op": "queue.process",
-            "description": "dummy_task",
-            "data": ApproxDict(),
-        }.items()
-    )
+    assert execution_event["spans"][0] == ApproxDict({
+        "trace_id": str(span.trace_id),
+        "same_process_as_parent": True,
+        "op": "queue.process",
+        "description": "dummy_task",
+    })
     assert submission_event["spans"] == [
         {
             "data": ApproxDict(),
