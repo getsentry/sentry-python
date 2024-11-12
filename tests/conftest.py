@@ -64,8 +64,9 @@ else:
 from sentry_sdk import scope
 import sentry_sdk.integrations.opentelemetry.scope as potel_scope
 
+
 # Disabling this, because this leads in Potel to Celery tests failing
-# TODO: Check if disabling this broke a bunch of other test (not sure how to do this)
+# TODO: Check if disabling this broke a bunch of other test (not sure how to do)
 # @pytest.fixture(autouse=True)
 def clean_scopes():
     """
@@ -80,7 +81,7 @@ def clean_scopes():
 
 
 @pytest.fixture(autouse=True)
-def internal_exceptions(request):git 
+def internal_exceptions(request):
     errors = []
     if "tests_internal_exceptions" in request.keywords:
         return
