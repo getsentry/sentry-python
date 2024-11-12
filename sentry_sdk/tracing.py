@@ -1257,9 +1257,9 @@ class POTelSpan:
                     span_name, start_time=start_timestamp, attributes=attributes
                 )
 
-                self.name = name
                 self.origin = origin or DEFAULT_SPAN_ORIGIN
                 self.description = description
+                self.name = span_name
                 self.source = source
 
                 if status is not None:
