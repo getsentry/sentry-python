@@ -20,6 +20,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
+- The `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore. Instead, the individual properties are accessible as `wsgi_environ.PATH_INFO`... If you need more data accessible in the `traces_sampler`, provide additional `attributes` to your `start_span`. # TODO
 
 ### Removed
 

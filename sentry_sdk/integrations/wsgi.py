@@ -120,7 +120,7 @@ class SentryWsgiMiddleware:
                                 name=DEFAULT_TRANSACTION_NAME,
                                 source=TRANSACTION_SOURCE_ROUTE,
                                 origin=self.span_origin,
-                                custom_sampling_context={"wsgi_environ": environ},
+                                attributes=_prepopulate_attributes(environ),
                             )
                             if should_trace
                             else nullcontext()
@@ -309,3 +309,28 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
         return event
 
     return event_processor
+
+
+def _prepopulate_attributes(wsgi_environ):
+    attributes = {}
+
+    for attr in (
+        "CONTENT_LENGTH",
+        "CONTENT_TYPE",
+        "PATH_INFO",
+        "QUERY_STRING",
+        "REQUEST_METHOD",
+        "SCRIPT_NAME",
+        "SERVER_NAME",
+        "SERVER_PORT",
+        "SERVER_PROTOCOL",
+        "multithread",
+        "multiprocess",
+        "run_once",
+        "url_scheme",
+        "version",
+    ):
+        if wsgi_environ.get(attr):
+            attributes[f"wsgi_environ.{attr}"] = wsgi_environ[attr]
+
+    return attributes
