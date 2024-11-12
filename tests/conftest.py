@@ -74,8 +74,7 @@ def clean_scopes():
     scope._isolation_scope.set(None)
     scope._current_scope.set(None)
 
-    potel_scope._INITIAL_CURRENT_SCOPE.clear()
-    potel_scope._INITIAL_ISOLATION_SCOPE.clear()
+    potel_scope._setup_initial_scopes()
 
 
 @pytest.fixture(autouse=True)
