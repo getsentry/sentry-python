@@ -721,3 +721,20 @@ async def test_custom_transaction_name(
     assert transaction_event["type"] == "transaction"
     assert transaction_event["transaction"] == "foobar"
     assert transaction_event["transaction_info"] == {"source": "custom"}
+
+
+@pytest.mark.asyncio
+async def test_asgi_scope_in_traces_sampler(sentry_init, asgi3_app):
+    def dummy_traces_sampler(sampling_context):
+        assert sampling_context["asgi_scope.path"] == "/test"
+        assert sampling_context["asgi_scope.scheme"] == "http"
+
+    sentry_init(
+        traces_sampler=dummy_traces_sampler,
+        traces_sample_rate=1.0,
+    )
+
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    async with TestClient(app) as client:
+        await client.get("/test")
