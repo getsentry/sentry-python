@@ -123,7 +123,10 @@ class SentrySampler(Sampler):
         # Explicit sampled value provided at start_span
         if attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED) is not None:
             sample_rate = float(attributes[SentrySpanAttribute.CUSTOM_SAMPLED])
-            return sampled_result(parent_span_context, attributes, sample_rate)
+            if sample_rate > 0:
+                return sampled_result(parent_span_context, attributes, sample_rate)
+            else:
+                return dropped_result(parent_span_context, attributes)
 
         sample_rate = None
 
