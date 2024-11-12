@@ -160,8 +160,8 @@ def _add_sentry_baggage_to_headers(headers, sentry_baggage):
     existing_baggage = headers.get(BAGGAGE_HEADER_NAME, "")
     stripped_existing_baggage = Baggage.strip_sentry_baggage(existing_baggage)
 
-    seperator = "," if len(stripped_existing_baggage) > 0 else ""
+    separator = "," if len(stripped_existing_baggage) > 0 else ""
 
     headers[BAGGAGE_HEADER_NAME] = (
-        stripped_existing_baggage + seperator + sentry_baggage
+        stripped_existing_baggage + separator + sentry_baggage
     )
