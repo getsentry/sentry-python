@@ -148,8 +148,6 @@ class SentrySampler(Sampler):
             parent_sampled = custom_parent_sampled
         else:
             parent_sampled = get_parent_sampled(parent_span_context, trace_id)
-        print("custom_parent_sampled", custom_parent_sampled)
-        print("get parent sampled", get_parent_sampled(parent_span_context, trace_id))
 
         if is_root_span and has_traces_sampler:
             sampling_context = {
