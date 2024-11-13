@@ -535,8 +535,6 @@ async def test_outgoing_trace_headers(
     with start_transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
-        # make trace_id difference between transactions
-        trace_id="0123456789012345678901234567890",
     ) as transaction:
         client = await aiohttp_client(raw_server)
         resp = await client.get("/")
@@ -572,14 +570,21 @@ async def test_outgoing_trace_headers_append_to_baggage(
     with start_transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
-        trace_id="0123456789012345678901234567890",
-    ):
+    ) as transaction:
         client = await aiohttp_client(raw_server)
         resp = await client.get("/", headers={"bagGage": "custom=value"})
 
         assert (
-            resp.request_info.headers["baggage"]
-            == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
+            sorted(resp.request_info.headers["baggage"].split(","))
+            == sorted([
+                "custom=value",
+                f"sentry-trace_id={transaction.trace_id}",
+                "sentry-environment=production",
+                "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42",
+                "sentry-transaction=/interactions/other-dogs/new-dog",
+                "sentry-sample_rate=1.0",
+                "sentry-sampled=true",
+            ])
         )
 
 
