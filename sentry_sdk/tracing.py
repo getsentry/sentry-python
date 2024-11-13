@@ -1212,7 +1212,6 @@ class POTelSpan:
         attributes=None,  # type: OTelSpanAttributes
         only_if_parent=False,  # type: bool
         otel_span=None,  # type: Optional[OtelSpan]
-        parent_sampled=None,  # type: Optional[bool]
         **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
