@@ -11,7 +11,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The SDK now supports Python 3.7 and higher.
 - `sentry_sdk.start_span` now only takes keyword arguments.
 - `sentry_sdk.start_span` no longer takes an explicit `span` argument.
-- `sentry_sdk.start_span` now accepts the `sampled` argument. It is however only taken into account for root spans (previously known as transactions).
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
