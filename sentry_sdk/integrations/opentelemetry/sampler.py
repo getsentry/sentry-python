@@ -120,8 +120,8 @@ class SentrySampler(Sampler):
         if not has_tracing_enabled(client.options):
             return dropped_result(parent_span_context, attributes)
 
-        has_parent = parent_span_context.is_valid
-        is_root_span = not has_parent or parent_span_context.is_remote
+        # parent_span_context.is_valid means this span has a parent, remote or local
+        is_root_span = not parent_span_context.is_valid or parent_span_context.is_remote
 
         # Explicit sampled value provided at start_span
         if attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED) is not None:
