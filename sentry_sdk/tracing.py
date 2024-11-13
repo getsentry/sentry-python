@@ -1390,6 +1390,11 @@ class POTelSpan:
         return format_span_id(self._otel_span.get_span_context().span_id)
 
     @property
+    def is_valid(self):
+        # type: () -> bool
+        return self._otel_span.get_span_context().is_valid
+
+    @property
     def sampled(self):
         # type: () -> Optional[bool]
         return self._otel_span.get_span_context().trace_flags.sampled
