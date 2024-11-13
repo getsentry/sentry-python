@@ -24,16 +24,16 @@ def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
 
 
 @pytest.mark.parametrize("sampled", [True, False])
-def test_nested_transaction_sampling_override(sentry_init, sampled):
+def test_nested_span_sampling_override(sentry_init, sampled):
     sentry_init(traces_sample_rate=1.0)
 
-    with start_transaction(name="outer", sampled=sampled) as outer_transaction:
-        assert outer_transaction.sampled is sampled
-        with start_transaction(
-            name="inner", sampled=(not sampled)
-        ) as inner_transaction:
-            assert inner_transaction.sampled is not sampled
-        assert outer_transaction.sampled is sampled
+    with start_span(name="outer", sampled=sampled) as outer_span:
+        assert outer_span.sampled is sampled
+        with start_span(name="inner", sampled=(not sampled)) as inner_span:
+            # won't work because the child span inherits the sampling decision
+            # from the parent
+            assert inner_span.sampled is sampled
+        assert outer_span.sampled is sampled
 
 
 def test_no_double_sampling(sentry_init, capture_events):
@@ -177,10 +177,8 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
     mock_random_value = 0.25 if parent_sampling_decision is False else 0.75
 
     with mock.patch.object(random, "random", return_value=mock_random_value):
-        transaction = start_transaction(
-            name="dogpark", parent_sampled=parent_sampling_decision
-        )
-        assert transaction.sampled is parent_sampling_decision
+        span = start_span(name="dogpark", parent_sampled=parent_sampling_decision)
+        assert span.sampled is parent_sampling_decision
 
 
 @pytest.mark.parametrize("parent_sampling_decision", [True, False])

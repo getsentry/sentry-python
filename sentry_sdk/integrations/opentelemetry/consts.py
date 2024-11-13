@@ -31,3 +31,6 @@ class SentrySpanAttribute:
     SOURCE = "sentry.source"
     CONTEXT = "sentry.context"
     CUSTOM_SAMPLED = "sentry.custom_sampled"  # used for saving start_span(sampled=X)
+    CUSTOM_PARENT_SAMPLED = (
+        "sentry.custom_parent_sampled"  # used for saving start_span(parent_sampled=X)
+    )

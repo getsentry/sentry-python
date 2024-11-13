@@ -1212,6 +1212,7 @@ class POTelSpan:
         attributes=None,  # type: OTelSpanAttributes
         only_if_parent=False,  # type: bool
         otel_span=None,  # type: Optional[OtelSpan]
+        parent_sampled=None,  # type: Optional[bool]
         **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
@@ -1252,6 +1253,10 @@ class POTelSpan:
                 attributes[SentrySpanAttribute.OP] = op
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
+                if parent_sampled is not None:
+                    attributes[SentrySpanAttribute.CUSTOM_PARENT_SAMPLED] = (
+                        parent_sampled
+                    )
 
                 self._otel_span = tracer.start_span(
                     span_name, start_time=start_timestamp, attributes=attributes

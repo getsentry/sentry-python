@@ -154,7 +154,11 @@ class SentrySampler(Sampler):
 
         else:
             # Check if there is a parent with a sampling decision
-            parent_sampled = get_parent_sampled(parent_span_context, trace_id)
+            parent_sampled = attributes.get(SentrySpanAttribute.CUSTOM_PARENT_SAMPLED)
+
+            if parent_sampled is None:
+                parent_sampled = get_parent_sampled(parent_span_context, trace_id)
+
             if parent_sampled is not None:
                 sample_rate = parent_sampled
             else:
