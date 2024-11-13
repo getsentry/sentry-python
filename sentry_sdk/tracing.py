@@ -1582,6 +1582,9 @@ class POTelSpan:
 
     def finish(self, end_timestamp=None):
         # type: (Optional[Union[float, datetime]]) -> Optional[str]
+        if hasattr(self._otel_span, "status") and self._otel_span.status.status_code == StatusCode.UNSET:
+            self.set_status(SPANSTATUS.OK)
+
         if end_timestamp is not None:
             from sentry_sdk.integrations.opentelemetry.utils import (
                 convert_to_otel_timestamp,
