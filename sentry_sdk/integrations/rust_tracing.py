@@ -36,6 +36,7 @@ from typing import Any, Callable, Dict, Tuple, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span as SentrySpan
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
@@ -224,9 +225,8 @@ class RustTracingLayer:
             return
         _parent_sentry_span, sentry_span = span_state
 
-        client_options = sentry_sdk.get_client().options
         send_sensitive_data = (
-            client_options["send_default_pii"]
+            should_send_default_pii()
             if self.send_sensitive_data is None
             else self.send_sensitive_data
         )
