@@ -1066,11 +1066,7 @@ def test_transaction_name_in_traces_sampler(
 
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
-        integrations=[
-            StarletteIntegration(
-                transaction_style=transaction_style, middleware_spans=False
-            )
-        ],
+        integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
     )
