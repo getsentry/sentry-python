@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from typing import Tuple, Optional, Generator, Dict, Any
     from typing_extensions import Unpack
 
-    from sentry_sdk._types import SamplingContext
     from sentry_sdk.tracing import TransactionKwargs
 
 
@@ -112,22 +111,31 @@ class PotelScope(Scope):
 
         return span_context
 
-    def start_transaction(self, custom_sampling_context=None, **kwargs):
-        # type: (Optional[SamplingContext], Unpack[TransactionKwargs]) -> POTelSpan
+    def start_transaction(self, **kwargs):
+        # type: (Unpack[TransactionKwargs]) -> POTelSpan
         """
         .. deprecated:: 3.0.0
             This function is deprecated and will be removed in a future release.
             Use :py:meth:`sentry_sdk.start_span` instead.
         """
-        return self.start_span(custom_sampling_context=custom_sampling_context)
+        return self.start_span(**kwargs)
 
-    def start_span(self, custom_sampling_context=None, **kwargs):
-        # type: (Optional[SamplingContext], Any) -> POTelSpan
+    def start_span(self, **kwargs):
+        # type: (Any) -> POTelSpan
         return POTelSpan(**kwargs, scope=self)
 
 
-_INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
-_INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
+_INITIAL_CURRENT_SCOPE = None
+_INITIAL_ISOLATION_SCOPE = None
+
+
+def _setup_initial_scopes():
+    global _INITIAL_CURRENT_SCOPE, _INITIAL_ISOLATION_SCOPE
+    _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
+    _INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
+
+
+_setup_initial_scopes()
 
 
 @contextmanager

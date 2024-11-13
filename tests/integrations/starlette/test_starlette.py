@@ -1244,6 +1244,7 @@ def test_transaction_http_method_default(sentry_init, capture_events):
     """
     sentry_init(
         traces_sample_rate=1.0,
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[StarletteIntegration()],
     )
     events = capture_events()
@@ -1269,6 +1270,7 @@ def test_transaction_http_method_default(sentry_init, capture_events):
 def test_transaction_http_method_custom(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[
             StarletteIntegration(
                 http_methods_to_capture=(

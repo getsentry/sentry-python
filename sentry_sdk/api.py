@@ -40,7 +40,6 @@ if TYPE_CHECKING:
         ExcInfo,
         MeasurementUnit,
         LogLevelStr,
-        SamplingContext,
     )
     from sentry_sdk.tracing import Span, TransactionKwargs
 
@@ -239,12 +238,8 @@ def flush(
     return get_client().flush(timeout=timeout, callback=callback)
 
 
-def start_span(
-    *,
-    custom_sampling_context=None,
-    **kwargs,  # type: Any
-):
-    # type: (...) -> POTelSpan
+def start_span(**kwargs):
+    # type: (type.Any) -> POTelSpan
     """
     Start and return a span.
 
@@ -257,13 +252,11 @@ def start_span(
     of the `with` block. If not using context managers, call the `finish()`
     method.
     """
-    # TODO: Consider adding type hints to the method signature.
-    return get_current_scope().start_span(custom_sampling_context, **kwargs)
+    return get_current_scope().start_span(**kwargs)
 
 
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
-    custom_sampling_context=None,  # type: Optional[SamplingContext]
     **kwargs,  # type: Unpack[TransactionKwargs]
 ):
     # type: (...) -> POTelSpan
@@ -295,14 +288,12 @@ def start_transaction(
 
     :param transaction: The transaction to start. If omitted, we create and
         start a new transaction.
-    :param custom_sampling_context: The transaction's custom sampling context.
     :param kwargs: Optional keyword arguments to be passed to the Transaction
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
     return start_span(
         span=transaction,
-        custom_sampling_context=custom_sampling_context,
         **kwargs,
     )
 
