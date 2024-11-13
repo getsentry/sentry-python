@@ -283,18 +283,10 @@ def _wrap_task_run(f):
         )  # type: Union[Span, NoOpMgr]
 
         with span_mgr as span:
-            try:
-                kwargs["headers"] = _update_celery_task_headers(
-                    kwarg_headers, span, integration.monitor_beat_tasks
-                )
-                return_value = f(*args, **kwargs)
-
-            except Exception:
-                reraise(*sys.exc_info())
-            else:
-                span.set_status(SPANSTATUS.OK)
-
-            return return_value
+            kwargs["headers"] = _update_celery_task_headers(
+                kwarg_headers, span, integration.monitor_beat_tasks
+            )
+            return f(*args, **kwargs)
 
     return apply_async  # type: ignore
 
@@ -322,30 +314,22 @@ def _wrap_tracer(task, f):
             # something such as attribute access can fail.
             headers = args[3].get("headers") or {}
             with sentry_sdk.continue_trace(headers):
-                try:
-                    with sentry_sdk.start_span(
-                        op=OP.QUEUE_TASK_CELERY,
-                        name=task.name,
-                        source=TRANSACTION_SOURCE_TASK,
-                        origin=CeleryIntegration.origin,
-                        custom_sampling_context={
-                            "celery_job": {
-                                "task": task.name,
-                                # for some reason, args[1] is a list if non-empty but a
-                                # tuple if empty
-                                "args": list(args[1]),
-                                "kwargs": args[2],
-                            }
-                        },
-                    ) as span:
-                        return_value = f(*args, **kwargs)
-
-                except Exception:
-                    reraise(*sys.exc_info())
-                else:
-                    span.set_status(SPANSTATUS.OK)
-
-                return return_value
+                with sentry_sdk.start_span(
+                    op=OP.QUEUE_TASK_CELERY,
+                    name=task.name,
+                    source=TRANSACTION_SOURCE_TASK,
+                    origin=CeleryIntegration.origin,
+                    custom_sampling_context={
+                        "celery_job": {
+                            "task": task.name,
+                            # for some reason, args[1] is a list if non-empty but a
+                            # tuple if empty
+                            "args": list(args[1]),
+                            "kwargs": args[2],
+                        }
+                    },
+                ):
+                    return f(*args, **kwargs)
 
     return _inner  # type: ignore
 
@@ -413,17 +397,13 @@ def _wrap_task_call(task, f):
                         task.app.connection().transport.driver_type,
                     )
 
-                result = f(*args, **kwargs)
+                return f(*args, **kwargs)
 
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
                 _capture_exception(task, exc_info)
             reraise(*exc_info)
-        else:
-            span.set_status(SPANSTATUS.OK)
-
-        return result
 
     return _inner  # type: ignore
 
@@ -513,35 +493,29 @@ def _patch_producer_publish():
         routing_key = kwargs.get("routing_key")
         exchange = kwargs.get("exchange")
 
-        try:
-            with sentry_sdk.start_span(
-                op=OP.QUEUE_PUBLISH,
-                name=task_name,
-                origin=CeleryIntegration.origin,
-                only_if_parent=True,
-            ) as span:
-                if task_id is not None:
-                    span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
+        with sentry_sdk.start_span(
+            op=OP.QUEUE_PUBLISH,
+            name=task_name,
+            origin=CeleryIntegration.origin,
+            only_if_parent=True,
+        ) as span:
+            if task_id is not None:
+                span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
 
-                if exchange == "" and routing_key is not None:
-                    # Empty exchange indicates the default exchange, meaning messages are
-                    # routed to the queue with the same name as the routing key.
-                    span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+            if exchange == "" and routing_key is not None:
+                # Empty exchange indicates the default exchange, meaning messages are
+                # routed to the queue with the same name as the routing key.
+                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
-                if retries is not None:
-                    span.set_data(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
+            if retries is not None:
+                span.set_data(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
 
-                with capture_internal_exceptions():
-                    span.set_data(
-                        SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
-                    )
+            with capture_internal_exceptions():
+                span.set_data(
+                    SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
+                )
 
-                return_value = original_publish(self, *args, **kwargs)
-
-        except Exception:
-            reraise(*sys.exc_info())
-        else:
-            span.set_status(SPANSTATUS.OK)
+            return_value = original_publish(self, *args, **kwargs)
 
         return return_value
 
