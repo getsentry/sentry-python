@@ -137,21 +137,6 @@ def test_prefers_traces_sampler_to_traces_sample_rate(
     assert transaction.sampled is traces_sampler_return_value
 
 
-@pytest.mark.parametrize("parent_sampling_decision", [True, False])
-def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
-    sentry_init, parent_sampling_decision
-):
-    # make traces_sampler pick the opposite of the inherited decision, to prove
-    # that traces_sampler takes precedence
-    traces_sampler = mock.Mock(return_value=not parent_sampling_decision)
-    sentry_init(traces_sampler=traces_sampler)
-
-    transaction = start_transaction(
-        name="dogpark", parent_sampled=parent_sampling_decision
-    )
-    assert transaction.sampled is not parent_sampling_decision
-
-
 @pytest.mark.parametrize("explicit_decision", [True, False])
 def test_traces_sampler_doesnt_overwrite_explicitly_passed_sampling_decision(
     sentry_init, explicit_decision
@@ -163,21 +148,6 @@ def test_traces_sampler_doesnt_overwrite_explicitly_passed_sampling_decision(
 
     transaction = start_transaction(name="dogpark", sampled=explicit_decision)
     assert transaction.sampled is explicit_decision
-
-
-@pytest.mark.parametrize("parent_sampling_decision", [True, False])
-def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
-    sentry_init, parent_sampling_decision
-):
-    # make sure the parent sampling decision is the opposite of what
-    # traces_sample_rate would produce, to prove the inheritance takes
-    # precedence
-    sentry_init(traces_sample_rate=0.5)
-    mock_random_value = 0.25 if parent_sampling_decision is False else 0.75
-
-    with mock.patch.object(random, "random", return_value=mock_random_value):
-        span = start_span(name="dogpark", parent_sampled=parent_sampling_decision)
-        assert span.sampled is parent_sampling_decision
 
 
 @pytest.mark.parametrize("parent_sampling_decision", [True, False])

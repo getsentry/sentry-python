@@ -1253,10 +1253,6 @@ class POTelSpan:
                 attributes[SentrySpanAttribute.OP] = op
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
-                if parent_sampled is not None:
-                    attributes[SentrySpanAttribute.CUSTOM_PARENT_SAMPLED] = (
-                        parent_sampled
-                    )
 
                 self._otel_span = tracer.start_span(
                     span_name, start_time=start_timestamp, attributes=attributes
