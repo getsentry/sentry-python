@@ -37,6 +37,7 @@ from typing import Any, Callable, Dict, Tuple, Optional
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.tracing import Span as SentrySpan
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 TraceState = Optional[Tuple[Optional[SentrySpan], SentrySpan]]
 
@@ -149,10 +150,12 @@ class RustTracingLayer:
             [Dict[str, Any]], EventTypeMapping
         ] = default_event_type_mapping,
         span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
+        send_sensitive_data: bool = None,
     ):
         self.origin = origin
         self.event_type_mapping = event_type_mapping
         self.span_filter = span_filter
+        self.send_sensitive_data = send_sensitive_data
 
     def on_event(self, event: str, _span_state: TraceState) -> None:
         deserialized_event = json.loads(event)
@@ -221,9 +224,19 @@ class RustTracingLayer:
             return
         _parent_sentry_span, sentry_span = span_state
 
+        client_options = sentry_sdk.get_client().options
+        send_sensitive_data = (
+            client_options["send_default_pii"]
+            if self.send_sensitive_data is None
+            else self.send_sensitive_data
+        )
+
         deserialized_values = json.loads(values)
         for key, value in deserialized_values.items():
-            sentry_span.set_data(key, value)
+            if send_sensitive_data:
+                sentry_span.set_data(key, value)
+            else:
+                sentry_span.set_data(key, SENSITIVE_DATA_SUBSTITUTE)
 
 
 class RustTracingIntegration(Integration):
@@ -246,11 +259,13 @@ class RustTracingIntegration(Integration):
             [Dict[str, Any]], EventTypeMapping
         ] = default_event_type_mapping,
         span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
+        send_sensitive_data: Optional[bool] = None,
     ):
         self.identifier = identifier
-
         origin = f"auto.function.rust_tracing.{identifier}"
-        self.tracing_layer = RustTracingLayer(origin, event_type_mapping, span_filter)
+        self.tracing_layer = RustTracingLayer(
+            origin, event_type_mapping, span_filter, send_sensitive_data
+        )
 
         initializer(self.tracing_layer)
 

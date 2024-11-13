@@ -1,3 +1,5 @@
+import pytest
+
 from string import Template
 from typing import Dict
 
@@ -360,7 +362,11 @@ def test_span_filter(sentry_init, capture_events):
 
 def test_record(sentry_init):
     rust_tracing = FakeRustTracing()
-    integration = RustTracingIntegration("test_record", rust_tracing.set_layer_impl)
+    integration = RustTracingIntegration(
+        "test_record",
+        initializer=rust_tracing.set_layer_impl,
+        send_sensitive_data=True,
+    )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     with start_transaction():
@@ -400,3 +406,45 @@ def test_record_in_ignored_span(sentry_init):
         # `on_record()` should not do anything to the current Sentry span if the associated Rust span was ignored
         span_after_record = sentry_sdk.get_current_span().to_json()
         assert span_after_record["data"]["version"] is None
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, send_sensitive_data, sensitive_data_expected",
+    [
+        (True, True, True),
+        (True, False, False),
+        (True, None, True),
+        (False, True, True),
+        (False, False, False),
+        (False, None, False),
+    ],
+)
+def test_sensitive_data(
+    sentry_init, send_default_pii, send_sensitive_data, sensitive_data_expected
+):
+    rust_tracing = FakeRustTracing()
+    integration = RustTracingIntegration(
+        "test_record",
+        initializer=rust_tracing.set_layer_impl,
+        send_sensitive_data=send_sensitive_data,
+    )
+
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
+    with start_transaction():
+        rust_tracing.new_span(RustTracingLevel.Info, 3)
+
+        span_before_record = sentry_sdk.get_current_span().to_json()
+        assert span_before_record["data"]["version"] is None
+
+        rust_tracing.record(3)
+
+        span_after_record = sentry_sdk.get_current_span().to_json()
+
+        if sensitive_data_expected:
+            assert span_after_record["data"]["version"] == "memoized"
+        else:
+            assert span_after_record["data"]["version"] == "[Filtered]"
