@@ -191,7 +191,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
         return x / y
 
     # XXX: For some reason the first call does not get instrumented properly.
-    celery_invocation(dummy_task, 1, 1)
+    # celery_invocation(dummy_task, 1, 1)
 
     events = capture_events()
 

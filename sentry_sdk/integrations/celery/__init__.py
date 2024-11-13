@@ -307,8 +307,8 @@ def _wrap_tracer(task, f):
         with isolation_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
-            scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
             scope.set_transaction_name(task.name, source=TRANSACTION_SOURCE_TASK)
+            scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
@@ -515,8 +515,6 @@ def _patch_producer_publish():
                     SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
                 )
 
-            return_value = original_publish(self, *args, **kwargs)
-
-        return return_value
+            return original_publish(self, *args, **kwargs)
 
     Producer.publish = sentry_publish
