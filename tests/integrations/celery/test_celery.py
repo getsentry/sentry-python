@@ -222,7 +222,6 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert len(execution_event["spans"]) == 1
     assert execution_event["spans"][0] == ApproxDict({
         "trace_id": str(span.trace_id),
-        "same_process_as_parent": True,
         "op": "queue.process",
         "description": "dummy_task",
     })
@@ -233,11 +232,11 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "op": "queue.submit.celery",
             "origin": "auto.queue.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
-            "same_process_as_parent": True,
             "span_id": submission_event["spans"][0]["span_id"],
             "start_timestamp": submission_event["spans"][0]["start_timestamp"],
             "timestamp": submission_event["spans"][0]["timestamp"],
             "trace_id": str(span.trace_id),
+            "status": "ok",
         }
     ]
 
