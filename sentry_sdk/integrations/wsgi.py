@@ -311,26 +311,33 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
     return event_processor
 
 
+ENVIRON_TO_ATTRIBUTE = {
+    "PATH_INFO": "url.path",
+    "REQUEST_METHOD": "http.request.method",
+    "SERVER_NAME": "server.address",
+    "SERVER_PORT": "server.port",
+    "url_scheme": "url.scheme",
+}
+
+
 def _prepopulate_attributes(wsgi_environ):
     attributes = {}
 
-    for attr in (
-        "CONTENT_LENGTH",
-        "CONTENT_TYPE",
-        "PATH_INFO",
-        "QUERY_STRING",
-        "REQUEST_METHOD",
-        "SCRIPT_NAME",
-        "SERVER_NAME",
-        "SERVER_PORT",
-        "SERVER_PROTOCOL",
-        "multithread",
-        "multiprocess",
-        "run_once",
-        "url_scheme",
-        "version",
-    ):
-        if wsgi_environ.get(attr):
-            attributes[f"wsgi_environ.{attr}"] = wsgi_environ[attr]
+    for property, attr in ENVIRON_TO_ATTRIBUTE.items():
+        if wsgi_environ.get(property) is not None:
+            attributes[attr] = wsgi_environ[property]
+
+    if wsgi_environ.get("SERVER_PROTOCOL") is not None:
+        try:
+            proto, version = wsgi_environ["SERVER_PROTOCOL"].split("/")
+            attributes["network.protocol.name"] = proto
+            attributes["network.protocol.version"] = version
+        except Exception:
+            attributes["network.protocol.name"] = wsgi_environ["SERVER_PROTOCOL"]
+
+    try:
+        attributes["url.full"] = ""
+    except Exception:
+        pass
 
     return attributes
