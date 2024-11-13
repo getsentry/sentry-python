@@ -32,6 +32,8 @@ if TYPE_CHECKING:
 
     from rq.job import Job
 
+DEFAULT_TRANSACTION_NAME = "unknown RQ task"
+
 
 class RqIntegration(Integration):
     identifier = "rq"
@@ -55,22 +57,27 @@ class RqIntegration(Integration):
         def sentry_patched_perform_job(self, job, *args, **kwargs):
             # type: (Any, Job, *Queue, **Any) -> bool
             with sentry_sdk.new_scope() as scope:
+                try:
+                    transaction_name = job.func_name or DEFAULT_TRANSACTION_NAME
+                except AttributeError:
+                    transaction_name = DEFAULT_TRANSACTION_NAME
+
+                scope.set_transaction_name(
+                    transaction_name, source=TRANSACTION_SOURCE_TASK
+                )
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
                 with sentry_sdk.continue_trace(
                     job.meta.get("_sentry_trace_headers") or {}
                 ):
-                    with sentry_sdk.start_transaction(
+                    with sentry_sdk.start_span(
                         op=OP.QUEUE_TASK_RQ,
-                        name="unknown RQ task",
+                        name=transaction_name,
                         source=TRANSACTION_SOURCE_TASK,
                         origin=RqIntegration.origin,
                         custom_sampling_context={"rq_job": job},
-                    ) as transaction:
-                        with capture_internal_exceptions():
-                            transaction.name = job.func_name
-
+                    ):
                         rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:
@@ -101,11 +108,9 @@ class RqIntegration(Integration):
         @ensure_integration_enabled(RqIntegration, old_enqueue_job)
         def sentry_patched_enqueue_job(self, job, **kwargs):
             # type: (Queue, Any, **Any) -> Any
-            scope = sentry_sdk.get_current_scope()
-            if scope.span is not None:
-                job.meta["_sentry_trace_headers"] = dict(
-                    scope.iter_trace_propagation_headers()
-                )
+            job.meta["_sentry_trace_headers"] = dict(
+                sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+            )
 
             return old_enqueue_job(self, job, **kwargs)
 
