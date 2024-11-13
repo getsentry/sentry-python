@@ -22,7 +22,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
 - The `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore for ASGI frameworks. Instead, the individual properties on the scope, if available, are accessible as follows:
 
-  | Scope property | Span attribute                  |
+  | Scope property | Sampling context key(s)         |
   | -------------- | ------------------------------- |
   | `type`         | `network.protocol.name`         |
   | `scheme`       | `url.scheme`                    |
