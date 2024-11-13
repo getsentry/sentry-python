@@ -150,7 +150,7 @@ class RustTracingLayer:
             [Dict[str, Any]], EventTypeMapping
         ] = default_event_type_mapping,
         span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
-        send_sensitive_data: bool = None,
+        send_sensitive_data: Optional[bool] = None,
     ):
         self.origin = origin
         self.event_type_mapping = event_type_mapping
