@@ -10,8 +10,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - The SDK now supports Python 3.7 and higher.
 - `sentry_sdk.start_span` now only takes keyword arguments.
-- `sentry_sdk.start_span` no longer takes an explicit `span` argument.
-- `sentry_sdk.start_span` no longer takes explicit `trace_id`, `span_id` or `parent_span_id` arguments.
+- `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
@@ -21,6 +20,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
+- The `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore for ASGI frameworks. Instead, the individual properties on the scope, if available, are accessible as follows:
+
+  | Scope property | Sampling context key(s)         |
+  | -------------- | ------------------------------- |
+  | `type`         | `network.protocol.name`         |
+  | `scheme`       | `url.scheme`                    |
+  | `path`         | `url.path`                      |
+  | `http_version` | `network.protocol.version`      |
+  | `method`       | `http.request.method`           |
+  | `server`       | `server.address`, `server.port` |
+  | `client`       | `client.address`, `client.port` |
+  | full URL       | `url.full`                      |
 
 ### Removed
 

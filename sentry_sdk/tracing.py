@@ -1228,9 +1228,11 @@ class POTelSpan:
         if otel_span is not None:
             self._otel_span = otel_span
         else:
-            skip_span = (
-                only_if_parent and not get_current_span().get_span_context().is_valid
-            )
+            skip_span = False
+            if only_if_parent:
+                parent_span_context = get_current_span().get_span_context()
+                skip_span = not parent_span_context.is_valid or parent_span_context.is_remote
+
             if skip_span:
                 self._otel_span = INVALID_SPAN
             else:
@@ -1250,6 +1252,7 @@ class POTelSpan:
                 # Prepopulate some attrs so that they're accessible in traces_sampler
                 attributes = attributes or {}
                 attributes[SentrySpanAttribute.OP] = op
+                attributes[SentrySpanAttribute.SOURCE] = source
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
@@ -1260,7 +1263,6 @@ class POTelSpan:
                 self.origin = origin or DEFAULT_SPAN_ORIGIN
                 self.description = description
                 self.name = span_name
-                self.source = source
 
                 if status is not None:
                     self.set_status(status)
