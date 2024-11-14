@@ -120,7 +120,9 @@ class SentryWsgiMiddleware:
                                 name=DEFAULT_TRANSACTION_NAME,
                                 source=TRANSACTION_SOURCE_ROUTE,
                                 origin=self.span_origin,
-                                attributes=_prepopulate_attributes(environ),
+                                attributes=_prepopulate_attributes(
+                                    environ, self.use_x_forwarded_for
+                                ),
                             )
                             if should_trace
                             else nullcontext()
@@ -313,14 +315,16 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
 
 ENVIRON_TO_ATTRIBUTE = {
     "PATH_INFO": "url.path",
+    "QUERY_STRING": "url.query",
     "REQUEST_METHOD": "http.request.method",
     "SERVER_NAME": "server.address",
     "SERVER_PORT": "server.port",
-    "url_scheme": "url.scheme",
+    "wsgi.url_scheme": "url.scheme",
 }
 
 
-def _prepopulate_attributes(wsgi_environ):
+def _prepopulate_attributes(wsgi_environ, use_x_forwarded_for=False):
+    """Extract span attributes from the WSGI environment."""
     attributes = {}
 
     for property, attr in ENVIRON_TO_ATTRIBUTE.items():
@@ -336,7 +340,9 @@ def _prepopulate_attributes(wsgi_environ):
             attributes["network.protocol.name"] = wsgi_environ["SERVER_PROTOCOL"]
 
     try:
-        attributes["url.full"] = ""
+        url = get_request_url(wsgi_environ, use_x_forwarded_for)
+        query = wsgi_environ.get("QUERY_STRING")
+        attributes["url.full"] = f"{url}?{query}"
     except Exception:
         pass
 
