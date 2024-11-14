@@ -1231,7 +1231,9 @@ class POTelSpan:
             skip_span = False
             if only_if_parent:
                 parent_span_context = get_current_span().get_span_context()
-                skip_span = not parent_span_context.is_valid or parent_span_context.is_remote
+                skip_span = (
+                    not parent_span_context.is_valid or parent_span_context.is_remote
+                )
 
             if skip_span:
                 self._otel_span = INVALID_SPAN
@@ -1400,11 +1402,6 @@ class POTelSpan:
     def sampled(self):
         # type: () -> Optional[bool]
         return self._otel_span.get_span_context().trace_flags.sampled
-
-    @sampled.setter
-    def sampled(self, value):
-        # type: (Optional[bool]) -> None
-        pass
 
     @property
     def op(self):
