@@ -202,7 +202,7 @@ class EventHandler(_BaseHandler):
                 client_options=client_options,
                 mechanism={"type": "logging", "handled": True},
             )
-        elif record.exc_info and record.exc_info[0] is None:
+        elif (record.exc_info and record.exc_info[0] is None) or record.stack_info:
             event = {}
             hint = {}
             with capture_internal_exceptions():
