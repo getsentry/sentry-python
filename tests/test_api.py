@@ -1,6 +1,7 @@
 import pytest
 from unittest import mock
 
+import sentry_sdk
 from sentry_sdk import (
     capture_exception,
     continue_trace,
