@@ -15,6 +15,7 @@ from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
+    _get_query,
     _get_request_data,
     _get_url,
 )
@@ -56,6 +57,14 @@ _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+
+ASGI_SCOPE_PROPERTY_TO_ATTRIBUTE = {
+    "http_version": "network.protocol.version",
+    "method": "http.request.method",
+    "path": "url.path",
+    "scheme": "url.scheme",
+    "type": "network.protocol.name",
+}
 
 
 def _capture_exception(exc, mechanism_type="asgi"):
@@ -213,23 +222,21 @@ class SentryAsgiMiddleware:
                             )
                             if should_trace
                             else nullcontext()
-                        ) as transaction:
-                            if transaction is not None:
-                                logger.debug(
-                                    "[ASGI] Started transaction: %s", transaction
-                                )
-                                transaction.set_tag("asgi.type", ty)
+                        ) as span:
+                            if span is not None:
+                                logger.debug("[ASGI] Started transaction: %s", span)
+                                span.set_tag("asgi.type", ty)
                             try:
 
                                 async def _sentry_wrapped_send(event):
                                     # type: (Dict[str, Any]) -> Any
                                     is_http_response = (
                                         event.get("type") == "http.response.start"
-                                        and transaction is not None
+                                        and span is not None
                                         and "status" in event
                                     )
                                     if is_http_response:
-                                        transaction.set_http_status(event["status"])
+                                        span.set_http_status(event["status"])
 
                                     return await send(event)
 
@@ -328,12 +335,31 @@ class SentryAsgiMiddleware:
 
 def _prepopulate_attributes(scope):
     # type: (Any) -> dict[str, Any]
-    """Unpack asgi_scope into serializable attributes."""
+    """Unpack ASGI scope into serializable OTel attributes."""
     scope = scope or {}
 
     attributes = {}
-    for attr in ("endpoint", "path", "root_path", "route", "scheme", "server", "type"):
+    for attr, key in ASGI_SCOPE_PROPERTY_TO_ATTRIBUTE.items():
         if scope.get(attr):
-            attributes[f"asgi_scope.{attr}"] = scope[attr]
+            attributes[key] = scope[attr]
+
+    for attr in ("client", "server"):
+        if scope.get(attr):
+            try:
+                host, port = scope[attr]
+                attributes[f"{attr}.address"] = host
+                attributes[f"{attr}.port"] = port
+            except Exception:
+                pass
+
+    try:
+        full_url = _get_url(scope)
+        query = _get_query(scope)
+        if query:
+            full_url = f"{full_url}?{query}"
+
+        attributes["url.full"] = full_url
+    except Exception:
+        pass
 
     return attributes
