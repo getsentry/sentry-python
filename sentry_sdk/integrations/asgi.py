@@ -209,7 +209,7 @@ class SentryAsgiMiddleware:
                                 name=transaction_name,
                                 source=transaction_source,
                                 origin=self.span_origin,
-                                custom_sampling_context={"asgi_scope": scope},
+                                attributes=_prepopulate_attributes(scope),
                             )
                             if should_trace
                             else nullcontext()
@@ -324,3 +324,16 @@ class SentryAsgiMiddleware:
             return name, source
 
         return name, source
+
+
+def _prepopulate_attributes(scope):
+    # type: (Any) -> dict[str, Any]
+    """Unpack asgi_scope into serializable attributes."""
+    scope = scope or {}
+
+    attributes = {}
+    for attr in ("endpoint", "path", "root_path", "route", "scheme", "server", "type"):
+        if scope.get(attr):
+            attributes[f"asgi_scope.{attr}"] = scope[attr]
+
+    return attributes
