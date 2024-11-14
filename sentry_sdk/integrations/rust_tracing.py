@@ -205,9 +205,18 @@ class RustTracingLayer:
         else:
             sentry_span = scope.start_span(**kwargs)
 
+        send_sensitive_data = (
+            should_send_default_pii()
+            if self.send_sensitive_data is None
+            else self.send_sensitive_data
+        )
+
         fields = metadata.get("fields", [])
         for field in fields:
-            sentry_span.set_data(field, attrs.get(field))
+            if send_sensitive_data:
+                sentry_span.set_data(field, attrs.get(field))
+            else:
+                sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
 
         scope.span = sentry_span
         return (parent_sentry_span, sentry_span)

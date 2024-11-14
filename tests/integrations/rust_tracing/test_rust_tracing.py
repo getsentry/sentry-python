@@ -1,3 +1,4 @@
+from unittest import mock
 import pytest
 
 from string import Template
@@ -66,7 +67,9 @@ class FakeRustTracing:
 def test_on_new_span_on_close(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test_on_new_span_on_close", rust_tracing.set_layer_impl
+        "test_on_new_span_on_close",
+        initializer=rust_tracing.set_layer_impl,
+        send_sensitive_data=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -105,7 +108,9 @@ def test_on_new_span_on_close(sentry_init, capture_events):
 def test_nested_on_new_span_on_close(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test_nested_on_new_span_on_close", rust_tracing.set_layer_impl
+        "test_nested_on_new_span_on_close",
+        initializer=rust_tracing.set_layer_impl,
+        send_sensitive_data=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -331,7 +336,10 @@ def test_span_filter(sentry_init, capture_events):
 
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test_span_filter", rust_tracing.set_layer_impl, span_filter=span_filter
+        "test_span_filter",
+        initializer=rust_tracing.set_layer_impl,
+        span_filter=span_filter,
+        send_sensitive_data=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -391,6 +399,7 @@ def test_record_in_ignored_span(sentry_init):
         "test_record_in_ignored_span",
         rust_tracing.set_layer_impl,
         span_filter=span_filter,
+        send_sensitive_data=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -438,13 +447,29 @@ def test_sensitive_data(
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         span_before_record = sentry_sdk.get_current_span().to_json()
-        assert span_before_record["data"]["version"] is None
+        if sensitive_data_expected:
+            assert span_before_record["data"]["version"] is None
+        else:
+            assert span_before_record["data"]["version"] == "[Filtered]"
 
         rust_tracing.record(3)
 
         span_after_record = sentry_sdk.get_current_span().to_json()
 
         if sensitive_data_expected:
-            assert span_after_record["data"]["version"] == "memoized"
+            assert span_after_record["data"] == {
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+                "use_memoized": True,
+                "version": "memoized",
+                "index": 10,
+            }
+
         else:
-            assert span_after_record["data"]["version"] == "[Filtered]"
+            assert span_after_record["data"] == {
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+                "use_memoized": "[Filtered]",
+                "version": "[Filtered]",
+                "index": "[Filtered]",
+            }
