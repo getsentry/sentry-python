@@ -20,6 +20,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
+- The `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore for ASGI frameworks. Instead, the individual properties, if available, are accessible as `asgi_scope.endpoint`, `asgi_scope.path`, `asgi_scope.root_path`, `asgi_scope.route`, `asgi_scope.scheme`, `asgi_scope.server` and `asgi_scope.type`.
 
 ### Removed
 

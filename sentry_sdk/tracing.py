@@ -1250,6 +1250,7 @@ class POTelSpan:
                 # Prepopulate some attrs so that they're accessible in traces_sampler
                 attributes = attributes or {}
                 attributes[SentrySpanAttribute.OP] = op
+                attributes[SentrySpanAttribute.SOURCE] = source
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
@@ -1260,7 +1261,6 @@ class POTelSpan:
                 self.origin = origin or DEFAULT_SPAN_ORIGIN
                 self.description = description
                 self.name = span_name
-                self.source = source
 
                 if status is not None:
                     self.set_status(status)
