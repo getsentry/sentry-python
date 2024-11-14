@@ -21,6 +21,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `sentry_sdk.init` now returns `None` instead of a context manager.
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
 - The `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore for WSGI frameworks. Instead, the individual properties are accessible as `wsgi_environ.PATH_INFO`... If you need more data accessible in the `traces_sampler`, provide additional `attributes` to your `start_span`. # TODO
+- The `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore for ASGI frameworks. Instead, the individual properties on the scope, if available, are accessible as follows:
+
+  | Scope property | Sampling context key(s)         |
+  | -------------- | ------------------------------- |
+  | `type`         | `network.protocol.name`         |
+  | `scheme`       | `url.scheme`                    |
+  | `path`         | `url.path`                      |
+  | `http_version` | `network.protocol.version`      |
+  | `method`       | `http.request.method`           |
+  | `server`       | `server.address`, `server.port` |
+  | `client`       | `client.address`, `client.port` |
+  | full URL       | `url.full`                      |
 
 ### Removed
 
