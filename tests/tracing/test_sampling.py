@@ -182,8 +182,13 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
     sentry_init(traces_sample_rate=0.5)
     mock_random_value = 0.25 if parent_sampling_decision is False else 0.75
 
+    sentry_trace_header = (
+        "12312012123120121231201212312012-1121201211212012-{sampled}".format(
+            sampled=int(parent_sampling_decision)
+        )
+    )
     with mock.patch.object(random, "random", return_value=mock_random_value):
-        with start_span(name="catpark", sampled=parent_sampling_decision):
+        with sentry_sdk.continue_trace({"sentry-trace": sentry_trace_header}):
             with start_span(name="dogpark") as span:
                 pass
 
