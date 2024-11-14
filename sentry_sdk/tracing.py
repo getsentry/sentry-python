@@ -1228,9 +1228,11 @@ class POTelSpan:
         if otel_span is not None:
             self._otel_span = otel_span
         else:
-            skip_span = (
-                only_if_parent and not get_current_span().get_span_context().is_valid
-            )
+            skip_span = False
+            if only_if_parent:
+                parent_span_context = get_current_span().get_span_context()
+                skip_span = not parent_span_context.is_valid or parent_span_context.is_remote
+
             if skip_span:
                 self._otel_span = INVALID_SPAN
             else:
