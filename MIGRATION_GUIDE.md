@@ -32,6 +32,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `scheme`         | `url.scheme`                    |
   | full URL         | `url.full`                      |
 
+- If you're using the Tornado integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `tornado_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+
+  | Request property | Sampling context key(s)                             |
+  | ---------------- | --------------------------------------------------- |
+  | `path`           | `url.path`                                          |
+  | `query`          | `url.query`                                         |
+  | `protocol`       | `url.scheme`                                        |
+  | `method`         | `http.request.method`                               |
+  | `host`           | `server.address`, `server.port`                     |
+  | `version`        | `network.protocol.name`, `network.protocol.version` |
+  | full URL         | `url.full`                                          |
+
 - If you're using the generic WSGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore. Instead, the individual properties of the environment are accessible, if available, as follows:
 
   | Env property      | Sampling context key(s)                           |
