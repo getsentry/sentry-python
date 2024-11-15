@@ -1253,8 +1253,10 @@ class POTelSpan:
 
                 # Prepopulate some attrs so that they're accessible in traces_sampler
                 attributes = attributes or {}
-                attributes[SentrySpanAttribute.OP] = op
-                attributes[SentrySpanAttribute.SOURCE] = source
+                if op is not None:
+                    attributes[SentrySpanAttribute.OP] = op
+                if source is not None:
+                    attributes[SentrySpanAttribute.SOURCE] = source
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
