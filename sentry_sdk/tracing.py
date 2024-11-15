@@ -1404,6 +1404,19 @@ class POTelSpan:
         return self._otel_span.get_span_context().trace_flags.sampled
 
     @property
+    def sample_rate(self):
+        # type: () -> Optional[float]
+        from sentry_sdk.integrations.opentelemetry.consts import (
+            TRACESTATE_SAMPLE_RATE_KEY,
+        )
+
+        sample_rate = self._otel_span.get_span_context().trace_state.get(
+            TRACESTATE_SAMPLE_RATE_KEY
+        )
+        sample_rate = cast("Optional[str]", sample_rate)
+        return float(sample_rate) if sample_rate is not None else None
+
+    @property
     def op(self):
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
