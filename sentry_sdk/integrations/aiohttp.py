@@ -389,7 +389,7 @@ def _prepopulate_attributes(request):
         attributes["server.address"] = request.host
 
     try:
-        url = f"{request.scheme}: //{request.host}{request.path}"
+        url = f"{request.scheme}://{request.host}{request.path}"
         if request.query_string:
             attributes["url.full"] = f"{url}?{request.query_string}"
     except Exception:
