@@ -1,3 +1,4 @@
+from unittest import mock
 import pytest
 
 from string import Template
@@ -66,7 +67,9 @@ class FakeRustTracing:
 def test_on_new_span_on_close(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test_on_new_span_on_close", rust_tracing.set_layer_impl
+        "test_on_new_span_on_close",
+        initializer=rust_tracing.set_layer_impl,
+        include_tracing_fields=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -105,7 +108,9 @@ def test_on_new_span_on_close(sentry_init, capture_events):
 def test_nested_on_new_span_on_close(sentry_init, capture_events):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test_nested_on_new_span_on_close", rust_tracing.set_layer_impl
+        "test_nested_on_new_span_on_close",
+        initializer=rust_tracing.set_layer_impl,
+        include_tracing_fields=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -331,7 +336,10 @@ def test_span_filter(sentry_init, capture_events):
 
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
-        "test_span_filter", rust_tracing.set_layer_impl, span_filter=span_filter
+        "test_span_filter",
+        initializer=rust_tracing.set_layer_impl,
+        span_filter=span_filter,
+        include_tracing_fields=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -365,7 +373,7 @@ def test_record(sentry_init):
     integration = RustTracingIntegration(
         "test_record",
         initializer=rust_tracing.set_layer_impl,
-        send_sensitive_data=True,
+        include_tracing_fields=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -391,6 +399,7 @@ def test_record_in_ignored_span(sentry_init):
         "test_record_in_ignored_span",
         rust_tracing.set_layer_impl,
         span_filter=span_filter,
+        include_tracing_fields=True,
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
@@ -409,7 +418,7 @@ def test_record_in_ignored_span(sentry_init):
 
 
 @pytest.mark.parametrize(
-    "send_default_pii, send_sensitive_data, sensitive_data_expected",
+    "send_default_pii, include_tracing_fields, tracing_fields_expected",
     [
         (True, True, True),
         (True, False, False),
@@ -419,14 +428,14 @@ def test_record_in_ignored_span(sentry_init):
         (False, None, False),
     ],
 )
-def test_sensitive_data(
-    sentry_init, send_default_pii, send_sensitive_data, sensitive_data_expected
+def test_include_tracing_fields(
+    sentry_init, send_default_pii, include_tracing_fields, tracing_fields_expected
 ):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_record",
         initializer=rust_tracing.set_layer_impl,
-        send_sensitive_data=send_sensitive_data,
+        include_tracing_fields=include_tracing_fields,
     )
 
     sentry_init(
@@ -438,13 +447,29 @@ def test_sensitive_data(
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         span_before_record = sentry_sdk.get_current_span().to_json()
-        assert span_before_record["data"]["version"] is None
+        if tracing_fields_expected:
+            assert span_before_record["data"]["version"] is None
+        else:
+            assert span_before_record["data"]["version"] == "[Filtered]"
 
         rust_tracing.record(3)
 
         span_after_record = sentry_sdk.get_current_span().to_json()
 
-        if sensitive_data_expected:
-            assert span_after_record["data"]["version"] == "memoized"
+        if tracing_fields_expected:
+            assert span_after_record["data"] == {
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+                "use_memoized": True,
+                "version": "memoized",
+                "index": 10,
+            }
+
         else:
-            assert span_after_record["data"]["version"] == "[Filtered]"
+            assert span_after_record["data"] == {
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+                "use_memoized": "[Filtered]",
+                "version": "[Filtered]",
+                "index": "[Filtered]",
+            }
