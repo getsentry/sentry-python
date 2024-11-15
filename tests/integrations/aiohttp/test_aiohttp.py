@@ -313,6 +313,7 @@ async def test_traces_sampler_gets_attributes_in_sampling_context(
 
     assert traces_sampler.call_count == 1
     sampling_context = traces_sampler.call_args.args[0]
+    assert isinstance(sampling_context, dict)
     assert re.match(
         r"http:\/\/127\.0\.0\.1:[0-9]{4,5}\/tricks\/kangaroo\?jump=high",
         sampling_context["url.full"],
