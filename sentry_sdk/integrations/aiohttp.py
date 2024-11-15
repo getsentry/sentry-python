@@ -65,6 +65,13 @@ if TYPE_CHECKING:
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 
+REQUEST_PROPERTY_TO_ATTRIBUTE = {
+    "query_string": "url.query",
+    "method": "http.request.method",
+    "scheme": "url.scheme",
+    "path": "url.path",
+}
+
 
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
@@ -127,19 +134,19 @@ class AioHttpIntegration(Integration):
 
                     headers = dict(request.headers)
                     with sentry_sdk.continue_trace(headers):
-                        with sentry_sdk.start_transaction(
+                        with sentry_sdk.start_span(
                             op=OP.HTTP_SERVER,
                             # If this transaction name makes it to the UI, AIOHTTP's
                             # URL resolver did not find a route or died trying.
                             name="generic AIOHTTP request",
                             source=TRANSACTION_SOURCE_ROUTE,
                             origin=AioHttpIntegration.origin,
-                            custom_sampling_context={"aiohttp_request": request},
-                        ) as transaction:
+                            attributes=_prepopulate_attributes(request),
+                        ) as span:
                             try:
                                 response = await old_handle(self, request)
                             except HTTPException as e:
-                                transaction.set_http_status(e.status_code)
+                                span.set_http_status(e.status_code)
 
                                 if (
                                     e.status_code
@@ -149,14 +156,14 @@ class AioHttpIntegration(Integration):
 
                                 raise
                             except (asyncio.CancelledError, ConnectionResetError):
-                                transaction.set_status(SPANSTATUS.CANCELLED)
+                                span.set_status(SPANSTATUS.CANCELLED)
                                 raise
                             except Exception:
                                 # This will probably map to a 500 but seems like we
                                 # have no way to tell. Do not set span status.
                                 reraise(*_capture_exception())
 
-                            transaction.set_http_status(response.status)
+                            span.set_http_status(response.status)
                             return response
 
         Application._handle = sentry_app_handle
@@ -363,3 +370,30 @@ def get_aiohttp_request_data(request):
 
     # request has no body
     return None
+
+
+def _prepopulate_attributes(request):
+    # type: (Request) -> dict[str, Any]
+    """Construct initial span attributes that can be used in traces sampler."""
+    attributes = {}
+
+    for prop, attr in REQUEST_PROPERTY_TO_ATTRIBUTE.items():
+        if getattr(request, prop, None) is not None:
+            attributes[attr] = getattr(request, prop)
+
+    if getattr(request, "host", None) is not None:
+        try:
+            host, port = request.host.split(":")
+            attributes["server.address"] = host
+            attributes["server.port"] = port
+        except ValueError:
+            attributes["server.address"] = request.host
+
+    try:
+        url = f"{request.scheme}://{request.host}{request.path}"
+        if request.query_string:
+            attributes["url.full"] = f"{url}?{request.query_string}"
+    except Exception:
+        pass
+
+    return attributes
