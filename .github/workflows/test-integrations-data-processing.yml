@@ -34,7 +34,7 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -120,7 +120,7 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -193,7 +193,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Data Processing tests passed
+    name: All pinned Data Processing tests passed
     needs: test-data_processing-pinned
     # Always run this, even if a dependent job failed
     if: always()

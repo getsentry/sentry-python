@@ -1,5 +1,5 @@
   check_required_tests:
-    name: All {{ group }} tests passed
+    name: All pinned {{ group }} tests passed
     {% if "pinned" in categories %}
     needs: test-{{ group | replace(" ", "_") | lower }}-pinned
     {% endif %}
