@@ -480,13 +480,10 @@ class Scope:
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
         """
-        Returns the Dynamic Sampling Context from the Propagation Context.
+        Returns the Dynamic Sampling Context from the baggage or populates one.
         """
-        return (
-            self._propagation_context.dynamic_sampling_context
-            if self._propagation_context
-            else None
-        )
+        baggage = self.get_baggage()
+        return baggage.dynamic_sampling_context() if baggage else None
 
     def get_traceparent(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[str]
