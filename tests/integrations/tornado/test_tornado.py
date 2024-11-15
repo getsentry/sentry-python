@@ -476,6 +476,4 @@ def test_attributes_in_traces_sampler(tornado_testcase, sentry_init):
     )
 
     client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
-    client.fetch(
-        "/hi?foo=bar", headers={"Cookie": "name=value; name2=value2; name3=value3"}
-    )
+    client.fetch("/hi?foo=bar")
