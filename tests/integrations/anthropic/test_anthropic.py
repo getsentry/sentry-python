@@ -1,5 +1,7 @@
 from unittest import mock
 
+from sentry_sdk.integrations import DidNotEnable
+
 try:
     from unittest.mock import AsyncMock
 except ImportError:
@@ -518,9 +520,8 @@ def test_streaming_create_message_with_input_json_delta(
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
         assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"text": "", "type": "text"}
-        ]  # we do not record InputJSONDelta because it could contain PII
-
+            {"text": "{'location': 'San Francisco, CA'}", "type": "text"}
+        ]
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
@@ -814,3 +815,22 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init):
         assert span.get_measurement("ai_prompt_tokens_used")["value"] == 10
         assert span.get_measurement("ai_completion_tokens_used")["value"] == 20
         assert span.get_measurement("ai_total_tokens_used")["value"] == 30
+
+
+def test_unsupported_anthropic_version(sentry_init):
+    with mock.patch(
+        "sentry_sdk.integrations.anthropic.package_version", return_value=(0, 15, 0)
+    ):
+        with pytest.raises(DidNotEnable):
+            sentry_init(
+                integrations=[AnthropicIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+
+def test_no_version_info(sentry_init):
+    with mock.patch(
+        "sentry_sdk.integrations.anthropic.package_version", return_value=None
+    ):
+        with pytest.raises(DidNotEnable):
+            sentry_init(integrations=[AnthropicIntegration()])
