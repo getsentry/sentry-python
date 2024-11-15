@@ -21,7 +21,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
-- The `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore for WSGI frameworks. Instead, the individual properties of the environment are accessible, if available, as follows:
+- If you're using the AIOHTTP integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `aiohttp_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+
+  | Request property | Sampling context key(s)         |
+  | ---------------- | ------------------------------- |
+  | `path`           | `url.path`                      |
+  | `query_string`   | `url.query`                     |
+  | `method`         | `http.request.method`           |
+  | `host`           | `server.address`, `server.port` |
+  | `scheme`         | `url.scheme`                    |
+  | full URL         | `url.full`                      |
+
+- If you're using the generic WSGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore. Instead, the individual properties of the environment are accessible, if available, as follows:
 
   | Env property      | Sampling context key(s)                           |
   | ----------------- | ------------------------------------------------- |
@@ -34,7 +45,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `wsgi.url_scheme` | `url.scheme`                                      |
   | full URL          | `url.full`                                        |
 
-- The `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore for ASGI frameworks. Instead, the individual properties of the scope, if available, are accessible as follows:
+- If you're using the generic ASGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore. Instead, the individual properties of the scope, if available, are accessible as follows:
 
   | Scope property | Sampling context key(s)         |
   | -------------- | ------------------------------- |
