@@ -48,6 +48,15 @@ _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
 DEFAULT_TRANSACTION_NAME = "generic WSGI request"
 
+ENVIRON_TO_ATTRIBUTE = {
+    "PATH_INFO": "url.path",
+    "QUERY_STRING": "url.query",
+    "REQUEST_METHOD": "http.request.method",
+    "SERVER_NAME": "server.address",
+    "SERVER_PORT": "server.port",
+    "wsgi.url_scheme": "url.scheme",
+}
+
 
 def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
     # type: (str, str, str) -> str
@@ -311,16 +320,6 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
         return event
 
     return event_processor
-
-
-ENVIRON_TO_ATTRIBUTE = {
-    "PATH_INFO": "url.path",
-    "QUERY_STRING": "url.query",
-    "REQUEST_METHOD": "http.request.method",
-    "SERVER_NAME": "server.address",
-    "SERVER_PORT": "server.port",
-    "wsgi.url_scheme": "url.scheme",
-}
 
 
 def _prepopulate_attributes(wsgi_environ, use_x_forwarded_for=False):
