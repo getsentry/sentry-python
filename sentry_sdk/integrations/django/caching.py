@@ -145,6 +145,7 @@ def should_enable_cache_spans():
         or integration.cache_spans is True
     )
 
+
 def patch_caching():
     # type: () -> None
     if not hasattr(CacheHandler, "_sentry_patched"):
