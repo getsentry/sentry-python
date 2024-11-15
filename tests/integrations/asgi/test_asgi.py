@@ -728,6 +728,7 @@ async def test_asgi_scope_in_traces_sampler(sentry_init, asgi3_app):
     def dummy_traces_sampler(sampling_context):
         assert sampling_context["url.path"] == "/test"
         assert sampling_context["url.scheme"] == "http"
+        assert sampling_context["url.query"] == "hello=there"
         assert sampling_context["url.full"] == "/test?hello=there"
         assert sampling_context["http.request.method"] == "GET"
         assert sampling_context["network.protocol.version"] == "1.1"

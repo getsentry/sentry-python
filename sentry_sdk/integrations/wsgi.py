@@ -48,6 +48,15 @@ _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
 DEFAULT_TRANSACTION_NAME = "generic WSGI request"
 
+ENVIRON_TO_ATTRIBUTE = {
+    "PATH_INFO": "url.path",
+    "QUERY_STRING": "url.query",
+    "REQUEST_METHOD": "http.request.method",
+    "SERVER_NAME": "server.address",
+    "SERVER_PORT": "server.port",
+    "wsgi.url_scheme": "url.scheme",
+}
+
 
 def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
     # type: (str, str, str) -> str
@@ -120,7 +129,9 @@ class SentryWsgiMiddleware:
                                 name=DEFAULT_TRANSACTION_NAME,
                                 source=TRANSACTION_SOURCE_ROUTE,
                                 origin=self.span_origin,
-                                custom_sampling_context={"wsgi_environ": environ},
+                                attributes=_prepopulate_attributes(
+                                    environ, self.use_x_forwarded_for
+                                ),
                             )
                             if should_trace
                             else nullcontext()
@@ -309,3 +320,29 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
         return event
 
     return event_processor
+
+
+def _prepopulate_attributes(wsgi_environ, use_x_forwarded_for=False):
+    """Extract span attributes from the WSGI environment."""
+    attributes = {}
+
+    for property, attr in ENVIRON_TO_ATTRIBUTE.items():
+        if wsgi_environ.get(property) is not None:
+            attributes[attr] = wsgi_environ[property]
+
+    if wsgi_environ.get("SERVER_PROTOCOL") is not None:
+        try:
+            proto, version = wsgi_environ["SERVER_PROTOCOL"].split("/")
+            attributes["network.protocol.name"] = proto
+            attributes["network.protocol.version"] = version
+        except Exception:
+            attributes["network.protocol.name"] = wsgi_environ["SERVER_PROTOCOL"]
+
+    try:
+        url = get_request_url(wsgi_environ, use_x_forwarded_for)
+        query = wsgi_environ.get("QUERY_STRING")
+        attributes["url.full"] = f"{url}?{query}"
+    except Exception:
+        pass
+
+    return attributes
