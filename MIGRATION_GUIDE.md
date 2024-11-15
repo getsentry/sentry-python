@@ -21,13 +21,27 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
-- The `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore for ASGI frameworks. Instead, the individual properties on the scope, if available, are accessible as follows:
+- The `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore for WSGI frameworks. Instead, the individual properties of the environment are accessible, if available, as follows:
+
+  | Env property      | Sampling context key(s)                           |
+  | ----------------- | ------------------------------------------------- |
+  | `PATH_INFO`       | `url.path`                                        |
+  | `QUERY_STRING`    | `url.query`                                       |
+  | `REQUEST_METHOD`  | `http.request.method`                             |
+  | `SERVER_NAME`     | `server.address`                                  |
+  | `SERVER_PORT`     | `server.port`                                     |
+  | `SERVER_PROTOCOL` | `server.protocol.name`, `server.protocol.version` |
+  | `wsgi.url_scheme` | `url.scheme`                                      |
+  | full URL          | `url.full`                                        |
+
+- The `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore for ASGI frameworks. Instead, the individual properties of the scope, if available, are accessible as follows:
 
   | Scope property | Sampling context key(s)         |
   | -------------- | ------------------------------- |
   | `type`         | `network.protocol.name`         |
   | `scheme`       | `url.scheme`                    |
   | `path`         | `url.path`                      |
+  | `query`        | `url.query`                     |
   | `http_version` | `network.protocol.version`      |
   | `method`       | `http.request.method`           |
   | `server`       | `server.address`, `server.port` |
