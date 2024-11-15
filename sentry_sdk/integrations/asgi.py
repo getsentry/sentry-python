@@ -356,6 +356,7 @@ def _prepopulate_attributes(scope):
         full_url = _get_url(scope)
         query = _get_query(scope)
         if query:
+            attributes["url.query"] = query
             full_url = f"{full_url}?{query}"
 
         attributes["url.full"] = full_url
