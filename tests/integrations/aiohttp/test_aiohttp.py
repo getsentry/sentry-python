@@ -1,12 +1,12 @@
 import asyncio
 import json
+import re
 from contextlib import suppress
 from unittest import mock
 
 import pytest
 from aiohttp import web, ClientSession
 from aiohttp.client import ServerDisconnectedError
-from aiohttp.web_request import Request
 from aiohttp.web_exceptions import (
     HTTPInternalServerError,
     HTTPNetworkAuthenticationRequired,
@@ -291,13 +291,12 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_even
 
 
 @pytest.mark.asyncio
-async def test_traces_sampler_gets_request_object_in_sampling_context(
+async def test_traces_sampler_gets_attributes_in_sampling_context(
     sentry_init,
     aiohttp_client,
-    DictionaryContaining,  # noqa: N803
-    ObjectDescribedBy,  # noqa: N803
 ):
-    traces_sampler = mock.Mock()
+    traces_sampler = mock.Mock(return_value=True)
+
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sampler=traces_sampler,
@@ -310,17 +309,20 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
     app.router.add_get("/tricks/kangaroo", kangaroo_handler)
 
     client = await aiohttp_client(app)
-    await client.get("/tricks/kangaroo")
+    await client.get("/tricks/kangaroo?jump=high")
 
-    traces_sampler.assert_any_call(
-        DictionaryContaining(
-            {
-                "aiohttp_request": ObjectDescribedBy(
-                    type=Request, attrs={"method": "GET", "path": "/tricks/kangaroo"}
-                )
-            }
-        )
+    assert traces_sampler.call_count == 1
+    sampling_context = traces_sampler.call_args.args[0]
+    assert re.match(
+        r"http:\/\/127\.0\.0\.1:[0-9]{4,5}\/tricks\/kangaroo\?jump=high",
+        sampling_context["url.full"],
     )
+    assert sampling_context["url.path"] == "/tricks/kangaroo"
+    assert sampling_context["url.query"] == "jump=high"
+    assert sampling_context["url.scheme"] == "http"
+    assert sampling_context["http.request.method"] == "GET"
+    assert sampling_context["server.address"] == "127.0.0.1"
+    assert sampling_context["server.port"].isnumeric()
 
 
 @pytest.mark.asyncio
@@ -574,9 +576,8 @@ async def test_outgoing_trace_headers_append_to_baggage(
         client = await aiohttp_client(raw_server)
         resp = await client.get("/", headers={"bagGage": "custom=value"})
 
-        assert (
-            sorted(resp.request_info.headers["baggage"].split(","))
-            == sorted([
+        assert sorted(resp.request_info.headers["baggage"].split(",")) == sorted(
+            [
                 "custom=value",
                 f"sentry-trace_id={transaction.trace_id}",
                 "sentry-environment=production",
@@ -584,7 +585,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
                 "sentry-transaction=/interactions/other-dogs/new-dog",
                 "sentry-sample_rate=1.0",
                 "sentry-sampled=true",
-            ])
+            ]
         )
 
 
