@@ -151,12 +151,25 @@ class RustTracingLayer:
             [Dict[str, Any]], EventTypeMapping
         ] = default_event_type_mapping,
         span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
-        send_sensitive_data: Optional[bool] = None,
+        include_tracing_fields: Optional[bool] = None,
     ):
         self.origin = origin
         self.event_type_mapping = event_type_mapping
         self.span_filter = span_filter
-        self.send_sensitive_data = send_sensitive_data
+        self.include_tracing_fields = include_tracing_fields
+
+    def _include_tracing_fields(self) -> bool:
+        """
+        By default, the values of tracing fields are not included in case they
+        contain PII. A user may override that by passing `True` for the
+        `include_tracing_fields` keyword argument of this integration or by
+        setting `send_default_pii` to `True` in their Sentry client options.
+        """
+        return (
+            should_send_default_pii()
+            if self.include_tracing_fields is None
+            else self.include_tracing_fields
+        )
 
     def on_event(self, event: str, _span_state: TraceState) -> None:
         deserialized_event = json.loads(event)
@@ -207,7 +220,10 @@ class RustTracingLayer:
 
         fields = metadata.get("fields", [])
         for field in fields:
-            sentry_span.set_data(field, attrs.get(field))
+            if self._include_tracing_fields():
+                sentry_span.set_data(field, attrs.get(field))
+            else:
+                sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
 
         scope.span = sentry_span
         return (parent_sentry_span, sentry_span)
@@ -225,15 +241,9 @@ class RustTracingLayer:
             return
         _parent_sentry_span, sentry_span = span_state
 
-        send_sensitive_data = (
-            should_send_default_pii()
-            if self.send_sensitive_data is None
-            else self.send_sensitive_data
-        )
-
         deserialized_values = json.loads(values)
         for key, value in deserialized_values.items():
-            if send_sensitive_data:
+            if self._include_tracing_fields():
                 sentry_span.set_data(key, value)
             else:
                 sentry_span.set_data(key, SENSITIVE_DATA_SUBSTITUTE)
@@ -259,12 +269,12 @@ class RustTracingIntegration(Integration):
             [Dict[str, Any]], EventTypeMapping
         ] = default_event_type_mapping,
         span_filter: Callable[[Dict[str, Any]], bool] = default_span_filter,
-        send_sensitive_data: Optional[bool] = None,
+        include_tracing_fields: Optional[bool] = None,
     ):
         self.identifier = identifier
         origin = f"auto.function.rust_tracing.{identifier}"
         self.tracing_layer = RustTracingLayer(
-            origin, event_type_mapping, span_filter, send_sensitive_data
+            origin, event_type_mapping, span_filter, include_tracing_fields
         )
 
         initializer(self.tracing_layer)
