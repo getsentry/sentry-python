@@ -381,12 +381,13 @@ def _prepopulate_attributes(request):
         if getattr(request, prop, None) is not None:
             attributes[attr] = getattr(request, prop)
 
-    try:
-        host, port = request.host.split(":")
-        attributes["server.address"] = host
-        attributes["server.port"] = port
-    except ValueError:
-        attributes["server.address"] = request.host
+    if getattr(request, "host", None) is not None:
+        try:
+            host, port = request.host.split(":")
+            attributes["server.address"] = host
+            attributes["server.port"] = port
+        except ValueError:
+            attributes["server.address"] = request.host
 
     try:
         url = f"{request.scheme}://{request.host}{request.path}"
