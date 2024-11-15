@@ -76,7 +76,7 @@ class RqIntegration(Integration):
                         name=transaction_name,
                         source=TRANSACTION_SOURCE_TASK,
                         origin=RqIntegration.origin,
-                        custom_sampling_context={"rq_job": job},
+                        attributes=_prepopulate_attributes(job),
                     ):
                         rv = old_perform_job(self, job, *args, **kwargs)
 
@@ -163,3 +163,11 @@ def _capture_exception(exc_info, **kwargs):
     )
 
     sentry_sdk.capture_event(event, hint=hint)
+
+
+JOB_PROPERTY_TO_ATTRIBUTE = {}
+
+
+def _prepopulate_attributes(job):
+    attributes = {}
+    return attributes
