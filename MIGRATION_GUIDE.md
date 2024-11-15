@@ -41,6 +41,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `type`         | `network.protocol.name`         |
   | `scheme`       | `url.scheme`                    |
   | `path`         | `url.path`                      |
+  | `query`        | `url.query`                     |
   | `http_version` | `network.protocol.version`      |
   | `method`       | `http.request.method`           |
   | `server`       | `server.address`, `server.port` |
