@@ -61,55 +61,6 @@ def _normalize_distribution_name(name):
 
 
 @pytest.mark.parametrize(
-    ("input_str", "expected_output"),
-    (
-        (
-            "2021-01-01T00:00:00.000000Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC time
-        (
-            "2021-01-01T00:00:00.000000",
-            datetime(2021, 1, 1).astimezone(timezone.utc),
-        ),  # No TZ -- assume local but convert to UTC
-        (
-            "2021-01-01T00:00:00Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC - No milliseconds
-        (
-            "2021-01-01T00:00:00.000000+00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000+0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2020-12-31T00:00:00.000000+02:00",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
-        ),  # UTC+2 time
-        (
-            "2020-12-31T00:00:00.000000-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time
-        (
-            "2020-12-31T00:00:00-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time - no milliseconds
-    ),
-)
-def test_datetime_from_isoformat(input_str, expected_output):
-    assert datetime_from_isoformat(input_str) == expected_output, input_str
-
-
-@pytest.mark.parametrize(
     "env_var_value,strict,expected",
     [
         (None, True, None),

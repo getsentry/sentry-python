@@ -27,8 +27,9 @@ from sentry_sdk.integrations.logging import ignore_logger
 
 try:
     from tornado import version_info as TORNADO_VERSION
-    from tornado.web import RequestHandler, HTTPError
     from tornado.gen import coroutine
+    from tornado.httputil import HTTPServerRequest
+    from tornado.web import RequestHandler, HTTPError
 except ImportError:
     raise DidNotEnable("Tornado not installed")
 
@@ -42,6 +43,14 @@ if TYPE_CHECKING:
     from typing import Generator
 
     from sentry_sdk._types import Event, EventProcessor
+
+
+REQUEST_PROPERTY_TO_ATTRIBUTE = {
+    "method": "http.request.method",
+    "path": "url.path",
+    "query": "url.query",
+    "protocol": "url.scheme",
+}
 
 
 class TornadoIntegration(Integration):
@@ -124,7 +133,7 @@ def _handle_request_impl(self):
                 name="generic Tornado request",
                 source=TRANSACTION_SOURCE_ROUTE,
                 origin=TornadoIntegration.origin,
-                custom_sampling_context={"tornado_request": self.request},
+                attributes=_prepopulate_attributes(self.request),
             ):
                 yield
 
@@ -218,3 +227,36 @@ class TornadoRequestExtractor(RequestExtractor):
     def size_of_file(self, file):
         # type: (Any) -> int
         return len(file.body or ())
+
+
+def _prepopulate_attributes(request):
+    # type: (HTTPServerRequest) -> dict[str, Any]
+    # https://www.tornadoweb.org/en/stable/httputil.html#tornado.httputil.HTTPServerRequest
+    attributes = {}
+
+    for prop, attr in REQUEST_PROPERTY_TO_ATTRIBUTE.items():
+        if getattr(request, prop, None) is not None:
+            attributes[attr] = getattr(request, prop)
+
+    if getattr(request, "version", None):
+        try:
+            proto, version = request.version.split("/")
+            attributes["network.protocol.name"] = proto
+            attributes["network.protocol.version"] = version
+        except ValueError:
+            attributes["network.protocol.name"] = request.version
+
+    if getattr(request, "host", None) is not None:
+        try:
+            address, port = request.host.split(":")
+            attributes["server.address"] = address
+            attributes["server.port"] = port
+        except ValueError:
+            attributes["server.address"] = request.host
+
+    try:
+        attributes["url.full"] = request.full_url()
+    except Exception:
+        pass
+
+    return attributes

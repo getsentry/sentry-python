@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 
@@ -450,3 +451,29 @@ def test_span_origin(tornado_testcase, sentry_init, capture_events):
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.tornado"
+
+
+def test_attributes_in_traces_sampler(tornado_testcase, sentry_init):
+    def traces_sampler(sampling_context):
+        assert sampling_context["url.query"] == "foo=bar"
+        assert sampling_context["url.path"] == "/hi"
+        assert sampling_context["url.scheme"] == "http"
+        assert re.match(
+            r"http:\/\/127\.0\.0\.1:[0-9]{4,5}\/hi\?foo=bar",
+            sampling_context["url.full"],
+        )
+        assert sampling_context["http.request.method"] == "GET"
+        assert sampling_context["server.address"] == "127.0.0.1"
+        assert sampling_context["server.port"].isnumeric()
+        assert sampling_context["network.protocol.name"] == "HTTP"
+        assert sampling_context["network.protocol.version"] == "1.1"
+
+        return True
+
+    sentry_init(
+        integrations=[TornadoIntegration],
+        traces_sampler=traces_sampler,
+    )
+
+    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
+    client.fetch("/hi?foo=bar")
