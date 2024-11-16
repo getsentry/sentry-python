@@ -816,38 +816,7 @@ def single_exception_from_error_tuple(
         if not full_stack:
             new_frames = frames
         else:
-            # Add the missing frames from full_stack
-            frame_ids = {
-                (
-                    frame["abs_path"],
-                    frame["context_line"],
-                    frame["lineno"],
-                    frame["function"],
-                )
-                for frame in frames
-            }
-
-            new_frames = [
-                stackframe
-                for stackframe in full_stack
-                if (
-                    stackframe["abs_path"],
-                    stackframe["context_line"],
-                    stackframe["lineno"],
-                    stackframe["function"],
-                )
-                not in frame_ids
-            ]
-            new_frames.extend(frames)
-
-            # Limit the number of frames
-            max_stack_frames = (
-                client_options.get("max_stack_frames", DEFAULT_MAX_STACK_FRAMES)
-                if client_options
-                else None
-            )
-            if max_stack_frames is not None:
-                new_frames = new_frames[:max_stack_frames]
+            new_frames = merge_stack_frames(frames, full_stack, client_options)
 
         exception_value["stacktrace"] = {"frames": new_frames}
 
@@ -1175,6 +1144,46 @@ def get_full_stack():
     stack_info.reverse()
 
     return stack_info
+
+
+def merge_stack_frames(frames, full_stack, client_options):
+    # type: (List[Dict[str, Any]], List[Dict[str, Any]], Optional[Dict[str, Any]]) -> List[Dict[str, Any]]
+    """
+    Add the missing frames from full_stack to frames and return the merged list.
+    """
+    frame_ids = {
+        (
+            frame["abs_path"],
+            frame["context_line"],
+            frame["lineno"],
+            frame["function"],
+        )
+        for frame in frames
+    }
+
+    new_frames = [
+        stackframe
+        for stackframe in full_stack
+        if (
+            stackframe["abs_path"],
+            stackframe["context_line"],
+            stackframe["lineno"],
+            stackframe["function"],
+        )
+        not in frame_ids
+    ]
+    new_frames.extend(frames)
+
+    # Limit the number of frames
+    max_stack_frames = (
+        client_options.get("max_stack_frames", DEFAULT_MAX_STACK_FRAMES)
+        if client_options
+        else None
+    )
+    if max_stack_frames is not None:
+        new_frames = new_frames[:max_stack_frames]
+
+    return new_frames
 
 
 def event_from_exception(
