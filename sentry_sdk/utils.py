@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
-import traceback
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
 try:
