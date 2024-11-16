@@ -1181,7 +1181,7 @@ def merge_stack_frames(frames, full_stack, client_options):
         else None
     )
     if max_stack_frames is not None:
-        new_frames = new_frames[:max_stack_frames]
+        new_frames = new_frames[len(new_frames) - max_stack_frames :]
 
     return new_frames
 
