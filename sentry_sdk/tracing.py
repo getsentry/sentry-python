@@ -43,6 +43,8 @@ if TYPE_CHECKING:
 
     from typing_extensions import TypedDict, Unpack
 
+    from opentelemetry.utils import types as OTelSpanAttributes
+
     P = ParamSpec("P")
     R = TypeVar("R")
 
@@ -1202,10 +1204,12 @@ class POTelSpan:
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
+        sampled=None,  # type: Optional[bool]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
+        attributes=None,  # type: OTelSpanAttributes
         only_if_parent=False,  # type: bool
         otel_span=None,  # type: Optional[OtelSpan]
         **_,  # type: dict[str, object]
@@ -1224,12 +1228,19 @@ class POTelSpan:
         if otel_span is not None:
             self._otel_span = otel_span
         else:
-            skip_span = (
-                only_if_parent and not get_current_span().get_span_context().is_valid
-            )
+            skip_span = False
+            if only_if_parent:
+                parent_span_context = get_current_span().get_span_context()
+                skip_span = (
+                    not parent_span_context.is_valid or parent_span_context.is_remote
+                )
+
             if skip_span:
                 self._otel_span = INVALID_SPAN
             else:
+                from sentry_sdk.integrations.opentelemetry.consts import (
+                    SentrySpanAttribute,
+                )
                 from sentry_sdk.integrations.opentelemetry.utils import (
                     convert_to_otel_timestamp,
                 )
@@ -1239,15 +1250,21 @@ class POTelSpan:
                     start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
                 span_name = name or description or op or ""
+
+                # Prepopulate some attrs so that they're accessible in traces_sampler
+                attributes = attributes or {}
+                attributes[SentrySpanAttribute.OP] = op
+                attributes[SentrySpanAttribute.SOURCE] = source
+                if sampled is not None:
+                    attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
+
                 self._otel_span = tracer.start_span(
-                    span_name, start_time=start_timestamp
+                    span_name, start_time=start_timestamp, attributes=attributes
                 )
 
                 self.origin = origin or DEFAULT_SPAN_ORIGIN
-                self.op = op
                 self.description = description
                 self.name = span_name
-                self.source = source
 
                 if status is not None:
                     self.set_status(status)
@@ -1377,14 +1394,14 @@ class POTelSpan:
         return format_span_id(self._otel_span.get_span_context().span_id)
 
     @property
+    def is_valid(self):
+        # type: () -> bool
+        return self._otel_span.get_span_context().is_valid
+
+    @property
     def sampled(self):
         # type: () -> Optional[bool]
         return self._otel_span.get_span_context().trace_flags.sampled
-
-    @sampled.setter
-    def sampled(self, value):
-        # type: (Optional[bool]) -> None
-        pass
 
     @property
     def op(self):

@@ -497,7 +497,11 @@ class Scope:
         client = self.get_client()
 
         # If we have an active span, return traceparent from there
-        if has_tracing_enabled(client.options) and self.span is not None:
+        if (
+            has_tracing_enabled(client.options)
+            and self.span is not None
+            and self.span.is_valid
+        ):
             return self.span.to_traceparent()
 
         # If this scope has a propagation context, return traceparent from there
@@ -521,7 +525,11 @@ class Scope:
         client = self.get_client()
 
         # If we have an active span, return baggage from there
-        if has_tracing_enabled(client.options) and self.span is not None:
+        if (
+            has_tracing_enabled(client.options)
+            and self.span is not None
+            and self.span.is_valid
+        ):
             return self.span.to_baggage()
 
         # If this scope has a propagation context, return baggage from there
@@ -610,7 +618,7 @@ class Scope:
         span = kwargs.pop("span", None)
         span = span or self.span
 
-        if has_tracing_enabled(client.options) and span is not None:
+        if has_tracing_enabled(client.options) and span is not None and span.is_valid:
             for header in span.iter_headers():
                 yield header
         else:
@@ -946,9 +954,7 @@ class Scope:
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
 
-    def start_transaction(
-        self, transaction=None, custom_sampling_context=None, **kwargs
-    ):
+    def start_transaction(self, transaction=None, **kwargs):
         # type: (Optional[Transaction], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
@@ -974,7 +980,6 @@ class Scope:
 
         :param transaction: The transaction to start. If omitted, we create and
             start a new transaction.
-        :param custom_sampling_context: The transaction's custom sampling context.
         :param kwargs: Optional keyword arguments to be passed to the Transaction
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
             available arguments.
@@ -985,8 +990,6 @@ class Scope:
 
         try_autostart_continuous_profiler()
 
-        custom_sampling_context = custom_sampling_context or {}
-
         # if we haven't been given a transaction, make one
         transaction = Transaction(**kwargs)
 
@@ -996,7 +999,6 @@ class Scope:
             "transaction_context": transaction.to_json(),
             "parent_sampled": transaction.parent_sampled,
         }
-        sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
         if transaction.sampled:
@@ -1317,7 +1319,11 @@ class Scope:
 
         # Add "trace" context
         if contexts.get("trace") is None:
-            if has_tracing_enabled(options) and self._span is not None:
+            if (
+                has_tracing_enabled(options)
+                and self._span is not None
+                and self._span.is_valid
+            ):
                 contexts["trace"] = self._span.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()

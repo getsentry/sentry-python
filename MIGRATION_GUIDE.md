@@ -10,7 +10,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - The SDK now supports Python 3.7 and higher.
 - `sentry_sdk.start_span` now only takes keyword arguments.
-- `sentry_sdk.start_span` no longer takes an explicit `span` argument.
+- `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
+- You can no longer change the sampled status of a span with `span.sampled = False` after starting it.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
@@ -19,11 +20,62 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Redis integration: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
+- The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
+- If you're using the AIOHTTP integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `aiohttp_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+
+  | Request property | Sampling context key(s)         |
+  | ---------------- | ------------------------------- |
+  | `path`           | `url.path`                      |
+  | `query_string`   | `url.query`                     |
+  | `method`         | `http.request.method`           |
+  | `host`           | `server.address`, `server.port` |
+  | `scheme`         | `url.scheme`                    |
+  | full URL         | `url.full`                      |
+
+- If you're using the Tornado integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `tornado_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+
+  | Request property | Sampling context key(s)                             |
+  | ---------------- | --------------------------------------------------- |
+  | `path`           | `url.path`                                          |
+  | `query`          | `url.query`                                         |
+  | `protocol`       | `url.scheme`                                        |
+  | `method`         | `http.request.method`                               |
+  | `host`           | `server.address`, `server.port`                     |
+  | `version`        | `network.protocol.name`, `network.protocol.version` |
+  | full URL         | `url.full`                                          |
+
+- If you're using the generic WSGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore. Instead, the individual properties of the environment are accessible, if available, as follows:
+
+  | Env property      | Sampling context key(s)                           |
+  | ----------------- | ------------------------------------------------- |
+  | `PATH_INFO`       | `url.path`                                        |
+  | `QUERY_STRING`    | `url.query`                                       |
+  | `REQUEST_METHOD`  | `http.request.method`                             |
+  | `SERVER_NAME`     | `server.address`                                  |
+  | `SERVER_PORT`     | `server.port`                                     |
+  | `SERVER_PROTOCOL` | `server.protocol.name`, `server.protocol.version` |
+  | `wsgi.url_scheme` | `url.scheme`                                      |
+  | full URL          | `url.full`                                        |
+
+- If you're using the generic ASGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore. Instead, the individual properties of the scope, if available, are accessible as follows:
+
+  | Scope property | Sampling context key(s)         |
+  | -------------- | ------------------------------- |
+  | `type`         | `network.protocol.name`         |
+  | `scheme`       | `url.scheme`                    |
+  | `path`         | `url.path`                      |
+  | `query`        | `url.query`                     |
+  | `http_version` | `network.protocol.version`      |
+  | `method`       | `http.request.method`           |
+  | `server`       | `server.address`, `server.port` |
+  | `client`       | `client.address`, `client.port` |
+  | full URL       | `url.full`                      |
 
 ### Removed
 
 - Spans no longer have a `description`. Use `name` instead.
 - Dropped support for Python 3.6.
+- The `custom_sampling_context` parameter of `start_transaction` has been removed. Use `attributes` instead to set key-value pairs of data that should be accessible in the traces sampler. Note that span attributes need to conform to the [OpenTelemetry specification](https://opentelemetry.io/docs/concepts/signals/traces/#attributes), meaning only certain types can be set as values.
 - The PyMongo integration no longer sets tags. The data is still accessible via span attributes.
 - The PyMongo integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
 - `sentry_sdk.metrics` and associated metrics APIs have been removed as Sentry no longer accepts metrics data in this form. See https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics

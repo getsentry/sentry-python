@@ -6,34 +6,33 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import start_span, start_transaction, capture_exception
-from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
 
 
-def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
+def test_sampling_decided_only_for_root_spans(sentry_init):
     sentry_init(traces_sample_rate=0.5)
 
-    with start_transaction(name="hi") as transaction:
-        assert transaction.sampled is not None
+    with start_span(name="outer1") as root_span1:
+        assert root_span1.sampled is not None
 
-        with start_span() as span:
-            assert span.sampled == transaction.sampled
+        with start_span(name="inner") as span:
+            assert span.sampled == root_span1.sampled
 
-    with start_span() as span:
-        assert span.sampled is None
+    with start_span(name="outer2") as root_span2:
+        assert root_span2.sampled is not None
 
 
 @pytest.mark.parametrize("sampled", [True, False])
-def test_nested_transaction_sampling_override(sentry_init, sampled):
+def test_nested_span_sampling_override(sentry_init, sampled):
     sentry_init(traces_sample_rate=1.0)
 
-    with start_transaction(name="outer", sampled=sampled) as outer_transaction:
-        assert outer_transaction.sampled is sampled
-        with start_transaction(
-            name="inner", sampled=(not sampled)
-        ) as inner_transaction:
-            assert inner_transaction.sampled is not sampled
-        assert outer_transaction.sampled is sampled
+    with start_span(name="outer", sampled=sampled) as outer_span:
+        assert outer_span.sampled is sampled
+        with start_span(name="inner", sampled=(not sampled)) as inner_span:
+            # won't work because the child span inherits the sampling decision
+            # from the parent
+            assert inner_span.sampled is sampled
+        assert outer_span.sampled is sampled
 
 
 def test_no_double_sampling(sentry_init, capture_events):
@@ -147,10 +146,17 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
     traces_sampler = mock.Mock(return_value=not parent_sampling_decision)
     sentry_init(traces_sampler=traces_sampler)
 
-    transaction = start_transaction(
-        name="dogpark", parent_sampled=parent_sampling_decision
+    sentry_trace_header = (
+        "12312012123120121231201212312012-1121201211212012-{sampled}".format(
+            sampled=int(parent_sampling_decision)
+        )
     )
-    assert transaction.sampled is not parent_sampling_decision
+
+    with sentry_sdk.continue_trace({"sentry-trace": sentry_trace_header}):
+        with sentry_sdk.start_span(name="dogpark") as span:
+            pass
+
+    assert span.sampled is not parent_sampling_decision
 
 
 @pytest.mark.parametrize("explicit_decision", [True, False])
@@ -176,18 +182,28 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
     sentry_init(traces_sample_rate=0.5)
     mock_random_value = 0.25 if parent_sampling_decision is False else 0.75
 
-    with mock.patch.object(random, "random", return_value=mock_random_value):
-        transaction = start_transaction(
-            name="dogpark", parent_sampled=parent_sampling_decision
+    sentry_trace_header = (
+        "12312012123120121231201212312012-1121201211212012-{sampled}".format(
+            sampled=int(parent_sampling_decision)
         )
-        assert transaction.sampled is parent_sampling_decision
+    )
+    with mock.patch.object(random, "random", return_value=mock_random_value):
+        with sentry_sdk.continue_trace({"sentry-trace": sentry_trace_header}):
+            with start_span(name="dogpark") as span:
+                pass
+
+    assert span.sampled is parent_sampling_decision
 
 
 @pytest.mark.parametrize("parent_sampling_decision", [True, False])
 def test_passes_parent_sampling_decision_in_sampling_context(
     sentry_init, parent_sampling_decision
 ):
-    sentry_init(traces_sample_rate=1.0)
+    def dummy_traces_sampler(sampling_context):
+        assert sampling_context["parent_sampled"] is parent_sampling_decision
+        return 1.0
+
+    sentry_init(traces_sample_rate=1.0, traces_sampler=dummy_traces_sampler)
 
     sentry_trace_header = (
         "12312012123120121231201212312012-1121201211212012-{sampled}".format(
@@ -195,29 +211,18 @@ def test_passes_parent_sampling_decision_in_sampling_context(
         )
     )
 
-    transaction = Transaction.continue_from_headers(
-        headers={"sentry-trace": sentry_trace_header}, name="dogpark"
-    )
-    spy = mock.Mock(wraps=transaction)
-    start_transaction(transaction=spy)
-
-    # there's only one call (so index at 0) and kwargs are always last in a call
-    # tuple (so index at -1)
-    sampling_context = spy._set_initial_sampling_decision.mock_calls[0][-1][
-        "sampling_context"
-    ]
-    assert "parent_sampled" in sampling_context
-    # because we passed in a spy, attribute access requires unwrapping
-    assert sampling_context["parent_sampled"]._mock_wraps is parent_sampling_decision
+    with sentry_sdk.continue_trace({"sentry-trace": sentry_trace_header}):
+        with sentry_sdk.start_span(name="dogpark"):
+            pass
 
 
-def test_passes_custom_samling_context_from_start_transaction_to_traces_sampler(
+def test_passes_attributes_from_start_span_to_traces_sampler(
     sentry_init, DictionaryContaining  # noqa: N803
 ):
     traces_sampler = mock.Mock()
     sentry_init(traces_sampler=traces_sampler)
 
-    start_transaction(custom_sampling_context={"dogs": "yes", "cats": "maybe"})
+    start_transaction(attributes={"dogs": "yes", "cats": "maybe"})
 
     traces_sampler.assert_any_call(
         DictionaryContaining({"dogs": "yes", "cats": "maybe"})

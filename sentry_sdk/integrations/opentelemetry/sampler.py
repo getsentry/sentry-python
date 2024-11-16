@@ -2,7 +2,6 @@ import random
 from typing import cast
 
 from opentelemetry import trace
-
 from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace.span import TraceState
 
@@ -12,6 +11,7 @@ from sentry_sdk.utils import is_valid_sample_rate, logger
 from sentry_sdk.integrations.opentelemetry.consts import (
     TRACESTATE_SAMPLED_KEY,
     TRACESTATE_SAMPLE_RATE_KEY,
+    SentrySpanAttribute,
 )
 
 from typing import TYPE_CHECKING
@@ -114,30 +114,45 @@ class SentrySampler(Sampler):
 
         parent_span_context = trace.get_current_span(parent_context).get_span_context()
 
+        attributes = attributes or {}
+
         # No tracing enabled, thus no sampling
         if not has_tracing_enabled(client.options):
             return dropped_result(parent_span_context, attributes)
 
-        sample_rate = None
+        # parent_span_context.is_valid means this span has a parent, remote or local
+        is_root_span = not parent_span_context.is_valid or parent_span_context.is_remote
 
-        # Check if sampled=True was passed to start_transaction
-        # TODO-anton: Do we want to keep the start_transaction(sampled=True) thing?
+        # Explicit sampled value provided at start_span
+        if attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED) is not None:
+            if is_root_span:
+                sample_rate = float(attributes[SentrySpanAttribute.CUSTOM_SAMPLED])
+                if sample_rate > 0:
+                    return sampled_result(parent_span_context, attributes, sample_rate)
+                else:
+                    return dropped_result(parent_span_context, attributes)
+            else:
+                logger.debug(
+                    f"[Tracing] Ignoring sampled param for non-root span {name}"
+                )
+
+        sample_rate = None
 
         # Check if there is a traces_sampler
         # Traces_sampler is responsible to check parent sampled to have full transactions.
         has_traces_sampler = callable(client.options.get("traces_sampler"))
-        if has_traces_sampler:
-            # TODO-anton: Make proper sampling_context
-            # TODO-neel-potel: Make proper sampling_context
+
+        if is_root_span and has_traces_sampler:
             sampling_context = {
                 "transaction_context": {
                     "name": name,
+                    "op": attributes.get(SentrySpanAttribute.OP),
+                    "source": attributes.get(SentrySpanAttribute.SOURCE),
                 },
                 "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
             }
-
+            sampling_context.update(attributes)
             sample_rate = client.options["traces_sampler"](sampling_context)
-
         else:
             # Check if there is a parent with a sampling decision
             parent_sampled = get_parent_sampled(parent_span_context, trace_id)
@@ -155,8 +170,7 @@ class SentrySampler(Sampler):
             return dropped_result(parent_span_context, attributes)
 
         # Down-sample in case of back pressure monitor says so
-        # TODO: this should only be done for transactions (aka root spans)
-        if client.monitor:
+        if is_root_span and client.monitor:
             sample_rate /= 2**client.monitor.downsample_factor
 
         # Roll the dice on sample rate
