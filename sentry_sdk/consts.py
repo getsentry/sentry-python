@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
 
+DEFAULT_MAX_STACK_FRAMES = 100
+DEFAULT_ADD_FULL_STACK = False
+
 
 # Also needs to be at the top to prevent circular import
 class EndpointType(Enum):
@@ -550,8 +553,8 @@ class ClientConstructor:
         cert_file=None,  # type: Optional[str]
         key_file=None,  # type: Optional[str]
         custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
-        add_full_stack=False,  # type: bool
-        max_stack_frames=50,  # type: Optional[int]
+        add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
+        max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
     ):
         # type: (...) -> None
         pass

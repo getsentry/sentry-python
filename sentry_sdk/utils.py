@@ -26,7 +26,12 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY37
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
+from sentry_sdk.consts import (
+    DEFAULT_ADD_FULL_STACK,
+    DEFAULT_MAX_STACK_FRAMES,
+    DEFAULT_MAX_VALUE_LENGTH,
+    EndpointType,
+)
 
 from typing import TYPE_CHECKING
 
@@ -837,7 +842,9 @@ def single_exception_from_error_tuple(
 
             # Limit the number of frames
             max_stack_frames = (
-                client_options.get("max_stack_frames") if client_options else None
+                client_options.get("max_stack_frames", DEFAULT_MAX_STACK_FRAMES)
+                if client_options
+                else None
             )
             if max_stack_frames is not None:
                 new_frames = new_frames[:max_stack_frames]
@@ -1179,7 +1186,7 @@ def event_from_exception(
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
 
-    if client_options and client_options["add_full_stack"]:
+    if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
         full_stack = get_full_stack()
     else:
         full_stack = None
