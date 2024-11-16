@@ -806,7 +806,7 @@ def single_exception_from_error_tuple(
             custom_repr=custom_repr,
         )
         for tb in iter_stacks(tb)
-    ]
+    ]  # type: List[Dict[str, Any]]
 
     if frames:
         if not full_stack:
@@ -835,6 +835,13 @@ def single_exception_from_error_tuple(
                 not in frame_ids
             ]
             new_frames.extend(frames)
+
+            # Limit the number of frames
+            max_stack_frames = (
+                client_options.get("max_stack_frames") if client_options else None
+            )
+            if max_stack_frames is not None:
+                new_frames = new_frames[:max_stack_frames]
 
         exception_value["stacktrace"] = {"frames": new_frames}
 
@@ -1142,22 +1149,10 @@ def get_full_stack():
     """
     Returns a serialized representation of the full stack from the first frame that is not in sentry_sdk.
     """
-    try:
-        # Raise an exception to capture the current stack
-        raise Exception
-    except:
-        # Get the current stack frame
-        _, _, tb = sys.exc_info()
-
-    # Get the frame one level up (skipping this function's frame)
-    if tb is None:
-        return []
-
-    frame = tb.tb_frame.f_back
-
     stack_info = []
 
     # Walk up the stack
+    frame = sys._getframe(1)  # type: Optional[FrameType]
     while frame:
         in_sdk = False
         try:
@@ -1184,11 +1179,11 @@ def event_from_exception(
     # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
-    full_stack = get_full_stack()
 
-    # TODO: add an option "add_full_stack" to the client options to add the full stack to the event (defaults to True)
-
-    # TODO: add an option "max_stack_frames" to the client options to limit the number of stack frames (defaults to 50?)
+    if client_options and client_options["add_full_stack"]:
+        full_stack = get_full_stack()
+    else:
+        full_stack = None
 
     return (
         {

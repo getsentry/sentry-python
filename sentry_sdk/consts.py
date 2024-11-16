@@ -550,6 +550,8 @@ class ClientConstructor:
         cert_file=None,  # type: Optional[str]
         key_file=None,  # type: Optional[str]
         custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
+        add_full_stack=False,  # type: bool
+        max_stack_frames=50,  # type: Optional[int]
     ):
         # type: (...) -> None
         pass
