@@ -44,6 +44,7 @@ class OpenTelemetryIntegration(Integration):
             "Use at your own risk."
         )
 
+        _setup_scope_context_management()
         _setup_sentry_tracing()
         _patch_readable_span()
         # _setup_instrumentors()
@@ -68,12 +69,15 @@ def _patch_readable_span():
     Span._readable_span = sentry_patched_readable_span
 
 
-def _setup_sentry_tracing():
+def _setup_scope_context_management():
     # type: () -> None
     import opentelemetry.context
 
     opentelemetry.context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
 
+
+def _setup_sentry_tracing():
+    # type: () -> None
     provider = TracerProvider(sampler=SentrySampler())
     provider.add_span_processor(PotelSentrySpanProcessor())
     trace.set_tracer_provider(provider)
