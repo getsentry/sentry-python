@@ -55,7 +55,7 @@ def test_monitor_unhealthy(sentry_init):
         assert monitor.downsample_factor == (i + 1 if i < 10 else 10)
 
 
-def test_transaction_uses_downsample_rate(
+def test_root_span_uses_downsample_rate(
     sentry_init, capture_envelopes, capture_record_lost_event_calls, monkeypatch
 ):
     sentry_init(
@@ -78,16 +78,14 @@ def test_transaction_uses_downsample_rate(
     assert monitor.is_healthy() is False
     assert monitor.downsample_factor == 1
 
-    with sentry_sdk.start_transaction(name="foobar") as transaction:
+    with sentry_sdk.start_span(name="foobar") as root_span:
         with sentry_sdk.start_span(name="foospan"):
             with sentry_sdk.start_span(name="foospan2"):
                 with sentry_sdk.start_span(name="foospan3"):
                     ...
 
-        assert transaction.sampled is False
-        assert (
-            transaction.sample_rate == 0.5
-        )  # TODO: this fails until we put the sample_rate in the POTelSpan
+        assert root_span.sampled is False
+        assert root_span.sample_rate == 0.5
 
     assert len(envelopes) == 0
 
@@ -104,7 +102,7 @@ def test_transaction_uses_downsample_rate(
                 "span",
                 None,
                 1,
-            ),  # Only one span (the transaction itself) is counted, since we did not record any spans in the first place.
+            ),  # Only one span (the root span itself) is counted, since we did not record any spans in the first place.
         ]
     )
 
