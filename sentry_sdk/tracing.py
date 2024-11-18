@@ -1253,8 +1253,10 @@ class POTelSpan:
 
                 # Prepopulate some attrs so that they're accessible in traces_sampler
                 attributes = attributes or {}
-                attributes[SentrySpanAttribute.OP] = op
-                attributes[SentrySpanAttribute.SOURCE] = source
+                if op is not None:
+                    attributes[SentrySpanAttribute.OP] = op
+                if source is not None:
+                    attributes[SentrySpanAttribute.SOURCE] = source
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
@@ -1402,6 +1404,19 @@ class POTelSpan:
     def sampled(self):
         # type: () -> Optional[bool]
         return self._otel_span.get_span_context().trace_flags.sampled
+
+    @property
+    def sample_rate(self):
+        # type: () -> Optional[float]
+        from sentry_sdk.integrations.opentelemetry.consts import (
+            TRACESTATE_SAMPLE_RATE_KEY,
+        )
+
+        sample_rate = self._otel_span.get_span_context().trace_state.get(
+            TRACESTATE_SAMPLE_RATE_KEY
+        )
+        sample_rate = cast("Optional[str]", sample_rate)
+        return float(sample_rate) if sample_rate is not None else None
 
     @property
     def op(self):

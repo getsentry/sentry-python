@@ -3,7 +3,7 @@ from typing import cast
 from datetime import datetime, timezone
 
 from urllib3.util import parse_url as urlparse
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from opentelemetry.trace import (
     Span as AbstractSpan,
     SpanKind,
@@ -354,7 +354,7 @@ def dsc_from_trace_state(trace_state):
     for k, v in trace_state.items():
         if Baggage.SENTRY_PREFIX_REGEX.match(k):
             key = re.sub(Baggage.SENTRY_PREFIX_REGEX, "", k)
-            dsc[key] = v
+            dsc[unquote(key)] = unquote(v)
     return dsc
 
 
