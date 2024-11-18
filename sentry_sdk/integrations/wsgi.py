@@ -119,23 +119,22 @@ class SentryWsgiMiddleware:
                             origin=self.span_origin,
                         )
 
-                    with (
-                        sentry_sdk.start_transaction(
+                    if transaction is not None:
+                        transaction = sentry_sdk.start_transaction(
                             transaction,
                             custom_sampling_context={"wsgi_environ": environ},
                         )
-                        if transaction is not None
-                        else nullcontext()
-                    ):
-                        try:
-                            response = self.app(
-                                environ,
-                                partial(
-                                    _sentry_start_response, start_response, transaction
-                                ),
-                            )
-                        except BaseException:
-                            reraise(*_capture_exception())
+                        transaction.__enter__()
+
+                    try:
+                        response = self.app(
+                            environ,
+                            partial(
+                                _sentry_start_response, start_response, transaction
+                            ),
+                        )
+                    except BaseException:
+                        reraise(*_capture_exception())
         finally:
             _wsgi_middleware_applied.set(False)
 
@@ -143,6 +142,7 @@ class SentryWsgiMiddleware:
             response=response,
             current_scope=current_scope,
             isolation_scope=scope,
+            transaction=transaction,
         )
 
 
@@ -245,11 +245,13 @@ class _ScopedResponse:
         response,  # type: Iterator[bytes]
         current_scope,  # type: sentry_sdk.scope.Scope
         isolation_scope,  # type: sentry_sdk.scope.Scope
+        transaction,  # type: Optional[sentry_sdk.tracing.Transaction]
     ):
         # type: (...) -> None
         self._response = response
         self._current_scope = current_scope
         self._isolation_scope = isolation_scope
+        self._transaction = transaction
 
     def __iter__(self):
         # type: () -> Iterator[bytes]
@@ -273,6 +275,13 @@ class _ScopedResponse:
             with use_scope(self._current_scope):
                 try:
                     self._response.close()  # type: ignore
+
+                    # Close the Sentry transaction
+                    # This is done here to make sure the Transaction stays
+                    # open until all streaming responses are done.
+                    # Of course this here works also for non streaming responses.
+                    if self._transaction is not None:
+                        self._transaction.__exit__(None, None, None)                    
                 except AttributeError:
                     pass
                 except BaseException:
