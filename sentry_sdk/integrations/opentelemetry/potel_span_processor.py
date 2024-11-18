@@ -179,7 +179,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         transaction_name, transaction_source = extract_transaction_name_source(span)
         span_data = extract_span_data(span)
-        (_, description, _, http_status, _) = span_data
+        (_, description, status, http_status, _) = span_data
 
         trace_context = get_trace_context(span, span_data=span_data)
         contexts = {"trace": trace_context}
@@ -240,6 +240,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
                 "origin": origin or DEFAULT_SPAN_ORIGIN,
             }
         )
+
+        if status:
+            span_json.setdefault("tags", {})["status"] = status
 
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id
