@@ -2,7 +2,6 @@ import functools
 
 import sentry_sdk
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
-from sentry_sdk.tracing_utils import finish_running_transaction
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
