@@ -2,6 +2,7 @@ import functools
 
 import sentry_sdk
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import finish_running_transaction
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -139,7 +140,7 @@ class BottleIntegration(Integration):
                     _capture_exception(res, handled=True)
 
                 # Manually close the transaction because Bottle does not call `close()` on the WSGI response
-                sentry_sdk.get_current_scope().transaction.__exit__(None, None, None)
+                finish_running_transaction()
 
                 return res
 

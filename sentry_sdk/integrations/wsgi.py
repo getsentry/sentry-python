@@ -9,10 +9,10 @@ from sentry_sdk.scope import should_send_default_pii, use_isolation_scope, use_s
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
-    nullcontext,
 )
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing_utils import finish_running_transaction
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -262,17 +262,15 @@ class _ScopedResponse:
                     try:
                         chunk = next(iterator)
                     except StopIteration:
+                        # Close the Sentry transaction (it could be that response.close() is never called by the framework)
+                        # This is done here to make sure the Transaction stays
+                        # open until all streaming responses are done.
+                        finish_running_transaction()
                         break
                     except BaseException:
                         reraise(*_capture_exception())
 
             yield chunk
-
-        # Close the Sentry transaction (it could be that response.close() is never called by the framework)
-        # This is done here to make sure the Transaction stays
-        # open until all streaming responses are done.
-        if self._transaction is not None and hasattr(self._transaction, "_context_manager_state"):
-            self._transaction.__exit__(None, None, None)
 
     def close(self):
         # type: () -> None
@@ -284,8 +282,7 @@ class _ScopedResponse:
                     # Close the Sentry transaction
                     # This is done here to make sure the Transaction stays
                     # open until all streaming responses are done.
-                    if self._transaction is not None and hasattr(self._transaction, "_context_manager_state"):
-                        self._transaction.__exit__(None, None, None)
+                    finish_running_transaction()
                 except AttributeError:
                     pass
                 except BaseException:

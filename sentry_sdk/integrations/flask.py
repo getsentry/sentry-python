@@ -7,6 +7,7 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import finish_running_transaction
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -156,7 +157,7 @@ def _request_started(app, **kwargs):
 
 def _request_finished(sender, response, **kwargs):
     # Manually close the transaction because Bottle does not call `close()` on the WSGI response
-    sentry_sdk.get_current_scope().transaction.__exit__(None, None, None)
+    finish_running_transaction()
 
 
 class FlaskRequestExtractor(RequestExtractor):
