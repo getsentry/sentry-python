@@ -90,7 +90,11 @@ class RqIntegration(Integration):
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
             # type: (Worker, Any, *Any, **Any) -> Any
-            retry = hasattr(job, 'retries_left') and job.retries_left and job.retries_left > 0
+            retry = (
+                hasattr(job, "retries_left")
+                and job.retries_left
+                and job.retries_left > 0
+            )
             failed = job._status == JobStatus.FAILED or job.is_failed
             if failed and not retry:
                 _capture_exception(exc_info)
