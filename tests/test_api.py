@@ -9,7 +9,7 @@ from sentry_sdk import (
     get_current_span,
     get_traceparent,
     is_initialized,
-    start_transaction,
+    start_span,
     set_tags,
     get_global_scope,
     get_current_scope,
@@ -43,23 +43,23 @@ def test_get_current_span_current_scope(sentry_init):
 
 
 @pytest.mark.forked
-def test_get_current_span_current_scope_with_transaction(sentry_init):
+def test_get_current_span_current_scope_with_span(sentry_init):
     sentry_init()
 
     assert get_current_span() is None
 
-    with start_transaction() as new_transaction:
-        assert get_current_span() == new_transaction
+    with start_span() as new_span:
+        assert get_current_span() == new_span
 
 
 @pytest.mark.forked
 def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
-    with start_transaction() as transaction:
+    with start_span() as span:
         expected_traceparent = "%s-%s-1" % (
-            transaction.trace_id,
-            transaction.span_id,
+            span.trace_id,
+            span.span_id,
         )
         assert get_traceparent() == expected_traceparent
 
@@ -77,7 +77,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
 
 
 @pytest.mark.forked
-def test_baggage_with_tracing_disabled(sentry_init):
+def test_baggage_with_tracing_disabled(sentry_init, SortedBaggage):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
     expected_baggage = (
@@ -85,43 +85,43 @@ def test_baggage_with_tracing_disabled(sentry_init):
             propagation_context.trace_id
         )
     )
-    assert get_baggage() == expected_baggage
+    assert get_baggage() == SortedBaggage(expected_baggage)
 
 
 @pytest.mark.forked
-def test_baggage_with_tracing_enabled(sentry_init):
+def test_baggage_with_tracing_enabled(sentry_init, SortedBaggage):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
-    with start_transaction() as transaction:
+    with start_span() as span:
         expected_baggage = "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={}".format(
-            transaction.trace_id, "true" if transaction.sampled else "false"
+            span.trace_id, "true" if span.sampled else "false"
         )
-        assert get_baggage() == expected_baggage
+        assert get_baggage() == SortedBaggage(expected_baggage)
 
 
 @pytest.mark.forked
 def test_continue_trace(sentry_init):
-    sentry_init()
+    sentry_init(traces_sample_rate=1.0)
 
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    transaction = continue_trace(
+
+    with continue_trace(
         {
             "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
             "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19",
         },
-        name="some name",
-    )
-    with start_transaction(transaction):
-        assert transaction.name == "some name"
+    ):
+        with start_span(name="some name") as span:
+            assert span.name == "some name"
 
-        propagation_context = get_isolation_scope()._propagation_context
-        assert propagation_context.trace_id == transaction.trace_id == trace_id
-        assert propagation_context.parent_span_id == parent_span_id
-        assert propagation_context.parent_sampled == parent_sampled
-        assert propagation_context.dynamic_sampling_context == {
-            "trace_id": "566e3688a61d4bc888951642d6f14a19"
-        }
+            propagation_context = get_isolation_scope()._propagation_context
+            assert propagation_context.trace_id == span.trace_id == trace_id
+            assert propagation_context.parent_span_id == parent_span_id
+            assert propagation_context.parent_sampled == parent_sampled
+            assert propagation_context.dynamic_sampling_context == {
+                "trace_id": "566e3688a61d4bc888951642d6f14a19"
+            }
 
 
 @pytest.mark.forked

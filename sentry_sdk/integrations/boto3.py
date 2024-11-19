@@ -72,17 +72,23 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
         op=OP.HTTP_CLIENT,
         name=description,
         origin=Boto3Integration.origin,
+        only_if_parent=True,
     )
 
+    data = {
+        SPANDATA.HTTP_METHOD: request.method,
+    }
     with capture_internal_exceptions():
         parsed_url = parse_url(request.url, sanitize=False)
-        span.set_data("aws.request.url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        data["aws.request.url"] = parsed_url.url
+        data[SPANDATA.HTTP_QUERY] = parsed_url.query
+        data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
+    for key, value in data.items():
+        span.set_data(key, value)
 
     span.set_tag("aws.service_id", service_id)
     span.set_tag("aws.operation_name", operation_name)
-    span.set_data(SPANDATA.HTTP_METHOD, request.method)
 
     # We do it in order for subsequent http calls/retries be
     # attached to this span.
@@ -91,6 +97,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     # request.context is an open-ended data-structure
     # where we can add anything useful in request life cycle.
     request.context["_sentrysdk_span"] = span
+    request.context["_sentrysdk_span_data"] = data
 
 
 def _sentry_after_call(context, parsed, **kwargs):
@@ -100,6 +107,15 @@ def _sentry_after_call(context, parsed, **kwargs):
     # Span could be absent if the integration is disabled.
     if span is None:
         return
+
+    span_data = context.pop("_sentrysdk_span_data", {})
+
+    sentry_sdk.add_breadcrumb(
+        type="http",
+        category="httplib",
+        data=span_data,
+    )
+
     span.__exit__(None, None, None)
 
     body = parsed.get("Body")
@@ -143,4 +159,13 @@ def _sentry_after_call_error(context, exception, **kwargs):
     # Span could be absent if the integration is disabled.
     if span is None:
         return
+
+    span_data = context.pop("_sentrysdk_span_data", {})
+
+    sentry_sdk.add_breadcrumb(
+        type="http",
+        category="httplib",
+        data=span_data,
+    )
+
     span.__exit__(type(exception), exception, None)

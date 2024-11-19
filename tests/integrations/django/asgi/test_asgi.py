@@ -104,14 +104,16 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, application):
+async def test_active_thread_id(
+    sentry_init, capture_envelopes, teardown_profiling, endpoint, application
+):
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
     ):
         sentry_init(
             integrations=[DjangoIntegration()],
             traces_sample_rate=1.0,
-            _experiments={"profiles_sample_rate": 1.0},
+            profiles_sample_rate=1.0,
         )
 
         envelopes = capture_envelopes()
@@ -121,17 +123,26 @@ async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, applic
         await comm.wait()
 
         assert response["status"] == 200, response["body"]
-        assert len(envelopes) == 1
 
-        profiles = [item for item in envelopes[0].items if item.type == "profile"]
-        assert len(profiles) == 1
+    assert len(envelopes) == 1
 
-        data = json.loads(response["body"])
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1
 
-        for profile in profiles:
-            transactions = profile.payload.json["transactions"]
-            assert len(transactions) == 1
-            assert str(data["active"]) == transactions[0]["active_thread_id"]
+    data = json.loads(response["body"])
+
+    for item in profiles:
+        transactions = item.payload.json["transactions"]
+        assert len(transactions) == 1
+        assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
+    assert len(transactions) == 1
+
+    for item in transactions:
+        transaction = item.payload.json
+        trace_context = transaction["contexts"]["trace"]
+        assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 @pytest.mark.asyncio

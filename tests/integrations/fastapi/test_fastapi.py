@@ -184,7 +184,7 @@ def test_legacy_setup(
 def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": 1.0},
+        profiles_sample_rate=1.0,
     )
     app = fastapi_app_factory()
     asgi_app = SentryAsgiMiddleware(app)
@@ -203,10 +203,18 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
     profiles = [item for item in envelopes[0].items if item.type == "profile"]
     assert len(profiles) == 1
 
-    for profile in profiles:
-        transactions = profile.payload.json["transactions"]
+    for item in profiles:
+        transactions = item.payload.json["transactions"]
         assert len(transactions) == 1
         assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
+    assert len(transactions) == 1
+
+    for item in transactions:
+        transaction = item.payload.json
+        trace_context = transaction["contexts"]["trace"]
+        assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 @pytest.mark.asyncio
@@ -238,7 +246,6 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
 
 
-@pytest.mark.asyncio
 def test_response_status_code_ok_in_transaction_context(sentry_init, capture_envelopes):
     """
     Tests that the response status code is added to the transaction "response" context.
@@ -267,7 +274,6 @@ def test_response_status_code_ok_in_transaction_context(sentry_init, capture_env
     assert transaction["contexts"]["response"]["status_code"] == 200
 
 
-@pytest.mark.asyncio
 def test_response_status_code_error_in_transaction_context(
     sentry_init,
     capture_envelopes,
@@ -304,7 +310,6 @@ def test_response_status_code_error_in_transaction_context(
     assert transaction["contexts"]["response"]["status_code"] == 500
 
 
-@pytest.mark.asyncio
 def test_response_status_code_not_found_in_transaction_context(
     sentry_init,
     capture_envelopes,

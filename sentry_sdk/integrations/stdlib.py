@@ -94,12 +94,19 @@ def _install_httplib():
             name="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin="auto.http.stdlib.httplib",
+            only_if_parent=True,
         )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
+
+        data = {
+            SPANDATA.HTTP_METHOD: method,
+        }
         if parsed_url is not None:
-            span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            data["url"] = parsed_url.url
+            data[SPANDATA.HTTP_QUERY] = parsed_url.query
+            data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
+        for key, value in data.items():
+            span.set_data(key, value)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
@@ -118,6 +125,7 @@ def _install_httplib():
                 self.putheader(key, value)
 
         self._sentrysdk_span = span  # type: ignore[attr-defined]
+        self._sentrysdk_span_data = data  # type: ignore[attr-defined]
 
         return rv
 
@@ -128,11 +136,23 @@ def _install_httplib():
         if span is None:
             return real_getresponse(self, *args, **kwargs)
 
-        rv = real_getresponse(self, *args, **kwargs)
+        try:
+            rv = real_getresponse(self, *args, **kwargs)
 
-        span.set_http_status(int(rv.status))
-        span.set_data("reason", rv.reason)
-        span.finish()
+            span_data = getattr(self, "_sentrysdk_span_data", {})
+            span_data[SPANDATA.HTTP_STATUS_CODE] = int(rv.status)
+            span_data["reason"] = rv.reason
+
+            sentry_sdk.add_breadcrumb(
+                type="http",
+                category="httplib",
+                data=span_data,
+            )
+
+            span.set_http_status(int(rv.status))
+            span.set_data("reason", rv.reason)
+        finally:
+            span.finish()
 
         return rv
 
@@ -206,6 +226,7 @@ def _install_subprocess():
             op=OP.SUBPROCESS,
             name=description,
             origin="auto.subprocess.stdlib.subprocess",
+            only_if_parent=True,
         ) as span:
             for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
@@ -256,6 +277,7 @@ def _install_subprocess():
         with sentry_sdk.start_span(
             op=OP.SUBPROCESS_WAIT,
             origin="auto.subprocess.stdlib.subprocess",
+            only_if_parent=True,
         ) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_wait(self, *a, **kw)
@@ -270,6 +292,7 @@ def _install_subprocess():
         with sentry_sdk.start_span(
             op=OP.SUBPROCESS_COMMUNICATE,
             origin="auto.subprocess.stdlib.subprocess",
+            only_if_parent=True,
         ) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_communicate(self, *a, **kw)

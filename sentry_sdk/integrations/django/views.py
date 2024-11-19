@@ -37,6 +37,7 @@ def patch_views():
             op=OP.VIEW_RESPONSE_RENDER,
             name="serialize response",
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ):
             return old_render(self)
 
@@ -76,6 +77,10 @@ def _wrap_sync_view(callback):
     @functools.wraps(callback)
     def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
+        current_scope = sentry_sdk.get_current_scope()
+        if current_scope.transaction is not None:
+            current_scope.transaction.update_active_thread()
+
         sentry_scope = sentry_sdk.get_isolation_scope()
         # set the active thread id to the handler thread for sync views
         # this isn't necessary for async views since that runs on main
@@ -86,6 +91,7 @@ def _wrap_sync_view(callback):
             op=OP.VIEW_RENDER,
             name=request.resolver_match.view_name,
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ):
             return callback(request, *args, **kwargs)
 

@@ -12,7 +12,14 @@ from opentelemetry.context import Context
 from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
 from sentry_sdk import capture_event
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
+from sentry_sdk.utils import get_current_thread_meta
+from sentry_sdk.profiler.continuous_profiler import (
+    try_autostart_continuous_profiler,
+    get_profiler_id,
+)
+from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
     convert_from_otel_timestamp,
@@ -20,6 +27,7 @@ from sentry_sdk.integrations.opentelemetry.utils import (
     extract_span_data,
     extract_transaction_name_source,
     get_trace_context,
+    get_profile_context,
     get_sentry_meta,
     set_sentry_meta,
 )
@@ -54,8 +62,11 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
     def on_start(self, span, parent_context=None):
         # type: (Span, Optional[Context]) -> None
-        if not is_sentry_span(span):
-            self._add_root_span(span, get_current_span(parent_context))
+        if is_sentry_span(span):
+            return
+
+        self._add_root_span(span, get_current_span(parent_context))
+        self._start_profile(span)
 
     def on_end(self, span):
         # type: (ReadableSpan) -> None
@@ -93,6 +104,32 @@ class PotelSentrySpanProcessor(SpanProcessor):
         else:
             # root span points to itself
             set_sentry_meta(span, "root_span", span)
+
+    def _start_profile(self, span):
+        # type: (Span) -> None
+        try_autostart_continuous_profiler()
+        profiler_id = get_profiler_id()
+        thread_id, thread_name = get_current_thread_meta()
+
+        if profiler_id:
+            span.set_attribute(SPANDATA.PROFILER_ID, profiler_id)
+        if thread_id:
+            span.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
+        if thread_name:
+            span.set_attribute(SPANDATA.THREAD_NAME, thread_name)
+
+        is_root_span = not span.parent or span.parent.is_remote
+        sampled = span.context and span.context.trace_flags.sampled
+
+        if is_root_span and sampled:
+            # profiler uses time.perf_counter_ns() so we cannot use the
+            # unix timestamp that is on span.start_time
+            # setting it to 0 means the profiler will internally measure time on start
+            profile = Profile(sampled, 0)
+            # TODO-neel-potel sampling context??
+            profile._set_initial_sampling_decision(sampling_context={})
+            profile.__enter__()
+            set_sentry_meta(span, "profile", profile)
 
     def _flush_root_span(self, span):
         # type: (ReadableSpan) -> None
@@ -142,10 +179,14 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         transaction_name, transaction_source = extract_transaction_name_source(span)
         span_data = extract_span_data(span)
-        (_, description, _, http_status, _) = span_data
+        (_, description, status, http_status, _) = span_data
 
         trace_context = get_trace_context(span, span_data=span_data)
         contexts = {"trace": trace_context}
+
+        profile_context = get_profile_context(span)
+        if profile_context:
+            contexts["profile"] = profile_context
 
         if http_status:
             contexts["response"] = {"status_code": http_status}
@@ -161,6 +202,13 @@ class PotelSentrySpanProcessor(SpanProcessor):
                 "contexts": contexts,
             }
         )
+
+        profile = cast("Optional[Profile]", get_sentry_meta(span, "profile"))
+        if profile:
+            profile.__exit__(None, None, None)
+            if profile.valid():
+                event["profile"] = profile
+                set_sentry_meta(span, "profile", None)
 
         return event
 
@@ -192,6 +240,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
                 "origin": origin or DEFAULT_SPAN_ORIGIN,
             }
         )
+
+        if status:
+            span_json.setdefault("tags", {})["status"] = status
 
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id

@@ -12,7 +12,6 @@ from sentry_sdk.integrations.redis.utils import (
     _get_pipeline_data,
     _update_span,
 )
-from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 from typing import TYPE_CHECKING
@@ -42,6 +41,7 @@ def patch_redis_pipeline(
             op=OP.DB_REDIS,
             name="redis.pipeline.execute",
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         ) as span:
             with capture_internal_exceptions():
                 span_data = get_db_data_fn(self)

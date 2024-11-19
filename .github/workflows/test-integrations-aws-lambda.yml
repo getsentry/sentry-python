@@ -32,7 +32,7 @@ jobs:
     name: permissions check
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
         with:
           persist-credentials: false
       - name: Check permissions on PR
@@ -63,7 +63,7 @@ jobs:
         os: [ubuntu-latest]
     needs: check-permissions
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v5
@@ -102,7 +102,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All AWS Lambda tests passed
+    name: All pinned AWS Lambda tests passed
     needs: test-aws_lambda-pinned
     # Always run this, even if a dependent job failed
     if: always()

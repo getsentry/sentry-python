@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from redis import Redis
     from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.tracing import Span
     from typing import Any
 
 

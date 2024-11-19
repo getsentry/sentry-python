@@ -23,7 +23,6 @@ from sentry_sdk.utils import (
     _is_external_source,
     _is_in_project_root,
     _module_in_list,
-    _serialize_span_attribute,
 )
 
 from typing import TYPE_CHECKING
@@ -134,13 +133,13 @@ def record_sql_queries(
 
     data = {}
     if params_list is not None:
-        data["db.params"] = _serialize_span_attribute(params_list)
+        data["db.params"] = params_list
     if paramstyle is not None:
-        data["db.paramstyle"] = _serialize_span_attribute(paramstyle)
+        data["db.paramstyle"] = paramstyle
     if executemany:
         data["db.executemany"] = True
     if record_cursor_repr and cursor is not None:
-        data["db.cursor"] = _serialize_span_attribute(cursor)
+        data["db.cursor"] = cursor
 
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
@@ -157,12 +156,8 @@ def record_sql_queries(
 
 def maybe_create_breadcrumbs_from_span(scope, span):
     # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
-    if span.op == OP.HTTP_CLIENT:
-        scope.add_breadcrumb(
-            type="http",
-            category="httplib",
-            data=span._data,
-        )
+    # TODO: can be removed when POtelSpan replaces Span
+    pass
 
 
 def _get_frame_module_abs_path(frame):
