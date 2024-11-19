@@ -376,7 +376,7 @@ class Scope:
         This checks the current scope, the isolation scope and the global scope for a client.
         If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
         """
-        current_scope = cls._get_current_scope()
+        current_scope = cls.get_current_scope()
         try:
             client = current_scope.client
         except AttributeError:
@@ -385,7 +385,7 @@ class Scope:
         if client is not None and client.is_active():
             return client
 
-        isolation_scope = cls._get_isolation_scope()
+        isolation_scope = cls.get_isolation_scope()
         try:
             client = isolation_scope.client
         except AttributeError:
