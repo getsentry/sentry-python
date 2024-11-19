@@ -1311,6 +1311,8 @@ class POTelSpan:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None:
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
+        else:
+            self.set_status(SPANSTATUS.OK)
 
         self.finish()
         context.detach(self._ctx_token)

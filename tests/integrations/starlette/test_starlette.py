@@ -18,6 +18,7 @@ from sentry_sdk.integrations.starlette import (
     StarletteRequestExtractor,
 )
 from sentry_sdk.utils import parse_version
+from tests.conftest import ApproxDict
 
 import starlette
 from starlette.authentication import (
@@ -765,7 +766,7 @@ def test_middleware_callback_spans(sentry_init, capture_events):
     for span in transaction_event["spans"]:
         assert span["op"] == expected[idx]["op"]
         assert span["description"] == expected[idx]["description"]
-        assert span["tags"] == expected[idx]["tags"]
+        assert span["tags"] == ApproxDict(expected[idx]["tags"])
         idx += 1
 
 
@@ -856,7 +857,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
     for span in transaction_event["spans"]:
         assert span["op"] == expected[idx]["op"]
         assert span["description"].startswith(expected[idx]["description"])
-        assert span["tags"] == expected[idx]["tags"]
+        assert span["tags"] == ApproxDict(expected[idx]["tags"])
         idx += 1
 
 
