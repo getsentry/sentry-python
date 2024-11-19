@@ -451,7 +451,11 @@ class _Client(BaseClient):
 
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
-        return self.options.get("send_default_pii", False)
+        result = self.options.get("send_default_pii")
+        if result is None:
+            result = not self.options["dsn"] and self.spotlight is not None
+
+        return result
 
     @property
     def dsn(self):
