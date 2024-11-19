@@ -9,7 +9,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
 )
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, TypeVar
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -169,7 +169,7 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     return _inner_send_data
 
 
-def _get_db_data(connection: clickhouse_driver.connection.Connection) -> dict[str, str]:
+def _get_db_data(connection: clickhouse_driver.connection.Connection) -> Dict[str, str]:
     return {
         SPANDATA.DB_SYSTEM: "clickhouse",
         SPANDATA.SERVER_ADDRESS: connection.host,
@@ -179,6 +179,6 @@ def _get_db_data(connection: clickhouse_driver.connection.Connection) -> dict[st
     }
 
 
-def _set_on_span(span: Span, data: dict[str, Any]):
+def _set_on_span(span: Span, data: Dict[str, Any]):
     for key, value in data.items():
         span.set_attribute(key, _serialize_span_attribute(value))
