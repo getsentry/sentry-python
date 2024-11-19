@@ -139,9 +139,6 @@ class BottleIntegration(Integration):
                 ):
                     _capture_exception(res, handled=True)
 
-                # Manually close the transaction because Bottle does not call `close()` on the WSGI response
-                finish_running_transaction()
-
                 return res
 
             return wrapped_callback
