@@ -729,5 +729,7 @@ if TYPE_CHECKING:
 def finish_running_transaction():
     # type: () -> None
     current_scope = sentry_sdk.get_current_scope()
-    if current_scope._transaction is not None and hasattr(current_scope._transaction, "_context_manager_state"):
-        current_scope._transaction.__exit__(None, None, None)
+    if current_scope.transaction is not None and hasattr(
+        current_scope.transaction, "_context_manager_state"
+    ):
+        current_scope.transaction.__exit__(None, None, None)
