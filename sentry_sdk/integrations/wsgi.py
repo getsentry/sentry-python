@@ -5,7 +5,7 @@ import sentry_sdk
 from sentry_sdk._werkzeug import get_host, _get_headers
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii, use_isolation_scope, use_scope
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
@@ -256,8 +256,8 @@ class _ScopedResponse:
         iterator = iter(self._response)
 
         while True:
-            with sentry_sdk.use_isolation_scope(self._isolation_scope):
-                with sentry_sdk.use_scope(self._current_scope):
+            with use_isolation_scope(self._isolation_scope):
+                with use_scope(self._current_scope):
                     try:
                         chunk = next(iterator)
                     except StopIteration:
@@ -269,8 +269,8 @@ class _ScopedResponse:
 
     def close(self):
         # type: () -> None
-        with sentry_sdk.use_isolation_scope(self._isolation_scope):
-            with sentry_sdk.use_scope(self._current_scope):
+        with use_isolation_scope(self._isolation_scope):
+            with use_scope(self._current_scope):
                 try:
                     self._response.close()  # type: ignore
                 except AttributeError:
