@@ -12,7 +12,6 @@ from sentry_sdk.integrations._wsgi_common import (
     nullcontext,
 )
 from sentry_sdk.sessions import track_session
-from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ContextVar,
@@ -98,6 +97,7 @@ class SentryWsgiMiddleware:
         _wsgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as scope:
+                current_scope = sentry_sdk.get_current_scope()
                 with track_session(scope, session_mode="request"):
                     with capture_internal_exceptions():
                         scope.clear_breadcrumbs()
@@ -138,7 +138,12 @@ class SentryWsgiMiddleware:
         finally:
             _wsgi_middleware_applied.set(False)
 
-        return _ScopedResponse(scope, response, transaction)
+        return _ScopedResponse(
+            response=response,
+            current_scope=current_scope,
+            isolation_scope=scope,
+            transaction=transaction,
+        )
 
 
 def _sentry_start_response(  # type: ignore
@@ -224,7 +229,7 @@ def _capture_exception():
 
 class _ScopedResponse:
     """
-    Users a separate scope for each response chunk.
+    Use separate scopes for each response chunk.
 
     This will make WSGI apps more tolerant against:
     - WSGI servers streaming responses from a different thread/from
@@ -233,12 +238,19 @@ class _ScopedResponse:
     - WSGI servers streaming responses interleaved from the same thread
     """
 
-    __slots__ = ("_response", "_scope", "_transaction")
+    __slots__ = ("_response", "_current_scope", "_isolation_scope", "_transaction")
 
-    def __init__(self, scope, response, transaction):
-        # type: (sentry_sdk.scope.Scope, Iterator[bytes], Optional[sentry_sdk.tracing.Transaction]) -> None
-        self._scope = scope
+    def __init__(
+        self,
+        response,  # type: Iterator[bytes]
+        current_scope,  # type: sentry_sdk.scope.Scope
+        isolation_scope,  # type: sentry_sdk.scope.Scope
+        transaction,  # type: Optional[sentry_sdk.tracing.Transaction]
+    ):
+        # type: (...) -> None
         self._response = response
+        self._current_scope = current_scope
+        self._isolation_scope = isolation_scope
         self._transaction = transaction
 
     def __iter__(self):
@@ -246,31 +258,34 @@ class _ScopedResponse:
         iterator = iter(self._response)
 
         while True:
-            with use_isolation_scope(self._scope):
-                try:
-                    chunk = next(iterator)
-                except StopIteration:
-                    break
-                except BaseException:
-                    reraise(*_capture_exception())
+            with sentry_sdk.use_isolation_scope(self._isolation_scope):
+                with sentry_sdk.use_scope(self._current_scope):
+                    try:
+                        chunk = next(iterator)
+                    except StopIteration:
+                        break
+                    except BaseException:
+                        reraise(*_capture_exception())
 
             yield chunk
 
     def close(self):
         # type: () -> None
-        with use_isolation_scope(self._scope):
-            try:
-                self._response.close()  # type: ignore
-                # Close the Sentry transaction
-                # This is done here to make sure the Transaction stays
-                # open until all streaming responses are done.
-                # Of course this here works also for non streaming responses.
-                if self._transaction is not None:
-                    self._transaction.__exit__(None, None, None)
-            except AttributeError:
-                pass
-            except BaseException:
-                reraise(*_capture_exception())
+        with sentry_sdk.use_isolation_scope(self._isolation_scope):
+            with sentry_sdk.use_scope(self._current_scope):
+                try:
+                    self._response.close()  # type: ignore
+
+                    # Close the Sentry transaction
+                    # This is done here to make sure the Transaction stays
+                    # open until all streaming responses are done.
+                    # Of course this here works also for non streaming responses.
+                    if self._transaction is not None:
+                        self._transaction.__exit__(None, None, None)
+                except AttributeError:
+                    pass
+                except BaseException:
+                    reraise(*_capture_exception())
 
 
 def _make_wsgi_event_processor(environ, use_x_forwarded_for):
