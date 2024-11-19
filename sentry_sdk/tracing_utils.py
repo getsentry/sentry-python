@@ -726,7 +726,7 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def finish_running_transaction(scope):
+def finish_running_transaction(scope=None):
     # type: (Optional[sentry_sdk.Scope]) -> None
     current_scope = scope or sentry_sdk.get_current_scope()
     if current_scope.transaction is not None and hasattr(
