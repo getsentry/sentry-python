@@ -36,6 +36,7 @@ try:
         before_render_template,
         got_request_exception,
         request_started,
+        request_finished,
     )
     from markupsafe import Markup
 except ImportError:
@@ -82,6 +83,7 @@ class FlaskIntegration(Integration):
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
+        request_finished.connect(_request_finished)
         got_request_exception.connect(_capture_exception)
 
         old_app = Flask.__call__
@@ -150,6 +152,11 @@ def _request_started(app, **kwargs):
     scope = sentry_sdk.get_isolation_scope()
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
+
+
+def _request_finished(sender, response, **kwargs):
+    # Manually close the transaction because Bottle does not call `close()` on the WSGI response
+    sentry_sdk.get_current_scope().transaction.__exit__(None, None, None)
 
 
 class FlaskRequestExtractor(RequestExtractor):
