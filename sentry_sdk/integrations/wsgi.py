@@ -119,12 +119,11 @@ class SentryWsgiMiddleware:
                             origin=self.span_origin,
                         )
 
-                    if transaction is not None:
-                        transaction = sentry_sdk.start_transaction(
-                            transaction,
-                            custom_sampling_context={"wsgi_environ": environ},
-                        )
-                        transaction.__enter__()
+                    transaction = sentry_sdk.start_transaction(
+                        transaction,
+                        custom_sampling_context={"wsgi_environ": environ},
+                    )
+                    transaction.__enter__()
 
                     try:
                         response = self.app(
@@ -272,7 +271,7 @@ class _ScopedResponse:
         # Close the Sentry transaction (it could be that response.close() is never called by the framework)
         # This is done here to make sure the Transaction stays
         # open until all streaming responses are done.
-        if self._transaction is not None:
+        if self._transaction is not None and hasattr(self._transaction, "_context_manager_state"):
             self._transaction.__exit__(None, None, None)
 
     def close(self):
@@ -285,7 +284,7 @@ class _ScopedResponse:
                     # Close the Sentry transaction
                     # This is done here to make sure the Transaction stays
                     # open until all streaming responses are done.
-                    if self._transaction is not None:
+                    if self._transaction is not None and hasattr(self._transaction, "_context_manager_state"):
                         self._transaction.__exit__(None, None, None)
                 except AttributeError:
                     pass
