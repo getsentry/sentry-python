@@ -245,13 +245,11 @@ class _ScopedResponse:
         response,  # type: Iterator[bytes]
         current_scope,  # type: sentry_sdk.scope.Scope
         isolation_scope,  # type: sentry_sdk.scope.Scope
-        transaction,  # type: Optional[sentry_sdk.tracing.Transaction]
     ):
         # type: (...) -> None
         self._response = response
         self._current_scope = current_scope
         self._isolation_scope = isolation_scope
-        self._transaction = transaction
 
     def __iter__(self):
         # type: () -> Iterator[bytes]
