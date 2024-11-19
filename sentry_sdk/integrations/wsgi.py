@@ -269,6 +269,12 @@ class _ScopedResponse:
 
             yield chunk
 
+        # Close the Sentry transaction (it could be that response.close() is never called by the framework)
+        # This is done here to make sure the Transaction stays
+        # open until all streaming responses are done.
+        if self._transaction is not None:
+            self._transaction.__exit__(None, None, None)
+
     def close(self):
         # type: () -> None
         with use_isolation_scope(self._isolation_scope):
@@ -279,9 +285,8 @@ class _ScopedResponse:
                     # Close the Sentry transaction
                     # This is done here to make sure the Transaction stays
                     # open until all streaming responses are done.
-                    # Of course this here works also for non streaming responses.
                     if self._transaction is not None:
-                        self._transaction.__exit__(None, None, None)                    
+                        self._transaction.__exit__(None, None, None)
                 except AttributeError:
                     pass
                 except BaseException:

@@ -138,6 +138,9 @@ class BottleIntegration(Integration):
                 ):
                     _capture_exception(res, handled=True)
 
+                # Manually close the transaction because Bottle does not call `close()` on the WSGI response
+                sentry_sdk.get_current_scope().transaction.__exit__(None, None, None)
+
                 return res
 
             return wrapped_callback
