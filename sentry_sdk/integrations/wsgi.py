@@ -257,21 +257,24 @@ class _ScopedResponse:
         # type: () -> Iterator[bytes]
         iterator = iter(self._response)
 
-        while True:
-            with use_isolation_scope(self._isolation_scope):
-                with use_scope(self._current_scope):
-                    try:
-                        chunk = next(iterator)
-                    except StopIteration:
-                        # Close the Sentry transaction (it could be that response.close() is never called by the framework)
-                        # This is done here to make sure the Transaction stays
-                        # open until all streaming responses are done.
-                        finish_running_transaction()
-                        break
-                    except BaseException:
-                        reraise(*_capture_exception())
+        try:
+            while True:
+                with use_isolation_scope(self._isolation_scope):
+                    with use_scope(self._current_scope):
+                        try:
+                            chunk = next(iterator)
+                        except StopIteration:
+                            break
+                        except BaseException:
+                            reraise(*_capture_exception())
 
-            yield chunk
+                yield chunk
+
+        finally:
+            # Close the Sentry transaction (it could be that response.close() is never called by the framework)
+            # This is done here to make sure the Transaction stays
+            # open until all streaming responses are done.
+            finish_running_transaction(self._current_scope)
 
     def close(self):
         # type: () -> None

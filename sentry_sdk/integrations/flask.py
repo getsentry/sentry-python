@@ -156,6 +156,7 @@ def _request_started(app, **kwargs):
 
 
 def _request_finished(sender, response, **kwargs):
+    # type: (Flask, Any, **Any) -> None
     # Manually close the transaction because Flask does not call `close()` on the WSGI response
     finish_running_transaction()
 
