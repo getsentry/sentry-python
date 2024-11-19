@@ -238,7 +238,7 @@ class _ScopedResponse:
     - WSGI servers streaming responses interleaved from the same thread
     """
 
-    __slots__ = ("_response", "_current_scope", "_isolation_scope")
+    __slots__ = ("_response", "_current_scope", "_isolation_scope", "_transaction")
 
     def __init__(
         self,
