@@ -34,8 +34,8 @@ def get_parent_sampled(parent_context, trace_id):
     # Only inherit sample rate if `traceId` is the same
     if is_span_context_valid and parent_context.trace_id == trace_id:
         # this is getSamplingDecision in JS
-        if parent_context.trace_flags.sampled:
-            return True
+        if parent_context.trace_flags.sampled is not None:
+            return parent_context.trace_flags.sampled
 
         dsc_sampled = parent_context.trace_state.get(TRACESTATE_SAMPLED_KEY)
         if dsc_sampled == "true":
