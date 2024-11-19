@@ -117,6 +117,9 @@ def starlette_app_factory(middleware=None, debug=True):
         capture_message("hi")
         return starlette.responses.JSONResponse({"status": "ok"})
 
+    async def _nomessage(request):
+        return starlette.responses.JSONResponse({"status": "ok"})
+
     async def _message_with_id(request):
         capture_message("hi")
         return starlette.responses.JSONResponse({"status": "ok"})
@@ -146,6 +149,18 @@ def starlette_app_factory(middleware=None, debug=True):
         }
         return templates.TemplateResponse("trace_meta.html", template_context)
 
+    all_methods = [
+        "CONNECT",
+        "DELETE",
+        "GET",
+        "HEAD",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PUT",
+        "TRACE",
+    ]
+
     app = starlette.applications.Starlette(
         debug=debug,
         routes=[
@@ -153,6 +168,7 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/some_url", _homepage),
             starlette.routing.Route("/custom_error", _custom_error),
             starlette.routing.Route("/message", _message),
+            starlette.routing.Route("/nomessage", _nomessage, methods=all_methods),
             starlette.routing.Route("/message/{message_id}", _message_with_id),
             starlette.routing.Route("/sync/thread_ids", _thread_ids_sync),
             starlette.routing.Route("/async/thread_ids", _thread_ids_async),
@@ -874,7 +890,7 @@ def test_legacy_setup(
 def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": 1.0},
+        profiles_sample_rate=1.0,
     )
     app = starlette_app_factory()
     asgi_app = SentryAsgiMiddleware(app)
@@ -893,10 +909,18 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
     profiles = [item for item in envelopes[0].items if item.type == "profile"]
     assert len(profiles) == 1
 
-    for profile in profiles:
-        transactions = profile.payload.json["transactions"]
+    for item in profiles:
+        transactions = item.payload.json["transactions"]
         assert len(transactions) == 1
         assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
+    assert len(transactions) == 1
+
+    for item in transactions:
+        transaction = item.payload.json
+        trace_context = transaction["contexts"]["trace"]
+        assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):
@@ -1230,6 +1254,70 @@ def test_configurable_status_codes_deprecated(
         assert len(events) == 1
     else:
         assert not events
+
+
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 21),
+    reason="Requires Starlette >= 0.21, because earlier versions do not support HTTP 'HEAD' requests",
+)
+def test_transaction_http_method_default(sentry_init, capture_events):
+    """
+    By default OPTIONS and HEAD requests do not create a transaction.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(),
+        ],
+    )
+    events = capture_events()
+
+    starlette_app = starlette_app_factory()
+
+    client = TestClient(starlette_app)
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert event["request"]["method"] == "GET"
+
+
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 21),
+    reason="Requires Starlette >= 0.21, because earlier versions do not support HTTP 'HEAD' requests",
+)
+def test_transaction_http_method_custom(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                ),  # capitalization does not matter
+            ),
+        ],
+        debug=True,
+    )
+    events = capture_events()
+
+    starlette_app = starlette_app_factory()
+
+    client = TestClient(starlette_app)
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
+
+    assert len(events) == 2
+
+    (event1, event2) = events
+
+    assert event1["request"]["method"] == "OPTIONS"
+    assert event2["request"]["method"] == "HEAD"
 
 
 parametrize_test_configurable_status_codes = pytest.mark.parametrize(

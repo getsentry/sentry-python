@@ -12,6 +12,7 @@ from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
 )
 from sentry_sdk.integrations._wsgi_common import (
+    DEFAULT_HTTP_METHODS_TO_CAPTURE,
     HttpCodeRangeContainer,
     _is_json_content_type,
     request_body_within_bounds,
@@ -64,7 +65,12 @@ except ImportError:
 
 try:
     # Optional dependency of Starlette to parse form data.
-    import multipart  # type: ignore
+    try:
+        # python-multipart 0.0.13 and later
+        import python_multipart as multipart  # type: ignore
+    except ImportError:
+        # python-multipart 0.0.12 and earlier
+        import multipart  # type: ignore
 except ImportError:
     multipart = None
 
@@ -85,6 +91,7 @@ class StarletteIntegration(Integration):
         transaction_style="url",  # type: str
         failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Union[Set[int], list[HttpStatusCodeRange], None]
         middleware_spans=True,  # type: bool
+        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
         # type: (...) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
@@ -94,6 +101,7 @@ class StarletteIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+        self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
         if isinstance(failed_request_status_codes, Set):
             self.failed_request_status_codes = (
@@ -390,6 +398,11 @@ def patch_asgi_app():
             mechanism_type=StarletteIntegration.identifier,
             transaction_style=integration.transaction_style,
             span_origin=StarletteIntegration.origin,
+            http_methods_to_capture=(
+                integration.http_methods_to_capture
+                if integration
+                else DEFAULT_HTTP_METHODS_TO_CAPTURE
+            ),
         )
 
         middleware.__call__ = middleware._run_asgi3
@@ -479,8 +492,11 @@ def patch_request_response():
                 if integration is None:
                     return old_func(*args, **kwargs)
 
-                sentry_scope = sentry_sdk.get_isolation_scope()
+                current_scope = sentry_sdk.get_current_scope()
+                if current_scope.transaction is not None:
+                    current_scope.transaction.update_active_thread()
 
+                sentry_scope = sentry_sdk.get_isolation_scope()
                 if sentry_scope.profile is not None:
                     sentry_scope.profile.update_active_thread_id()
 

@@ -52,7 +52,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -92,7 +92,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v4.5.0
+        uses: codecov/codecov-action@v5.0.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -138,7 +138,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -178,7 +178,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v4.5.0
+        uses: codecov/codecov-action@v5.0.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -193,7 +193,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Web Frameworks 1 tests passed
+    name: All pinned Web Frameworks 1 tests passed
     needs: test-web_frameworks_1-pinned
     # Always run this, even if a dependent job failed
     if: always()

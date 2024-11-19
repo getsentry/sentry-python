@@ -32,7 +32,7 @@ jobs:
     name: permissions check
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.2.2
         with:
           persist-credentials: false
       - name: Check permissions on PR
@@ -67,7 +67,7 @@ jobs:
         os: [ubuntu-20.04]
     needs: check-permissions
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.2.2
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v5
@@ -97,7 +97,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v4.5.0
+        uses: codecov/codecov-action@v5.0.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -112,7 +112,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All AWS Lambda tests passed
+    name: All pinned AWS Lambda tests passed
     needs: test-aws_lambda-pinned
     # Always run this, even if a dependent job failed
     if: always()
