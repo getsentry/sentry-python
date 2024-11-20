@@ -168,7 +168,7 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": '[{"x": 100}]',
+                "db.params": [{"x": 100}],
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -181,7 +181,7 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": "[[170], [200]]",
+                "db.params": [[170], [200]],
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -194,8 +194,8 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.result": "[[370]]",
-                "db.params": '{"minv": 150}',
+                "db.result": [[370]],
+                "db.params": {"minv": 150},
             },
             "message": "SELECT sum(x) FROM test WHERE x > 150",
             "type": "default",
@@ -348,9 +348,7 @@ def test_clickhouse_client_spans(
     assert event["spans"] == expected_spans
 
 
-def test_clickhouse_client_spans_with_pii(
-    sentry_init, capture_events, capture_envelopes
-) -> None:
+def test_clickhouse_client_spans_with_pii(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         _experiments={"record_sql_params": True},
@@ -620,7 +618,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.result": "[[], []]",
+                "db.result": [[], []],
             },
             "message": "DROP TABLE IF EXISTS test",
             "type": "default",
@@ -633,7 +631,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.result": "[[], []]",
+                "db.result": [[], []],
             },
             "message": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "type": "default",
@@ -646,7 +644,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": '[{"x": 100}]',
+                "db.params": [{"x": 100}],
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -659,7 +657,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": "[[170], [200]]",
+                "db.params": [[170], [200]],
             },
             "message": "INSERT INTO test (x) VALUES",
             "type": "default",
@@ -672,8 +670,8 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "db.user": "default",
                 "server.address": "localhost",
                 "server.port": 9000,
-                "db.params": '{"minv": 150}',
-                "db.result": '[[["370"]], [["\'sum(x)\'", "\'Int64\'"]]]',
+                "db.params": {"minv": 150},
+                "db.result": [[["370"]], [["'sum(x)'", "'Int64'"]]],
             },
             "message": "SELECT sum(x) FROM test WHERE x > 150",
             "type": "default",
