@@ -120,17 +120,18 @@ class SentryWsgiMiddleware:
                         )
 
                     if transaction is not None:
-                        transaction = sentry_sdk.start_transaction(
+                        sentry_sdk.start_transaction(
                             transaction,
                             custom_sampling_context={"wsgi_environ": environ},
-                        )
-                        transaction.__enter__()
+                        ).__enter__()
 
                     try:
                         response = self.app(
                             environ,
                             partial(
-                                _sentry_start_response, start_response, transaction
+                                _sentry_start_response,
+                                start_response,
+                                transaction,
                             ),
                         )
                     except BaseException:

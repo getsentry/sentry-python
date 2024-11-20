@@ -36,6 +36,8 @@ if TYPE_CHECKING:
 
     from types import FrameType
 
+    from sentry_sdk._types import ExcInfo
+
 
 SENTRY_TRACE_REGEX = re.compile(
     "^[ \t]*"  # whitespace
