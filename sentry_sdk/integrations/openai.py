@@ -137,7 +137,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
 
     span = sentry_sdk.start_span(
         op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
-        description="Chat Completion",
+        name="Chat Completion",
         origin=OpenAIIntegration.origin,
         only_if_parent=True,
     )
