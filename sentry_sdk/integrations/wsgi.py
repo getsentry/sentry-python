@@ -145,7 +145,6 @@ class SentryWsgiMiddleware:
             response=response,
             current_scope=current_scope,
             isolation_scope=scope,
-            transaction=transaction,
         )
 
 
@@ -241,20 +240,18 @@ class _ScopedResponse:
     - WSGI servers streaming responses interleaved from the same thread
     """
 
-    __slots__ = ("_response", "_current_scope", "_isolation_scope", "_transaction")
+    __slots__ = ("_response", "_current_scope", "_isolation_scope")
 
     def __init__(
         self,
         response,  # type: Iterator[bytes]
         current_scope,  # type: sentry_sdk.scope.Scope
         isolation_scope,  # type: sentry_sdk.scope.Scope
-        transaction,  # type: Optional[sentry_sdk.tracing.Transaction]
     ):
         # type: (...) -> None
         self._response = response
         self._current_scope = current_scope
         self._isolation_scope = isolation_scope
-        self._transaction = transaction
 
     def __iter__(self):
         # type: () -> Iterator[bytes]
