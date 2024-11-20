@@ -7,7 +7,6 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
-from sentry_sdk.tracing_utils import finish_running_transaction
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -37,7 +36,6 @@ try:
         before_render_template,
         got_request_exception,
         request_started,
-        request_finished,
     )
     from markupsafe import Markup
 except ImportError:
@@ -84,7 +82,6 @@ class FlaskIntegration(Integration):
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
-        request_finished.connect(_request_finished)
         got_request_exception.connect(_capture_exception)
 
         old_app = Flask.__call__
@@ -153,12 +150,6 @@ def _request_started(app, **kwargs):
     scope = sentry_sdk.get_isolation_scope()
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
-
-
-def _request_finished(sender, response, **kwargs):
-    # type: (Flask, Any, **Any) -> None
-    # Manually close the transaction because Flask does not call `close()` on the WSGI response
-    finish_running_transaction()
 
 
 class FlaskRequestExtractor(RequestExtractor):
