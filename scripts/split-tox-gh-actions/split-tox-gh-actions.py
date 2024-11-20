@@ -65,18 +65,18 @@ GROUPS = {
         "openai",
         "huggingface_hub",
     ],
-    "AWS Lambda": [
+    "AWS": [
         # this is separate from Cloud Computing because only this one test suite
         # needs to run with access to GitHub secrets
         "aws_lambda",
     ],
-    "Cloud Computing": [
+    "Cloud": [
         "boto3",
         "chalice",
         "cloud_resource_context",
         "gcp",
     ],
-    "Data Processing": [
+    "Tasks": [
         "arq",
         "beam",
         "celery",
@@ -86,7 +86,7 @@ GROUPS = {
         "rq",
         "spark",
     ],
-    "Databases": [
+    "DBs": [
         "asyncpg",
         "clickhouse_driver",
         "pymongo",
@@ -100,19 +100,19 @@ GROUPS = {
         "graphene",
         "strawberry",
     ],
-    "Networking": [
+    "Network": [
         "gevent",
         "grpc",
         "httpx",
         "requests",
     ],
-    "Web Frameworks 1": [
+    "Web 1": [
         "django",
         "flask",
         "starlette",
         "fastapi",
     ],
-    "Web Frameworks 2": [
+    "Web 2": [
         "aiohttp",
         "asgi",
         "bottle",
@@ -124,7 +124,7 @@ GROUPS = {
         "starlite",
         "tornado",
     ],
-    "Miscellaneous": [
+    "Misc": [
         "launchdarkly",
         "loguru",
         "openfeature",
