@@ -135,8 +135,10 @@ class SentryWsgiMiddleware:
                             ),
                         )
                     except BaseException:
-                        finish_running_transaction(current_scope, sys.exc_info())
-                        reraise(*_capture_exception())
+                        exc_info = sys.exc_info()
+                        _capture_exception(exc_info)
+                        finish_running_transaction(current_scope, exc_info)
+                        reraise(*exc_info)
 
         finally:
             _wsgi_middleware_applied.set(False)
@@ -207,13 +209,13 @@ def get_client_ip(environ):
     return environ.get("REMOTE_ADDR")
 
 
-def _capture_exception():
-    # type: () -> ExcInfo
+def _capture_exception(exc_info=None):
+    # type: (Optional[ExcInfo]) -> ExcInfo
     """
     Captures the current exception and sends it to Sentry.
     Returns the ExcInfo tuple to it can be reraised afterwards.
     """
-    exc_info = sys.exc_info()
+    exc_info = exc_info or sys.exc_info()
     e = exc_info[1]
 
     # SystemExit(0) is the only uncaught exception that is expected behavior
@@ -274,6 +276,7 @@ class _ScopedResponse:
             # Close the Sentry transaction (it could be that response.close() is never called by the framework)
             # This is done here to make sure the Transaction stays
             # open until all streaming responses are done.
+            import ipdb; ipdb.set_trace()
             finish_running_transaction(self._current_scope)
 
     def close(self):
