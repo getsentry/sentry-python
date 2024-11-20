@@ -726,10 +726,13 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def finish_running_transaction(scope=None):
-    # type: (Optional[sentry_sdk.Scope]) -> None
+def finish_running_transaction(scope=None, exc_info=None):
+    # type: (Optional[sentry_sdk.Scope], Optional[ExcInfo]) -> None
     current_scope = scope or sentry_sdk.get_current_scope()
     if current_scope.transaction is not None and hasattr(
         current_scope.transaction, "_context_manager_state"
     ):
-        current_scope.transaction.__exit__(None, None, None)
+        if exc_info is not None:
+            current_scope.transaction.__exit__(*exc_info)
+        else:
+            current_scope.transaction.__exit__(None, None, None)

@@ -135,6 +135,8 @@ class SentryWsgiMiddleware:
                         )
                     except BaseException:
                         reraise(*_capture_exception())
+                    finally:
+                        finish_running_transaction(current_scope, sys.exc_info())
         finally:
             _wsgi_middleware_applied.set(False)
 
