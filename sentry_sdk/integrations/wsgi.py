@@ -267,10 +267,6 @@ class _ScopedResponse:
                         try:
                             chunk = next(iterator)
                         except StopIteration:
-                            # Close the Sentry transaction (it could be that response.close() is never called by the framework)
-                            # This is done here to make sure the Transaction stays
-                            # open until all streaming responses are done.
-                            finish_running_transaction(self._current_scope)
                             break
                         except BaseException:
                             reraise(*_capture_exception())
