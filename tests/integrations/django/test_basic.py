@@ -157,7 +157,8 @@ def test_has_trace_if_performance_enabled(sentry_init, client, capture_events):
         traces_sample_rate=1.0,
     )
     events = capture_events()
-    client.head(reverse("view_exc_with_msg"))
+    response = client.head(reverse("view_exc_with_msg"))
+    response.close()
 
     (msg_event, error_event, transaction_event) = events
 
@@ -213,9 +214,10 @@ def test_trace_from_headers_if_performance_enabled(sentry_init, client, capture_
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    client.head(
+    response = client.head(
         reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
     )
+    response.close()
 
     (msg_event, error_event, transaction_event) = events
 
@@ -1186,7 +1188,8 @@ def test_span_origin(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("view_with_signal"))
+    response = client.get(reverse("view_with_signal"))
+    response.close()
 
     (transaction,) = events
 
@@ -1211,9 +1214,9 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get("/nomessage").close()
+    client.options("/nomessage").close()
+    client.head("/nomessage").close()
 
     (event,) = events
 
@@ -1235,9 +1238,9 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get("/nomessage").close()
+    client.options("/nomessage").close()
+    client.head("/nomessage").close()
 
     assert len(events) == 2
 
