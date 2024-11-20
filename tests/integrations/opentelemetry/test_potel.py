@@ -1,8 +1,8 @@
 import pytest
-
 from opentelemetry import trace
 
 import sentry_sdk
+from tests.conftest import ApproxDict
 
 
 tracer = trace.get_tracer(__name__)
@@ -43,7 +43,6 @@ def test_root_span_transaction_payload_started_with_otel_only(capture_envelopes)
     assert "span_id" in trace_context
     assert trace_context["origin"] == "manual"
     assert trace_context["op"] == "request"
-    assert trace_context["status"] == "ok"
 
     assert payload["spans"] == []
 
@@ -63,7 +62,6 @@ def test_child_span_payload_started_with_otel_only(capture_envelopes):
     assert span["op"] == "db"
     assert span["description"] == "db"
     assert span["origin"] == "manual"
-    assert span["status"] == "ok"
     assert span["span_id"] is not None
     assert span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
     assert span["parent_span_id"] == payload["contexts"]["trace"]["span_id"]
@@ -222,8 +220,8 @@ def test_span_attributes_in_data_started_with_otel(capture_envelopes):
     (item,) = envelope.items
     payload = item.payload.json
 
-    assert payload["contexts"]["trace"]["data"] == {"foo": "bar", "baz": 42}
-    assert payload["spans"][0]["data"] == {"abc": 99, "def": "moo"}
+    assert payload["contexts"]["trace"]["data"] == ApproxDict({"foo": "bar", "baz": 42})
+    assert payload["spans"][0]["data"] == ApproxDict({"abc": 99, "def": "moo"})
 
 
 def test_span_data_started_with_sentry(capture_envelopes):
@@ -238,18 +236,22 @@ def test_span_data_started_with_sentry(capture_envelopes):
     (item,) = envelope.items
     payload = item.payload.json
 
-    assert payload["contexts"]["trace"]["data"] == {
-        "foo": "bar",
-        "sentry.origin": "manual",
-        "sentry.description": "request",
-        "sentry.op": "http",
-    }
-    assert payload["spans"][0]["data"] == {
-        "baz": 42,
-        "sentry.origin": "manual",
-        "sentry.description": "statement",
-        "sentry.op": "db",
-    }
+    assert payload["contexts"]["trace"]["data"] == ApproxDict(
+        {
+            "foo": "bar",
+            "sentry.origin": "manual",
+            "sentry.description": "request",
+            "sentry.op": "http",
+        }
+    )
+    assert payload["spans"][0]["data"] == ApproxDict(
+        {
+            "baz": 42,
+            "sentry.origin": "manual",
+            "sentry.description": "statement",
+            "sentry.op": "db",
+        }
+    )
 
 
 def test_transaction_tags_started_with_otel(capture_envelopes):

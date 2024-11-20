@@ -6,6 +6,7 @@ from opentelemetry.trace import (
     SpanContext,
     NonRecordingSpan,
     TraceFlags,
+    TraceState,
     use_span,
 )
 
@@ -14,6 +15,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
     SENTRY_USE_CURRENT_SCOPE_KEY,
     SENTRY_USE_ISOLATION_SCOPE_KEY,
+    TRACESTATE_SAMPLED_KEY,
 )
 from sentry_sdk.integrations.opentelemetry.utils import trace_state_from_baggage
 from sentry_sdk.scope import Scope, ScopeType
@@ -96,10 +98,15 @@ class PotelScope(Scope):
             else TraceFlags.DEFAULT
         )
 
-        # TODO-neel-potel do we need parent and sampled like JS?
-        trace_state = None
         if self._propagation_context.baggage:
             trace_state = trace_state_from_baggage(self._propagation_context.baggage)
+        else:
+            trace_state = TraceState()
+
+        # for twp to work, we also need to consider deferred sampling when the sampling
+        # flag is not present, so the above TraceFlags are not sufficient
+        if self._propagation_context.parent_sampled is None:
+            trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "deferred")
 
         span_context = SpanContext(
             trace_id=int(self._propagation_context.trace_id, 16),  # type: ignore
