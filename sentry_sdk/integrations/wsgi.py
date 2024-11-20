@@ -276,7 +276,6 @@ class _ScopedResponse:
             # Close the Sentry transaction (it could be that response.close() is never called by the framework)
             # This is done here to make sure the Transaction stays
             # open until all streaming responses are done.
-            import ipdb; ipdb.set_trace()
             finish_running_transaction(self._current_scope)
 
     def close(self):
