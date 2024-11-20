@@ -283,12 +283,12 @@ class _ScopedResponse:
         with use_isolation_scope(self._isolation_scope):
             with use_scope(self._current_scope):
                 try:
-                    self._response.close()  # type: ignore
-
                     # Close the Sentry transaction
                     # This is done here to make sure the Transaction stays
                     # open until all streaming responses are done.
                     finish_running_transaction()
+
+                    self._response.close()  # type: ignore
                 except AttributeError:
                     pass
                 except BaseException:
