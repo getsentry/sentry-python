@@ -4,26 +4,26 @@
 
 ### Various fixes & improvements
 
-- feat: Send PII to Spotlight when no DSN is set (#3804) by @BYK
+- New: introduce `rust_tracing` integration. See https://docs.sentry.io/platforms/python/integrations/rust_tracing/ (#3717) by @matt-codecov
 - Auto enable Litestar integration (#3540) by @provinzkraut
-- fix(httpx): Prevent Sentry baggage duplication (#3728) by @szokeasaurusrex
-- test(gcp): Only run GCP tests when they should (#3721) by @szokeasaurusrex
-- fix(falcon): Don't exhaust request body stream (#3768) by @szokeasaurusrex
-- fix(integrations): Check retries_left before capturing exception (#3803) by @malkovro
-- fix(openai): Use name instead of description (#3807) by @sourceful-rob
-- Shorten CI workflow names (#3805) by @sentrivana
-- build(deps): bump codecov/codecov-action from 4.6.0 to 5.0.2 (#3792) by @dependabot
-- feat(spotlight): Auto enable cache_spans for Spotlight on DEBUG (#3791) by @BYK
-- Make sentry-sdk[pure-eval] installable with pip==24.0 (#3757) by @sentrivana
-- tests: Test with pyspark prerelease (#3760) by @sentrivana
-- fix: include_tracing_fields arg to control unvetted data in rust_tracing integration (#3780) by @matt-codecov
-- feat: introduce rust_tracing integration (#3717) by @matt-codecov
-- Fix aws lambda tests (by reducing event size) (#3770) by @antonpirker
-- feat(spotlight): Inject Spotlight button on Django (#3751) by @BYK
-- ref(init): Deprecate `sentry_sdk.init` context manager (#3729) by @szokeasaurusrex
-- Handle parameter `stack_info` for the `LoggingIntegration` (#3745) by @gmcrocetti
-- Fix(Arq): fix integration with Worker settings as a dict (#3742) by @saber-solooki
+- Deprecate `sentry_sdk.init` context manager (#3729) by @szokeasaurusrex
+- feat(spotlight): Send PII to Spotlight when no DSN is set (#3804) by @BYK
 - feat(spotlight): Add info logs when Sentry is enabled (#3735) by @BYK
+- feat(spotlight): Inject Spotlight button on Django (#3751) by @BYK
+- feat(spotlight): Auto enable cache_spans for Spotlight on DEBUG (#3791) by @BYK
+- fix(logging): Handle parameter `stack_info` for the `LoggingIntegration` (#3745) by @gmcrocetti
+- fix(pure-eval): Make sentry-sdk[pure-eval] installable with pip==24.0 (#3757) by @sentrivana
+- fix(rust_tracing): include_tracing_fields arg to control unvetted data in rust_tracing integration (#3780) by @matt-codecov
+- fix(aws) Fix aws lambda tests (by reducing event size) (#3770) by @antonpirker
+- fix(arq): fix integration with Worker settings as a dict (#3742) by @saber-solooki
+- fix(httpx): Prevent Sentry baggage duplication (#3728) by @szokeasaurusrex
+- fix(falcon): Don't exhaust request body stream (#3768) by @szokeasaurusrex
+- fix(integrations): Check `retries_left` before capturing exception (#3803) by @malkovro
+- fix(openai): Use name instead of description (#3807) by @sourceful-rob
+- test(gcp): Only run GCP tests when they should (#3721) by @szokeasaurusrex
+- chore: Shorten CI workflow names (#3805) by @sentrivana
+- chore: Test with pyspark prerelease (#3760) by @sentrivana
+- build(deps): bump codecov/codecov-action from 4.6.0 to 5.0.2 (#3792) by @dependabot
 - build(deps): bump actions/checkout from 4.2.1 to 4.2.2 (#3691) by @dependabot
 
 ## 2.18.0
