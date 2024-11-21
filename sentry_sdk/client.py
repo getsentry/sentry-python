@@ -128,7 +128,11 @@ def _get_options(*args, **kwargs):
         rv["traces_sample_rate"] = 1.0
 
     if rv["event_scrubber"] is None:
-        rv["event_scrubber"] = EventScrubber(send_default_pii=rv["send_default_pii"])
+        rv["event_scrubber"] = EventScrubber(
+            send_default_pii=(
+                False if rv["send_default_pii"] is None else rv["send_default_pii"]
+            )
+        )
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
@@ -451,10 +455,9 @@ class _Client(BaseClient):
 
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
-        result = self.options.get("send_default_pii", False)
-
-        if not self.options["dsn"] and self.spotlight is not None:
-            result = True
+        result = self.options.get("send_default_pii")
+        if result is None:
+            result = not self.options["dsn"] and self.spotlight is not None
 
         return result
 
