@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
 from typing import Optional, List
 
-from sentry_sdk.tracing_utils import _should_be_included
+from sentry_sdk.tracing_utils import _should_be_included, Baggage
 import pytest
 
 
@@ -94,3 +94,24 @@ def test_should_be_included(test_case, expected):
     kwargs = asdict(test_case)
     kwargs.pop("id")
     assert _should_be_included(**kwargs) == expected
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    (
+        ("", ""),
+        ("foo=bar", "foo=bar"),
+        (" foo=bar, baz =  qux ", " foo=bar, baz =  qux "),
+        ("sentry-trace_id=123", ""),
+        ("  sentry-trace_id = 123  ", ""),
+        ("sentry-trace_id=123,sentry-public_key=456", ""),
+        ("foo=bar,sentry-trace_id=123", "foo=bar"),
+        ("foo=bar,sentry-trace_id=123,baz=qux", "foo=bar,baz=qux"),
+        (
+            "foo=bar,sentry-trace_id=123,baz=qux,sentry-public_key=456",
+            "foo=bar,baz=qux",
+        ),
+    ),
+)
+def test_strip_sentry_baggage(header, expected):
+    assert Baggage.strip_sentry_baggage(header) == expected
