@@ -829,6 +829,13 @@ def test_should_send_default_pii_true_without_dsn_and_spotlight(sentry_init):
     assert should_send_default_pii() is True
 
 
+def test_should_send_default_pii_false_without_dsn_and_spotlight(sentry_init):
+    sentry_init(spotlight=True, send_default_pii=False)
+
+    # There is now now way to opt out of sending PII to spotlight
+    assert should_send_default_pii() is True
+
+
 def test_set_tags():
     scope = Scope()
     scope.set_tags({"tag1": "value1", "tag2": "value2"})
