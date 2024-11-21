@@ -234,6 +234,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(sentry_init):
     assert sampling_context["messaging.system"] == "rq"
     assert sampling_context["rq.job.args"] == ["Bodhi"]
     assert sampling_context["rq.job.kwargs"] == '{"trick": "roll over"}'
+    assert "do_trick" in sampling_context["rq.job.func"]
     assert sampling_context["messaging.message.id"]
     assert sampling_context["messaging.destination.name"] == "default"
 

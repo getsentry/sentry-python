@@ -193,10 +193,8 @@ def _prepopulate_attributes(job, queue):
         if getattr(queue, prop, None) is not None:
             attributes[attr] = getattr(queue, prop)
 
-    try:
-        attributes["rq.job.args"] = _serialize_span_attribute(job.args)
-        attributes["rq.job.kwargs"] = _serialize_span_attribute(job.kwargs)
-    except Exception:
-        pass
+    for key in ("args", "kwargs", "func"):
+        if getattr(job, key, None):
+            attributes[f"rq.job.{key}"] = _serialize_span_attribute(getattr(job, key))
 
     return attributes
