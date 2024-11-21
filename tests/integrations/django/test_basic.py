@@ -51,7 +51,7 @@ def test_view_exceptions(sentry_init, client, capture_exceptions, capture_events
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
-    client.get(reverse("view_exc"))
+    unpack_werkzeug_response(client.get(reverse("view_exc")))
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -72,7 +72,7 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
-    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    unpack_werkzeug_response(client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"}))
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -91,7 +91,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
-    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    unpack_werkzeug_response(client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"}))
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -103,7 +103,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
 def test_middleware_exceptions(sentry_init, client, capture_exceptions):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
-    client.get(reverse("middleware_exc"))
+    unpack_werkzeug_response(client.get(reverse("middleware_exc")))
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -932,7 +932,7 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
 
     for url, expected_line in views_tests:
         events = capture_events()
-        client.get(url)
+        unpack_werkzeug_response(client.get(url))
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
 
@@ -971,7 +971,7 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
     )
     events = capture_events()
 
-    client.get(reverse("message"))
+    unpack_werkzeug_response(client.get(reverse("message")))
 
     message, transaction = events
 
@@ -988,7 +988,7 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("message"))
+    unpack_werkzeug_response(client.get(reverse("message")))
 
     message, transaction = events
 
@@ -1012,7 +1012,7 @@ def test_signals_spans(sentry_init, client, capture_events, render_span_tree):
     )
     events = capture_events()
 
-    client.get(reverse("message"))
+    unpack_werkzeug_response(client.get(reverse("message")))
 
     message, transaction = events
 
@@ -1035,7 +1035,7 @@ def test_signals_spans_disabled(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("message"))
+    unpack_werkzeug_response(client.get(reverse("message")))
 
     message, transaction = events
 
@@ -1065,7 +1065,7 @@ def test_signals_spans_filtering(sentry_init, client, capture_events, render_spa
     )
     events = capture_events()
 
-    client.get(reverse("send_myapp_custom_signal"))
+    unpack_werkzeug_response(client.get(reverse("send_myapp_custom_signal")))
 
     (transaction,) = events
 
@@ -1190,9 +1190,7 @@ def test_span_origin(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    response = client.get(reverse("view_with_signal"))
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
+    unpack_werkzeug_response(client.get(reverse("view_with_signal")))
 
     (transaction,) = events
 
@@ -1217,17 +1215,9 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    response = client.get("/nomessage")
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
-
-    response = client.options("/nomessage")
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
-
-    response = client.head("/nomessage")
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
+    unpack_werkzeug_response(client.get("/nomessage"))
+    unpack_werkzeug_response(client.options("/nomessage"))
+    unpack_werkzeug_response(client.head("/nomessage"))
 
     (event,) = events
 
@@ -1249,18 +1239,9 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    response = client.get("/nomessage")
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
-    
-    response = client.options("/nomessage")
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
-    
-    response = client.head("/nomessage")
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
-    
+    unpack_werkzeug_response(client.get("/nomessage"))
+    unpack_werkzeug_response(client.options("/nomessage"))
+    unpack_werkzeug_response(client.head("/nomessage"))
 
     assert len(events) == 2
 
