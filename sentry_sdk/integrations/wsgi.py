@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import sys
 from functools import partial
 
@@ -43,6 +44,9 @@ if TYPE_CHECKING:
         def __call__(self, status, response_headers, exc_info=None):  # type: ignore
             # type: (str, WsgiResponseHeaders, Optional[WsgiExcInfo]) -> WsgiResponseIter
             pass
+
+
+MAX_TRANSACTION_DURATION_MINUTES = 5
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
@@ -271,6 +275,17 @@ class _ScopedResponse:
                             reraise(*_capture_exception())
 
                 yield chunk
+
+                # Finish long running transactions at some point
+                try:
+                    transaction_duration = (datetime.now(timezone.utc) - self._current_scope.transaction.start_timestamp).total_seconds() / 60
+                    if transaction_duration > MAX_TRANSACTION_DURATION_MINUTES:
+                        with use_isolation_scope(self._isolation_scope):
+                            with use_scope(self._current_scope):
+                                finish_running_transaction(self._current_scope)
+                except AttributeError:
+                    # transaction is not there anymore
+                    pass
 
         finally:
             with use_isolation_scope(self._isolation_scope):
