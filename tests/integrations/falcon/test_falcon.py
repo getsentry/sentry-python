@@ -460,3 +460,48 @@ def test_span_origin(sentry_init, capture_events, make_client):
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.falcon"
+
+
+def test_falcon_request_media(sentry_init):
+    # test_passed stores whether the test has passed.
+    test_passed = False
+
+    # test_failure_reason stores the reason why the test failed
+    # if test_passed is False. The value is meaningless when
+    # test_passed is True.
+    test_failure_reason = "test endpoint did not get called"
+
+    class SentryCaptureMiddleware:
+        def process_request(self, _req, _resp):
+            # This capture message forces Falcon event processors to run
+            # before the request handler runs
+            sentry_sdk.capture_message("Processing request")
+
+    class RequestMediaResource:
+        def on_post(self, req, _):
+            nonlocal test_passed, test_failure_reason
+            raw_data = req.bounded_stream.read()
+
+            # If the raw_data is empty, the request body stream
+            # has been exhausted by the SDK. Test should fail in
+            # this case.
+            test_passed = raw_data != b""
+            test_failure_reason = "request body has been read"
+
+    sentry_init(integrations=[FalconIntegration()])
+
+    try:
+        app_class = falcon.App  # Falcon ≥3.0
+    except AttributeError:
+        app_class = falcon.API  # Falcon <3.0
+
+    app = app_class(middleware=[SentryCaptureMiddleware()])
+    app.add_route("/read_body", RequestMediaResource())
+
+    client = falcon.testing.TestClient(app)
+
+    client.simulate_post("/read_body", json={"foo": "bar"})
+
+    # Check that simulate_post actually calls the resource, and
+    # that the SDK does not exhaust the request body stream.
+    assert test_passed, test_failure_reason
