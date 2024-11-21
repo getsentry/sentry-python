@@ -2,14 +2,22 @@ import logging
 import pickle
 import gzip
 import io
+import os
 import socket
+import sys
 from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
+import brotli
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
+
+try:
+    import gevent
+except ImportError:
+    gevent = None
 
 import sentry_sdk
 from sentry_sdk import (
@@ -20,6 +28,7 @@ from sentry_sdk import (
     get_isolation_scope,
     Hub,
 )
+from sentry_sdk._compat import PY37, PY38
 from sentry_sdk.envelope import Envelope, Item, parse_json
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
@@ -52,8 +61,12 @@ class CapturingServer(WSGIServer):
         """
         request = Request(environ)
         event = envelope = None
-        if request.headers.get("content-encoding") == "gzip":
+        content_encoding = request.headers.get("content-encoding")
+        if content_encoding == "gzip":
             rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
+            compressed = True
+        elif content_encoding == "br":
+            rdr = io.BytesIO(brotli.decompress(request.data))
             compressed = True
         else:
             rdr = io.BytesIO(request.data)
@@ -91,7 +104,7 @@ def make_client(request, capturing_server):
     def inner(**kwargs):
         return Client(
             "http://foobar@{}/132".format(capturing_server.url[len("http://") :]),
-            **kwargs
+            **kwargs,
         )
 
     return inner
@@ -115,7 +128,16 @@ def mock_transaction_envelope(span_count):
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
-@pytest.mark.parametrize("compressionlevel", (0, 9))
+@pytest.mark.parametrize("compression_level", (0, 9, None))
+@pytest.mark.parametrize(
+    "compression_algo",
+    (
+        ("gzip", "br", "<invalid>", None)
+        if PY37 or gevent is None
+        else ("gzip", "<invalid>", None)
+    ),
+)
+@pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works(
     capturing_server,
     request,
@@ -125,15 +147,26 @@ def test_transport_works(
     make_client,
     client_flush_method,
     use_pickle,
-    compressionlevel,
+    compression_level,
+    compression_algo,
+    http2,
     maybe_monkeypatched_threading,
 ):
     caplog.set_level(logging.DEBUG)
+
+    experiments = {}
+    if compression_level is not None:
+        experiments["transport_compression_level"] = compression_level
+
+    if compression_algo is not None:
+        experiments["transport_compression_algo"] = compression_algo
+
+    if http2:
+        experiments["transport_http2"] = True
+
     client = make_client(
         debug=debug,
-        _experiments={
-            "transport_zlib_compression_level": compressionlevel,
-        },
+        _experiments=experiments,
     )
 
     if use_pickle:
@@ -152,7 +185,21 @@ def test_transport_works(
     out, err = capsys.readouterr()
     assert not err and not out
     assert capturing_server.captured
-    assert capturing_server.captured[0].compressed == (compressionlevel > 0)
+    should_compress = (
+        # default is to compress with brotli if available, gzip otherwise
+        (compression_level is None)
+        or (
+            # setting compression level to 0 means don't compress
+            compression_level
+            > 0
+        )
+    ) and (
+        # if we couldn't resolve to a known algo, we don't compress
+        compression_algo
+        != "<invalid>"
+    )
+
+    assert capturing_server.captured[0].compressed == should_compress
 
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
@@ -172,20 +219,33 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
 
     client = make_client(_experiments=_experiments)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["num_pools"] == expected_num_pools
 
 
-def test_two_way_ssl_authentication(make_client):
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
+def test_two_way_ssl_authentication(make_client, http2):
     _experiments = {}
+    if http2:
+        _experiments["transport_http2"] = True
 
-    client = make_client(_experiments=_experiments)
-
-    options = client.transport._get_pool_options(
-        [], "/path/to/cert.pem", "/path/to/key.pem"
+    current_dir = os.path.dirname(__file__)
+    cert_file = f"{current_dir}/test.pem"
+    key_file = f"{current_dir}/test.key"
+    client = make_client(
+        cert_file=cert_file,
+        key_file=key_file,
+        _experiments=_experiments,
     )
-    assert options["cert_file"] == "/path/to/cert.pem"
-    assert options["key_file"] == "/path/to/key.pem"
+    options = client.transport._get_pool_options()
+
+    if http2:
+        assert options["ssl_context"] is not None
+    else:
+        assert options["cert_file"] == cert_file
+        assert options["key_file"] == key_file
 
 
 def test_socket_options(make_client):
@@ -197,21 +257,37 @@ def test_socket_options(make_client):
 
     client = make_client(socket_options=socket_options)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["socket_options"] == socket_options
 
 
 def test_keep_alive_true(make_client):
     client = make_client(keep_alive=True)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
 
 
-def test_keep_alive_off_by_default(make_client):
+def test_keep_alive_on_by_default(make_client):
     client = make_client()
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert "socket_options" not in options
+
+
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_http2_with_https_dsn(make_client):
+    client = make_client(_experiments={"transport_http2": True})
+    client.transport.parsed_dsn.scheme = "https"
+    options = client.transport._get_pool_options()
+    assert options["http2"] is True
+
+
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_no_http2_with_http_dsn(make_client):
+    client = make_client(_experiments={"transport_http2": True})
+    client.transport.parsed_dsn.scheme = "http"
+    options = client.transport._get_pool_options()
+    assert options["http2"] is False
 
 
 def test_socket_options_override_keep_alive(make_client):
@@ -223,7 +299,7 @@ def test_socket_options_override_keep_alive(make_client):
 
     client = make_client(socket_options=socket_options, keep_alive=False)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["socket_options"] == socket_options
 
 
@@ -235,7 +311,7 @@ def test_socket_options_merge_with_keep_alive(make_client):
 
     client = make_client(socket_options=socket_options, keep_alive=True)
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     try:
         assert options["socket_options"] == [
             (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
@@ -257,7 +333,7 @@ def test_socket_options_override_defaults(make_client):
     # socket option defaults, so we need to set this and not ignore it.
     client = make_client(socket_options=[])
 
-    options = client.transport._get_pool_options([])
+    options = client.transport._get_pool_options()
     assert options["socket_options"] == []
 
 

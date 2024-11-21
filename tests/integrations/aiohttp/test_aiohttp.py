@@ -55,7 +55,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
     assert request["url"] == "http://{host}/".format(host=host)
     assert request["headers"] == {
         "Accept": "*/*",
-        "Accept-Encoding": "gzip, deflate",
+        "Accept-Encoding": mock.ANY,
         "Host": host,
         "User-Agent": request["headers"]["User-Agent"],
         "baggage": mock.ANY,
