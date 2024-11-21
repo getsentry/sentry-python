@@ -158,6 +158,7 @@ def test_has_trace_if_performance_enabled(sentry_init, client, capture_events):
     )
     events = capture_events()
     response = client.head(reverse("view_exc_with_msg"))
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
     response.close()
 
     (msg_event, error_event, transaction_event) = events
@@ -217,6 +218,7 @@ def test_trace_from_headers_if_performance_enabled(sentry_init, client, capture_
     response = client.head(
         reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
     )
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
     response.close()
 
     (msg_event, error_event, transaction_event) = events
@@ -1189,6 +1191,7 @@ def test_span_origin(sentry_init, client, capture_events):
     events = capture_events()
 
     response = client.get(reverse("view_with_signal"))
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
     response.close()
 
     (transaction,) = events
@@ -1214,9 +1217,17 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get("/nomessage").close()
-    client.options("/nomessage").close()
-    client.head("/nomessage").close()
+    response = client.get("/nomessage")
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
+    response.close()
+
+    response = client.options("/nomessage")
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
+    response.close()
+
+    response = client.head("/nomessage")
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
+    response.close()
 
     (event,) = events
 
@@ -1238,9 +1249,18 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get("/nomessage").close()
-    client.options("/nomessage").close()
-    client.head("/nomessage").close()
+    response = client.get("/nomessage")
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
+    response.close()
+    
+    response = client.options("/nomessage")
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
+    response.close()
+    
+    response = client.head("/nomessage")
+    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
+    response.close()
+    
 
     assert len(events) == 2
 
