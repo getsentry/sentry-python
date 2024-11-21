@@ -6,6 +6,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
+    _serialize_span_attribute,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -191,5 +192,11 @@ def _prepopulate_attributes(job, queue):
     for prop, attr in QUEUE_PROPERTY_TO_ATTRIBUTE.items():
         if getattr(queue, prop, None) is not None:
             attributes[attr] = getattr(queue, prop)
+
+    try:
+        attributes["rq.job.args"] = _serialize_span_attribute(job.args)
+        attributes["rq.job.kwargs"] = _serialize_span_attribute(job.kwargs)
+    except Exception:
+        pass
 
     return attributes
