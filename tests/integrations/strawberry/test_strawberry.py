@@ -199,7 +199,9 @@ def test_capture_request_if_available_and_send_pii_is_on(
 
     query = "query ErrorQuery { error }"
     # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"}).close()
+    client.post(
+        "/graphql", json={"query": query, "operationName": "ErrorQuery"}
+    ).close()
 
     assert len(events) == 1
 
@@ -255,7 +257,9 @@ def test_do_not_capture_request_if_send_pii_is_off(
 
     query = "query ErrorQuery { error }"
     # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"}).close()
+    client.post(
+        "/graphql", json={"query": query, "operationName": "ErrorQuery"}
+    ).close()
 
     assert len(events) == 1
 
@@ -336,7 +340,9 @@ def test_capture_transaction_on_error(
 
     query = "query ErrorQuery { error }"
     # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"}).close()
+    client.post(
+        "/graphql", json={"query": query, "operationName": "ErrorQuery"}
+    ).close()
 
     assert len(events) == 2
     (_, transaction_event) = events
@@ -414,7 +420,9 @@ def test_capture_transaction_on_success(
 
     query = "query GreetingQuery { hello }"
     # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"}).close()
+    client.post(
+        "/graphql", json={"query": query, "operationName": "GreetingQuery"}
+    ).close()
 
     assert len(events) == 1
     (transaction_event,) = events
@@ -725,7 +733,9 @@ def test_span_origin2(
 
     query = "query GreetingQuery { hello }"
     # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"}).close()
+    client.post(
+        "/graphql", json={"query": query, "operationName": "GreetingQuery"}
+    ).close()
 
     (event,) = events
 

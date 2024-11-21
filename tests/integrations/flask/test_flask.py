@@ -989,7 +989,7 @@ def test_transaction_http_method_default(
     events = capture_events()
 
     client = app.test_client()
-    
+
     response = client.get("/nomessage")
     assert response.status_code == 200
     # Close the response to ensure the WSGI cycle is complete and the transaction is finished
@@ -1033,7 +1033,7 @@ def test_transaction_http_method_custom(
     events = capture_events()
 
     client = app.test_client()
-    
+
     response = client.get("/nomessage")
     assert response.status_code == 200
     # Close the response to ensure the WSGI cycle is complete and the transaction is finished

@@ -72,7 +72,9 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
-    unpack_werkzeug_response(client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"}))
+    unpack_werkzeug_response(
+        client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    )
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -91,7 +93,9 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
-    unpack_werkzeug_response(client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"}))
+    unpack_werkzeug_response(
+        client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    )
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -157,9 +161,7 @@ def test_has_trace_if_performance_enabled(sentry_init, client, capture_events):
         traces_sample_rate=1.0,
     )
     events = capture_events()
-    response = client.head(reverse("view_exc_with_msg"))
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
+    unpack_werkzeug_response(client.head(reverse("view_exc_with_msg")))
 
     (msg_event, error_event, transaction_event) = events
 
@@ -215,11 +217,11 @@ def test_trace_from_headers_if_performance_enabled(sentry_init, client, capture_
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    response = client.head(
-        reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
+    unpack_werkzeug_response(
+        client.head(
+            reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
+        )
     )
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
 
     (msg_event, error_event, transaction_event) = events
 
