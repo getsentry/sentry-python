@@ -811,7 +811,7 @@ def test_should_send_default_pii_false(sentry_init):
     assert should_send_default_pii() is False
 
 
-def test_should_send_default_pii_default_fals(sentry_init):
+def test_should_send_default_pii_default_false(sentry_init):
     sentry_init()
 
     assert should_send_default_pii() is False
