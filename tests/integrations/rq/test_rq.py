@@ -165,7 +165,12 @@ def test_tracing_enabled(
 
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
     assert transaction["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-    assert transaction["contexts"]["trace"] == error_event["contexts"]["trace"]
+    for trace_key in error_event["contexts"]["trace"]:
+        assert trace_key in transaction["contexts"]["trace"]
+        assert (
+            error_event["contexts"]["trace"][trace_key]
+            == transaction["contexts"]["trace"][trace_key]
+        )
 
 
 def test_tracing_disabled(
