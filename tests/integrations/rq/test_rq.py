@@ -118,7 +118,9 @@ def test_transaction_with_error(
     )
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
+    assert envelope["contexts"]["trace"] == DictionaryContaining(
+        error_event["contexts"]["trace"]
+    )
     assert envelope["transaction"] == error_event["transaction"]
     assert envelope["extra"]["rq-job"] == DictionaryContaining(
         {
@@ -148,10 +150,7 @@ def test_error_has_trace_context_if_tracing_disabled(
     assert error_event["contexts"]["trace"]
 
 
-def test_tracing_enabled(
-    sentry_init,
-    capture_events,
-):
+def test_tracing_enabled(sentry_init, capture_events, DictionaryContaining):
     sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
@@ -165,7 +164,10 @@ def test_tracing_enabled(
 
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
     assert transaction["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-    assert transaction["contexts"]["trace"] == error_event["contexts"]["trace"]
+    assert (
+        DictionaryContaining(error_event["contexts"]["trace"])
+        == transaction["contexts"]["trace"]
+    )
 
 
 def test_tracing_disabled(
@@ -218,9 +220,7 @@ def test_transaction_no_error(
     )
 
 
-def test_traces_sampler_gets_correct_values_in_sampling_context(
-    sentry_init, DictionaryContaining, ObjectDescribedBy  # noqa:N803
-):
+def test_traces_sampler_gets_correct_values_in_sampling_context(sentry_init):
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(integrations=[RqIntegration()], traces_sampler=traces_sampler)
 
@@ -230,22 +230,13 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     queue.enqueue(do_trick, "Bodhi", trick="roll over")
     worker.work(burst=True)
 
-    traces_sampler.assert_any_call(
-        DictionaryContaining(
-            {
-                "rq_job": ObjectDescribedBy(
-                    type=rq.job.Job,
-                    attrs={
-                        "description": "tests.integrations.rq.test_rq.do_trick('Bodhi', trick='roll over')",
-                        "result": "Bodhi, can you roll over? Good dog!",
-                        "func_name": "tests.integrations.rq.test_rq.do_trick",
-                        "args": ("Bodhi",),
-                        "kwargs": {"trick": "roll over"},
-                    },
-                ),
-            }
-        )
-    )
+    sampling_context = traces_sampler.call_args_list[0][0][0]
+    assert sampling_context["messaging.system"] == "rq"
+    assert sampling_context["rq.job.args"] == ["Bodhi"]
+    assert sampling_context["rq.job.kwargs"] == '{"trick": "roll over"}'
+    assert sampling_context["rq.job.func"] == "do_trick"
+    assert sampling_context["messaging.message.id"]
+    assert sampling_context["messaging.destination.name"] == "default"
 
 
 @pytest.mark.skipif(

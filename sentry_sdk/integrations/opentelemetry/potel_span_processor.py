@@ -179,14 +179,14 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         transaction_name, transaction_source = extract_transaction_name_source(span)
         span_data = extract_span_data(span)
-        (_, description, status, http_status, _) = span_data
-
         trace_context = get_trace_context(span, span_data=span_data)
         contexts = {"trace": trace_context}
 
         profile_context = get_profile_context(span)
         if profile_context:
             contexts["profile"] = profile_context
+
+        (_, description, _, http_status, _) = span_data
 
         if http_status:
             contexts["response"] = {"status_code": http_status}

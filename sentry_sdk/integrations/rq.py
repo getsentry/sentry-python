@@ -6,6 +6,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
+    _serialize_span_attribute,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -35,6 +36,15 @@ if TYPE_CHECKING:
 DEFAULT_TRANSACTION_NAME = "unknown RQ task"
 
 
+JOB_PROPERTY_TO_ATTRIBUTE = {
+    "id": "messaging.message.id",
+}
+
+QUEUE_PROPERTY_TO_ATTRIBUTE = {
+    "name": "messaging.destination.name",
+}
+
+
 class RqIntegration(Integration):
     identifier = "rq"
     origin = f"auto.queue.{identifier}"
@@ -54,8 +64,8 @@ class RqIntegration(Integration):
         old_perform_job = Worker.perform_job
 
         @ensure_integration_enabled(RqIntegration, old_perform_job)
-        def sentry_patched_perform_job(self, job, *args, **kwargs):
-            # type: (Any, Job, *Queue, **Any) -> bool
+        def sentry_patched_perform_job(self, job, queue, *args, **kwargs):
+            # type: (Any, Job, Queue, *Any, **Any) -> bool
             with sentry_sdk.new_scope() as scope:
                 try:
                     transaction_name = job.func_name or DEFAULT_TRANSACTION_NAME
@@ -76,9 +86,9 @@ class RqIntegration(Integration):
                         name=transaction_name,
                         source=TRANSACTION_SOURCE_TASK,
                         origin=RqIntegration.origin,
-                        custom_sampling_context={"rq_job": job},
+                        attributes=_prepopulate_attributes(job, queue),
                     ):
-                        rv = old_perform_job(self, job, *args, **kwargs)
+                        rv = old_perform_job(self, job, queue, *args, **kwargs)
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is
@@ -167,3 +177,30 @@ def _capture_exception(exc_info, **kwargs):
     )
 
     sentry_sdk.capture_event(event, hint=hint)
+
+
+def _prepopulate_attributes(job, queue):
+    # type: (Job, Queue) -> dict[str, Any]
+    attributes = {
+        "messaging.system": "rq",
+    }
+
+    for prop, attr in JOB_PROPERTY_TO_ATTRIBUTE.items():
+        if getattr(job, prop, None) is not None:
+            attributes[attr] = getattr(job, prop)
+
+    for prop, attr in QUEUE_PROPERTY_TO_ATTRIBUTE.items():
+        if getattr(queue, prop, None) is not None:
+            attributes[attr] = getattr(queue, prop)
+
+    for key in ("args", "kwargs"):
+        if getattr(job, key, None):
+            attributes[f"rq.job.{key}"] = _serialize_span_attribute(getattr(job, key))
+
+    func = job.func
+    if callable(func):
+        func = func.__name__
+
+    attributes["rq.job.func"] = _serialize_span_attribute(func)
+
+    return attributes

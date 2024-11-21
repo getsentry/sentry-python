@@ -114,7 +114,6 @@ def extract_span_data(span):
     description = span.name
     status, http_status = extract_span_status(span)
     origin = None
-
     if span.attributes is None:
         return (op, description, status, http_status, origin)
 
@@ -133,11 +132,23 @@ def extract_span_data(span):
 
     rpc_service = span.attributes.get(SpanAttributes.RPC_SERVICE)
     if rpc_service:
-        return ("rpc", description, status, http_status, origin)
+        return (
+            span.attributes.get(SentrySpanAttribute.OP) or "rpc",
+            description,
+            status,
+            http_status,
+            origin,
+        )
 
     messaging_system = span.attributes.get(SpanAttributes.MESSAGING_SYSTEM)
     if messaging_system:
-        return ("message", description, status, http_status, origin)
+        return (
+            span.attributes.get(SentrySpanAttribute.OP) or "message",
+            description,
+            status,
+            http_status,
+            origin,
+        )
 
     faas_trigger = span.attributes.get(SpanAttributes.FAAS_TRIGGER)
     if faas_trigger:
