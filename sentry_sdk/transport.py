@@ -720,6 +720,7 @@ class HttpTransport(BaseHttpTransport):
 
 try:
     import httpcore
+    import h2  # type: ignore # noqa: F401
 except ImportError:
     # Sorry, no Http2Transport for you
     class Http2Transport(HttpTransport):
