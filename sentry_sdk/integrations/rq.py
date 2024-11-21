@@ -193,8 +193,14 @@ def _prepopulate_attributes(job, queue):
         if getattr(queue, prop, None) is not None:
             attributes[attr] = getattr(queue, prop)
 
-    for key in ("args", "kwargs", "func"):
+    for key in ("args", "kwargs"):
         if getattr(job, key, None):
             attributes[f"rq.job.{key}"] = _serialize_span_attribute(getattr(job, key))
+
+    func = job.func
+    if callable(func):
+        func = func.__name__
+
+    attributes["rq.job.func"] = _serialize_span_attribute(func)
 
     return attributes
