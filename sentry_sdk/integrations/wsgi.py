@@ -273,10 +273,12 @@ class _ScopedResponse:
                 yield chunk
 
         finally:
-            # Close the Sentry transaction (it could be that response.close() is never called by the framework)
-            # This is done here to make sure the Transaction stays
-            # open until all streaming responses are done.
-            finish_running_transaction(self._current_scope)
+            with use_isolation_scope(self._isolation_scope):
+                with use_scope(self._current_scope):
+                    # Close the Sentry transaction (it could be that response.close() is never called by the framework)
+                    # This is done here to make sure the Transaction stays
+                    # open until all streaming responses are done.
+                    finish_running_transaction(self._current_scope)
 
     def close(self):
         # type: () -> None
