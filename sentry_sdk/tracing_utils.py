@@ -604,6 +604,21 @@ class Baggage:
 
         return ",".join(items)
 
+    @staticmethod
+    def strip_sentry_baggage(header):
+        # type: (str) -> str
+        """Remove Sentry baggage from the given header.
+
+        Given a Baggage header, return a new Baggage header with all Sentry baggage items removed.
+        """
+        return ",".join(
+            (
+                item
+                for item in header.split(",")
+                if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
+            )
+        )
+
 
 def should_propagate_trace(client, url):
     # type: (sentry_sdk.client.BaseClient, str) -> bool
