@@ -71,6 +71,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `client`       | `client.address`, `client.port` |
   | full URL       | `url.full`                      |
 
+- If you're using the RQ integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `rq_job` object anymore. Instead, the individual properties of the scope, if available, are accessible as follows:
+
+  | RQ property     | Sampling context key(s)      |
+  | --------------- | ---------------------------- |
+  | `rq_job.args`   | `rq.job.args`                |
+  | `rq_job.kwargs` | `rq.job.kwargs`              |
+  | `rq_job.func`   | `rq.job.func`                |
+  | `queue.name`    | `messaging.destination.name` |
+  | `job.id`        | `messaging.message.id`       |
+
+  Note that `rq.job.args`, `rq.job.kwargs`, and `rq.job.func` are serialized and not the actual objects on the job.
+
 ### Removed
 
 - Spans no longer have a `description`. Use `name` instead.
