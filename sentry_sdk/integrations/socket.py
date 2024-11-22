@@ -59,7 +59,9 @@ def _patch_create_connection():
             origin=SocketIntegration.origin,
             only_if_parent=True,
         ) as span:
-            span.set_data("address", address)
+            host, port = address
+            span.set_data("address.host", host)
+            span.set_data("address.port", port)
             span.set_data("timeout", timeout)
             span.set_data("source_address", source_address)
 
