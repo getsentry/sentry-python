@@ -133,7 +133,7 @@ class SentryWsgiMiddleware:
                         ).__enter__()
                         timer = Timer(
                             MAX_TRANSACTION_DURATION_SECONDS,
-                            finish_long_running_transaction,
+                            _finish_long_running_transaction,
                             args=(current_scope, scope),
                         )
                         timer.start()
@@ -245,25 +245,6 @@ def _capture_exception(exc_info=None):
     return exc_info
 
 
-def finish_long_running_transaction(current_scope, isolation_scope):
-    # type: (sentry_sdk.scope.Scope, sentry_sdk.scope.Scope) -> None
-    """
-    Make sure we don't keep transactions open for too long.
-    Triggered after MAX_TRANSACTION_DURATION_SECONDS have passed.
-    """
-    try:
-        transaction_duration = (
-            datetime.now(timezone.utc) - current_scope.transaction.start_timestamp
-        ).total_seconds()
-        if transaction_duration > MAX_TRANSACTION_DURATION_SECONDS:
-            with use_isolation_scope(isolation_scope):
-                with use_scope(current_scope):
-                    finish_running_transaction()
-    except AttributeError:
-        # transaction is not there anymore
-        pass
-
-
 class _ScopedResponse:
     """
     Use separate scopes for each response chunk.
@@ -366,3 +347,22 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
         return event
 
     return event_processor
+
+
+def _finish_long_running_transaction(current_scope, isolation_scope):
+    # type: (sentry_sdk.scope.Scope, sentry_sdk.scope.Scope) -> None
+    """
+    Make sure we don't keep transactions open for too long.
+    Triggered after MAX_TRANSACTION_DURATION_SECONDS have passed.
+    """
+    try:
+        transaction_duration = (
+            datetime.now(timezone.utc) - current_scope.transaction.start_timestamp
+        ).total_seconds()
+        if transaction_duration > MAX_TRANSACTION_DURATION_SECONDS:
+            with use_isolation_scope(isolation_scope):
+                with use_scope(current_scope):
+                    finish_running_transaction()
+    except AttributeError:
+        # transaction is not there anymore
+        pass

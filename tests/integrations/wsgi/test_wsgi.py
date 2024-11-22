@@ -535,7 +535,7 @@ def test_long_running_transaction_finished(sentry_init, capture_events):
             - datetime_from_isoformat(transaction["start_timestamp"])
         ).total_seconds()
         assert (
-            transaction_duration <= new_max_duration * 1.2
+            transaction_duration <= new_max_duration * 1.02
         )  # we allow 2% margin for processing the request
 
 
