@@ -21,6 +21,16 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
+- If you're using the Celery integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
+
+  | Dictionary keys        | Sampling context key |
+  | ---------------------- | -------------------- |
+  | `celery_job["args"]`   | `celery.job.args`    |
+  | `celery_job["kwargs"]` | `celery.job.kwargs`  |
+  | `celery_job["task"]`   | `celery.job.task`    |
+
+  Note that all of these are serialized, i.e., not the original `args` and `kwargs` but rather OpenTelemetry-friendly span attributes.
+
 - If you're using the AIOHTTP integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `aiohttp_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
 
   | Request property | Sampling context key(s)         |
@@ -71,7 +81,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `client`       | `client.address`, `client.port` |
   | full URL       | `url.full`                      |
 
-- If you're using the RQ integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `rq_job` object anymore. Instead, the individual properties of the scope, if available, are accessible as follows:
+- If you're using the RQ integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `rq_job` object anymore. Instead, the individual properties of the job and the queue, if available, are accessible as follows:
 
   | RQ property     | Sampling context key(s)      |
   | --------------- | ---------------------------- |
@@ -79,7 +89,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `rq_job.kwargs` | `rq.job.kwargs`              |
   | `rq_job.func`   | `rq.job.func`                |
   | `queue.name`    | `messaging.destination.name` |
-  | `job.id`        | `messaging.message.id`       |
+  | `rq_job.id`     | `messaging.message.id`       |
 
   Note that `rq.job.args`, `rq.job.kwargs`, and `rq.job.func` are serialized and not the actual objects on the job.
 

@@ -13,6 +13,7 @@ from sentry_sdk.integrations.celery import (
     _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
+from sentry_sdk.utils import _serialize_span_attribute
 from tests.conftest import ApproxDict
 
 
@@ -430,7 +431,7 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
 
 
 def test_traces_sampler_gets_task_info_in_sampling_context(
-    init_celery, celery_invocation, DictionaryContaining  # noqa:N803
+    init_celery, celery_invocation
 ):
     traces_sampler = mock.Mock()
     celery = init_celery(traces_sampler=traces_sampler)
@@ -445,10 +446,13 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
         walk_dogs, [["Maisey", "Charlie", "Bodhi", "Cory"], "Dog park round trip"], 1
     )
 
-    traces_sampler.assert_any_call(
-        # depending on the iteration of celery_invocation, the data might be
-        # passed as args or as kwargs, so make this generic
-        DictionaryContaining({"celery_job": dict(task="dog_walk", **args_kwargs)})
+    sampling_context = traces_sampler.call_args_list[1][0][0]
+    assert sampling_context["celery.job.task"] == "dog_walk"
+    assert sampling_context["celery.job.args"] == _serialize_span_attribute(
+        args_kwargs["args"]
+    )
+    assert sampling_context["celery.job.kwargs"] == _serialize_span_attribute(
+        args_kwargs["kwargs"]
     )
 
 
