@@ -39,6 +39,18 @@ TIMEOUT_WARNING_BUFFER = 1500  # Buffer time required to send timeout warning to
 MILLIS_TO_SECONDS = 1000.0
 
 
+EVENT_TO_ATTRIBUTES = {
+    "httpMethod": "http.request.method",
+    "queryStringParameters": "url.query",
+    "path": "url.path",
+    # headers
+}
+
+CONTEXT_TO_ATTRIBUTES = {
+    "function_name": "faas.name",
+}
+
+
 def _wrap_init_error(init_error):
     # type: (F) -> F
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
@@ -151,10 +163,6 @@ def _wrap_handler(handler):
                     name=aws_context.function_name,
                     source=TRANSACTION_SOURCE_COMPONENT,
                     origin=AwsLambdaIntegration.origin,
-                    custom_sampling_context={
-                        "aws_event": aws_event,
-                        "aws_context": aws_context,
-                    },
                     attributes=_prepopulate_attributes(aws_event, aws_context),
                 ):
                     try:
@@ -458,18 +466,6 @@ def _event_from_error_json(error_json):
     }  # type: Event
 
     return event
-
-
-EVENT_TO_ATTRIBUTES = {
-    "httpMethod": "http.request.method",
-    "queryStringParameters": "url.query",
-    "path": "url.path",
-    # headers
-}
-
-CONTEXT_TO_ATTRIBUTES = {
-    "function_name": "faas.name",
-}
 
 
 def _prepopulate_attributes(aws_event, aws_context):
