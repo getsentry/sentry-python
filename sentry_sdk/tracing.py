@@ -1329,8 +1329,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
+        self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
 
     @property
     def origin(self):
@@ -1344,8 +1343,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.ORIGIN, value)
+        self.set_attribute(SentrySpanAttribute.ORIGIN, value)
 
     @property
     def containing_transaction(self):
@@ -1435,8 +1433,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.OP, value)
+        self.set_attribute(SentrySpanAttribute.OP, value)
 
     @property
     def name(self):
@@ -1450,8 +1447,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.NAME, value)
+        self.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property
     def source(self):
@@ -1573,6 +1569,11 @@ class POTelSpan:
 
     def set_attribute(self, key, value):
         # type: (str, Any) -> None
+        if value is None:
+            # otel doesn't support None as values, preferring to not set the key
+            # at all instead
+            return
+
         self._otel_span.set_attribute(key, _serialize_span_attribute(value))
 
     def set_status(self, status):
