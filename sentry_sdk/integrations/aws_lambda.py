@@ -463,7 +463,7 @@ def _event_from_error_json(error_json):
 EVENT_TO_ATTRIBUTES = {
     "httpMethod": "http.request.method",
     "queryStringParameters": "url.query",
-    # url
+    "path": "url.path",
     # headers
 }
 
@@ -476,11 +476,23 @@ def _prepopulate_attributes(aws_event, aws_context):
     attributes = {}
 
     for prop, attr in EVENT_TO_ATTRIBUTES.items():
-        if getattr(aws_event, prop, None) is not None:
-            attributes[attr] = getattr(aws_event, prop)
+        if aws_event.get(prop) is not None:
+            attributes[attr] = aws_event[prop]
 
     for prop, attr in CONTEXT_TO_ATTRIBUTES.items():
-        if getattr(aws_context, prop, None) is not None:
-            attributes[attr] = getattr(aws_context, prop)
+        if aws_context.get(prop) is not None:
+            attributes[attr] = aws_context.get(prop)
+
+    url = _get_url(aws_event, aws_context)
+    if url:
+        if aws_event.get("queryStringParameters"):
+            url += f"?{aws_event['queryStringParameters']}"
+        attributes["url.full"] = url
+
+    headers = aws_event.get("headers") or {}
+    if headers.get("X-Forwarded-Proto"):
+        attributes["network.protocol.name"] = headers["X-Forwarded-Proto"]
+    if headers.get("Host"):
+        attributes["server.address"] = headers["Host"]
 
     return attributes

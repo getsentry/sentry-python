@@ -93,6 +93,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
   Note that `rq.job.args`, `rq.job.kwargs`, and `rq.job.func` are serialized and not the actual objects on the job.
 
+- If you're using the AWS Lambda integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `aws_event` and `aws_context` objects anymore. Instead, the following, if available, is accessible:
+
+  | AWS property                                | Sampling context key(s) |
+  | ------------------------------------------- | ----------------------- |
+  | `aws_event["httpMethod"]`                   | `http.request.method`   |
+  | `aws_event["queryStringParameters"]`        | `url.query`             |
+  | `aws_event["path"]`                         | `url.path`              |
+  | full URL                                    | `url.full`              |
+  | `aws_event["headers"]["X-Forwarded-Proto"]` | `network.protocol.name` |
+  | `aws_event["headers"]["Host"]`              | `server.address`        |
+  | `aws_context["function_name"]`              | `faas.name`             |
+
 ### Removed
 
 - Spans no longer have a `description`. Use `name` instead.
