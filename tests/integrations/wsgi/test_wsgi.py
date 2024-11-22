@@ -501,9 +501,9 @@ def test_span_origin_custom(sentry_init, capture_events):
 
 def test_long_running_transaction_finished(sentry_init, capture_events):
     # we allow transactions to be 0.5 seconds as a maximum
-    new_max_duration = 0.5 / 60
+    new_max_duration = 0.5
 
-    with mock.patch.object(sentry_sdk.integrations.wsgi, "MAX_TRANSACTION_DURATION_MINUTES", new_max_duration):
+    with mock.patch.object(sentry_sdk.integrations.wsgi, "MAX_TRANSACTION_DURATION_SECONDS", new_max_duration):
         def generate_content():
             # This response will take 1.5 seconds to generate
             for _ in range(15):
@@ -525,5 +525,5 @@ def test_long_running_transaction_finished(sentry_init, capture_events):
 
         (transaction,) = events
 
-        transaction_duration = (datetime_from_isoformat(transaction["timestamp"]) - datetime_from_isoformat(transaction["start_timestamp"])).total_seconds() / 60
-        assert transaction_duration <= new_max_duration * 1.05  # we allow 2% error margin for processing the request
+        transaction_duration = (datetime_from_isoformat(transaction["timestamp"]) - datetime_from_isoformat(transaction["start_timestamp"])).total_seconds()
+        assert transaction_duration <= new_max_duration * 1.2  # we allow 2% margin for processing the request

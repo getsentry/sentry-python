@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 import sys
 from functools import partial
+from threading import Timer
 
 import sentry_sdk
 from sentry_sdk._werkzeug import get_host, _get_headers
@@ -46,7 +47,7 @@ if TYPE_CHECKING:
             pass
 
 
-MAX_TRANSACTION_DURATION_MINUTES = 5
+MAX_TRANSACTION_DURATION_SECONDS = 5 * 60
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
@@ -128,7 +129,12 @@ class SentryWsgiMiddleware:
                             transaction,
                             custom_sampling_context={"wsgi_environ": environ},
                         ).__enter__()
-
+                        timer = Timer(
+                            MAX_TRANSACTION_DURATION_SECONDS,
+                            finish_long_running_transaction,
+                            args=(current_scope, scope),
+                        )
+                        timer.start()
                     try:
                         response = self.app(
                             environ,
@@ -235,6 +241,25 @@ def _capture_exception(exc_info=None):
     return exc_info
 
 
+def finish_long_running_transaction(current_scope, isolation_scope):
+    # type: (sentry_sdk.scope.Scope, sentry_sdk.scope.Scope) -> None
+    """
+    Make sure we don't keep transactions open for too long.
+    Triggered after MAX_TRANSACTION_DURATION_SECONDS have passed.
+    """
+    try:
+        transaction_duration = (
+            datetime.now(timezone.utc) - current_scope.transaction.start_timestamp
+        ).total_seconds()
+        if transaction_duration > MAX_TRANSACTION_DURATION_SECONDS:
+            with use_isolation_scope(isolation_scope):
+                with use_scope(current_scope):
+                    finish_running_transaction()
+    except AttributeError:
+        # transaction is not there anymore
+        pass
+
+
 class _ScopedResponse:
     """
     Use separate scopes for each response chunk.
@@ -275,17 +300,6 @@ class _ScopedResponse:
                             reraise(*_capture_exception())
 
                 yield chunk
-
-                # Finish long running transactions at some point
-                try:
-                    transaction_duration = (datetime.now(timezone.utc) - self._current_scope.transaction.start_timestamp).total_seconds() / 60
-                    if transaction_duration > MAX_TRANSACTION_DURATION_MINUTES:
-                        with use_isolation_scope(self._isolation_scope):
-                            with use_scope(self._current_scope):
-                                finish_running_transaction(self._current_scope)
-                except AttributeError:
-                    # transaction is not there anymore
-                    pass
 
         finally:
             with use_isolation_scope(self._isolation_scope):
