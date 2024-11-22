@@ -621,7 +621,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                             {
                                 "http.request.method": "GET",
                                 "url.path": "/sit/stay/rollover",
-                                "url.query": "repeat=twice",
+                                "url.query": "repeat=again",
                                 "url.full": "http://x.io/sit/stay/rollover?repeat=twice",
                                 "network.protocol.name": "http",
                                 "server.address": "x.io",
