@@ -619,18 +619,12 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                     traces_sampler.assert_any_call(
                         DictionaryContaining(
                             {
-                                "aws_event": DictionaryContaining({
-                                    "httpMethod": "GET",
-                                    "path": "/sit/stay/rollover",
-                                    "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"},
-                                }),
-                                "aws_context": ObjectDescribedBy(
-                                    type=get_lambda_bootstrap().LambdaContext,
-                                    attrs={
-                                        'function_name': StringContaining("test_"),
-                                        'function_version': '$LATEST',
-                                    }
-                                )
+                                "http.request.method": "GET",
+                                "url.path": "/sit/stay/rollover",
+                                "url.query": "repeat=again",
+                                "url.full": "http://x.io/sit/stay/rollover?repeat=twice",
+                                "network.protocol.name": "http",
+                                "server.address": "x.io",
                             }
                         )
                     )
@@ -649,7 +643,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
             )
         """
         ),
-        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"}}',
+        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "query_string": {"repeat": "again"}, "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"}}',
     )
 
     assert response["Payload"]["AssertionError raised"] is False
