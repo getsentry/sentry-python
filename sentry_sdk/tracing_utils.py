@@ -745,7 +745,7 @@ if TYPE_CHECKING:
 
 
 def finish_running_transaction(scope=None, exc_info=None, timer=None):
-    # type: (Optional[sentry_sdk.Scope], Optional[ExcInfo], Timer) -> None
+    # type: (Optional[sentry_sdk.Scope], Optional[ExcInfo], Optional[Timer]) -> None
     current_scope = scope or sentry_sdk.get_current_scope()
     if current_scope.transaction is not None and hasattr(
         current_scope.transaction, "_context_manager_state"
