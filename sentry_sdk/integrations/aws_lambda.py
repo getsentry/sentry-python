@@ -43,7 +43,6 @@ EVENT_TO_ATTRIBUTES = {
     "httpMethod": "http.request.method",
     "queryStringParameters": "url.query",
     "path": "url.path",
-    # headers
 }
 
 CONTEXT_TO_ATTRIBUTES = {
