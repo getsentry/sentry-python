@@ -549,7 +549,7 @@ def test_long_running_transaction_timer_canceled(sentry_init, capture_events):
         new_max_duration,
     ):
         with mock.patch(
-            "sentry_sdk.integrations.wsgi.finish_long_running_transaction"
+            "sentry_sdk.integrations.wsgi._finish_long_running_transaction"
         ) as mock_finish:
 
             def generate_content():
