@@ -23,11 +23,11 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
 - If you're using the Celery integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
 
-  | Dictionary keys | Sampling context key         |
-  | ---------------- | ------------------------------- |
-  | `celery_job["args"]`   | `celery.job.args`                |
-  | `celery_job["kwargs"]` | `celery.job.kwargs`              |
-  | `celery_job["task"]`   | `celery.job.task`                |
+  | Dictionary keys        | Sampling context key |
+  | ---------------------- | -------------------- |
+  | `celery_job["args"]`   | `celery.job.args`    |
+  | `celery_job["kwargs"]` | `celery.job.kwargs`  |
+  | `celery_job["task"]`   | `celery.job.task`    |
 
   Note that all of these are serialized, i.e., not the original `args` and `kwargs` but rather OpenTelemetry-friendly span attributes.
 
