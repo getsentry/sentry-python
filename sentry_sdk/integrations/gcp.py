@@ -222,19 +222,32 @@ def _get_google_cloud_logs_url(final_time):
 
 
 ENV_TO_ATTRIBUTE = {
-    "FUNCTION_NAME": "",
+    "FUNCTION_NAME": "faas.name",
+    # XXX map these to something
     "ENTRY_POINT": "",
     "FUNCTION_IDENTITY": "",
-    "FUNCTION_REGION": "",
+    "FUNCTION_REGION": "faas.invoked_region",
     "GCP_PROJECT": "",
+}
+
+EVENT_TO_ATTRIBUTE = {
+    # XXX more attrs
+    "method": "http.request.method",
+    "query_string": "url.query",
 }
 
 
 def _prepopulate_attributes(gcp_event):
-    attributes = {}
+    attributes = {
+        "cloud.provider": "gcp",
+    }
 
     for key, attr in ENV_TO_ATTRIBUTE.items():
         if environ.get(key):
             attributes[attr] = environ[key]
+
+    for key, attr in EVENT_TO_ATTRIBUTE.items():
+        if getattr(gcp_event, key, None):
+            attributes[attr] = getattr(gcp_event, key)
 
     return attributes
