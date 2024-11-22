@@ -537,3 +537,40 @@ def test_long_running_transaction_finished(sentry_init, capture_events):
         assert (
             transaction_duration <= new_max_duration * 1.2
         )  # we allow 2% margin for processing the request
+
+
+def test_long_running_transaction_timer_canceled(sentry_init, capture_events):
+    # we allow transactions to be 0.5 seconds as a maximum
+    new_max_duration = 0.5
+
+    with mock.patch.object(
+        sentry_sdk.integrations.wsgi,
+        "MAX_TRANSACTION_DURATION_SECONDS",
+        new_max_duration,
+    ):
+        with mock.patch(
+            "sentry_sdk.integrations.wsgi.finish_long_running_transaction"
+        ) as mock_finish:
+
+            def generate_content():
+                # This response will take 0.3 seconds to generate
+                for _ in range(3):
+                    time.sleep(0.1)
+                    yield "ok"
+
+            def long_running_app(environ, start_response):
+                start_response("200 OK", [])
+                return generate_content()
+
+            sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+            app = SentryWsgiMiddleware(long_running_app)
+
+            events = capture_events()
+
+            client = Client(app)
+            response = client.get("/")
+            _ = response.get_data()
+
+            (transaction,) = events
+
+            mock_finish.assert_not_called()

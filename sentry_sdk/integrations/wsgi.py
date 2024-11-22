@@ -114,6 +114,7 @@ class SentryWsgiMiddleware:
                         )
 
                     method = environ.get("REQUEST_METHOD", "").upper()
+
                     transaction = None
                     if method in self.http_methods_to_capture:
                         transaction = continue_trace(
@@ -124,6 +125,7 @@ class SentryWsgiMiddleware:
                             origin=self.span_origin,
                         )
 
+                    timer = None
                     if transaction is not None:
                         sentry_sdk.start_transaction(
                             transaction,
@@ -135,6 +137,7 @@ class SentryWsgiMiddleware:
                             args=(current_scope, scope),
                         )
                         timer.start()
+
                     try:
                         response = self.app(
                             environ,
@@ -147,7 +150,7 @@ class SentryWsgiMiddleware:
                     except BaseException:
                         exc_info = sys.exc_info()
                         _capture_exception(exc_info)
-                        finish_running_transaction(current_scope, exc_info)
+                        finish_running_transaction(current_scope, exc_info, timer)
                         reraise(*exc_info)
 
         finally:
@@ -157,6 +160,7 @@ class SentryWsgiMiddleware:
             response=response,
             current_scope=current_scope,
             isolation_scope=scope,
+            timer=timer,
         )
 
 
@@ -271,18 +275,20 @@ class _ScopedResponse:
     - WSGI servers streaming responses interleaved from the same thread
     """
 
-    __slots__ = ("_response", "_current_scope", "_isolation_scope")
+    __slots__ = ("_response", "_current_scope", "_isolation_scope", "_timer")
 
     def __init__(
         self,
         response,  # type: Iterator[bytes]
         current_scope,  # type: sentry_sdk.scope.Scope
         isolation_scope,  # type: sentry_sdk.scope.Scope
+        timer=None,  # type: Optional[Timer]
     ):
         # type: (...) -> None
         self._response = response
         self._current_scope = current_scope
         self._isolation_scope = isolation_scope
+        self._timer = timer
 
     def __iter__(self):
         # type: () -> Iterator[bytes]
@@ -304,14 +310,14 @@ class _ScopedResponse:
         finally:
             with use_isolation_scope(self._isolation_scope):
                 with use_scope(self._current_scope):
-                    finish_running_transaction()
+                    finish_running_transaction(timer=self._timer)
 
     def close(self):
         # type: () -> None
         with use_isolation_scope(self._isolation_scope):
             with use_scope(self._current_scope):
                 try:
-                    finish_running_transaction()
+                    finish_running_transaction(timer=self._timer)
                     self._response.close()  # type: ignore
                 except AttributeError:
                     pass

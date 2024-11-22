@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from types import FrameType
 
     from sentry_sdk._types import ExcInfo
+    from threading import Timer
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -743,12 +744,15 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def finish_running_transaction(scope=None, exc_info=None):
-    # type: (Optional[sentry_sdk.Scope], Optional[ExcInfo]) -> None
+def finish_running_transaction(scope=None, exc_info=None, timer=None):
+    # type: (Optional[sentry_sdk.Scope], Optional[ExcInfo], Timer) -> None
     current_scope = scope or sentry_sdk.get_current_scope()
     if current_scope.transaction is not None and hasattr(
         current_scope.transaction, "_context_manager_state"
     ):
+        if timer is not None:
+            timer.cancel()
+
         if exc_info is not None:
             current_scope.transaction.__exit__(*exc_info)
         else:
