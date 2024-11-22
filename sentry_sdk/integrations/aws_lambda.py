@@ -475,8 +475,8 @@ def _prepopulate_attributes(aws_event, aws_context):
             attributes[attr] = aws_event[prop]
 
     for prop, attr in CONTEXT_TO_ATTRIBUTES.items():
-        if aws_context.get(prop) is not None:
-            attributes[attr] = aws_context.get(prop)
+        if getattr(aws_context, prop, None) is not None:
+            attributes[attr] = getattr(aws_context, prop)
 
     url = _get_url(aws_event, aws_context)
     if url:
