@@ -13,7 +13,7 @@ on:
 jobs:
   release-comment-issues:
     runs-on: ubuntu-20.04
-    name: 'Notify issues'
+    name: Notify issues
     steps:
       - name: Get version
         id: get_version
