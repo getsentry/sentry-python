@@ -84,22 +84,12 @@ def _wrap_func(func):
                 headers = gcp_event.headers
 
             with sentry_sdk.continue_trace(headers):
-                sampling_context = {
-                    "gcp_env": {
-                        "function_name": environ.get("FUNCTION_NAME"),
-                        "function_entry_point": environ.get("ENTRY_POINT"),
-                        "function_identity": environ.get("FUNCTION_IDENTITY"),
-                        "function_region": environ.get("FUNCTION_REGION"),
-                        "function_project": environ.get("GCP_PROJECT"),
-                    },
-                    "gcp_event": gcp_event,
-                }
                 with sentry_sdk.start_transaction(
                     op=OP.FUNCTION_GCP,
                     name=environ.get("FUNCTION_NAME", ""),
                     source=TRANSACTION_SOURCE_COMPONENT,
                     origin=GcpIntegration.origin,
-                    custom_sampling_context=sampling_context,
+                    attributes=_prepopulate_attributes(gcp_event),
                 ):
                     try:
                         return func(functionhandler, gcp_event, *args, **kwargs)
@@ -229,3 +219,22 @@ def _get_google_cloud_logs_url(final_time):
     )
 
     return url
+
+
+ENV_TO_ATTRIBUTE = {
+    "FUNCTION_NAME": "",
+    "ENTRY_POINT": "",
+    "FUNCTION_IDENTITY": "",
+    "FUNCTION_REGION": "",
+    "GCP_PROJECT": "",
+}
+
+
+def _prepopulate_attributes(gcp_event):
+    attributes = {}
+
+    for key, attr in ENV_TO_ATTRIBUTE.items():
+        if environ.get(key):
+            attributes[attr] = environ[key]
+
+    return attributes
