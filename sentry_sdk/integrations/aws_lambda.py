@@ -155,6 +155,7 @@ def _wrap_handler(handler):
                         "aws_event": aws_event,
                         "aws_context": aws_context,
                     },
+                    attributes=_prepopulate_attributes(aws_event, aws_context),
                 ):
                     try:
                         return handler(aws_event, aws_context, *args, **kwargs)
@@ -457,3 +458,29 @@ def _event_from_error_json(error_json):
     }  # type: Event
 
     return event
+
+
+EVENT_TO_ATTRIBUTES = {
+    "httpMethod": "http.request.method",
+    "queryStringParameters": "url.query",
+    # url
+    # headers
+}
+
+CONTEXT_TO_ATTRIBUTES = {
+    "function_name": "faas.name",
+}
+
+
+def _prepopulate_attributes(aws_event, aws_context):
+    attributes = {}
+
+    for prop, attr in EVENT_TO_ATTRIBUTES.items():
+        if getattr(aws_event, prop, None) is not None:
+            attributes[attr] = getattr(aws_event, prop)
+
+    for prop, attr in CONTEXT_TO_ATTRIBUTES.items():
+        if getattr(aws_context, prop, None) is not None:
+            attributes[attr] = getattr(aws_context, prop)
+
+    return attributes
