@@ -304,21 +304,14 @@ class _ScopedResponse:
         finally:
             with use_isolation_scope(self._isolation_scope):
                 with use_scope(self._current_scope):
-                    # Close the Sentry transaction (it could be that response.close() is never called by the framework)
-                    # This is done here to make sure the Transaction stays
-                    # open until all streaming responses are done.
-                    finish_running_transaction(self._current_scope)
+                    finish_running_transaction()
 
     def close(self):
         # type: () -> None
         with use_isolation_scope(self._isolation_scope):
             with use_scope(self._current_scope):
                 try:
-                    # Close the Sentry transaction
-                    # This is done here to make sure the Transaction stays
-                    # open until all streaming responses are done.
                     finish_running_transaction()
-
                     self._response.close()  # type: ignore
                 except AttributeError:
                     pass
