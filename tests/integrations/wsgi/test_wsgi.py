@@ -1,7 +1,9 @@
+import time
 from collections import Counter
 from unittest import mock
 
 import pytest
+from sentry_sdk.utils import datetime_from_isoformat
 from werkzeug.test import Client
 
 import sentry_sdk
@@ -495,3 +497,80 @@ def test_span_origin_custom(sentry_init, capture_events):
     (event,) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.dogpark.deluxe"
+
+
+def test_long_running_transaction_finished(sentry_init, capture_events):
+    # we allow transactions to be 0.5 seconds as a maximum
+    new_max_duration = 0.5
+
+    with mock.patch.object(
+        sentry_sdk.integrations.wsgi,
+        "MAX_TRANSACTION_DURATION_SECONDS",
+        new_max_duration,
+    ):
+
+        def generate_content():
+            # This response will take 1.5 seconds to generate
+            for _ in range(15):
+                time.sleep(0.1)
+                yield "ok"
+
+        def long_running_app(environ, start_response):
+            start_response("200 OK", [])
+            return generate_content()
+
+        sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+        app = SentryWsgiMiddleware(long_running_app)
+
+        events = capture_events()
+
+        client = Client(app)
+        response = client.get("/")
+        _ = response.get_data()
+
+        (transaction,) = events
+
+        transaction_duration = (
+            datetime_from_isoformat(transaction["timestamp"])
+            - datetime_from_isoformat(transaction["start_timestamp"])
+        ).total_seconds()
+        assert (
+            transaction_duration <= new_max_duration * 1.02
+        )  # we allow 2% margin for processing the request
+
+
+def test_long_running_transaction_timer_canceled(sentry_init, capture_events):
+    # we allow transactions to be 0.5 seconds as a maximum
+    new_max_duration = 0.5
+
+    with mock.patch.object(
+        sentry_sdk.integrations.wsgi,
+        "MAX_TRANSACTION_DURATION_SECONDS",
+        new_max_duration,
+    ):
+        with mock.patch(
+            "sentry_sdk.integrations.wsgi._finish_long_running_transaction"
+        ) as mock_finish:
+
+            def generate_content():
+                # This response will take 0.3 seconds to generate
+                for _ in range(3):
+                    time.sleep(0.1)
+                    yield "ok"
+
+            def long_running_app(environ, start_response):
+                start_response("200 OK", [])
+                return generate_content()
+
+            sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+            app = SentryWsgiMiddleware(long_running_app)
+
+            events = capture_events()
+
+            client = Client(app)
+            response = client.get("/")
+            _ = response.get_data()
+
+            (transaction,) = events
+
+            mock_finish.assert_not_called()
