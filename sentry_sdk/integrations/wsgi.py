@@ -356,13 +356,9 @@ def _finish_long_running_transaction(current_scope, isolation_scope):
     Triggered after MAX_TRANSACTION_DURATION_SECONDS have passed.
     """
     try:
-        transaction_duration = (
-            datetime.now(timezone.utc) - current_scope.transaction.start_timestamp
-        ).total_seconds()
-        if transaction_duration > MAX_TRANSACTION_DURATION_SECONDS:
-            with use_isolation_scope(isolation_scope):
-                with use_scope(current_scope):
-                    finish_running_transaction()
+        with use_isolation_scope(isolation_scope):
+            with use_scope(current_scope):
+                finish_running_transaction()
     except AttributeError:
         # transaction is not there anymore
         pass
