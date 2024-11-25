@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 import sys
 from functools import partial
 from threading import Timer
