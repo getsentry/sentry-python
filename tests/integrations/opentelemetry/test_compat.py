@@ -9,7 +9,7 @@ def test_transaction_name_span_description_compat(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(
+    with sentry_sdk.start_span(
         name="trx-name",
         op="trx-op",
     ) as trx:
@@ -33,13 +33,12 @@ def test_transaction_name_span_description_compat(
     assert spn.__class__.__name__ == "POTelSpan"
     assert spn.op == "span-op"
     assert spn.description == "span-desc"
-    assert spn.name is None
+    assert spn.name == "span-desc"
 
     assert spn._otel_span is not None
     assert spn._otel_span.name == "span-desc"
     assert spn._otel_span.attributes["sentry.op"] == "span-op"
     assert spn._otel_span.attributes["sentry.description"] == "span-desc"
-    assert "sentry.name" not in spn._otel_span.attributes
 
     transaction = events[0]
     assert transaction["transaction"] == "trx-name"
@@ -53,4 +52,3 @@ def test_transaction_name_span_description_compat(
     assert span["op"] == "span-op"
     assert span["data"]["sentry.op"] == "span-op"
     assert span["data"]["sentry.description"] == "span-desc"
-    assert "sentry.name" not in span["data"]

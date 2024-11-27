@@ -376,7 +376,7 @@ class Scope:
         This checks the current scope, the isolation scope and the global scope for a client.
         If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
         """
-        current_scope = cls._get_current_scope()
+        current_scope = cls.get_current_scope()
         try:
             client = current_scope.client
         except AttributeError:
@@ -385,7 +385,7 @@ class Scope:
         if client is not None and client.is_active():
             return client
 
-        isolation_scope = cls._get_isolation_scope()
+        isolation_scope = cls.get_isolation_scope()
         try:
             client = isolation_scope.client
         except AttributeError:
@@ -480,13 +480,10 @@ class Scope:
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
         """
-        Returns the Dynamic Sampling Context from the Propagation Context.
+        Returns the Dynamic Sampling Context from the baggage or populates one.
         """
-        return (
-            self._propagation_context.dynamic_sampling_context
-            if self._propagation_context
-            else None
-        )
+        baggage = self.get_baggage()
+        return baggage.dynamic_sampling_context() if baggage else None
 
     def get_traceparent(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[str]
@@ -789,14 +786,6 @@ class Scope:
         # type: (Optional[Span]) -> None
         """Set current tracing span."""
         self._span = span
-        # XXX: this differs from the implementation in JS, there Scope.setSpan
-        # does not set Scope._transactionName.
-        if isinstance(span, Transaction):
-            transaction = span
-            if transaction.name:
-                self._transaction = transaction.name
-                if transaction.source:
-                    self._transaction_info["source"] = transaction.source
 
     @property
     def profile(self):
