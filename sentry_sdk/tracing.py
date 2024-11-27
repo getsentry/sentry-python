@@ -163,6 +163,7 @@ SOURCE_FOR_STYLE = {
 }
 
 DEFAULT_SPAN_ORIGIN = "manual"
+DEFAULT_SPAN_NAME = "<unlabeled span>"
 
 tracer = otel_trace.get_tracer(__name__)
 
@@ -1249,12 +1250,14 @@ class POTelSpan:
                     # OTel timestamps have nanosecond precision
                     start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
-                span_name = name or description or op or ""
+                span_name = name or description or op or DEFAULT_SPAN_NAME
 
                 # Prepopulate some attrs so that they're accessible in traces_sampler
                 attributes = attributes or {}
-                attributes[SentrySpanAttribute.OP] = op
-                attributes[SentrySpanAttribute.SOURCE] = source
+                if op is not None:
+                    attributes[SentrySpanAttribute.OP] = op
+                if source is not None:
+                    attributes[SentrySpanAttribute.SOURCE] = source
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
@@ -1308,6 +1311,8 @@ class POTelSpan:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None:
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
+        else:
+            self.set_status(SPANSTATUS.OK)
 
         self.finish()
         context.detach(self._ctx_token)
@@ -1324,8 +1329,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
+        self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
 
     @property
     def origin(self):
@@ -1339,8 +1343,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.ORIGIN, value)
+        self.set_attribute(SentrySpanAttribute.ORIGIN, value)
 
     @property
     def containing_transaction(self):
@@ -1396,12 +1399,27 @@ class POTelSpan:
     @property
     def is_valid(self):
         # type: () -> bool
-        return self._otel_span.get_span_context().is_valid
+        return self._otel_span.get_span_context().is_valid and isinstance(
+            self._otel_span, ReadableSpan
+        )
 
     @property
     def sampled(self):
         # type: () -> Optional[bool]
         return self._otel_span.get_span_context().trace_flags.sampled
+
+    @property
+    def sample_rate(self):
+        # type: () -> Optional[float]
+        from sentry_sdk.integrations.opentelemetry.consts import (
+            TRACESTATE_SAMPLE_RATE_KEY,
+        )
+
+        sample_rate = self._otel_span.get_span_context().trace_state.get(
+            TRACESTATE_SAMPLE_RATE_KEY
+        )
+        sample_rate = cast("Optional[str]", sample_rate)
+        return float(sample_rate) if sample_rate is not None else None
 
     @property
     def op(self):
@@ -1415,8 +1433,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.OP, value)
+        self.set_attribute(SentrySpanAttribute.OP, value)
 
     @property
     def name(self):
@@ -1430,8 +1447,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.NAME, value)
+        self.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property
     def source(self):
@@ -1553,6 +1569,11 @@ class POTelSpan:
 
     def set_attribute(self, key, value):
         # type: (str, Any) -> None
+        if value is None:
+            # otel doesn't support None as values, preferring to not set the key
+            # at all instead
+            return
+
         self._otel_span.set_attribute(key, _serialize_span_attribute(value))
 
     def set_status(self, status):

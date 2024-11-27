@@ -34,10 +34,14 @@ def get_parent_sampled(parent_context, trace_id):
     # Only inherit sample rate if `traceId` is the same
     if is_span_context_valid and parent_context.trace_id == trace_id:
         # this is getSamplingDecision in JS
-        if parent_context.trace_flags.sampled:
-            return True
-
+        # if there was no sampling flag, defer the decision
         dsc_sampled = parent_context.trace_state.get(TRACESTATE_SAMPLED_KEY)
+        if dsc_sampled == "deferred":
+            return None
+
+        if parent_context.trace_flags.sampled is not None:
+            return parent_context.trace_flags.sampled
+
         if dsc_sampled == "true":
             return True
         elif dsc_sampled == "false":
@@ -53,6 +57,8 @@ def dropped_result(parent_span_context, attributes, sample_rate=None):
 
     if TRACESTATE_SAMPLED_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
+    elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
+        trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "false")
 
     if sample_rate and TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
@@ -88,6 +94,9 @@ def sampled_result(span_context, attributes, sample_rate):
 
     if TRACESTATE_SAMPLED_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "true")
+    elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
+        trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "true")
+
     if TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
