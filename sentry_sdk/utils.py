@@ -1119,33 +1119,6 @@ def exc_info_from_error(error):
     return exc_info
 
 
-def get_full_stack():
-    # type: () -> List[Dict[str, Any]]
-    """
-    Returns a serialized representation of the full stack from the first frame that is not in sentry_sdk.
-    """
-    stack_info = []
-
-    # Walk up the stack
-    frame = sys._getframe(1)  # type: Optional[FrameType]
-    while frame:
-        in_sdk = False
-        try:
-            if "sentry_sdk" in frame.f_code.co_filename:
-                in_sdk = True
-        except Exception:
-            pass
-
-        if not in_sdk:
-            stack_info.append(serialize_frame(frame))
-
-        frame = frame.f_back
-
-    stack_info.reverse()
-
-    return stack_info
-
-
 def merge_stack_frames(frames, full_stack, client_options):
     # type: (List[Dict[str, Any]], List[Dict[str, Any]], Optional[Dict[str, Any]]) -> List[Dict[str, Any]]
     """
@@ -1196,7 +1169,10 @@ def event_from_exception(
     hint = event_hint_with_exc_info(exc_info)
 
     if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
-        full_stack = get_full_stack()
+        full_stack = current_stacktrace(
+            include_local_variables=client_options["include_local_variables"],
+            max_value_length=client_options["max_value_length"],
+        )["frames"]
     else:
         full_stack = None
 
