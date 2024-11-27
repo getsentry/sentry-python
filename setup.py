@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.18.0",
+    version="2.19.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -70,7 +70,7 @@ setup(
         "openfeature": ["openfeature-sdk>=0.7.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": ["opentelemetry-distro"],
-        "pure_eval": ["pure_eval", "executing", "asttokens"],
+        "pure-eval": ["pure_eval", "executing", "asttokens"],
         "pymongo": ["pymongo>=3.1"],
         "pyspark": ["pyspark>=2.4.4"],
         "quart": ["quart>=0.16.1", "blinker>=1.1"],

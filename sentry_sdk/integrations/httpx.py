@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
-from sentry_sdk.tracing_utils import should_propagate_trace
+from sentry_sdk.tracing_utils import Baggage, should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
     from typing import Any
 
 
@@ -76,11 +77,9 @@ def _install_httpx_client():
                             key=key, value=value, url=request.url
                         )
                     )
-                    if key == BAGGAGE_HEADER_NAME and request.headers.get(
-                        BAGGAGE_HEADER_NAME
-                    ):
-                        # do not overwrite any existing baggage, just append to it
-                        request.headers[key] += "," + value
+
+                    if key == BAGGAGE_HEADER_NAME:
+                        _add_sentry_baggage_to_headers(request.headers, value)
                     else:
                         request.headers[key] = value
 
@@ -148,3 +147,21 @@ def _install_httpx_async_client():
             return rv
 
     AsyncClient.send = send
+
+
+def _add_sentry_baggage_to_headers(headers, sentry_baggage):
+    # type: (MutableMapping[str, str], str) -> None
+    """Add the Sentry baggage to the headers.
+
+    This function directly mutates the provided headers. The provided sentry_baggage
+    is appended to the existing baggage. If the baggage already contains Sentry items,
+    they are stripped out first.
+    """
+    existing_baggage = headers.get(BAGGAGE_HEADER_NAME, "")
+    stripped_existing_baggage = Baggage.strip_sentry_baggage(existing_baggage)
+
+    separator = "," if len(stripped_existing_baggage) > 0 else ""
+
+    headers[BAGGAGE_HEADER_NAME] = (
+        stripped_existing_baggage + separator + sentry_baggage
+    )
