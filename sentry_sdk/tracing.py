@@ -1,3 +1,4 @@
+import json
 import uuid
 import random
 import time
@@ -1631,8 +1632,12 @@ class POTelSpan:
 
     def to_json(self):
         # type: () -> dict[str, Any]
-        # TODO-neel-potel for sampling context
-        pass
+        """
+        Only meant for testing. Not used internally anymore.
+        """
+        if not isinstance(self._otel_span, ReadableSpan):
+            return {}
+        return json.loads(self._otel_span.to_json())
 
     def get_trace_context(self):
         # type: () -> dict[str, Any]

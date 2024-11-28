@@ -96,6 +96,7 @@ def _install_httplib():
             origin="auto.http.stdlib.httplib",
             only_if_parent=True,
         )
+        span.__enter__()
 
         data = {
             SPANDATA.HTTP_METHOD: method,
@@ -152,7 +153,7 @@ def _install_httplib():
             span.set_http_status(int(rv.status))
             span.set_data("reason", rv.reason)
         finally:
-            span.finish()
+            span.__exit__(None, None, None)
 
         return rv
 
