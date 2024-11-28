@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message, start_span, continue_trace, isolation_scope
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
@@ -14,6 +14,31 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 from tests.conftest import ApproxDict, create_mock_http_server
 
 PORT = create_mock_http_server()
+
+
+@pytest.fixture
+def capture_request_headers(monkeypatch):
+    """
+    HTTPConnection.send is passed a string containing (among other things)
+    the headers on the request. Mock it so we can check the headers.
+    """
+
+    def inner(do_send=True):
+        request_headers = {}
+        old_send = HTTPConnection.send
+
+        def patched_send(self, data):
+            for line in data.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+            if do_send:
+                old_send(self, data)
+
+        monkeypatch.setattr(HTTPConnection, "send", patched_send)
+        return request_headers
+
+    return inner
 
 
 def test_crumb_capture(sentry_init, capture_events):
@@ -79,7 +104,7 @@ def test_empty_realurl(sentry_init):
     """
 
     sentry_init(dsn="")
-    HTTPConnection("example.com", port=443).putrequest("POST", None)
+    HTTPConnection("localhost", PORT).putrequest("POST", None)
 
 
 def test_httplib_misuse(sentry_init, capture_events, request):
@@ -131,40 +156,28 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     )
 
 
-def test_outgoing_trace_headers(sentry_init, monkeypatch, capture_envelopes):
-    # HTTPSConnection.send is passed a string containing (among other things)
-    # the headers on the request. Mock it so we can check the headers, and also
-    # so it doesn't try to actually talk to the internet.
-    mock_send = mock.Mock()
-    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
-
+def test_outgoing_trace_headers(
+    sentry_init, capture_envelopes, capture_request_headers, SortedBaggage
+):
     sentry_init(traces_sample_rate=1.0)
-
     envelopes = capture_envelopes()
+    request_headers = capture_request_headers()
 
     headers = {}
+    headers["sentry-trace"] = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
     headers["baggage"] = (
         "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
+        "sentry-sampled=true, sentry-sample_rate=0.01337, "
         "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
     )
 
-    transaction = Transaction.continue_from_headers(headers)
-
-    with start_transaction(
-        transaction=transaction,
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        trace_id="12312012123120121231201212312012",
-    ) as transaction:
-        HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
-
-        (request_str,) = mock_send.call_args[0]
-        request_headers = {}
-        for line in request_str.decode("utf-8").split("\r\n")[1:]:
-            if line:
-                key, val = line.split(": ")
-                request_headers[key] = val
+    with isolation_scope():
+        with continue_trace(headers):
+            with start_span(name="/interactions/other-dogs/new-dog"):
+                conn = HTTPConnection("localhost", PORT)
+                conn.request("GET", "/top-chasers")
+                conn.getresponse()
 
     (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
@@ -180,38 +193,30 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch, capture_envelopes):
     expected_outgoing_baggage = (
         "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
         "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sampled=true,"
         "sentry-sample_rate=0.01337,"
         "sentry-user_id=Am%C3%A9lie"
     )
 
-    assert request_headers["baggage"] == expected_outgoing_baggage
+    assert request_headers["baggage"] == SortedBaggage(expected_outgoing_baggage)
 
 
-def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch, capture_envelopes):
-    # HTTPSConnection.send is passed a string containing (among other things)
-    # the headers on the request. Mock it so we can check the headers, and also
-    # so it doesn't try to actually talk to the internet.
-    mock_send = mock.Mock()
-    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
-
+def test_outgoing_trace_headers_head_sdk(
+    sentry_init, monkeypatch, capture_request_headers, capture_envelopes, SortedBaggage
+):
     # make sure transaction is always sampled
     monkeypatch.setattr(random, "random", lambda: 0.1)
 
     sentry_init(traces_sample_rate=0.5, release="foo")
-
     envelopes = capture_envelopes()
+    request_headers = capture_request_headers()
 
-    transaction = Transaction.continue_from_headers({})
-
-    with start_transaction(transaction=transaction, name="Head SDK tx") as transaction:
-        HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
-
-        (request_str,) = mock_send.call_args[0]
-        request_headers = {}
-        for line in request_str.decode("utf-8").split("\r\n")[1:]:
-            if line:
-                key, val = line.split(": ")
-                request_headers[key] = val
+    with isolation_scope():
+        with continue_trace({}):
+            with start_span(name="Head SDK tx") as root_span:
+                conn = HTTPConnection("localhost", PORT)
+                conn.request("GET", "/top-chasers")
+                conn.getresponse()
 
     (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
@@ -225,14 +230,15 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch, capture_envel
     assert request_headers["sentry-trace"] == expected_sentry_trace
 
     expected_outgoing_baggage = (
-        "sentry-trace_id=%s,"
+        f"sentry-trace_id={root_span.trace_id},"
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-sample_rate=0.5,"
-        "sentry-sampled=%s"
-    ) % (transaction.trace_id, "true" if transaction.sampled else "false")
+        "sentry-sampled=true,"
+        "sentry-transaction=Head%20SDK%20tx"
+    )
 
-    assert request_headers["baggage"] == expected_outgoing_baggage
+    assert request_headers["baggage"] == SortedBaggage(expected_outgoing_baggage)
 
 
 @pytest.mark.parametrize(
@@ -295,42 +301,23 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch, capture_envel
     ],
 )
 def test_option_trace_propagation_targets(
-    sentry_init, monkeypatch, trace_propagation_targets, host, path, trace_propagated
+    sentry_init,
+    capture_request_headers,
+    trace_propagation_targets,
+    host,
+    path,
+    trace_propagated,
 ):
-    # HTTPSConnection.send is passed a string containing (among other things)
-    # the headers on the request. Mock it so we can check the headers, and also
-    # so it doesn't try to actually talk to the internet.
-    mock_send = mock.Mock()
-    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
-
     sentry_init(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
     )
 
-    headers = {
-        "baggage": (
-            "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
-        )
-    }
+    request_headers = capture_request_headers(do_send=False)
 
-    transaction = Transaction.continue_from_headers(headers)
-
-    with start_transaction(
-        transaction=transaction,
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        trace_id="12312012123120121231201212312012",
-    ) as transaction:
+    with start_span(name="foo"):
         HTTPSConnection(host).request("GET", path)
-
-        (request_str,) = mock_send.call_args[0]
-        request_headers = {}
-        for line in request_str.decode("utf-8").split("\r\n")[1:]:
-            if line:
-                key, val = line.split(": ")
-                request_headers[key] = val
+        # don't invoke getresponse to avoid actual network traffic
 
         if trace_propagated:
             assert "sentry-trace" in request_headers
@@ -344,8 +331,8 @@ def test_span_origin(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, debug=True)
     events = capture_events()
 
-    with start_transaction(name="foo"):
-        conn = HTTPSConnection("example.com")
+    with start_span(name="foo"):
+        conn = HTTPConnection("localhost", PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
 
@@ -364,9 +351,9 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    with start_transaction(op="op", name="name"):
+    with start_span(op="op", name="name"):
         try:
-            conn = HTTPSConnection("www.squirrelchasers.com")
+            conn = HTTPConnection("localhost", PORT)
             conn.request("GET", "/top-chasers")
             conn.getresponse()
         except Exception:
@@ -385,4 +372,4 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     span = transaction["spans"][0]
     assert span["op"] == "http.client"
-    assert span["description"] == "GET https://www.squirrelchasers.com/top-chasers"
+    assert span["description"] == f"GET http://localhost:{PORT}/top-chasers"
