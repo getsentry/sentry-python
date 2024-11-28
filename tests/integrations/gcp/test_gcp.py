@@ -304,16 +304,12 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                 try:
                     traces_sampler.assert_any_call(
                         DictionaryContaining({
-                            "gcp_env": DictionaryContaining({
-                                "function_name": "chase_into_tree",
-                                "function_region": "dogpark",
-                                "function_project": "SquirrelChasing",
-                            }),
-                            "gcp_event": {
-                                "type": "chase",
-                                "chasers": ["Maisey", "Charlie"],
-                                "num_squirrels": 2,
-                            },
+                            "faas.name": "chase_into_tree",
+                            "faas.region": "dogpark",
+                            "gcp.function.identity": "func_ID",
+                            "gcp.function.entry_point": "cloud_function",
+                            "gcp.function.project": "SquirrelChasing",
+                            "cloud.provider": "gcp",
                         })
                     )
                 except AssertionError:

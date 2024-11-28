@@ -468,7 +468,9 @@ def _event_from_error_json(error_json):
 
 
 def _prepopulate_attributes(aws_event, aws_context):
-    attributes = {}
+    attributes = {
+        "cloud.provider": "aws",
+    }
 
     for prop, attr in EVENT_TO_ATTRIBUTES.items():
         if aws_event.get(prop) is not None:
