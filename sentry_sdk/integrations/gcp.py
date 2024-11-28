@@ -223,10 +223,10 @@ def _get_google_cloud_logs_url(final_time):
 
 ENV_TO_ATTRIBUTE = {
     "FUNCTION_NAME": "faas.name",
-    "ENTRY_POINT": "gcp.entry_point",
-    "FUNCTION_IDENTITY": "gcp.function_identity",
+    "ENTRY_POINT": "gcp.function.entry_point",
+    "FUNCTION_IDENTITY": "gcp.function.identity",
     "FUNCTION_REGION": "faas.region",
-    "GCP_PROJECT": "gcp.project",
+    "GCP_PROJECT": "gcp.function.project",
 }
 
 EVENT_TO_ATTRIBUTE = {

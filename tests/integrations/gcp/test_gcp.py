@@ -306,9 +306,9 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                         DictionaryContaining({
                             "faas.name": "chase_into_tree",
                             "faas.region": "dogpark",
-                            "gcp.function_identity": "func_ID",
-                            "gcp.entry_point": "cloud_function",
-                            "gcp.project": "SquirrelChasing",
+                            "gcp.function.identity": "func_ID",
+                            "gcp.function.entry_point": "cloud_function",
+                            "gcp.function.project": "SquirrelChasing",
                             "cloud.provider": "gcp",
                         })
                     )
