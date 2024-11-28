@@ -161,36 +161,43 @@ def span_data_for_http_method(span):
     # type: (ReadableSpan) -> OtelExtractedSpanData
     span_attributes = span.attributes or {}
 
-    op = "http"
+    op = span_attributes.get(SentrySpanAttribute.OP)
+    if op is None:
+        op = "http"
 
-    if span.kind == SpanKind.SERVER:
-        op += ".server"
-    elif span.kind == SpanKind.CLIENT:
-        op += ".client"
+        if span.kind == SpanKind.SERVER:
+            op += ".server"
+        elif span.kind == SpanKind.CLIENT:
+            op += ".client"
 
     http_method = span_attributes.get(SpanAttributes.HTTP_METHOD)
     route = span_attributes.get(SpanAttributes.HTTP_ROUTE)
     target = span_attributes.get(SpanAttributes.HTTP_TARGET)
     peer_name = span_attributes.get(SpanAttributes.NET_PEER_NAME)
 
-    description = f"{http_method}"
+    # TODO-neel-potel remove description completely
+    description = span_attributes.get(
+        SentrySpanAttribute.DESCRIPTION
+    ) or span_attributes.get(SentrySpanAttribute.NAME)
+    if description is None:
+        description = f"{http_method}"
 
-    if route:
-        description = f"{http_method} {route}"
-    elif target:
-        description = f"{http_method} {target}"
-    elif peer_name:
-        description = f"{http_method} {peer_name}"
-    else:
-        url = span_attributes.get(SpanAttributes.HTTP_URL)
-        url = cast("Optional[str]", url)
+        if route:
+            description = f"{http_method} {route}"
+        elif target:
+            description = f"{http_method} {target}"
+        elif peer_name:
+            description = f"{http_method} {peer_name}"
+        else:
+            url = span_attributes.get(SpanAttributes.HTTP_URL)
+            url = cast("Optional[str]", url)
 
-        if url:
-            parsed_url = urlparse(url)
-            url = "{}://{}{}".format(
-                parsed_url.scheme, parsed_url.netloc, parsed_url.path
-            )
-            description = f"{http_method} {url}"
+            if url:
+                parsed_url = urlparse(url)
+                url = "{}://{}{}".format(
+                    parsed_url.scheme, parsed_url.netloc, parsed_url.path
+                )
+                description = f"{http_method} {url}"
 
     status, http_status = extract_span_status(span)
 
