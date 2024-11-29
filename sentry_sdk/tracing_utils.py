@@ -739,39 +739,10 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def finish_running_transaction(transaction=None, exc_info=None, timer=None, current_scope=None, isolation_scope=None, debug=None):
-    # type: (Optional[sentry_sdk.Transaction], Optional[ExcInfo], Optional[Timer]) -> None
-    print(f"----")
-    print(f"\nCALLED finish_running_transaction {id(transaction)} / {transaction} / {exc_info} / {timer} / {current_scope} / {isolation_scope} / debug: {debug}")
-    import traceback
-    traceback.print_stack()
-    # print(f"{id(transaction)} / {sentry_sdk.get_current_scope().transaction}")
-    print(f"hasattr _ctx_token: {hasattr(transaction, '_ctx_token')}")
-    # print(f"_ctx_token: {transaction._ctx_token}")
-
-    if timer is not None:
-        timer.cancel()
-
+def finish_running_transaction(transaction=None, exc_info=None):
+    # type: (Optional[sentry_sdk.Transaction], Optional[ExcInfo]) -> None
     if transaction is not None and hasattr(transaction, "_ctx_token"):
-        with (
-            sentry_sdk.use_isolation_scope(isolation_scope)
-            if isolation_scope is not None
-            else contextlib.nullcontext()
-        ) as scope1:
-            with (
-                sentry_sdk.use_scope(current_scope)
-                if current_scope is not None
-                else contextlib.nullcontext()
-            ) as scope2:
-                if exc_info is not None:
-                    transaction.__exit__(*exc_info)
-                else:
-                    transaction.__exit__(None, None, None)
-
-                print(f"End of current scope: {scope2}")
-
-            print(f"End of isolation scope: {scope1}")
-    else:
-        print(f"Transaction has no _ctx_token")
-
-    print("done finish_running_transaction")
+        if exc_info is not None:
+            transaction.__exit__(*exc_info)
+        else:
+            transaction.__exit__(None, None, None)
