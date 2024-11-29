@@ -38,14 +38,6 @@ async def boom():
     1 / 0
 
 
-@pytest.fixture(scope="session")
-def event_loop(request):
-    """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
 def get_sentry_task_factory(mock_get_running_loop):
     """
     Patches (mocked) asyncio and gets the sentry_task_factory.
@@ -58,11 +50,10 @@ def get_sentry_task_factory(mock_get_running_loop):
 
 
 @minimum_python_37
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_create_task(
     sentry_init,
     capture_events,
-    event_loop,
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -76,10 +67,10 @@ async def test_create_task(
 
     with sentry_sdk.start_transaction(name="test_transaction_for_create_task"):
         with sentry_sdk.start_span(op="root", name="not so important"):
-            tasks = [event_loop.create_task(foo()), event_loop.create_task(bar())]
+            tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
-            sentry_sdk.flush()
+    sentry_sdk.flush()
 
     (transaction_event,) = events
 
@@ -102,7 +93,7 @@ async def test_create_task(
 
 
 @minimum_python_37
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_gather(
     sentry_init,
     capture_events,
@@ -121,7 +112,7 @@ async def test_gather(
         with sentry_sdk.start_span(op="root", name="not so important"):
             await asyncio.gather(foo(), bar(), return_exceptions=True)
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
     (transaction_event,) = events
 
@@ -144,11 +135,10 @@ async def test_gather(
 
 
 @minimum_python_37
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_exception(
     sentry_init,
     capture_events,
-    event_loop,
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -162,10 +152,10 @@ async def test_exception(
 
     with sentry_sdk.start_transaction(name="test_exception"):
         with sentry_sdk.start_span(op="root", name="not so important"):
-            tasks = [event_loop.create_task(boom()), event_loop.create_task(bar())]
+            tasks = [asyncio.create_task(boom()), asyncio.create_task(bar())]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
-            sentry_sdk.flush()
+    sentry_sdk.flush()
 
     (error_event, _) = events
 
@@ -178,7 +168,7 @@ async def test_exception(
 
 
 @minimum_python_37
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_task_result(sentry_init):
     sentry_init(
         integrations=[
@@ -194,7 +184,7 @@ async def test_task_result(sentry_init):
 
 
 @minimum_python_311
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_task_with_context(sentry_init):
     """
     Integration test to ensure working context parameter in Python 3.11+
@@ -362,11 +352,10 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
 
 
 @minimum_python_37
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_span_origin(
     sentry_init,
     capture_events,
-    event_loop,
 ):
     sentry_init(
         integrations=[AsyncioIntegration()],
@@ -377,11 +366,11 @@ async def test_span_origin(
 
     with sentry_sdk.start_transaction(name="something"):
         tasks = [
-            event_loop.create_task(foo()),
+            asyncio.create_task(foo()),
         ]
         await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
     (event,) = events
 
