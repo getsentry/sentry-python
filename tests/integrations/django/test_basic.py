@@ -50,7 +50,7 @@ def test_view_exceptions(sentry_init, client, capture_exceptions, capture_events
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
-    client.get(reverse("view_exc"))
+    unpack_werkzeug_response(client.get(reverse("view_exc")))
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -71,7 +71,9 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
-    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    unpack_werkzeug_response(
+        client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    )
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -90,7 +92,9 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
-    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    unpack_werkzeug_response(
+        client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    )
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -102,7 +106,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
 def test_middleware_exceptions(sentry_init, client, capture_exceptions):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
-    client.get(reverse("middleware_exc"))
+    unpack_werkzeug_response(client.get(reverse("middleware_exc")))
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -156,7 +160,7 @@ def test_has_trace_if_performance_enabled(sentry_init, client, capture_events):
         traces_sample_rate=1.0,
     )
     events = capture_events()
-    client.head(reverse("view_exc_with_msg"))
+    unpack_werkzeug_response(client.head(reverse("view_exc_with_msg")))
 
     (msg_event, error_event, transaction_event) = events
 
@@ -212,8 +216,10 @@ def test_trace_from_headers_if_performance_enabled(sentry_init, client, capture_
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    client.head(
-        reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
+    unpack_werkzeug_response(
+        client.head(
+            reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
+        )
     )
 
     (msg_event, error_event, transaction_event) = events
@@ -930,7 +936,7 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
 
     for url, expected_line in views_tests:
         events = capture_events()
-        client.get(url)
+        unpack_werkzeug_response(client.get(url))
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
 
@@ -974,7 +980,7 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
     )
     events = capture_events()
 
-    client.get(reverse("message"))
+    unpack_werkzeug_response(client.get(reverse("message")))
 
     message, transaction = events
 
@@ -991,7 +997,7 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("message"))
+    unpack_werkzeug_response(client.get(reverse("message")))
 
     message, transaction = events
 
@@ -1015,7 +1021,7 @@ def test_signals_spans(sentry_init, client, capture_events, render_span_tree):
     )
     events = capture_events()
 
-    client.get(reverse("message"))
+    unpack_werkzeug_response(client.get(reverse("message")))
 
     message, transaction = events
 
@@ -1038,7 +1044,7 @@ def test_signals_spans_disabled(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("message"))
+    unpack_werkzeug_response(client.get(reverse("message")))
 
     message, transaction = events
 
@@ -1068,7 +1074,7 @@ def test_signals_spans_filtering(sentry_init, client, capture_events, render_spa
     )
     events = capture_events()
 
-    client.get(reverse("send_myapp_custom_signal"))
+    unpack_werkzeug_response(client.get(reverse("send_myapp_custom_signal")))
 
     (transaction,) = events
 
@@ -1196,7 +1202,7 @@ def test_span_origin(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("view_with_signal"))
+    unpack_werkzeug_response(client.get(reverse("view_with_signal")))
 
     (transaction,) = events
 
@@ -1226,9 +1232,9 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("nomessage"))
-    client.options(reverse("nomessage"))
-    client.head(reverse("nomessage"))
+    unpack_werkzeug_response(client.get(reverse("nomessage")))
+    unpack_werkzeug_response(client.options(reverse("nomessage")))
+    unpack_werkzeug_response(client.head(reverse("nomessage")))
 
     (event,) = events
 
@@ -1252,9 +1258,9 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("nomessage"))
-    client.options(reverse("nomessage"))
-    client.head(reverse("nomessage"))
+    unpack_werkzeug_response(client.get(reverse("nomessage")))
+    unpack_werkzeug_response(client.options(reverse("nomessage")))
+    unpack_werkzeug_response(client.head(reverse("nomessage")))
 
     assert len(events) == 2
 
