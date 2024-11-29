@@ -1,6 +1,5 @@
 import sys
 from functools import partial
-from threading import Timer
 
 import sentry_sdk
 from sentry_sdk._werkzeug import get_host, _get_headers
@@ -124,18 +123,11 @@ class SentryWsgiMiddleware:
                             origin=self.span_origin,
                         )
 
-                    timer = None
                     if transaction is not None:
                         sentry_sdk.start_transaction(
                             transaction,
                             custom_sampling_context={"wsgi_environ": environ},
                         ).__enter__()
-                        timer = Timer(
-                            MAX_TRANSACTION_DURATION_SECONDS,
-                            _finish_long_running_transaction,
-                            args=(current_scope, scope),
-                        )
-                        timer.start()
 
                     try:
                         response = self.app(
@@ -149,7 +141,7 @@ class SentryWsgiMiddleware:
                     except BaseException:
                         exc_info = sys.exc_info()
                         _capture_exception(exc_info)
-                        finish_running_transaction(current_scope, exc_info, timer)
+                        finish_running_transaction(current_scope, exc_info)
                         reraise(*exc_info)
 
         finally:
@@ -159,7 +151,6 @@ class SentryWsgiMiddleware:
             response=response,
             current_scope=current_scope,
             isolation_scope=scope,
-            timer=timer,
         )
 
 
@@ -255,20 +246,18 @@ class _ScopedResponse:
     - WSGI servers streaming responses interleaved from the same thread
     """
 
-    __slots__ = ("_response", "_current_scope", "_isolation_scope", "_timer")
+    __slots__ = ("_response", "_current_scope", "_isolation_scope")
 
     def __init__(
         self,
         response,  # type: Iterator[bytes]
         current_scope,  # type: sentry_sdk.scope.Scope
         isolation_scope,  # type: sentry_sdk.scope.Scope
-        timer=None,  # type: Optional[Timer]
     ):
         # type: (...) -> None
         self._response = response
         self._current_scope = current_scope
         self._isolation_scope = isolation_scope
-        self._timer = timer
 
     def __iter__(self):
         # type: () -> Iterator[bytes]
@@ -290,14 +279,14 @@ class _ScopedResponse:
         finally:
             with use_isolation_scope(self._isolation_scope):
                 with use_scope(self._current_scope):
-                    finish_running_transaction(timer=self._timer)
+                    finish_running_transaction()
 
     def close(self):
         # type: () -> None
         with use_isolation_scope(self._isolation_scope):
             with use_scope(self._current_scope):
                 try:
-                    finish_running_transaction(timer=self._timer)
+                    finish_running_transaction()
                     self._response.close()  # type: ignore
                 except AttributeError:
                     pass
@@ -346,18 +335,3 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
         return event
 
     return event_processor
-
-
-def _finish_long_running_transaction(current_scope, isolation_scope):
-    # type: (sentry_sdk.scope.Scope, sentry_sdk.scope.Scope) -> None
-    """
-    Make sure we don't keep transactions open for too long.
-    Triggered after MAX_TRANSACTION_DURATION_SECONDS have passed.
-    """
-    try:
-        with use_isolation_scope(isolation_scope):
-            with use_scope(current_scope):
-                finish_running_transaction()
-    except AttributeError:
-        # transaction is not there anymore
-        pass
