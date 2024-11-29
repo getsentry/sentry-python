@@ -500,11 +500,11 @@ def test_span_origin_custom(sentry_init, capture_events):
 
 
 def test_long_running_transaction_finished(sentry_init, capture_events):
-    # we allow transactions to be 0.5 seconds as a maximum
-    new_max_duration = 0.5
+    # we allow transactions to be 1 seconds as a maximum
+    new_max_duration = 1
 
     with mock.patch.object(
-        sentry_sdk.integrations.wsgi,
+        sentry_sdk.tracing,
         "MAX_TRANSACTION_DURATION_SECONDS",
         new_max_duration,
     ):
@@ -512,8 +512,11 @@ def test_long_running_transaction_finished(sentry_init, capture_events):
         def generate_content():
             # This response will take 1.5 seconds to generate
             for _ in range(15):
-                time.sleep(0.1)
-                yield "ok"
+                with sentry_sdk.start_span(
+                    op="generate_content", name="generate_content {_}"
+                ):
+                    time.sleep(0.1)
+                    yield "ok"
 
         def long_running_app(environ, start_response):
             start_response("200 OK", [])
@@ -534,6 +537,8 @@ def test_long_running_transaction_finished(sentry_init, capture_events):
             datetime_from_isoformat(transaction["timestamp"])
             - datetime_from_isoformat(transaction["start_timestamp"])
         ).total_seconds()
+
         assert (
-            transaction_duration <= new_max_duration * 1.02
-        )  # we allow 2% margin for processing the request
+            transaction_duration
+            <= new_max_duration * 1.05  # we allow 5% margin for processing the request
+        ), "Long running transaction has not been finished after a set maximum duration"

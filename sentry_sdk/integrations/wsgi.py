@@ -45,9 +45,6 @@ if TYPE_CHECKING:
             pass
 
 
-MAX_TRANSACTION_DURATION_SECONDS = 5 * 60
-
-
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
 
