@@ -5,6 +5,7 @@ removed at any time without prior notice.
 """
 
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations.opentelemetry.scope import setup_initial_scopes
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
@@ -74,6 +75,7 @@ def _setup_scope_context_management():
     import opentelemetry.context
 
     opentelemetry.context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
+    setup_initial_scopes()
 
 
 def _setup_sentry_tracing():
