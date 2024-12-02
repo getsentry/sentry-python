@@ -127,7 +127,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
             # setting it to 0 means the profiler will internally measure time on start
             profile = Profile(sampled, 0)
             # TODO-neel-potel sampling context??
-            profile._set_initial_sampling_decision(sampling_context=create_sampling_context(span, parent_context))
+            profile._set_initial_sampling_decision(
+                sampling_context=create_sampling_context(span, parent_context)
+            )
             profile.__enter__()
             set_sentry_meta(span, "profile", profile)
 
