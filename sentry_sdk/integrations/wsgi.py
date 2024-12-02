@@ -9,8 +9,10 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
+    nullcontext,
 )
 from sentry_sdk.sessions import track_session
+from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ContextVar,
