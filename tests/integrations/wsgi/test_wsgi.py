@@ -1,4 +1,6 @@
+import time
 from collections import Counter
+from datetime import datetime
 from unittest import mock
 
 import pytest
@@ -40,7 +42,7 @@ class ExitingIterable:
 
 
 def test_basic(sentry_init, crashing_app, capture_events):
-    sentry_init(send_default_pii=True)
+    sentry_init(send_default_pii=True, debug=True)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -141,7 +143,7 @@ def test_transaction_with_error(
     def dogpark(environ, start_response):
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0, debug=True)
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
@@ -491,3 +493,48 @@ def test_span_origin_custom(sentry_init, capture_events):
     (event,) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.dogpark.deluxe"
+
+
+def test_long_running_transaction_finished(sentry_init, capture_events):
+    """
+    Test that a long running transaction is finished after the maximum duration,
+    no matter if the response is still being generated.
+    """
+    # we allow transactions to be 0.5 seconds as a maximum
+    new_max_duration = 0.5
+
+    with mock.patch.object(
+        sentry_sdk.integrations.wsgi,
+        "MAX_TRANSACTION_DURATION_SECONDS",
+        new_max_duration,
+    ):
+
+        def generate_content():
+            # This response will take 1.5 seconds to generate
+            for _ in range(15):
+                time.sleep(0.1)
+                yield "ok"
+
+        def long_running_app(environ, start_response):
+            start_response("200 OK", [])
+            return generate_content()
+
+        sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+        app = SentryWsgiMiddleware(long_running_app)
+
+        events = capture_events()
+
+        client = Client(app)
+        response = client.get("/")
+        _ = response.get_data()
+
+        (transaction,) = events
+
+        transaction_duration = (
+            datetime.fromisoformat(transaction["timestamp"])
+            - datetime.fromisoformat(transaction["start_timestamp"])
+        ).total_seconds()
+        assert (
+            transaction_duration
+            <= new_max_duration * 1.02  # we allow 2% margin for processing the request
+        ), "Long running transaction has not been finished after a set maximum duration"

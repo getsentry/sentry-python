@@ -36,6 +36,9 @@ if TYPE_CHECKING:
 
     from types import FrameType
 
+    from sentry_sdk._types import ExcInfo
+    from threading import Timer
+
 
 SENTRY_TRACE_REGEX = re.compile(
     "^[ \t]*"  # whitespace
@@ -731,3 +734,15 @@ from sentry_sdk.tracing import (
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
+
+if TYPE_CHECKING:
+    from sentry_sdk.tracing import Span
+
+
+def finish_running_transaction(transaction=None, exc_info=None):
+    # type: (Optional[sentry_sdk.Transaction], Optional[ExcInfo]) -> None
+    if transaction is not None and hasattr(transaction, "_ctx_token"):
+        if exc_info is not None:
+            transaction.__exit__(*exc_info)
+        else:
+            transaction.__exit__(None, None, None)
