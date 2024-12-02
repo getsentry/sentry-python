@@ -1,19 +1,19 @@
 import sys
 from functools import partial
-from threading import Timer
 
 import sentry_sdk
 from sentry_sdk._werkzeug import get_host, _get_headers
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.scope import should_send_default_pii, use_isolation_scope, use_scope
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
+    nullcontext,
 )
 from sentry_sdk.sessions import track_session
+from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
-from sentry_sdk.tracing_utils import finish_running_transaction
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -44,9 +44,6 @@ if TYPE_CHECKING:
         def __call__(self, status, response_headers, exc_info=None):  # type: ignore
             # type: (str, WsgiResponseHeaders, Optional[WsgiExcInfo]) -> WsgiResponseIter
             pass
-
-
-MAX_TRANSACTION_DURATION_SECONDS = 5 * 60
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
@@ -101,7 +98,6 @@ class SentryWsgiMiddleware:
         _wsgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as scope:
-                current_scope = sentry_sdk.get_current_scope()
                 with track_session(scope, session_mode="request"):
                     with capture_internal_exceptions():
                         scope.clear_breadcrumbs()
@@ -113,7 +109,6 @@ class SentryWsgiMiddleware:
                         )
 
                     method = environ.get("REQUEST_METHOD", "").upper()
-
                     transaction = None
                     if method in self.http_methods_to_capture:
                         transaction = continue_trace(
@@ -124,43 +119,27 @@ class SentryWsgiMiddleware:
                             origin=self.span_origin,
                         )
 
-                    timer = None
-                    if transaction is not None:
+                    with (
                         sentry_sdk.start_transaction(
                             transaction,
                             custom_sampling_context={"wsgi_environ": environ},
-                        ).__enter__()
-                        timer = Timer(
-                            MAX_TRANSACTION_DURATION_SECONDS,
-                            _finish_long_running_transaction,
-                            args=(current_scope, scope),
                         )
-                        timer.start()
-
-                    try:
-                        response = self.app(
-                            environ,
-                            partial(
-                                _sentry_start_response,
-                                start_response,
-                                transaction,
-                            ),
-                        )
-                    except BaseException:
-                        exc_info = sys.exc_info()
-                        _capture_exception(exc_info)
-                        finish_running_transaction(current_scope, exc_info, timer)
-                        reraise(*exc_info)
-
+                        if transaction is not None
+                        else nullcontext()
+                    ):
+                        try:
+                            response = self.app(
+                                environ,
+                                partial(
+                                    _sentry_start_response, start_response, transaction
+                                ),
+                            )
+                        except BaseException:
+                            reraise(*_capture_exception())
         finally:
             _wsgi_middleware_applied.set(False)
 
-        return _ScopedResponse(
-            response=response,
-            current_scope=current_scope,
-            isolation_scope=scope,
-            timer=timer,
-        )
+        return _ScopedResponse(scope, response)
 
 
 def _sentry_start_response(  # type: ignore
@@ -222,13 +201,13 @@ def get_client_ip(environ):
     return environ.get("REMOTE_ADDR")
 
 
-def _capture_exception(exc_info=None):
-    # type: (Optional[ExcInfo]) -> ExcInfo
+def _capture_exception():
+    # type: () -> ExcInfo
     """
     Captures the current exception and sends it to Sentry.
     Returns the ExcInfo tuple to it can be reraised afterwards.
     """
-    exc_info = exc_info or sys.exc_info()
+    exc_info = sys.exc_info()
     e = exc_info[1]
 
     # SystemExit(0) is the only uncaught exception that is expected behavior
@@ -246,7 +225,7 @@ def _capture_exception(exc_info=None):
 
 class _ScopedResponse:
     """
-    Use separate scopes for each response chunk.
+    Users a separate scope for each response chunk.
 
     This will make WSGI apps more tolerant against:
     - WSGI servers streaming responses from a different thread/from
@@ -255,54 +234,37 @@ class _ScopedResponse:
     - WSGI servers streaming responses interleaved from the same thread
     """
 
-    __slots__ = ("_response", "_current_scope", "_isolation_scope", "_timer")
+    __slots__ = ("_response", "_scope")
 
-    def __init__(
-        self,
-        response,  # type: Iterator[bytes]
-        current_scope,  # type: sentry_sdk.scope.Scope
-        isolation_scope,  # type: sentry_sdk.scope.Scope
-        timer=None,  # type: Optional[Timer]
-    ):
-        # type: (...) -> None
+    def __init__(self, scope, response):
+        # type: (sentry_sdk.scope.Scope, Iterator[bytes]) -> None
+        self._scope = scope
         self._response = response
-        self._current_scope = current_scope
-        self._isolation_scope = isolation_scope
-        self._timer = timer
 
     def __iter__(self):
         # type: () -> Iterator[bytes]
         iterator = iter(self._response)
 
-        try:
-            while True:
-                with use_isolation_scope(self._isolation_scope):
-                    with use_scope(self._current_scope):
-                        try:
-                            chunk = next(iterator)
-                        except StopIteration:
-                            break
-                        except BaseException:
-                            reraise(*_capture_exception())
+        while True:
+            with use_isolation_scope(self._scope):
+                try:
+                    chunk = next(iterator)
+                except StopIteration:
+                    break
+                except BaseException:
+                    reraise(*_capture_exception())
 
-                yield chunk
-
-        finally:
-            with use_isolation_scope(self._isolation_scope):
-                with use_scope(self._current_scope):
-                    finish_running_transaction(timer=self._timer)
+            yield chunk
 
     def close(self):
         # type: () -> None
-        with use_isolation_scope(self._isolation_scope):
-            with use_scope(self._current_scope):
-                try:
-                    finish_running_transaction(timer=self._timer)
-                    self._response.close()  # type: ignore
-                except AttributeError:
-                    pass
-                except BaseException:
-                    reraise(*_capture_exception())
+        with use_isolation_scope(self._scope):
+            try:
+                self._response.close()  # type: ignore
+            except AttributeError:
+                pass
+            except BaseException:
+                reraise(*_capture_exception())
 
 
 def _make_wsgi_event_processor(environ, use_x_forwarded_for):
@@ -346,18 +308,3 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
         return event
 
     return event_processor
-
-
-def _finish_long_running_transaction(current_scope, isolation_scope):
-    # type: (sentry_sdk.scope.Scope, sentry_sdk.scope.Scope) -> None
-    """
-    Make sure we don't keep transactions open for too long.
-    Triggered after MAX_TRANSACTION_DURATION_SECONDS have passed.
-    """
-    try:
-        with use_isolation_scope(isolation_scope):
-            with use_scope(current_scope):
-                finish_running_transaction()
-    except AttributeError:
-        # transaction is not there anymore
-        pass

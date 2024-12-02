@@ -198,10 +198,7 @@ def test_capture_request_if_available_and_send_pii_is_on(
     client = client_factory(schema)
 
     query = "query ErrorQuery { error }"
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post(
-        "/graphql", json={"query": query, "operationName": "ErrorQuery"}
-    ).close()
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 1
 
@@ -256,10 +253,7 @@ def test_do_not_capture_request_if_send_pii_is_off(
     client = client_factory(schema)
 
     query = "query ErrorQuery { error }"
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post(
-        "/graphql", json={"query": query, "operationName": "ErrorQuery"}
-    ).close()
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 1
 
@@ -299,8 +293,7 @@ def test_breadcrumb_no_operation_name(
     client = client_factory(schema)
 
     query = "{ error }"
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query}).close()
+    client.post("/graphql", json={"query": query})
 
     assert len(events) == 1
 
@@ -339,10 +332,7 @@ def test_capture_transaction_on_error(
     client = client_factory(schema)
 
     query = "query ErrorQuery { error }"
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post(
-        "/graphql", json={"query": query, "operationName": "ErrorQuery"}
-    ).close()
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 2
     (_, transaction_event) = events
@@ -419,10 +409,7 @@ def test_capture_transaction_on_success(
     client = client_factory(schema)
 
     query = "query GreetingQuery { hello }"
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post(
-        "/graphql", json={"query": query, "operationName": "GreetingQuery"}
-    ).close()
+    client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
 
     assert len(events) == 1
     (transaction_event,) = events
@@ -499,8 +486,7 @@ def test_transaction_no_operation_name(
     client = client_factory(schema)
 
     query = "{ hello }"
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query}).close()
+    client.post("/graphql", json={"query": query})
 
     assert len(events) == 1
     (transaction_event,) = events
@@ -580,8 +566,7 @@ def test_transaction_mutation(
     client = client_factory(schema)
 
     query = 'mutation Change { change(attribute: "something") }'
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query}).close()
+    client.post("/graphql", json={"query": query})
 
     assert len(events) == 1
     (transaction_event,) = events
@@ -656,8 +641,7 @@ def test_handle_none_query_gracefully(
     client_factory = request.getfixturevalue(client_factory)
     client = client_factory(schema)
 
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={}).close()
+    client.post("/graphql", json={})
 
     assert len(events) == 0, "expected no events to be sent to Sentry"
 
@@ -689,8 +673,7 @@ def test_span_origin(
     client = client_factory(schema)
 
     query = 'mutation Change { change(attribute: "something") }'
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query}).close()
+    client.post("/graphql", json={"query": query})
 
     (event,) = events
 
@@ -732,10 +715,7 @@ def test_span_origin2(
     client = client_factory(schema)
 
     query = "query GreetingQuery { hello }"
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post(
-        "/graphql", json={"query": query, "operationName": "GreetingQuery"}
-    ).close()
+    client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
 
     (event,) = events
 
@@ -777,8 +757,7 @@ def test_span_origin3(
     client = client_factory(schema)
 
     query = "subscription { messageAdded { content } }"
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    client.post("/graphql", json={"query": query}).close()
+    client.post("/graphql", json={"query": query})
 
     (event,) = events
 

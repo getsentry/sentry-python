@@ -394,8 +394,6 @@ def test_flask_formdata_request_appear_transaction_body(
     client = app.test_client()
     response = client.post("/", data=data)
     assert response.status_code == 200
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
 
     event, transaction_event = events
 
@@ -748,8 +746,6 @@ def test_tracing_success(sentry_init, capture_events, app):
     with app.test_client() as client:
         response = client.get("/message_tx")
         assert response.status_code == 200
-        # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-        response.close()
 
     message_event, transaction_event = events
 
@@ -942,9 +938,7 @@ def test_response_status_code_not_found_in_transaction_context(
     envelopes = capture_envelopes()
 
     client = app.test_client()
-    response = client.get("/not-existing-route")
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
+    client.get("/not-existing-route")
 
     sentry_sdk.get_client().flush()
 
@@ -989,21 +983,14 @@ def test_transaction_http_method_default(
     events = capture_events()
 
     client = app.test_client()
-
     response = client.get("/nomessage")
     assert response.status_code == 200
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
 
     response = client.options("/nomessage")
     assert response.status_code == 200
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
 
     response = client.head("/nomessage")
     assert response.status_code == 200
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
 
     (event,) = events
 
@@ -1033,21 +1020,14 @@ def test_transaction_http_method_custom(
     events = capture_events()
 
     client = app.test_client()
-
     response = client.get("/nomessage")
     assert response.status_code == 200
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
 
     response = client.options("/nomessage")
     assert response.status_code == 200
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
 
     response = client.head("/nomessage")
     assert response.status_code == 200
-    # Close the response to ensure the WSGI cycle is complete and the transaction is finished
-    response.close()
 
     assert len(events) == 2
 
