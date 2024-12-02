@@ -11,6 +11,8 @@ from urllib.parse import quote, unquote
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+from sentry_sdk.integrations.opentelemetry.sampler import get_parent_sampled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     filename_for_module,
@@ -33,8 +35,8 @@ if TYPE_CHECKING:
     from typing import Generator
     from typing import Optional
     from typing import Union
-
     from types import FrameType
+    from opentelemetry.util.types import Attributes
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -723,6 +725,18 @@ def get_current_span(scope=None):
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
+
+
+def create_sampling_context(span, parent_context):
+    # type: (, ) -> dict[str, Any]
+    return {
+        "transaction_context": {
+            "name": span.name,
+            "op": span.attributes.get(SentrySpanAttribute.OP),
+            "source": span.attributes.get(SentrySpanAttribute.SOURCE),
+        },
+        "parent_sampled": get_parent_sampled(parent_context, trace_id),
+    }
 
 
 # Circular imports

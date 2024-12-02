@@ -66,7 +66,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
             return
 
         self._add_root_span(span, get_current_span(parent_context))
-        self._start_profile(span)
+        self._start_profile(span, parent_context)
 
     def on_end(self, span):
         # type: (ReadableSpan) -> None
@@ -105,8 +105,8 @@ class PotelSentrySpanProcessor(SpanProcessor):
             # root span points to itself
             set_sentry_meta(span, "root_span", span)
 
-    def _start_profile(self, span):
-        # type: (Span) -> None
+    def _start_profile(self, span, parent_context):
+        # type: (Span, Optional[Context]) -> None
         try_autostart_continuous_profiler()
         profiler_id = get_profiler_id()
         thread_id, thread_name = get_current_thread_meta()
@@ -127,7 +127,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
             # setting it to 0 means the profiler will internally measure time on start
             profile = Profile(sampled, 0)
             # TODO-neel-potel sampling context??
-            profile._set_initial_sampling_decision(sampling_context={})
+            profile._set_initial_sampling_decision(sampling_context=create_sampling_context(span, parent_context))
             profile.__enter__()
             set_sentry_meta(span, "profile", profile)
 
