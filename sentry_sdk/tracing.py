@@ -13,6 +13,8 @@ from sentry_sdk.utils import (
     nanosecond_time,
 )
 
+MAX_TRANSACTION_DURATION_SECONDS = 5 * 60
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -377,7 +379,10 @@ class Span:
 
         scope, old_span = self._context_manager_state
         del self._context_manager_state
+
         self.finish(scope)
+        self.prune_transaction()
+
         scope.span = old_span
 
     @property
@@ -650,6 +655,30 @@ class Span:
         maybe_create_breadcrumbs_from_span(scope, self)
 
         return None
+
+    def prune_transaction(self, scope=None):
+        # type: (Optional[sentry_sdk.Scope]) -> None
+        if (
+            self.containing_transaction
+            and self.containing_transaction.timestamp is not None
+        ):
+            # transaction already finished, nothing to do
+            return
+
+        trx = self.containing_transaction
+        if trx is None or self is trx:
+            return
+
+        transaction_duration = (
+            datetime.now(timezone.utc) - trx.start_timestamp
+        ).total_seconds()
+
+        if transaction_duration > MAX_TRANSACTION_DURATION_SECONDS:
+            logger.debug(
+                "Finishing Transaction because it is running longer the maximum allowed duration (%ss)",
+                MAX_TRANSACTION_DURATION_SECONDS,
+            )
+            trx.__exit__(None, None, None)
 
     def to_json(self):
         # type: () -> Dict[str, Any]
