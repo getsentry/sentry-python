@@ -15,8 +15,8 @@ except ImportError:
     pass  # All tests will be skipped with incompatible versions
 
 
-minimum_python_37 = pytest.mark.skipif(
-    sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
+minimum_python_38 = pytest.mark.skipif(
+    sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
 )
 
 
@@ -49,7 +49,7 @@ def get_sentry_task_factory(mock_get_running_loop):
     return patched_factory
 
 
-@minimum_python_37
+@minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
 async def test_create_task(
     sentry_init,
@@ -92,7 +92,7 @@ async def test_create_task(
     )
 
 
-@minimum_python_37
+@minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
 async def test_gather(
     sentry_init,
@@ -134,7 +134,7 @@ async def test_gather(
     )
 
 
-@minimum_python_37
+@minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
 async def test_exception(
     sentry_init,
@@ -167,7 +167,7 @@ async def test_exception(
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "asyncio"
 
 
-@minimum_python_37
+@minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
 async def test_task_result(sentry_init):
     sentry_init(
@@ -213,7 +213,7 @@ async def test_task_with_context(sentry_init):
     assert retrieve_task.result() == "changed value"
 
 
-@minimum_python_37
+@minimum_python_38
 @patch("asyncio.get_running_loop")
 def test_patch_asyncio(mock_get_running_loop):
     """
@@ -232,7 +232,7 @@ def test_patch_asyncio(mock_get_running_loop):
     assert callable(sentry_task_factory)
 
 
-@minimum_python_37
+@minimum_python_38
 @patch("asyncio.get_running_loop")
 @patch("sentry_sdk.integrations.asyncio.Task")
 def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):  # noqa: N803
@@ -261,7 +261,7 @@ def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):  # noq
     assert task_kwargs["loop"] == mock_loop
 
 
-@minimum_python_37
+@minimum_python_38
 @patch("asyncio.get_running_loop")
 def test_sentry_task_factory_with_factory(mock_get_running_loop):
     mock_loop = mock_get_running_loop.return_value
@@ -351,7 +351,7 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
     assert task_factory_kwargs["context"] == mock_context
 
 
-@minimum_python_37
+@minimum_python_38
 @pytest.mark.asyncio(loop_scope="module")
 async def test_span_origin(
     sentry_init,
