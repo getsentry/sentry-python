@@ -14,13 +14,13 @@ from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
-from sentry_sdk.tracing_utils import create_sampling_context
 from sentry_sdk.utils import get_current_thread_meta
 from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     get_profiler_id,
 )
 from sentry_sdk.profiler.transaction_profiler import Profile
+from sentry_sdk.integrations.opentelemetry.sampler import create_sampling_context
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
     convert_from_otel_timestamp,

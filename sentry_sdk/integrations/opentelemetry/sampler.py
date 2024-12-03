@@ -6,7 +6,7 @@ from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace.span import TraceState
 
 import sentry_sdk
-from sentry_sdk.tracing_utils import create_sampling_context, has_tracing_enabled
+from sentry_sdk.tracing_utils import has_tracing_enabled
 from sentry_sdk.utils import is_valid_sample_rate, logger
 from sentry_sdk.integrations.opentelemetry.consts import (
     TRACESTATE_SAMPLED_KEY,
@@ -17,7 +17,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, Sequence, Union
+    from typing import Any, Optional, Sequence, Union
     from opentelemetry.context import Context
     from opentelemetry.trace import Link, SpanKind
     from opentelemetry.trace.span import SpanContext
@@ -187,3 +187,19 @@ class SentrySampler(Sampler):
 
     def get_description(self) -> str:
         return self.__class__.__name__
+
+
+def create_sampling_context(name, attributes, parent_context, trace_id):
+    # type: (str, Attributes, Context, str) -> dict[str, Any]
+    sampling_context = {
+        "transaction_context": {
+            "name": name,
+            "op": attributes.get(SentrySpanAttribute.OP),
+            "source": attributes.get(SentrySpanAttribute.SOURCE),
+        },
+        "parent_sampled": get_parent_sampled(parent_context, trace_id),
+    }
+
+    sampling_context.update(attributes)
+
+    return sampling_context
