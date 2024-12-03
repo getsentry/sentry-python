@@ -107,7 +107,7 @@ class SentrySpanProcessor(SpanProcessor):
             set_sentry_meta(span, "root_span", span)
 
     def _start_profile(self, span):
-        # type: (Span, Optional[Context]) -> None
+        # type: (Span) -> None
         try_autostart_continuous_profiler()
         profiler_id = get_profiler_id()
         thread_id, thread_name = get_current_thread_meta()
