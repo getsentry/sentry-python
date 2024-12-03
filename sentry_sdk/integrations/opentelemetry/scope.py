@@ -1,7 +1,14 @@
 from typing import cast
 from contextlib import contextmanager
 
-from opentelemetry.context import get_value, set_value, attach, detach, get_current
+from opentelemetry.context import (
+    Context,
+    get_value,
+    set_value,
+    attach,
+    detach,
+    get_current,
+)
 from opentelemetry.trace import (
     SpanContext,
     NonRecordingSpan,
@@ -136,13 +143,13 @@ _INITIAL_CURRENT_SCOPE = None
 _INITIAL_ISOLATION_SCOPE = None
 
 
-def _setup_initial_scopes():
+def setup_initial_scopes():
     global _INITIAL_CURRENT_SCOPE, _INITIAL_ISOLATION_SCOPE
     _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
     _INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
 
-
-_setup_initial_scopes()
+    scopes = (_INITIAL_CURRENT_SCOPE, _INITIAL_ISOLATION_SCOPE)
+    attach(set_value(SENTRY_SCOPES_KEY, scopes))
 
 
 @contextmanager

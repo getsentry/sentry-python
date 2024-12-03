@@ -307,3 +307,24 @@ def test_records_lost_event_only_if_traces_sampler_enabled(
 
     # Use Counter because order of calls does not matter
     assert Counter(record_lost_event_calls) == Counter(expected_record_lost_event_calls)
+
+
+@pytest.mark.parametrize("parent_sampling_decision", [True, False])
+def test_profiles_sampler_gets_sampling_context(sentry_init, parent_sampling_decision):
+    def dummy_profiles_sampler(sampling_context):
+        assert sampling_context["transaction_context"] == {
+            "name": "dogpark",
+            "op": "op",
+            "source": "custom",
+        }
+        assert sampling_context["parent_sampled"] == parent_sampling_decision
+        return 1.0
+
+    sentry_init(traces_sample_rate=1.0, profiles_sampler=dummy_profiles_sampler)
+
+    sentry_trace = "12312012123120121231201212312012-1121201211212012-{}".format(
+        int(parent_sampling_decision)
+    )
+    with sentry_sdk.continue_trace({"sentry-trace": sentry_trace}):
+        with sentry_sdk.start_span(name="dogpark", op="op"):
+            pass
