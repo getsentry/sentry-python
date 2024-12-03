@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from typing import Generator
     from typing import Optional
     from typing import Union
-
     from types import FrameType
 
 
@@ -731,6 +730,3 @@ from sentry_sdk.tracing import (
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span

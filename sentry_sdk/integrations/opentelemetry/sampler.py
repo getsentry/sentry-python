@@ -17,7 +17,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, Sequence, Union
+    from typing import Any, Optional, Sequence, Union
     from opentelemetry.context import Context
     from opentelemetry.trace import Link, SpanKind
     from opentelemetry.trace.span import SpanContext
@@ -152,15 +152,9 @@ class SentrySampler(Sampler):
         has_traces_sampler = callable(client.options.get("traces_sampler"))
 
         if is_root_span and has_traces_sampler:
-            sampling_context = {
-                "transaction_context": {
-                    "name": name,
-                    "op": attributes.get(SentrySpanAttribute.OP),
-                    "source": attributes.get(SentrySpanAttribute.SOURCE),
-                },
-                "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
-            }
-            sampling_context.update(attributes)
+            sampling_context = create_sampling_context(
+                name, attributes, parent_span_context, trace_id
+            )
             sample_rate = client.options["traces_sampler"](sampling_context)
         else:
             # Check if there is a parent with a sampling decision
@@ -193,3 +187,19 @@ class SentrySampler(Sampler):
 
     def get_description(self) -> str:
         return self.__class__.__name__
+
+
+def create_sampling_context(name, attributes, parent_span_context, trace_id):
+    # type: (str, Attributes, SpanContext, str) -> dict[str, Any]
+    sampling_context = {
+        "transaction_context": {
+            "name": name,
+            "op": attributes.get(SentrySpanAttribute.OP),
+            "source": attributes.get(SentrySpanAttribute.SOURCE),
+        },
+        "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
+    }
+
+    sampling_context.update(attributes)
+
+    return sampling_context
