@@ -88,6 +88,7 @@ def patch_redis_client(cls, is_cluster, get_db_data_fn):
                 op=cache_properties["op"],
                 name=cache_properties["description"],
                 origin=SPAN_ORIGIN,
+                only_if_parent=True,
             )
             cache_span.__enter__()
 
@@ -97,6 +98,7 @@ def patch_redis_client(cls, is_cluster, get_db_data_fn):
             op=db_properties["op"],
             name=db_properties["description"],
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         )
         db_span.__enter__()
 
