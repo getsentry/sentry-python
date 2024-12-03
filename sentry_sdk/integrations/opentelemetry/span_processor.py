@@ -67,7 +67,7 @@ class SentrySpanProcessor(SpanProcessor):
             return
 
         self._add_root_span(span, get_current_span(parent_context))
-        self._start_profile(span, parent_context)
+        self._start_profile(span)
 
     def on_end(self, span):
         # type: (ReadableSpan) -> None
@@ -106,7 +106,7 @@ class SentrySpanProcessor(SpanProcessor):
             # root span points to itself
             set_sentry_meta(span, "root_span", span)
 
-    def _start_profile(self, span, parent_context):
+    def _start_profile(self, span):
         # type: (Span, Optional[Context]) -> None
         try_autostart_continuous_profiler()
         profiler_id = get_profiler_id()
@@ -128,7 +128,7 @@ class SentrySpanProcessor(SpanProcessor):
             # setting it to 0 means the profiler will internally measure time on start
             profile = Profile(sampled, 0)
             sampling_context = create_sampling_context(
-                span.name, span.attributes, parent_context, span.context.trace_id
+                span.name, span.attributes, span.parent, span.context.trace_id
             )
             profile._set_initial_sampling_decision(sampling_context)
             profile.__enter__()
