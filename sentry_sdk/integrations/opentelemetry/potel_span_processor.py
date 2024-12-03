@@ -14,6 +14,7 @@ from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 from sentry_sdk import capture_event
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
+from sentry_sdk.tracing_utils import create_sampling_context
 from sentry_sdk.utils import get_current_thread_meta
 from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
@@ -126,9 +127,10 @@ class PotelSentrySpanProcessor(SpanProcessor):
             # unix timestamp that is on span.start_time
             # setting it to 0 means the profiler will internally measure time on start
             profile = Profile(sampled, 0)
-            # TODO-neel-potel sampling context??
             profile._set_initial_sampling_decision(
-                sampling_context=create_sampling_context(span, parent_context)
+                sampling_context=create_sampling_context(
+                    span.name, span.attributes, parent_context, span.context.trace_id
+                )
             )
             profile.__enter__()
             set_sentry_meta(span, "profile", profile)

@@ -6,7 +6,7 @@ from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace.span import TraceState
 
 import sentry_sdk
-from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.tracing_utils import create_sampling_context, has_tracing_enabled
 from sentry_sdk.utils import is_valid_sample_rate, logger
 from sentry_sdk.integrations.opentelemetry.consts import (
     TRACESTATE_SAMPLED_KEY,
@@ -152,15 +152,9 @@ class SentrySampler(Sampler):
         has_traces_sampler = callable(client.options.get("traces_sampler"))
 
         if is_root_span and has_traces_sampler:
-            sampling_context = {
-                "transaction_context": {
-                    "name": name,
-                    "op": attributes.get(SentrySpanAttribute.OP),
-                    "source": attributes.get(SentrySpanAttribute.SOURCE),
-                },
-                "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
-            }
-            sampling_context.update(attributes)
+            sampling_context = create_sampling_context(
+                name, attributes, parent_span_context, trace_id
+            )
             sample_rate = client.options["traces_sampler"](sampling_context)
         else:
             # Check if there is a parent with a sampling decision

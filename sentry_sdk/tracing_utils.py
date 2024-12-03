@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Union
     from types import FrameType
+    from opentelemetry.context import Context
     from opentelemetry.util.types import Attributes
 
 
@@ -727,16 +728,20 @@ def get_current_span(scope=None):
     return current_span
 
 
-def create_sampling_context(span, parent_context):
-    # type: (, ) -> dict[str, Any]
-    return {
+def create_sampling_context(name, attributes, parent_context, trace_id):
+    # type: (str, Attributes, Context, str) -> dict[str, Any]
+    sampling_context = {
         "transaction_context": {
-            "name": span.name,
-            "op": span.attributes.get(SentrySpanAttribute.OP),
-            "source": span.attributes.get(SentrySpanAttribute.SOURCE),
+            "name": name,
+            "op": attributes.get(SentrySpanAttribute.OP),
+            "source": attributes.get(SentrySpanAttribute.SOURCE),
         },
         "parent_sampled": get_parent_sampled(parent_context, trace_id),
     }
+
+    sampling_context.update(attributes)
+
+    return sampling_context
 
 
 # Circular imports
