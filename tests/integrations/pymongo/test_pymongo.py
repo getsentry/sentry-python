@@ -1,6 +1,6 @@
 import re
 
-from sentry_sdk import capture_message, start_transaction
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
 
@@ -37,7 +37,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
 
     connection = MongoClient(mongo_server.uri)
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution
@@ -119,13 +119,9 @@ def test_breadcrumbs(
     list(
         connection["test_db"]["test_collection"].find({"foobar": 1})
     )  # force query execution
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
-    if traces_sample_rate:
-        event = events[1]
-    else:
-        event = events[0]
-
+    (event,) = events
     (crumb,) = event["breadcrumbs"]["values"]
 
     assert crumb["category"] == "query"
@@ -450,7 +446,7 @@ def test_span_origin(sentry_init, capture_events, mongo_server):
 
     connection = MongoClient(mongo_server.uri)
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution
