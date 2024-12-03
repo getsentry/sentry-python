@@ -1,7 +1,6 @@
 import pytest
 
 import sentry_sdk
-from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
@@ -41,7 +40,7 @@ async def test_async_breadcrumb(sentry_init, capture_events):
     connection = cluster.RedisCluster(host="localhost", port=6379)
 
     await connection.get("foobar")
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
     (event,) = events
     (crumb,) = event["breadcrumbs"]["values"]

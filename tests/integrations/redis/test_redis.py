@@ -4,7 +4,6 @@ import pytest
 from fakeredis import FakeStrictRedis
 
 import sentry_sdk
-from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
@@ -24,7 +23,7 @@ def test_basic(sentry_init, capture_events):
     connection = FakeStrictRedis()
 
     connection.get("foobar")
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
     (event,) = events
     (crumb,) = event["breadcrumbs"]["values"]
@@ -231,7 +230,7 @@ def test_breadcrumbs(sentry_init, capture_events):
     short_string = "b" * 10
     connection.set("somekey2", short_string)
 
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
     (event,) = events
     crumbs = event["breadcrumbs"]["values"]
