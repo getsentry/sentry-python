@@ -99,7 +99,7 @@ class SentryPropagator(TextMapPropagator):
 
             # TODO-neel-potel check trace_propagation_targets
             # TODO-neel-potel test propagator works with twp
-            for (key, value) in current_scope.iter_trace_propagation_headers():
+            for key, value in current_scope.iter_trace_propagation_headers():
                 setter.set(carrier, key, value)
 
     @property
