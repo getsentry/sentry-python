@@ -1,3 +1,4 @@
+import contextlib
 import os
 from datetime import datetime
 from unittest import mock
@@ -619,21 +620,15 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
         bob = Person(name="Bob")
         session.add(bob)
 
-        class fake_record_sql_queries:  # noqa: N801
-            def __init__(self, *args, **kwargs):
-                with freeze_time(datetime(2024, 1, 1, microsecond=0)):
-                    with record_sql_queries(*args, **kwargs) as span:
-                        self.span = span
-                        freezer = freeze_time(datetime(2024, 1, 1, microsecond=99999))
-                        freezer.start()
+        @contextlib.contextmanager
+        def fake_record_sql_queries(*args, **kwargs):  # noqa: N801
+            with freeze_time(datetime(2024, 1, 1, second=0)):
+                with record_sql_queries(*args, **kwargs) as span:
+                    freezer = freeze_time(datetime(2024, 1, 1, second=1))
+                    freezer.start()
+                    yield span
 
-                    freezer.stop()
-
-            def __enter__(self):
-                return self.span
-
-            def __exit__(self, type, value, traceback):
-                pass
+                freezer.stop()
 
         with mock.patch(
             "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
