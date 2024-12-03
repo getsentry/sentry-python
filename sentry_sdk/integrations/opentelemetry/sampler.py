@@ -189,15 +189,15 @@ class SentrySampler(Sampler):
         return self.__class__.__name__
 
 
-def create_sampling_context(name, attributes, parent_context, trace_id):
-    # type: (str, Attributes, Context, str) -> dict[str, Any]
+def create_sampling_context(name, attributes, parent_span_context, trace_id):
+    # type: (str, Attributes, SpanContext, str) -> dict[str, Any]
     sampling_context = {
         "transaction_context": {
             "name": name,
             "op": attributes.get(SentrySpanAttribute.OP),
             "source": attributes.get(SentrySpanAttribute.SOURCE),
         },
-        "parent_sampled": get_parent_sampled(parent_context, trace_id),
+        "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
     }
 
     sampling_context.update(attributes)
