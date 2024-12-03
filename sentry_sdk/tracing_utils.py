@@ -147,6 +147,7 @@ def record_sql_queries(
         op=OP.DB,
         name=query,
         origin=span_origin,
+        only_if_parent=True,
     ) as span:
         for k, v in data.items():
             span.set_data(k, v)
