@@ -1252,9 +1252,9 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("nomessage"))
-    client.options(reverse("nomessage"))
-    client.head(reverse("nomessage"))
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
 
     assert len(events) == 2
 

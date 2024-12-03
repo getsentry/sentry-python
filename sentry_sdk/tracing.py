@@ -1317,6 +1317,7 @@ class POTelSpan:
 
         self.finish()
         context.detach(self._ctx_token)
+        del self._ctx_token
 
     @property
     def description(self):
