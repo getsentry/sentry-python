@@ -20,6 +20,7 @@ from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
 )
 from sentry_sdk.profiler.transaction_profiler import Profile
+from sentry_sdk.integrations.opentelemetry.sampler import create_sampling_context
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
     convert_from_otel_timestamp,
@@ -126,8 +127,10 @@ class SentrySpanProcessor(SpanProcessor):
             # unix timestamp that is on span.start_time
             # setting it to 0 means the profiler will internally measure time on start
             profile = Profile(sampled, 0)
-            # TODO-neel-potel sampling context??
-            profile._set_initial_sampling_decision(sampling_context={})
+            sampling_context = create_sampling_context(
+                span.name, span.attributes, span.parent, span.context.trace_id
+            )
+            profile._set_initial_sampling_decision(sampling_context)
             profile.__enter__()
             set_sentry_meta(span, "profile", profile)
 
