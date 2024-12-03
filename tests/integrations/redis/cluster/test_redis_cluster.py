@@ -1,7 +1,8 @@
 import pytest
+
+import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.api import start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
 
@@ -68,7 +69,7 @@ def test_rediscluster_basic(sentry_init, capture_events, send_default_pii, descr
     )
     events = capture_events()
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         rc = redis.RedisCluster(host="localhost", port=6379)
         rc.set("bar", 1)
 
@@ -117,7 +118,7 @@ def test_rediscluster_pipeline(
     events = capture_events()
 
     rc = redis.RedisCluster(host="localhost", port=6379)
-    with start_transaction():
+    with sentry_sdk.start_span():
         pipeline = rc.pipeline()
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -152,7 +153,7 @@ def test_rediscluster_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     rc = redis.RedisCluster(host="localhost", port=6379)
-    with start_transaction(name="custom_transaction"):
+    with sentry_sdk.start_span(name="custom_transaction"):
         # default case
         rc.set("somekey", "somevalue")
 
