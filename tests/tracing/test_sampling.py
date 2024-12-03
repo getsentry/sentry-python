@@ -323,7 +323,7 @@ def test_profiles_sampler_gets_sampling_context(sentry_init, parent_sampling_dec
     sentry_init(traces_sample_rate=1.0, profiles_sampler=dummy_profiles_sampler)
 
     sentry_trace = "12312012123120121231201212312012-1121201211212012-{}".format(
-        int(sampling_decision=parent_sampling_decision)
+        int(parent_sampling_decision)
     )
     with sentry_sdk.continue_trace({"sentry-trace": sentry_trace}):
         with sentry_sdk.start_span(name="dogpark", op="op"):
