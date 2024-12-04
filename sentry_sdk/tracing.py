@@ -1313,7 +1313,12 @@ class POTelSpan:
         if value is not None:
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
         else:
-            self.set_status(SPANSTATUS.OK)
+            status_unset = (
+                hasattr(self._otel_span, "status")
+                and self._otel_span.status.status_code == StatusCode.UNSET
+            )
+            if status_unset:
+                self.set_status(SPANSTATUS.OK)
 
         self.finish()
         context.detach(self._ctx_token)
