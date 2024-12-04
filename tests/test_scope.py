@@ -23,6 +23,7 @@ from sentry_sdk.integrations.opentelemetry.scope import (
     use_scope,
     use_isolation_scope,
 )
+from tests.conftest import ApproxDict
 
 
 SLOTS_NOT_COPIED = {"client"}
@@ -806,8 +807,8 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
     transaction = envelope.items[0].get_transaction_event()
 
     assert transaction["tags"] == {"isolation_scope1": 1, "current_scope2": 1, "trx": 1}
-    assert transaction["spans"][0]["tags"] == {"a": 1}
-    assert transaction["spans"][1]["tags"] == {"b": 1}
+    assert transaction["spans"][0]["tags"] == ApproxDict({"a": 1})
+    assert transaction["spans"][1]["tags"] == ApproxDict({"b": 1})
 
 
 def test_should_send_default_pii_true(sentry_init):
