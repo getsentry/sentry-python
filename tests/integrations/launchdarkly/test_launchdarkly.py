@@ -57,7 +57,7 @@ def test_launchdarkly_integration_threaded(sentry_init):
         # This means the evaluations in each task are captured separately.
         with sentry_sdk.isolation_scope():
             client.variation(flag_key, context, False)
-            return [f["flag"] for f in sentry_sdk.get_current_scope().flags.get()]
+            return sentry_sdk.get_current_scope().flags.get()
 
     td.update(td.flag("hello").variation_for_all(True))
     td.update(td.flag("world").variation_for_all(False))
@@ -67,8 +67,14 @@ def test_launchdarkly_integration_threaded(sentry_init):
     with cf.ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(task, ["world", "other"]))
 
-    assert results[0] == ["hello", "world"]
-    assert results[1] == ["hello", "other"]
+    assert results[0] == [
+        {"flag": "hello", "result": True},
+        {"flag": "world", "result": False},
+    ]
+    assert results[1] == [
+        {"flag": "hello", "result": True},
+        {"flag": "other", "result": False},
+    ]
 
 
 def test_launchdarkly_integration_asyncio(sentry_init):
@@ -81,7 +87,7 @@ def test_launchdarkly_integration_asyncio(sentry_init):
     async def task(flag_key):
         with sentry_sdk.isolation_scope():
             client.variation(flag_key, context, False)
-            return [f["flag"] for f in sentry_sdk.get_current_scope().flags.get()]
+            return sentry_sdk.get_current_scope().flags.get()
 
     async def runner():
         return asyncio.gather(task("world"), task("other"))
@@ -91,8 +97,14 @@ def test_launchdarkly_integration_asyncio(sentry_init):
     client.variation("hello", context, False)
 
     results = asyncio.run(runner()).result()
-    assert results[0] == ["hello", "world"]
-    assert results[1] == ["hello", "other"]
+    assert results[0] == [
+        {"flag": "hello", "result": True},
+        {"flag": "world", "result": False},
+    ]
+    assert results[1] == [
+        {"flag": "hello", "result": True},
+        {"flag": "other", "result": False},
+    ]
 
 
 def test_launchdarkly_integration_did_not_enable(monkeypatch):

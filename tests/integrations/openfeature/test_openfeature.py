@@ -44,13 +44,19 @@ def test_openfeature_integration_threaded(sentry_init):
         # Create a new isolation scope for the thread. This means the flags
         with sentry_sdk.isolation_scope():
             client.get_boolean_value(flag, default_value=False)
-            return [f["flag"] for f in sentry_sdk.get_current_scope().flags.get()]
+            return sentry_sdk.get_current_scope().flags.get()
 
     with cf.ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(task, ["world", "other"]))
 
-    assert results[0] == ["hello", "world"]
-    assert results[1] == ["hello", "other"]
+    assert results[0] == [
+        {"flag": "hello", "result": True},
+        {"flag": "world", "result": False},
+    ]
+    assert results[1] == [
+        {"flag": "hello", "result": True},
+        {"flag": "other", "result": False},
+    ]
 
 
 def test_openfeature_integration_asyncio(sentry_init):
@@ -59,7 +65,7 @@ def test_openfeature_integration_asyncio(sentry_init):
     async def task(flag):
         with sentry_sdk.isolation_scope():
             client.get_boolean_value(flag, default_value=False)
-            return [f["flag"] for f in sentry_sdk.get_current_scope().flags.get()]
+            return sentry_sdk.get_current_scope().flags.get()
 
     async def runner():
         return asyncio.gather(task("world"), task("other"))
@@ -76,5 +82,11 @@ def test_openfeature_integration_asyncio(sentry_init):
     client.get_boolean_value("hello", default_value=False)
 
     results = asyncio.run(runner()).result()
-    assert results[0] == ["hello", "world"]
-    assert results[1] == ["hello", "other"]
+    assert results[0] == [
+        {"flag": "hello", "result": True},
+        {"flag": "world", "result": False},
+    ]
+    assert results[1] == [
+        {"flag": "hello", "result": True},
+        {"flag": "other", "result": False},
+    ]
