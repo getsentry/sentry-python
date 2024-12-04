@@ -152,7 +152,7 @@ def test_bad_chat(sentry_init, capture_events):
     with pytest.raises(httpx.HTTPError):
         client.chat(model="some-model", message="hello")
 
-    (event, _) = events
+    (event,) = events
     assert event["level"] == "error"
 
 
