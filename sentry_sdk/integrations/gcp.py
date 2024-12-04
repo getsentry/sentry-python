@@ -236,6 +236,7 @@ EVENT_TO_ATTRIBUTE = {
 
 
 def _prepopulate_attributes(gcp_event):
+    # type: (Any) -> dict[str, Any]
     attributes = {
         "cloud.provider": "gcp",
     }

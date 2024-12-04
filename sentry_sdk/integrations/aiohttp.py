@@ -389,11 +389,9 @@ def _prepopulate_attributes(request):
         except ValueError:
             attributes["server.address"] = request.host
 
-    try:
+    with capture_internal_exceptions():
         url = f"{request.scheme}://{request.host}{request.path}"  # noqa: E231
         if request.query_string:
             attributes["url.full"] = f"{url}?{request.query_string}"
-    except Exception:
-        pass
 
     return attributes

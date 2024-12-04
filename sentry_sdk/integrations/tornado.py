@@ -254,9 +254,7 @@ def _prepopulate_attributes(request):
         except ValueError:
             attributes["server.address"] = request.host
 
-    try:
+    with capture_internal_exceptions():
         attributes["url.full"] = request.full_url()
-    except Exception:
-        pass
 
     return attributes

@@ -32,6 +32,7 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk.utils import (
     ContextVar,
+    capture_internal_exceptions,
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -348,11 +349,12 @@ def _prepopulate_attributes(scope):
             try:
                 host, port = scope[attr]
                 attributes[f"{attr}.address"] = host
-                attributes[f"{attr}.port"] = port
+                if port is not None:
+                    attributes[f"{attr}.port"] = port
             except Exception:
                 pass
 
-    try:
+    with capture_internal_exceptions():
         full_url = _get_url(scope)
         query = _get_query(scope)
         if query:
@@ -360,7 +362,5 @@ def _prepopulate_attributes(scope):
             full_url = f"{full_url}?{query}"
 
         attributes["url.full"] = full_url
-    except Exception:
-        pass
 
     return attributes

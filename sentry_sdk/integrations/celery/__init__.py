@@ -514,6 +514,7 @@ def _patch_producer_publish():
 
 
 def _prepopulate_attributes(task, args, kwargs):
+    # type: (Any, *Any, **Any) -> dict[str, str]
     attributes = {
         "celery.job.task": task.name,
         "celery.job.args": _serialize_span_attribute(args),

@@ -468,6 +468,7 @@ def _event_from_error_json(error_json):
 
 
 def _prepopulate_attributes(aws_event, aws_context):
+    # type: (Any, Any) -> dict[str, Any]
     attributes = {
         "cloud.provider": "aws",
     }
