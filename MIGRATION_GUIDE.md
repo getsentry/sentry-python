@@ -20,18 +20,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Redis integration: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
-- The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
-- If you're using the Celery integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
+- The `sampling_context` argument of `traces_sampler` and `profiles_sampler` now additionally contains all span attributes known at span start.
+- If you're using the Celery integration and a custom traces/profiles sampler, the `sampling_context` argument of `traces_sampler` and `profiles_sampler` doesn't contain the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
 
-  | Dictionary keys        | Sampling context key |
-  | ---------------------- | -------------------- |
-  | `celery_job["args"]`   | `celery.job.args`    |
-  | `celery_job["kwargs"]` | `celery.job.kwargs`  |
-  | `celery_job["task"]`   | `celery.job.task`    |
+  | Dictionary keys        | Sampling context key        | Example                        |
+  | ---------------------- | --------------------------- | ------------------------------ |
+  | `celery_job["args"]`   | `celery.job.args.{index}`   | `celery.job.args.0`            |
+  | `celery_job["kwargs"]` | `celery.job.kwargs.{kwarg}` | `celery.job.kwargs.kwarg_name` |
+  | `celery_job["task"]`   | `celery.job.task`           |                                |
 
   Note that all of these are serialized, i.e., not the original `args` and `kwargs` but rather OpenTelemetry-friendly span attributes.
 
-- If you're using the AIOHTTP integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `aiohttp_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+- If you're using the AIOHTTP integration and a custom traces/profiles sampler, the `sampling_context` argument of `traces_sampler` and `profiles_sampler` doesn't contain the `aiohttp_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
 
   | Request property | Sampling context key(s)         |
   | ---------------- | ------------------------------- |
@@ -42,7 +42,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `scheme`         | `url.scheme`                    |
   | full URL         | `url.full`                      |
 
-- If you're using the Tornado integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `tornado_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+- If you're using the Tornado integration and a custom traces/profiles sampler, the `sampling_context` argument of `traces_sampler` and `profiles_sampler` doesn't contain the `tornado_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
 
   | Request property | Sampling context key(s)                             |
   | ---------------- | --------------------------------------------------- |
@@ -54,7 +54,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `version`        | `network.protocol.name`, `network.protocol.version` |
   | full URL         | `url.full`                                          |
 
-- If you're using the generic WSGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore. Instead, the individual properties of the environment are accessible, if available, as follows:
+- If you're using the generic WSGI integration and a custom traces/profiles sampler, the `sampling_context` argument of `traces_sampler` and `profiles_sampler` doesn't contain the `wsgi_environ` object anymore. Instead, the individual properties of the environment are accessible, if available, as follows:
 
   | Env property      | Sampling context key(s)                           |
   | ----------------- | ------------------------------------------------- |
@@ -67,7 +67,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `wsgi.url_scheme` | `url.scheme`                                      |
   | full URL          | `url.full`                                        |
 
-- If you're using the generic ASGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore. Instead, the individual properties of the scope, if available, are accessible as follows:
+- If you're using the generic ASGI integration and a custom traces/profiles sampler, the `sampling_context` argument of `traces_sampler` and `profiles_sampler` doesn't contain the `asgi_scope` object anymore. Instead, the individual properties of the scope, if available, are accessible as follows:
 
   | Scope property | Sampling context key(s)         |
   | -------------- | ------------------------------- |
@@ -81,19 +81,19 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `client`       | `client.address`, `client.port` |
   | full URL       | `url.full`                      |
 
-- If you're using the RQ integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `rq_job` object anymore. Instead, the individual properties of the job and the queue, if available, are accessible as follows:
+- If you're using the RQ integration and a custom traces/profiles sampler, the `sampling_context` argument of `traces_sampler` and `profiles_sampler` doesn't contain the `rq_job` object anymore. Instead, the individual properties of the job and the queue, if available, are accessible as follows:
 
-  | RQ property     | Sampling context key(s)      |
-  | --------------- | ---------------------------- |
-  | `rq_job.args`   | `rq.job.args`                |
-  | `rq_job.kwargs` | `rq.job.kwargs`              |
-  | `rq_job.func`   | `rq.job.func`                |
-  | `queue.name`    | `messaging.destination.name` |
-  | `rq_job.id`     | `messaging.message.id`       |
+  | RQ property     | Sampling context key         | Example                |
+  | --------------- | ---------------------------- | ---------------------- |
+  | `rq_job.args`   | `rq.job.args.{index}`        | `rq.job.args.0`        |
+  | `rq_job.kwargs` | `rq.job.kwargs.{kwarg}`      | `rq.job.args.my_kwarg` |
+  | `rq_job.func`   | `rq.job.func`                |                        |
+  | `queue.name`    | `messaging.destination.name` |                        |
+  | `rq_job.id`     | `messaging.message.id`       |                        |
 
   Note that `rq.job.args`, `rq.job.kwargs`, and `rq.job.func` are serialized and not the actual objects on the job.
 
-- If you're using the AWS Lambda integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `aws_event` and `aws_context` objects anymore. Instead, the following, if available, is accessible:
+- If you're using the AWS Lambda integration and a custom traces/profiles sampler, the `sampling_context` argument of `traces_sampler` and `profiles_sampler` doesn't contain the `aws_event` and `aws_context` objects anymore. Instead, the following, if available, is accessible:
 
   | AWS property                                | Sampling context key(s) |
   | ------------------------------------------- | ----------------------- |
@@ -105,7 +105,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `aws_event["headers"]["Host"]`              | `server.address`        |
   | `aws_context["function_name"]`              | `faas.name`             |
 
-- If you're using the GCP integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `gcp_env` and `gcp_event` keys anymore. Instead, the following, if available, is accessible:
+- If you're using the GCP integration and a custom traces/profiles sampler, the `sampling_context` argument of `traces_sampler` and `profiles_sampler` doesn't contain the `gcp_env` and `gcp_event` keys anymore. Instead, the following, if available, is accessible:
 
   | Old sampling context key          | New sampling context key   |
   | --------------------------------- | -------------------------- |
