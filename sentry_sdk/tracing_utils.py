@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from typing import Generator
     from typing import Optional
     from typing import Union
-
     from types import FrameType
 
 
@@ -148,6 +147,7 @@ def record_sql_queries(
         op=OP.DB,
         name=query,
         origin=span_origin,
+        only_if_parent=True,
     ) as span:
         for k, v in data.items():
             span.set_data(k, v)
@@ -731,6 +731,3 @@ from sentry_sdk.tracing import (
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
