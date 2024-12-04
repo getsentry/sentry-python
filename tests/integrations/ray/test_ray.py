@@ -186,7 +186,7 @@ def test_tracing_in_ray_actors():
     assert worker_envelopes == []
 
 
-# @pytest.mark.forked
+@pytest.mark.forked
 def test_errors_in_ray_actors():
     setup_sentry_with_logging_transport()
 
