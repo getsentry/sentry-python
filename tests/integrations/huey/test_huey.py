@@ -1,7 +1,7 @@
 import pytest
 from decimal import DivisionByZero
 
-from sentry_sdk import start_transaction
+import sentry_sdk
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.utils import parse_version
 
@@ -160,7 +160,7 @@ def test_huey_enqueue(init_huey, capture_events):
 
     events = capture_events()
 
-    with start_transaction() as transaction:
+    with sentry_sdk.start_span() as transaction:
         dummy_task()
 
     (event,) = events
@@ -182,7 +182,7 @@ def test_huey_propagate_trace(init_huey, capture_events):
     def propagated_trace_task():
         pass
 
-    with start_transaction() as outer_transaction:
+    with sentry_sdk.start_span() as outer_transaction:
         execute_huey_task(huey, propagated_trace_task)
 
     assert (
@@ -200,7 +200,7 @@ def test_span_origin_producer(init_huey, capture_events):
 
     events = capture_events()
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         dummy_task()
 
     (event,) = events
