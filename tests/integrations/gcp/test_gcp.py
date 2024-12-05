@@ -293,11 +293,11 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         dedent(
             """
             functionhandler = None
-            event = {
-                "type": "chase",
-                "chasers": ["Maisey", "Charlie"],
-                "num_squirrels": 2,
-            }
+
+            from collections import namedtuple
+            GCPEvent = namedtuple("GCPEvent", ["headers"])
+            event = GCPEvent(headers={"Custom-Header": "Custom Value"})
+
             def cloud_function(functionhandler, event):
                 # this runs after the transaction has started, which means we
                 # can make assertions about traces_sampler
@@ -310,14 +310,15 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                             "gcp.function.entry_point": "cloud_function",
                             "gcp.function.project": "SquirrelChasing",
                             "cloud.provider": "gcp",
+                            "http.request.header.custom-header": "Custom Value",
                         })
                     )
                 except AssertionError:
                     # catch the error and return it because the error itself will
                     # get swallowed by the SDK as an "internal exception"
-                    return {"AssertionError raised": True,}
+                    return {"AssertionError raised": True}
 
-                return {"AssertionError raised": False,}
+                return {"AssertionError raised": False}
             """
         )
         + FUNCTIONS_PRELUDE

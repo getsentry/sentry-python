@@ -467,6 +467,7 @@ def test_attributes_in_traces_sampler(tornado_testcase, sentry_init):
         assert sampling_context["server.port"].isnumeric()
         assert sampling_context["network.protocol.name"] == "HTTP"
         assert sampling_context["network.protocol.version"] == "1.1"
+        assert sampling_context["http.request.header.custom-header"] == "Custom Value"
 
         return True
 
@@ -476,4 +477,4 @@ def test_attributes_in_traces_sampler(tornado_testcase, sentry_init):
     )
 
     client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
-    client.fetch("/hi?foo=bar")
+    client.fetch("/hi?foo=bar", headers={"Custom-Header": "Custom Value"})

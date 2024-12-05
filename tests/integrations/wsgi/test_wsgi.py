@@ -1,5 +1,4 @@
 from collections import Counter
-from datetime import datetime
 from unittest import mock
 
 import pytest
@@ -327,10 +326,7 @@ def test_trace_from_headers_if_performance_disabled(
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
-def test_traces_sampler_gets_correct_values_in_sampling_context(
-    sentry_init,
-    DictionaryContaining,  # noqa:N803
-):
+def test_traces_sampler_gets_correct_values_in_sampling_context(sentry_init):
     def app(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
@@ -343,13 +339,14 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         assert (
             sampling_context["url.full"] == "http://localhost/dogs/are/great/?cats=too"
         )
+        assert sampling_context["http.request.header.custom-header"] == "Custom Value"
         return True
 
     sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
     app = SentryWsgiMiddleware(app)
     client = Client(app)
 
-    client.get("/dogs/are/great/?cats=too")
+    client.get("/dogs/are/great/?cats=too", headers={"Custom-Header": "Custom Value"})
 
 
 def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
