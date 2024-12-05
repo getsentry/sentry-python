@@ -15,13 +15,11 @@ from sentry_sdk.scope import (
     ScopeType,
     should_send_default_pii,
 )
-from sentry_sdk.integrations.opentelemetry.integration import (
-    _setup_scope_context_management,
-)
 from sentry_sdk.integrations.opentelemetry.scope import (
     PotelScope as Scope,
     use_scope,
     use_isolation_scope,
+    setup_scope_context_management,
 )
 
 
@@ -31,7 +29,7 @@ SLOTS_NOT_COPIED = {"client"}
 
 @pytest.fixture(autouse=True)
 def setup_otel_scope_management():
-    _setup_scope_context_management()
+    setup_scope_context_management()
 
 
 def test_copying():
