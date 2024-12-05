@@ -309,7 +309,9 @@ async def test_traces_sampler_gets_attributes_in_sampling_context(
     app.router.add_get("/tricks/kangaroo", kangaroo_handler)
 
     client = await aiohttp_client(app)
-    await client.get("/tricks/kangaroo?jump=high")
+    await client.get(
+        "/tricks/kangaroo?jump=high", headers={"Custom-Header": "Custom Value"}
+    )
 
     assert traces_sampler.call_count == 1
     sampling_context = traces_sampler.call_args_list[0][0][0]
@@ -324,6 +326,7 @@ async def test_traces_sampler_gets_attributes_in_sampling_context(
     assert sampling_context["http.request.method"] == "GET"
     assert sampling_context["server.address"] == "127.0.0.1"
     assert sampling_context["server.port"].isnumeric()
+    assert sampling_context["http.request.header.custom-header"] == "Custom Value"
 
 
 @pytest.mark.asyncio

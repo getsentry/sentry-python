@@ -230,9 +230,7 @@ def _request_headers_to_span_attributes(headers):
     for header, value in headers.items():
         if isinstance(value, AnnotatedValue):
             value = SENSITIVE_DATA_SUBSTITUTE
-        else:
-            value = value.lower()
-        attributes[f"http.request.header.{header}"] = value
+        attributes[f"http.request.header.{header.lower()}"] = value
 
     return attributes
 

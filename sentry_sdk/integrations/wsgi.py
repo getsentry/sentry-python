@@ -345,6 +345,8 @@ def _prepopulate_attributes(wsgi_environ, use_x_forwarded_for=False):
         query = wsgi_environ.get("QUERY_STRING")
         attributes["url.full"] = f"{url}?{query}"
 
-    attributes.update(_request_headers_to_span_attributes(_get_headers(wsgi_environ)))
+    attributes.update(
+        _request_headers_to_span_attributes(dict(_get_headers(wsgi_environ)))
+    )
 
     return attributes
