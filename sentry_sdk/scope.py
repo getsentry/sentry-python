@@ -1,5 +1,6 @@
 import os
 import sys
+import warnings
 from copy import copy
 from collections import deque
 from contextlib import contextmanager
@@ -10,6 +11,7 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
+from sentry_sdk.flag_utils import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
@@ -26,16 +28,18 @@ from sentry_sdk.tracing import (
     Span,
     Transaction,
 )
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
     capture_internal_exceptions,
     ContextVar,
+    datetime_from_isoformat,
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
     logger,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
@@ -153,7 +157,7 @@ def _disable_capture(fn):
     return wrapper  # type: ignore
 
 
-class Scope(object):
+class Scope:
     """The scope holds extra information that should be sent with all
     events that belong to it.
     """
@@ -189,6 +193,7 @@ class Scope(object):
         "client",
         "_type",
         "_last_event_id",
+        "_flags",
     )
 
     def __init__(self, ty=None, client=None):
@@ -245,6 +250,8 @@ class Scope(object):
         rv._profile = self._profile
 
         rv._last_event_id = self._last_event_id
+
+        rv._flags = copy(self._flags)
 
         return rv
 
@@ -682,6 +689,7 @@ class Scope(object):
 
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id = None  # type: Optional[str]
+        self._flags = None  # type: Optional[FlagBuffer]
 
     @_attr_setter
     def level(self, value):
@@ -965,7 +973,7 @@ class Scope(object):
         transaction=None,
         instrumenter=INSTRUMENTER.SENTRY,
         custom_sampling_context=None,
-        **kwargs
+        **kwargs,
     ):
         # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
@@ -1065,6 +1073,13 @@ class Scope(object):
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        if kwargs.get("description") is not None:
+            warnings.warn(
+                "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         with new_scope():
             kwargs.setdefault("scope", self)
 
@@ -1306,7 +1321,17 @@ class Scope(object):
         event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
             self._breadcrumbs
         )
-        event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+
+        # Attempt to sort timestamps
+        try:
+            for crumb in event["breadcrumbs"]["values"]:
+                if isinstance(crumb["timestamp"], str):
+                    crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
+
+            event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+        except Exception as err:
+            logger.debug("Error when sorting breadcrumbs", exc_info=err)
+            pass
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
@@ -1525,6 +1550,17 @@ class Scope(object):
             self._name,
             self._type,
         )
+
+    @property
+    def flags(self):
+        # type: () -> FlagBuffer
+        if self._flags is None:
+            max_flags = (
+                self.get_client().options["_experiments"].get("max_flags")
+                or DEFAULT_FLAG_CAPACITY
+            )
+            self._flags = FlagBuffer(capacity=max_flags)
+        return self._flags
 
 
 @contextmanager

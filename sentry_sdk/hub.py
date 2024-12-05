@@ -22,7 +22,7 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -101,7 +101,7 @@ class HubMeta(type):
         rv = _local.get(None)
         if rv is None:
             with _suppress_hub_deprecation_warning():
-                # This will raise a deprecation warning; supress it since we already warned above.
+                # This will raise a deprecation warning; suppress it since we already warned above.
                 rv = Hub(GLOBAL_HUB)
             _local.set(rv)
         return rv

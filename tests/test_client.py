@@ -21,12 +21,14 @@ from sentry_sdk import (
     capture_event,
     set_tag,
 )
+from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 from sentry_sdk.utils import capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -244,7 +246,10 @@ def test_transport_option(monkeypatch):
         },
     ],
 )
-def test_proxy(monkeypatch, testcase):
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
+def test_proxy(monkeypatch, testcase, http2):
     if testcase["env_http_proxy"] is not None:
         monkeypatch.setenv("HTTP_PROXY", testcase["env_http_proxy"])
     if testcase["env_https_proxy"] is not None:
@@ -253,6 +258,9 @@ def test_proxy(monkeypatch, testcase):
         monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
 
     kwargs = {}
+
+    if http2:
+        kwargs["_experiments"] = {"transport_http2": True}
 
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
@@ -263,13 +271,31 @@ def test_proxy(monkeypatch, testcase):
 
     client = Client(testcase["dsn"], **kwargs)
 
+    proxy = getattr(
+        client.transport._pool,
+        "proxy",
+        getattr(client.transport._pool, "_proxy_url", None),
+    )
     if testcase["expected_proxy_scheme"] is None:
-        assert client.transport._pool.proxy is None
+        assert proxy is None
     else:
-        assert client.transport._pool.proxy.scheme == testcase["expected_proxy_scheme"]
+        scheme = (
+            proxy.scheme.decode("ascii")
+            if isinstance(proxy.scheme, bytes)
+            else proxy.scheme
+        )
+        assert scheme == testcase["expected_proxy_scheme"]
 
         if testcase.get("arg_proxy_headers") is not None:
-            assert client.transport._pool.proxy_headers == testcase["arg_proxy_headers"]
+            proxy_headers = (
+                dict(
+                    (k.decode("ascii"), v.decode("ascii"))
+                    for k, v in client.transport._pool._proxy_headers
+                )
+                if http2
+                else client.transport._pool.proxy_headers
+            )
+            assert proxy_headers == testcase["arg_proxy_headers"]
 
 
 @pytest.mark.parametrize(
@@ -279,60 +305,66 @@ def test_proxy(monkeypatch, testcase):
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "http://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.poolmanager.ProxyManager'>",
+            "should_be_socks_proxy": False,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "socks4a://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "socks4://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "socks5h://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": "socks5://localhost/123",
             "arg_https_proxy": None,
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": None,
             "arg_https_proxy": "socks4a://localhost/123",
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": None,
             "arg_https_proxy": "socks4://localhost/123",
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": None,
             "arg_https_proxy": "socks5h://localhost/123",
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
         {
             "dsn": "https://foo@sentry.io/123",
             "arg_http_proxy": None,
             "arg_https_proxy": "socks5://localhost/123",
-            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+            "should_be_socks_proxy": True,
         },
     ],
 )
-def test_socks_proxy(testcase):
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
+def test_socks_proxy(testcase, http2):
     kwargs = {}
+
+    if http2:
+        kwargs["_experiments"] = {"transport_http2": True}
 
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
@@ -340,7 +372,12 @@ def test_socks_proxy(testcase):
         kwargs["https_proxy"] = testcase["arg_https_proxy"]
 
     client = Client(testcase["dsn"], **kwargs)
-    assert str(type(client.transport._pool)) == testcase["expected_proxy_class"]
+    assert ("socks" in str(type(client.transport._pool)).lower()) == testcase[
+        "should_be_socks_proxy"
+    ], (
+        f"Expected {kwargs} to result in SOCKS == {testcase['should_be_socks_proxy']}"
+        f"but got {str(type(client.transport._pool))}"
+    )
 
 
 def test_simple_transport(sentry_init):
@@ -531,7 +568,17 @@ def test_capture_event_works(sentry_init):
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
-def test_atexit(tmpdir, monkeypatch, num_messages):
+@pytest.mark.parametrize(
+    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+)
+def test_atexit(tmpdir, monkeypatch, num_messages, http2):
+    if http2:
+        options = '_experiments={"transport_http2": True}'
+        transport = "Http2Transport"
+    else:
+        options = ""
+        transport = "HttpTransport"
+
     app = tmpdir.join("app.py")
     app.write(
         dedent(
@@ -545,13 +592,13 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
         message = event.get("message", "")
         print(message)
 
-    transport.HttpTransport.capture_envelope = capture_envelope
-    init("http://foobar@localhost/123", shutdown_timeout={num_messages})
+    transport.{transport}.capture_envelope = capture_envelope
+    init("http://foobar@localhost/123", shutdown_timeout={num_messages}, {options})
 
     for _ in range({num_messages}):
         capture_message("HI")
     """.format(
-                num_messages=num_messages
+                transport=transport, options=options, num_messages=num_messages
             )
         )
     )
@@ -944,6 +991,39 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     assert frame["vars"]["environ"] == {"a": "<This is me>"}
 
 
+def test_custom_repr_on_vars(sentry_init, capture_events):
+    class Foo:
+        pass
+
+    class Fail:
+        pass
+
+    def custom_repr(value):
+        if isinstance(value, Foo):
+            return "custom repr"
+        elif isinstance(value, Fail):
+            raise ValueError("oops")
+        else:
+            return None
+
+    sentry_init(custom_repr=custom_repr)
+    events = capture_events()
+
+    try:
+        my_vars = {"foo": Foo(), "fail": Fail(), "normal": 42}
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    (event,) = events
+    (exception,) = event["exception"]["values"]
+    (frame,) = exception["stacktrace"]["frames"]
+    my_vars = frame["vars"]["my_vars"]
+    assert my_vars["foo"] == "custom repr"
+    assert my_vars["normal"] == "42"
+    assert "Fail object" in my_vars["fail"]
+
+
 @pytest.mark.parametrize(
     "dsn",
     [
@@ -1062,6 +1142,47 @@ def test_debug_option(
         assert "something is wrong" in caplog.text
     else:
         assert "something is wrong" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "client_option,env_var_value,spotlight_url_expected",
+    [
+        (None, None, None),
+        (None, "", None),
+        (None, "F", None),
+        (False, None, None),
+        (False, "", None),
+        (False, "t", None),
+        (None, "t", DEFAULT_SPOTLIGHT_URL),
+        (None, "1", DEFAULT_SPOTLIGHT_URL),
+        (True, None, DEFAULT_SPOTLIGHT_URL),
+        (True, "http://localhost:8080/slurp", DEFAULT_SPOTLIGHT_URL),
+        ("http://localhost:8080/slurp", "f", "http://localhost:8080/slurp"),
+        (None, "http://localhost:8080/slurp", "http://localhost:8080/slurp"),
+    ],
+)
+def test_spotlight_option(
+    sentry_init,
+    monkeypatch,
+    client_option,
+    env_var_value,
+    spotlight_url_expected,
+):
+    if env_var_value is None:
+        monkeypatch.delenv("SENTRY_SPOTLIGHT", raising=False)
+    else:
+        monkeypatch.setenv("SENTRY_SPOTLIGHT", env_var_value)
+
+    if client_option is None:
+        sentry_init()
+    else:
+        sentry_init(spotlight=client_option)
+
+    client = sentry_sdk.get_client()
+    url = client.spotlight.url if client.spotlight else None
+    assert (
+        url == spotlight_url_expected
+    ), f"With config {client_option} and env {env_var_value}"
 
 
 class IssuesSamplerTestConfig:

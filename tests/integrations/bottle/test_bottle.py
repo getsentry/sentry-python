@@ -3,12 +3,14 @@ import pytest
 import logging
 
 from io import BytesIO
-from bottle import Bottle, debug as set_debug, abort, redirect
+from bottle import Bottle, debug as set_debug, abort, redirect, HTTPResponse
 from sentry_sdk import capture_message
+from sentry_sdk.integrations.bottle import BottleIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 from sentry_sdk.integrations.logging import LoggingIntegration
 from werkzeug.test import Client
+from werkzeug.wrappers import Response
 
 import sentry_sdk.integrations.bottle as bottle_sentry
 
@@ -337,29 +339,6 @@ def test_errors_not_reported_twice(
     assert len(events) == 1
 
 
-def test_logging(sentry_init, capture_events, app, get_client):
-    # ensure that Bottle's logger magic doesn't break ours
-    sentry_init(
-        integrations=[
-            bottle_sentry.BottleIntegration(),
-            LoggingIntegration(event_level="ERROR"),
-        ]
-    )
-
-    @app.route("/")
-    def index():
-        app.logger.error("hi")
-        return "ok"
-
-    events = capture_events()
-
-    client = get_client()
-    client.get("/")
-
-    (event,) = events
-    assert event["level"] == "error"
-
-
 def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client):
     sentry_init(integrations=[bottle_sentry.BottleIntegration()])
 
@@ -385,31 +364,6 @@ def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client)
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "bottle"
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
-
-
-def test_500(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
-
-    set_debug(False)
-    app.catchall = True
-
-    @app.route("/")
-    def index():
-        1 / 0
-
-    @app.error(500)
-    def error_handler(err):
-        capture_message("error_msg")
-        return "My error"
-
-    events = capture_events()
-
-    client = get_client()
-    response = client.get("/")
-    assert response[1] == "500 Internal Server Error"
-
-    _, event = events
-    assert event["message"] == "error_msg"
 
 
 def test_error_in_errorhandler(sentry_init, capture_events, app, get_client):
@@ -493,3 +447,80 @@ def test_span_origin(
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.bottle"
+
+
+@pytest.mark.parametrize("raise_error", [True, False])
+@pytest.mark.parametrize(
+    ("integration_kwargs", "status_code", "should_capture"),
+    (
+        ({}, None, False),
+        ({}, 400, False),
+        ({}, 451, False),  # Highest 4xx status code
+        ({}, 500, True),
+        ({}, 511, True),  # Highest 5xx status code
+        ({"failed_request_status_codes": set()}, 500, False),
+        ({"failed_request_status_codes": set()}, 511, False),
+        ({"failed_request_status_codes": {404, *range(500, 600)}}, 404, True),
+        ({"failed_request_status_codes": {404, *range(500, 600)}}, 500, True),
+        ({"failed_request_status_codes": {404, *range(500, 600)}}, 400, False),
+    ),
+)
+def test_failed_request_status_codes(
+    sentry_init,
+    capture_events,
+    integration_kwargs,
+    status_code,
+    should_capture,
+    raise_error,
+):
+    sentry_init(integrations=[BottleIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    app = Bottle()
+
+    @app.route("/")
+    def handle():
+        if status_code is not None:
+            response = HTTPResponse(status=status_code)
+            if raise_error:
+                raise response
+            else:
+                return response
+        return "OK"
+
+    client = Client(app, Response)
+    response = client.get("/")
+
+    expected_status = 200 if status_code is None else status_code
+    assert response.status_code == expected_status
+
+    if should_capture:
+        (event,) = events
+        assert event["exception"]["values"][0]["type"] == "HTTPResponse"
+    else:
+        assert not events
+
+
+def test_failed_request_status_codes_non_http_exception(sentry_init, capture_events):
+    """
+    If an exception, which is not an instance of HTTPResponse, is raised, it should be captured, even if
+    failed_request_status_codes is empty.
+    """
+    sentry_init(integrations=[BottleIntegration(failed_request_status_codes=set())])
+    events = capture_events()
+
+    app = Bottle()
+
+    @app.route("/")
+    def handle():
+        1 / 0
+
+    client = Client(app, Response)
+
+    try:
+        client.get("/")
+    except ZeroDivisionError:
+        pass
+
+    (event,) = events
+    assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"

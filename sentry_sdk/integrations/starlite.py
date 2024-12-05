@@ -1,5 +1,4 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -21,6 +20,8 @@ try:
     from pydantic import BaseModel  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlite is not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
@@ -137,7 +138,7 @@ def enable_span_for_middleware(middleware):
         middleware_name = self.__class__.__name__
         with sentry_sdk.start_span(
             op=OP.MIDDLEWARE_STARLITE,
-            description=middleware_name,
+            name=middleware_name,
             origin=StarliteIntegration.origin,
         ) as middleware_span:
             middleware_span.set_tag("starlite.middleware_name", middleware_name)
@@ -149,7 +150,7 @@ def enable_span_for_middleware(middleware):
                     return await receive(*args, **kwargs)
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLITE_RECEIVE,
-                    description=getattr(receive, "__qualname__", str(receive)),
+                    name=getattr(receive, "__qualname__", str(receive)),
                     origin=StarliteIntegration.origin,
                 ) as span:
                     span.set_tag("starlite.middleware_name", middleware_name)
@@ -166,7 +167,7 @@ def enable_span_for_middleware(middleware):
                     return await send(message)
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLITE_SEND,
-                    description=getattr(send, "__qualname__", str(send)),
+                    name=getattr(send, "__qualname__", str(send)),
                     origin=StarliteIntegration.origin,
                 ) as span:
                     span.set_tag("starlite.middleware_name", middleware_name)

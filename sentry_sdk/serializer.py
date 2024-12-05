@@ -11,7 +11,8 @@ from sentry_sdk.utils import (
     safe_repr,
     strip_string,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -112,6 +113,7 @@ def serialize(event, **kwargs):
     :param max_request_body_size: If set to "always", will never trim request bodies.
     :param max_value_length: The max length to strip strings to, defaults to sentry_sdk.consts.DEFAULT_MAX_VALUE_LENGTH
     :param is_vars: If we're serializing vars early, we want to repr() things that are JSON-serializable to make their type more apparent. For example, it's useful to see the difference between a unicode-string and a bytestring when viewing a stacktrace.
+    :param custom_repr: A custom repr function that runs before safe_repr on the object to be serialized. If it returns None or throws internally, we will fallback to safe_repr.
 
     """
     memo = Memo()
@@ -123,6 +125,17 @@ def serialize(event, **kwargs):
     )  # type: bool
     max_value_length = kwargs.pop("max_value_length", None)  # type: Optional[int]
     is_vars = kwargs.pop("is_vars", False)
+    custom_repr = kwargs.pop("custom_repr", None)  # type: Callable[..., Optional[str]]
+
+    def _safe_repr_wrapper(value):
+        # type: (Any) -> str
+        try:
+            repr_value = None
+            if custom_repr is not None:
+                repr_value = custom_repr(value)
+            return repr_value or safe_repr(value)
+        except Exception:
+            return safe_repr(value)
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -257,7 +270,7 @@ def serialize(event, **kwargs):
             _annotate(rem=[["!limit", "x"]])
             if is_databag:
                 return _flatten_annotated(
-                    strip_string(safe_repr(obj), max_length=max_value_length)
+                    strip_string(_safe_repr_wrapper(obj), max_length=max_value_length)
                 )
             return None
 
@@ -274,7 +287,7 @@ def serialize(event, **kwargs):
             if should_repr_strings or (
                 isinstance(obj, float) and (math.isinf(obj) or math.isnan(obj))
             ):
-                return safe_repr(obj)
+                return _safe_repr_wrapper(obj)
             else:
                 return obj
 
@@ -285,7 +298,7 @@ def serialize(event, **kwargs):
             return (
                 str(format_timestamp(obj))
                 if not should_repr_strings
-                else safe_repr(obj)
+                else _safe_repr_wrapper(obj)
             )
 
         elif isinstance(obj, Mapping):
@@ -345,13 +358,13 @@ def serialize(event, **kwargs):
             return rv_list
 
         if should_repr_strings:
-            obj = safe_repr(obj)
+            obj = _safe_repr_wrapper(obj)
         else:
             if isinstance(obj, bytes) or isinstance(obj, bytearray):
                 obj = obj.decode("utf-8", "replace")
 
             if not isinstance(obj, str):
-                obj = safe_repr(obj)
+                obj = _safe_repr_wrapper(obj)
 
         is_span_description = (
             len(path) == 3 and path[0] == "spans" and path[-1] == "description"

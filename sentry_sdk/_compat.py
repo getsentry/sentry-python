@@ -1,6 +1,6 @@
 import sys
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 
 PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
+PY38 = sys.version_info[0] == 3 and sys.version_info[1] >= 8
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
 

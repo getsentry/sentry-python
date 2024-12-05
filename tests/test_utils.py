@@ -1,7 +1,7 @@
 import threading
 import re
 import sys
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from unittest import mock
 
 import pytest
@@ -12,6 +12,9 @@ from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    datetime_from_isoformat,
+    env_to_bool,
+    format_timestamp,
     get_current_thread_meta,
     get_default_release,
     get_error_message,
@@ -28,14 +31,12 @@ from sentry_sdk.utils import (
     _get_installed_modules,
     _generate_installed_modules,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
 )
 
 
 class TestIntegration(Integration):
     """
-    Test integration for testing ensure_integration_enabled and
-    ensure_integration_enabled_async decorators.
+    Test integration for testing ensure_integration_enabled decorator.
     """
 
     identifier = "test"
@@ -57,6 +58,126 @@ def _normalize_distribution_name(name):
     for more details.
     """
     return re.sub(r"[-_.]+", "-", name).lower()
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_output"),
+    (
+        (
+            "2021-01-01T00:00:00.000000Z",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),  # UTC time
+        (
+            "2021-01-01T00:00:00.000000",
+            datetime(2021, 1, 1).astimezone(timezone.utc),
+        ),  # No TZ -- assume local but convert to UTC
+        (
+            "2021-01-01T00:00:00Z",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),  # UTC - No milliseconds
+        (
+            "2021-01-01T00:00:00.000000+00:00",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000-00:00",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000+0000",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000-0000",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2020-12-31T00:00:00.000000+02:00",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
+        ),  # UTC+2 time
+        (
+            "2020-12-31T00:00:00.000000-0200",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+        ),  # UTC-2 time
+        (
+            "2020-12-31T00:00:00-0200",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+        ),  # UTC-2 time - no milliseconds
+    ),
+)
+def test_datetime_from_isoformat(input_str, expected_output):
+    assert datetime_from_isoformat(input_str) == expected_output, input_str
+
+
+@pytest.mark.parametrize(
+    "env_var_value,strict,expected",
+    [
+        (None, True, None),
+        (None, False, False),
+        ("", True, None),
+        ("", False, False),
+        ("t", True, True),
+        ("T", True, True),
+        ("t", False, True),
+        ("T", False, True),
+        ("y", True, True),
+        ("Y", True, True),
+        ("y", False, True),
+        ("Y", False, True),
+        ("1", True, True),
+        ("1", False, True),
+        ("True", True, True),
+        ("True", False, True),
+        ("true", True, True),
+        ("true", False, True),
+        ("tRuE", True, True),
+        ("tRuE", False, True),
+        ("Yes", True, True),
+        ("Yes", False, True),
+        ("yes", True, True),
+        ("yes", False, True),
+        ("yEs", True, True),
+        ("yEs", False, True),
+        ("On", True, True),
+        ("On", False, True),
+        ("on", True, True),
+        ("on", False, True),
+        ("oN", True, True),
+        ("oN", False, True),
+        ("f", True, False),
+        ("f", False, False),
+        ("n", True, False),
+        ("N", True, False),
+        ("n", False, False),
+        ("N", False, False),
+        ("0", True, False),
+        ("0", False, False),
+        ("False", True, False),
+        ("False", False, False),
+        ("false", True, False),
+        ("false", False, False),
+        ("FaLsE", True, False),
+        ("FaLsE", False, False),
+        ("No", True, False),
+        ("No", False, False),
+        ("no", True, False),
+        ("no", False, False),
+        ("nO", True, False),
+        ("nO", False, False),
+        ("Off", True, False),
+        ("Off", False, False),
+        ("off", True, False),
+        ("off", False, False),
+        ("oFf", True, False),
+        ("oFf", False, False),
+        ("xxx", True, None),
+        ("xxx", False, True),
+    ],
+)
+def test_env_to_bool(env_var_value, strict, expected):
+    assert (
+        env_to_bool(env_var_value, strict=strict) == expected
+    ), f"Value: {env_var_value}, strict: {strict}"
 
 
 @pytest.mark.parametrize(
@@ -660,90 +781,6 @@ def test_ensure_integration_enabled_no_original_function_disabled(sentry_init):
     assert patched_function.__name__ == "function_to_patch"
 
 
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_integration_enabled(sentry_init):
-    # Setup variables and functions for the test
-    async def original_function():
-        return "original"
-
-    async def function_to_patch():
-        return "patched"
-
-    sentry_init(integrations=[TestIntegration()])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(
-        TestIntegration, original_function
-    )(function_to_patch)
-
-    assert await patched_function() == "patched"
-    assert patched_function.__name__ == "original_function"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_integration_disabled(sentry_init):
-    # Setup variables and functions for the test
-    async def original_function():
-        return "original"
-
-    async def function_to_patch():
-        return "patched"
-
-    sentry_init(integrations=[])  # TestIntegration is disabled
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(
-        TestIntegration, original_function
-    )(function_to_patch)
-
-    assert await patched_function() == "original"
-    assert patched_function.__name__ == "original_function"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_no_original_function_enabled(
-    sentry_init,
-):
-    shared_variable = "original"
-
-    async def function_to_patch():
-        nonlocal shared_variable
-        shared_variable = "patched"
-
-    sentry_init(integrations=[TestIntegration])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(TestIntegration)(
-        function_to_patch
-    )
-    await patched_function()
-
-    assert shared_variable == "patched"
-    assert patched_function.__name__ == "function_to_patch"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_no_original_function_disabled(
-    sentry_init,
-):
-    shared_variable = "original"
-
-    async def function_to_patch():
-        nonlocal shared_variable
-        shared_variable = "patched"
-
-    sentry_init(integrations=[])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(TestIntegration)(
-        function_to_patch
-    )
-    await patched_function()
-
-    assert shared_variable == "original"
-    assert patched_function.__name__ == "function_to_patch"
-
-
 @pytest.mark.parametrize(
     "delta,expected_milliseconds",
     [
@@ -878,3 +915,39 @@ def test_get_current_thread_meta_failed_to_get_main_thread():
     thread.start()
     thread.join()
     assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+
+
+@pytest.mark.parametrize(
+    ("datetime_object", "expected_output"),
+    (
+        (
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+            "2021-01-01T00:00:00.000000Z",
+        ),  # UTC time
+        (
+            datetime(2021, 1, 1, tzinfo=timezone(timedelta(hours=2))),
+            "2020-12-31T22:00:00.000000Z",
+        ),  # UTC+2 time
+        (
+            datetime(2021, 1, 1, tzinfo=timezone(timedelta(hours=-7))),
+            "2021-01-01T07:00:00.000000Z",
+        ),  # UTC-7 time
+        (
+            datetime(2021, 2, 3, 4, 56, 7, 890123, tzinfo=timezone.utc),
+            "2021-02-03T04:56:07.890123Z",
+        ),  # UTC time all non-zero fields
+    ),
+)
+def test_format_timestamp(datetime_object, expected_output):
+    formatted = format_timestamp(datetime_object)
+
+    assert formatted == expected_output
+
+
+def test_format_timestamp_naive():
+    datetime_object = datetime(2021, 1, 1)
+    timestamp_regex = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}Z"
+
+    # Ensure that some timestamp is returned, without error. We currently treat these as local time, but this is an
+    # implementation detail which we should not assert here.
+    assert re.fullmatch(timestamp_regex, format_timestamp(datetime_object))

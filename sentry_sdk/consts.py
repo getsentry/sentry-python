@@ -1,7 +1,7 @@
 import itertools
 
 from enum import Enum
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
@@ -16,6 +16,11 @@ class EndpointType(Enum):
     """
 
     ENVELOPE = "envelope"
+
+
+class CompressionAlgo(Enum):
+    GZIP = "gzip"
+    BROTLI = "br"
 
 
 if TYPE_CHECKING:
@@ -53,14 +58,17 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
-            "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
+            "max_flags": Optional[int],
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
             "continuous_profiling_mode": Optional[ContinuousProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
+            "transport_compression_level": Optional[int],
+            "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
+            "transport_http2": Optional[bool],
             "enable_metrics": Optional[bool],
             "before_emit_metric": Optional[
                 Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
@@ -465,6 +473,8 @@ class OP:
     QUEUE_TASK_RQ = "queue.task.rq"
     QUEUE_SUBMIT_HUEY = "queue.submit.huey"
     QUEUE_TASK_HUEY = "queue.task.huey"
+    QUEUE_SUBMIT_RAY = "queue.submit.ray"
+    QUEUE_TASK_RAY = "queue.task.ray"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
@@ -479,6 +489,7 @@ class OP:
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor:
+
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
@@ -496,7 +507,7 @@ class ClientConstructor:
         transport=None,  # type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]
         transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
         sample_rate=1.0,  # type: float
-        send_default_pii=False,  # type: bool
+        send_default_pii=None,  # type: Optional[bool]
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
@@ -539,6 +550,7 @@ class ClientConstructor:
         spotlight=None,  # type: Optional[Union[bool, str]]
         cert_file=None,  # type: Optional[str]
         key_file=None,  # type: Optional[str]
+        custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
     ):
         # type: (...) -> None
         pass
@@ -564,4 +576,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.12.0"
+VERSION = "2.19.0"

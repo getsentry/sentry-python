@@ -3,7 +3,6 @@ from copy import deepcopy
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
@@ -11,6 +10,8 @@ from sentry_sdk.utils import (
     transaction_from_function,
     logger,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict
@@ -87,9 +88,14 @@ def patch_get_request_handler():
             @wraps(old_call)
             def _sentry_call(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
+                current_scope = sentry_sdk.get_current_scope()
+                if current_scope.transaction is not None:
+                    current_scope.transaction.update_active_thread()
+
                 sentry_scope = sentry_sdk.get_isolation_scope()
                 if sentry_scope.profile is not None:
                     sentry_scope.profile.update_active_thread_id()
+
                 return old_call(*args, **kwargs)
 
             dependant.call = _sentry_call
@@ -98,10 +104,10 @@ def patch_get_request_handler():
 
         async def _sentry_app(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            if sentry_sdk.get_client().get_integration(FastApiIntegration) is None:
+            integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
+            if integration is None:
                 return await old_app(*args, **kwargs)
 
-            integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
             request = args[0]
 
             _set_transaction_name_and_source(

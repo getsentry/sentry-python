@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from threading import Lock
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -14,6 +14,10 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Set
     from typing import Type
+    from typing import Union
+
+
+_DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
 
 
 _installer_lock = Lock()
@@ -91,6 +95,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.huey.HueyIntegration",
     "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration",
     "sentry_sdk.integrations.langchain.LangchainIntegration",
+    "sentry_sdk.integrations.litestar.LitestarIntegration",
     "sentry_sdk.integrations.loguru.LoguruIntegration",
     "sentry_sdk.integrations.openai.OpenAIIntegration",
     "sentry_sdk.integrations.pymongo.PyMongoIntegration",
@@ -121,7 +126,7 @@ def setup_integrations(
     with_auto_enabling_integrations=False,
     disabled_integrations=None,
 ):
-    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Integration]]) -> Dict[str, Integration]
+    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Union[type[Integration], Integration]]]) -> Dict[str, Integration]
     """
     Given a list of integration instances, this installs them all.
 

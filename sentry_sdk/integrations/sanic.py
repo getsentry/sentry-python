@@ -19,7 +19,8 @@ from sentry_sdk.utils import (
     parse_version,
     reraise,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Container
@@ -211,9 +212,7 @@ async def _context_exit(request, response=None):
         if not request.ctx._sentry_do_integration:
             return
 
-        integration = sentry_sdk.get_client().get_integration(
-            SanicIntegration
-        )  # type: Integration
+        integration = sentry_sdk.get_client().get_integration(SanicIntegration)
 
         response_status = None if response is None else response.status
 

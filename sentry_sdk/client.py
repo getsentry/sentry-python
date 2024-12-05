@@ -5,12 +5,14 @@ import socket
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
-from typing import cast
+from typing import cast, overload
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
+    ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
+    env_to_bool,
     format_timestamp,
     get_sdk_name,
     get_type_name,
@@ -21,7 +23,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
-from sentry_sdk.transport import HttpTransport, make_transport
+from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
@@ -30,7 +32,6 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
-from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -43,7 +44,7 @@ from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -53,14 +54,17 @@ if TYPE_CHECKING:
     from typing import Sequence
     from typing import Type
     from typing import Union
+    from typing import TypeVar
 
     from sentry_sdk._types import Event, Hint, SDKInfo
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
+    from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
 
+    I = TypeVar("I", bound=Integration)  # noqa: E741
 
 _client_init_debug = ContextVar("client_init_debug")
 
@@ -104,11 +108,7 @@ def _get_options(*args, **kwargs):
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
     if rv["debug"] is None:
-        rv["debug"] = os.environ.get("SENTRY_DEBUG", "False").lower() in (
-            "true",
-            "1",
-            "t",
-        )
+        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG", "False"), strict=True)
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -128,7 +128,11 @@ def _get_options(*args, **kwargs):
         rv["traces_sample_rate"] = 1.0
 
     if rv["event_scrubber"] is None:
-        rv["event_scrubber"] = EventScrubber()
+        rv["event_scrubber"] = EventScrubber(
+            send_default_pii=(
+                False if rv["send_default_pii"] is None else rv["send_default_pii"]
+            )
+        )
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
@@ -153,6 +157,8 @@ class BaseClient:
 
     The basic definition of a client that is used for sending data to Sentry.
     """
+
+    spotlight = None  # type: Optional[SpotlightClient]
 
     def __init__(self, options=None):
         # type: (Optional[Dict[str, Any]]) -> None
@@ -198,8 +204,20 @@ class BaseClient:
         # type: (*Any, **Any) -> None
         return None
 
-    def get_integration(self, *args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    if TYPE_CHECKING:
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (str) -> Optional[Integration]
+            ...
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (type[I]) -> Optional[I]
+            ...
+
+    def get_integration(self, name_or_class):
+        # type: (Union[str, type[Integration]]) -> Optional[Integration]
         return None
 
     def close(self, *args, **kwargs):
@@ -374,7 +392,16 @@ class _Client(BaseClient):
                 disabled_integrations=self.options["disabled_integrations"],
             )
 
-            self.spotlight = None
+            spotlight_config = self.options.get("spotlight")
+            if spotlight_config is None and "SENTRY_SPOTLIGHT" in os.environ:
+                spotlight_env_value = os.environ["SENTRY_SPOTLIGHT"]
+                spotlight_config = env_to_bool(spotlight_env_value, strict=True)
+                self.options["spotlight"] = (
+                    spotlight_config
+                    if spotlight_config is not None
+                    else spotlight_env_value
+                )
+
             if self.options.get("spotlight"):
                 self.spotlight = setup_spotlight(self.options)
 
@@ -406,7 +433,7 @@ class _Client(BaseClient):
             self.monitor
             or self.metrics_aggregator
             or has_profiling_enabled(self.options)
-            or isinstance(self.transport, HttpTransport)
+            or isinstance(self.transport, BaseHttpTransport)
         ):
             # If we have anything on that could spawn a background thread, we
             # need to check if it's safe to use them.
@@ -428,7 +455,11 @@ class _Client(BaseClient):
 
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
-        return self.options.get("send_default_pii", False)
+        result = self.options.get("send_default_pii")
+        if result is None:
+            result = not self.options["dsn"] and self.spotlight is not None
+
+        return result
 
     @property
     def dsn(self):
@@ -519,7 +550,7 @@ class _Client(BaseClient):
 
         if event is not None:
             event_scrubber = self.options["event_scrubber"]
-            if event_scrubber and not self.options["send_default_pii"]:
+            if event_scrubber:
                 event_scrubber.scrub_event(event)
 
         # Postprocess the event here so that annotated types do
@@ -531,6 +562,7 @@ class _Client(BaseClient):
                     cast("Dict[str, Any]", event),
                     max_request_body_size=self.options.get("max_request_body_size"),
                     max_value_length=self.options.get("max_value_length"),
+                    custom_repr=self.options.get("custom_repr"),
                 ),
             )
 
@@ -729,18 +761,16 @@ class _Client(BaseClient):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        if hint is None:
-            hint = {}
-        event_id = event.get("event_id")
         hint = dict(hint or ())  # type: Hint
 
-        if event_id is None:
-            event["event_id"] = event_id = uuid.uuid4().hex
         if not self._should_capture(event, hint, scope):
             return None
 
         profile = event.pop("profile", None)
 
+        event_id = event.get("event_id")
+        if event_id is None:
+            event["event_id"] = event_id = uuid.uuid4().hex
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -788,15 +818,16 @@ class _Client(BaseClient):
         for attachment in attachments or ():
             envelope.add_item(attachment.to_envelope_item())
 
+        return_value = None
         if self.spotlight:
             self.spotlight.capture_envelope(envelope)
+            return_value = event_id
 
-        if self.transport is None:
-            return None
+        if self.transport is not None:
+            self.transport.capture_envelope(envelope)
+            return_value = event_id
 
-        self.transport.capture_envelope(envelope)
-
-        return event_id
+        return return_value
 
     def capture_session(
         self, session  # type: Session
@@ -807,10 +838,22 @@ class _Client(BaseClient):
         else:
             self.session_flusher.add_session(session)
 
+    if TYPE_CHECKING:
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (str) -> Optional[Integration]
+            ...
+
+        @overload
+        def get_integration(self, name_or_class):
+            # type: (type[I]) -> Optional[I]
+            ...
+
     def get_integration(
         self, name_or_class  # type: Union[str, Type[Integration]]
     ):
-        # type: (...) -> Any
+        # type: (...) -> Optional[Integration]
         """Returns the integration for this client by name or class.
         If the client does not have that integration then `None` is returned.
         """
@@ -873,7 +916,7 @@ class _Client(BaseClient):
         self.close()
 
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a

@@ -12,7 +12,8 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
@@ -69,7 +70,7 @@ if TYPE_CHECKING:
         """
 
         description: str
-        """A description of what operation is being performed within the span."""
+        """A description of what operation is being performed within the span. This argument is DEPRECATED. Please use the `name` parameter, instead."""
 
         hub: Optional["sentry_sdk.Hub"]
         """The hub to use for this span. This argument is DEPRECATED. Please use the `scope` parameter, instead."""
@@ -96,10 +97,10 @@ if TYPE_CHECKING:
         Default "manual".
         """
 
-    class TransactionKwargs(SpanKwargs, total=False):
         name: str
-        """Identifier of the transaction. Will show up in the Sentry UI."""
+        """A string describing what operation is being performed within the span/transaction."""
 
+    class TransactionKwargs(SpanKwargs, total=False):
         source: str
         """
         A string describing the source of the transaction name. This will be used to determine the transaction's type.
@@ -226,6 +227,10 @@ class Span:
     :param op: The span's operation. A list of recommended values is available here:
         https://develop.sentry.dev/sdk/performance/span-operations/
     :param description: A description of what operation is being performed within the span.
+
+        .. deprecated:: 2.15.0
+            Please use the `name` parameter, instead.
+    :param name: A string describing what operation is being performed within the span.
     :param hub: The hub to use for this span.
 
         .. deprecated:: 2.0.0
@@ -260,6 +265,7 @@ class Span:
         "_local_aggregator",
         "scope",
         "origin",
+        "name",
     )
 
     def __init__(
@@ -277,6 +283,7 @@ class Span:
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         scope=None,  # type: Optional[sentry_sdk.Scope]
         origin="manual",  # type: str
+        name=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -285,7 +292,7 @@ class Span:
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
         self.op = op
-        self.description = description
+        self.description = name or description
         self.status = status
         self.hub = hub  # backwards compatibility
         self.scope = scope
@@ -322,8 +329,7 @@ class Span:
         self._span_recorder = None  # type: Optional[_SpanRecorder]
         self._local_aggregator = None  # type: Optional[LocalAggregator]
 
-        thread_id, thread_name = get_current_thread_meta()
-        self.set_thread(thread_id, thread_name)
+        self.update_active_thread()
         self.set_profiler_id(get_profiler_id())
 
     # TODO this should really live on the Transaction class rather than the Span
@@ -399,6 +405,13 @@ class Span:
         be removed in the next major version. Going forward, it should only
         be used by the SDK itself.
         """
+        if kwargs.get("description") is not None:
+            warnings.warn(
+                "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         configuration_instrumenter = sentry_sdk.get_client().options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
@@ -718,6 +731,11 @@ class Span:
             "profiler_id": profiler_id,
         }
 
+    def update_active_thread(self):
+        # type: () -> None
+        thread_id, thread_name = get_current_thread_meta()
+        self.set_thread(thread_id, thread_name)
+
 
 class Transaction(Span):
     """The Transaction is the root element that holds all the spans
@@ -749,7 +767,7 @@ class Transaction(Span):
         "_baggage",
     )
 
-    def __init__(
+    def __init__(  # type: ignore[misc]
         self,
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
@@ -1297,4 +1315,8 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
-from sentry_sdk.metrics import LocalAggregator
+
+with warnings.catch_warnings():
+    # The code in this file which uses `LocalAggregator` is only called from the deprecated `metrics` module.
+    warnings.simplefilter("ignore", DeprecationWarning)
+    from sentry_sdk.metrics import LocalAggregator

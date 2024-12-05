@@ -1,7 +1,6 @@
 import sys
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
@@ -23,6 +22,8 @@ try:
     from arq.worker import JobExecutionFailed, Retry, RetryJob, Worker
 except ImportError:
     raise DidNotEnable("Arq is not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
@@ -78,7 +79,7 @@ def patch_enqueue_job():
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         with sentry_sdk.start_span(
-            op=OP.QUEUE_SUBMIT_ARQ, description=function, origin=ArqIntegration.origin
+            op=OP.QUEUE_SUBMIT_ARQ, name=function, origin=ArqIntegration.origin
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
@@ -196,6 +197,17 @@ def patch_create_worker():
     def _sentry_create_worker(*args, **kwargs):
         # type: (*Any, **Any) -> Worker
         settings_cls = args[0]
+
+        if isinstance(settings_cls, dict):
+            if "functions" in settings_cls:
+                settings_cls["functions"] = [
+                    _get_arq_function(func) for func in settings_cls["functions"]
+                ]
+            if "cron_jobs" in settings_cls:
+                settings_cls["cron_jobs"] = [
+                    _get_arq_cron_job(cron_job)
+                    for cron_job in settings_cls["cron_jobs"]
+                ]
 
         if hasattr(settings_cls, "functions"):
             settings_cls.functions = [

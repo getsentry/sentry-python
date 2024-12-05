@@ -10,7 +10,7 @@ from sentry_sdk.utils import (
     parse_version,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -43,6 +43,12 @@ except ImportError:
     FALCON3 = False
 
 
+_FALCON_UNSET = None  # type: Optional[object]
+if FALCON3:  # falcon.request._UNSET is only available in Falcon 3.0+
+    with capture_internal_exceptions():
+        from falcon.request import _UNSET as _FALCON_UNSET  # type: ignore[import-not-found, no-redef]
+
+
 class FalconRequestExtractor(RequestExtractor):
     def env(self):
         # type: () -> Dict[str, Any]
@@ -73,27 +79,23 @@ class FalconRequestExtractor(RequestExtractor):
         else:
             return None
 
-    if FALCON3:
+    def json(self):
+        # type: () -> Optional[Dict[str, Any]]
+        # fallback to cached_media = None if self.request._media is not available
+        cached_media = None
+        with capture_internal_exceptions():
+            # self.request._media is the cached self.request.media
+            # value. It is only available if self.request.media
+            # has already been accessed. Therefore, reading
+            # self.request._media will not exhaust the raw request
+            # stream (self.request.bounded_stream) because it has
+            # already been read if self.request._media is set.
+            cached_media = self.request._media
 
-        def json(self):
-            # type: () -> Optional[Dict[str, Any]]
-            try:
-                return self.request.media
-            except falcon.errors.HTTPBadRequest:
-                return None
+        if cached_media is not _FALCON_UNSET:
+            return cached_media
 
-    else:
-
-        def json(self):
-            # type: () -> Optional[Dict[str, Any]]
-            try:
-                return self.request.media
-            except falcon.errors.HTTPBadRequest:
-                # NOTE(jmagnusson): We return `falcon.Request._media` here because
-                # falcon 1.4 doesn't do proper type checking in
-                # `falcon.Request.media`. This has been fixed in 2.0.
-                # Relevant code: https://github.com/falconry/falcon/blob/1.4.1/falcon/request.py#L953
-                return self.request._media
+        return None
 
 
 class SentryFalconMiddleware:

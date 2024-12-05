@@ -21,22 +21,14 @@ AIO_PORT = 50052
 AIO_PORT += os.getpid() % 100  # avoid port conflicts when running tests in parallel
 
 
-@pytest.fixture(scope="function")
-def event_loop(request):
-    """Create an instance of the default event loop for each test case."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest_asyncio.fixture(scope="function")
-async def grpc_server(sentry_init, event_loop):
+async def grpc_server(sentry_init):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     server = grpc.aio.server()
     server.add_insecure_port("[::]:{}".format(AIO_PORT))
     add_gRPCTestServiceServicer_to_server(TestService, server)
 
-    await event_loop.create_task(server.start())
+    await asyncio.create_task(server.start())
 
     try:
         yield server
@@ -45,12 +37,12 @@ async def grpc_server(sentry_init, event_loop):
 
 
 @pytest.mark.asyncio
-async def test_noop_for_unimplemented_method(event_loop, sentry_init, capture_events):
+async def test_noop_for_unimplemented_method(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     server = grpc.aio.server()
     server.add_insecure_port("[::]:{}".format(AIO_PORT))
 
-    await event_loop.create_task(server.start())
+    await asyncio.create_task(server.start())
 
     events = capture_events()
     try:
@@ -282,7 +274,7 @@ class TestService(gRPCTestServiceServicer):
     async def TestServe(cls, request, context):  # noqa: N802
         with start_span(
             op="test",
-            description="test",
+            name="test",
             origin="auto.grpc.grpc.TestService.aio",
         ):
             pass

@@ -2,7 +2,6 @@ import sys
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -19,6 +18,8 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     reraise,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional, Union, TypeVar
@@ -58,7 +59,7 @@ def patch_enqueue():
         # type: (Huey, Task) -> Optional[Union[Result, ResultGroup]]
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_HUEY,
-            description=task.name,
+            name=task.name,
             origin=HueyIntegration.origin,
         ):
             if not isinstance(task, PeriodicTask):

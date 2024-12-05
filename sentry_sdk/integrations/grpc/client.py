@@ -1,8 +1,9 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator, Iterable, Union
@@ -28,7 +29,7 @@ class ClientInterceptor(
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            description="unary unary call to %s" % method,
+            name="unary unary call to %s" % method,
             origin=SPAN_ORIGIN,
         ) as span:
             span.set_data("type", "unary unary")
@@ -49,7 +50,7 @@ class ClientInterceptor(
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            description="unary stream call to %s" % method,
+            name="unary stream call to %s" % method,
             origin=SPAN_ORIGIN,
         ) as span:
             span.set_data("type", "unary stream")

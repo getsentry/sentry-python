@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
@@ -26,12 +26,11 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY37
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
-if TYPE_CHECKING:
-    from collections.abc import Awaitable
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -70,6 +69,25 @@ _installed_modules = None
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
+
+FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
+TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
+
+
+def env_to_bool(value, *, strict=False):
+    # type: (Any, Optional[bool]) -> bool | None
+    """Casts an ENV variable value to boolean using the constants defined above.
+    In strict mode, it may return None if the value doesn't match any of the predefined values.
+    """
+    normalized = str(value).lower() if value is not None else None
+
+    if normalized in FALSY_ENV_VALUES:
+        return False
+
+    if normalized in TRUTHY_ENV_VALUES:
+        return True
+
+    return None if strict else bool(value)
 
 
 def json_dumps(data):
@@ -208,7 +226,40 @@ def to_timestamp(value):
 
 def format_timestamp(value):
     # type: (datetime) -> str
-    return value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    """Formats a timestamp in RFC 3339 format.
+
+    Any datetime objects with a non-UTC timezone are converted to UTC, so that all timestamps are formatted in UTC.
+    """
+    utctime = value.astimezone(timezone.utc)
+
+    # We use this custom formatting rather than isoformat for backwards compatibility (we have used this format for
+    # several years now), and isoformat is slightly different.
+    return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+ISO_TZ_SEPARATORS = frozenset(("+", "-"))
+
+
+def datetime_from_isoformat(value):
+    # type: (str) -> datetime
+    try:
+        result = datetime.fromisoformat(value)
+    except (AttributeError, ValueError):
+        # py 3.6
+        timestamp_format = (
+            "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
+        )
+        if value.endswith("Z"):
+            value = value[:-1] + "+0000"
+
+        if value[-6] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+            value = value[:-3] + value[-2:]
+        elif value[-5] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+
+        result = datetime.strptime(value, timestamp_format)
+    return result.astimezone(timezone.utc)
 
 
 def event_hint_with_exc_info(exc_info=None):
@@ -585,8 +636,9 @@ def serialize_frame(
     include_local_variables=True,
     include_source_context=True,
     max_value_length=None,
+    custom_repr=None,
 ):
-    # type: (FrameType, Optional[int], bool, bool, Optional[int]) -> Dict[str, Any]
+    # type: (FrameType, Optional[int], bool, bool, Optional[int], Optional[Callable[..., Optional[str]]]) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -618,7 +670,9 @@ def serialize_frame(
     if include_local_variables:
         from sentry_sdk.serializer import serialize
 
-        rv["vars"] = serialize(dict(frame.f_locals), is_vars=True)
+        rv["vars"] = serialize(
+            dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+        )
 
     return rv
 
@@ -657,11 +711,21 @@ def get_errno(exc_value):
 
 def get_error_message(exc_value):
     # type: (Optional[BaseException]) -> str
-    return (
+    message = (
         getattr(exc_value, "message", "")
         or getattr(exc_value, "detail", "")
         or safe_str(exc_value)
-    )
+    )  # type: str
+
+    # __notes__ should be a list of strings when notes are added
+    # via add_note, but can be anything else if __notes__ is set
+    # directly. We only support strings in __notes__, since that
+    # is the correct use.
+    notes = getattr(exc_value, "__notes__", None)  # type: object
+    if isinstance(notes, list) and len(notes) > 0:
+        message += "\n" + "\n".join(note for note in notes if isinstance(note, str))
+
+    return message
 
 
 def single_exception_from_error_tuple(
@@ -723,10 +787,12 @@ def single_exception_from_error_tuple(
         include_local_variables = True
         include_source_context = True
         max_value_length = DEFAULT_MAX_VALUE_LENGTH  # fallback
+        custom_repr = None
     else:
         include_local_variables = client_options["include_local_variables"]
         include_source_context = client_options["include_source_context"]
         max_value_length = client_options["max_value_length"]
+        custom_repr = client_options.get("custom_repr")
 
     frames = [
         serialize_frame(
@@ -735,6 +801,7 @@ def single_exception_from_error_tuple(
             include_local_variables=include_local_variables,
             include_source_context=include_source_context,
             max_value_length=max_value_length,
+            custom_repr=custom_repr,
         )
         for tb in iter_stacks(tb)
     ]
@@ -1051,7 +1118,7 @@ def event_from_exception(
 
 
 def _module_in_list(name, items):
-    # type: (str, Optional[List[str]]) -> bool
+    # type: (Optional[str], Optional[List[str]]) -> bool
     if name is None:
         return False
 
@@ -1066,8 +1133,11 @@ def _module_in_list(name, items):
 
 
 def _is_external_source(abs_path):
-    # type: (str) -> bool
+    # type: (Optional[str]) -> bool
     # check if frame is in 'site-packages' or 'dist-packages'
+    if abs_path is None:
+        return False
+
     external_source = (
         re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
     )
@@ -1075,8 +1145,8 @@ def _is_external_source(abs_path):
 
 
 def _is_in_project_root(abs_path, project_root):
-    # type: (str, Optional[str]) -> bool
-    if project_root is None:
+    # type: (Optional[str], Optional[str]) -> bool
+    if abs_path is None or project_root is None:
         return False
 
     # check if path is in the project root
@@ -1659,12 +1729,6 @@ def _no_op(*_a, **_k):
     pass
 
 
-async def _no_op_async(*_a, **_k):
-    # type: (*Any, **Any) -> None
-    """No-op function for ensure_integration_enabled_async."""
-    pass
-
-
 if TYPE_CHECKING:
 
     @overload
@@ -1724,59 +1788,6 @@ def ensure_integration_enabled(
             return sentry_patched_function(*args, **kwargs)
 
         if original_function is _no_op:
-            return wraps(sentry_patched_function)(runner)
-
-        return wraps(original_function)(runner)
-
-    return patcher
-
-
-if TYPE_CHECKING:
-
-    # mypy has some trouble with the overloads, hence the ignore[no-overload-impl]
-    @overload  # type: ignore[no-overload-impl]
-    def ensure_integration_enabled_async(
-        integration,  # type: type[sentry_sdk.integrations.Integration]
-        original_function,  # type: Callable[P, Awaitable[R]]
-    ):
-        # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
-        ...
-
-    @overload
-    def ensure_integration_enabled_async(
-        integration,  # type: type[sentry_sdk.integrations.Integration]
-    ):
-        # type: (...) -> Callable[[Callable[P, Awaitable[None]]], Callable[P, Awaitable[None]]]
-        ...
-
-
-# The ignore[no-redef] also needed because mypy is struggling with these overloads.
-def ensure_integration_enabled_async(  # type: ignore[no-redef]
-    integration,  # type: type[sentry_sdk.integrations.Integration]
-    original_function=_no_op_async,  # type: Union[Callable[P, Awaitable[R]], Callable[P, Awaitable[None]]]
-):
-    # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
-    """
-    Version of `ensure_integration_enabled` for decorating async functions.
-
-    Please refer to the `ensure_integration_enabled` documentation for more information.
-    """
-
-    if TYPE_CHECKING:
-        # Type hint to ensure the default function has the right typing. The overloads
-        # ensure the default _no_op function is only used when R is None.
-        original_function = cast(Callable[P, Awaitable[R]], original_function)
-
-    def patcher(sentry_patched_function):
-        # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
-        async def runner(*args: "P.args", **kwargs: "P.kwargs"):
-            # type: (...) -> R
-            if sentry_sdk.get_client().get_integration(integration) is None:
-                return await original_function(*args, **kwargs)
-
-            return await sentry_patched_function(*args, **kwargs)
-
-        if original_function is _no_op_async:
             return wraps(sentry_patched_function)(runner)
 
         return wraps(original_function)(runner)

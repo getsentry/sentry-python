@@ -126,6 +126,31 @@ def asgi3_ws_app():
     return app
 
 
+@pytest.fixture
+def asgi3_custom_transaction_app():
+
+    async def app(scope, receive, send):
+        sentry_sdk.get_current_scope().set_transaction_name("foobar", source="custom")
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [
+                    [b"content-type", b"text/plain"],
+                ],
+            }
+        )
+
+        await send(
+            {
+                "type": "http.response.body",
+                "body": b"Hello, world!",
+            }
+        )
+
+    return app
+
+
 def test_invalid_transaction_style(asgi3_app):
     with pytest.raises(ValueError) as exp:
         SentryAsgiMiddleware(asgi3_app, transaction_style="URL")
@@ -679,3 +704,20 @@ async def test_transaction_name_in_traces_sampler(
 
     async with TestClient(app) as client:
         await client.get(request_url)
+
+
+@pytest.mark.asyncio
+async def test_custom_transaction_name(
+    sentry_init, asgi3_custom_transaction_app, capture_events
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+    app = SentryAsgiMiddleware(asgi3_custom_transaction_app)
+
+    async with TestClient(app) as client:
+        await client.get("/test")
+
+    (transaction_event,) = events
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "foobar"
+    assert transaction_event["transaction_info"] == {"source": "custom"}
