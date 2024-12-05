@@ -61,6 +61,7 @@ def patch_enqueue():
             op=OP.QUEUE_SUBMIT_HUEY,
             name=task.name,
             origin=HueyIntegration.origin,
+            only_if_parent=True,
         ):
             if not isinstance(task, PeriodicTask):
                 # Attach trace propagation data to task kwargs. We do
@@ -134,6 +135,8 @@ def _wrap_task_execute(func):
             exc_info = sys.exc_info()
             _capture_exception(exc_info)
             reraise(*exc_info)
+        else:
+            sentry_sdk.get_current_scope().transaction.set_status(SPANSTATUS.OK)
 
         return result
 
@@ -159,13 +162,12 @@ def patch_execute():
 
             sentry_headers = task.kwargs.pop("sentry_headers", {})
             with sentry_sdk.continue_trace(sentry_headers):
-                with sentry_sdk.start_transaction(
+                with sentry_sdk.start_span(
                     name=task.name,
                     op=OP.QUEUE_TASK_HUEY,
                     source=TRANSACTION_SOURCE_TASK,
                     origin=HueyIntegration.origin,
-                ) as transaction:
-                    transaction.set_status(SPANSTATUS.OK)
+                ):
                     return old_execute(self, task, timestamp)
 
     Huey._execute = _sentry_execute

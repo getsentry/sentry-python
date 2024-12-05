@@ -11,6 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
 )
 from sentry_sdk.sessions import track_session
+from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ContextVar,
@@ -45,6 +46,17 @@ if TYPE_CHECKING:
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
+
+DEFAULT_TRANSACTION_NAME = "generic WSGI request"
+
+ENVIRON_TO_ATTRIBUTE = {
+    "PATH_INFO": "url.path",
+    "QUERY_STRING": "url.query",
+    "REQUEST_METHOD": "http.request.method",
+    "SERVER_NAME": "server.address",
+    "SERVER_PORT": "server.port",
+    "wsgi.url_scheme": "url.scheme",
+}
 
 
 def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
@@ -96,6 +108,10 @@ class SentryWsgiMiddleware:
         _wsgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as scope:
+                scope.set_transaction_name(
+                    DEFAULT_TRANSACTION_NAME, source=TRANSACTION_SOURCE_ROUTE
+                )
+
                 with track_session(scope, session_mode="request"):
                     with capture_internal_exceptions():
                         scope.clear_breadcrumbs()
@@ -105,18 +121,18 @@ class SentryWsgiMiddleware:
                                 environ, self.use_x_forwarded_for
                             )
                         )
-
                     method = environ.get("REQUEST_METHOD", "").upper()
                     should_trace = method in self.http_methods_to_capture
                     with sentry_sdk.continue_trace(environ):
                         with (
-                            sentry_sdk.start_transaction(
-                                environ,
+                            sentry_sdk.start_span(
                                 op=OP.HTTP_SERVER,
-                                name="generic WSGI request",
+                                name=DEFAULT_TRANSACTION_NAME,
                                 source=TRANSACTION_SOURCE_ROUTE,
                                 origin=self.span_origin,
-                                custom_sampling_context={"wsgi_environ": environ},
+                                attributes=_prepopulate_attributes(
+                                    environ, self.use_x_forwarded_for
+                                ),
                             )
                             if should_trace
                             else nullcontext()
@@ -305,3 +321,29 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
         return event
 
     return event_processor
+
+
+def _prepopulate_attributes(wsgi_environ, use_x_forwarded_for=False):
+    """Extract span attributes from the WSGI environment."""
+    attributes = {}
+
+    for property, attr in ENVIRON_TO_ATTRIBUTE.items():
+        if wsgi_environ.get(property) is not None:
+            attributes[attr] = wsgi_environ[property]
+
+    if wsgi_environ.get("SERVER_PROTOCOL") is not None:
+        try:
+            proto, version = wsgi_environ["SERVER_PROTOCOL"].split("/")
+            attributes["network.protocol.name"] = proto
+            attributes["network.protocol.version"] = version
+        except Exception:
+            attributes["network.protocol.name"] = wsgi_environ["SERVER_PROTOCOL"]
+
+    try:
+        url = get_request_url(wsgi_environ, use_x_forwarded_for)
+        query = wsgi_environ.get("QUERY_STRING")
+        attributes["url.full"] = f"{url}?{query}"
+    except Exception:
+        pass
+
+    return attributes

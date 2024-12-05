@@ -32,8 +32,8 @@ def _get_headers(asgi_scope):
     return headers
 
 
-def _get_url(asgi_scope, default_scheme, host):
-    # type: (Dict[str, Any], Literal["ws", "http"], Optional[Union[AnnotatedValue, str]]) -> str
+def _get_url(asgi_scope, default_scheme=None, host=None):
+    # type: (Dict[str, Any], Optional[Literal["ws", "http"]], Optional[Union[AnnotatedValue, str]]) -> str
     """
     Extract URL from the ASGI scope, without also including the querystring.
     """

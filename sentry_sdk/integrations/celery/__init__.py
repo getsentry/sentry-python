@@ -20,6 +20,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     reraise,
+    _serialize_span_attribute,
 )
 
 from typing import TYPE_CHECKING
@@ -318,15 +319,9 @@ def _wrap_tracer(task, f):
                     name=task.name,
                     source=TRANSACTION_SOURCE_TASK,
                     origin=CeleryIntegration.origin,
-                    custom_sampling_context={
-                        "celery_job": {
-                            "task": task.name,
-                            # for some reason, args[1] is a list if non-empty but a
-                            # tuple if empty
-                            "args": list(args[1]),
-                            "kwargs": args[2],
-                        }
-                    },
+                    # for some reason, args[1] is a list if non-empty but a
+                    # tuple if empty
+                    attributes=_prepopulate_attributes(task, list(args[1]), args[2]),
                 ) as transaction:
                     transaction.set_status(SPANSTATUS.OK)
                     return f(*args, **kwargs)
@@ -495,6 +490,7 @@ def _patch_producer_publish():
             op=OP.QUEUE_PUBLISH,
             name=task_name,
             origin=CeleryIntegration.origin,
+            only_if_parent=True,
         ) as span:
             if task_id is not None:
                 span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
@@ -515,3 +511,12 @@ def _patch_producer_publish():
             return original_publish(self, *args, **kwargs)
 
     Producer.publish = sentry_publish
+
+
+def _prepopulate_attributes(task, args, kwargs):
+    attributes = {
+        "celery.job.task": task.name,
+        "celery.job.args": _serialize_span_attribute(args),
+        "celery.job.kwargs": _serialize_span_attribute(kwargs),
+    }
+    return attributes

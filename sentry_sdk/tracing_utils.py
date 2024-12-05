@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from typing import Generator
     from typing import Optional
     from typing import Union
-
     from types import FrameType
 
 
@@ -148,6 +147,7 @@ def record_sql_queries(
         op=OP.DB,
         name=query,
         origin=span_origin,
+        only_if_parent=True,
     ) as span:
         for k, v in data.items():
             span.set_data(k, v)
@@ -603,6 +603,21 @@ class Baggage:
             items.append(self.third_party_items)
 
         return ",".join(items)
+
+    @staticmethod
+    def strip_sentry_baggage(header):
+        # type: (str) -> str
+        """Remove Sentry baggage from the given header.
+
+        Given a Baggage header, return a new Baggage header with all Sentry baggage items removed.
+        """
+        return ",".join(
+            (
+                item
+                for item in header.split(",")
+                if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
+            )
+        )
 
 
 def should_propagate_trace(client, url):

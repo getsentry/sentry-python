@@ -39,6 +39,17 @@ TIMEOUT_WARNING_BUFFER = 1500  # Buffer time required to send timeout warning to
 MILLIS_TO_SECONDS = 1000.0
 
 
+EVENT_TO_ATTRIBUTES = {
+    "httpMethod": "http.request.method",
+    "queryStringParameters": "url.query",
+    "path": "url.path",
+}
+
+CONTEXT_TO_ATTRIBUTES = {
+    "function_name": "faas.name",
+}
+
+
 def _wrap_init_error(init_error):
     # type: (F) -> F
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
@@ -151,10 +162,7 @@ def _wrap_handler(handler):
                     name=aws_context.function_name,
                     source=TRANSACTION_SOURCE_COMPONENT,
                     origin=AwsLambdaIntegration.origin,
-                    custom_sampling_context={
-                        "aws_event": aws_event,
-                        "aws_context": aws_context,
-                    },
+                    attributes=_prepopulate_attributes(aws_event, aws_context),
                 ):
                     try:
                         return handler(aws_event, aws_context, *args, **kwargs)
@@ -457,3 +465,31 @@ def _event_from_error_json(error_json):
     }  # type: Event
 
     return event
+
+
+def _prepopulate_attributes(aws_event, aws_context):
+    attributes = {
+        "cloud.provider": "aws",
+    }
+
+    for prop, attr in EVENT_TO_ATTRIBUTES.items():
+        if aws_event.get(prop) is not None:
+            attributes[attr] = aws_event[prop]
+
+    for prop, attr in CONTEXT_TO_ATTRIBUTES.items():
+        if getattr(aws_context, prop, None) is not None:
+            attributes[attr] = getattr(aws_context, prop)
+
+    url = _get_url(aws_event, aws_context)
+    if url:
+        if aws_event.get("queryStringParameters"):
+            url += f"?{aws_event['queryStringParameters']}"
+        attributes["url.full"] = url
+
+    headers = aws_event.get("headers") or {}
+    if headers.get("X-Forwarded-Proto"):
+        attributes["network.protocol.name"] = headers["X-Forwarded-Proto"]
+    if headers.get("Host"):
+        attributes["server.address"] = headers["Host"]
+
+    return attributes

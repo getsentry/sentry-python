@@ -226,7 +226,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
         {
             "category": "query",
             "data": {
-                "db.params": "('Bob', 'secret_pw', datetime.date(1984, 3, 1))",
+                "db.params": ["Bob", "secret_pw", "datetime.date(1984, 3, 1)"],
                 "db.paramstyle": "format",
             },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",

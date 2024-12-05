@@ -3,7 +3,7 @@ from typing import cast
 from datetime import datetime, timezone
 
 from urllib3.util import parse_url as urlparse
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from opentelemetry.trace import (
     Span as AbstractSpan,
     SpanKind,
@@ -114,7 +114,6 @@ def extract_span_data(span):
     description = span.name
     status, http_status = extract_span_status(span)
     origin = None
-
     if span.attributes is None:
         return (op, description, status, http_status, origin)
 
@@ -133,11 +132,23 @@ def extract_span_data(span):
 
     rpc_service = span.attributes.get(SpanAttributes.RPC_SERVICE)
     if rpc_service:
-        return ("rpc", description, status, http_status, origin)
+        return (
+            span.attributes.get(SentrySpanAttribute.OP) or "rpc",
+            description,
+            status,
+            http_status,
+            origin,
+        )
 
     messaging_system = span.attributes.get(SpanAttributes.MESSAGING_SYSTEM)
     if messaging_system:
-        return ("message", description, status, http_status, origin)
+        return (
+            span.attributes.get(SentrySpanAttribute.OP) or "message",
+            description,
+            status,
+            http_status,
+            origin,
+        )
 
     faas_trigger = span.attributes.get(SpanAttributes.FAAS_TRIGGER)
     if faas_trigger:
@@ -150,36 +161,43 @@ def span_data_for_http_method(span):
     # type: (ReadableSpan) -> OtelExtractedSpanData
     span_attributes = span.attributes or {}
 
-    op = "http"
+    op = span_attributes.get(SentrySpanAttribute.OP)
+    if op is None:
+        op = "http"
 
-    if span.kind == SpanKind.SERVER:
-        op += ".server"
-    elif span.kind == SpanKind.CLIENT:
-        op += ".client"
+        if span.kind == SpanKind.SERVER:
+            op += ".server"
+        elif span.kind == SpanKind.CLIENT:
+            op += ".client"
 
     http_method = span_attributes.get(SpanAttributes.HTTP_METHOD)
     route = span_attributes.get(SpanAttributes.HTTP_ROUTE)
     target = span_attributes.get(SpanAttributes.HTTP_TARGET)
     peer_name = span_attributes.get(SpanAttributes.NET_PEER_NAME)
 
-    description = f"{http_method}"
+    # TODO-neel-potel remove description completely
+    description = span_attributes.get(
+        SentrySpanAttribute.DESCRIPTION
+    ) or span_attributes.get(SentrySpanAttribute.NAME)
+    if description is None:
+        description = f"{http_method}"
 
-    if route:
-        description = f"{http_method} {route}"
-    elif target:
-        description = f"{http_method} {target}"
-    elif peer_name:
-        description = f"{http_method} {peer_name}"
-    else:
-        url = span_attributes.get(SpanAttributes.HTTP_URL)
-        url = cast("Optional[str]", url)
+        if route:
+            description = f"{http_method} {route}"
+        elif target:
+            description = f"{http_method} {target}"
+        elif peer_name:
+            description = f"{http_method} {peer_name}"
+        else:
+            url = span_attributes.get(SpanAttributes.HTTP_URL)
+            url = cast("Optional[str]", url)
 
-        if url:
-            parsed_url = urlparse(url)
-            url = "{}://{}{}".format(
-                parsed_url.scheme, parsed_url.netloc, parsed_url.path
-            )
-            description = f"{http_method} {url}"
+            if url:
+                parsed_url = urlparse(url)
+                url = "{}://{}{}".format(
+                    parsed_url.scheme, parsed_url.netloc, parsed_url.path
+                )
+                description = f"{http_method} {url}"
 
     status, http_status = extract_span_status(span)
 
@@ -234,7 +252,7 @@ def extract_span_status(span):
         return (inferred_status, http_status)
 
     if status and status.status_code == StatusCode.UNSET:
-        return (SPANSTATUS.OK, None)
+        return (None, None)
     else:
         return (SPANSTATUS.UNKNOWN_ERROR, None)
 
@@ -308,8 +326,10 @@ def get_trace_context(span, span_data=None):
         "parent_span_id": parent_span_id,
         "op": op,
         "origin": origin or DEFAULT_SPAN_ORIGIN,
-        "status": status,
     }  # type: dict[str, Any]
+
+    if status:
+        trace_context["status"] = status
 
     if span.attributes:
         trace_context["data"] = dict(span.attributes)
@@ -352,7 +372,7 @@ def dsc_from_trace_state(trace_state):
     for k, v in trace_state.items():
         if Baggage.SENTRY_PREFIX_REGEX.match(k):
             key = re.sub(Baggage.SENTRY_PREFIX_REGEX, "", k)
-            dsc[key] = v
+            dsc[unquote(key)] = unquote(v)
     return dsc
 
 

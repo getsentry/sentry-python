@@ -6,11 +6,8 @@ removed at any time without prior notice.
 
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
-from sentry_sdk.integrations.opentelemetry.potel_span_processor import (
-    PotelSentrySpanProcessor,
-)
-from sentry_sdk.integrations.opentelemetry.contextvars_context import (
-    SentryContextVarsRuntimeContext,
+from sentry_sdk.integrations.opentelemetry.span_processor import (
+    SentrySpanProcessor,
 )
 from sentry_sdk.integrations.opentelemetry.sampler import SentrySampler
 from sentry_sdk.utils import logger
@@ -70,12 +67,8 @@ def _patch_readable_span():
 
 def _setup_sentry_tracing():
     # type: () -> None
-    import opentelemetry.context
-
-    opentelemetry.context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
-
     provider = TracerProvider(sampler=SentrySampler())
-    provider.add_span_processor(PotelSentrySpanProcessor())
+    provider.add_span_processor(SentrySpanProcessor())
     trace.set_tracer_provider(provider)
 
     set_global_textmap(SentryPropagator())

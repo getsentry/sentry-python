@@ -72,6 +72,7 @@ def patch_templates():
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(self.template_name),
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
             if isinstance(self.context_data, dict):
                 for k, v in self.context_data.items():
@@ -102,6 +103,7 @@ def patch_templates():
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(template_name),
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
             for k, v in context.items():
                 span.set_data(f"context.{k}", v)

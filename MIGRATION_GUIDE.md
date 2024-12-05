@@ -10,7 +10,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - The SDK now supports Python 3.7 and higher.
 - `sentry_sdk.start_span` now only takes keyword arguments.
-- `sentry_sdk.start_span` no longer takes an explicit `span` argument.
+- `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
+- You can no longer change the sampled status of a span with `span.sampled = False` after starting it.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
@@ -19,11 +20,109 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Redis integration: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
+- The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
+- If you're using the Celery integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
+
+  | Dictionary keys        | Sampling context key |
+  | ---------------------- | -------------------- |
+  | `celery_job["args"]`   | `celery.job.args`    |
+  | `celery_job["kwargs"]` | `celery.job.kwargs`  |
+  | `celery_job["task"]`   | `celery.job.task`    |
+
+  Note that all of these are serialized, i.e., not the original `args` and `kwargs` but rather OpenTelemetry-friendly span attributes.
+
+- If you're using the AIOHTTP integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `aiohttp_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+
+  | Request property | Sampling context key(s)         |
+  | ---------------- | ------------------------------- |
+  | `path`           | `url.path`                      |
+  | `query_string`   | `url.query`                     |
+  | `method`         | `http.request.method`           |
+  | `host`           | `server.address`, `server.port` |
+  | `scheme`         | `url.scheme`                    |
+  | full URL         | `url.full`                      |
+
+- If you're using the Tornado integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `tornado_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+
+  | Request property | Sampling context key(s)                             |
+  | ---------------- | --------------------------------------------------- |
+  | `path`           | `url.path`                                          |
+  | `query`          | `url.query`                                         |
+  | `protocol`       | `url.scheme`                                        |
+  | `method`         | `http.request.method`                               |
+  | `host`           | `server.address`, `server.port`                     |
+  | `version`        | `network.protocol.name`, `network.protocol.version` |
+  | full URL         | `url.full`                                          |
+
+- If you're using the generic WSGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `wsgi_environ` object anymore. Instead, the individual properties of the environment are accessible, if available, as follows:
+
+  | Env property      | Sampling context key(s)                           |
+  | ----------------- | ------------------------------------------------- |
+  | `PATH_INFO`       | `url.path`                                        |
+  | `QUERY_STRING`    | `url.query`                                       |
+  | `REQUEST_METHOD`  | `http.request.method`                             |
+  | `SERVER_NAME`     | `server.address`                                  |
+  | `SERVER_PORT`     | `server.port`                                     |
+  | `SERVER_PROTOCOL` | `server.protocol.name`, `server.protocol.version` |
+  | `wsgi.url_scheme` | `url.scheme`                                      |
+  | full URL          | `url.full`                                        |
+
+- If you're using the generic ASGI integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `asgi_scope` object anymore. Instead, the individual properties of the scope, if available, are accessible as follows:
+
+  | Scope property | Sampling context key(s)         |
+  | -------------- | ------------------------------- |
+  | `type`         | `network.protocol.name`         |
+  | `scheme`       | `url.scheme`                    |
+  | `path`         | `url.path`                      |
+  | `query`        | `url.query`                     |
+  | `http_version` | `network.protocol.version`      |
+  | `method`       | `http.request.method`           |
+  | `server`       | `server.address`, `server.port` |
+  | `client`       | `client.address`, `client.port` |
+  | full URL       | `url.full`                      |
+
+- If you're using the RQ integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `rq_job` object anymore. Instead, the individual properties of the job and the queue, if available, are accessible as follows:
+
+  | RQ property     | Sampling context key(s)      |
+  | --------------- | ---------------------------- |
+  | `rq_job.args`   | `rq.job.args`                |
+  | `rq_job.kwargs` | `rq.job.kwargs`              |
+  | `rq_job.func`   | `rq.job.func`                |
+  | `queue.name`    | `messaging.destination.name` |
+  | `rq_job.id`     | `messaging.message.id`       |
+
+  Note that `rq.job.args`, `rq.job.kwargs`, and `rq.job.func` are serialized and not the actual objects on the job.
+
+- If you're using the AWS Lambda integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `aws_event` and `aws_context` objects anymore. Instead, the following, if available, is accessible:
+
+  | AWS property                                | Sampling context key(s) |
+  | ------------------------------------------- | ----------------------- |
+  | `aws_event["httpMethod"]`                   | `http.request.method`   |
+  | `aws_event["queryStringParameters"]`        | `url.query`             |
+  | `aws_event["path"]`                         | `url.path`              |
+  | full URL                                    | `url.full`              |
+  | `aws_event["headers"]["X-Forwarded-Proto"]` | `network.protocol.name` |
+  | `aws_event["headers"]["Host"]`              | `server.address`        |
+  | `aws_context["function_name"]`              | `faas.name`             |
+
+- If you're using the GCP integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `gcp_env` and `gcp_event` keys anymore. Instead, the following, if available, is accessible:
+
+  | Old sampling context key          | New sampling context key   |
+  | --------------------------------- | -------------------------- |
+  | `gcp_env["function_name"]`        | `faas.name`                |
+  | `gcp_env["function_region"]`      | `faas.region`              |
+  | `gcp_env["function_project"]`     | `gcp.function.project`     |
+  | `gcp_env["function_identity"]`    | `gcp.function.identity`    |
+  | `gcp_env["function_entry_point"]` | `gcp.function.entry_point` |
+  | `gcp_event.method`                | `http.request.method`      |
+  | `gcp_event.query_string`          | `url.query`                |
+
 
 ### Removed
 
 - Spans no longer have a `description`. Use `name` instead.
 - Dropped support for Python 3.6.
+- The `custom_sampling_context` parameter of `start_transaction` has been removed. Use `attributes` instead to set key-value pairs of data that should be accessible in the traces sampler. Note that span attributes need to conform to the [OpenTelemetry specification](https://opentelemetry.io/docs/concepts/signals/traces/#attributes), meaning only certain types can be set as values.
 - The PyMongo integration no longer sets tags. The data is still accessible via span attributes.
 - The PyMongo integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
 - `sentry_sdk.metrics` and associated metrics APIs have been removed as Sentry no longer accepts metrics data in this form. See https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics
@@ -39,6 +138,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `span.containing_transaction` has been removed. Use `span.root_span` instead.
 - `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.
 - `PropagationContext` constructor no longer takes a `dynamic_sampling_context` but takes a `baggage` object instead.
+- `ThreadingIntegration` no longer takes the `propagate_hub` argument.
 
 ### Deprecated
 

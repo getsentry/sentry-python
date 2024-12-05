@@ -30,7 +30,7 @@ jobs:
         python-version: ["3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
         os: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -52,7 +52,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v4.6.0
+        uses: codecov/codecov-action@v5.0.7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -67,7 +67,7 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All Common tests passed
+    name: All pinned Common tests passed
     needs: test-common-pinned
     # Always run this, even if a dependent job failed
     if: always()

@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.integrations.opentelemetry.scope import setup_scope_context_management
 
 if TYPE_CHECKING:
     from typing import Any, Optional
@@ -24,6 +25,7 @@ def _init(*args, **kwargs):
     """
     client = sentry_sdk.Client(*args, **kwargs)
     sentry_sdk.get_global_scope().set_client(client)
+    setup_scope_context_management()
     _check_python_deprecations()
 
 

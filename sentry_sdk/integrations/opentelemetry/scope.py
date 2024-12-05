@@ -1,11 +1,18 @@
 from typing import cast
 from contextlib import contextmanager
 
-from opentelemetry.context import get_value, set_value, attach, detach, get_current
+from opentelemetry.context import (
+    get_value,
+    set_value,
+    attach,
+    detach,
+    get_current,
+)
 from opentelemetry.trace import (
     SpanContext,
     NonRecordingSpan,
     TraceFlags,
+    TraceState,
     use_span,
 )
 
@@ -14,6 +21,10 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
     SENTRY_USE_CURRENT_SCOPE_KEY,
     SENTRY_USE_ISOLATION_SCOPE_KEY,
+    TRACESTATE_SAMPLED_KEY,
+)
+from sentry_sdk.integrations.opentelemetry.contextvars_context import (
+    SentryContextVarsRuntimeContext,
 )
 from sentry_sdk.integrations.opentelemetry.utils import trace_state_from_baggage
 from sentry_sdk.scope import Scope, ScopeType
@@ -24,7 +35,6 @@ if TYPE_CHECKING:
     from typing import Tuple, Optional, Generator, Dict, Any
     from typing_extensions import Unpack
 
-    from sentry_sdk._types import SamplingContext
     from sentry_sdk.tracing import TransactionKwargs
 
 
@@ -97,10 +107,15 @@ class PotelScope(Scope):
             else TraceFlags.DEFAULT
         )
 
-        # TODO-neel-potel do we need parent and sampled like JS?
-        trace_state = None
         if self._propagation_context.baggage:
             trace_state = trace_state_from_baggage(self._propagation_context.baggage)
+        else:
+            trace_state = TraceState()
+
+        # for twp to work, we also need to consider deferred sampling when the sampling
+        # flag is not present, so the above TraceFlags are not sufficient
+        if self._propagation_context.parent_sampled is None:
+            trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "deferred")
 
         span_context = SpanContext(
             trace_id=int(self._propagation_context.trace_id, 16),  # type: ignore
@@ -112,22 +127,39 @@ class PotelScope(Scope):
 
         return span_context
 
-    def start_transaction(self, custom_sampling_context=None, **kwargs):
-        # type: (Optional[SamplingContext], Unpack[TransactionKwargs]) -> POTelSpan
+    def start_transaction(self, **kwargs):
+        # type: (Unpack[TransactionKwargs]) -> POTelSpan
         """
         .. deprecated:: 3.0.0
             This function is deprecated and will be removed in a future release.
             Use :py:meth:`sentry_sdk.start_span` instead.
         """
-        return self.start_span(custom_sampling_context=custom_sampling_context)
+        return self.start_span(**kwargs)
 
-    def start_span(self, custom_sampling_context=None, **kwargs):
-        # type: (Optional[SamplingContext], Any) -> POTelSpan
+    def start_span(self, **kwargs):
+        # type: (Any) -> POTelSpan
         return POTelSpan(**kwargs, scope=self)
 
 
-_INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
-_INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
+_INITIAL_CURRENT_SCOPE = None
+_INITIAL_ISOLATION_SCOPE = None
+
+
+def setup_initial_scopes():
+    global _INITIAL_CURRENT_SCOPE, _INITIAL_ISOLATION_SCOPE
+    _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
+    _INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
+
+    scopes = (_INITIAL_CURRENT_SCOPE, _INITIAL_ISOLATION_SCOPE)
+    attach(set_value(SENTRY_SCOPES_KEY, scopes))
+
+
+def setup_scope_context_management():
+    # type: () -> None
+    import opentelemetry.context
+
+    opentelemetry.context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
+    setup_initial_scopes()
 
 
 @contextmanager

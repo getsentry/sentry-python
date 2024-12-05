@@ -153,6 +153,7 @@ class CommandTracer(monitoring.CommandListener):
                 op=OP.DB,
                 name=query,
                 origin=PyMongoIntegration.origin,
+                only_if_parent=True,
             )
 
             with capture_internal_exceptions():

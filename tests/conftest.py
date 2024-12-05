@@ -62,7 +62,10 @@ else:
 
 
 from sentry_sdk import scope
-import sentry_sdk.integrations.opentelemetry.scope as potel_scope
+from sentry_sdk.integrations.opentelemetry.scope import (
+    setup_scope_context_management,
+    setup_initial_scopes,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -74,8 +77,7 @@ def clean_scopes():
     scope._isolation_scope.set(None)
     scope._current_scope.set(None)
 
-    potel_scope._INITIAL_CURRENT_SCOPE.clear()
-    potel_scope._INITIAL_ISOLATION_SCOPE.clear()
+    setup_initial_scopes()
 
 
 @pytest.fixture(autouse=True)
@@ -188,6 +190,7 @@ def sentry_init(request):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
         sentry_sdk.get_global_scope().set_client(client)
+        setup_scope_context_management()
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
@@ -643,3 +646,18 @@ class ApproxDict(dict):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+
+@pytest.fixture(name="SortedBaggage")
+def sorted_baggage_matcher():
+    class SortedBaggage:
+        def __init__(self, baggage):
+            self.baggage = baggage
+
+        def __eq__(self, other):
+            return sorted(self.baggage.split(",")) == sorted(other.split(","))
+
+        def __ne__(self, other):
+            return not self.__eq__(other)
+
+    return SortedBaggage
