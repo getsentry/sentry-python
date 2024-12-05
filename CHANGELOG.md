@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.19.1
+
+### Various fixes & improvements
+
+- Copy scope.client reference as well (#3857) by @sl0thentr0py
+- fix(spotlight): Don't give up on Spotlight on 3 errors (#3856) by @BYK
+- fix(django): Fix errors when instrumenting Django cache (#3855) by @BYK
+- Script for checking if our instrumented libs are python 3.13 compatible (#3425) by @antonpirker
+- Add missing stack frames (#3673) by @antonpirker
+- fix(grpc): Return proper metadata object instead of list in… (#3205) by @fdellekart
+- Improve ray tests (#3846) by @antonpirker
+- Test with celery 5.5.0rc3 (#3842) by @sentrivana
+- Revert "Fix spans for streaming responses in WSGI based frameworks (#3798)" (#3836) by @antonpirker
+- Fix asyncio testing setup (#3832) by @sl0thentr0py
+- build(deps): bump codecov/codecov-action from 5.0.2 to 5.0.7 (#3821) by @dependabot
+- Fix CI (#3834) by @sentrivana
+- ref(flags): rename launch darkly hook to match JS SDK (#3743) by @aliu39
+- Use new clickhouse gh action (#3826) by @antonpirker
+- Fix spans for streaming responses in WSGI based frameworks (#3798) by @antonpirker
+
 ## 2.19.0
 
 ### Various fixes & improvements
