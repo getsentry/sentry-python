@@ -20,7 +20,10 @@ from sentry_sdk.utils import (
     reraise,
 )
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import (
+    _filter_headers,
+    _request_headers_to_span_attributes,
+)
 
 from typing import TYPE_CHECKING
 
@@ -162,7 +165,7 @@ def _wrap_handler(handler):
                     name=aws_context.function_name,
                     source=TRANSACTION_SOURCE_COMPONENT,
                     origin=AwsLambdaIntegration.origin,
-                    attributes=_prepopulate_attributes(aws_event, aws_context),
+                    attributes=_prepopulate_attributes(request_data, aws_context),
                 ):
                     try:
                         return handler(aws_event, aws_context, *args, **kwargs)
@@ -468,6 +471,7 @@ def _event_from_error_json(error_json):
 
 
 def _prepopulate_attributes(aws_event, aws_context):
+    # type: (Any, Any) -> dict[str, Any]
     attributes = {
         "cloud.provider": "aws",
     }
@@ -486,10 +490,15 @@ def _prepopulate_attributes(aws_event, aws_context):
             url += f"?{aws_event['queryStringParameters']}"
         attributes["url.full"] = url
 
-    headers = aws_event.get("headers") or {}
+    headers = {}
+    if aws_event.get("headers") and isinstance(aws_event["headers"], dict):
+        headers = aws_event["headers"]
+
     if headers.get("X-Forwarded-Proto"):
         attributes["network.protocol.name"] = headers["X-Forwarded-Proto"]
     if headers.get("Host"):
         attributes["server.address"] = headers["Host"]
+
+    attributes.update(_request_headers_to_span_attributes(headers))
 
     return attributes

@@ -9,9 +9,9 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
+    _request_headers_to_span_attributes,
 )
 from sentry_sdk.sessions import track_session
-from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ContextVar,
@@ -324,6 +324,7 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
 
 
 def _prepopulate_attributes(wsgi_environ, use_x_forwarded_for=False):
+    # type: (dict[str, str], bool) -> dict[str, str]
     """Extract span attributes from the WSGI environment."""
     attributes = {}
 
@@ -339,11 +340,13 @@ def _prepopulate_attributes(wsgi_environ, use_x_forwarded_for=False):
         except Exception:
             attributes["network.protocol.name"] = wsgi_environ["SERVER_PROTOCOL"]
 
-    try:
+    with capture_internal_exceptions():
         url = get_request_url(wsgi_environ, use_x_forwarded_for)
         query = wsgi_environ.get("QUERY_STRING")
         attributes["url.full"] = f"{url}?{query}"
-    except Exception:
-        pass
+
+    attributes.update(
+        _request_headers_to_span_attributes(dict(_get_headers(wsgi_environ)))
+    )
 
     return attributes

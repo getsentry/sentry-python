@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, logger
+from sentry_sdk.utils import AnnotatedValue, logger, SENSITIVE_DATA_SUBSTITUTE
 
 try:
     from django.http.request import RawPostDataException
@@ -219,6 +219,20 @@ def _filter_headers(headers):
         )
         for k, v in headers.items()
     }
+
+
+def _request_headers_to_span_attributes(headers):
+    # type: (dict[str, str]) -> dict[str, str]
+    attributes = {}
+
+    headers = _filter_headers(headers)
+
+    for header, value in headers.items():
+        if isinstance(value, AnnotatedValue):
+            value = SENSITIVE_DATA_SUBSTITUTE
+        attributes[f"http.request.header.{header.lower()}"] = value
+
+    return attributes
 
 
 def _in_http_status_code_range(code, code_ranges):
