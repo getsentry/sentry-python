@@ -1,4 +1,5 @@
 import base64
+import itertools
 import json
 import linecache
 import logging
@@ -26,7 +27,7 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY37
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, MAX_STACK_FRAMES, EndpointType
 
 from typing import TYPE_CHECKING
 
@@ -803,7 +804,7 @@ def single_exception_from_error_tuple(
             max_value_length=max_value_length,
             custom_repr=custom_repr,
         )
-        for tb in iter_stacks(tb)
+        for tb in itertools.islice(iter_stacks(tb), MAX_STACK_FRAMES)
     ]
 
     if frames:

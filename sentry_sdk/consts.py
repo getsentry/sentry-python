@@ -82,6 +82,18 @@ DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 MATCH_ALL = r".*"
 
+MAX_STACK_FRAMES = 300  # type: int
+"""The maximum number of stack frames to capture on error events.
+
+Relay enforces a limit of 250 frames on the stack trace. See
+https://github.com/getsentry/relay/blob/aae36669414a1f7c6ef68d5226cb2e96a28f7667/relay-event-normalization/src/trimming.rs#L286.
+We use a slightly higher value here; Relay will trim any frames
+beyond its limit.
+
+This constant is for internal use only, and it may be changed or removed
+at any time.
+"""
+
 FALSE_VALUES = [
     "false",
     "no",
