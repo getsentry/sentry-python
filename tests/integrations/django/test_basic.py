@@ -1,6 +1,8 @@
+import inspect
 import json
 import os
 import re
+import sys
 import pytest
 from functools import partial
 from unittest.mock import patch
@@ -11,6 +13,7 @@ from django import VERSION as DJANGO_VERSION
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
+from django.utils.functional import SimpleLazyObject
 
 try:
     from django.urls import reverse
@@ -28,6 +31,7 @@ from sentry_sdk.integrations.django import (
 )
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.profiler.utils import get_frame_name
 from sentry_sdk.tracing import Span
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
@@ -411,7 +415,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
     )
-    assert crumb["data"]["db.params"] == '{"my_foo": 10}'
+    assert crumb["data"]["db.params"] == {"my_foo": 10}
 
 
 @pytest.mark.forked
@@ -473,7 +477,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     (event,) = events
     crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
-    assert crumb["data"]["db.params"] == '{"my_param": 10}'
+    assert crumb["data"]["db.params"] == {"my_param": 10}
 
 
 @pytest.mark.forked
@@ -526,7 +530,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
         {
             "category": "query",
             "data": {
-                "db.params": '{"first_var": "fizz", "second_var": "not a date"}',
+                "db.params": {"first_var": "fizz", "second_var": "not a date"},
                 "db.paramstyle": "format",
             },
             "message": 'insert into my_test_table ("foo", "bar") values (%(first_var)s, '
@@ -1248,9 +1252,9 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get(reverse("nomessage"))
-    client.options(reverse("nomessage"))
-    client.head(reverse("nomessage"))
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
 
     assert len(events) == 2
 
@@ -1312,3 +1316,47 @@ def test_ensures_no_spotlight_middleware_when_no_spotlight(
     added = frozenset(settings.MIDDLEWARE) ^ original_middleware
 
     assert "sentry_sdk.spotlight.SpotlightMiddleware" not in added
+
+
+def test_get_frame_name_when_in_lazy_object():
+    allowed_to_init = False
+
+    class SimpleLazyObjectWrapper(SimpleLazyObject):
+        def unproxied_method(self):
+            """
+            For testing purposes. We inject a method on the SimpleLazyObject
+            class so if python is executing this method, we should get
+            this class instead of the wrapped class and avoid evaluating
+            the wrapped object too early.
+            """
+            return inspect.currentframe()
+
+    class GetFrame:
+        def __init__(self):
+            assert allowed_to_init, "GetFrame not permitted to initialize yet"
+
+        def proxied_method(self):
+            """
+            For testing purposes. We add an proxied method on the instance
+            class so if python is executing this method, we should get
+            this class instead of the wrapper class.
+            """
+            return inspect.currentframe()
+
+    instance = SimpleLazyObjectWrapper(lambda: GetFrame())
+
+    assert get_frame_name(instance.unproxied_method()) == (
+        "SimpleLazyObjectWrapper.unproxied_method"
+        if sys.version_info < (3, 11)
+        else "test_get_frame_name_when_in_lazy_object.<locals>.SimpleLazyObjectWrapper.unproxied_method"
+    )
+
+    # Now that we're about to access an instance method on the wrapped class,
+    # we should permit initializing it
+    allowed_to_init = True
+
+    assert get_frame_name(instance.proxied_method()) == (
+        "GetFrame.proxied_method"
+        if sys.version_info < (3, 11)
+        else "test_get_frame_name_when_in_lazy_object.<locals>.GetFrame.proxied_method"
+    )

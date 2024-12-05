@@ -1,3 +1,4 @@
+import json
 import uuid
 import random
 import time
@@ -10,6 +11,8 @@ from opentelemetry.trace import (
     format_span_id,
     Span as OtelSpan,
     TraceState,
+    get_current_span,
+    INVALID_SPAN,
 )
 from opentelemetry.trace.status import StatusCode
 from opentelemetry.sdk.trace import ReadableSpan
@@ -40,6 +43,8 @@ if TYPE_CHECKING:
     from typing import TypeVar
 
     from typing_extensions import TypedDict, Unpack
+
+    from opentelemetry.utils import types as OTelSpanAttributes
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -159,6 +164,7 @@ SOURCE_FOR_STYLE = {
 }
 
 DEFAULT_SPAN_ORIGIN = "manual"
+DEFAULT_SPAN_NAME = "<unlabeled span>"
 
 tracer = otel_trace.get_tracer(__name__)
 
@@ -1200,9 +1206,13 @@ class POTelSpan:
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
+        sampled=None,  # type: Optional[bool]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
+        source=TRANSACTION_SOURCE_CUSTOM,  # type: str
+        attributes=None,  # type: OTelSpanAttributes
+        only_if_parent=False,  # type: bool
         otel_span=None,  # type: Optional[OtelSpan]
         **_,  # type: dict[str, object]
     ):
@@ -1213,28 +1223,55 @@ class POTelSpan:
         listed in the signature. These additional arguments are ignored.
 
         If otel_span is passed explicitly, just acts as a proxy.
+
+        If only_if_parent is True, just return an INVALID_SPAN
+        and avoid instrumentation if there's no active parent span.
         """
         if otel_span is not None:
             self._otel_span = otel_span
         else:
-            from sentry_sdk.integrations.opentelemetry.utils import (
-                convert_to_otel_timestamp,
-            )
+            skip_span = False
+            if only_if_parent:
+                parent_span_context = get_current_span().get_span_context()
+                skip_span = (
+                    not parent_span_context.is_valid or parent_span_context.is_remote
+                )
 
-            if start_timestamp is not None:
-                # OTel timestamps have nanosecond precision
-                start_timestamp = convert_to_otel_timestamp(start_timestamp)
+            if skip_span:
+                self._otel_span = INVALID_SPAN
+            else:
+                from sentry_sdk.integrations.opentelemetry.consts import (
+                    SentrySpanAttribute,
+                )
+                from sentry_sdk.integrations.opentelemetry.utils import (
+                    convert_to_otel_timestamp,
+                )
 
-            span_name = name or description or op or ""
-            self._otel_span = tracer.start_span(span_name, start_time=start_timestamp)
+                if start_timestamp is not None:
+                    # OTel timestamps have nanosecond precision
+                    start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
-            self.origin = origin or DEFAULT_SPAN_ORIGIN
-            self.op = op
-            self.description = description
-            self.name = span_name
+                span_name = name or description or op or DEFAULT_SPAN_NAME
 
-            if status is not None:
-                self.set_status(status)
+                # Prepopulate some attrs so that they're accessible in traces_sampler
+                attributes = attributes or {}
+                if op is not None:
+                    attributes[SentrySpanAttribute.OP] = op
+                if source is not None:
+                    attributes[SentrySpanAttribute.SOURCE] = source
+                if sampled is not None:
+                    attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
+
+                self._otel_span = tracer.start_span(
+                    span_name, start_time=start_timestamp, attributes=attributes
+                )
+
+                self.origin = origin or DEFAULT_SPAN_ORIGIN
+                self.description = description
+                self.name = span_name
+
+                if status is not None:
+                    self.set_status(status)
 
     def __eq__(self, other):
         # type: (POTelSpan) -> bool
@@ -1275,9 +1312,17 @@ class POTelSpan:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None:
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
+        else:
+            status_unset = (
+                hasattr(self._otel_span, "status")
+                and self._otel_span.status.status_code == StatusCode.UNSET
+            )
+            if status_unset:
+                self.set_status(SPANSTATUS.OK)
 
         self.finish()
         context.detach(self._ctx_token)
+        del self._ctx_token
 
     @property
     def description(self):
@@ -1291,8 +1336,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
+        self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
 
     @property
     def origin(self):
@@ -1306,8 +1350,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.ORIGIN, value)
+        self.set_attribute(SentrySpanAttribute.ORIGIN, value)
 
     @property
     def containing_transaction(self):
@@ -1361,14 +1404,29 @@ class POTelSpan:
         return format_span_id(self._otel_span.get_span_context().span_id)
 
     @property
+    def is_valid(self):
+        # type: () -> bool
+        return self._otel_span.get_span_context().is_valid and isinstance(
+            self._otel_span, ReadableSpan
+        )
+
+    @property
     def sampled(self):
         # type: () -> Optional[bool]
         return self._otel_span.get_span_context().trace_flags.sampled
 
-    @sampled.setter
-    def sampled(self, value):
-        # type: (Optional[bool]) -> None
-        pass
+    @property
+    def sample_rate(self):
+        # type: () -> Optional[float]
+        from sentry_sdk.integrations.opentelemetry.consts import (
+            TRACESTATE_SAMPLE_RATE_KEY,
+        )
+
+        sample_rate = self._otel_span.get_span_context().trace_state.get(
+            TRACESTATE_SAMPLE_RATE_KEY
+        )
+        sample_rate = cast("Optional[str]", sample_rate)
+        return float(sample_rate) if sample_rate is not None else None
 
     @property
     def op(self):
@@ -1382,8 +1440,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.OP, value)
+        self.set_attribute(SentrySpanAttribute.OP, value)
 
     @property
     def name(self):
@@ -1397,8 +1454,7 @@ class POTelSpan:
         # type: (Optional[str]) -> None
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
-        if value is not None:
-            self.set_attribute(SentrySpanAttribute.NAME, value)
+        self.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property
     def source(self):
@@ -1452,7 +1508,7 @@ class POTelSpan:
         # type: (**Any) -> POTelSpan
         kwargs.setdefault("sampled", self.sampled)
 
-        span = POTelSpan(**kwargs)
+        span = POTelSpan(only_if_parent=True, **kwargs)
         return span
 
     def iter_headers(self):
@@ -1520,6 +1576,11 @@ class POTelSpan:
 
     def set_attribute(self, key, value):
         # type: (str, Any) -> None
+        if value is None:
+            # otel doesn't support None as values, preferring to not set the key
+            # at all instead
+            return
+
         self._otel_span.set_attribute(key, _serialize_span_attribute(value))
 
     def set_status(self, status):
@@ -1577,8 +1638,12 @@ class POTelSpan:
 
     def to_json(self):
         # type: () -> dict[str, Any]
-        # TODO-neel-potel for sampling context
-        pass
+        """
+        Only meant for testing. Not used internally anymore.
+        """
+        if not isinstance(self._otel_span, ReadableSpan):
+            return {}
+        return json.loads(self._otel_span.to_json())
 
     def get_trace_context(self):
         # type: () -> dict[str, Any]

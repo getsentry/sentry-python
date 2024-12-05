@@ -72,6 +72,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
         op=OP.HTTP_CLIENT,
         name=description,
         origin=Boto3Integration.origin,
+        only_if_parent=True,
     )
 
     data = {
@@ -115,20 +116,19 @@ def _sentry_after_call(context, parsed, **kwargs):
         data=span_data,
     )
 
-    span.__exit__(None, None, None)
-
     body = parsed.get("Body")
     if not isinstance(body, StreamingBody):
+        span.__exit__(None, None, None)
         return
 
-    streaming_span = span.start_child(
+    streaming_span = sentry_sdk.start_span(
         op=OP.HTTP_CLIENT_STREAM,
-        name=span.description,
+        name=span.name,
         origin=Boto3Integration.origin,
+        only_if_parent=True,
     )
 
     orig_read = body.read
-    orig_close = body.close
 
     def sentry_streaming_body_read(*args, **kwargs):
         # type: (*Any, **Any) -> bytes
@@ -143,12 +143,16 @@ def _sentry_after_call(context, parsed, **kwargs):
 
     body.read = sentry_streaming_body_read
 
+    orig_close = body.close
+
     def sentry_streaming_body_close(*args, **kwargs):
         # type: (*Any, **Any) -> None
         streaming_span.finish()
         orig_close(*args, **kwargs)
 
     body.close = sentry_streaming_body_close
+
+    span.__exit__(None, None, None)
 
 
 def _sentry_after_call_error(context, exception, **kwargs):

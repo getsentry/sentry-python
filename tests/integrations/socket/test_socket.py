@@ -42,9 +42,9 @@ def test_create_connection_trace(sentry_init, capture_events):
     assert connect_span["description"] == "example.com:443"
     assert connect_span["data"] == ApproxDict(
         {
-            "address": ["example.com", 443],
+            "address.host": "example.com",
+            "address.port": 443,
             "timeout": timeout,
-            "source_address": None,
         }
     )
 

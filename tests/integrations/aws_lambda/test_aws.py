@@ -98,7 +98,7 @@ def truncate_data(data):
             elif key == "cloudwatch logs":
                 for cloudwatch_key in data["extra"]["cloudwatch logs"].keys():
                     if cloudwatch_key in ["url", "log_group", "log_stream"]:
-                        cleaned_data["extra"].setdefault("cloudwatch logs", {})[cloudwatch_key] = data["extra"]["cloudwatch logs"][cloudwatch_key]
+                        cleaned_data["extra"].setdefault("cloudwatch logs", {})[cloudwatch_key] = data["extra"]["cloudwatch logs"][cloudwatch_key].split("=")[0]
 
     if data.get("level") is not None:
         cleaned_data["level"] = data.get("level")
@@ -228,7 +228,7 @@ def test_basic(run_lambda_function):
     assert event["extra"]["lambda"]["function_name"].startswith("test_")
 
     logs_url = event["extra"]["cloudwatch logs"]["url"]
-    assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region=")
+    assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region")
     assert not re.search("(=;|=$)", logs_url)
     assert event["extra"]["cloudwatch logs"]["log_group"].startswith(
         "/aws/lambda/test_"
@@ -370,7 +370,7 @@ def test_timeout_error(run_lambda_function):
     assert event["extra"]["lambda"]["function_name"].startswith("test_")
 
     logs_url = event["extra"]["cloudwatch logs"]["url"]
-    assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region=")
+    assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region")
     assert not re.search("(=;|=$)", logs_url)
     assert event["extra"]["cloudwatch logs"]["log_group"].startswith(
         "/aws/lambda/test_"
@@ -462,11 +462,11 @@ def test_performance_error(run_lambda_function):
                         "X-Forwarded-Proto": "https"
                     },
                     "httpMethod": "GET",
-                    "path": "/path1",
+                    "path": "/1",
                     "queryStringParameters": {
-                        "done": "false"
+                        "done": "f"
                     },
-                    "dog": "Maisey"
+                    "d": "D1"
                 },
                 {
                     "headers": {
@@ -474,11 +474,11 @@ def test_performance_error(run_lambda_function):
                         "X-Forwarded-Proto": "http"
                     },
                     "httpMethod": "POST",
-                    "path": "/path2",
+                    "path": "/2",
                     "queryStringParameters": {
-                        "done": "true"
+                        "done": "t"
                     },
-                    "dog": "Charlie"
+                    "d": "D2"
                 }
             ]
             """,
@@ -538,9 +538,9 @@ def test_non_dict_event(
         request_data = {
             "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
             "method": "GET",
-            "url": "https://x1.io/path1",
+            "url": "https://x1.io/1",
             "query_string": {
-                "done": "false",
+                "done": "f",
             },
         }
     else:
@@ -619,18 +619,12 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                     traces_sampler.assert_any_call(
                         DictionaryContaining(
                             {
-                                "aws_event": DictionaryContaining({
-                                    "httpMethod": "GET",
-                                    "path": "/sit/stay/rollover",
-                                    "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"},
-                                }),
-                                "aws_context": ObjectDescribedBy(
-                                    type=get_lambda_bootstrap().LambdaContext,
-                                    attrs={
-                                        'function_name': StringContaining("test_"),
-                                        'function_version': '$LATEST',
-                                    }
-                                )
+                                "http.request.method": "GET",
+                                "url.path": "/sit/stay/rollover",
+                                "url.query": "repeat=again",
+                                "url.full": "http://x.io/sit/stay/rollover?repeat=twice",
+                                "network.protocol.name": "http",
+                                "server.address": "x.io",
                             }
                         )
                     )
@@ -649,7 +643,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
             )
         """
         ),
-        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"}}',
+        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "query_string": {"repeat": "again"}, "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"}}',
     )
 
     assert response["Payload"]["AssertionError raised"] is False

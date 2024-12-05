@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime
 from unittest import mock
 
 import pytest
@@ -40,7 +41,7 @@ class ExitingIterable:
 
 
 def test_basic(sentry_init, crashing_app, capture_events):
-    sentry_init(send_default_pii=True)
+    sentry_init(send_default_pii=True, debug=True)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -141,7 +142,7 @@ def test_transaction_with_error(
     def dogpark(environ, start_response):
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0, debug=True)
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
@@ -334,25 +335,21 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
 
-    traces_sampler = mock.Mock(return_value=True)
+    def traces_sampler(sampling_context):
+        assert sampling_context["http.request.method"] == "GET"
+        assert sampling_context["url.path"] == "/dogs/are/great/"
+        assert sampling_context["url.query"] == "cats=too"
+        assert sampling_context["url.scheme"] == "http"
+        assert (
+            sampling_context["url.full"] == "http://localhost/dogs/are/great/?cats=too"
+        )
+        return True
+
     sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
     app = SentryWsgiMiddleware(app)
     client = Client(app)
 
-    client.get("/dogs/are/great/")
-
-    traces_sampler.assert_any_call(
-        DictionaryContaining(
-            {
-                "wsgi_environ": DictionaryContaining(
-                    {
-                        "PATH_INFO": "/dogs/are/great/",
-                        "REQUEST_METHOD": "GET",
-                    },
-                ),
-            }
-        )
-    )
+    client.get("/dogs/are/great/?cats=too")
 
 
 def test_session_mode_defaults_to_request_mode_in_wsgi_handler(

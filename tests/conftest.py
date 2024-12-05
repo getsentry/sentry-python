@@ -74,8 +74,7 @@ def clean_scopes():
     scope._isolation_scope.set(None)
     scope._current_scope.set(None)
 
-    potel_scope._INITIAL_CURRENT_SCOPE.clear()
-    potel_scope._INITIAL_ISOLATION_SCOPE.clear()
+    potel_scope.setup_initial_scopes()
 
 
 @pytest.fixture(autouse=True)
@@ -643,3 +642,18 @@ class ApproxDict(dict):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+
+@pytest.fixture(name="SortedBaggage")
+def sorted_baggage_matcher():
+    class SortedBaggage:
+        def __init__(self, baggage):
+            self.baggage = baggage
+
+        def __eq__(self, other):
+            return sorted(self.baggage.split(",")) == sorted(other.split(","))
+
+        def __ne__(self, other):
+            return not self.__eq__(other)
+
+    return SortedBaggage

@@ -31,7 +31,7 @@ def test_no_cache_basic(sentry_init, capture_events, render_span_tree):
     assert (
         render_span_tree(event)
         == """\
-- op="": description=null
+- op="<unlabeled span>": description=null
   - op="db.redis": description="GET 'mycachekey'"\
 """
     )
@@ -61,7 +61,7 @@ def test_cache_basic(sentry_init, capture_events, render_span_tree):
     assert (
         render_span_tree(event)
         == """\
-- op="": description=null
+- op="<unlabeled span>": description=null
   - op="db.redis": description="HGET 'mycachekey' [Filtered]"
   - op="cache.get": description="mycachekey"
     - op="db.redis": description="GET 'mycachekey'"
@@ -97,7 +97,7 @@ def test_cache_keys(sentry_init, capture_events, render_span_tree):
     assert (
         render_span_tree(event)
         == """\
-- op="": description=null
+- op="<unlabeled span>": description=null
   - op="db.redis": description="GET 'somethingelse'"
   - op="cache.get": description="blub"
     - op="db.redis": description="GET 'blub'"

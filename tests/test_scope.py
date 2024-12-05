@@ -11,16 +11,27 @@ from sentry_sdk import (
 )
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import (
-    Scope,
+    Scope as BaseScope,
     ScopeType,
-    use_isolation_scope,
-    use_scope,
     should_send_default_pii,
+)
+from sentry_sdk.integrations.opentelemetry.integration import (
+    _setup_scope_context_management,
+)
+from sentry_sdk.integrations.opentelemetry.scope import (
+    PotelScope as Scope,
+    use_scope,
+    use_isolation_scope,
 )
 
 
 SLOTS_NOT_COPIED = {"client"}
 """__slots__ that are not copied when copying a Scope object."""
+
+
+@pytest.fixture(autouse=True)
+def setup_otel_scope_management():
+    _setup_scope_context_management()
 
 
 def test_copying():
@@ -212,7 +223,7 @@ def test_get_isolation_scope():
 def test_get_global_scope():
     scope = Scope.get_global_scope()
     assert scope is not None
-    assert scope.__class__ == Scope
+    assert scope.__class__ == BaseScope
     assert scope._type == ScopeType.GLOBAL
 
 
@@ -809,6 +820,24 @@ def test_should_send_default_pii_false(sentry_init):
     sentry_init(send_default_pii=False)
 
     assert should_send_default_pii() is False
+
+
+def test_should_send_default_pii_default_false(sentry_init):
+    sentry_init()
+
+    assert should_send_default_pii() is False
+
+
+def test_should_send_default_pii_false_with_dsn_and_spotlight(sentry_init):
+    sentry_init(dsn="http://key@localhost/1", spotlight=True)
+
+    assert should_send_default_pii() is False
+
+
+def test_should_send_default_pii_true_without_dsn_and_spotlight(sentry_init):
+    sentry_init(spotlight=True)
+
+    assert should_send_default_pii() is True
 
 
 def test_set_tags():

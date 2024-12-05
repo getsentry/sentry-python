@@ -6,6 +6,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
+    _serialize_span_attribute,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -32,6 +33,17 @@ if TYPE_CHECKING:
 
     from rq.job import Job
 
+DEFAULT_TRANSACTION_NAME = "unknown RQ task"
+
+
+JOB_PROPERTY_TO_ATTRIBUTE = {
+    "id": "messaging.message.id",
+}
+
+QUEUE_PROPERTY_TO_ATTRIBUTE = {
+    "name": "messaging.destination.name",
+}
+
 
 class RqIntegration(Integration):
     identifier = "rq"
@@ -52,26 +64,31 @@ class RqIntegration(Integration):
         old_perform_job = Worker.perform_job
 
         @ensure_integration_enabled(RqIntegration, old_perform_job)
-        def sentry_patched_perform_job(self, job, *args, **kwargs):
-            # type: (Any, Job, *Queue, **Any) -> bool
+        def sentry_patched_perform_job(self, job, queue, *args, **kwargs):
+            # type: (Any, Job, Queue, *Any, **Any) -> bool
             with sentry_sdk.new_scope() as scope:
+                try:
+                    transaction_name = job.func_name or DEFAULT_TRANSACTION_NAME
+                except AttributeError:
+                    transaction_name = DEFAULT_TRANSACTION_NAME
+
+                scope.set_transaction_name(
+                    transaction_name, source=TRANSACTION_SOURCE_TASK
+                )
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
                 with sentry_sdk.continue_trace(
                     job.meta.get("_sentry_trace_headers") or {}
                 ):
-                    with sentry_sdk.start_transaction(
+                    with sentry_sdk.start_span(
                         op=OP.QUEUE_TASK_RQ,
-                        name="unknown RQ task",
+                        name=transaction_name,
                         source=TRANSACTION_SOURCE_TASK,
                         origin=RqIntegration.origin,
-                        custom_sampling_context={"rq_job": job},
-                    ) as transaction:
-                        with capture_internal_exceptions():
-                            transaction.name = job.func_name
-
-                        rv = old_perform_job(self, job, *args, **kwargs)
+                        attributes=_prepopulate_attributes(job, queue),
+                    ):
+                        rv = old_perform_job(self, job, queue, *args, **kwargs)
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is
@@ -87,9 +104,13 @@ class RqIntegration(Integration):
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
             # type: (Worker, Any, *Any, **Any) -> Any
-            # Note, the order of the `or` here is important,
-            # because calling `job.is_failed` will change `_status`.
-            if job._status == JobStatus.FAILED or job.is_failed:
+            retry = (
+                hasattr(job, "retries_left")
+                and job.retries_left
+                and job.retries_left > 0
+            )
+            failed = job._status == JobStatus.FAILED or job.is_failed
+            if failed and not retry:
                 _capture_exception(exc_info)
 
             return old_handle_exception(self, job, *exc_info, **kwargs)
@@ -101,11 +122,9 @@ class RqIntegration(Integration):
         @ensure_integration_enabled(RqIntegration, old_enqueue_job)
         def sentry_patched_enqueue_job(self, job, **kwargs):
             # type: (Queue, Any, **Any) -> Any
-            scope = sentry_sdk.get_current_scope()
-            if scope.span is not None:
-                job.meta["_sentry_trace_headers"] = dict(
-                    scope.iter_trace_propagation_headers()
-                )
+            job.meta["_sentry_trace_headers"] = dict(
+                sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+            )
 
             return old_enqueue_job(self, job, **kwargs)
 
@@ -158,3 +177,30 @@ def _capture_exception(exc_info, **kwargs):
     )
 
     sentry_sdk.capture_event(event, hint=hint)
+
+
+def _prepopulate_attributes(job, queue):
+    # type: (Job, Queue) -> dict[str, Any]
+    attributes = {
+        "messaging.system": "rq",
+    }
+
+    for prop, attr in JOB_PROPERTY_TO_ATTRIBUTE.items():
+        if getattr(job, prop, None) is not None:
+            attributes[attr] = getattr(job, prop)
+
+    for prop, attr in QUEUE_PROPERTY_TO_ATTRIBUTE.items():
+        if getattr(queue, prop, None) is not None:
+            attributes[attr] = getattr(queue, prop)
+
+    for key in ("args", "kwargs"):
+        if getattr(job, key, None):
+            attributes[f"rq.job.{key}"] = _serialize_span_attribute(getattr(job, key))
+
+    func = job.func
+    if callable(func):
+        func = func.__name__
+
+    attributes["rq.job.func"] = _serialize_span_attribute(func)
+
+    return attributes

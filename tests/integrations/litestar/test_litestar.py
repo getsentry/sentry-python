@@ -5,6 +5,7 @@ import pytest
 
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.litestar import LitestarIntegration
+from tests.conftest import ApproxDict
 
 from typing import Any
 
@@ -202,7 +203,7 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         return (
             expected_span["op"] == actual_span["op"]
             and expected_span["description"] == actual_span["description"]
-            and expected_span["tags"] == actual_span["tags"]
+            and ApproxDict(expected_span["tags"]) == actual_span["tags"]
         )
 
     actual_litestar_spans = list(
@@ -298,7 +299,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         return (
             expected_span["op"] == actual_span["op"]
             and actual_span["description"].startswith(expected_span["description"])
-            and expected_span["tags"] == actual_span["tags"]
+            and ApproxDict(expected_span["tags"]) == actual_span["tags"]
         )
 
     actual_litestar_spans = list(
