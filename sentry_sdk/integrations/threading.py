@@ -7,7 +7,6 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import (
     event_from_exception,
     capture_internal_exceptions,
-    logger,
     reraise,
 )
 
@@ -27,21 +26,9 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(self, propagate_hub=None, propagate_scope=True):
-        # type: (Optional[bool], bool) -> None
-        if propagate_hub is not None:
-            logger.warning(
-                "Deprecated: propagate_hub is deprecated. This will be removed in the future."
-            )
-
-        # Note: propagate_hub did not have any effect on propagation of scope data
-        # scope data was always propagated no matter what the value of propagate_hub was
-        # This is why the default for propagate_scope is True
-
+    def __init__(self, propagate_scope=True):
+        # type: (bool) -> None
         self.propagate_scope = propagate_scope
-
-        if propagate_hub is not None:
-            self.propagate_scope = propagate_hub
 
     @staticmethod
     def setup_once():
@@ -99,7 +86,8 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
                 with sentry_sdk.use_scope(current_scope_to_use):
                     return _run_old_run_func()
         else:
-            return _run_old_run_func()
+            with sentry_sdk.isolation_scope():
+                return _run_old_run_func()
 
     return run  # type: ignore
 
