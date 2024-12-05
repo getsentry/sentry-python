@@ -203,6 +203,7 @@ class Scope:
         rv = object.__new__(self.__class__)  # type: Scope
 
         rv._type = self._type
+        rv.client = self.client
         rv._level = self._level
         rv._name = self._name
         rv._fingerprint = self._fingerprint
