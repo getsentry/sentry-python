@@ -2,7 +2,6 @@ from typing import cast
 from contextlib import contextmanager
 
 from opentelemetry.context import (
-    Context,
     get_value,
     set_value,
     attach,
@@ -23,6 +22,9 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_USE_CURRENT_SCOPE_KEY,
     SENTRY_USE_ISOLATION_SCOPE_KEY,
     TRACESTATE_SAMPLED_KEY,
+)
+from sentry_sdk.integrations.opentelemetry.contextvars_context import (
+    SentryContextVarsRuntimeContext,
 )
 from sentry_sdk.integrations.opentelemetry.utils import trace_state_from_baggage
 from sentry_sdk.scope import Scope, ScopeType
@@ -150,6 +152,14 @@ def setup_initial_scopes():
 
     scopes = (_INITIAL_CURRENT_SCOPE, _INITIAL_ISOLATION_SCOPE)
     attach(set_value(SENTRY_SCOPES_KEY, scopes))
+
+
+def setup_scope_context_management():
+    # type: () -> None
+    import opentelemetry.context
+
+    opentelemetry.context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
+    setup_initial_scopes()
 
 
 @contextmanager
