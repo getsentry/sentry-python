@@ -62,7 +62,10 @@ else:
 
 
 from sentry_sdk import scope
-import sentry_sdk.integrations.opentelemetry.scope as potel_scope
+from sentry_sdk.integrations.opentelemetry.scope import (
+    setup_scope_context_management,
+    setup_initial_scopes,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -74,7 +77,7 @@ def clean_scopes():
     scope._isolation_scope.set(None)
     scope._current_scope.set(None)
 
-    potel_scope.setup_initial_scopes()
+    setup_initial_scopes()
 
 
 @pytest.fixture(autouse=True)
@@ -187,6 +190,7 @@ def sentry_init(request):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
         sentry_sdk.get_global_scope().set_client(client)
+        setup_scope_context_management()
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in

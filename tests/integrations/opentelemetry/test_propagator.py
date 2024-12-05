@@ -1,6 +1,5 @@
 import pytest
 
-from unittest import mock
 from unittest.mock import MagicMock
 
 from opentelemetry.trace.propagation import get_current_span
@@ -12,8 +11,6 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_TRACE_KEY,
 )
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
-from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
-from sentry_sdk.tracing_utils import Baggage
 
 
 @pytest.mark.forked
@@ -23,7 +20,7 @@ def test_extract_no_context_no_sentry_trace_header():
     Extract should return empty context.
     """
     carrier = None
-    context = None
+    context = {}
     getter = MagicMock()
     getter.get.return_value = None
 
@@ -144,8 +141,8 @@ def test_inject_continue_trace(sentry_init, SortedBaggage):
     with sentry_sdk.continue_trace(incoming_headers):
         with sentry_sdk.start_span(name="foo") as span:
             SentryPropagator().inject(carrier, setter=setter)
-            assert(carrier["sentry-trace"]) == f"{trace_id}-{span.span_id}-1"
-            assert(carrier["baggage"]) == SortedBaggage(baggage)
+            assert (carrier["sentry-trace"]) == f"{trace_id}-{span.span_id}-1"
+            assert (carrier["baggage"]) == SortedBaggage(baggage)
 
 
 def test_inject_head_sdk(sentry_init, SortedBaggage):
@@ -156,7 +153,7 @@ def test_inject_head_sdk(sentry_init, SortedBaggage):
 
     with sentry_sdk.start_span(name="foo") as span:
         SentryPropagator().inject(carrier, setter=setter)
-        assert(carrier["sentry-trace"]) == f"{span.trace_id}-{span.span_id}-1"
-        assert(carrier["baggage"]) == SortedBaggage(
+        assert (carrier["sentry-trace"]) == f"{span.trace_id}-{span.span_id}-1"
+        assert (carrier["baggage"]) == SortedBaggage(
             f"sentry-transaction=foo,sentry-release=release,sentry-environment=production,sentry-trace_id={span.trace_id},sentry-sample_rate=1.0,sentry-sampled=true"
         )
