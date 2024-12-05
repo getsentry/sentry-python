@@ -1,6 +1,7 @@
 import pytest
 import sys
 from unittest.mock import patch
+
 from sentry_sdk.integrations.spark.spark_driver import (
     _set_app_properties,
     _start_sentry_listener,
@@ -18,8 +19,22 @@ from py4j.protocol import Py4JJavaError
 ################
 
 
-def test_set_app_properties():
-    spark_context = SparkContext(appName="Testing123")
+@pytest.fixture(scope="function")
+def sentry_init_with_reset(sentry_init):
+    from sentry_sdk.integrations import _processed_integrations
+
+    yield lambda: sentry_init(integrations=[SparkIntegration()])
+    _processed_integrations.remove("spark")
+
+
+@pytest.fixture(scope="function")
+def create_spark_context():
+    yield lambda: SparkContext(appName="Testing123")
+    SparkContext._active_spark_context.stop()
+
+
+def test_set_app_properties(create_spark_context):
+    spark_context = create_spark_context()
     _set_app_properties()
 
     assert spark_context.getLocalProperty("sentry_app_name") == "Testing123"
@@ -30,9 +45,8 @@ def test_set_app_properties():
     )
 
 
-def test_start_sentry_listener():
-    spark_context = SparkContext.getOrCreate()
-
+def test_start_sentry_listener(create_spark_context):
+    spark_context = create_spark_context()
     gateway = spark_context._gateway
     assert gateway._callback_server is None
 
@@ -41,9 +55,28 @@ def test_start_sentry_listener():
     assert gateway._callback_server is not None
 
 
-def test_initialize_spark_integration(sentry_init):
-    sentry_init(integrations=[SparkIntegration()])
-    SparkContext.getOrCreate()
+@patch("sentry_sdk.integrations.spark.spark_driver._patch_spark_context_init")
+def test_initialize_spark_integration_before_spark_context_init(
+    mock_patch_spark_context_init,
+    sentry_init_with_reset,
+    create_spark_context,
+):
+    sentry_init_with_reset()
+    create_spark_context()
+
+    mock_patch_spark_context_init.assert_called_once()
+
+
+@patch("sentry_sdk.integrations.spark.spark_driver._activate_integration")
+def test_initialize_spark_integration_after_spark_context_init(
+    mock_activate_integration,
+    create_spark_context,
+    sentry_init_with_reset,
+):
+    create_spark_context()
+    sentry_init_with_reset()
+
+    mock_activate_integration.assert_called_once()
 
 
 @pytest.fixture
