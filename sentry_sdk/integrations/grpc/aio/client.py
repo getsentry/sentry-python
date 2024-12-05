@@ -24,6 +24,8 @@ class ClientInterceptor:
         if client_call_details.metadata is None:
             client_call_details = client_call_details._replace(metadata=Metadata())
         elif not isinstance(client_call_details.metadata, Metadata):
+            # This is a workaround for a GRPC bug, which was fixed in grpcio v1.60.0
+            # See https://github.com/grpc/grpc/issues/34298.
             client_call_details = client_call_details._replace(
                 metadata=Metadata.from_tuple(client_call_details.metadata)
             )
