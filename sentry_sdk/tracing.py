@@ -1,3 +1,4 @@
+import json
 import uuid
 import random
 import time
@@ -1312,10 +1313,16 @@ class POTelSpan:
         if value is not None:
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
         else:
-            self.set_status(SPANSTATUS.OK)
+            status_unset = (
+                hasattr(self._otel_span, "status")
+                and self._otel_span.status.status_code == StatusCode.UNSET
+            )
+            if status_unset:
+                self.set_status(SPANSTATUS.OK)
 
         self.finish()
         context.detach(self._ctx_token)
+        del self._ctx_token
 
     @property
     def description(self):
@@ -1634,8 +1641,12 @@ class POTelSpan:
 
     def to_json(self):
         # type: () -> dict[str, Any]
-        # TODO-neel-potel for sampling context
-        pass
+        """
+        Only meant for testing. Not used internally anymore.
+        """
+        if not isinstance(self._otel_span, ReadableSpan):
+            return {}
+        return json.loads(self._otel_span.to_json())
 
     def get_trace_context(self):
         # type: () -> dict[str, Any]

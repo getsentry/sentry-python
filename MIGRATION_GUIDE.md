@@ -105,6 +105,19 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `aws_event["headers"]["Host"]`              | `server.address`        |
   | `aws_context["function_name"]`              | `faas.name`             |
 
+- If you're using the GCP integration, the `sampling_context` argument of `traces_sampler` doesn't contain the `gcp_env` and `gcp_event` keys anymore. Instead, the following, if available, is accessible:
+
+  | Old sampling context key          | New sampling context key   |
+  | --------------------------------- | -------------------------- |
+  | `gcp_env["function_name"]`        | `faas.name`                |
+  | `gcp_env["function_region"]`      | `faas.region`              |
+  | `gcp_env["function_project"]`     | `gcp.function.project`     |
+  | `gcp_env["function_identity"]`    | `gcp.function.identity`    |
+  | `gcp_env["function_entry_point"]` | `gcp.function.entry_point` |
+  | `gcp_event.method`                | `http.request.method`      |
+  | `gcp_event.query_string`          | `url.query`                |
+
+
 ### Removed
 
 - Spans no longer have a `description`. Use `name` instead.

@@ -11,6 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
 )
 from sentry_sdk.sessions import track_session
+from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ContextVar,

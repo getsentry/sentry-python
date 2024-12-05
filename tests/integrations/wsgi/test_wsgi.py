@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime
 from unittest import mock
 
 import pytest
@@ -40,7 +41,7 @@ class ExitingIterable:
 
 
 def test_basic(sentry_init, crashing_app, capture_events):
-    sentry_init(send_default_pii=True)
+    sentry_init(send_default_pii=True, debug=True)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
@@ -141,7 +142,7 @@ def test_transaction_with_error(
     def dogpark(environ, start_response):
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0, debug=True)
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
