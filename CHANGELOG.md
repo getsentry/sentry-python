@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.19.1
+
+### Various fixes & improvements
+
+- Fix errors when instrumenting Django cache (#3855) by @BYK
+- Copy `scope.client` reference as well (#3857) by @sl0thentr0py
+- Don't give up on Spotlight on 3 errors (#3856) by @BYK
+- Add missing stack frames (#3673) by @antonpirker
+- Fix wrong metadata type in async gRPC interceptor (#3205) by @fdellekart
+- Rename launch darkly hook to match JS SDK (#3743) by @aliu39
+- Script for checking if our instrumented libs are Python 3.13 compatible (#3425) by @antonpirker
+- Improve Ray tests (#3846) by @antonpirker
+- Test with Celery `5.5.0rc3` (#3842) by @sentrivana
+- Fix asyncio testing setup (#3832) by @sl0thentr0py
+- Bump `codecov/codecov-action` from `5.0.2` to `5.0.7` (#3821) by @dependabot
+- Fix CI (#3834) by @sentrivana
+- Use new ClickHouse GH action (#3826) by @antonpirker
+
 ## 2.19.0
 
 ### Various fixes & improvements

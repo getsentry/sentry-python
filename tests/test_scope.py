@@ -23,10 +23,6 @@ from sentry_sdk.integrations.opentelemetry.scope import (
 )
 
 
-SLOTS_NOT_COPIED = {"client"}
-"""__slots__ that are not copied when copying a Scope object."""
-
-
 @pytest.fixture(autouse=True)
 def setup_otel_scope_management():
     setup_scope_context_management()
@@ -52,7 +48,7 @@ def test_all_slots_copied():
     scope_copy = copy.copy(scope)
 
     # Check all attributes are copied
-    for attr in set(Scope.__slots__) - SLOTS_NOT_COPIED:
+    for attr in set(Scope.__slots__):
         assert getattr(scope_copy, attr) == getattr(scope, attr)
 
 
