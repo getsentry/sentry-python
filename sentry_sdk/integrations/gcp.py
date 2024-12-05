@@ -7,7 +7,10 @@ from os import environ
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import (
+    _filter_headers,
+    _request_headers_to_span_attributes,
+)
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
@@ -248,5 +251,9 @@ def _prepopulate_attributes(gcp_event):
     for key, attr in EVENT_TO_ATTRIBUTE.items():
         if getattr(gcp_event, key, None):
             attributes[attr] = getattr(gcp_event, key)
+
+    if hasattr(gcp_event, "headers"):
+        headers = gcp_event.headers
+        attributes.update(_request_headers_to_span_attributes(headers))
 
     return attributes

@@ -13,6 +13,7 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.sessions import track_session
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
+    _request_headers_to_span_attributes,
     request_body_within_bounds,
 )
 from sentry_sdk.tracing import (
@@ -393,5 +394,7 @@ def _prepopulate_attributes(request):
         url = f"{request.scheme}://{request.host}{request.path}"  # noqa: E231
         if request.query_string:
             attributes["url.full"] = f"{url}?{request.query_string}"
+
+    attributes.update(_request_headers_to_span_attributes(dict(request.headers)))
 
     return attributes

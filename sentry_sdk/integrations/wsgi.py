@@ -9,6 +9,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
+    _request_headers_to_span_attributes,
 )
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
@@ -343,5 +344,7 @@ def _prepopulate_attributes(wsgi_environ, use_x_forwarded_for=False):
         url = get_request_url(wsgi_environ, use_x_forwarded_for)
         query = wsgi_environ.get("QUERY_STRING")
         attributes["url.full"] = f"{url}?{query}"
+
+    attributes.update(_request_headers_to_span_attributes(_get_headers(wsgi_environ)))
 
     return attributes

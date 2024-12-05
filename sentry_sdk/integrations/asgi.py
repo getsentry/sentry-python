@@ -21,6 +21,7 @@ from sentry_sdk.integrations._asgi_common import (
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    _request_headers_to_span_attributes,
 )
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import (
@@ -362,5 +363,7 @@ def _prepopulate_attributes(scope):
             full_url = f"{full_url}?{query}"
 
         attributes["url.full"] = full_url
+
+    attributes.update(_request_headers_to_span_attributes(_get_headers(scope)))
 
     return attributes
