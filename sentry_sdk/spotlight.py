@@ -42,11 +42,6 @@ class SpotlightClient:
 
     def capture_envelope(self, envelope):
         # type: (Envelope) -> None
-        if self.tries > 3:
-            sentry_logger.warning(
-                "Too many errors sending to Spotlight, stop sending events there."
-            )
-            return
         body = io.BytesIO()
         envelope.serialize_into(body)
         try:
@@ -60,7 +55,7 @@ class SpotlightClient:
             )
             req.close()
         except Exception as e:
-            self.tries += 1
+            # TODO: Implement buffering and retrying with exponential backoff
             sentry_logger.warning(str(e))
 
 
