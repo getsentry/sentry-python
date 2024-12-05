@@ -165,7 +165,9 @@ def _wrap_handler(handler):
                     name=aws_context.function_name,
                     source=TRANSACTION_SOURCE_COMPONENT,
                     origin=AwsLambdaIntegration.origin,
-                    attributes=_prepopulate_attributes(aws_event, aws_context, headers),
+                    attributes=_prepopulate_attributes(
+                        request_data, aws_context, headers
+                    ),
                 ):
                     try:
                         return handler(aws_event, aws_context, *args, **kwargs)

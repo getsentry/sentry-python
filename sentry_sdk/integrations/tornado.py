@@ -247,7 +247,7 @@ def _prepopulate_attributes(request):
         except ValueError:
             attributes["network.protocol.name"] = request.version
 
-    if getattr(request, "host", None) is not None:
+    if getattr(request, "host", None):
         try:
             address, port = request.host.split(":")
             attributes["server.address"] = address
