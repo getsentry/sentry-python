@@ -2,9 +2,10 @@ import io
 import json
 import mimetypes
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.session import Session
 from sentry_sdk.utils import json_dumps, capture_internal_exceptions
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -189,9 +190,7 @@ class PayloadRef:
                         self.bytes = f.read()
             elif self.json is not None:
                 self.bytes = json_dumps(self.json)
-            else:
-                self.bytes = b""
-        return self.bytes
+        return self.bytes or b""
 
     @property
     def inferred_content_type(self):
@@ -261,7 +260,7 @@ class Item:
     def data_category(self):
         # type: (...) -> EventDataCategory
         ty = self.headers.get("type")
-        if ty == "session":
+        if ty == "session" or ty == "sessions":
             return "session"
         elif ty == "attachment":
             return "attachment"

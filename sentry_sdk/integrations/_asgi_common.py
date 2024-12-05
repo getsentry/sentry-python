@@ -2,7 +2,8 @@ import urllib
 
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

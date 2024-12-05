@@ -6,11 +6,11 @@ from unittest.mock import MagicMock
 import pytest
 from opentelemetry.trace import SpanKind, SpanContext, Status, StatusCode
 
+import sentry_sdk
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
 )
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
@@ -24,7 +24,7 @@ def test_is_sentry_span():
     client = MagicMock()
     client.options = {"instrumenter": "otel"}
     client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
-    Scope.get_global_scope().set_client(client)
+    sentry_sdk.get_global_scope().set_client(client)
 
     assert not span_processor._is_sentry_span(otel_span)
 
@@ -307,7 +307,7 @@ def test_on_start_transaction():
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
     fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
-    Scope.get_global_scope().set_client(fake_client)
+    sentry_sdk.get_global_scope().set_client(fake_client)
 
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.span_processor.start_transaction",
@@ -351,7 +351,7 @@ def test_on_start_child():
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
     fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
-    Scope.get_global_scope().set_client(fake_client)
+    sentry_sdk.get_global_scope().set_client(fake_client)
 
     fake_span = MagicMock()
 
@@ -361,7 +361,7 @@ def test_on_start_child():
 
     fake_span.start_child.assert_called_once_with(
         span_id="1234567890abcdef",
-        description="Sample OTel Span",
+        name="Sample OTel Span",
         start_timestamp=datetime.fromtimestamp(
             otel_span.start_time / 1e9, timezone.utc
         ),
@@ -416,7 +416,7 @@ def test_on_end_sentry_transaction():
 
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
-    Scope.get_global_scope().set_client(fake_client)
+    sentry_sdk.get_global_scope().set_client(fake_client)
 
     fake_sentry_span = MagicMock(spec=Transaction)
     fake_sentry_span.set_context = MagicMock()
@@ -452,7 +452,7 @@ def test_on_end_sentry_span():
 
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
-    Scope.get_global_scope().set_client(fake_client)
+    sentry_sdk.get_global_scope().set_client(fake_client)
 
     fake_sentry_span = MagicMock(spec=Span)
     fake_sentry_span.set_context = MagicMock()
@@ -479,7 +479,7 @@ def test_link_trace_context_to_error_event():
     """
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
-    Scope.get_global_scope().set_client(fake_client)
+    sentry_sdk.get_global_scope().set_client(fake_client)
 
     span_id = "1234567890abcdef"
     trace_id = "1234567890abcdef1234567890abcdef"
@@ -537,7 +537,7 @@ def test_pruning_old_spans_on_start():
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel", "debug": False}
     fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
-    Scope.get_global_scope().set_client(fake_client)
+    sentry_sdk.get_global_scope().set_client(fake_client)
 
     span_processor = SentrySpanProcessor()
 
@@ -579,7 +579,7 @@ def test_pruning_old_spans_on_end():
 
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
-    Scope.get_global_scope().set_client(fake_client)
+    sentry_sdk.get_global_scope().set_client(fake_client)
 
     fake_sentry_span = MagicMock(spec=Span)
     fake_sentry_span.set_context = MagicMock()

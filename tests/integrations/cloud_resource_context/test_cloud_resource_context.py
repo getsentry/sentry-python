@@ -394,13 +394,17 @@ def test_setup_once(
             else:
                 fake_set_context.assert_not_called()
 
-            if warning_called:
-                correct_warning_found = False
+            def invalid_value_warning_calls():
+                """
+                Iterator that yields True if the warning was called with the expected message.
+                Written as a generator function, rather than a list comprehension, to allow
+                us to handle exceptions that might be raised during the iteration if the
+                warning call was not as expected.
+                """
                 for call in fake_warning.call_args_list:
-                    if call[0][0].startswith("Invalid value for cloud_provider:"):
-                        correct_warning_found = True
-                        break
+                    try:
+                        yield call[0][0].startswith("Invalid value for cloud_provider:")
+                    except (IndexError, KeyError, TypeError, AttributeError):
+                        ...
 
-                assert correct_warning_found
-            else:
-                fake_warning.assert_not_called()
+            assert warning_called == any(invalid_value_warning_calls())

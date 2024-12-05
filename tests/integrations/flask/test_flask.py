@@ -28,7 +28,6 @@ from sentry_sdk import (
     capture_exception,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.scope import Scope
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
@@ -46,6 +45,10 @@ def app():
     @app.route("/message")
     def hi():
         capture_message("hi")
+        return "ok"
+
+    @app.route("/nomessage")
+    def nohi():
         return "ok"
 
     @app.route("/message/<int:message_id>")
@@ -278,7 +281,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
     @app.route("/")
     def index():
-        Scope.get_isolation_scope().set_user({"ip_address": "1.2.3.4", "id": "42"})
+        sentry_sdk.get_isolation_scope().set_user({"ip_address": "1.2.3.4", "id": "42"})
         try:
             raise ValueError("stuff")
         except Exception:
@@ -666,15 +669,15 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
-    Scope.get_isolation_scope().set_tag("request_data", False)
+    sentry_sdk.get_isolation_scope().set_tag("request_data", False)
 
     @app.route("/")
     def index():
-        Scope.get_isolation_scope().set_tag("request_data", True)
+        sentry_sdk.get_isolation_scope().set_tag("request_data", True)
 
         def generate():
             for row in range(1000):
-                assert Scope.get_isolation_scope()._tags["request_data"]
+                assert sentry_sdk.get_isolation_scope()._tags["request_data"]
 
                 yield str(row) + "\n"
 
@@ -685,7 +688,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     assert response.data.decode() == "".join(str(row) + "\n" for row in range(1000))
     assert not events
 
-    assert not Scope.get_isolation_scope()._tags["request_data"]
+    assert not sentry_sdk.get_isolation_scope()._tags["request_data"]
 
 
 def test_scoped_test_client(sentry_init, app):
@@ -963,3 +966,71 @@ def test_span_origin(sentry_init, app, capture_events):
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
+
+
+def test_transaction_http_method_default(
+    sentry_init,
+    app,
+    capture_events,
+):
+    """
+    By default OPTIONS and HEAD requests do not create a transaction.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[flask_sentry.FlaskIntegration()],
+    )
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.get("/nomessage")
+    assert response.status_code == 200
+
+    response = client.options("/nomessage")
+    assert response.status_code == 200
+
+    response = client.head("/nomessage")
+    assert response.status_code == 200
+
+    (event,) = events
+
+    assert len(events) == 1
+    assert event["request"]["method"] == "GET"
+
+
+def test_transaction_http_method_custom(
+    sentry_init,
+    app,
+    capture_events,
+):
+    """
+    Configure FlaskIntegration to ONLY capture OPTIONS and HEAD requests.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            flask_sentry.FlaskIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                )  # capitalization does not matter
+            )  # case does not matter
+        ],
+    )
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.get("/nomessage")
+    assert response.status_code == 200
+
+    response = client.options("/nomessage")
+    assert response.status_code == 200
+
+    response = client.head("/nomessage")
+    assert response.status_code == 200
+
+    assert len(events) == 2
+
+    (event1, event2) = events
+    assert event1["request"]["method"] == "OPTIONS"
+    assert event2["request"]["method"] == "HEAD"

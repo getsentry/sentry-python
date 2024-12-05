@@ -7,9 +7,9 @@ from unittest.mock import Mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
@@ -26,7 +26,7 @@ try:
 except ImportError:
     ReusableClient = None
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Container
@@ -234,12 +234,12 @@ def test_concurrency(sentry_init, app):
 
     @app.route("/context-check/<i>")
     async def context_check(request, i):
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         scope.set_tag("i", i)
 
         await asyncio.sleep(random.random())
 
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         assert scope._tags["i"] == i
 
         return response.text("ok")
@@ -329,7 +329,7 @@ def test_concurrency(sentry_init, app):
     else:
         asyncio.run(runner())
 
-    scope = Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
     assert not scope._tags
 
 

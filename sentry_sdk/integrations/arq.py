@@ -1,11 +1,10 @@
 import sys
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -23,6 +22,8 @@ try:
     from arq.worker import JobExecutionFailed, Retry, RetryJob, Worker
 except ImportError:
     raise DidNotEnable("Arq is not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
@@ -78,7 +79,7 @@ def patch_enqueue_job():
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         with sentry_sdk.start_span(
-            op=OP.QUEUE_SUBMIT_ARQ, description=function, origin=ArqIntegration.origin
+            op=OP.QUEUE_SUBMIT_ARQ, name=function, origin=ArqIntegration.origin
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
@@ -115,7 +116,7 @@ def patch_run_job():
 
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
 
     if scope.transaction is not None:
         if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
@@ -126,7 +127,7 @@ def _capture_exception(exc_info):
 
     event, hint = event_from_exception(
         exc_info,
-        client_options=Scope.get_client().options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": ArqIntegration.identifier, "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
@@ -138,7 +139,7 @@ def _make_event_processor(ctx, *args, **kwargs):
         # type: (Event, Hint) -> Optional[Event]
 
         with capture_internal_exceptions():
-            scope = Scope.get_current_scope()
+            scope = sentry_sdk.get_current_scope()
             if scope.transaction is not None:
                 scope.transaction.name = ctx["job_name"]
                 event["transaction"] = ctx["job_name"]
@@ -172,7 +173,7 @@ def _wrap_coroutine(name, coroutine):
         if integration is None:
             return await coroutine(ctx, *args, **kwargs)
 
-        Scope.get_isolation_scope().add_event_processor(
+        sentry_sdk.get_isolation_scope().add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)
         )
 
@@ -196,6 +197,17 @@ def patch_create_worker():
     def _sentry_create_worker(*args, **kwargs):
         # type: (*Any, **Any) -> Worker
         settings_cls = args[0]
+
+        if isinstance(settings_cls, dict):
+            if "functions" in settings_cls:
+                settings_cls["functions"] = [
+                    _get_arq_function(func) for func in settings_cls["functions"]
+                ]
+            if "cron_jobs" in settings_cls:
+                settings_cls["cron_jobs"] = [
+                    _get_arq_cron_job(cron_job)
+                    for cron_job in settings_cls["cron_jobs"]
+                ]
 
         if hasattr(settings_cls, "functions"):
             settings_cls.functions = [

@@ -13,7 +13,6 @@ from google.protobuf.message import Message
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.scope import Scope
 
 
 class ClientInterceptor:
@@ -29,7 +28,10 @@ class ClientInterceptor:
             client_call_details = client_call_details._replace(
                 metadata=Metadata.from_tuple(client_call_details.metadata)
             )
-        for key, value in Scope.get_current_scope().iter_trace_propagation_headers():
+        for (
+            key,
+            value,
+        ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers():
             client_call_details.metadata.add(key, value)
         return client_call_details
 
@@ -45,7 +47,7 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            description="unary unary call to %s" % method.decode(),
+            name="unary unary call to %s" % method.decode(),
             origin=SPAN_ORIGIN,
         ) as span:
             span.set_data("type", "unary unary")
@@ -75,7 +77,7 @@ class SentryUnaryStreamClientInterceptor(
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            description="unary stream call to %s" % method.decode(),
+            name="unary stream call to %s" % method.decode(),
             origin=SPAN_ORIGIN,
         ) as span:
             span.set_data("type", "unary stream")

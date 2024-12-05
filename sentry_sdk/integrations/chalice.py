@@ -11,7 +11,6 @@ from sentry_sdk.utils import (
     parse_version,
     reraise,
 )
-from sentry_sdk._types import TYPE_CHECKING
 
 try:
     import chalice  # type: ignore
@@ -20,6 +19,8 @@ try:
     from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
 except ImportError:
     raise DidNotEnable("Chalice is not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

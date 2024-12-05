@@ -6,7 +6,6 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -24,7 +23,7 @@ try:
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable
@@ -105,7 +104,7 @@ class RqIntegration(Integration):
         @ensure_integration_enabled(RqIntegration, old_enqueue_job)
         def sentry_patched_enqueue_job(self, job, **kwargs):
             # type: (Queue, Any, **Any) -> Any
-            scope = Scope.get_current_scope()
+            scope = sentry_sdk.get_current_scope()
             if scope.span is not None:
                 job.meta["_sentry_trace_headers"] = dict(
                     scope.iter_trace_propagation_headers()

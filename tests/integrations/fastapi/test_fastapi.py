@@ -1,9 +1,11 @@
 import json
 import logging
+import pytest
 import threading
+import warnings
 from unittest import mock
 
-import pytest
+import fastapi
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -12,6 +14,12 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk.utils import parse_version
+
+
+FASTAPI_VERSION = parse_version(fastapi.__version__)
+
+from tests.integrations.starlette import test_starlette
 
 
 def fastapi_app_factory():
@@ -27,6 +35,17 @@ def fastapi_app_factory():
     async def _message():
         capture_message("Hi")
         return {"message": "Hi"}
+
+    @app.delete("/nomessage")
+    @app.get("/nomessage")
+    @app.head("/nomessage")
+    @app.options("/nomessage")
+    @app.patch("/nomessage")
+    @app.post("/nomessage")
+    @app.put("/nomessage")
+    @app.trace("/nomessage")
+    async def _nomessage():
+        return {"message": "nothing here..."}
 
     @app.get("/message/{message_id}")
     async def _message_with_id(message_id):
@@ -165,7 +184,7 @@ def test_legacy_setup(
 def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": 1.0},
+        profiles_sample_rate=1.0,
     )
     app = fastapi_app_factory()
     asgi_app = SentryAsgiMiddleware(app)
@@ -184,10 +203,18 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
     profiles = [item for item in envelopes[0].items if item.type == "profile"]
     assert len(profiles) == 1
 
-    for profile in profiles:
-        transactions = profile.payload.json["transactions"]
+    for item in profiles:
+        transactions = item.payload.json["transactions"]
         assert len(transactions) == 1
         assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
+    assert len(transactions) == 1
+
+    for item in transactions:
+        transaction = item.payload.json
+        trace_context = transaction["contexts"]["trace"]
+        assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 @pytest.mark.asyncio
@@ -503,38 +530,28 @@ def test_transaction_name_in_middleware(
     )
 
 
-@pytest.mark.parametrize(
-    "failed_request_status_codes,status_code,expected_error",
-    [
-        (None, 500, True),
-        (None, 400, False),
-        ([500, 501], 500, True),
-        ([500, 501], 401, False),
-        ([range(400, 499)], 401, True),
-        ([range(400, 499)], 500, False),
-        ([range(400, 499), range(500, 599)], 300, False),
-        ([range(400, 499), range(500, 599)], 403, True),
-        ([range(400, 499), range(500, 599)], 503, True),
-        ([range(400, 403), 500, 501], 401, True),
-        ([range(400, 403), 500, 501], 405, False),
-        ([range(400, 403), 500, 501], 501, True),
-        ([range(400, 403), 500, 501], 503, False),
-        ([None], 500, False),
-    ],
-)
-def test_configurable_status_codes(
+@test_starlette.parametrize_test_configurable_status_codes_deprecated
+def test_configurable_status_codes_deprecated(
     sentry_init,
     capture_events,
     failed_request_status_codes,
     status_code,
     expected_error,
 ):
+    with pytest.warns(DeprecationWarning):
+        starlette_integration = StarletteIntegration(
+            failed_request_status_codes=failed_request_status_codes
+        )
+
+    with pytest.warns(DeprecationWarning):
+        fast_api_integration = FastApiIntegration(
+            failed_request_status_codes=failed_request_status_codes
+        )
+
     sentry_init(
         integrations=[
-            StarletteIntegration(
-                failed_request_status_codes=failed_request_status_codes
-            ),
-            FastApiIntegration(failed_request_status_codes=failed_request_status_codes),
+            starlette_integration,
+            fast_api_integration,
         ]
     )
 
@@ -553,3 +570,114 @@ def test_configurable_status_codes(
         assert len(events) == 1
     else:
         assert not events
+
+
+@pytest.mark.skipif(
+    FASTAPI_VERSION < (0, 80),
+    reason="Requires FastAPI >= 0.80, because earlier versions do not support HTTP 'HEAD' requests",
+)
+def test_transaction_http_method_default(sentry_init, capture_events):
+    """
+    By default OPTIONS and HEAD requests do not create a transaction.
+    """
+    # FastAPI is heavily based on Starlette so we also need
+    # to enable StarletteIntegration.
+    # In the future this will be auto enabled.
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+        ],
+    )
+
+    app = fastapi_app_factory()
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert event["request"]["method"] == "GET"
+
+
+@pytest.mark.skipif(
+    FASTAPI_VERSION < (0, 80),
+    reason="Requires FastAPI >= 0.80, because earlier versions do not support HTTP 'HEAD' requests",
+)
+def test_transaction_http_method_custom(sentry_init, capture_events):
+    # FastAPI is heavily based on Starlette so we also need
+    # to enable StarletteIntegration.
+    # In the future this will be auto enabled.
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                ),  # capitalization does not matter
+            ),
+            FastApiIntegration(
+                http_methods_to_capture=(
+                    "OPTIONS",
+                    "head",
+                ),  # capitalization does not matter
+            ),
+        ],
+    )
+
+    app = fastapi_app_factory()
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.get("/nomessage")
+    client.options("/nomessage")
+    client.head("/nomessage")
+
+    assert len(events) == 2
+
+    (event1, event2) = events
+
+    assert event1["request"]["method"] == "OPTIONS"
+    assert event2["request"]["method"] == "HEAD"
+
+
+@test_starlette.parametrize_test_configurable_status_codes
+def test_configurable_status_codes(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    integration_kwargs = {}
+    if failed_request_status_codes is not None:
+        integration_kwargs["failed_request_status_codes"] = failed_request_status_codes
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        starlette_integration = StarletteIntegration(**integration_kwargs)
+        fastapi_integration = FastApiIntegration(**integration_kwargs)
+
+    sentry_init(integrations=[starlette_integration, fastapi_integration])
+
+    events = capture_events()
+
+    app = FastAPI()
+
+    @app.get("/error")
+    async def _error():
+        raise HTTPException(status_code)
+
+    client = TestClient(app)
+    client.get("/error")
+
+    assert len(events) == int(expected_error)

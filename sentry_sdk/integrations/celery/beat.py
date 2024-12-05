@@ -5,12 +5,12 @@ from sentry_sdk.integrations.celery.utils import (
     _get_humanized_interval,
     _now_seconds_since_epoch,
 )
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     logger,
     match_regex_list,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -185,7 +185,7 @@ def _wrap_beat_scheduler(original_function):
             return original_function(*args, **kwargs)
 
         # Tasks started by Celery Beat start a new Trace
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         scope.set_new_propagation_context()
         scope._name = "celery-beat"
 

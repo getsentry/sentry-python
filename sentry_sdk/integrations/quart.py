@@ -1,20 +1,19 @@
 import asyncio
 import inspect
-import threading
 from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
 )
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -122,11 +121,13 @@ def patch_scaffold_route():
                 @ensure_integration_enabled(QuartIntegration, old_func)
                 def _sentry_func(*args, **kwargs):
                     # type: (*Any, **Any) -> Any
-                    scope = Scope.get_isolation_scope()
-                    if scope.profile is not None:
-                        scope.profile.active_thread_id = (
-                            threading.current_thread().ident
-                        )
+                    current_scope = sentry_sdk.get_current_scope()
+                    if current_scope.transaction is not None:
+                        current_scope.transaction.update_active_thread()
+
+                    sentry_scope = sentry_sdk.get_isolation_scope()
+                    if sentry_scope.profile is not None:
+                        sentry_scope.profile.update_active_thread_id()
 
                     return old_func(*args, **kwargs)
 
@@ -140,7 +141,7 @@ def patch_scaffold_route():
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Request) -> None
+    # type: (sentry_sdk.Scope, str, Request) -> None
 
     try:
         name_for_style = {
@@ -169,10 +170,10 @@ async def _request_websocket_started(app, **kwargs):
     # Set the transaction name here, but rely on ASGI middleware
     # to actually start the transaction
     _set_transaction_name_and_source(
-        Scope.get_current_scope(), integration.transaction_style, request_websocket
+        sentry_sdk.get_current_scope(), integration.transaction_style, request_websocket
     )
 
-    scope = Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
     evt_processor = _make_request_event_processor(app, request_websocket, integration)
     scope.add_event_processor(evt_processor)
 

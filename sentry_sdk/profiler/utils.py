@@ -2,8 +2,9 @@ import os
 from collections import deque
 
 from sentry_sdk._compat import PY311
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import filename_for_module
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk._lru_cache import LRUCache
@@ -88,7 +89,7 @@ else:
                 and co_varnames[0] == "self"
                 and "self" in frame.f_locals
             ):
-                for cls in frame.f_locals["self"].__class__.__mro__:
+                for cls in type(frame.f_locals["self"]).__mro__:
                     if name in cls.__dict__:
                         return "{}.{}".format(cls.__name__, name)
         except (AttributeError, ValueError):

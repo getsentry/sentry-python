@@ -6,6 +6,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+from sentry_sdk.consts import VERSION
 from sentry_sdk.profiler.continuous_profiler import (
     setup_continuous_profiler,
     start_profiler,
@@ -31,6 +32,13 @@ def experimental_options(mode=None, auto_start=None):
     }
 
 
+mock_sdk_info = {
+    "name": "sentry.python",
+    "version": VERSION,
+    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
+}
+
+
 @pytest.mark.parametrize("mode", [pytest.param("foo")])
 @pytest.mark.parametrize(
     "make_options",
@@ -38,7 +46,11 @@ def experimental_options(mode=None, auto_start=None):
 )
 def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling):
     with pytest.raises(ValueError):
-        setup_continuous_profiler(make_options(mode=mode), lambda envelope: None)
+        setup_continuous_profiler(
+            make_options(mode=mode),
+            mock_sdk_info,
+            lambda envelope: None,
+        )
 
 
 @pytest.mark.parametrize(
@@ -54,7 +66,11 @@ def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling
 )
 def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
     options = make_options(mode=mode)
-    setup_continuous_profiler(options, lambda envelope: None)
+    setup_continuous_profiler(
+        options,
+        mock_sdk_info,
+        lambda envelope: None,
+    )
 
 
 @pytest.mark.parametrize(
@@ -71,9 +87,17 @@ def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
 def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling):
     options = make_options(mode=mode)
     # setting up the first time should return True to indicate success
-    assert setup_continuous_profiler(options, lambda envelope: None)
+    assert setup_continuous_profiler(
+        options,
+        mock_sdk_info,
+        lambda envelope: None,
+    )
     # setting up the second time should return False to indicate no-op
-    assert not setup_continuous_profiler(options, lambda envelope: None)
+    assert not setup_continuous_profiler(
+        options,
+        mock_sdk_info,
+        lambda envelope: None,
+    )
 
 
 def assert_single_transaction_with_profile_chunks(envelopes, thread):
@@ -119,7 +143,15 @@ def assert_single_transaction_with_profile_chunks(envelopes, thread):
     for profile_chunk_item in items["profile_chunk"]:
         profile_chunk = profile_chunk_item.payload.json
         assert profile_chunk == ApproxDict(
-            {"platform": "python", "profiler_id": profiler_id, "version": "2"}
+            {
+                "client_sdk": {
+                    "name": mock.ANY,
+                    "version": VERSION,
+                },
+                "platform": "python",
+                "profiler_id": profiler_id,
+                "version": "2",
+            }
         )
 
 
@@ -136,6 +168,7 @@ def assert_single_transaction_without_profile_chunks(envelopes):
     assert "profile" not in transaction["contexts"]
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "mode",
     [

@@ -116,6 +116,11 @@ def message(request):
 
 
 @csrf_exempt
+def nomessage(request):
+    return HttpResponse("ok")
+
+
+@csrf_exempt
 def view_with_signal(request):
     custom_signal = Signal()
     custom_signal.send(sender="hello")
@@ -191,15 +196,13 @@ def template_test2(request, *args, **kwargs):
 
 @csrf_exempt
 def template_test3(request, *args, **kwargs):
-    from sentry_sdk import Scope
-
-    traceparent = Scope.get_current_scope().get_traceparent()
+    traceparent = sentry_sdk.get_current_scope().get_traceparent()
     if traceparent is None:
-        traceparent = Scope.get_isolation_scope().get_traceparent()
+        traceparent = sentry_sdk.get_isolation_scope().get_traceparent()
 
-    baggage = Scope.get_current_scope().get_baggage()
+    baggage = sentry_sdk.get_current_scope().get_baggage()
     if baggage is None:
-        baggage = Scope.get_isolation_scope().get_baggage()
+        baggage = sentry_sdk.get_isolation_scope().get_baggage()
 
     capture_message(traceparent + "\n" + baggage.serialize())
     return render(request, "trace_meta.html", {})

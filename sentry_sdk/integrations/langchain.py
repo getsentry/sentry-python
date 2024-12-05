@@ -2,18 +2,19 @@ from collections import OrderedDict
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name, record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.utils import logger, capture_internal_exceptions
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, List, Callable, Dict, Union, Optional
     from uuid import UUID
-from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import logger, capture_internal_exceptions
 
 try:
     from langchain_core.messages import BaseMessage
@@ -137,7 +138,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
         watched_span = None  # type: Optional[WatchedSpan]
         if parent_id:
-            parent_span = self.span_map[parent_id]  # type: Optional[WatchedSpan]
+            parent_span = self.span_map.get(parent_id)  # type: Optional[WatchedSpan]
             if parent_span:
                 watched_span = WatchedSpan(parent_span.span.start_child(**kwargs))
                 parent_span.children.append(watched_span)
@@ -145,8 +146,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
 
         if kwargs.get("op", "").startswith("ai.pipeline."):
-            if kwargs.get("description"):
-                set_ai_pipeline_name(kwargs.get("description"))
+            if kwargs.get("name"):
+                set_ai_pipeline_name(kwargs.get("name"))
             watched_span.is_pipeline = True
 
         watched_span.span.__enter__()
@@ -185,7 +186,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_RUN,
-                description=kwargs.get("name") or "Langchain LLM call",
+                name=kwargs.get("name") or "Langchain LLM call",
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
@@ -207,7 +208,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
-                description=kwargs.get("name") or "Langchain Chat Model",
+                name=kwargs.get("name") or "Langchain Chat Model",
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
@@ -311,7 +312,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     if kwargs.get("parent_run_id") is not None
                     else OP.LANGCHAIN_PIPELINE
                 ),
-                description=kwargs.get("name") or "Chain execution",
+                name=kwargs.get("name") or "Chain execution",
                 origin=LangchainIntegration.origin,
             )
             metadata = kwargs.get("metadata")
@@ -344,7 +345,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_AGENT,
-                description=action.tool or "AI tool usage",
+                name=action.tool or "AI tool usage",
                 origin=LangchainIntegration.origin,
             )
             if action.tool_input and should_send_default_pii() and self.include_prompts:
@@ -377,9 +378,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_TOOL,
-                description=serialized.get("name")
-                or kwargs.get("name")
-                or "AI tool usage",
+                name=serialized.get("name") or kwargs.get("name") or "AI tool usage",
                 origin=LangchainIntegration.origin,
             )
             if should_send_default_pii() and self.include_prompts:
@@ -421,6 +420,8 @@ def _wrap_configure(f):
         # type: (Any, Any) -> Any
 
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
 
         with capture_internal_exceptions():
             new_callbacks = []  # type: List[BaseCallbackHandler]
@@ -444,7 +445,7 @@ def _wrap_configure(f):
                 elif isinstance(existing_callbacks, BaseCallbackHandler):
                     new_callbacks.append(existing_callbacks)
                 else:
-                    logger.warn("Unknown callback type: %s", existing_callbacks)
+                    logger.debug("Unknown callback type: %s", existing_callbacks)
 
             already_added = False
             for callback in new_callbacks:

@@ -1,5 +1,385 @@
 # Changelog
 
+## 2.18.0
+
+### Various fixes & improvements
+
+- Add LaunchDarkly and OpenFeature integration (#3648) by @cmanallen
+- Correct typo in a comment (#3726) by @szokeasaurusrex
+- End `http.client` span on timeout (#3723) by @Zylphrex
+- Check for `h2` existence in HTTP/2 transport (#3690) by @BYK
+- Use `type()` instead when extracting frames (#3716) by @Zylphrex
+- Prefer `python_multipart` import over `multipart` (#3710) by @musicinmybrain
+- Update active thread for asgi (#3669) by @Zylphrex
+- Only enable HTTP2 when DSN is HTTPS (#3678) by @BYK
+- Prepare for upstream Strawberry extension removal (#3649) by @DoctorJohn
+- Enhance README with improved clarity and developer-friendly examples (#3667) by @UTSAVS26
+- Run license compliance action on all PRs (#3699) by @szokeasaurusrex
+- Run CodeQL action on all PRs (#3698) by @szokeasaurusrex
+- Fix UTC assuming test (#3722) by @BYK
+- Exclude fakeredis 2.26.0 on py3.6 and 3.7 (#3695) by @szokeasaurusrex
+- Unpin `pytest` for `tornado-latest` tests (#3714) by @szokeasaurusrex
+- Install `pytest-asyncio` for `redis` tests (Python 3.12-13) (#3706) by @szokeasaurusrex
+- Clarify that only pinned tests are required (#3713) by @szokeasaurusrex
+- Remove accidentally-committed print (#3712) by @szokeasaurusrex
+- Disable broken RQ test in newly-released RQ 2.0 (#3708) by @szokeasaurusrex
+- Unpin `pytest` for `celery` tests (#3701) by @szokeasaurusrex
+- Unpin `pytest` on Python 3.8+ `gevent` tests (#3700) by @szokeasaurusrex
+- Unpin `pytest` for Python 3.8+ `common` tests (#3697) by @szokeasaurusrex
+- Remove `pytest` pin in `requirements-devenv.txt` (#3696) by @szokeasaurusrex
+- Test with Falcon 4.0 (#3684) by @sentrivana
+
+## 2.17.0
+
+### Various fixes & improvements
+
+- Add support for async calls in Anthropic and OpenAI integration (#3497) by @vetyy
+- Allow custom transaction names in ASGI (#3664) by @sl0thentr0py
+- Langchain: Handle case when parent span wasn't traced (#3656) by @rbasoalto
+- Fix Anthropic integration when using tool calls (#3615) by @kwnath
+- More defensive Django Spotlight middleware injection (#3665) by @BYK
+- Remove `ensure_integration_enabled_async` (#3632) by @sentrivana
+- Test with newer Falcon version (#3644, #3653, #3662) by @sentrivana
+- Fix mypy (#3657) by @sentrivana
+- Fix flaky transport test (#3666) by @sentrivana
+- Remove pin on `sphinx` (#3650) by @sentrivana
+- Bump `actions/checkout` from `4.2.0` to `4.2.1` (#3651) by @dependabot
+
+## 2.16.0
+
+### Integrations
+
+- Bottle: Add `failed_request_status_codes` (#3618) by @szokeasaurusrex
+
+  You can now define a set of integers that will determine which status codes
+  should be reported to Sentry.
+
+    ```python
+    sentry_sdk.init(
+        integrations=[
+            BottleIntegration(
+                failed_request_status_codes={403, *range(500, 600)},
+            )
+        ]
+    )
+    ```
+
+  Examples of valid `failed_request_status_codes`:
+
+  - `{500}` will only send events on HTTP 500.
+  - `{400, *range(500, 600)}` will send events on HTTP 400 as well as the 5xx range.
+  - `{500, 503}` will send events on HTTP 500 and 503.
+  - `set()` (the empty set) will not send events for any HTTP status code.
+
+  The default is `{*range(500, 600)}`, meaning that all 5xx status codes are reported to Sentry.
+
+- Bottle: Delete never-reached code (#3605) by @szokeasaurusrex
+- Redis: Remove flaky test (#3626) by @sentrivana
+- Django: Improve getting `psycopg3` connection info (#3580) by @nijel
+- Django: Add `SpotlightMiddleware` when Spotlight is enabled (#3600) by @BYK
+- Django: Open relevant error when `SpotlightMiddleware` is on (#3614) by @BYK
+- Django: Support `http_methods_to_capture` in ASGI Django (#3607) by @sentrivana
+
+  ASGI Django now also supports the `http_methods_to_capture` integration option. This is a configurable tuple of HTTP method verbs that should create a transaction in Sentry. The default is `("CONNECT", "DELETE", "GET", "PATCH", "POST", "PUT", "TRACE",)`. `OPTIONS` and `HEAD` are not included by default.
+
+  Here's how to use it:
+
+  ```python
+  sentry_sdk.init(
+      integrations=[
+          DjangoIntegration(
+              http_methods_to_capture=("GET", "POST"),
+          ),
+      ],
+  )
+  ```
+
+### Miscellaneous
+
+- Add 3.13 to setup.py (#3574) by @sentrivana
+- Add 3.13 to basepython (#3589) by @sentrivana
+- Fix type of `sample_rate` in DSC (and add explanatory tests) (#3603) by @antonpirker
+- Add `httpcore` based `HTTP2Transport` (#3588) by @BYK
+- Add opportunistic Brotli compression (#3612) by @BYK
+- Add `__notes__` support (#3620) by @szokeasaurusrex
+- Remove useless makefile targets (#3604) by @antonpirker
+- Simplify tox version spec (#3609) by @sentrivana
+- Consolidate contributing docs (#3606) by @antonpirker
+- Bump `codecov/codecov-action` from `4.5.0` to `4.6.0` (#3617) by @dependabot
+
+## 2.15.0
+
+### Integrations
+
+- Configure HTTP methods to capture in ASGI/WSGI middleware and frameworks (#3531) by @antonpirker
+
+  We've added a new option to the Django, Flask, Starlette and FastAPI integrations called `http_methods_to_capture`. This is a configurable tuple of HTTP method verbs that should create a transaction in Sentry. The default is `("CONNECT", "DELETE", "GET", "PATCH", "POST", "PUT", "TRACE",)`. `OPTIONS` and `HEAD` are not included by default.
+
+  Here's how to use it (substitute Flask for your framework integration):
+
+  ```python
+  sentry_sdk.init(
+      integrations=[
+        FlaskIntegration(
+            http_methods_to_capture=("GET", "POST"),
+        ),
+    ],
+  )
+  ```
+
+- Django: Allow ASGI to use `drf_request` in `DjangoRequestExtractor` (#3572) by @PakawiNz
+- Django: Don't let `RawPostDataException` bubble up (#3553) by @sentrivana
+- Django: Add `sync_capable` to `SentryWrappingMiddleware` (#3510) by @szokeasaurusrex
+- AIOHTTP: Add `failed_request_status_codes` (#3551) by @szokeasaurusrex
+
+  You can now define a set of integers that will determine which status codes
+  should be reported to Sentry.
+
+    ```python
+    sentry_sdk.init(
+        integrations=[
+            AioHttpIntegration(
+                failed_request_status_codes={403, *range(500, 600)},
+            )
+        ]
+    )
+    ```
+
+  Examples of valid `failed_request_status_codes`:
+
+  - `{500}` will only send events on HTTP 500.
+  - `{400, *range(500, 600)}` will send events on HTTP 400 as well as the 5xx range.
+  - `{500, 503}` will send events on HTTP 500 and 503.
+  - `set()` (the empty set) will not send events for any HTTP status code.
+
+  The default is `{*range(500, 600)}`, meaning that all 5xx status codes are reported to Sentry.
+
+- AIOHTTP: Delete test which depends on AIOHTTP behavior (#3568) by @szokeasaurusrex
+- AIOHTTP: Handle invalid responses (#3554) by @szokeasaurusrex
+- FastAPI/Starlette: Support new `failed_request_status_codes` (#3563) by @szokeasaurusrex
+
+  The format of `failed_request_status_codes` has changed from a list
+  of integers and containers to a set:
+
+  ```python
+  sentry_sdk.init(
+      integrations=StarletteIntegration(
+          failed_request_status_codes={403, *range(500, 600)},
+      ),
+  )
+  ```
+
+  The old way of defining `failed_request_status_codes` will continue to work
+  for the time being. Examples of valid new-style `failed_request_status_codes`:
+
+  - `{500}` will only send events on HTTP 500.
+  - `{400, *range(500, 600)}` will send events on HTTP 400 as well as the 5xx range.
+  - `{500, 503}` will send events on HTTP 500 and 503.
+  - `set()` (the empty set) will not send events for any HTTP status code.
+
+  The default is `{*range(500, 600)}`, meaning that all 5xx status codes are reported to Sentry.
+
+- FastAPI/Starlette: Fix `failed_request_status_codes=[]` (#3561) by @szokeasaurusrex
+- FastAPI/Starlette: Remove invalid `failed_request_status_code` tests (#3560) by @szokeasaurusrex
+- FastAPI/Starlette: Refactor shared test parametrization (#3562) by @szokeasaurusrex
+
+### Miscellaneous
+
+- Deprecate `sentry_sdk.metrics` (#3512) by @szokeasaurusrex
+- Add `name` parameter to `start_span()` and deprecate `description` parameter (#3524 & #3525) by @antonpirker
+- Fix `add_query_source` with modules outside of project root (#3313) by @rominf
+- Test more integrations on 3.13 (#3578) by @sentrivana
+- Fix trailing whitespace (#3579) by @sentrivana
+- Improve `get_integration` typing (#3550) by @szokeasaurusrex
+- Make import-related tests stable (#3548) by @BYK
+- Fix breadcrumb sorting (#3511) by @sentrivana
+- Fix breadcrumb timestamp casting and its tests (#3546) by @BYK
+- Don't use deprecated `logger.warn` (#3552) by @sentrivana
+- Fix Cohere API change (#3549) by @BYK
+- Fix deprecation message (#3536) by @antonpirker
+- Remove experimental `explain_plan` feature. (#3534) by @antonpirker
+- X-fail one of the Lambda tests (#3592) by @antonpirker
+- Update Codecov config (#3507) by @antonpirker
+- Update `actions/upload-artifact` to `v4` with merge (#3545) by @joshuarli
+- Bump `actions/checkout` from `4.1.7` to `4.2.0` (#3585) by @dependabot
+
+## 2.14.0
+
+### Various fixes & improvements
+
+- New `SysExitIntegration` (#3401) by @szokeasaurusrex
+
+  For more information, see the documentation for the [SysExitIntegration](https://docs.sentry.io/platforms/python/integrations/sys_exit).
+
+- Add `SENTRY_SPOTLIGHT` env variable support (#3443) by @BYK
+- Support Strawberry `0.239.2` (#3491) by @szokeasaurusrex
+- Add separate `pii_denylist` to `EventScrubber` and run it always (#3463) by @sl0thentr0py
+- Celery: Add wrapper for `Celery().send_task` to support behavior as `Task.apply_async` (#2377) by @divaltor
+- Django: SentryWrappingMiddleware.__init__ fails if super() is object (#2466) by @cameron-simpson
+- Fix data_category for sessions envelope items (#3473) by @sl0thentr0py
+- Fix non-UTC timestamps (#3461) by @szokeasaurusrex
+- Remove obsolete object as superclass (#3480) by @sentrivana
+- Replace custom `TYPE_CHECKING` with stdlib `typing.TYPE_CHECKING` (#3447) by @dev-satoshi
+- Refactor `tracing_utils.py` (#3452) by @rominf
+- Explicitly export symbol in subpackages instead of ignoring (#3400) by @hartungstenio
+- Better test coverage reports (#3498) by @antonpirker
+- Fixed config for old coverage versions (#3504) by @antonpirker
+- Fix AWS Lambda tests (#3495) by @antonpirker
+- Remove broken Bottle tests (#3505) by @sentrivana
+
+## 2.13.0
+
+### Various fixes & improvements
+
+- **New integration:** [Ray](https://docs.sentry.io/platforms/python/integrations/ray/) (#2400) (#2444) by @glowskir
+
+  Usage: (add the RayIntegration to your `sentry_sdk.init()` call and make sure it is called in the worker processes)
+  ```python
+  import ray
+
+  import sentry_sdk
+  from sentry_sdk.integrations.ray import RayIntegration
+
+  def init_sentry():
+      sentry_sdk.init(
+          dsn="...",
+          traces_sample_rate=1.0,
+          integrations=[RayIntegration()],
+      )
+
+  init_sentry()
+
+  ray.init(
+      runtime_env=dict(worker_process_setup_hook=init_sentry),
+  )
+  ```
+  For more information, see the documentation for the [Ray integration](https://docs.sentry.io/platforms/python/integrations/ray/).
+
+- **New integration:** [Litestar](https://docs.sentry.io/platforms/python/integrations/litestar/) (#2413) (#3358) by @KellyWalker
+
+  Usage: (add the LitestarIntegration to your `sentry_sdk.init()`)
+  ```python
+  from litestar import Litestar, get
+
+  import sentry_sdk
+  from sentry_sdk.integrations.litestar import LitestarIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[LitestarIntegration()],
+  )
+
+  @get("/")
+  async def index() -> str:
+      return "Hello, world!"
+
+  app = Litestar(...)
+  ```
+  For more information, see the documentation for the [Litestar integration](https://docs.sentry.io/platforms/python/integrations/litestar/).
+
+- **New integration:** [Dramatiq](https://docs.sentry.io/platforms/python/integrations/dramatiq/) from @jacobsvante (#3397) by @antonpirker
+  Usage: (add the DramatiqIntegration to your `sentry_sdk.init()`)
+  ```python
+  import dramatiq
+
+  import sentry_sdk
+  from sentry_sdk.integrations.dramatiq import DramatiqIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[DramatiqIntegration()],
+  )
+
+  @dramatiq.actor(max_retries=0)
+  def dummy_actor(x, y):
+      return x / y
+
+  dummy_actor.send(12, 0)
+  ```
+
+  For more information, see the documentation for the [Dramatiq integration](https://docs.sentry.io/platforms/python/integrations/dramatiq/).
+
+- **New config option:** Expose `custom_repr` function that precedes `safe_repr` invocation in serializer (#3438) by @sl0thentr0py
+
+  See: https://docs.sentry.io/platforms/python/configuration/options/#custom-repr
+
+- Profiling: Add client SDK info to profile chunk (#3386) by @Zylphrex
+- Serialize vars early to avoid living references (#3409) by @sl0thentr0py
+- Deprecate hub-based `sessions.py` logic (#3419) by @szokeasaurusrex
+- Deprecate `is_auto_session_tracking_enabled` (#3428) by @szokeasaurusrex
+- Add note to generated yaml files (#3423) by @sentrivana
+- Slim down PR template (#3382) by @sentrivana
+- Use new banner in readme (#3390) by @sentrivana
+
+## 2.12.0
+
+### Various fixes & improvements
+
+- API: Expose the scope getters to top level API and use them everywhere  (#3357) by @sl0thentr0py
+- API: `push_scope` deprecation warning (#3355) (#3355) by @szokeasaurusrex
+- API: Replace `push_scope` (#3353, #3354) by @szokeasaurusrex
+- API: Deprecate, avoid, or stop using `configure_scope` (#3348, #3349, #3350, #3351) by @szokeasaurusrex
+- OTel: Remove experimental autoinstrumentation (#3239) by @sentrivana
+- Graphene: Add span for grapqhl operation (#2788) by @czyber
+- AI: Add async support for `ai_track` decorator (#3376) by @czyber
+- CI: Workaround bug preventing Django test runs (#3371) by @szokeasaurusrex
+- CI: Remove Django setuptools pin (#3378) by @szokeasaurusrex
+- Tests: Test with Django 5.1 RC (#3370) by @sentrivana
+- Broaden `add_attachment` type (#3342) by @szokeasaurusrex
+- Add span data to the transactions trace context (#3374) by @antonpirker
+- Gracefully fail attachment path not found case (#3337) by @sl0thentr0py
+- Document attachment parameters (#3342) by @szokeasaurusrex
+- Bump checkouts/data-schemas from `0feb234` to `6d2c435` (#3369) by @dependabot
+- Bump checkouts/data-schemas from `88273a9` to `0feb234` (#3252) by @dependabot
+
+## 2.11.0
+
+### Various fixes & improvements
+
+- Add `disabled_integrations` (#3328) by @sentrivana
+
+  Disabling individual integrations is now much easier.
+  Instead of disabling all automatically enabled integrations and specifying the ones
+  you want to keep, you can now use the new
+  [`disabled_integrations`](https://docs.sentry.io/platforms/python/configuration/options/#auto-enabling-integrations)
+  config option to provide a list of integrations to disable:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.flask import FlaskIntegration
+
+  sentry_sdk.init(
+      # Do not use the Flask integration even if Flask is installed.
+      disabled_integrations=[
+          FlaskIntegration(),
+      ],
+  )
+  ```
+
+- Use operation name as transaction name in Strawberry (#3294) by @sentrivana
+- WSGI integrations respect `SCRIPT_NAME` env variable (#2622) by @sarvaSanjay
+- Make Django DB spans have origin `auto.db.django` (#3319) by @antonpirker
+- Sort breadcrumbs by time before sending (#3307) by @antonpirker
+- Fix `KeyError('sentry-monitor-start-timestamp-s')` (#3278) by @Mohsen-Khodabakhshi
+- Set MongoDB tags directly on span data (#3290) by @0Calories
+- Lower logger level for some messages (#3305) by @sentrivana and @antonpirker
+- Emit deprecation warnings from `Hub` API (#3280) by @szokeasaurusrex
+- Clarify that `instrumenter` is internal-only (#3299) by @szokeasaurusrex
+- Support Django 5.1 (#3207) by @sentrivana
+- Remove apparently unnecessary `if` (#3298) by @szokeasaurusrex
+- Preliminary support for Python 3.13 (#3200) by @sentrivana
+- Move `sentry_sdk.init` out of `hub.py` (#3276) by @szokeasaurusrex
+- Unhardcode integration list (#3240) by @rominf
+- Allow passing of PostgreSQL port in tests (#3281) by @rominf
+- Add tests for `@ai_track` decorator (#3325) by @colin-sentry
+- Do not include type checking code in coverage report (#3327) by @antonpirker
+- Fix test_installed_modules (#3309) by @szokeasaurusrex
+- Fix typos and grammar in a comment (#3293) by @szokeasaurusrex
+- Fixed failed tests setup (#3303) by @antonpirker
+- Only assert warnings we are interested in (#3314) by @szokeasaurusrex
+
 ## 2.10.0
 
 ### Various fixes & improvements
@@ -22,7 +402,7 @@
           LangchainIntegration(tiktoken_encoding_name="cl100k_base"),
       ],
   )
-  ``` 
+  ```
 
 - PyMongo: Send query description as valid JSON (#3291) by @0Calories
 - Remove Python 2 compatibility code (#3284) by @szokeasaurusrex
@@ -137,7 +517,7 @@ This change fixes a regression in our cron monitoring feature, which caused cron
   ```python
   from sentry_sdk.integrations.starlette import StarletteIntegration
   from sentry_sdk.integrations.fastapi import FastApiIntegration
-  
+
   sentry_sdk.init(
       # ...
       integrations=[
@@ -266,9 +646,9 @@ This change fixes a regression in our cron monitoring feature, which caused cron
       integrations=[AnthropicIntegration()],
   )
 
-  client = Anthropic()  
+  client = Anthropic()
   ```
-  Check out [the Anthropic docs](https://docs.sentry.io/platforms/python/integrations/anthropic/) for details. 
+  Check out [the Anthropic docs](https://docs.sentry.io/platforms/python/integrations/anthropic/) for details.
 
 - **New integration:** [Huggingface Hub](https://docs.sentry.io/platforms/python/integrations/huggingface/) (#3033) by @colin-sentry
 
@@ -323,13 +703,13 @@ This change fixes a regression in our cron monitoring feature, which caused cron
 
 ## 2.0.0
 
-This is the first major update in a *long* time! 
+This is the first major update in a *long* time!
 
 We dropped support for some ancient languages and frameworks (Yes, Python 2.7 is no longer supported). Additionally we refactored a big part of the foundation of the SDK (how data inside the SDK is handled).
 
 We hope you like it!
 
-For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: https://docs.sentry.io/platforms/python/migration/1.x-to-2.x 
+For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: https://docs.sentry.io/platforms/python/migration/1.x-to-2.x
 
 ### New Features
 
@@ -369,7 +749,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
 
     # later in the code execution:
 
-    scope = sentry_sdk.Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     scope.set_transaction_name("new-transaction-name")
     ```
 - The classes listed in the table below are now abstract base classes. Therefore, they can no longer be instantiated. Subclasses can only be instantiated if they implement all of the abstract methods.
@@ -446,7 +826,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
       # do something with the forked scope
   ```
 
-- `configure_scope` is deprecated. Use the new isolation scope directly via `Scope.get_isolation_scope()` instead.
+- `configure_scope` is deprecated. Use the new isolation scope directly via `get_isolation_scope()` instead.
 
   Before:
 
@@ -458,9 +838,9 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
   After:
 
   ```python
-  from sentry_sdk.scope import Scope
+  from sentry_sdk import get_isolation_scope
 
-  scope = Scope.get_isolation_scope()
+  scope = get_isolation_scope()
   # do something with `scope`
   ```
 
@@ -517,7 +897,7 @@ This is the final 1.x release for the forseeable future. Development will contin
       "failure_issue_threshold": 5,
       "recovery_threshold": 5,
   }
-  
+
   @monitor(monitor_slug='<monitor-slug>', monitor_config=monitor_config)
   def tell_the_world():
       print('My scheduled task...')
@@ -532,14 +912,14 @@ This is the final 1.x release for the forseeable future. Development will contin
   ```python
   import django.db.models.signals
   import sentry_sdk
-  
+
   sentry_sdk.init(
       ...
       integrations=[
           DjangoIntegration(
               ...
               signals_denylist=[
-                  django.db.models.signals.pre_init, 
+                  django.db.models.signals.pre_init,
                   django.db.models.signals.post_init,
               ],
           ),
@@ -562,7 +942,7 @@ This is the final 1.x release for the forseeable future. Development will contin
       tags["extra"] = "foo"
       del tags["release"]
       return True
-  
+
   sentry_sdk.init(
       ...
       _experiments={

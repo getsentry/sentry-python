@@ -7,7 +7,7 @@ from http.client import HTTPConnection
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import Scope, add_global_event_processor
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -18,7 +18,8 @@ from sentry_sdk.utils import (
     safe_repr,
     parse_url,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -89,7 +90,7 @@ def _install_httplib():
 
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
+            name="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin="auto.http.stdlib.httplib",
         )
@@ -102,7 +103,10 @@ def _install_httplib():
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
         if should_propagate_trace(client, real_url):
-            for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
+            for (
+                key,
+                value,
+            ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
                 logger.debug(
@@ -123,11 +127,13 @@ def _install_httplib():
         if span is None:
             return real_getresponse(self, *args, **kwargs)
 
-        rv = real_getresponse(self, *args, **kwargs)
+        try:
+            rv = real_getresponse(self, *args, **kwargs)
 
-        span.set_http_status(int(rv.status))
-        span.set_data("reason", rv.reason)
-        span.finish()
+            span.set_http_status(int(rv.status))
+            span.set_data("reason", rv.reason)
+        finally:
+            span.finish()
 
         return rv
 
@@ -199,10 +205,10 @@ def _install_subprocess():
 
         with sentry_sdk.start_span(
             op=OP.SUBPROCESS,
-            description=description,
+            name=description,
             origin="auto.subprocess.stdlib.subprocess",
         ) as span:
-            for k, v in Scope.get_current_scope().iter_trace_propagation_headers(
+            for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
                 if env is None:

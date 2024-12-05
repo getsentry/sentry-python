@@ -77,11 +77,18 @@ def test_logging_extra_data_integer_keys(sentry_init, capture_events):
     assert event["extra"] == {"1": 1}
 
 
-def test_logging_stack(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "enable_stack_trace_kwarg",
+    (
+        pytest.param({"exc_info": True}, id="exc_info"),
+        pytest.param({"stack_info": True}, id="stack_info"),
+    ),
+)
+def test_logging_stack_trace(sentry_init, capture_events, enable_stack_trace_kwarg):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
 
-    logger.error("first", exc_info=True)
+    logger.error("first", **enable_stack_trace_kwarg)
     logger.error("second")
 
     (

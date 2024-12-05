@@ -18,7 +18,6 @@ from opentelemetry.trace import (
     TraceFlags,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -31,6 +30,8 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
 )
 from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional, Set

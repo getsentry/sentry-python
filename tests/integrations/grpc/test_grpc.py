@@ -357,7 +357,7 @@ class TestService(gRPCTestServiceServicer):
     def TestServe(request, context):  # noqa: N802
         with start_span(
             op="test",
-            description="test",
+            name="test",
             origin="auto.grpc.grpc.TestService",
         ):
             pass

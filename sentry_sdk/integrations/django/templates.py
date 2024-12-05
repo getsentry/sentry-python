@@ -5,10 +5,10 @@ from django.utils.safestring import mark_safe
 from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
-from sentry_sdk import Scope
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import ensure_integration_enabled
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -70,7 +70,7 @@ def patch_templates():
         # type: (SimpleTemplateResponse) -> str
         with sentry_sdk.start_span(
             op=OP.TEMPLATE_RENDER,
-            description=_get_template_name_description(self.template_name),
+            name=_get_template_name_description(self.template_name),
             origin=DjangoIntegration.origin,
         ) as span:
             span.set_data("context", self.context_data)
@@ -93,12 +93,12 @@ def patch_templates():
         context = context or {}
         if "sentry_trace_meta" not in context:
             context["sentry_trace_meta"] = mark_safe(
-                Scope.get_current_scope().trace_propagation_meta()
+                sentry_sdk.get_current_scope().trace_propagation_meta()
             )
 
         with sentry_sdk.start_span(
             op=OP.TEMPLATE_RENDER,
-            description=_get_template_name_description(template_name),
+            name=_get_template_name_description(template_name),
             origin=DjangoIntegration.origin,
         ) as span:
             span.set_data("context", context)

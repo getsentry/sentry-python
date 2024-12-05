@@ -7,7 +7,6 @@ import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
-from sentry_sdk.scope import Scope
 
 original_start = Thread.start
 original_run = Thread.run
@@ -45,7 +44,7 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     events = capture_events()
 
     def stage1():
-        Scope.get_isolation_scope().set_tag("stage1", "true")
+        sentry_sdk.get_isolation_scope().set_tag("stage1", "true")
 
         t = Thread(target=stage2)
         t.start()
@@ -81,7 +80,7 @@ def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
     events = capture_events()
 
     def double(number):
-        with sentry_sdk.start_span(op="task", description=str(number)):
+        with sentry_sdk.start_span(op="task", name=str(number)):
             return number * 2
 
     with sentry_sdk.start_transaction(name="test_handles_threadpool"):
