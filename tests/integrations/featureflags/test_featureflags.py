@@ -32,9 +32,9 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
 
     events = capture_events()
     sentry_sdk.capture_exception(Exception("something wrong!"))
-    [event] = events
 
-    assert event["contexts"]["flags"] == {
+    assert len(events) == 1
+    assert events[0]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
             {"flag": "world", "result": True},
