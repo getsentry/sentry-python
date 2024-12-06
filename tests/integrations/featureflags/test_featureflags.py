@@ -5,7 +5,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations import _processed_integrations, _installed_integrations
-from sentry_sdk.integrations.featureflags import FeatureFlagsIntegration
+from sentry_sdk.integrations.featureflags import FeatureFlagsIntegration, add_flag
 
 
 @pytest.fixture
@@ -22,11 +22,10 @@ def uninstall_integration():
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
     uninstall_integration(FeatureFlagsIntegration.identifier)
     sentry_init(integrations=[FeatureFlagsIntegration()])
-    flags_integration = sentry_sdk.get_client().get_integration(FeatureFlagsIntegration)
 
-    flags_integration.set_flag("hello", False)
-    flags_integration.set_flag("world", True)
-    flags_integration.set_flag("other", False)
+    add_flag("hello", False)
+    add_flag("world", True)
+    add_flag("other", False)
 
     events = capture_events()
     sentry_sdk.capture_exception(Exception("something wrong!"))
@@ -49,17 +48,13 @@ def test_featureflags_integration_threaded(
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
-    flags_integration = sentry_sdk.get_client().get_integration(FeatureFlagsIntegration)
-    flags_integration.set_flag("hello", False)
+    add_flag("hello", False)
 
     def task(flag_key):
         # Creates a new isolation scope for the thread.
         # This means the evaluations in each task are captured separately.
         with sentry_sdk.isolation_scope():
-            flags_integration = sentry_sdk.get_client().get_integration(
-                FeatureFlagsIntegration
-            )
-            flags_integration.set_flag(flag_key, False)
+            add_flag(flag_key, False)
             # use a tag to identify to identify events later on
             sentry_sdk.set_tag("task_id", flag_key)
             sentry_sdk.capture_exception(Exception("something wrong!"))
@@ -102,17 +97,13 @@ def test_featureflags_integration_asyncio(
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
-    flags_integration = sentry_sdk.get_client().get_integration(FeatureFlagsIntegration)
-    flags_integration.set_flag("hello", False)
+    add_flag("hello", False)
 
     async def task(flag_key):
         # Creates a new isolation scope for the thread.
         # This means the evaluations in each task are captured separately.
         with sentry_sdk.isolation_scope():
-            flags_integration = sentry_sdk.get_client().get_integration(
-                FeatureFlagsIntegration
-            )
-            flags_integration.set_flag(flag_key, False)
+            add_flag(flag_key, False)
             # use a tag to identify to identify events later on
             sentry_sdk.set_tag("task_id", flag_key)
             sentry_sdk.capture_exception(Exception("something wrong!"))

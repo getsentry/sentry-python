@@ -12,7 +12,7 @@ class FeatureFlagsIntegration(Integration):
         scope = sentry_sdk.get_current_scope()
         scope.add_error_processor(flag_error_processor)
 
-    @staticmethod
-    def set_flag(flag: str, result: bool):
-        flags = sentry_sdk.get_current_scope().flags
-        flags.set(flag, result)
+
+def add_flag(flag: str, result: bool):
+    flags = sentry_sdk.get_current_scope().flags
+    flags.set(flag, result)
