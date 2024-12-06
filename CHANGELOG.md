@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.19.2
+
+### Various fixes & improvements
+
+- Deepcopy and ensure get_all function always terminates (#3861) by @cmanallen
+- Cleanup chalice test environment (#3858) by @antonpirker
+
 ## 2.19.1
 
 ### Various fixes & improvements
