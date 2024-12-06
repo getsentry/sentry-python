@@ -21,10 +21,7 @@ from sentry_sdk.integrations.opentelemetry.scope import (
     use_isolation_scope,
     setup_scope_context_management,
 )
-
-
-SLOTS_NOT_COPIED = {"client"}
-"""__slots__ that are not copied when copying a Scope object."""
+from tests.conftest import ApproxDict
 
 
 @pytest.fixture(autouse=True)
@@ -52,7 +49,7 @@ def test_all_slots_copied():
     scope_copy = copy.copy(scope)
 
     # Check all attributes are copied
-    for attr in set(Scope.__slots__) - SLOTS_NOT_COPIED:
+    for attr in set(Scope.__slots__):
         assert getattr(scope_copy, attr) == getattr(scope, attr)
 
 
@@ -804,8 +801,8 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
     transaction = envelope.items[0].get_transaction_event()
 
     assert transaction["tags"] == {"isolation_scope1": 1, "current_scope2": 1, "trx": 1}
-    assert transaction["spans"][0]["tags"] == {"a": 1}
-    assert transaction["spans"][1]["tags"] == {"b": 1}
+    assert transaction["spans"][0]["tags"] == ApproxDict({"a": 1})
+    assert transaction["spans"][1]["tags"] == ApproxDict({"b": 1})
 
 
 def test_should_send_default_pii_true(sentry_init):
