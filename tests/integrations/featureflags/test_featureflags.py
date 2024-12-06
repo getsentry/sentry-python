@@ -1,25 +1,11 @@
 import asyncio
 import concurrent.futures as cf
 
-import pytest
-
 import sentry_sdk
-from sentry_sdk.integrations import _processed_integrations, _installed_integrations
 from sentry_sdk.integrations.featureflags import (
     FeatureFlagsIntegration,
     add_feature_flag,
 )
-
-
-@pytest.fixture
-def uninstall_integration():
-    """Forces the next call to sentry_init to re-install/setup an integration."""
-
-    def inner(identifier):
-        _processed_integrations.discard(identifier)
-        _installed_integrations.discard(identifier)
-
-    return inner
 
 
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
