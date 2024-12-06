@@ -5,3 +5,5 @@ certifi
 # So we pin this here to make our Lambda layer work with
 # Lambda Function using Python 3.7+
 urllib3<1.27
+
+opentelemetry-distro>=0.35b0

@@ -65,7 +65,7 @@ async def test_create_task(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="test_transaction_for_create_task"):
+    with sentry_sdk.start_span(name="test_transaction_for_create_task"):
         with sentry_sdk.start_span(op="root", name="not so important"):
             tasks = [asyncio.create_task(foo()), asyncio.create_task(bar())]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
@@ -108,7 +108,7 @@ async def test_gather(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="test_transaction_for_gather"):
+    with sentry_sdk.start_span(name="test_transaction_for_gather"):
         with sentry_sdk.start_span(op="root", name="not so important"):
             await asyncio.gather(foo(), bar(), return_exceptions=True)
 
@@ -150,7 +150,8 @@ async def test_exception(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="test_exception"):
+    with sentry_sdk.start_span(name="test_exception"):
+        sentry_sdk.get_isolation_scope().set_transaction_name("test_exception")
         with sentry_sdk.start_span(op="root", name="not so important"):
             tasks = [asyncio.create_task(boom()), asyncio.create_task(bar())]
             await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
@@ -364,7 +365,7 @@ async def test_span_origin(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="something"):
+    with sentry_sdk.start_span(name="something"):
         tasks = [
             asyncio.create_task(foo()),
         ]
