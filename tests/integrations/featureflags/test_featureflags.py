@@ -1,15 +1,26 @@
 import asyncio
 import concurrent.futures as cf
 
+import pytest
+
 import sentry_sdk
-from sentry_sdk.integrations import _processed_integrations
+from sentry_sdk.integrations import _processed_integrations, _installed_integrations
 from sentry_sdk.integrations.featureflags import FeatureFlagsIntegration
 
 
-def test_featureflags_integration(sentry_init, capture_events):
-    _processed_integrations.discard(
-        FeatureFlagsIntegration.identifier
-    )  # force reinstall
+@pytest.fixture
+def uninstall_integration():
+    """Forces the next call to sentry_init to re-install/setup an integration."""
+
+    def inner(identifier):
+        _processed_integrations.discard(identifier)
+        _installed_integrations.discard(identifier)
+
+    return inner
+
+
+def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
+    uninstall_integration(FeatureFlagsIntegration.identifier)
     sentry_init(integrations=[FeatureFlagsIntegration()])
     flags_integration = sentry_sdk.get_client().get_integration(FeatureFlagsIntegration)
 
@@ -30,10 +41,10 @@ def test_featureflags_integration(sentry_init, capture_events):
     }
 
 
-def test_featureflags_integration_threaded(sentry_init, capture_events):
-    _processed_integrations.discard(
-        FeatureFlagsIntegration.identifier
-    )  # force reinstall
+def test_featureflags_integration_threaded(
+    sentry_init, capture_events, uninstall_integration
+):
+    uninstall_integration(FeatureFlagsIntegration.identifier)
     sentry_init(integrations=[FeatureFlagsIntegration()])
     events = capture_events()
 
@@ -50,22 +61,32 @@ def test_featureflags_integration_threaded(sentry_init, capture_events):
             )
             flags_integration.set_flag(flag_key, False)
             # use a tag to identify to identify events later on
-            sentry_sdk.set_tag("flag_key", flag_key)
+            sentry_sdk.set_tag("task_id", flag_key)
             sentry_sdk.capture_exception(Exception("something wrong!"))
 
     # Run tasks in separate threads
     with cf.ThreadPoolExecutor(max_workers=2) as pool:
         pool.map(task, ["world", "other"])
 
-    assert len(events) == 2
-    events.sort(key=lambda e: e["tags"]["flag_key"])
+    # Capture error in original scope
+    sentry_sdk.set_tag("task_id", "0")
+    sentry_sdk.capture_exception(Exception("something wrong!"))
+
+    assert len(events) == 3
+    events.sort(key=lambda e: e["tags"]["task_id"])
+
     assert events[0]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": False},
+        ]
+    }
+    assert events[1]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
             {"flag": "other", "result": False},
         ]
     }
-    assert events[1]["contexts"]["flags"] == {
+    assert events[2]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
             {"flag": "world", "result": False},
@@ -73,10 +94,10 @@ def test_featureflags_integration_threaded(sentry_init, capture_events):
     }
 
 
-def test_featureflags_integration_asyncio(sentry_init, capture_events):
-    _processed_integrations.discard(
-        FeatureFlagsIntegration.identifier
-    )  # force reinstall
+def test_featureflags_integration_asyncio(
+    sentry_init, capture_events, uninstall_integration
+):
+    uninstall_integration(FeatureFlagsIntegration.identifier)
     sentry_init(integrations=[FeatureFlagsIntegration()])
     events = capture_events()
 
@@ -93,7 +114,7 @@ def test_featureflags_integration_asyncio(sentry_init, capture_events):
             )
             flags_integration.set_flag(flag_key, False)
             # use a tag to identify to identify events later on
-            sentry_sdk.set_tag("flag_key", flag_key)
+            sentry_sdk.set_tag("task_id", flag_key)
             sentry_sdk.capture_exception(Exception("something wrong!"))
 
     async def runner():
@@ -101,15 +122,25 @@ def test_featureflags_integration_asyncio(sentry_init, capture_events):
 
     asyncio.run(runner())
 
-    assert len(events) == 2
-    events.sort(key=lambda e: e["tags"]["flag_key"])
+    # Capture error in original scope
+    sentry_sdk.set_tag("task_id", "0")
+    sentry_sdk.capture_exception(Exception("something wrong!"))
+
+    assert len(events) == 3
+    events.sort(key=lambda e: e["tags"]["task_id"])
+
     assert events[0]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": False},
+        ]
+    }
+    assert events[1]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
             {"flag": "other", "result": False},
         ]
     }
-    assert events[1]["contexts"]["flags"] == {
+    assert events[2]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
             {"flag": "world", "result": False},
