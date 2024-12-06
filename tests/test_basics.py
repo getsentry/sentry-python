@@ -32,7 +32,7 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import get_sdk_name, reraise
+from sentry_sdk.utils import datetime_from_isoformat, get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
 
 
@@ -348,7 +348,7 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.fromisoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
+        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
@@ -389,7 +389,7 @@ def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.fromisoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
+        datetime_from_isoformat(x["timestamp"]) for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
 
