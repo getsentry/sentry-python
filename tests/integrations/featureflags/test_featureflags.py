@@ -5,7 +5,10 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations import _processed_integrations, _installed_integrations
-from sentry_sdk.integrations.featureflags import FeatureFlagsIntegration, add_flag
+from sentry_sdk.integrations.featureflags import (
+    FeatureFlagsIntegration,
+    add_feature_flag,
+)
 
 
 @pytest.fixture
@@ -23,9 +26,9 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
     uninstall_integration(FeatureFlagsIntegration.identifier)
     sentry_init(integrations=[FeatureFlagsIntegration()])
 
-    add_flag("hello", False)
-    add_flag("world", True)
-    add_flag("other", False)
+    add_feature_flag("hello", False)
+    add_feature_flag("world", True)
+    add_feature_flag("other", False)
 
     events = capture_events()
     sentry_sdk.capture_exception(Exception("something wrong!"))
@@ -48,13 +51,13 @@ def test_featureflags_integration_threaded(
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
-    add_flag("hello", False)
+    add_feature_flag("hello", False)
 
     def task(flag_key):
         # Creates a new isolation scope for the thread.
         # This means the evaluations in each task are captured separately.
         with sentry_sdk.isolation_scope():
-            add_flag(flag_key, False)
+            add_feature_flag(flag_key, False)
             # use a tag to identify to identify events later on
             sentry_sdk.set_tag("task_id", flag_key)
             sentry_sdk.capture_exception(Exception("something wrong!"))
@@ -97,13 +100,13 @@ def test_featureflags_integration_asyncio(
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
-    add_flag("hello", False)
+    add_feature_flag("hello", False)
 
     async def task(flag_key):
         # Creates a new isolation scope for the thread.
         # This means the evaluations in each task are captured separately.
         with sentry_sdk.isolation_scope():
-            add_flag(flag_key, False)
+            add_feature_flag(flag_key, False)
             # use a tag to identify to identify events later on
             sentry_sdk.set_tag("task_id", flag_key)
             sentry_sdk.capture_exception(Exception("something wrong!"))

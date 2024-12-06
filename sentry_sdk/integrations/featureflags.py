@@ -16,11 +16,11 @@ class FeatureFlagsIntegration(Integration):
     @example
     ```
     import sentry_sdk
-    from sentry_sdk.integrations.featureflags import FeatureFlagsIntegration, add_flag
+    from sentry_sdk.integrations.featureflags import FeatureFlagsIntegration, add_feature_flag
 
     sentry_sdk.init(dsn="my_dsn", integrations=[FeatureFlagsIntegration()]);
 
-    add_flag('my-flag', true);
+    add_feature_flag('my-flag', true);
     sentry_sdk.capture_exception(Exception('broke')); // 'my-flag' should be captured on this Sentry event.
     ```
     """
@@ -33,7 +33,7 @@ class FeatureFlagsIntegration(Integration):
         scope.add_error_processor(flag_error_processor)
 
 
-def add_flag(flag: str, result: bool):
+def add_feature_flag(flag: str, result: bool):
     """
     Records a flag and its value to be sent on subsequent error events. We recommend you do this
     on flag evaluations. Flags are buffered per Sentry scope and limited to 100 per event.
