@@ -1,6 +1,7 @@
 from copy import copy
 
 import pytest
+from copy import copy
 
 from sentry_sdk._lru_cache import LRUCache
 

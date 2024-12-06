@@ -170,7 +170,15 @@ class LRUCache:
     def get_all(self):
         nodes = []
         node = self.root[NEXT]
-        while node is not self.root:
+
+        # To ensure the loop always terminates we iterate to the maximum
+        # size of the LRU cache.
+        for _ in range(self.max_size):
+            # The cache may not be full. We exit early if we've wrapped
+            # around to the head.
+            if node is self.root:
+                break
             nodes.append((node[KEY], node[VALUE]))
             node = node[NEXT]
+
         return nodes

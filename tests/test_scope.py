@@ -19,10 +19,6 @@ from sentry_sdk.scope import (
 )
 
 
-SLOTS_NOT_COPIED = {"client"}
-"""__slots__ that are not copied when copying a Scope object."""
-
-
 def test_copying():
     s1 = Scope()
     s1.fingerprint = {}
@@ -43,7 +39,7 @@ def test_all_slots_copied():
     scope_copy = copy.copy(scope)
 
     # Check all attributes are copied
-    for attr in set(Scope.__slots__) - SLOTS_NOT_COPIED:
+    for attr in set(Scope.__slots__):
         assert getattr(scope_copy, attr) == getattr(scope, attr)
 
 
