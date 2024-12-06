@@ -625,6 +625,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                                 "url.full": "http://x.io/sit/stay/rollover?repeat=twice",
                                 "network.protocol.name": "http",
                                 "server.address": "x.io",
+                                "http.request.header.custom-header": "Custom Value",
                             }
                         )
                     )
@@ -643,7 +644,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
             )
         """
         ),
-        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "query_string": {"repeat": "again"}, "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"}}',
+        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "query_string": {"repeat": "again"}, "headers": {"Host": "x.io", "X-Forwarded-Proto": "http", "Custom-Header": "Custom Value"}}',
     )
 
     assert response["Payload"]["AssertionError raised"] is False

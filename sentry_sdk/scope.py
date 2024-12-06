@@ -26,6 +26,7 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
     NoOpSpan,
     Span,
+    POTelSpan,
     Transaction,
 )
 from sentry_sdk.utils import (
@@ -202,6 +203,7 @@ class Scope:
         rv = object.__new__(self.__class__)  # type: Scope
 
         rv._type = self._type
+        rv.client = self.client
         rv._level = self._level
         rv._name = self._name
         rv._fingerprint = self._fingerprint
@@ -669,7 +671,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture = True  # type: bool
 
-        self._span = None  # type: Optional[Span]
+        self._span = None  # type: Optional[POTelSpan]
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
 
@@ -777,13 +779,13 @@ class Scope:
 
     @property
     def span(self):
-        # type: () -> Optional[Span]
+        # type: () -> Optional[POTelSpan]
         """Get current tracing span."""
         return self._span
 
     @span.setter
     def span(self, span):
-        # type: (Optional[Span]) -> None
+        # type: (Optional[POTelSpan]) -> None
         """Set current tracing span."""
         self._span = span
 

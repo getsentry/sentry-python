@@ -1280,11 +1280,11 @@ class POTelSpan:
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
+            "<%s(op=%r, name:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
             % (
                 self.__class__.__name__,
                 self.op,
-                self.description,
+                self.name,
                 self.trace_id,
                 self.span_id,
                 self.parent_span_id,
@@ -1313,7 +1313,12 @@ class POTelSpan:
         if value is not None:
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
         else:
-            self.set_status(SPANSTATUS.OK)
+            status_unset = (
+                hasattr(self._otel_span, "status")
+                and self._otel_span.status.status_code == StatusCode.UNSET
+            )
+            if status_unset:
+                self.set_status(SPANSTATUS.OK)
 
         self.finish()
         context.detach(self._ctx_token)

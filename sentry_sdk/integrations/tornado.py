@@ -22,6 +22,7 @@ from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
     _filter_headers,
     _is_json_content_type,
+    _request_headers_to_span_attributes,
 )
 from sentry_sdk.integrations.logging import ignore_logger
 
@@ -246,7 +247,7 @@ def _prepopulate_attributes(request):
         except ValueError:
             attributes["network.protocol.name"] = request.version
 
-    if getattr(request, "host", None) is not None:
+    if getattr(request, "host", None):
         try:
             address, port = request.host.split(":")
             attributes["server.address"] = address
@@ -254,9 +255,9 @@ def _prepopulate_attributes(request):
         except ValueError:
             attributes["server.address"] = request.host
 
-    try:
+    with capture_internal_exceptions():
         attributes["url.full"] = request.full_url()
-    except Exception:
-        pass
+
+    attributes.update(_request_headers_to_span_attributes(request.headers))
 
     return attributes

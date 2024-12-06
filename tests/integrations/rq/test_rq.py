@@ -227,13 +227,23 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(sentry_init):
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    queue.enqueue(do_trick, "Bodhi", trick="roll over")
+    queue.enqueue(
+        do_trick,
+        "Bodhi",
+        {"age": 5},
+        trick="roll over",
+        times=2,
+        followup=["fetch", "give paw"],
+    )
     worker.work(burst=True)
 
     sampling_context = traces_sampler.call_args_list[0][0][0]
     assert sampling_context["messaging.system"] == "rq"
-    assert sampling_context["rq.job.args"] == ["Bodhi"]
-    assert sampling_context["rq.job.kwargs"] == '{"trick": "roll over"}'
+    assert sampling_context["rq.job.args.0"] == "Bodhi"
+    assert sampling_context["rq.job.args.1"] == "{'age': 5}"
+    assert sampling_context["rq.job.kwargs.trick"] == "roll over"
+    assert sampling_context["rq.job.kwargs.times"] == "2"
+    assert sampling_context["rq.job.kwargs.followup"] == "['fetch', 'give paw']"
     assert sampling_context["rq.job.func"] == "do_trick"
     assert sampling_context["messaging.message.id"]
     assert sampling_context["messaging.destination.name"] == "default"

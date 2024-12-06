@@ -162,7 +162,7 @@ def patch_execute():
 
             sentry_headers = task.kwargs.pop("sentry_headers", {})
             with sentry_sdk.continue_trace(sentry_headers):
-                with sentry_sdk.start_transaction(
+                with sentry_sdk.start_span(
                     name=task.name,
                     op=OP.QUEUE_TASK_HUEY,
                     source=TRANSACTION_SOURCE_TASK,
