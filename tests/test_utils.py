@@ -12,6 +12,7 @@ from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    datetime_from_isoformat,
     env_to_bool,
     format_timestamp,
     get_current_thread_meta,
@@ -933,3 +934,52 @@ class NoStr:
 )
 def test_serialize_span_attribute(value, result):
     assert _serialize_span_attribute(value) == result
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_output"),
+    (
+        (
+            "2021-01-01T00:00:00.000000Z",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),  # UTC time
+        (
+            "2021-01-01T00:00:00.000000",
+            datetime(2021, 1, 1, tzinfo=datetime.now().astimezone().tzinfo),
+        ),  # No TZ -- assume UTC
+        (
+            "2021-01-01T00:00:00Z",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),  # UTC - No milliseconds
+        (
+            "2021-01-01T00:00:00.000000+00:00",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000-00:00",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000+0000",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000-0000",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2020-12-31T00:00:00.000000+02:00",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
+        ),  # UTC+2 time
+        (
+            "2020-12-31T00:00:00.000000-0200",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+        ),  # UTC-2 time
+        (
+            "2020-12-31T00:00:00-0200",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+        ),  # UTC-2 time - no milliseconds
+    ),
+)
+def test_datetime_from_isoformat(input_str, expected_output):
+    assert datetime_from_isoformat(input_str) == expected_output, input_str
