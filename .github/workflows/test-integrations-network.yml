@@ -42,18 +42,22 @@ jobs:
         run: |
           coverage erase
       - name: Test gevent latest
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest"
       - name: Test grpc latest
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc-latest"
       - name: Test httpx latest
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx-latest"
       - name: Test requests latest
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-requests-latest"
@@ -100,18 +104,22 @@ jobs:
         run: |
           coverage erase
       - name: Test gevent pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent"
       - name: Test grpc pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-grpc"
       - name: Test httpx pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-httpx"
       - name: Test requests pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-requests"

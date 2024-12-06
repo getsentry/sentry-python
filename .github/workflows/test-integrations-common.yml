@@ -42,6 +42,7 @@ jobs:
         run: |
           coverage erase
       - name: Test common pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-common"
