@@ -211,13 +211,13 @@ def setup_spotlight(options):
     if not isinstance(url, str):
         return None
 
-    if (
-        settings is not None
-        and settings.DEBUG
-        and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1"))
-        and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_MIDDLEWARE", "1"))
-    ):
-        with capture_internal_exceptions():
+    with capture_internal_exceptions():
+        if (
+            settings is not None
+            and settings.DEBUG
+            and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1"))
+            and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_MIDDLEWARE", "1"))
+        ):
             middleware = settings.MIDDLEWARE
             if DJANGO_SPOTLIGHT_MIDDLEWARE_PATH not in middleware:
                 settings.MIDDLEWARE = type(middleware)(
