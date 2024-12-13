@@ -66,7 +66,8 @@ try:
 
     SPOTLIGHT_JS_ENTRY_PATH = "/assets/main.js"
     SPOTLIGHT_JS_SNIPPET_PATTERN = (
-        '<script type="module" crossorigin src="{}"></script>'
+        '<script>window.__spotlight = {{ initOptions: {{ sidecarUrl: '{spotlight_url}', fullPage: false }} }};</script>\n'
+        '<script type="module" crossorigin src="{spotlight_js_url}"></script>\n'
     )
     SPOTLIGHT_ERROR_PAGE_SNIPPET = (
         '<html><base href="{spotlight_url}">\n'
@@ -113,7 +114,7 @@ try:
                     )
                     urllib.request.urlopen(req)
                     self._spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
-                        spotlight_js_url
+                        spotlight_url=self._spotlight_url, spotlight_js_url=spotlight_js_url
                     )
                 except urllib.error.URLError as err:
                     sentry_logger.debug(
