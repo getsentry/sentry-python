@@ -66,7 +66,7 @@ try:
 
     SPOTLIGHT_JS_ENTRY_PATH = "/assets/main.js"
     SPOTLIGHT_JS_SNIPPET_PATTERN = (
-        '<script>window.__spotlight = {{ initOptions: {{ sidecarUrl: '{spotlight_url}', fullPage: false }} }};</script>\n'
+        "<script>window.__spotlight = {{ initOptions: {{ sidecarUrl: '{spotlight_url}', fullPage: false }} }};</script>\n"
         '<script type="module" crossorigin src="{spotlight_js_url}"></script>\n'
     )
     SPOTLIGHT_ERROR_PAGE_SNIPPET = (
