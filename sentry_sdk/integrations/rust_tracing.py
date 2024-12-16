@@ -32,7 +32,7 @@ Each native extension requires its own integration.
 
 import json
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Tuple, Optional
+from typing import Any, Callable, Dict, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration

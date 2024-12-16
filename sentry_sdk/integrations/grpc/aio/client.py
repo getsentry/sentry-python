@@ -44,10 +44,12 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
         request: Message,
     ) -> Union[UnaryUnaryCall, Message]:
         method = client_call_details.method
+        if isinstance(method, bytes):
+            method = method.decode()
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            name="unary unary call to %s" % method.decode(),
+            name="unary unary call to %s" % method,
             origin=SPAN_ORIGIN,
             only_if_parent=True,
         ) as span:
@@ -75,10 +77,12 @@ class SentryUnaryStreamClientInterceptor(
         request: Message,
     ) -> Union[AsyncIterable[Any], UnaryStreamCall]:
         method = client_call_details.method
+        if isinstance(method, bytes):
+            method = method.decode()
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            name="unary stream call to %s" % method.decode(),
+            name="unary stream call to %s" % method,
             origin=SPAN_ORIGIN,
             only_if_parent=True,
         ) as span:
