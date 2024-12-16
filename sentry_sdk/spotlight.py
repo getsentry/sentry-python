@@ -66,7 +66,8 @@ try:
 
     SPOTLIGHT_JS_ENTRY_PATH = "/assets/main.js"
     SPOTLIGHT_JS_SNIPPET_PATTERN = (
-        '<script type="module" crossorigin src="{}"></script>'
+        "<script>window.__spotlight = {{ initOptions: {{ sidecarUrl: '{spotlight_url}', fullPage: false }} }};</script>\n"
+        '<script type="module" crossorigin src="{spotlight_js_url}"></script>\n'
     )
     SPOTLIGHT_ERROR_PAGE_SNIPPET = (
         '<html><base href="{spotlight_url}">\n'
@@ -113,7 +114,8 @@ try:
                     )
                     urllib.request.urlopen(req)
                     self._spotlight_script = SPOTLIGHT_JS_SNIPPET_PATTERN.format(
-                        spotlight_js_url
+                        spotlight_url=self._spotlight_url,
+                        spotlight_js_url=spotlight_js_url,
                     )
                 except urllib.error.URLError as err:
                     sentry_logger.debug(
@@ -210,13 +212,13 @@ def setup_spotlight(options):
     if not isinstance(url, str):
         return None
 
-    if (
-        settings is not None
-        and settings.DEBUG
-        and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1"))
-        and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_MIDDLEWARE", "1"))
-    ):
-        with capture_internal_exceptions():
+    with capture_internal_exceptions():
+        if (
+            settings is not None
+            and settings.DEBUG
+            and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_ON_ERROR", "1"))
+            and env_to_bool(os.environ.get("SENTRY_SPOTLIGHT_MIDDLEWARE", "1"))
+        ):
             middleware = settings.MIDDLEWARE
             if DJANGO_SPOTLIGHT_MIDDLEWARE_PATH not in middleware:
                 settings.MIDDLEWARE = type(middleware)(
