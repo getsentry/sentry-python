@@ -1,5 +1,7 @@
 import sys
 
+from opentelemetry.trace.status import StatusCode
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -116,7 +118,14 @@ def patch_run_job():
                 origin=ArqIntegration.origin,
             ) as span:
                 return_value = await old_run_job(self, job_id, score)
-                span.set_status(SPANSTATUS.OK)
+
+                status_unset = (
+                    hasattr(span._otel_span, "status")
+                    and span._otel_span.status.status_code == StatusCode.UNSET
+                )
+                if status_unset:
+                    span.set_status(SPANSTATUS.OK)
+
                 return return_value
 
     Worker.run_job = _sentry_run_job
