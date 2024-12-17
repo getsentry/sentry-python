@@ -1595,7 +1595,9 @@ class POTelSpan:
         if not hasattr(self._otel_span, "status"):
             return None
 
-        if self._otel_span.status.status_code == StatusCode.OK:
+        if self._otel_span.status.status_code == StatusCode.UNSET:
+            return None
+        elif self._otel_span.status.status_code == StatusCode.OK:
             return SPANSTATUS.OK
         else:
             return SPANSTATUS.UNKNOWN_ERROR
