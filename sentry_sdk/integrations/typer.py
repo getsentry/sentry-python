@@ -41,7 +41,7 @@ def _make_excepthook(old_excepthook):
         # type: (Type[BaseException], BaseException, Optional[TracebackType]) -> None
         integration = sentry_sdk.get_client().get_integration(TyperIntegration)
 
-        # Note: If  we replace this with ensure_integration_enabled then
+        # Note: If we replace this with ensure_integration_enabled then
         # we break the exceptiongroup backport;
         # See: https://github.com/getsentry/sentry-python/issues/3097
         if integration is None:
