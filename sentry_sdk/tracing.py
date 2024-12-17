@@ -1586,6 +1586,12 @@ class POTelSpan:
     @property
     def status(self):
         # type: () -> Optional[str]
+        """
+        Return the Sentry `SPANSTATUS` corresponding to the underlying OTel status.
+        Because differences in possible values in OTel `StatusCode` and
+        Sentry `SPANSTATUS` it can not be guaranteed that the status
+        set in `set_status()` will be the same as the one returned here.
+        """
         if not hasattr(self._otel_span, "status"):
             return None
 
