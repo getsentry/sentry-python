@@ -1583,6 +1583,22 @@ class POTelSpan:
 
         self._otel_span.set_attribute(key, _serialize_span_attribute(value))
 
+    @property
+    def status(self):
+        # type: () -> Optional[str]
+        if not hasattr(self._otel_span, "status"):
+            return None
+
+        if self._otel_span.status.status_code == StatusCode.OK:
+            return SPANSTATUS.OK
+        else:
+            return SPANSTATUS.UNKNOWN_ERROR
+
+    @status.setter
+    def status(self, value):
+        # type: (Optional[Any]) -> None
+        raise NotImplementedError("Use set_status instead")
+
     def set_status(self, status):
         # type: (str) -> None
         if status == SPANSTATUS.OK:

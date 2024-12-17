@@ -119,11 +119,7 @@ def patch_run_job():
             ) as span:
                 return_value = await old_run_job(self, job_id, score)
 
-                status_unset = (
-                    hasattr(span._otel_span, "status")
-                    and span._otel_span.status.status_code == StatusCode.UNSET
-                )
-                if status_unset:
+                if span.status is None:
                     span.set_status(SPANSTATUS.OK)
 
                 return return_value
