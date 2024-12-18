@@ -57,11 +57,11 @@ def test_scope_flags_copy():
 
     # New scope has the change. Old scope was not polluted by changes
     # to the new scope.
-    old_scope.flags.get() == [
+    assert old_scope.flags.get() == [
         {"flag": "a", "result": True},
         {"flag": "b", "result": True},
     ]
-    new_scope.flags.get() == [{"flag": "a", "result": False}]
+    assert new_scope.flags.get() == [{"flag": "a", "result": False}]
 
 
 def test_merging(sentry_init, capture_events):
