@@ -1,4 +1,5 @@
 import gc
+import sys
 from concurrent import futures
 from threading import Thread
 
@@ -124,6 +125,9 @@ def test_circular_references(sentry_init, request):
     assert unreachable_objects == 0
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 7), reason="Test requires Python 3.7 or higher"
+)
 def test_double_patching(sentry_init, capture_events):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
     events = capture_events()
