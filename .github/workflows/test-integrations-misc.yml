@@ -69,6 +69,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest"
+      - name: Test typer latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-typer-latest"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |
@@ -139,6 +143,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond"
+      - name: Test typer pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-typer"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |
