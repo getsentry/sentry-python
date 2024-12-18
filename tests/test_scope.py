@@ -44,24 +44,25 @@ def test_all_slots_copied():
 
 
 def test_scope_flags_copy():
-    # A scope exists and a flag is appended to it.
+    # Assert forking creates a deepcopy of the flag buffer. The new
+    # scope is free to mutate without consequence to the old scope. The
+    # old scope is free to mutate without consequence to the new scope.
     old_scope = Scope()
     old_scope.flags.set("a", True)
 
-    # Scope is forked; flag buffer is copied and contains the data of
-    # the parent. The flag is overwritten on the child. The parent
-    # scope can continue mutating without interfering with the child.
     new_scope = old_scope.fork()
     new_scope.flags.set("a", False)
     old_scope.flags.set("b", True)
+    new_scope.flags.set("c", True)
 
-    # New scope has the change. Old scope was not polluted by changes
-    # to the new scope.
     assert old_scope.flags.get() == [
         {"flag": "a", "result": True},
         {"flag": "b", "result": True},
     ]
-    assert new_scope.flags.get() == [{"flag": "a", "result": False}]
+    assert new_scope.flags.get() == [
+        {"flag": "a", "result": False},
+        {"flag": "c", "result": True},
+    ]
 
 
 def test_merging(sentry_init, capture_events):
