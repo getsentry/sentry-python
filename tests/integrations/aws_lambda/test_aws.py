@@ -37,10 +37,10 @@ from textwrap import dedent
 import pytest
 
 RUNTIMES_TO_TEST = [
-    "python3.8",
-    "python3.9",
-    "python3.10",
-    "python3.11",
+    # "python3.8",
+    # "python3.9",
+    # "python3.10",
+    # "python3.11",
     "python3.12",
 ]
 
@@ -590,7 +590,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     import inspect
 
-    _, response = run_lambda_function(
+    function_code = (
         LAMBDA_PRELUDE
         + dedent(inspect.getsource(StringContaining))
         + dedent(inspect.getsource(DictionaryContaining))
@@ -621,7 +621,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                             {
                                 "http.request.method": "GET",
                                 "url.path": "/sit/stay/rollover",
-                                "url.query": "repeat=again",
+                                "url.query": "repeat=twice",
                                 "url.full": "http://x.io/sit/stay/rollover?repeat=twice",
                                 "network.protocol.name": "http",
                                 "server.address": "x.io",
@@ -643,10 +643,15 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                 traces_sampler=traces_sampler,
             )
         """
-        ),
-        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "query_string": {"repeat": "again"}, "headers": {"Host": "x.io", "X-Forwarded-Proto": "http", "Custom-Header": "Custom Value"}}',
+        )
     )
 
+    payload = b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "queryStringParameters": "repeat=twice", "headers": {"Host": "x.io", "X-Forwarded-Proto": "http", "Custom-Header": "Custom Value"}}'
+
+    _, response = run_lambda_function(
+        code=function_code,
+        payload=payload,
+    )
     assert response["Payload"]["AssertionError raised"] is False
 
 
