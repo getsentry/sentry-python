@@ -1602,11 +1602,6 @@ class POTelSpan:
         else:
             return SPANSTATUS.UNKNOWN_ERROR
 
-    @status.setter
-    def status(self, value):
-        # type: (Optional[Any]) -> None
-        raise NotImplementedError("Use set_status instead")
-
     def set_status(self, status):
         # type: (str) -> None
         if status == SPANSTATUS.OK:
