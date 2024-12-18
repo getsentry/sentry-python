@@ -62,8 +62,6 @@ Agreement.
 
 """
 
-from copy import deepcopy
-
 SENTINEL = object()
 
 
@@ -90,13 +88,6 @@ class LRUCache:
         self.root[:] = [self.root, self.root, None, None]
 
         self.hits = self.misses = 0
-
-    def __copy__(self):
-        cache = LRUCache(self.max_size)
-        cache.full = self.full
-        cache.cache = deepcopy(self.cache)
-        cache.root = deepcopy(self.root)
-        return cache
 
     def set(self, key, value):
         link = self.cache.get(key, SENTINEL)
