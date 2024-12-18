@@ -14,7 +14,7 @@ from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessageChunk
 from langchain_core.outputs import ChatGenerationChunk
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.integrations.langchain import LangchainIntegration
 from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -163,7 +163,7 @@ def test_langchain_agent(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction():
+    with start_span():
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     tx = events[0]
@@ -237,7 +237,7 @@ def test_langchain_error(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction(), pytest.raises(Exception):
+    with start_span(), pytest.raises(Exception):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     error = events[0]
@@ -332,7 +332,7 @@ def test_span_origin(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction():
+    with start_span():
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     (event,) = events
