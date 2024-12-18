@@ -8,6 +8,25 @@ from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import Dsn
 
 
+def test_span_trimming(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, _experiments={"max_spans": 3})
+    events = capture_events()
+
+    with start_span(name="hi"):
+        for i in range(10):
+            with start_span(op="foo{}".format(i)):
+                pass
+
+    (event,) = events
+
+    assert len(event["spans"]) == 3
+
+    span1, span2, span3 = event["spans"]
+    assert span1["op"] == "foo0"
+    assert span2["op"] == "foo1"
+    assert span3["op"] == "foo2"
+
+
 def test_transaction_naming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
