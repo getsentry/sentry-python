@@ -62,7 +62,7 @@ Agreement.
 
 """
 
-from copy import copy, deepcopy
+from copy import deepcopy
 
 SENTINEL = object()
 
@@ -94,7 +94,7 @@ class LRUCache:
     def __copy__(self):
         cache = LRUCache(self.max_size)
         cache.full = self.full
-        cache.cache = copy(self.cache)
+        cache.cache = deepcopy(self.cache)
         cache.root = deepcopy(self.root)
         return cache
 

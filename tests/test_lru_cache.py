@@ -76,3 +76,12 @@ def test_cache_copy():
     cache.get(1)
     assert copied.get_all() == [(1, 1), (2, 2), (3, 3)]
     assert cache.get_all() == [(2, 2), (3, 3), (1, 1)]
+
+
+def test_cache_no_overwrites_to_parent():
+    cache1 = LRUCache(max_size=2)
+    cache1.set(1, True)
+    cache2 = cache1.__copy__()
+    cache2.set(1, False)
+    assert cache1.get(1) is True
+    assert cache2.get(1) is False
