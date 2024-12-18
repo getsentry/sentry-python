@@ -32,7 +32,7 @@ class TyperIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        typer.main.except_hook = _make_excepthook(typer.main.except_hook)
+        typer.main.except_hook = _make_excepthook(typer.main.except_hook)  # type: ignore
 
 
 def _make_excepthook(old_excepthook):
