@@ -6,9 +6,9 @@ from sentry_sdk.integrations import Integration
 
 class FeatureFlagsIntegration(Integration):
     """
-    Sentry integration for buffering feature flags manually with an API and capturing them on
-    error events. We recommend you do this on each flag evaluation. Flags are buffered per Sentry
-    scope.
+    Sentry integration for capturing feature flags on error events. To manually buffer flag data,
+    call `integrations.featureflags.add_feature_flag`. We recommend you do this on each flag
+    evaluation.
 
     See the [feature flag documentation](https://develop.sentry.dev/sdk/expected-features/#feature-flags)
     for more information.
@@ -37,8 +37,8 @@ class FeatureFlagsIntegration(Integration):
 def add_feature_flag(flag, result):
     # type: (str, bool) -> None
     """
-    Records a flag and its value to be sent on subsequent error events. We recommend you do this
-    on flag evaluations. Flags are buffered per Sentry scope and limited to 100 per event.
+    Records a flag and its value to be sent on subsequent error events by FeatureFlagsIntegration.
+    We recommend you do this on flag evaluations. Flags are buffered per Sentry scope.
     """
     flags = sentry_sdk.get_current_scope().flags
     flags.set(flag, result)
