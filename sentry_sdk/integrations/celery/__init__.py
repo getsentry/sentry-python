@@ -4,7 +4,6 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk import isolation_scope
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
@@ -310,38 +309,21 @@ def _wrap_tracer(task, f):
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            transaction = None
-
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
-            with capture_internal_exceptions():
-                headers = args[3].get("headers") or {}
-                transaction = continue_trace(
-                    headers,
+            headers = args[3].get("headers") or {}
+            with sentry_sdk.continue_trace(headers):
+                with sentry_sdk.start_transaction(
                     op=OP.QUEUE_TASK_CELERY,
-                    name="unknown celery task",
+                    name=task.name,
                     source=TRANSACTION_SOURCE_TASK,
                     origin=CeleryIntegration.origin,
-                )
-                transaction.name = task.name
-                transaction.set_status(SPANSTATUS.OK)
-
-            if transaction is None:
-                return f(*args, **kwargs)
-
-            with sentry_sdk.start_transaction(
-                transaction,
-                custom_sampling_context={
-                    "celery_job": {
-                        "task": task.name,
-                        # for some reason, args[1] is a list if non-empty but a
-                        # tuple if empty
-                        "args": list(args[1]),
-                        "kwargs": args[2],
-                    }
-                },
-            ):
-                return f(*args, **kwargs)
+                    # for some reason, args[1] is a list if non-empty but a
+                    # tuple if empty
+                    attributes=_prepopulate_attributes(task, list(args[1]), args[2]),
+                ) as transaction:
+                    transaction.set_status(SPANSTATUS.OK)
+                    return f(*args, **kwargs)
 
     return _inner  # type: ignore
 
@@ -507,6 +489,7 @@ def _patch_producer_publish():
             op=OP.QUEUE_PUBLISH,
             name=task_name,
             origin=CeleryIntegration.origin,
+            only_if_parent=True,
         ) as span:
             if task_id is not None:
                 span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
@@ -527,3 +510,20 @@ def _patch_producer_publish():
             return original_publish(self, *args, **kwargs)
 
     Producer.publish = sentry_publish
+
+
+def _prepopulate_attributes(task, args, kwargs):
+    # type: (Any, *Any, **Any) -> dict[str, str]
+    attributes = {
+        "celery.job.task": task.name,
+    }
+
+    for i, arg in enumerate(args):
+        with capture_internal_exceptions():
+            attributes[f"celery.job.args.{i}"] = str(arg)
+
+    for kwarg, value in kwargs.items():
+        with capture_internal_exceptions():
+            attributes[f"celery.job.kwargs.{kwarg}"] = str(value)
+
+    return attributes

@@ -151,6 +151,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         op=OP.ANTHROPIC_MESSAGES_CREATE,
         description="Anthropic messages create",
         origin=AnthropicIntegration.origin,
+        only_if_parent=True,
     )
     span.__enter__()
 

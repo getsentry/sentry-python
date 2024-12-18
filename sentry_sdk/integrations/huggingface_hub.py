@@ -77,6 +77,7 @@ def _wrap_text_generation(f):
             op=consts.OP.HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE,
             name="Text Generation",
             origin=HuggingfaceHubIntegration.origin,
+            only_if_parent=True,
         )
         span.__enter__()
         try:

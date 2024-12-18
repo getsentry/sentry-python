@@ -1,10 +1,9 @@
-from contextlib import contextmanager
 import json
 from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, logger
+from sentry_sdk.utils import AnnotatedValue, logger, SENSITIVE_DATA_SUBSTITUTE
 
 try:
     from django.http.request import RawPostDataException
@@ -16,7 +15,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
-    from typing import Iterator
     from typing import Mapping
     from typing import MutableMapping
     from typing import Optional
@@ -50,13 +48,6 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "PUT",
     "TRACE",
 )
-
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext():
-    # type: () -> Iterator[None]
-    yield
 
 
 def request_body_within_bounds(client, content_length):
@@ -228,6 +219,20 @@ def _filter_headers(headers):
         )
         for k, v in headers.items()
     }
+
+
+def _request_headers_to_span_attributes(headers):
+    # type: (dict[str, str]) -> dict[str, str]
+    attributes = {}
+
+    headers = _filter_headers(headers)
+
+    for header, value in headers.items():
+        if isinstance(value, AnnotatedValue):
+            value = SENSITIVE_DATA_SUBSTITUTE
+        attributes[f"http.request.header.{header.lower()}"] = value
+
+    return attributes
 
 
 def _in_http_status_code_range(code, code_ranges):

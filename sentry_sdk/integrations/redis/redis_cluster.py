@@ -9,7 +9,7 @@ from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
 )
-from sentry_sdk.integrations.redis.modules.queries import _set_db_data_on_span
+from sentry_sdk.integrations.redis.modules.queries import _get_connection_data
 from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 
 from sentry_sdk.utils import capture_internal_exceptions
@@ -23,29 +23,29 @@ if TYPE_CHECKING:
         RedisCluster as AsyncRedisCluster,
         ClusterPipeline as AsyncClusterPipeline,
     )
-    from sentry_sdk.tracing import Span
 
 
-def _set_async_cluster_db_data(span, async_redis_cluster_instance):
-    # type: (Span, AsyncRedisCluster[Any]) -> None
+def _get_async_cluster_db_data(async_redis_cluster_instance):
+    # type: (AsyncRedisCluster[Any]) -> dict[str, Any]
     default_node = async_redis_cluster_instance.get_default_node()
     if default_node is not None and default_node.connection_kwargs is not None:
-        _set_db_data_on_span(span, default_node.connection_kwargs)
+        return _get_connection_data(default_node.connection_kwargs)
+    else:
+        return {}
 
 
-def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
-    # type: (Span, AsyncClusterPipeline[Any]) -> None
+def _get_async_cluster_pipeline_db_data(async_redis_cluster_pipeline_instance):
+    # type: (AsyncClusterPipeline[Any]) -> dict[str, Any]
     with capture_internal_exceptions():
-        _set_async_cluster_db_data(
-            span,
+        return _get_async_cluster_db_data(
             # the AsyncClusterPipeline has always had a `_client` attr but it is private so potentially problematic and mypy
             # does not recognize it - see https://github.com/redis/redis-py/blame/v5.0.0/redis/asyncio/cluster.py#L1386
             async_redis_cluster_pipeline_instance._client,  # type: ignore[attr-defined]
         )
 
 
-def _set_cluster_db_data(span, redis_cluster_instance):
-    # type: (Span, RedisCluster[Any]) -> None
+def _get_cluster_db_data(redis_cluster_instance):
+    # type: (RedisCluster[Any]) -> dict[str, Any]
     default_node = redis_cluster_instance.get_default_node()
 
     if default_node is not None:
@@ -53,7 +53,9 @@ def _set_cluster_db_data(span, redis_cluster_instance):
             "host": default_node.host,
             "port": default_node.port,
         }
-        _set_db_data_on_span(span, connection_params)
+        return _get_connection_data(connection_params)
+    else:
+        return {}
 
 
 def _patch_redis_cluster():
@@ -67,13 +69,13 @@ def _patch_redis_cluster():
         patch_redis_client(
             RedisCluster,
             is_cluster=True,
-            set_db_data_fn=_set_cluster_db_data,
+            get_db_data_fn=_get_cluster_db_data,
         )
         patch_redis_pipeline(
             cluster.ClusterPipeline,
             is_cluster=True,
             get_command_args_fn=_parse_rediscluster_command,
-            set_db_data_fn=_set_cluster_db_data,
+            get_db_data_fn=_get_cluster_db_data,
         )
 
     try:
@@ -89,11 +91,11 @@ def _patch_redis_cluster():
         patch_redis_async_client(
             async_cluster.RedisCluster,
             is_cluster=True,
-            set_db_data_fn=_set_async_cluster_db_data,
+            get_db_data_fn=_get_async_cluster_db_data,
         )
         patch_redis_async_pipeline(
             async_cluster.ClusterPipeline,
             is_cluster=True,
             get_command_args_fn=_parse_rediscluster_command,
-            set_db_data_fn=_set_async_cluster_pipeline_db_data,
+            get_db_data_fn=_get_async_cluster_pipeline_db_data,
         )
