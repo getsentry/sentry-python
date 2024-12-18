@@ -43,6 +43,22 @@ def test_all_slots_copied():
         assert getattr(scope_copy, attr) == getattr(scope, attr)
 
 
+def test_scope_flags_copy():
+    # A scope exists and a flag is appended to it.
+    old_scope = Scope()
+    old_scope.flags.set("a", True)
+
+    # Scope is forked; flag buffer is copied and contains the data of
+    # the parent. The flag is overwritten.
+    new_scope = old_scope.fork()
+    new_scope.flags.set("a", False)
+
+    # New scope has the change. Old scope was not polluted by changes
+    # to the new scope.
+    old_scope.flags.get() == [{"flag": "a", "result": True}]
+    new_scope.flags.get() == [{"flag": "a", "result": False}]
+
+
 def test_merging(sentry_init, capture_events):
     sentry_init()
 
