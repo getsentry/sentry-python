@@ -120,6 +120,9 @@ def _wrap_handler(handler):
         configured_time = aws_context.get_remaining_time_in_millis()
 
         with sentry_sdk.isolation_scope() as scope:
+            scope.set_transaction_name(
+                aws_context.function_name, source=TRANSACTION_SOURCE_COMPONENT
+            )
             timeout_thread = None
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
@@ -160,7 +163,7 @@ def _wrap_handler(handler):
                 headers = {}
 
             with sentry_sdk.continue_trace(headers):
-                with sentry_sdk.start_transaction(
+                with sentry_sdk.start_span(
                     op=OP.FUNCTION_AWS,
                     name=aws_context.function_name,
                     source=TRANSACTION_SOURCE_COMPONENT,
