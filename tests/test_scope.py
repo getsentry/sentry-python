@@ -49,13 +49,18 @@ def test_scope_flags_copy():
     old_scope.flags.set("a", True)
 
     # Scope is forked; flag buffer is copied and contains the data of
-    # the parent. The flag is overwritten.
+    # the parent. The flag is overwritten on the child. The parent
+    # scope can continue mutating without interfering with the child.
     new_scope = old_scope.fork()
     new_scope.flags.set("a", False)
+    old_scope.flags.set("b", True)
 
     # New scope has the change. Old scope was not polluted by changes
     # to the new scope.
-    old_scope.flags.get() == [{"flag": "a", "result": True}]
+    old_scope.flags.get() == [
+        {"flag": "a", "result": True},
+        {"flag": "b", "result": True},
+    ]
     new_scope.flags.get() == [{"flag": "a", "result": False}]
 
 
