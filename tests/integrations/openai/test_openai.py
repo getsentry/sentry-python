@@ -83,8 +83,8 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]["content"]
-        assert "the model response" in span["data"]["ai.responses"]["content"]
+        assert '"content": "hello"' in span["data"]["ai.input_messages"]
+        assert '"content": "the model response"' in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
@@ -125,8 +125,8 @@ async def test_nonstreaming_chat_completion_async(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]["content"]
-        assert "the model response" in span["data"]["ai.responses"]["content"]
+        assert '"content": "hello"' in span["data"]["ai.input_messages"]
+        assert '"content": "the model response"' in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
@@ -218,7 +218,7 @@ def test_streaming_chat_completion(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]["content"]
+        assert '"content": "hello"' in span["data"]["ai.input_messages"]
         assert "hello world" in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
@@ -314,7 +314,7 @@ async def test_streaming_chat_completion_async(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]["content"]
+        assert '"content": "hello"' in span["data"]["ai.input_messages"]
         assert "hello world" in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
@@ -330,6 +330,7 @@ async def test_streaming_chat_completion_async(
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
+@pytest.mark.forked
 def test_bad_chat_completion(sentry_init, capture_events):
     sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -460,6 +461,7 @@ async def test_embeddings_create_async(
     assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
@@ -487,6 +489,7 @@ def test_embeddings_create_raises_error(
     assert event["level"] == "error"
 
 
+@pytest.mark.forked
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
