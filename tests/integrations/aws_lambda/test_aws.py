@@ -646,7 +646,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         )
     )
 
-    payload = b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "queryStringParameters": "repeat=twice", "headers": {"Host": "x.io", "X-Forwarded-Proto": "http", "Custom-Header": "Custom Value"}}'
+    payload = b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "queryStringParameters": {"repeat": "twice"}, "headers": {"Host": "x.io", "X-Forwarded-Proto": "http", "Custom-Header": "Custom Value"}}'
 
     _, response = run_lambda_function(
         code=function_code,
