@@ -376,7 +376,9 @@ def _get_url(aws_event, aws_context):
     path = aws_event.get("path", None)
 
     headers = aws_event.get("headers")
-    if headers is None:
+    # Some AWS Services (ie. EventBridge) set headers as a list
+    # or None, so we must ensure it is a dict
+    if not isinstance(headers, dict):
         headers = {}
 
     host = headers.get("Host", None)
