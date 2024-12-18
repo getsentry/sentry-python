@@ -62,7 +62,7 @@ Agreement.
 
 """
 
-from copy import copy, deepcopy
+from typing import cast, Any
 
 SENTINEL = object()
 
@@ -95,7 +95,7 @@ class LRUCache:
         # walk around the circle and fill the new root / cache
         cache = {}
         node_old = root_old = self.root
-        node_new = root_new = [None] * 4
+        node_new = root_new = [cast(Any, None)] * 4
         while (node_old := node_old[NEXT]) is not root_old:
             _, _, key, val = node_old
             cache[node_old[KEY]] = node_new[NEXT] = [node_new, None, key, val]
