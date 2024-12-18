@@ -92,11 +92,24 @@ class LRUCache:
         self.hits = self.misses = 0
 
     def __copy__(self):
-        cache = LRUCache(self.max_size)
-        cache.full = self.full
-        cache.cache = copy(self.cache)
-        cache.root = deepcopy(self.root)
-        return cache
+        # walk around the circle and fill the new root / cache
+        cache = {}
+        node_old = root_old = self.root
+        node_new = root_new = [None] * 4
+        while (node_old := node_old[NEXT]) is not root_old:
+            _, _, key, val = node_old
+            cache[node_old[KEY]] = node_new[NEXT] = [node_new, None, key, val]
+            node_new = node_new[NEXT]
+
+        # close the circle
+        node_new[NEXT] = root_new
+        root_new[PREV] = node_new
+
+        lru_cache = LRUCache(self.max_size)
+        lru_cache.full = self.full
+        lru_cache.cache = cache
+        lru_cache.root = root_new
+        return lru_cache
 
     def set(self, key, value):
         link = self.cache.get(key, SENTINEL)
