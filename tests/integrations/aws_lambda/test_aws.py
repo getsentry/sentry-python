@@ -287,7 +287,8 @@ def test_request_data(run_lambda_function):
             "X-Forwarded-Proto": "https"
           },
           "queryStringParameters": {
-            "bonkers": "true"
+            "bonkers": "true",
+            "wild": "false"
           },
           "pathParameters": null,
           "stageVariables": null,
@@ -312,7 +313,7 @@ def test_request_data(run_lambda_function):
             "X-Forwarded-Proto": "https",
         },
         "method": "GET",
-        "query_string": {"bonkers": "true"},
+        "query_string": "bonkers=true&wild=false",
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
     }
 
