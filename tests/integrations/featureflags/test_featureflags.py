@@ -7,6 +7,9 @@ from sentry_sdk.integrations.featureflags import (
     add_feature_flag,
 )
 
+import pytest
+import sys
+
 
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
     uninstall_integration(FeatureFlagsIntegration.identifier)
@@ -78,6 +81,9 @@ def test_featureflags_integration_threaded(
     }
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 7), reason="Test requires Python 3.7 or higher"
+)
 def test_featureflags_integration_asyncio(
     sentry_init, capture_events, uninstall_integration
 ):
