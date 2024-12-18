@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.8","3.12","3.13"]
+        python-version: ["3.6","3.7","3.8","3.12","3.13"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -73,6 +73,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest"
+      - name: Test typer latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-typer-latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -153,6 +157,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond"
+      - name: Test typer pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-typer"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
