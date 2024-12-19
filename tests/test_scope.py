@@ -19,10 +19,6 @@ from sentry_sdk.scope import (
 )
 
 
-SLOTS_NOT_COPIED = {"client"}
-"""__slots__ that are not copied when copying a Scope object."""
-
-
 def test_copying():
     s1 = Scope()
     s1.fingerprint = {}
@@ -43,7 +39,7 @@ def test_all_slots_copied():
     scope_copy = copy.copy(scope)
 
     # Check all attributes are copied
-    for attr in set(Scope.__slots__) - SLOTS_NOT_COPIED:
+    for attr in set(Scope.__slots__):
         assert getattr(scope_copy, attr) == getattr(scope, attr)
 
 
@@ -809,6 +805,24 @@ def test_should_send_default_pii_false(sentry_init):
     sentry_init(send_default_pii=False)
 
     assert should_send_default_pii() is False
+
+
+def test_should_send_default_pii_default_false(sentry_init):
+    sentry_init()
+
+    assert should_send_default_pii() is False
+
+
+def test_should_send_default_pii_false_with_dsn_and_spotlight(sentry_init):
+    sentry_init(dsn="http://key@localhost/1", spotlight=True)
+
+    assert should_send_default_pii() is False
+
+
+def test_should_send_default_pii_true_without_dsn_and_spotlight(sentry_init):
+    sentry_init(spotlight=True)
+
+    assert should_send_default_pii() is True
 
 
 def test_set_tags():

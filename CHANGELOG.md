@@ -1,5 +1,85 @@
 # Changelog
 
+## 2.19.2
+
+### Various fixes & improvements
+
+- Deepcopy and ensure get_all function always terminates (#3861) by @cmanallen
+- Cleanup chalice test environment (#3858) by @antonpirker
+
+## 2.19.1
+
+### Various fixes & improvements
+
+- Fix errors when instrumenting Django cache (#3855) by @BYK
+- Copy `scope.client` reference as well (#3857) by @sl0thentr0py
+- Don't give up on Spotlight on 3 errors (#3856) by @BYK
+- Add missing stack frames (#3673) by @antonpirker
+- Fix wrong metadata type in async gRPC interceptor (#3205) by @fdellekart
+- Rename launch darkly hook to match JS SDK (#3743) by @aliu39
+- Script for checking if our instrumented libs are Python 3.13 compatible (#3425) by @antonpirker
+- Improve Ray tests (#3846) by @antonpirker
+- Test with Celery `5.5.0rc3` (#3842) by @sentrivana
+- Fix asyncio testing setup (#3832) by @sl0thentr0py
+- Bump `codecov/codecov-action` from `5.0.2` to `5.0.7` (#3821) by @dependabot
+- Fix CI (#3834) by @sentrivana
+- Use new ClickHouse GH action (#3826) by @antonpirker
+
+## 2.19.0
+
+### Various fixes & improvements
+
+- New: introduce `rust_tracing` integration. See https://docs.sentry.io/platforms/python/integrations/rust_tracing/ (#3717) by @matt-codecov
+- Auto enable Litestar integration (#3540) by @provinzkraut
+- Deprecate `sentry_sdk.init` context manager (#3729) by @szokeasaurusrex
+- feat(spotlight): Send PII to Spotlight when no DSN is set (#3804) by @BYK
+- feat(spotlight): Add info logs when Sentry is enabled (#3735) by @BYK
+- feat(spotlight): Inject Spotlight button on Django (#3751) by @BYK
+- feat(spotlight): Auto enable cache_spans for Spotlight on DEBUG (#3791) by @BYK
+- fix(logging): Handle parameter `stack_info` for the `LoggingIntegration` (#3745) by @gmcrocetti
+- fix(pure-eval): Make sentry-sdk[pure-eval] installable with pip==24.0 (#3757) by @sentrivana
+- fix(rust_tracing): include_tracing_fields arg to control unvetted data in rust_tracing integration (#3780) by @matt-codecov
+- fix(aws) Fix aws lambda tests (by reducing event size) (#3770) by @antonpirker
+- fix(arq): fix integration with Worker settings as a dict (#3742) by @saber-solooki
+- fix(httpx): Prevent Sentry baggage duplication (#3728) by @szokeasaurusrex
+- fix(falcon): Don't exhaust request body stream (#3768) by @szokeasaurusrex
+- fix(integrations): Check `retries_left` before capturing exception (#3803) by @malkovro
+- fix(openai): Use name instead of description (#3807) by @sourceful-rob
+- test(gcp): Only run GCP tests when they should (#3721) by @szokeasaurusrex
+- chore: Shorten CI workflow names (#3805) by @sentrivana
+- chore: Test with pyspark prerelease (#3760) by @sentrivana
+- build(deps): bump codecov/codecov-action from 4.6.0 to 5.0.2 (#3792) by @dependabot
+- build(deps): bump actions/checkout from 4.2.1 to 4.2.2 (#3691) by @dependabot
+
+## 2.18.0
+
+### Various fixes & improvements
+
+- Add LaunchDarkly and OpenFeature integration (#3648) by @cmanallen
+- Correct typo in a comment (#3726) by @szokeasaurusrex
+- End `http.client` span on timeout (#3723) by @Zylphrex
+- Check for `h2` existence in HTTP/2 transport (#3690) by @BYK
+- Use `type()` instead when extracting frames (#3716) by @Zylphrex
+- Prefer `python_multipart` import over `multipart` (#3710) by @musicinmybrain
+- Update active thread for asgi (#3669) by @Zylphrex
+- Only enable HTTP2 when DSN is HTTPS (#3678) by @BYK
+- Prepare for upstream Strawberry extension removal (#3649) by @DoctorJohn
+- Enhance README with improved clarity and developer-friendly examples (#3667) by @UTSAVS26
+- Run license compliance action on all PRs (#3699) by @szokeasaurusrex
+- Run CodeQL action on all PRs (#3698) by @szokeasaurusrex
+- Fix UTC assuming test (#3722) by @BYK
+- Exclude fakeredis 2.26.0 on py3.6 and 3.7 (#3695) by @szokeasaurusrex
+- Unpin `pytest` for `tornado-latest` tests (#3714) by @szokeasaurusrex
+- Install `pytest-asyncio` for `redis` tests (Python 3.12-13) (#3706) by @szokeasaurusrex
+- Clarify that only pinned tests are required (#3713) by @szokeasaurusrex
+- Remove accidentally-committed print (#3712) by @szokeasaurusrex
+- Disable broken RQ test in newly-released RQ 2.0 (#3708) by @szokeasaurusrex
+- Unpin `pytest` for `celery` tests (#3701) by @szokeasaurusrex
+- Unpin `pytest` on Python 3.8+ `gevent` tests (#3700) by @szokeasaurusrex
+- Unpin `pytest` for Python 3.8+ `common` tests (#3697) by @szokeasaurusrex
+- Remove `pytest` pin in `requirements-devenv.txt` (#3696) by @szokeasaurusrex
+- Test with Falcon 4.0 (#3684) by @sentrivana
+
 ## 2.17.0
 
 ### Various fixes & improvements
