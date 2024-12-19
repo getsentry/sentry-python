@@ -1,5 +1,4 @@
 import pytest
-
 from copy import deepcopy
 
 from sentry_sdk._lru_cache import LRUCache
