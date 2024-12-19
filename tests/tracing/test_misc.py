@@ -36,11 +36,6 @@ def test_transaction_naming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    # only transactions have names - spans don't
-    with pytest.raises(TypeError):
-        start_span(name="foo")
-    assert len(events) == 0
-
     # default name in event if no name is passed
     with start_transaction() as transaction:
         pass

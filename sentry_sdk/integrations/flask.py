@@ -1,7 +1,9 @@
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations._wsgi_common import (
+    DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    RequestExtractor,
+)
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
@@ -11,6 +13,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
@@ -51,14 +55,19 @@ class FlaskIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="endpoint"):
-        # type: (str) -> None
+    def __init__(
+        self,
+        transaction_style="endpoint",  # type: str
+        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
+    ):
+        # type: (...) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
     @staticmethod
     def setup_once():
@@ -82,9 +91,16 @@ class FlaskIntegration(Integration):
             if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
+            integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),
                 span_origin=FlaskIntegration.origin,
+                http_methods_to_capture=(
+                    integration.http_methods_to_capture
+                    if integration
+                    else DEFAULT_HTTP_METHODS_TO_CAPTURE
+                ),
             )
             return middleware(environ, start_response)
 
@@ -117,10 +133,12 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-@ensure_integration_enabled(FlaskIntegration)
 def _request_started(app, **kwargs):
     # type: (Flask, **Any) -> None
     integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+    if integration is None:
+        return
+
     request = flask_request._get_current_object()
 
     # Set the transaction name and source here,

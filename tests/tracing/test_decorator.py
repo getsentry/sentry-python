@@ -26,7 +26,7 @@ def test_trace_decorator():
 
         result2 = start_child_span_decorator(my_example_function)()
         fake_start_child.assert_called_once_with(
-            op="function", description="test_decorator.my_example_function"
+            op="function", name="test_decorator.my_example_function"
         )
         assert result2 == "return_of_sync_function"
 
@@ -58,7 +58,7 @@ async def test_trace_decorator_async():
         result2 = await start_child_span_decorator(my_async_example_function)()
         fake_start_child.assert_called_once_with(
             op="function",
-            description="test_decorator.my_async_example_function",
+            name="test_decorator.my_async_example_function",
         )
         assert result2 == "return_of_async_function"
 

@@ -55,7 +55,7 @@ def _patch_create_connection():
 
         with sentry_sdk.start_span(
             op=OP.SOCKET_CONNECTION,
-            description=_get_span_description(address[0], address[1]),
+            name=_get_span_description(address[0], address[1]),
             origin=SocketIntegration.origin,
         ) as span:
             span.set_data("address", address)
@@ -81,7 +81,7 @@ def _patch_getaddrinfo():
 
         with sentry_sdk.start_span(
             op=OP.SOCKET_DNS,
-            description=_get_span_description(host, port),
+            name=_get_span_description(host, port),
             origin=SocketIntegration.origin,
         ) as span:
             span.set_data("host", host)

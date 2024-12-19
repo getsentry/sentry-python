@@ -21,9 +21,11 @@ from sentry_sdk.utils import (
     to_string,
     is_sentry_url,
     _is_external_source,
+    _is_in_project_root,
     _module_in_list,
 )
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -144,7 +146,7 @@ def record_sql_queries(
 
     with sentry_sdk.start_span(
         op=OP.DB,
-        description=query,
+        name=query,
         origin=span_origin,
     ) as span:
         for k, v in data.items():
@@ -168,6 +170,34 @@ def maybe_create_breadcrumbs_from_span(scope, span):
             message=span.description,
             data=span._data,
         )
+
+
+def _get_frame_module_abs_path(frame):
+    # type: (FrameType) -> Optional[str]
+    try:
+        return frame.f_code.co_filename
+    except Exception:
+        return None
+
+
+def _should_be_included(
+    is_sentry_sdk_frame,  # type: bool
+    namespace,  # type: Optional[str]
+    in_app_include,  # type: Optional[list[str]]
+    in_app_exclude,  # type: Optional[list[str]]
+    abs_path,  # type: Optional[str]
+    project_root,  # type: Optional[str]
+):
+    # type: (...) -> bool
+    # in_app_include takes precedence over in_app_exclude
+    should_be_included = _module_in_list(namespace, in_app_include)
+    should_be_excluded = _is_external_source(abs_path) or _module_in_list(
+        namespace, in_app_exclude
+    )
+    return not is_sentry_sdk_frame and (
+        should_be_included
+        or (_is_in_project_root(abs_path, project_root) and not should_be_excluded)
+    )
 
 
 def add_query_source(span):
@@ -200,10 +230,7 @@ def add_query_source(span):
     # Find the correct frame
     frame = sys._getframe()  # type: Union[FrameType, None]
     while frame is not None:
-        try:
-            abs_path = frame.f_code.co_filename
-        except Exception:
-            abs_path = ""
+        abs_path = _get_frame_module_abs_path(frame)
 
         try:
             namespace = frame.f_globals.get("__name__")  # type: Optional[str]
@@ -214,20 +241,15 @@ def add_query_source(span):
             "sentry_sdk."
         )
 
-        should_be_included = not _is_external_source(abs_path)
-        if namespace is not None:
-            if in_app_exclude and _module_in_list(namespace, in_app_exclude):
-                should_be_included = False
-            if in_app_include and _module_in_list(namespace, in_app_include):
-                # in_app_include takes precedence over in_app_exclude, so doing it
-                # at the end
-                should_be_included = True
-
-        if (
-            abs_path.startswith(project_root)
-            and should_be_included
-            and not is_sentry_sdk_frame
-        ):
+        should_be_included = _should_be_included(
+            is_sentry_sdk_frame=is_sentry_sdk_frame,
+            namespace=namespace,
+            in_app_include=in_app_include,
+            in_app_exclude=in_app_exclude,
+            abs_path=abs_path,
+            project_root=project_root,
+        )
+        if should_be_included:
             break
 
         frame = frame.f_back
@@ -250,10 +272,7 @@ def add_query_source(span):
         if namespace is not None:
             span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
 
-        try:
-            filepath = frame.f_code.co_filename
-        except Exception:
-            filepath = None
+        filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
             if namespace is not None:
                 in_app_path = filename_for_module(namespace, filepath)
@@ -513,7 +532,7 @@ class Baggage:
             sentry_items["public_key"] = Dsn(options["dsn"]).public_key
 
         if options.get("traces_sample_rate"):
-            sentry_items["sample_rate"] = options["traces_sample_rate"]
+            sentry_items["sample_rate"] = str(options["traces_sample_rate"])
 
         return Baggage(sentry_items, third_party_items, mutable)
 
@@ -590,6 +609,21 @@ class Baggage:
 
         return ",".join(items)
 
+    @staticmethod
+    def strip_sentry_baggage(header):
+        # type: (str) -> str
+        """Remove Sentry baggage from the given header.
+
+        Given a Baggage header, return a new Baggage header with all Sentry baggage items removed.
+        """
+        return ",".join(
+            (
+                item
+                for item in header.split(",")
+                if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
+            )
+        )
+
 
 def should_propagate_trace(client, url):
     # type: (sentry_sdk.client.BaseClient, str) -> bool
@@ -646,7 +680,7 @@ def start_child_span_decorator(func):
 
             with span.start_child(
                 op=OP.FUNCTION,
-                description=qualname_from_function(func),
+                name=qualname_from_function(func),
             ):
                 return await func(*args, **kwargs)
 
@@ -674,7 +708,7 @@ def start_child_span_decorator(func):
 
             with span.start_child(
                 op=OP.FUNCTION,
-                description=qualname_from_function(func),
+                name=qualname_from_function(func),
             ):
                 return func(*args, **kwargs)
 

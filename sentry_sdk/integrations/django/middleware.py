@@ -7,13 +7,14 @@ from functools import wraps
 from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
     ContextVar,
     transaction_from_function,
     capture_internal_exceptions,
 )
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -29,7 +30,9 @@ _import_string_should_wrap_middleware = ContextVar(
     "import_string_should_wrap_middleware"
 )
 
-if DJANGO_VERSION < (3, 1):
+DJANGO_SUPPORTS_ASYNC_MIDDLEWARE = DJANGO_VERSION >= (3, 1)
+
+if not DJANGO_SUPPORTS_ASYNC_MIDDLEWARE:
     _asgi_middleware_mixin_factory = lambda _: object
 else:
     from .asgi import _asgi_middleware_mixin_factory
@@ -84,7 +87,7 @@ def _wrap_middleware(middleware, middleware_name):
 
         middleware_span = sentry_sdk.start_span(
             op=OP.MIDDLEWARE_DJANGO,
-            description=description,
+            name=description,
             origin=DjangoIntegration.origin,
         )
         middleware_span.set_tag("django.function_name", function_name)
@@ -122,7 +125,10 @@ def _wrap_middleware(middleware, middleware_name):
     class SentryWrappingMiddleware(
         _asgi_middleware_mixin_factory(_check_middleware_span)  # type: ignore
     ):
-        async_capable = getattr(middleware, "async_capable", False)
+        sync_capable = getattr(middleware, "sync_capable", True)
+        async_capable = DJANGO_SUPPORTS_ASYNC_MIDDLEWARE and getattr(
+            middleware, "async_capable", False
+        )
 
         def __init__(self, get_response=None, *args, **kwargs):
             # type: (Optional[Callable[..., Any]], *Any, **Any) -> None

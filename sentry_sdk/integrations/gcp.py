@@ -1,3 +1,4 @@
+import functools
 import sys
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -13,14 +14,13 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
-    ensure_integration_enabled,
     event_from_exception,
     logger,
     TimeoutThread,
     reraise,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 # Constants
 TIMEOUT_WARNING_BUFFER = 1.5  # Buffer time required to send timeout warning to Sentry
@@ -39,12 +39,14 @@ if TYPE_CHECKING:
 
 def _wrap_func(func):
     # type: (F) -> F
-    @ensure_integration_enabled(GcpIntegration, func)
+    @functools.wraps(func)
     def sentry_func(functionhandler, gcp_event, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
         client = sentry_sdk.get_client()
 
         integration = client.get_integration(GcpIntegration)
+        if integration is None:
+            return func(functionhandler, gcp_event, *args, **kwargs)
 
         configured_time = environ.get("FUNCTION_TIMEOUT_SEC")
         if not configured_time:

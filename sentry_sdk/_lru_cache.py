@@ -62,6 +62,8 @@ Agreement.
 
 """
 
+from copy import copy, deepcopy
+
 SENTINEL = object()
 
 
@@ -88,6 +90,13 @@ class LRUCache:
         self.root[:] = [self.root, self.root, None, None]
 
         self.hits = self.misses = 0
+
+    def __copy__(self):
+        cache = LRUCache(self.max_size)
+        cache.full = self.full
+        cache.cache = copy(self.cache)
+        cache.root = deepcopy(self.root)
+        return cache
 
     def set(self, key, value):
         link = self.cache.get(key, SENTINEL)
@@ -154,3 +163,19 @@ class LRUCache:
         self.hits += 1
 
         return link[VALUE]
+
+    def get_all(self):
+        nodes = []
+        node = self.root[NEXT]
+
+        # To ensure the loop always terminates we iterate to the maximum
+        # size of the LRU cache.
+        for _ in range(self.max_size):
+            # The cache may not be full. We exit early if we've wrapped
+            # around to the head.
+            if node is self.root:
+                break
+            nodes.append((node[KEY], node[VALUE]))
+            node = node[NEXT]
+
+        return nodes

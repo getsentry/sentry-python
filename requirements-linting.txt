@@ -14,3 +14,7 @@ loguru # There is no separate types module.
 flake8-bugbear
 pep8-naming
 pre-commit # local linting
+httpcore
+openfeature-sdk
+launchdarkly-server-sdk
+typer

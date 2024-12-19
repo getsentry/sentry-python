@@ -1,3 +1,5 @@
+import functools
+
 import sentry_sdk
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
@@ -7,12 +9,19 @@ from sentry_sdk.utils import (
     parse_version,
     transaction_from_function,
 )
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import (
+    Integration,
+    DidNotEnable,
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+)
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Set
+
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
@@ -25,9 +34,9 @@ if TYPE_CHECKING:
 try:
     from bottle import (
         Bottle,
+        HTTPResponse,
         Route,
         request as bottle_request,
-        HTTPResponse,
         __version__ as BOTTLE_VERSION,
     )
 except ImportError:
@@ -43,8 +52,13 @@ class BottleIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="endpoint"):
-        # type: (str) -> None
+    def __init__(
+        self,
+        transaction_style="endpoint",  # type: str
+        *,
+        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
+    ):
+        # type: (...) -> None
 
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -52,6 +66,7 @@ class BottleIntegration(Integration):
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
     def setup_once():
@@ -80,10 +95,12 @@ class BottleIntegration(Integration):
 
         old_handle = Bottle._handle
 
-        @ensure_integration_enabled(BottleIntegration, old_handle)
+        @functools.wraps(old_handle)
         def _patched_handle(self, environ):
             # type: (Bottle, Dict[str, Any]) -> Any
             integration = sentry_sdk.get_client().get_integration(BottleIntegration)
+            if integration is None:
+                return old_handle(self, environ)
 
             scope = sentry_sdk.get_isolation_scope()
             scope._name = "bottle"
@@ -98,27 +115,28 @@ class BottleIntegration(Integration):
 
         old_make_callback = Route._make_callback
 
-        @ensure_integration_enabled(BottleIntegration, old_make_callback)
+        @functools.wraps(old_make_callback)
         def patched_make_callback(self, *args, **kwargs):
             # type: (Route, *object, **object) -> Any
-            client = sentry_sdk.get_client()
             prepared_callback = old_make_callback(self, *args, **kwargs)
+
+            integration = sentry_sdk.get_client().get_integration(BottleIntegration)
+            if integration is None:
+                return prepared_callback
 
             def wrapped_callback(*args, **kwargs):
                 # type: (*object, **object) -> Any
-
                 try:
                     res = prepared_callback(*args, **kwargs)
-                except HTTPResponse:
-                    raise
                 except Exception as exception:
-                    event, hint = event_from_exception(
-                        exception,
-                        client_options=client.options,
-                        mechanism={"type": "bottle", "handled": False},
-                    )
-                    sentry_sdk.capture_event(event, hint=hint)
+                    _capture_exception(exception, handled=False)
                     raise exception
+
+                if (
+                    isinstance(res, HTTPResponse)
+                    and res.status_code in integration.failed_request_status_codes
+                ):
+                    _capture_exception(res, handled=True)
 
                 return res
 
@@ -189,3 +207,13 @@ def _make_request_event_processor(app, request, integration):
         return event
 
     return event_processor
+
+
+def _capture_exception(exception, handled):
+    # type: (BaseException, bool) -> None
+    event, hint = event_from_exception(
+        exception,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "bottle", "handled": handled},
+    )
+    sentry_sdk.capture_event(event, hint=hint)

@@ -116,6 +116,11 @@ def message(request):
 
 
 @csrf_exempt
+def nomessage(request):
+    return HttpResponse("ok")
+
+
+@csrf_exempt
 def view_with_signal(request):
     custom_signal = Signal()
     custom_signal.send(sender="hello")

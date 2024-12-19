@@ -35,7 +35,7 @@ from sentry_sdk.utils import reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -182,6 +182,17 @@ def reset_integrations():
         pass
     _processed_integrations.clear()
     _installed_integrations.clear()
+
+
+@pytest.fixture
+def uninstall_integration():
+    """Use to force the next call to sentry_init to re-install/setup an integration."""
+
+    def inner(identifier):
+        _processed_integrations.discard(identifier)
+        _installed_integrations.discard(identifier)
+
+    return inner
 
 
 @pytest.fixture

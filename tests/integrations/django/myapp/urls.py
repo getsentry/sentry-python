@@ -43,6 +43,7 @@ urlpatterns = [
     ),
     path("middleware-exc", views.message, name="middleware_exc"),
     path("message", views.message, name="message"),
+    path("nomessage", views.nomessage, name="nomessage"),
     path("view-with-signal", views.view_with_signal, name="view_with_signal"),
     path("mylogin", views.mylogin, name="mylogin"),
     path("classbased", views.ClassBasedView.as_view(), name="classbased"),

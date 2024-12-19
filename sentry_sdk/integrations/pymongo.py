@@ -8,12 +8,12 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
-from sentry_sdk._types import TYPE_CHECKING
-
 try:
     from pymongo import monitoring
 except ImportError:
     raise DidNotEnable("Pymongo not installed")
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Union
@@ -158,7 +158,7 @@ class CommandTracer(monitoring.CommandListener):
             query = json.dumps(command, default=str)
             span = sentry_sdk.start_span(
                 op=OP.DB,
-                description=query,
+                name=query,
                 origin=PyMongoIntegration.origin,
             )
 

@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
@@ -26,12 +26,16 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY37
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
+from sentry_sdk.consts import (
+    DEFAULT_ADD_FULL_STACK,
+    DEFAULT_MAX_STACK_FRAMES,
+    DEFAULT_MAX_VALUE_LENGTH,
+    EndpointType,
+)
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
-
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -227,7 +231,40 @@ def to_timestamp(value):
 
 def format_timestamp(value):
     # type: (datetime) -> str
-    return value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    """Formats a timestamp in RFC 3339 format.
+
+    Any datetime objects with a non-UTC timezone are converted to UTC, so that all timestamps are formatted in UTC.
+    """
+    utctime = value.astimezone(timezone.utc)
+
+    # We use this custom formatting rather than isoformat for backwards compatibility (we have used this format for
+    # several years now), and isoformat is slightly different.
+    return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+ISO_TZ_SEPARATORS = frozenset(("+", "-"))
+
+
+def datetime_from_isoformat(value):
+    # type: (str) -> datetime
+    try:
+        result = datetime.fromisoformat(value)
+    except (AttributeError, ValueError):
+        # py 3.6
+        timestamp_format = (
+            "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
+        )
+        if value.endswith("Z"):
+            value = value[:-1] + "+0000"
+
+        if value[-6] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+            value = value[:-3] + value[-2:]
+        elif value[-5] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+
+        result = datetime.strptime(value, timestamp_format)
+    return result.astimezone(timezone.utc)
 
 
 def event_hint_with_exc_info(exc_info=None):
@@ -679,11 +716,21 @@ def get_errno(exc_value):
 
 def get_error_message(exc_value):
     # type: (Optional[BaseException]) -> str
-    return (
+    message = (
         getattr(exc_value, "message", "")
         or getattr(exc_value, "detail", "")
         or safe_str(exc_value)
-    )
+    )  # type: str
+
+    # __notes__ should be a list of strings when notes are added
+    # via add_note, but can be anything else if __notes__ is set
+    # directly. We only support strings in __notes__, since that
+    # is the correct use.
+    notes = getattr(exc_value, "__notes__", None)  # type: object
+    if isinstance(notes, list) and len(notes) > 0:
+        message += "\n" + "\n".join(note for note in notes if isinstance(note, str))
+
+    return message
 
 
 def single_exception_from_error_tuple(
@@ -695,6 +742,7 @@ def single_exception_from_error_tuple(
     exception_id=None,  # type: Optional[int]
     parent_id=None,  # type: Optional[int]
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Dict[str, Any]
     """
@@ -762,10 +810,15 @@ def single_exception_from_error_tuple(
             custom_repr=custom_repr,
         )
         for tb in iter_stacks(tb)
-    ]
+    ]  # type: List[Dict[str, Any]]
 
     if frames:
-        exception_value["stacktrace"] = {"frames": frames}
+        if not full_stack:
+            new_frames = frames
+        else:
+            new_frames = merge_stack_frames(frames, full_stack, client_options)
+
+        exception_value["stacktrace"] = {"frames": new_frames}
 
     return exception_value
 
@@ -820,6 +873,7 @@ def exceptions_from_error(
     exception_id=0,  # type: int
     parent_id=0,  # type: int
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
@@ -839,6 +893,7 @@ def exceptions_from_error(
         exception_id=exception_id,
         parent_id=parent_id,
         source=source,
+        full_stack=full_stack,
     )
     exceptions = [parent]
 
@@ -864,6 +919,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__cause__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -885,6 +941,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__context__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -901,6 +958,7 @@ def exceptions_from_error(
                 exception_id=exception_id,
                 parent_id=parent_id,
                 source="exceptions[%s]" % idx,
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -911,6 +969,7 @@ def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
@@ -928,6 +987,7 @@ def exceptions_from_error_tuple(
             mechanism=mechanism,
             exception_id=0,
             parent_id=0,
+            full_stack=full_stack,
         )
 
     else:
@@ -935,7 +995,12 @@ def exceptions_from_error_tuple(
         for exc_type, exc_value, tb in walk_exception_chain(exc_info):
             exceptions.append(
                 single_exception_from_error_tuple(
-                    exc_type, exc_value, tb, client_options, mechanism
+                    exc_type=exc_type,
+                    exc_value=exc_value,
+                    tb=tb,
+                    client_options=client_options,
+                    mechanism=mechanism,
+                    full_stack=full_stack,
                 )
             )
 
@@ -1054,6 +1119,46 @@ def exc_info_from_error(error):
     return exc_info
 
 
+def merge_stack_frames(frames, full_stack, client_options):
+    # type: (List[Dict[str, Any]], List[Dict[str, Any]], Optional[Dict[str, Any]]) -> List[Dict[str, Any]]
+    """
+    Add the missing frames from full_stack to frames and return the merged list.
+    """
+    frame_ids = {
+        (
+            frame["abs_path"],
+            frame["context_line"],
+            frame["lineno"],
+            frame["function"],
+        )
+        for frame in frames
+    }
+
+    new_frames = [
+        stackframe
+        for stackframe in full_stack
+        if (
+            stackframe["abs_path"],
+            stackframe["context_line"],
+            stackframe["lineno"],
+            stackframe["function"],
+        )
+        not in frame_ids
+    ]
+    new_frames.extend(frames)
+
+    # Limit the number of frames
+    max_stack_frames = (
+        client_options.get("max_stack_frames", DEFAULT_MAX_STACK_FRAMES)
+        if client_options
+        else None
+    )
+    if max_stack_frames is not None:
+        new_frames = new_frames[len(new_frames) - max_stack_frames :]
+
+    return new_frames
+
+
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
     client_options=None,  # type: Optional[Dict[str, Any]]
@@ -1062,12 +1167,21 @@ def event_from_exception(
     # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+
+    if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
+        full_stack = current_stacktrace(
+            include_local_variables=client_options["include_local_variables"],
+            max_value_length=client_options["max_value_length"],
+        )["frames"]
+    else:
+        full_stack = None
+
     return (
         {
             "level": "error",
             "exception": {
                 "values": exceptions_from_error_tuple(
-                    exc_info, client_options, mechanism
+                    exc_info, client_options, mechanism, full_stack
                 )
             },
         },
@@ -1076,7 +1190,7 @@ def event_from_exception(
 
 
 def _module_in_list(name, items):
-    # type: (str, Optional[List[str]]) -> bool
+    # type: (Optional[str], Optional[List[str]]) -> bool
     if name is None:
         return False
 
@@ -1091,8 +1205,11 @@ def _module_in_list(name, items):
 
 
 def _is_external_source(abs_path):
-    # type: (str) -> bool
+    # type: (Optional[str]) -> bool
     # check if frame is in 'site-packages' or 'dist-packages'
+    if abs_path is None:
+        return False
+
     external_source = (
         re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
     )
@@ -1100,8 +1217,8 @@ def _is_external_source(abs_path):
 
 
 def _is_in_project_root(abs_path, project_root):
-    # type: (str, Optional[str]) -> bool
-    if project_root is None:
+    # type: (Optional[str], Optional[str]) -> bool
+    if abs_path is None or project_root is None:
         return False
 
     # check if path is in the project root
@@ -1684,12 +1801,6 @@ def _no_op(*_a, **_k):
     pass
 
 
-async def _no_op_async(*_a, **_k):
-    # type: (*Any, **Any) -> None
-    """No-op function for ensure_integration_enabled_async."""
-    pass
-
-
 if TYPE_CHECKING:
 
     @overload
@@ -1749,59 +1860,6 @@ def ensure_integration_enabled(
             return sentry_patched_function(*args, **kwargs)
 
         if original_function is _no_op:
-            return wraps(sentry_patched_function)(runner)
-
-        return wraps(original_function)(runner)
-
-    return patcher
-
-
-if TYPE_CHECKING:
-
-    # mypy has some trouble with the overloads, hence the ignore[no-overload-impl]
-    @overload  # type: ignore[no-overload-impl]
-    def ensure_integration_enabled_async(
-        integration,  # type: type[sentry_sdk.integrations.Integration]
-        original_function,  # type: Callable[P, Awaitable[R]]
-    ):
-        # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
-        ...
-
-    @overload
-    def ensure_integration_enabled_async(
-        integration,  # type: type[sentry_sdk.integrations.Integration]
-    ):
-        # type: (...) -> Callable[[Callable[P, Awaitable[None]]], Callable[P, Awaitable[None]]]
-        ...
-
-
-# The ignore[no-redef] also needed because mypy is struggling with these overloads.
-def ensure_integration_enabled_async(  # type: ignore[no-redef]
-    integration,  # type: type[sentry_sdk.integrations.Integration]
-    original_function=_no_op_async,  # type: Union[Callable[P, Awaitable[R]], Callable[P, Awaitable[None]]]
-):
-    # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
-    """
-    Version of `ensure_integration_enabled` for decorating async functions.
-
-    Please refer to the `ensure_integration_enabled` documentation for more information.
-    """
-
-    if TYPE_CHECKING:
-        # Type hint to ensure the default function has the right typing. The overloads
-        # ensure the default _no_op function is only used when R is None.
-        original_function = cast(Callable[P, Awaitable[R]], original_function)
-
-    def patcher(sentry_patched_function):
-        # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
-        async def runner(*args: "P.args", **kwargs: "P.kwargs"):
-            # type: (...) -> R
-            if sentry_sdk.get_client().get_integration(integration) is None:
-                return await original_function(*args, **kwargs)
-
-            return await sentry_patched_function(*args, **kwargs)
-
-        if original_function is _no_op_async:
             return wraps(sentry_patched_function)(runner)
 
         return wraps(original_function)(runner)

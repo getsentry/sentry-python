@@ -1,20 +1,22 @@
+from contextlib import contextmanager
 import json
 from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue, logger
-from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from django.http.request import RawPostDataException
 except ImportError:
     RawPostDataException = None
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
+    from typing import Iterator
     from typing import Mapping
     from typing import MutableMapping
     from typing import Optional
@@ -36,6 +38,25 @@ SENSITIVE_ENV_KEYS = (
 SENSITIVE_HEADERS = tuple(
     x[len("HTTP_") :] for x in SENSITIVE_ENV_KEYS if x.startswith("HTTP_")
 )
+
+DEFAULT_HTTP_METHODS_TO_CAPTURE = (
+    "CONNECT",
+    "DELETE",
+    "GET",
+    # "HEAD",  # do not capture HEAD requests by default
+    # "OPTIONS",  # do not capture OPTIONS requests by default
+    "PATCH",
+    "POST",
+    "PUT",
+    "TRACE",
+)
+
+
+# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
+@contextmanager
+def nullcontext():
+    # type: () -> Iterator[None]
+    yield
 
 
 def request_body_within_bounds(client, content_length):
@@ -152,7 +173,13 @@ class RequestExtractor:
             if not self.is_json():
                 return None
 
-            raw_data = self.raw_data()
+            try:
+                raw_data = self.raw_data()
+            except (RawPostDataException, ValueError):
+                # The body might have already been read, in which case this will
+                # fail
+                raw_data = None
+
             if raw_data is None:
                 return None
 
@@ -204,7 +231,7 @@ def _filter_headers(headers):
 
 
 def _in_http_status_code_range(code, code_ranges):
-    # type: (int, list[HttpStatusCodeRange]) -> bool
+    # type: (object, list[HttpStatusCodeRange]) -> bool
     for target in code_ranges:
         if isinstance(target, int):
             if code == target:
@@ -220,3 +247,18 @@ def _in_http_status_code_range(code, code_ranges):
             )
 
     return False
+
+
+class HttpCodeRangeContainer:
+    """
+    Wrapper to make it possible to use list[HttpStatusCodeRange] as a Container[int].
+    Used for backwards compatibility with the old `failed_request_status_codes` option.
+    """
+
+    def __init__(self, code_ranges):
+        # type: (list[HttpStatusCodeRange]) -> None
+        self._code_ranges = code_ranges
+
+    def __contains__(self, item):
+        # type: (object) -> bool
+        return _in_http_status_code_range(item, self._code_ranges)

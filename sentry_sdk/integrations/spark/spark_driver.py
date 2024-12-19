@@ -3,7 +3,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
 from sentry_sdk.scope import Scope
 
-from sentry_sdk._types import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

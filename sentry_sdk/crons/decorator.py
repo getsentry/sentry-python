@@ -1,10 +1,11 @@
 from functools import wraps
 from inspect import iscoroutinefunction
 
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.crons import capture_checkin
 from sentry_sdk.crons.consts import MonitorStatus
 from sentry_sdk.utils import now
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable

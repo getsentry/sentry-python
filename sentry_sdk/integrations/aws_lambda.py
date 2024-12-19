@@ -1,3 +1,6 @@
+import functools
+import json
+import re
 import sys
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
@@ -19,7 +22,8 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk._types import TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -55,6 +59,11 @@ def _wrap_init_error(init_error):
                 )
                 sentry_sdk.capture_event(sentry_event, hint=hint)
 
+            else:
+                # Fall back to AWS lambdas JSON representation of the error
+                sentry_event = _event_from_error_json(json.loads(args[1]))
+                sentry_sdk.capture_event(sentry_event)
+
         return init_error(*args, **kwargs)
 
     return sentry_init_error  # type: ignore
@@ -62,7 +71,7 @@ def _wrap_init_error(init_error):
 
 def _wrap_handler(handler):
     # type: (F) -> F
-    @ensure_integration_enabled(AwsLambdaIntegration, handler)
+    @functools.wraps(handler)
     def sentry_handler(aws_event, aws_context, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
 
@@ -76,6 +85,12 @@ def _wrap_handler(handler):
         # will be the same for all events in the list, since they're all hitting
         # the lambda in the same request.)
 
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(AwsLambdaIntegration)
+
+        if integration is None:
+            return handler(aws_event, aws_context, *args, **kwargs)
+
         if isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
             batch_size = len(aws_event)
@@ -88,9 +103,6 @@ def _wrap_handler(handler):
             # headers, path, http method, etc in any case, so it's fine that
             # this is empty
             request_data = {}
-
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(AwsLambdaIntegration)
 
         configured_time = aws_context.get_remaining_time_in_millis()
 
@@ -427,3 +439,58 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
     )
 
     return url
+
+
+def _parse_formatted_traceback(formatted_tb):
+    # type: (list[str]) -> list[dict[str, Any]]
+    frames = []
+    for frame in formatted_tb:
+        match = re.match(r'File "(.+)", line (\d+), in (.+)', frame.strip())
+        if match:
+            file_name, line_number, func_name = match.groups()
+            line_number = int(line_number)
+            frames.append(
+                {
+                    "filename": file_name,
+                    "function": func_name,
+                    "lineno": line_number,
+                    "vars": None,
+                    "pre_context": None,
+                    "context_line": None,
+                    "post_context": None,
+                }
+            )
+    return frames
+
+
+def _event_from_error_json(error_json):
+    # type: (dict[str, Any]) -> Event
+    """
+    Converts the error JSON from AWS Lambda into a Sentry error event.
+    This is not a full fletched event, but better than nothing.
+
+    This is an example of where AWS creates the error JSON:
+    https://github.com/aws/aws-lambda-python-runtime-interface-client/blob/2.2.1/awslambdaric/bootstrap.py#L479
+    """
+    event = {
+        "level": "error",
+        "exception": {
+            "values": [
+                {
+                    "type": error_json.get("errorType"),
+                    "value": error_json.get("errorMessage"),
+                    "stacktrace": {
+                        "frames": _parse_formatted_traceback(
+                            error_json.get("stackTrace", [])
+                        ),
+                    },
+                    "mechanism": {
+                        "type": "aws_lambda",
+                        "handled": False,
+                    },
+                }
+            ],
+        },
+    }  # type: Event
+
+    return event
