@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
 
+DEFAULT_MAX_STACK_FRAMES = 100
+DEFAULT_ADD_FULL_STACK = False
+
 
 # Also needs to be at the top to prevent circular import
 class EndpointType(Enum):
@@ -59,6 +62,7 @@ if TYPE_CHECKING:
         "Experiments",
         {
             "max_spans": Optional[int],
+            "max_flags": Optional[int],
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
             "continuous_profiling_mode": Optional[ContinuousProfilerMode],
@@ -488,6 +492,7 @@ class OP:
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor:
+
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
@@ -505,7 +510,7 @@ class ClientConstructor:
         transport=None,  # type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]
         transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
         sample_rate=1.0,  # type: float
-        send_default_pii=False,  # type: bool
+        send_default_pii=None,  # type: Optional[bool]
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
@@ -549,6 +554,8 @@ class ClientConstructor:
         cert_file=None,  # type: Optional[str]
         key_file=None,  # type: Optional[str]
         custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
+        add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
+        max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
     ):
         # type: (...) -> None
         pass
@@ -574,4 +581,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.16.0"
+VERSION = "2.19.2"
