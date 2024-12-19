@@ -160,7 +160,7 @@ def _wrap_handler(handler):
                 headers = {}
 
             with sentry_sdk.continue_trace(headers):
-                with sentry_sdk.start_transaction(
+                with sentry_sdk.start_span(
                     op=OP.FUNCTION_AWS,
                     name=aws_context.function_name,
                     source=TRANSACTION_SOURCE_COMPONENT,

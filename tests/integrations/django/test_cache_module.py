@@ -530,7 +530,7 @@ def test_cache_spans_get_many(
 
     from django.core.cache import cache
 
-    with sentry_sdk.start_transaction(name="caches"):
+    with sentry_sdk.start_span(name="caches"):
         cache.get_many([f"S{id}", f"S{id+1}"])
         cache.set(f"S{id}", "Sensitive1")
         cache.get_many([f"S{id}", f"S{id+1}"])
@@ -574,7 +574,7 @@ def test_cache_spans_set_many(
 
     from django.core.cache import cache
 
-    with sentry_sdk.start_transaction(name="caches"):
+    with sentry_sdk.start_span(name="caches"):
         cache.set_many({f"S{id}": "Sensitive1", f"S{id+1}": "Sensitive2"})
         cache.get(f"S{id}")
 

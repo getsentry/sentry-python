@@ -313,7 +313,7 @@ def _wrap_tracer(task, f):
             # something such as attribute access can fail.
             headers = args[3].get("headers") or {}
             with sentry_sdk.continue_trace(headers):
-                with sentry_sdk.start_transaction(
+                with sentry_sdk.start_span(
                     op=OP.QUEUE_TASK_CELERY,
                     name=task.name,
                     source=TRANSACTION_SOURCE_TASK,

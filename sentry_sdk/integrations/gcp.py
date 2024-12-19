@@ -87,7 +87,7 @@ def _wrap_func(func):
                 headers = gcp_event.headers
 
             with sentry_sdk.continue_trace(headers):
-                with sentry_sdk.start_transaction(
+                with sentry_sdk.start_span(
                     op=OP.FUNCTION_GCP,
                     name=environ.get("FUNCTION_NAME", ""),
                     source=TRANSACTION_SOURCE_COMPONENT,
