@@ -87,88 +87,83 @@ def sentry_listener():
     return listener
 
 
-@pytest.fixture
-def mock_add_breadcrumb():
-    with patch("sentry_sdk.add_breadcrumb") as mock:
-        yield mock
-
-
-def test_sentry_listener_on_job_start(sentry_listener, mock_add_breadcrumb):
+def test_sentry_listener_on_job_start(sentry_listener):
     listener = sentry_listener
+    with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
 
-    class MockJobStart:
-        def jobId(self):  # noqa: N802
-            return "sample-job-id-start"
+        class MockJobStart:
+            def jobId(self):  # noqa: N802
+                return "sample-job-id-start"
 
-    mock_job_start = MockJobStart()
-    listener.onJobStart(mock_job_start)
+        mock_job_start = MockJobStart()
+        listener.onJobStart(mock_job_start)
 
-    mock_add_breadcrumb.assert_called_once()
-    mock_hub = mock_add_breadcrumb.call_args
+        mock_add_breadcrumb.assert_called_once()
+        mock_hub = mock_add_breadcrumb.call_args
 
-    assert mock_hub.kwargs["level"] == "info"
-    assert "sample-job-id-start" in mock_hub.kwargs["message"]
+        assert mock_hub.kwargs["level"] == "info"
+        assert "sample-job-id-start" in mock_hub.kwargs["message"]
 
 
 @pytest.mark.parametrize(
     "job_result, level", [("JobSucceeded", "info"), ("JobFailed", "warning")]
 )
-def test_sentry_listener_on_job_end(
-    sentry_listener, mock_add_breadcrumb, job_result, level
-):
+def test_sentry_listener_on_job_end(sentry_listener, job_result, level):
     listener = sentry_listener
+    with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
 
-    class MockJobResult:
-        def toString(self):  # noqa: N802
-            return job_result
+        class MockJobResult:
+            def toString(self):  # noqa: N802
+                return job_result
 
-    class MockJobEnd:
-        def jobId(self):  # noqa: N802
-            return "sample-job-id-end"
+        class MockJobEnd:
+            def jobId(self):  # noqa: N802
+                return "sample-job-id-end"
 
-        def jobResult(self):  # noqa: N802
-            result = MockJobResult()
-            return result
+            def jobResult(self):  # noqa: N802
+                result = MockJobResult()
+                return result
 
-    mock_job_end = MockJobEnd()
-    listener.onJobEnd(mock_job_end)
+        mock_job_end = MockJobEnd()
+        listener.onJobEnd(mock_job_end)
 
-    mock_add_breadcrumb.assert_called_once()
-    mock_hub = mock_add_breadcrumb.call_args
+        mock_add_breadcrumb.assert_called_once()
+        mock_hub = mock_add_breadcrumb.call_args
 
-    assert mock_hub.kwargs["level"] == level
-    assert mock_hub.kwargs["data"]["result"] == job_result
-    assert "sample-job-id-end" in mock_hub.kwargs["message"]
+        assert mock_hub.kwargs["level"] == level
+        assert mock_hub.kwargs["data"]["result"] == job_result
+        assert "sample-job-id-end" in mock_hub.kwargs["message"]
 
 
-def test_sentry_listener_on_stage_submitted(sentry_listener, mock_add_breadcrumb):
+def test_sentry_listener_on_stage_submitted(sentry_listener):
     listener = sentry_listener
+    with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
 
-    class StageInfo:
-        def stageId(self):  # noqa: N802
-            return "sample-stage-id-submit"
+        class StageInfo:
+            def stageId(self):  # noqa: N802
+                return "sample-stage-id-submit"
 
-        def name(self):
-            return "run-job"
+            def name(self):
+                return "run-job"
 
-        def attemptId(self):  # noqa: N802
-            return 14
+            def attemptId(self):  # noqa: N802
+                return 14
 
-    class MockStageSubmitted:
-        def stageInfo(self):  # noqa: N802
-            stageinf = StageInfo()
-            return stageinf
+        class MockStageSubmitted:
+            def stageInfo(self):  # noqa: N802
+                stageinf = StageInfo()
+                return stageinf
 
-    mock_stage_submitted = MockStageSubmitted()
-    listener.onStageSubmitted(mock_stage_submitted)
+        mock_stage_submitted = MockStageSubmitted()
+        listener.onStageSubmitted(mock_stage_submitted)
 
-    mock_add_breadcrumb.assert_called_once()
-    mock_hub = mock_add_breadcrumb.call_args
+        mock_add_breadcrumb.assert_called_once()
+        mock_hub = mock_add_breadcrumb.call_args
 
-    assert mock_hub.kwargs["level"] == "info"
-    assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
-    assert mock_hub.kwargs["data"]["attemptId"] == 14
-    assert mock_hub.kwargs["data"]["name"] == "run-job"
+        assert mock_hub.kwargs["level"] == "info"
+        assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
+        assert mock_hub.kwargs["data"]["attemptId"] == 14
+        assert mock_hub.kwargs["data"]["name"] == "run-job"
 
 
 @pytest.fixture
@@ -208,39 +203,39 @@ def get_mock_stage_completed():
 
 
 def test_sentry_listener_on_stage_completed_success(
-    sentry_listener, mock_add_breadcrumb, get_mock_stage_completed
+    sentry_listener, get_mock_stage_completed
 ):
     listener = sentry_listener
+    with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
+        mock_stage_completed = get_mock_stage_completed(failure_reason=False)
+        listener.onStageCompleted(mock_stage_completed)
 
-    mock_stage_completed = get_mock_stage_completed(failure_reason=False)
-    listener.onStageCompleted(mock_stage_completed)
+        mock_add_breadcrumb.assert_called_once()
+        mock_hub = mock_add_breadcrumb.call_args
 
-    mock_add_breadcrumb.assert_called_once()
-    mock_hub = mock_add_breadcrumb.call_args
-
-    assert mock_hub.kwargs["level"] == "info"
-    assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
-    assert mock_hub.kwargs["data"]["attemptId"] == 14
-    assert mock_hub.kwargs["data"]["name"] == "run-job"
-    assert "reason" not in mock_hub.kwargs["data"]
+        assert mock_hub.kwargs["level"] == "info"
+        assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
+        assert mock_hub.kwargs["data"]["attemptId"] == 14
+        assert mock_hub.kwargs["data"]["name"] == "run-job"
+        assert "reason" not in mock_hub.kwargs["data"]
 
 
 def test_sentry_listener_on_stage_completed_failure(
-    sentry_listener, mock_add_breadcrumb, get_mock_stage_completed
+    sentry_listener, get_mock_stage_completed
 ):
     listener = sentry_listener
+    with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
+        mock_stage_completed = get_mock_stage_completed(failure_reason=True)
+        listener.onStageCompleted(mock_stage_completed)
 
-    mock_stage_completed = get_mock_stage_completed(failure_reason=True)
-    listener.onStageCompleted(mock_stage_completed)
+        mock_add_breadcrumb.assert_called_once()
+        mock_hub = mock_add_breadcrumb.call_args
 
-    mock_add_breadcrumb.assert_called_once()
-    mock_hub = mock_add_breadcrumb.call_args
-
-    assert mock_hub.kwargs["level"] == "warning"
-    assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
-    assert mock_hub.kwargs["data"]["attemptId"] == 14
-    assert mock_hub.kwargs["data"]["name"] == "run-job"
-    assert mock_hub.kwargs["data"]["reason"] == "failure-reason"
+        assert mock_hub.kwargs["level"] == "warning"
+        assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
+        assert mock_hub.kwargs["data"]["attemptId"] == 14
+        assert mock_hub.kwargs["data"]["name"] == "run-job"
+        assert mock_hub.kwargs["data"]["reason"] == "failure-reason"
 
 
 ################
