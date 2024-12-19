@@ -1,4 +1,3 @@
-from copy import copy
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -24,12 +23,6 @@ class FlagBuffer:
     def clear(self):
         # type: () -> None
         self.buffer = LRUCache(self.capacity)
-
-    def __copy__(self):
-        # type: () -> FlagBuffer
-        buffer = FlagBuffer(capacity=self.capacity)
-        buffer.buffer = copy(self.buffer)
-        return buffer
 
     def get(self):
         # type: () -> list[FlagData]
