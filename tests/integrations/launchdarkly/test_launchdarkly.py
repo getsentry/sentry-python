@@ -1,8 +1,5 @@
 import concurrent.futures as cf
-
 import ldclient
-
-import sentry_sdk
 import pytest
 
 from ldclient import LDClient
@@ -10,6 +7,7 @@ from ldclient.config import Config
 from ldclient.context import Context
 from ldclient.integrations.test_data import TestData
 
+import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
 

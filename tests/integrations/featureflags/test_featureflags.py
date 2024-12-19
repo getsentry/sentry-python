@@ -1,12 +1,11 @@
 import concurrent.futures as cf
+import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations.featureflags import (
     FeatureFlagsIntegration,
     add_feature_flag,
 )
-
-import pytest
 
 
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):

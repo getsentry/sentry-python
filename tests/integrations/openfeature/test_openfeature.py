@@ -1,10 +1,11 @@
 import concurrent.futures as cf
-import sentry_sdk
+import pytest
 
 from openfeature import api
 from openfeature.provider.in_memory_provider import InMemoryFlag, InMemoryProvider
+
+import sentry_sdk
 from sentry_sdk.integrations.openfeature import OpenFeatureIntegration
-import pytest
 
 
 def test_openfeature_integration(sentry_init, capture_events, uninstall_integration):
