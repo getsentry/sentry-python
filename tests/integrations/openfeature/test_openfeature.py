@@ -1,4 +1,6 @@
 import concurrent.futures as cf
+import sys
+
 import pytest
 
 from openfeature import api
@@ -91,12 +93,13 @@ def test_openfeature_integration_threaded(
     }
 
 
+@pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_openfeature_integration_asyncio(
     sentry_init, capture_events, uninstall_integration
 ):
     """Assert concurrently evaluated flags do not pollute one another."""
 
-    asyncio = pytest.importorskip("asyncio")  # Only available in Python 3.7+.
+    asyncio = pytest.importorskip("asyncio")
 
     uninstall_integration(OpenFeatureIntegration.identifier)
     sentry_init(integrations=[OpenFeatureIntegration()])
