@@ -1,10 +1,10 @@
-import asyncio
 import concurrent.futures as cf
 import sentry_sdk
 
 from openfeature import api
 from openfeature.provider.in_memory_provider import InMemoryFlag, InMemoryProvider
 from sentry_sdk.integrations.openfeature import OpenFeatureIntegration
+import pytest
 
 
 def test_openfeature_integration(sentry_init, capture_events, uninstall_integration):
@@ -94,6 +94,8 @@ def test_openfeature_integration_asyncio(
     sentry_init, capture_events, uninstall_integration
 ):
     """Assert concurrently evaluated flags do not pollute one another."""
+
+    asyncio = pytest.importorskip("asyncio")  # Only available in Python 3.7+.
 
     uninstall_integration(OpenFeatureIntegration.identifier)
     sentry_init(integrations=[OpenFeatureIntegration()])

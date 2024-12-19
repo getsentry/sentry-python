@@ -1,4 +1,3 @@
-import asyncio
 import concurrent.futures as cf
 
 import ldclient
@@ -114,6 +113,9 @@ def test_launchdarkly_integration_asyncio(
     sentry_init, capture_events, uninstall_integration
 ):
     """Assert concurrently evaluated flags do not pollute one another."""
+
+    asyncio = pytest.importorskip("asyncio")  # Only available in Python 3.7+.
+
     td = TestData.data_source()
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
     context = Context.create("user1")
