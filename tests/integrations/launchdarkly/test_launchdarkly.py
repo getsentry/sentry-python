@@ -1,9 +1,7 @@
-import asyncio
 import concurrent.futures as cf
+import sys
 
 import ldclient
-
-import sentry_sdk
 import pytest
 
 from ldclient import LDClient
@@ -11,6 +9,7 @@ from ldclient.config import Config
 from ldclient.context import Context
 from ldclient.integrations.test_data import TestData
 
+import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
 
@@ -19,9 +18,13 @@ from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
     "use_global_client",
     (False, True),
 )
-def test_launchdarkly_integration(sentry_init, use_global_client):
+def test_launchdarkly_integration(
+    sentry_init, use_global_client, capture_events, uninstall_integration
+):
     td = TestData.data_source()
     config = Config("sdk-key", update_processor_class=td)
+
+    uninstall_integration(LaunchDarklyIntegration.identifier)
     if use_global_client:
         ldclient.set_config(config)
         sentry_init(integrations=[LaunchDarklyIntegration()])
@@ -39,25 +42,38 @@ def test_launchdarkly_integration(sentry_init, use_global_client):
     client.variation("world", Context.create("user1", "user"), False)
     client.variation("other", Context.create("user2", "user"), False)
 
-    assert sentry_sdk.get_current_scope().flags.get() == [
-        {"flag": "hello", "result": True},
-        {"flag": "world", "result": True},
-        {"flag": "other", "result": False},
-    ]
+    events = capture_events()
+    sentry_sdk.capture_exception(Exception("something wrong!"))
+
+    assert len(events) == 1
+    assert events[0]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": True},
+            {"flag": "world", "result": True},
+            {"flag": "other", "result": False},
+        ]
+    }
 
 
-def test_launchdarkly_integration_threaded(sentry_init):
+def test_launchdarkly_integration_threaded(
+    sentry_init, capture_events, uninstall_integration
+):
     td = TestData.data_source()
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
-    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
     context = Context.create("user1")
+
+    uninstall_integration(LaunchDarklyIntegration.identifier)
+    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+    events = capture_events()
 
     def task(flag_key):
         # Creates a new isolation scope for the thread.
         # This means the evaluations in each task are captured separately.
         with sentry_sdk.isolation_scope():
             client.variation(flag_key, context, False)
-            return [f["flag"] for f in sentry_sdk.get_current_scope().flags.get()]
+            # use a tag to identify to identify events later on
+            sentry_sdk.set_tag("task_id", flag_key)
+            sentry_sdk.capture_exception(Exception("something wrong!"))
 
     td.update(td.flag("hello").variation_for_all(True))
     td.update(td.flag("world").variation_for_all(False))
@@ -65,34 +81,91 @@ def test_launchdarkly_integration_threaded(sentry_init):
     client.variation("hello", context, False)
 
     with cf.ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(task, ["world", "other"]))
+        pool.map(task, ["world", "other"])
 
-    assert results[0] == ["hello", "world"]
-    assert results[1] == ["hello", "other"]
+    # Capture error in original scope
+    sentry_sdk.set_tag("task_id", "0")
+    sentry_sdk.capture_exception(Exception("something wrong!"))
+
+    assert len(events) == 3
+    events.sort(key=lambda e: e["tags"]["task_id"])
+
+    assert events[0]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": True},
+        ]
+    }
+    assert events[1]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": True},
+            {"flag": "other", "result": False},
+        ]
+    }
+    assert events[2]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": True},
+            {"flag": "world", "result": False},
+        ]
+    }
 
 
-def test_launchdarkly_integration_asyncio(sentry_init):
+@pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
+def test_launchdarkly_integration_asyncio(
+    sentry_init, capture_events, uninstall_integration
+):
     """Assert concurrently evaluated flags do not pollute one another."""
+
+    asyncio = pytest.importorskip("asyncio")
+
     td = TestData.data_source()
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
-    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
     context = Context.create("user1")
+
+    uninstall_integration(LaunchDarklyIntegration.identifier)
+    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+    events = capture_events()
 
     async def task(flag_key):
         with sentry_sdk.isolation_scope():
             client.variation(flag_key, context, False)
-            return [f["flag"] for f in sentry_sdk.get_current_scope().flags.get()]
+            # use a tag to identify to identify events later on
+            sentry_sdk.set_tag("task_id", flag_key)
+            sentry_sdk.capture_exception(Exception("something wrong!"))
 
     async def runner():
         return asyncio.gather(task("world"), task("other"))
 
     td.update(td.flag("hello").variation_for_all(True))
     td.update(td.flag("world").variation_for_all(False))
+    # Capture an eval before we split isolation scopes.
     client.variation("hello", context, False)
 
-    results = asyncio.run(runner()).result()
-    assert results[0] == ["hello", "world"]
-    assert results[1] == ["hello", "other"]
+    asyncio.run(runner())
+
+    # Capture error in original scope
+    sentry_sdk.set_tag("task_id", "0")
+    sentry_sdk.capture_exception(Exception("something wrong!"))
+
+    assert len(events) == 3
+    events.sort(key=lambda e: e["tags"]["task_id"])
+
+    assert events[0]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": True},
+        ]
+    }
+    assert events[1]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": True},
+            {"flag": "other", "result": False},
+        ]
+    }
+    assert events[2]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": True},
+            {"flag": "world", "result": False},
+        ]
+    }
 
 
 def test_launchdarkly_integration_did_not_enable(monkeypatch):
