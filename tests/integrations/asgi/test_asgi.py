@@ -128,7 +128,6 @@ def asgi3_ws_app():
 
 @pytest.fixture
 def asgi3_custom_transaction_app():
-
     async def app(scope, receive, send):
         sentry_sdk.get_current_scope().set_transaction_name("foobar", source="custom")
         await send(
