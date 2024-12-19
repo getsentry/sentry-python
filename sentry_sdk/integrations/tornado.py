@@ -125,7 +125,7 @@ def _handle_request_impl(self):
         scope.add_event_processor(processor)
 
         with sentry_sdk.continue_trace(headers):
-            with sentry_sdk.start_transaction(
+            with sentry_sdk.start_span(
                 op=OP.HTTP_SERVER,
                 # Like with all other integrations, this is our
                 # fallback transaction in case there is no route.

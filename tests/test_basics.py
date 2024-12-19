@@ -16,7 +16,7 @@ from sentry_sdk import (
     capture_event,
     capture_exception,
     capture_message,
-    start_transaction,
+    start_span,
     last_event_id,
     add_breadcrumb,
     isolation_scope,
@@ -174,7 +174,7 @@ def test_option_before_send_transaction(sentry_init, capture_events):
         traces_sample_rate=1.0,
     )
     events = capture_events()
-    transaction = start_transaction(name="foo")
+    transaction = start_span(name="foo")
     transaction.finish()
 
     (event,) = events
@@ -191,7 +191,7 @@ def test_option_before_send_transaction_discard(sentry_init, capture_events):
         traces_sample_rate=1.0,
     )
     events = capture_events()
-    transaction = start_transaction(name="foo")
+    transaction = start_span(name="foo")
     transaction.finish()
 
     assert len(events) == 0
@@ -592,7 +592,7 @@ def test_event_processor_drop_records_client_report(
 
         capture_message("dropped")
 
-        with start_transaction(name="dropped"):
+        with start_span(name="dropped"):
             pass
 
         assert len(events) == 0
@@ -697,7 +697,7 @@ def test_functions_to_trace(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="something"):
+    with start_span(name="something"):
         time.sleep(0)
 
         for word in ["World", "You"]:
@@ -733,7 +733,7 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="something"):
+    with start_span(name="something"):
         wg = WorldGreeter("World")
         wg.greet()
         wg.greet("You")
@@ -822,7 +822,7 @@ def test_last_event_id_transaction(sentry_init):
 
     assert last_event_id() is None
 
-    with start_transaction(name="test"):
+    with start_span(name="test"):
         pass
 
     assert last_event_id() is None, "Transaction should not set last_event_id"

@@ -4,7 +4,7 @@ import httpx
 import pytest
 from cohere import Client, ChatMessage
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.integrations.cohere import CohereIntegration
 
 from unittest import mock  # python 3.3 and above
@@ -41,7 +41,7 @@ def test_nonstreaming_chat(
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         response = client.chat(
             model="some-model",
             chat_history=[ChatMessage(role="SYSTEM", message="some context")],
@@ -110,7 +110,7 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         responses = list(
             client.chat_stream(
                 model="some-model",
@@ -186,7 +186,7 @@ def test_embed(sentry_init, capture_events, send_default_pii, include_prompts):
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         response = client.embed(texts=["hello"], model="text-embedding-3-large")
 
     assert len(response.embeddings[0]) == 3
@@ -227,7 +227,7 @@ def test_span_origin_chat(sentry_init, capture_events):
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         client.chat(
             model="some-model",
             chat_history=[ChatMessage(role="SYSTEM", message="some context")],
@@ -265,7 +265,7 @@ def test_span_origin_embed(sentry_init, capture_events):
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         client.embed(texts=["hello"], model="text-embedding-3-large")
 
     (event,) = events

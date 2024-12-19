@@ -9,7 +9,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.profiler.transaction_profiler import (
     GeventScheduler,
     Profile,
@@ -148,7 +148,7 @@ def test_profiles_sample_rate(
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
     ):
-        with start_transaction(name="profiling"):
+        with start_span(name="profiling"):
             pass
 
     items = defaultdict(list)
@@ -219,7 +219,7 @@ def test_profiles_sampler(
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
     ):
-        with start_transaction(name="profiling"):
+        with start_span(name="profiling"):
             pass
 
     items = defaultdict(list)
@@ -249,7 +249,7 @@ def test_minimum_unique_samples_required(
     envelopes = capture_envelopes()
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    with start_transaction(name="profiling"):
+    with start_span(name="profiling"):
         pass
 
     items = defaultdict(list)
@@ -277,7 +277,7 @@ def test_profile_captured(
 
     envelopes = capture_envelopes()
 
-    with start_transaction(name="profiling"):
+    with start_span(name="profiling"):
         time.sleep(0.05)
 
     items = defaultdict(list)

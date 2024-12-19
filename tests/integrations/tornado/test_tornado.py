@@ -4,7 +4,7 @@ import re
 import pytest
 
 import sentry_sdk
-from sentry_sdk import start_transaction, capture_message
+from sentry_sdk import start_span, capture_message
 from sentry_sdk.integrations.tornado import TornadoIntegration
 
 from tornado.web import RequestHandler, Application, HTTPError
@@ -117,7 +117,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
     events = capture_events()
     client = tornado_testcase(Application([(r"/hi", handler)]))
 
-    with start_transaction(name="client") as span:
+    with start_span(name="client") as span:
         pass
 
     response = client.fetch(
@@ -135,7 +135,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
     assert client_tx["transaction"] == "client"
     assert client_tx["transaction_info"] == {
         "source": "custom"
-    }  # because this is just the start_transaction() above.
+    }  # because this is just the start_span() above.
 
     if server_error is not None:
         assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"

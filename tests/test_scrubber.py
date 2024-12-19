@@ -1,7 +1,7 @@
 import sys
 import logging
 
-from sentry_sdk import capture_exception, capture_event, start_transaction, start_span
+from sentry_sdk import capture_exception, capture_event, start_span
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk.scrubber import EventScrubber
 from tests.conftest import ApproxDict
@@ -145,7 +145,7 @@ def test_span_data_scrubbing(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction(name="hi"):
+    with start_span(name="hi"):
         with start_span(op="foo", name="bar") as span:
             span.set_data("password", "secret")
             span.set_data("datafoo", "databar")

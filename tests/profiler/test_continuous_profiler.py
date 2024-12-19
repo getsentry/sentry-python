@@ -198,7 +198,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
     thread = threading.current_thread()
 
-    with sentry_sdk.start_transaction(name="profiling"):
+    with sentry_sdk.start_span(name="profiling"):
         with sentry_sdk.start_span(op="op"):
             time.sleep(0.05)
 
@@ -209,7 +209,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 
@@ -219,7 +219,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 
@@ -260,7 +260,7 @@ def test_continuous_profiler_manual_start_and_stop(
 
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 
@@ -270,7 +270,7 @@ def test_continuous_profiler_manual_start_and_stop(
 
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 

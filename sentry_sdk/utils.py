@@ -1802,7 +1802,7 @@ def ensure_integration_enabled(
     ```python
     @ensure_integration_enabled(MyIntegration, my_function)
     def patch_my_function():
-        with sentry_sdk.start_transaction(...):
+        with sentry_sdk.start_span(...):
             return my_function()
     ```
     """
