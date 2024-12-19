@@ -132,6 +132,7 @@ GROUPS = {
         "potel",
         "pure_eval",
         "trytond",
+        "typer",
     ],
 }
 

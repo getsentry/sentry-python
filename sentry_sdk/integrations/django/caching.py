@@ -75,11 +75,12 @@ def _patch_cache_method(cache, method_name, address, port):
                         span.set_data(SPANDATA.CACHE_HIT, True)
                     else:
                         span.set_data(SPANDATA.CACHE_HIT, False)
-                else:
-                    try:
+                else:  # TODO: We don't handle `get_or_set` which we should
+                    arg_count = len(args)
+                    if arg_count >= 2:
                         # 'set' command
                         item_size = len(str(args[1]))
-                    except IndexError:
+                    elif arg_count == 1:
                         # 'set_many' command
                         item_size = len(str(args[0]))
 
