@@ -1,7 +1,6 @@
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
-from sentry_sdk.scope import Scope
 
 from typing import TYPE_CHECKING
 
@@ -232,8 +231,9 @@ class SentryListener(SparkListener):
         data=None,  # type: Optional[dict[str, Any]]
     ):
         # type: (...) -> None
-        Scope.set_isolation_scope(Scope.get_global_scope())
-        sentry_sdk.add_breadcrumb(level=level, message=message, data=data)
+        sentry_sdk.get_global_scope().add_breadcrumb(
+            level=level, message=message, data=data
+        )
 
     def onJobStart(self, jobStart):  # noqa: N802,N803
         # type: (Any) -> None
