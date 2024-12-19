@@ -597,8 +597,7 @@ def test_messaging_destination_name_default_exchange(
     mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
 
     @celery_app.task()
-    def task():
-        ...
+    def task(): ...
 
     task.apply_async()
 
@@ -622,8 +621,7 @@ def test_messaging_destination_name_nondefault_exchange(
     mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
 
     @celery_app.task()
-    def task():
-        ...
+    def task(): ...
 
     task.apply_async()
 
@@ -637,8 +635,7 @@ def test_messaging_id(init_celery, capture_events):
     events = capture_events()
 
     @celery.task
-    def example_task():
-        ...
+    def example_task(): ...
 
     example_task.apply_async()
 
@@ -652,8 +649,7 @@ def test_retry_count_zero(init_celery, capture_events):
     events = capture_events()
 
     @celery.task()
-    def task():
-        ...
+    def task(): ...
 
     task.apply_async()
 
@@ -670,8 +666,7 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_events):
     events = capture_events()
 
     @celery.task()
-    def task():
-        ...
+    def task(): ...
 
     task.apply_async()
 
@@ -689,8 +684,7 @@ def test_messaging_system(system, init_celery, capture_events):
     celery.conf.broker_url = f"{system}://example.com"  # noqa: E231
 
     @celery.task()
-    def task():
-        ...
+    def task(): ...
 
     task.apply_async()
 
@@ -713,8 +707,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
     events = capture_events()
 
     @celery.task()
-    def task():
-        ...
+    def task(): ...
 
     with start_transaction():
         task.apply_async()
@@ -736,8 +729,7 @@ def test_receive_latency(init_celery, capture_events):
     events = capture_events()
 
     @celery.task()
-    def task():
-        ...
+    def task(): ...
 
     task.apply_async()
 
@@ -754,8 +746,7 @@ def tests_span_origin_consumer(init_celery, capture_events):
     events = capture_events()
 
     @celery.task()
-    def task():
-        ...
+    def task(): ...
 
     task.apply_async()
 
@@ -779,8 +770,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
     events = capture_events()
 
     @celery.task()
-    def task():
-        ...
+    def task(): ...
 
     with start_transaction(name="custom_transaction"):
         task.apply_async()

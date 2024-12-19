@@ -566,8 +566,7 @@ async def test_asgi_request_body(
 async def test_asgi_mixin_iscoroutinefunction_before_3_12():
     sentry_asgi_mixin = _asgi_middleware_mixin_factory(lambda: None)
 
-    async def get_response():
-        ...
+    async def get_response(): ...
 
     instance = sentry_asgi_mixin(get_response)
     assert asyncio.iscoroutinefunction(instance)
@@ -582,8 +581,7 @@ async def test_asgi_mixin_iscoroutinefunction_before_3_12():
 def test_asgi_mixin_iscoroutinefunction_when_not_async_before_3_12():
     sentry_asgi_mixin = _asgi_middleware_mixin_factory(lambda: None)
 
-    def get_response():
-        ...
+    def get_response(): ...
 
     instance = sentry_asgi_mixin(get_response)
     assert not asyncio.iscoroutinefunction(instance)
