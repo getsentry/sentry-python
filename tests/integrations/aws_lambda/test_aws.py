@@ -67,6 +67,8 @@ def truncate_data(data):
 
         if data["contexts"].get("trace") is not None:
             cleaned_data["contexts"]["trace"] = data["contexts"].get("trace")
+            if cleaned_data["contexts"]["trace"].get("data", {}) != {}:
+                cleaned_data["contexts"]["trace"]["data"] = {"removed": "by truncate_data()"}
 
     if data.get("transaction") is not None:
         cleaned_data["transaction"] = data.get("transaction")
@@ -488,6 +490,15 @@ def test_performance_error(run_lambda_function):
         ),
         (b"[]", False, 1),
     ],
+    ids=[
+        "int",
+        "float",
+        "string",
+        "bool",
+        "list",
+        "list_with_request_data",
+        "empty_list",
+    ],
 )
 def test_non_dict_event(
     run_lambda_function,
@@ -540,9 +551,7 @@ def test_non_dict_event(
             "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
             "method": "GET",
             "url": "https://x1.io/1",
-            "query_string": {
-                "done": "f",
-            },
+            "query_string": "done=f",
         }
     else:
         request_data = {"url": "awslambda:///{}".format(function_name)}
