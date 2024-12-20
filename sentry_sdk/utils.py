@@ -25,7 +25,12 @@ except ImportError:
     BaseExceptionGroup = None  # type: ignore
 
 import sentry_sdk
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
+from sentry_sdk.consts import (
+    DEFAULT_ADD_FULL_STACK,
+    DEFAULT_MAX_STACK_FRAMES,
+    DEFAULT_MAX_VALUE_LENGTH,
+    EndpointType,
+)
 
 from typing import TYPE_CHECKING
 
@@ -712,6 +717,7 @@ def single_exception_from_error_tuple(
     exception_id=None,  # type: Optional[int]
     parent_id=None,  # type: Optional[int]
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Dict[str, Any]
     """
@@ -779,10 +785,15 @@ def single_exception_from_error_tuple(
             custom_repr=custom_repr,
         )
         for tb in iter_stacks(tb)
-    ]
+    ]  # type: List[Dict[str, Any]]
 
     if frames:
-        exception_value["stacktrace"] = {"frames": frames}
+        if not full_stack:
+            new_frames = frames
+        else:
+            new_frames = merge_stack_frames(frames, full_stack, client_options)
+
+        exception_value["stacktrace"] = {"frames": new_frames}
 
     return exception_value
 
@@ -837,6 +848,7 @@ def exceptions_from_error(
     exception_id=0,  # type: int
     parent_id=0,  # type: int
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
@@ -856,6 +868,7 @@ def exceptions_from_error(
         exception_id=exception_id,
         parent_id=parent_id,
         source=source,
+        full_stack=full_stack,
     )
     exceptions = [parent]
 
@@ -881,6 +894,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__cause__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -902,6 +916,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__context__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -918,6 +933,7 @@ def exceptions_from_error(
                 exception_id=exception_id,
                 parent_id=parent_id,
                 source="exceptions[%s]" % idx,
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -928,6 +944,7 @@ def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
@@ -945,6 +962,7 @@ def exceptions_from_error_tuple(
             mechanism=mechanism,
             exception_id=0,
             parent_id=0,
+            full_stack=full_stack,
         )
 
     else:
@@ -952,7 +970,12 @@ def exceptions_from_error_tuple(
         for exc_type, exc_value, tb in walk_exception_chain(exc_info):
             exceptions.append(
                 single_exception_from_error_tuple(
-                    exc_type, exc_value, tb, client_options, mechanism
+                    exc_type=exc_type,
+                    exc_value=exc_value,
+                    tb=tb,
+                    client_options=client_options,
+                    mechanism=mechanism,
+                    full_stack=full_stack,
                 )
             )
 
@@ -1071,6 +1094,46 @@ def exc_info_from_error(error):
     return exc_info
 
 
+def merge_stack_frames(frames, full_stack, client_options):
+    # type: (List[Dict[str, Any]], List[Dict[str, Any]], Optional[Dict[str, Any]]) -> List[Dict[str, Any]]
+    """
+    Add the missing frames from full_stack to frames and return the merged list.
+    """
+    frame_ids = {
+        (
+            frame["abs_path"],
+            frame["context_line"],
+            frame["lineno"],
+            frame["function"],
+        )
+        for frame in frames
+    }
+
+    new_frames = [
+        stackframe
+        for stackframe in full_stack
+        if (
+            stackframe["abs_path"],
+            stackframe["context_line"],
+            stackframe["lineno"],
+            stackframe["function"],
+        )
+        not in frame_ids
+    ]
+    new_frames.extend(frames)
+
+    # Limit the number of frames
+    max_stack_frames = (
+        client_options.get("max_stack_frames", DEFAULT_MAX_STACK_FRAMES)
+        if client_options
+        else None
+    )
+    if max_stack_frames is not None:
+        new_frames = new_frames[len(new_frames) - max_stack_frames :]
+
+    return new_frames
+
+
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
     client_options=None,  # type: Optional[Dict[str, Any]]
@@ -1079,12 +1142,21 @@ def event_from_exception(
     # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+
+    if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
+        full_stack = current_stacktrace(
+            include_local_variables=client_options["include_local_variables"],
+            max_value_length=client_options["max_value_length"],
+        )["frames"]
+    else:
+        full_stack = None
+
     return (
         {
             "level": "error",
             "exception": {
                 "values": exceptions_from_error_tuple(
-                    exc_info, client_options, mechanism
+                    exc_info, client_options, mechanism, full_stack
                 )
             },
         },
@@ -1857,3 +1929,28 @@ def _serialize_span_attribute(value):
             return str(value)
         except Exception:
             return None
+
+
+ISO_TZ_SEPARATORS = frozenset(("+", "-"))
+
+
+def datetime_from_isoformat(value):
+    # type: (str) -> datetime
+    try:
+        result = datetime.fromisoformat(value)
+    except (AttributeError, ValueError):
+        # py 3.6
+        timestamp_format = (
+            "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
+        )
+        if value.endswith("Z"):
+            value = value[:-1] + "+0000"
+
+        if value[-6] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+            value = value[:-3] + value[-2:]
+        elif value[-5] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+
+        result = datetime.strptime(value, timestamp_format)
+    return result.astimezone(timezone.utc)

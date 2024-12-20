@@ -15,23 +15,18 @@ from sentry_sdk.scope import (
     ScopeType,
     should_send_default_pii,
 )
-from sentry_sdk.integrations.opentelemetry.integration import (
-    _setup_scope_context_management,
-)
 from sentry_sdk.integrations.opentelemetry.scope import (
     PotelScope as Scope,
     use_scope,
     use_isolation_scope,
+    setup_scope_context_management,
 )
-
-
-SLOTS_NOT_COPIED = {"client"}
-"""__slots__ that are not copied when copying a Scope object."""
+from tests.conftest import ApproxDict
 
 
 @pytest.fixture(autouse=True)
 def setup_otel_scope_management():
-    _setup_scope_context_management()
+    setup_scope_context_management()
 
 
 def test_copying():
@@ -54,8 +49,30 @@ def test_all_slots_copied():
     scope_copy = copy.copy(scope)
 
     # Check all attributes are copied
-    for attr in set(Scope.__slots__) - SLOTS_NOT_COPIED:
+    for attr in set(Scope.__slots__):
         assert getattr(scope_copy, attr) == getattr(scope, attr)
+
+
+def test_scope_flags_copy():
+    # Assert forking creates a deepcopy of the flag buffer. The new
+    # scope is free to mutate without consequence to the old scope. The
+    # old scope is free to mutate without consequence to the new scope.
+    old_scope = Scope()
+    old_scope.flags.set("a", True)
+
+    new_scope = old_scope.fork()
+    new_scope.flags.set("a", False)
+    old_scope.flags.set("b", True)
+    new_scope.flags.set("c", True)
+
+    assert old_scope.flags.get() == [
+        {"flag": "a", "result": True},
+        {"flag": "b", "result": True},
+    ]
+    assert new_scope.flags.get() == [
+        {"flag": "a", "result": False},
+        {"flag": "c", "result": True},
+    ]
 
 
 def test_merging(sentry_init, capture_events):
@@ -806,8 +823,8 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
     transaction = envelope.items[0].get_transaction_event()
 
     assert transaction["tags"] == {"isolation_scope1": 1, "current_scope2": 1, "trx": 1}
-    assert transaction["spans"][0]["tags"] == {"a": 1}
-    assert transaction["spans"][1]["tags"] == {"b": 1}
+    assert transaction["spans"][0]["tags"] == ApproxDict({"a": 1})
+    assert transaction["spans"][1]["tags"] == ApproxDict({"b": 1})
 
 
 def test_should_send_default_pii_true(sentry_init):

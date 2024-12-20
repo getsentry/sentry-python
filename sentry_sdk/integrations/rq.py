@@ -6,7 +6,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
-    _serialize_span_attribute,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -183,6 +182,7 @@ def _prepopulate_attributes(job, queue):
     # type: (Job, Queue) -> dict[str, Any]
     attributes = {
         "messaging.system": "rq",
+        "rq.job.id": job.id,
     }
 
     for prop, attr in JOB_PROPERTY_TO_ATTRIBUTE.items():
@@ -193,14 +193,20 @@ def _prepopulate_attributes(job, queue):
         if getattr(queue, prop, None) is not None:
             attributes[attr] = getattr(queue, prop)
 
-    for key in ("args", "kwargs"):
-        if getattr(job, key, None):
-            attributes[f"rq.job.{key}"] = _serialize_span_attribute(getattr(job, key))
+    if getattr(job, "args", None):
+        for i, arg in enumerate(job.args):
+            with capture_internal_exceptions():
+                attributes[f"rq.job.args.{i}"] = str(arg)
+
+    if getattr(job, "kwargs", None):
+        for kwarg, value in job.kwargs.items():
+            with capture_internal_exceptions():
+                attributes[f"rq.job.kwargs.{kwarg}"] = str(value)
 
     func = job.func
     if callable(func):
         func = func.__name__
 
-    attributes["rq.job.func"] = _serialize_span_attribute(func)
+    attributes["rq.job.func"] = str(func)
 
     return attributes

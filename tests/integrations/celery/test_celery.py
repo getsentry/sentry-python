@@ -13,7 +13,6 @@ from sentry_sdk.integrations.celery import (
     _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
-from sentry_sdk.utils import _serialize_span_attribute
 from tests.conftest import ApproxDict
 
 
@@ -443,12 +442,10 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
 
     sampling_context = traces_sampler.call_args_list[1][0][0]
     assert sampling_context["celery.job.task"] == "dog_walk"
-    assert sampling_context["celery.job.args"] == _serialize_span_attribute(
-        args_kwargs["args"]
-    )
-    assert sampling_context["celery.job.kwargs"] == _serialize_span_attribute(
-        args_kwargs["kwargs"]
-    )
+    for i, arg in enumerate(args_kwargs["args"]):
+        assert sampling_context[f"celery.job.args.{i}"] == str(arg)
+    for kwarg, value in args_kwargs["kwargs"].items():
+        assert sampling_context[f"celery.job.kwargs.{kwarg}"] == str(value)
 
 
 def test_abstract_task(capture_events, celery, celery_invocation):

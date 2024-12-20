@@ -2,6 +2,7 @@ import pytest
 from opentelemetry import trace
 
 import sentry_sdk
+from sentry_sdk.consts import SPANSTATUS
 from tests.conftest import ApproxDict
 
 
@@ -331,3 +332,35 @@ def test_potel_span_root_span_references():
         with sentry_sdk.start_span(description="http") as http_span:
             assert not http_span.is_root_span
             assert http_span.root_span == request_span
+
+
+@pytest.mark.parametrize(
+    "status_in,status_out",
+    [
+        (None, None),
+        ("", SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.OK, SPANSTATUS.OK),
+        (SPANSTATUS.ABORTED, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.ALREADY_EXISTS, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.CANCELLED, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.DATA_LOSS, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.DEADLINE_EXCEEDED, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.FAILED_PRECONDITION, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.INTERNAL_ERROR, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.INVALID_ARGUMENT, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.NOT_FOUND, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.OUT_OF_RANGE, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.PERMISSION_DENIED, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.RESOURCE_EXHAUSTED, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.UNAUTHENTICATED, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.UNAVAILABLE, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.UNIMPLEMENTED, SPANSTATUS.UNKNOWN_ERROR),
+        (SPANSTATUS.UNKNOWN_ERROR, SPANSTATUS.UNKNOWN_ERROR),
+    ],
+)
+def test_potel_span_status(status_in, status_out):
+    span = sentry_sdk.start_span(name="test")
+    if status_in is not None:
+        span.set_status(status_in)
+
+    assert span.status == status_out

@@ -1280,11 +1280,11 @@ class POTelSpan:
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
+            "<%s(op=%r, name:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
             % (
                 self.__class__.__name__,
                 self.op,
-                self.description,
+                self.name,
                 self.trace_id,
                 self.span_id,
                 self.parent_span_id,
@@ -1582,6 +1582,25 @@ class POTelSpan:
             return
 
         self._otel_span.set_attribute(key, _serialize_span_attribute(value))
+
+    @property
+    def status(self):
+        # type: () -> Optional[str]
+        """
+        Return the Sentry `SPANSTATUS` corresponding to the underlying OTel status.
+        Because differences in possible values in OTel `StatusCode` and
+        Sentry `SPANSTATUS` it can not be guaranteed that the status
+        set in `set_status()` will be the same as the one returned here.
+        """
+        if not hasattr(self._otel_span, "status"):
+            return None
+
+        if self._otel_span.status.status_code == StatusCode.UNSET:
+            return None
+        elif self._otel_span.status.status_code == StatusCode.OK:
+            return SPANSTATUS.OK
+        else:
+            return SPANSTATUS.UNKNOWN_ERROR
 
     def set_status(self, status):
         # type: (str) -> None

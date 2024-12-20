@@ -20,7 +20,6 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     reraise,
-    _serialize_span_attribute,
 )
 
 from typing import TYPE_CHECKING
@@ -517,9 +516,17 @@ def _patch_producer_publish():
 
 
 def _prepopulate_attributes(task, args, kwargs):
+    # type: (Any, *Any, **Any) -> dict[str, str]
     attributes = {
         "celery.job.task": task.name,
-        "celery.job.args": _serialize_span_attribute(args),
-        "celery.job.kwargs": _serialize_span_attribute(kwargs),
     }
+
+    for i, arg in enumerate(args):
+        with capture_internal_exceptions():
+            attributes[f"celery.job.args.{i}"] = str(arg)
+
+    for kwarg, value in kwargs.items():
+        with capture_internal_exceptions():
+            attributes[f"celery.job.kwargs.{kwarg}"] = str(value)
+
     return attributes

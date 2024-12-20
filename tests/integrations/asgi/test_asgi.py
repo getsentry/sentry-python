@@ -128,7 +128,6 @@ def asgi3_ws_app():
 
 @pytest.fixture
 def asgi3_custom_transaction_app():
-
     async def app(scope, receive, send):
         sentry_sdk.get_current_scope().set_transaction_name("foobar", source="custom")
         await send(
@@ -733,6 +732,7 @@ async def test_asgi_scope_in_traces_sampler(sentry_init, asgi3_app):
         assert sampling_context["http.request.method"] == "GET"
         assert sampling_context["network.protocol.version"] == "1.1"
         assert sampling_context["network.protocol.name"] == "http"
+        assert sampling_context["http.request.header.custom-header"] == "Custom Value"
 
     sentry_init(
         traces_sampler=dummy_traces_sampler,
@@ -742,4 +742,4 @@ async def test_asgi_scope_in_traces_sampler(sentry_init, asgi3_app):
     app = SentryAsgiMiddleware(asgi3_app)
 
     async with TestClient(app) as client:
-        await client.get("/test?hello=there")
+        await client.get("/test?hello=there", headers={"Custom-Header": "Custom Value"})

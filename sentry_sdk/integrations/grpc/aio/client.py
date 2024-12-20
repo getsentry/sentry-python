@@ -6,6 +6,7 @@ from grpc.aio import (
     ClientCallDetails,
     UnaryUnaryCall,
     UnaryStreamCall,
+    Metadata,
 )
 from google.protobuf.message import Message
 
@@ -19,23 +20,19 @@ class ClientInterceptor:
     def _update_client_call_details_metadata_from_scope(
         client_call_details: ClientCallDetails,
     ) -> ClientCallDetails:
-        metadata = (
-            list(client_call_details.metadata) if client_call_details.metadata else []
-        )
+        if client_call_details.metadata is None:
+            client_call_details = client_call_details._replace(metadata=Metadata())
+        elif not isinstance(client_call_details.metadata, Metadata):
+            # This is a workaround for a GRPC bug, which was fixed in grpcio v1.60.0
+            # See https://github.com/grpc/grpc/issues/34298.
+            client_call_details = client_call_details._replace(
+                metadata=Metadata.from_tuple(client_call_details.metadata)
+            )
         for (
             key,
             value,
         ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers():
-            metadata.append((key, value))
-
-        client_call_details = ClientCallDetails(
-            method=client_call_details.method,
-            timeout=client_call_details.timeout,
-            metadata=metadata,
-            credentials=client_call_details.credentials,
-            wait_for_ready=client_call_details.wait_for_ready,
-        )
-
+            client_call_details.metadata.add(key, value)
         return client_call_details
 
 
@@ -47,10 +44,12 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
         request: Message,
     ) -> Union[UnaryUnaryCall, Message]:
         method = client_call_details.method
+        if isinstance(method, bytes):
+            method = method.decode()
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            name="unary unary call to %s" % method.decode(),
+            name="unary unary call to %s" % method,
             origin=SPAN_ORIGIN,
             only_if_parent=True,
         ) as span:
@@ -78,10 +77,12 @@ class SentryUnaryStreamClientInterceptor(
         request: Message,
     ) -> Union[AsyncIterable[Any], UnaryStreamCall]:
         method = client_call_details.method
+        if isinstance(method, bytes):
+            method = method.decode()
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            name="unary stream call to %s" % method.decode(),
+            name="unary stream call to %s" % method,
             origin=SPAN_ORIGIN,
             only_if_parent=True,
         ) as span:
