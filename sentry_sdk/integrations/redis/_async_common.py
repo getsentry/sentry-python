@@ -3,14 +3,15 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
 from sentry_sdk.integrations.redis.modules.caches import (
     _compile_cache_span_properties,
-    _set_cache_data,
+    _get_cache_data,
 )
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
-    _set_client_data,
-    _set_pipeline_data,
+    _create_breadcrumb,
+    _get_client_data,
+    _get_pipeline_data,
+    _update_span,
 )
-from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 from typing import TYPE_CHECKING
@@ -23,9 +24,9 @@ if TYPE_CHECKING:
 
 
 def patch_redis_async_pipeline(
-    pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn
+    pipeline_cls, is_cluster, get_command_args_fn, get_db_data_fn
 ):
-    # type: (Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]], bool, Any, Callable[[Span, Any], None]) -> None
+    # type: (Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]], bool, Any, Callable[[Any], dict[str, Any]]) -> None
     old_execute = pipeline_cls.execute
 
     from sentry_sdk.integrations.redis import RedisIntegration
@@ -39,24 +40,28 @@ def patch_redis_async_pipeline(
             op=OP.DB_REDIS,
             name="redis.pipeline.execute",
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         ) as span:
             with capture_internal_exceptions():
-                set_db_data_fn(span, self)
-                _set_pipeline_data(
-                    span,
-                    is_cluster,
-                    get_command_args_fn,
-                    False if is_cluster else self.is_transaction,
-                    self._command_stack if is_cluster else self.command_stack,
+                span_data = get_db_data_fn(self)
+                pipeline_data = _get_pipeline_data(
+                    is_cluster=is_cluster,
+                    get_command_args_fn=get_command_args_fn,
+                    is_transaction=False if is_cluster else self.is_transaction,
+                    command_stack=(
+                        self._command_stack if is_cluster else self.command_stack
+                    ),
                 )
+                _update_span(span, span_data, pipeline_data)
+                _create_breadcrumb("redis.pipeline.execute", span_data, pipeline_data)
 
             return await old_execute(self, *args, **kwargs)
 
     pipeline_cls.execute = _sentry_execute  # type: ignore
 
 
-def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
-    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None]) -> None
+def patch_redis_async_client(cls, is_cluster, get_db_data_fn):
+    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Any], dict[str, Any]]) -> None
     old_execute_command = cls.execute_command
 
     from sentry_sdk.integrations.redis import RedisIntegration
@@ -80,6 +85,7 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
                 op=cache_properties["op"],
                 name=cache_properties["description"],
                 origin=SPAN_ORIGIN,
+                only_if_parent=True,
             )
             cache_span.__enter__()
 
@@ -89,18 +95,24 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
             op=db_properties["op"],
             name=db_properties["description"],
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         )
         db_span.__enter__()
 
-        set_db_data_fn(db_span, self)
-        _set_client_data(db_span, is_cluster, name, *args)
+        db_span_data = get_db_data_fn(self)
+        db_client_span_data = _get_client_data(is_cluster, name, *args)
+        _update_span(db_span, db_span_data, db_client_span_data)
+        _create_breadcrumb(
+            db_properties["description"], db_span_data, db_client_span_data
+        )
 
         value = await old_execute_command(self, name, *args, **kwargs)
 
         db_span.__exit__(None, None, None)
 
         if cache_span:
-            _set_cache_data(cache_span, self, cache_properties, value)
+            cache_span_data = _get_cache_data(self, cache_properties, value)
+            _update_span(cache_span, cache_span_data)
             cache_span.__exit__(None, None, None)
 
         return value

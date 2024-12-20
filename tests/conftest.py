@@ -24,7 +24,6 @@ import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import (  # noqa: F401
-    _DEFAULT_INTEGRATIONS,
     _installed_integrations,
     _processed_integrations,
 )
@@ -63,6 +62,10 @@ else:
 
 
 from sentry_sdk import scope
+from sentry_sdk.integrations.opentelemetry.scope import (
+    setup_scope_context_management,
+    setup_initial_scopes,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -73,6 +76,8 @@ def clean_scopes():
     scope._global_scope = None
     scope._isolation_scope.set(None)
     scope._current_scope.set(None)
+
+    setup_initial_scopes()
 
 
 @pytest.fixture(autouse=True)
@@ -173,13 +178,8 @@ def reset_integrations():
     with a clean slate to ensure monkeypatching works well,
     but this also means some other stuff will be monkeypatched twice.
     """
-    global _DEFAULT_INTEGRATIONS, _processed_integrations
-    try:
-        _DEFAULT_INTEGRATIONS.remove(
-            "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-        )
-    except ValueError:
-        pass
+    global _installed_integrations, _processed_integrations
+
     _processed_integrations.clear()
     _installed_integrations.clear()
 
@@ -201,6 +201,7 @@ def sentry_init(request):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
         sentry_sdk.get_global_scope().set_client(client)
+        setup_scope_context_management()
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
@@ -656,3 +657,18 @@ class ApproxDict(dict):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+
+@pytest.fixture(name="SortedBaggage")
+def sorted_baggage_matcher():
+    class SortedBaggage:
+        def __init__(self, baggage):
+            self.baggage = baggage
+
+        def __eq__(self, other):
+            return sorted(self.baggage.split(",")) == sorted(other.split(","))
+
+        def __ne__(self, other):
+            return not self.__eq__(other)
+
+    return SortedBaggage

@@ -1,12 +1,12 @@
 import asyncio
 import json
+import re
 from contextlib import suppress
 from unittest import mock
 
 import pytest
 from aiohttp import web, ClientSession
 from aiohttp.client import ServerDisconnectedError
-from aiohttp.web_request import Request
 from aiohttp.web_exceptions import (
     HTTPInternalServerError,
     HTTPNetworkAuthenticationRequired,
@@ -291,13 +291,12 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_even
 
 
 @pytest.mark.asyncio
-async def test_traces_sampler_gets_request_object_in_sampling_context(
+async def test_traces_sampler_gets_attributes_in_sampling_context(
     sentry_init,
     aiohttp_client,
-    DictionaryContaining,  # noqa: N803
-    ObjectDescribedBy,  # noqa: N803
 ):
-    traces_sampler = mock.Mock()
+    traces_sampler = mock.Mock(return_value=True)
+
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sampler=traces_sampler,
@@ -310,17 +309,24 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
     app.router.add_get("/tricks/kangaroo", kangaroo_handler)
 
     client = await aiohttp_client(app)
-    await client.get("/tricks/kangaroo")
-
-    traces_sampler.assert_any_call(
-        DictionaryContaining(
-            {
-                "aiohttp_request": ObjectDescribedBy(
-                    type=Request, attrs={"method": "GET", "path": "/tricks/kangaroo"}
-                )
-            }
-        )
+    await client.get(
+        "/tricks/kangaroo?jump=high", headers={"Custom-Header": "Custom Value"}
     )
+
+    assert traces_sampler.call_count == 1
+    sampling_context = traces_sampler.call_args_list[0][0][0]
+    assert isinstance(sampling_context, dict)
+    assert re.match(
+        r"http:\/\/127\.0\.0\.1:[0-9]{4,5}\/tricks\/kangaroo\?jump=high",
+        sampling_context["url.full"],
+    )
+    assert sampling_context["url.path"] == "/tricks/kangaroo"
+    assert sampling_context["url.query"] == "jump=high"
+    assert sampling_context["url.scheme"] == "http"
+    assert sampling_context["http.request.method"] == "GET"
+    assert sampling_context["server.address"] == "127.0.0.1"
+    assert sampling_context["server.port"].isnumeric()
+    assert sampling_context["http.request.header.custom-header"] == "Custom Value"
 
 
 @pytest.mark.asyncio
@@ -517,11 +523,15 @@ async def test_crumb_capture(
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_client):
+async def test_outgoing_trace_headers(
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_envelopes
+):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
     )
+
+    envelopes = capture_envelopes()
 
     async def handler(request):
         return web.Response(text="OK")
@@ -531,20 +541,21 @@ async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_c
     with start_transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
-        # make trace_id difference between transactions
-        trace_id="0123456789012345678901234567890",
     ) as transaction:
         client = await aiohttp_client(raw_server)
         resp = await client.get("/")
-        request_span = transaction._span_recorder.spans[-1]
 
-        assert resp.request_info.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
+    (envelope,) = envelopes
+    transaction = envelope.get_transaction_event()
+    request_span = transaction["spans"][-1]
+
+    assert resp.request_info.headers[
+        "sentry-trace"
+    ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+        trace_id=transaction["contexts"]["trace"]["trace_id"],
+        parent_span_id=request_span["span_id"],
+        sampled=1,
+    )
 
 
 @pytest.mark.asyncio
@@ -565,14 +576,20 @@ async def test_outgoing_trace_headers_append_to_baggage(
     with start_transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
-        trace_id="0123456789012345678901234567890",
-    ):
+    ) as transaction:
         client = await aiohttp_client(raw_server)
         resp = await client.get("/", headers={"bagGage": "custom=value"})
 
-        assert (
-            resp.request_info.headers["baggage"]
-            == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
+        assert sorted(resp.request_info.headers["baggage"].split(",")) == sorted(
+            [
+                "custom=value",
+                f"sentry-trace_id={transaction.trace_id}",
+                "sentry-environment=production",
+                "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42",
+                "sentry-transaction=/interactions/other-dogs/new-dog",
+                "sentry-sample_rate=1.0",
+                "sentry-sampled=true",
+            ]
         )
 
 
