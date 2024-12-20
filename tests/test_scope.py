@@ -53,6 +53,28 @@ def test_all_slots_copied():
         assert getattr(scope_copy, attr) == getattr(scope, attr)
 
 
+def test_scope_flags_copy():
+    # Assert forking creates a deepcopy of the flag buffer. The new
+    # scope is free to mutate without consequence to the old scope. The
+    # old scope is free to mutate without consequence to the new scope.
+    old_scope = Scope()
+    old_scope.flags.set("a", True)
+
+    new_scope = old_scope.fork()
+    new_scope.flags.set("a", False)
+    old_scope.flags.set("b", True)
+    new_scope.flags.set("c", True)
+
+    assert old_scope.flags.get() == [
+        {"flag": "a", "result": True},
+        {"flag": "b", "result": True},
+    ]
+    assert new_scope.flags.get() == [
+        {"flag": "a", "result": False},
+        {"flag": "c", "result": True},
+    ]
+
+
 def test_merging(sentry_init, capture_events):
     sentry_init()
 

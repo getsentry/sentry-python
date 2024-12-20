@@ -1,7 +1,5 @@
 import sys
 
-from opentelemetry.trace.status import StatusCode
-
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
