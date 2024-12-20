@@ -505,7 +505,7 @@ def test_transaction_no_operation_name(
     query_span = query_spans[0]
     assert query_span["description"] == "query"
     assert query_span["data"]["graphql.operation.type"] == "query"
-    assert query_span["data"]["graphql.operation.name"] is None
+    assert "graphql.operation.name" not in query_span["data"]
     assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
 
@@ -582,7 +582,7 @@ def test_transaction_mutation(
     query_span = query_spans[0]
     assert query_span["description"] == "mutation"
     assert query_span["data"]["graphql.operation.type"] == "mutation"
-    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.operation.name"] == "Change"
     assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
 

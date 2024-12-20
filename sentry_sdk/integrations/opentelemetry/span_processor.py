@@ -43,6 +43,9 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event
 
 
+DEFAULT_MAX_SPANS = 1000
+
+
 class SentrySpanProcessor(SpanProcessor):
     """
     Converts OTel spans into Sentry spans so they can be sent to the Sentry backend.
@@ -79,7 +82,7 @@ class SentrySpanProcessor(SpanProcessor):
             # if have a root span ending, we build a transaction and send it
             self._flush_root_span(span)
         else:
-            self._children_spans[span.parent.span_id].append(span)
+            self._append_child_span(span)
 
     # TODO-neel-potel not sure we need a clear like JS
     def shutdown(self):
@@ -149,6 +152,20 @@ class SentrySpanProcessor(SpanProcessor):
         # TODO-neel-potel sort and cutoff max spans
 
         sentry_sdk.capture_event(transaction_event)
+
+    def _append_child_span(self, span):
+        # type: (ReadableSpan) -> None
+        if not span.parent:
+            return
+
+        max_spans = (
+            sentry_sdk.get_client().options["_experiments"].get("max_spans")
+            or DEFAULT_MAX_SPANS
+        )
+
+        children_spans = self._children_spans[span.parent.span_id]
+        if len(children_spans) < max_spans:
+            children_spans.append(span)
 
     def _collect_children(self, span):
         # type: (ReadableSpan) -> List[ReadableSpan]
