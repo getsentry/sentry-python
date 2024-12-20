@@ -121,6 +121,9 @@ def _wrap_handler(handler):
         configured_time = aws_context.get_remaining_time_in_millis()
 
         with sentry_sdk.isolation_scope() as scope:
+            scope.set_transaction_name(
+                aws_context.function_name, source=TRANSACTION_SOURCE_COMPONENT
+            )
             timeout_thread = None
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
