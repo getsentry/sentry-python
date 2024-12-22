@@ -12,7 +12,7 @@ def mock_unleash_client():
         "world": False,
     }
 
-    def is_enabled(feature: str, *a, **kw) -> bool:
+    def is_enabled(feature, *a, **kw):
         return features.get(feature, False)
 
     client = Mock()

@@ -1,5 +1,4 @@
 import pytest
-from typing import Any
 from unittest.mock import Mock
 
 import sentry_sdk
@@ -34,7 +33,7 @@ def mock_unleash_client():
 
     disabled_variant = {"name": "disabled", "enabled": False}
 
-    def get_variant(feature: str, *a, **kw) -> dict[str, Any]:
+    def get_variant(feature, *a, **kw):
         return feature_to_variant.get(feature, disabled_variant)
 
     client = Mock()
