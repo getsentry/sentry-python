@@ -10,8 +10,8 @@ from sentry_sdk.integrations.featureflags import (
 )
 
 
-def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
-    uninstall_integration(FeatureFlagsIntegration.identifier)
+def test_featureflags_integration(sentry_init, capture_events, reset_integration):
+    reset_integration(FeatureFlagsIntegration.identifier)
     sentry_init(integrations=[FeatureFlagsIntegration()])
 
     add_feature_flag("hello", False)
@@ -32,9 +32,9 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
 
 
 def test_featureflags_integration_threaded(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init, capture_events, reset_integration
 ):
-    uninstall_integration(FeatureFlagsIntegration.identifier)
+    reset_integration(FeatureFlagsIntegration.identifier)
     sentry_init(integrations=[FeatureFlagsIntegration()])
     events = capture_events()
 
@@ -82,11 +82,11 @@ def test_featureflags_integration_threaded(
 
 @pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_featureflags_integration_asyncio(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init, capture_events, reset_integration
 ):
     asyncio = pytest.importorskip("asyncio")
 
-    uninstall_integration(FeatureFlagsIntegration.identifier)
+    reset_integration(FeatureFlagsIntegration.identifier)
     sentry_init(integrations=[FeatureFlagsIntegration()])
     events = capture_events()
 

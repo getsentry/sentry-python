@@ -6,10 +6,9 @@ from tests.integrations.unleash import MockUnleashClient
 
 
 @patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
-def test_is_enabled(sentry_init, capture_events, uninstall_integration):
+def test_is_enabled(sentry_init, capture_events, reset_integration):
     mock_unleash_client = MockUnleashClient()
-
-    uninstall_integration(UnleashIntegration.identifier)
+    reset_integration(UnleashIntegration.identifier)
     sentry_init(integrations=[UnleashIntegration()])
 
     mock_unleash_client.is_enabled("hello")
@@ -30,9 +29,9 @@ def test_is_enabled(sentry_init, capture_events, uninstall_integration):
 
 
 @patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
-def test_get_variant(sentry_init, capture_events, uninstall_integration):
+def test_get_variant(sentry_init, capture_events, reset_integration):
     mock_unleash_client = MockUnleashClient()
-    uninstall_integration(UnleashIntegration.identifier)
+    reset_integration(UnleashIntegration.identifier)
     sentry_init(integrations=[UnleashIntegration()])
 
     mock_unleash_client.get_variant("toggle_feature")

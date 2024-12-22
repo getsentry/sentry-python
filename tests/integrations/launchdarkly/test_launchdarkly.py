@@ -19,12 +19,12 @@ from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
     (False, True),
 )
 def test_launchdarkly_integration(
-    sentry_init, use_global_client, capture_events, uninstall_integration
+    sentry_init, use_global_client, capture_events, reset_integration
 ):
     td = TestData.data_source()
     config = Config("sdk-key", update_processor_class=td)
 
-    uninstall_integration(LaunchDarklyIntegration.identifier)
+    reset_integration(LaunchDarklyIntegration.identifier)
     if use_global_client:
         ldclient.set_config(config)
         sentry_init(integrations=[LaunchDarklyIntegration()])
@@ -56,13 +56,13 @@ def test_launchdarkly_integration(
 
 
 def test_launchdarkly_integration_threaded(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init, capture_events, reset_integration
 ):
     td = TestData.data_source()
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
     context = Context.create("user1")
 
-    uninstall_integration(LaunchDarklyIntegration.identifier)
+    reset_integration(LaunchDarklyIntegration.identifier)
     sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
     events = capture_events()
 
@@ -111,7 +111,7 @@ def test_launchdarkly_integration_threaded(
 
 @pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_launchdarkly_integration_asyncio(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init, capture_events, reset_integration
 ):
     """Assert concurrently evaluated flags do not pollute one another."""
 
@@ -121,7 +121,7 @@ def test_launchdarkly_integration_asyncio(
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
     context = Context.create("user1")
 
-    uninstall_integration(LaunchDarklyIntegration.identifier)
+    reset_integration(LaunchDarklyIntegration.identifier)
     sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
     events = capture_events()
 

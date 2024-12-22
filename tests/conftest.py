@@ -185,7 +185,7 @@ def reset_integrations():
 
 
 @pytest.fixture
-def uninstall_integration():
+def reset_integration():
     """Use to force the next call to sentry_init to re-install/setup an integration."""
 
     def inner(identifier):
