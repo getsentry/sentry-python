@@ -52,7 +52,7 @@ class UnleashIntegration(Integration):
             enabled = variant.get("enabled", False)
             payload_type = variant.get("payload", {}).get("type")
 
-            if payload_type is None or payload_type == "boolean":
+            if payload_type is None:
                 flags = sentry_sdk.get_current_scope().flags
                 flags.set(feature, enabled)
 
