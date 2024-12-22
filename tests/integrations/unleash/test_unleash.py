@@ -4,6 +4,9 @@ import sentry_sdk
 from sentry_sdk.integrations.unleash import UnleashIntegration
 from tests.integrations.unleash import MockUnleashClient
 
+original_is_enabled = MockUnleashClient.is_enabled
+original_get_variant = MockUnleashClient.get_variant
+
 
 @patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
 def test_is_enabled(sentry_init, capture_events, reset_integration):
@@ -51,3 +54,21 @@ def test_get_variant(sentry_init, capture_events, reset_integration):
             {"flag": "unknown_feature", "result": False},
         ]
     }
+
+
+def test_wrapper_attributes(sentry_init, reset_integration):
+    reset_integration(UnleashIntegration.identifier)
+    sentry_init(integrations=[UnleashIntegration()])
+
+    client = MockUnleashClient()
+    assert client.is_enabled.__name__ == "is_enabled"
+    assert client.is_enabled.__qualname__ == original_is_enabled.__qualname__
+    assert MockUnleashClient.is_enabled.__name__ == "is_enabled"
+    assert MockUnleashClient.is_enabled.__qualname__ == original_is_enabled.__qualname__
+
+    assert client.get_variant.__name__ == "get_variant"
+    assert client.get_variant.__qualname__ == original_get_variant.__qualname__
+    assert MockUnleashClient.get_variant.__name__ == "get_variant"
+    assert (
+        MockUnleashClient.get_variant.__qualname__ == original_get_variant.__qualname__
+    )
