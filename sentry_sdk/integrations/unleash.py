@@ -3,9 +3,12 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.flag_utils import flag_error_processor
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 
-from UnleashClient import UnleashClient
+try:
+    from UnleashClient import UnleashClient
+except ImportError:
+    raise DidNotEnable("UnleashClient is not installed")
 
 if TYPE_CHECKING:
     from typing import Any
