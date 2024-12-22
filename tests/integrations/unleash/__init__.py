@@ -1,3 +1,8 @@
+import pytest
+
+pytest.importorskip("UnleashClient")
+
+
 class MockUnleashClient:
 
     def __init__(self, *a, **kw):
