@@ -11,16 +11,16 @@ from sentry_sdk.integrations.openfeature import OpenFeatureIntegration
 
 
 def test_openfeature_integration(sentry_init, capture_events, uninstall_integration):
-    uninstall_integration(OpenFeatureIntegration.identifier)
-    sentry_init(integrations=[OpenFeatureIntegration()])
-
     flags = {
         "hello": InMemoryFlag("on", {"on": True, "off": False}),
         "world": InMemoryFlag("off", {"on": True, "off": False}),
     }
     api.set_provider(InMemoryProvider(flags))
-
     client = api.get_client()
+
+    uninstall_integration(OpenFeatureIntegration.identifier)
+    sentry_init(integrations=[OpenFeatureIntegration(client)])
+
     client.get_boolean_value("hello", default_value=False)
     client.get_boolean_value("world", default_value=False)
     client.get_boolean_value("other", default_value=True)
@@ -41,18 +41,18 @@ def test_openfeature_integration(sentry_init, capture_events, uninstall_integrat
 def test_openfeature_integration_threaded(
     sentry_init, capture_events, uninstall_integration
 ):
-    uninstall_integration(OpenFeatureIntegration.identifier)
-    sentry_init(integrations=[OpenFeatureIntegration()])
-    events = capture_events()
-
     flags = {
         "hello": InMemoryFlag("on", {"on": True, "off": False}),
         "world": InMemoryFlag("off", {"on": True, "off": False}),
     }
     api.set_provider(InMemoryProvider(flags))
+    client = api.get_client()
+
+    uninstall_integration(OpenFeatureIntegration.identifier)
+    sentry_init(integrations=[OpenFeatureIntegration(client)])
+    events = capture_events()
 
     # Capture an eval before we split isolation scopes.
-    client = api.get_client()
     client.get_boolean_value("hello", default_value=False)
 
     def task(flag):
@@ -101,9 +101,19 @@ def test_openfeature_integration_asyncio(
 
     asyncio = pytest.importorskip("asyncio")
 
+    flags = {
+        "hello": InMemoryFlag("on", {"on": True, "off": False}),
+        "world": InMemoryFlag("off", {"on": True, "off": False}),
+    }
+    api.set_provider(InMemoryProvider(flags))
+    client = api.get_client()
+
     uninstall_integration(OpenFeatureIntegration.identifier)
-    sentry_init(integrations=[OpenFeatureIntegration()])
+    sentry_init(integrations=[OpenFeatureIntegration(client)])
     events = capture_events()
+
+    # Capture an eval before we split isolation scopes.
+    client.get_boolean_value("hello", default_value=False)
 
     async def task(flag):
         with sentry_sdk.isolation_scope():
@@ -114,16 +124,6 @@ def test_openfeature_integration_asyncio(
 
     async def runner():
         return asyncio.gather(task("world"), task("other"))
-
-    flags = {
-        "hello": InMemoryFlag("on", {"on": True, "off": False}),
-        "world": InMemoryFlag("off", {"on": True, "off": False}),
-    }
-    api.set_provider(InMemoryProvider(flags))
-
-    # Capture an eval before we split isolation scopes.
-    client = api.get_client()
-    client.get_boolean_value("hello", default_value=False)
 
     asyncio.run(runner())
 

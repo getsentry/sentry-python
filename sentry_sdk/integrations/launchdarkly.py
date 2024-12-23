@@ -4,39 +4,37 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.flag_utils import flag_error_processor
 
+if TYPE_CHECKING:
+    from typing import Any, Optional
+
 try:
-    import ldclient
     from ldclient.hook import Hook, Metadata
 
     if TYPE_CHECKING:
         from ldclient import LDClient
         from ldclient.hook import EvaluationSeriesContext
         from ldclient.evaluation import EvaluationDetail
-
-        from typing import Any
 except ImportError:
     raise DidNotEnable("LaunchDarkly is not installed")
 
 
 class LaunchDarklyIntegration(Integration):
     identifier = "launchdarkly"
-    _ld_client = None  # type: LDClient | None
+    _client = None  # type: Optional[LDClient]
 
-    def __init__(self, ld_client=None):
-        # type: (LDClient | None) -> None
+    def __init__(self, client):
+        # type: (LDClient) -> None
         """
-        :param client: An initialized LDClient instance. If a client is not provided, this
-            integration will attempt to use the shared global instance.
+        :param client: An initialized LDClient instance.
         """
-        self.__class__._ld_client = ld_client
+        self.__class__._client = client
 
     @staticmethod
     def setup_once():
         # type: () -> None
-        try:
-            client = LaunchDarklyIntegration._ld_client or ldclient.get()
-        except Exception as exc:
-            raise DidNotEnable("Error getting LaunchDarkly client. " + repr(exc))
+        client = LaunchDarklyIntegration._client
+        if not client:
+            raise DidNotEnable("Error getting LDClient instance")
 
         # Register the flag collection hook with the LD client.
         client.add_hook(LaunchDarklyHook())
