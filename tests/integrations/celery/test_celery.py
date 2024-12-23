@@ -126,14 +126,14 @@ def test_simple_with_performance(capture_events, init_celery, celery_invocation)
         foo = 42  # noqa
         return x / y
 
-    with sentry_sdk.start_span(op="unit test transaction") as span:
+    with sentry_sdk.start_span(op="unit test transaction") as root_span:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
     (_, error_event, _, _) = events
 
-    assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
-    assert error_event["contexts"]["trace"]["span_id"] != span.span_id
+    assert error_event["contexts"]["trace"]["trace_id"] == root_span.trace_id
+    assert error_event["contexts"]["trace"]["span_id"] != root_span.span_id
     assert error_event["transaction"] == "dummy_task"
     assert "celery_task_id" in error_event["tags"]
     assert error_event["extra"]["celery-job"] == dict(
@@ -195,12 +195,12 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
 
     events = capture_events()
 
-    with sentry_sdk.start_span(name="submission") as span:
+    with sentry_sdk.start_span(name="submission") as root_span:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     if task_fails:
         error_event = events.pop(0)
-        assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
+        assert error_event["contexts"]["trace"]["trace_id"] == root_span.trace_id
         assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
     execution_event, submission_event = events
@@ -211,8 +211,8 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert submission_event["transaction_info"] == {"source": "custom"}
 
     assert execution_event["type"] == submission_event["type"] == "transaction"
-    assert execution_event["contexts"]["trace"]["trace_id"] == span.trace_id
-    assert submission_event["contexts"]["trace"]["trace_id"] == span.trace_id
+    assert execution_event["contexts"]["trace"]["trace_id"] == root_span.trace_id
+    assert submission_event["contexts"]["trace"]["trace_id"] == root_span.trace_id
 
     if task_fails:
         assert execution_event["contexts"]["trace"]["status"] == "internal_error"
@@ -221,7 +221,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
 
     assert len(execution_event["spans"]) == 1
     assert execution_event["spans"][0] == ApproxDict({
-        "trace_id": str(span.trace_id),
+        "trace_id": str(root_span.trace_id),
         "op": "queue.process",
         "description": "dummy_task",
     })
@@ -235,7 +235,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "span_id": submission_event["spans"][0]["span_id"],
             "start_timestamp": submission_event["spans"][0]["start_timestamp"],
             "timestamp": submission_event["spans"][0]["timestamp"],
-            "trace_id": str(span.trace_id),
+            "trace_id": str(root_span.trace_id),
             "status": "ok",
             "tags": {
                 "status": "ok",
