@@ -27,7 +27,7 @@ class MockUnleashClient:
                 "enabled": True,
                 "payload": {"type": "csv", "value": "abc 123\ncsbq 94"},
             },
-            "toggle_feature": {"name": "variant1", "enabled": True},
+            "no_payload_feature": {"name": "variant1", "enabled": True},
         }
 
         self.disabled_variant = {"name": "disabled", "enabled": False}

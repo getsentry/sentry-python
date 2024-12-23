@@ -42,7 +42,7 @@ def test_get_variant(sentry_init, capture_events, uninstall_integration):
     uninstall_integration(UnleashIntegration)
     sentry_init(integrations=[UnleashIntegration()])
 
-    client.get_variant("toggle_feature")
+    client.get_variant("no_payload_feature")
     client.get_variant("string_feature")
     client.get_variant("json_feature")
     client.get_variant("csv_feature")
@@ -55,7 +55,11 @@ def test_get_variant(sentry_init, capture_events, uninstall_integration):
     assert len(events) == 1
     assert events[0]["contexts"]["flags"] == {
         "values": [
-            {"flag": "toggle_feature", "result": True},
+            {"flag": "no_payload_feature", "result": True},
+            {"flag": "string_feature", "result": True},
+            {"flag": "json_feature", "result": True},
+            {"flag": "csv_feature", "result": True},
+            {"flag": "number_feature", "result": True},
             {"flag": "unknown_feature", "result": False},
         ]
     }
@@ -129,7 +133,7 @@ def test_get_variant_threaded(sentry_init, capture_events, uninstall_integration
     client.get_variant("hello")
 
     with cf.ThreadPoolExecutor(max_workers=2) as pool:
-        pool.map(task, ["other", "toggle_feature"])
+        pool.map(task, ["no_payload_feature", "other"])
 
     # Capture error in original scope
     sentry_sdk.set_tag("task_id", "0")
@@ -146,13 +150,13 @@ def test_get_variant_threaded(sentry_init, capture_events, uninstall_integration
     assert events[1]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
-            {"flag": "other", "result": False},
+            {"flag": "no_payload_feature", "result": True},
         ]
     }
     assert events[2]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
-            {"flag": "toggle_feature", "result": True},
+            {"flag": "other", "result": False},
         ]
     }
 
@@ -226,7 +230,7 @@ def test_get_variant_asyncio(sentry_init, capture_events, uninstall_integration)
             sentry_sdk.capture_exception(Exception("something wrong!"))
 
     async def runner():
-        return asyncio.gather(task("other"), task("toggle_feature"))
+        return asyncio.gather(task("no_payload_feature"), task("other"))
 
     # Capture an eval before we split isolation scopes.
     client.get_variant("hello")
@@ -248,13 +252,13 @@ def test_get_variant_asyncio(sentry_init, capture_events, uninstall_integration)
     assert events[1]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
-            {"flag": "other", "result": False},
+            {"flag": "no_payload_feature", "result": True},
         ]
     }
     assert events[2]["contexts"]["flags"] == {
         "values": [
             {"flag": "hello", "result": False},
-            {"flag": "toggle_feature", "result": True},
+            {"flag": "other", "result": False},
         ]
     }
 

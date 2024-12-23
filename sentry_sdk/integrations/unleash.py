@@ -30,8 +30,8 @@ class UnleashIntegration(Integration):
             # type: (UnleashClient, str, *Any, **Any) -> Any
             enabled = old_is_enabled(self, feature, *a, **kw)
 
-            # We have no way of knowing what type of feature this is. Have to treat it as
-            # boolean flag. TODO: Unless we fetch a list of non-bool flags on startup..
+            # We have no way of knowing what type of unleash feature this is, so we have to treat
+            # it as a boolean / toggle feature.
             flags = sentry_sdk.get_current_scope().flags
             flags.set(feature, enabled)
 
@@ -42,12 +42,13 @@ class UnleashIntegration(Integration):
             # type: (UnleashClient, str, *Any, **Any) -> Any
             variant = old_get_variant(self, feature, *a, **kw)
             enabled = variant.get("enabled", False)
-            payload_type = variant.get("payload", {}).get("type")
+            # _payload_type = variant.get("payload", {}).get("type")
 
-            if payload_type is None:
-                flags = sentry_sdk.get_current_scope().flags
-                flags.set(feature, enabled)
-
+            # Payloads are not always used as the feature's value for application logic. They
+            # may be used for metrics or debugging context instead. Therefore, we treat every
+            # variant as a boolean toggle, using the `enabled` field.
+            flags = sentry_sdk.get_current_scope().flags
+            flags.set(feature, enabled)
             return variant
 
         UnleashClient.is_enabled = sentry_is_enabled  # type: ignore
