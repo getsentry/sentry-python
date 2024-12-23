@@ -35,7 +35,6 @@ class LaunchDarklyIntegration(Integration):
         # type: () -> None
         try:
             client = LaunchDarklyIntegration._ld_client or ldclient.get()
-            print("got client")
         except Exception as exc:
             raise DidNotEnable("Error getting LaunchDarkly client. " + repr(exc))
 
