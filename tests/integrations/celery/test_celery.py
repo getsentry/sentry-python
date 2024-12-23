@@ -443,7 +443,7 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
         walk_dogs, [["Maisey", "Charlie", "Bodhi", "Cory"], "Dog park round trip"], 1
     )
 
-    sampling_context = traces_sampler.call_args_list[1][0][0]
+    sampling_context = traces_sampler.call_args_list[0][0][0]
     assert sampling_context["celery.job.task"] == "dog_walk"
     for i, arg in enumerate(args_kwargs["args"]):
         assert sampling_context[f"celery.job.args.{i}"] == str(arg)
