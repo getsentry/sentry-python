@@ -4,28 +4,41 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.flag_utils import flag_error_processor
 
+if TYPE_CHECKING:
+    from typing import Optional
+
 try:
-    from openfeature import api
     from openfeature.hook import Hook
 
     if TYPE_CHECKING:
         from openfeature.flag_evaluation import FlagEvaluationDetails
         from openfeature.hook import HookContext, HookHints
+        from openfeature.client import OpenFeatureClient
 except ImportError:
     raise DidNotEnable("OpenFeature is not installed")
 
 
 class OpenFeatureIntegration(Integration):
     identifier = "openfeature"
+    _client = None  # type: Optional[OpenFeatureClient]
+
+    def __init__(self, client):
+        # type: (OpenFeatureClient) -> None
+        self.__class__._client = client
 
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        client = OpenFeatureIntegration._client
+        if not client:
+            raise DidNotEnable("Error getting OpenFeatureClient instance")
+
+        # Register the hook within the openfeature client.
+        client.add_hooks(hooks=[OpenFeatureHook()])
+
         scope = sentry_sdk.get_current_scope()
         scope.add_error_processor(flag_error_processor)
-
-        # Register the hook within the global openfeature hooks list.
-        api.add_hooks(hooks=[OpenFeatureHook()])
 
 
 class OpenFeatureHook(Hook):
