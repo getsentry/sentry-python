@@ -64,6 +64,7 @@
 
       {% for framework in frameworks %}
       - name: Test {{ framework }} {{ category }}
+        {% raw %}if: ${{ !cancelled() }}{% endraw %}
         run: |
           set -x # print commands that are executed
           {% if category == "pinned" %}
