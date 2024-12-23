@@ -28,7 +28,6 @@ from sentry_sdk.integrations import (  # noqa: F401
     _DEFAULT_INTEGRATIONS,
     _installed_integrations,
     _processed_integrations,
-    Integration,
 )
 from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
