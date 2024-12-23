@@ -273,11 +273,11 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with sentry_sdk.start_span() as span:
+    with sentry_sdk.start_span() as root_span:
         dummy_task.delay()
 
     (event,) = events
-    assert event["contexts"]["trace"]["trace_id"] != span.trace_id
+    assert event["contexts"]["trace"]["trace_id"] != root_span.trace_id
     assert event["transaction"] == "dummy_task"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -508,7 +508,7 @@ def test_baggage_propagation(init_celery):
     def dummy_task(self, x, y):
         return _get_headers(self)
 
-    with sentry_sdk.start_span() as span:
+    with sentry_sdk.start_span() as root_span:
         result = dummy_task.apply_async(
             args=(1, 0),
             headers={"baggage": "custom=value"},
@@ -517,7 +517,7 @@ def test_baggage_propagation(init_celery):
         assert sorted(result["baggage"].split(",")) == sorted(
             [
                 "sentry-release=abcdef",
-                "sentry-trace_id={}".format(span.trace_id),
+                "sentry-trace_id={}".format(root_span.trace_id),
                 "sentry-environment=production",
                 "sentry-sample_rate=1.0",
                 "sentry-sampled=true",
@@ -540,8 +540,8 @@ def test_sentry_propagate_traces_override(init_celery):
         trace_id = get_current_span().trace_id
         return trace_id
 
-    with sentry_sdk.start_span() as span:
-        transaction_trace_id = span.trace_id
+    with sentry_sdk.start_span() as root_span:
+        transaction_trace_id = root_span.trace_id
 
         # should propagate trace
         task_transaction_id = dummy_task.apply_async(
