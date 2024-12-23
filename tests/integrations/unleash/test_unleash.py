@@ -1,7 +1,7 @@
 import concurrent.futures as cf
 import sys
 from random import random
-from unittest.mock import patch
+from unittest import mock
 
 import pytest
 
@@ -9,15 +9,11 @@ import sentry_sdk
 from sentry_sdk.integrations.unleash import UnleashIntegration
 from tests.integrations.unleash.testutils import MockUnleashClient
 
-original_is_enabled = MockUnleashClient.is_enabled
-original_get_variant = MockUnleashClient.get_variant
 
-
-@patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
 def test_is_enabled(sentry_init, capture_events, uninstall_integration):
     client = MockUnleashClient()
     uninstall_integration(UnleashIntegration)
-    sentry_init(integrations=[UnleashIntegration()])
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
 
     client.is_enabled("hello")
     client.is_enabled("world")
@@ -36,11 +32,10 @@ def test_is_enabled(sentry_init, capture_events, uninstall_integration):
     }
 
 
-@patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
 def test_get_variant(sentry_init, capture_events, uninstall_integration):
     client = MockUnleashClient()
     uninstall_integration(UnleashIntegration)
-    sentry_init(integrations=[UnleashIntegration()])
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
 
     client.get_variant("no_payload_feature")
     client.get_variant("string_feature")
@@ -65,11 +60,10 @@ def test_get_variant(sentry_init, capture_events, uninstall_integration):
     }
 
 
-@patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
 def test_is_enabled_threaded(sentry_init, capture_events, uninstall_integration):
     client = MockUnleashClient()
     uninstall_integration(UnleashIntegration)
-    sentry_init(integrations=[UnleashIntegration()])
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
     events = capture_events()
 
     def task(flag_key):
@@ -113,11 +107,10 @@ def test_is_enabled_threaded(sentry_init, capture_events, uninstall_integration)
     }
 
 
-@patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
 def test_get_variant_threaded(sentry_init, capture_events, uninstall_integration):
     client = MockUnleashClient()
     uninstall_integration(UnleashIntegration)
-    sentry_init(integrations=[UnleashIntegration()])
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
     events = capture_events()
 
     def task(flag_key):
@@ -162,13 +155,12 @@ def test_get_variant_threaded(sentry_init, capture_events, uninstall_integration
 
 
 @pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
-@patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
 def test_is_enabled_asyncio(sentry_init, capture_events, uninstall_integration):
     asyncio = pytest.importorskip("asyncio")
 
     client = MockUnleashClient()
     uninstall_integration(UnleashIntegration)
-    sentry_init(integrations=[UnleashIntegration()])
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
     events = capture_events()
 
     async def task(flag_key):
@@ -213,13 +205,12 @@ def test_is_enabled_asyncio(sentry_init, capture_events, uninstall_integration):
 
 
 @pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
-@patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
 def test_get_variant_asyncio(sentry_init, capture_events, uninstall_integration):
     asyncio = pytest.importorskip("asyncio")
 
     client = MockUnleashClient()
     uninstall_integration(UnleashIntegration)
-    sentry_init(integrations=[UnleashIntegration()])
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
     events = capture_events()
 
     async def task(flag_key):
@@ -263,50 +254,41 @@ def test_get_variant_asyncio(sentry_init, capture_events, uninstall_integration)
     }
 
 
-@patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
 def test_wraps_original(sentry_init, uninstall_integration):
-    uninstall_integration(UnleashIntegration)
-
-    with patch(
-        "sentry_sdk.integrations.unleash.UnleashClient.is_enabled"
-    ) as mock_is_enabled:
-        with patch(
-            "sentry_sdk.integrations.unleash.UnleashClient.get_variant"
-        ) as mock_get_variant:
-            mock_is_enabled.return_value = random() < 0.5
-            mock_get_variant.return_value = {"enabled": random() < 0.5}
-            sentry_init(integrations=[UnleashIntegration()])
-            client = MockUnleashClient()
-
-            res = client.is_enabled("test-flag", "arg", kwarg=1)
-            assert res == mock_is_enabled.return_value
-            assert mock_is_enabled.call_args == (
-                (client, "test-flag", "arg"),
-                {"kwarg": 1},
-            )
-
-            res = client.get_variant("test-flag", "arg", kwarg=1)
-            assert res == mock_get_variant.return_value
-            assert mock_get_variant.call_args == (
-                (client, "test-flag", "arg"),
-                {"kwarg": 1},
-            )
-
-
-@patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
-def test_wrapper_attributes(sentry_init, uninstall_integration):
-    uninstall_integration(UnleashIntegration)
-    sentry_init(integrations=[UnleashIntegration()])
-
     client = MockUnleashClient()
+    mock_is_enabled = mock.Mock(return_value=random() < 0.5)
+    client.is_enabled = mock_is_enabled
+    mock_get_variant = mock.Mock(return_value={"enabled": random() < 0.5})
+    client.get_variant = mock_get_variant
+
+    uninstall_integration(UnleashIntegration)
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
+
+    res = client.is_enabled("test-flag", "arg", kwarg=1)
+    assert res == mock_is_enabled.return_value
+    assert mock_is_enabled.call_args == (
+        ("test-flag", "arg"),
+        {"kwarg": 1},
+    )
+
+    res = client.get_variant("test-flag", "arg", kwarg=1)
+    assert res == mock_get_variant.return_value
+    assert mock_get_variant.call_args == (
+        ("test-flag", "arg"),
+        {"kwarg": 1},
+    )
+
+
+def test_wrapper_attributes(sentry_init, uninstall_integration):
+    client = MockUnleashClient()
+    original_is_enabled = client.is_enabled
+    original_get_variant = client.get_variant
+
+    uninstall_integration(UnleashIntegration)
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
+
     assert client.is_enabled.__name__ == "is_enabled"
     assert client.is_enabled.__qualname__ == original_is_enabled.__qualname__
-    assert MockUnleashClient.is_enabled.__name__ == "is_enabled"
-    assert MockUnleashClient.is_enabled.__qualname__ == original_is_enabled.__qualname__
 
     assert client.get_variant.__name__ == "get_variant"
     assert client.get_variant.__qualname__ == original_get_variant.__qualname__
-    assert MockUnleashClient.get_variant.__name__ == "get_variant"
-    assert (
-        MockUnleashClient.get_variant.__qualname__ == original_get_variant.__qualname__
-    )
