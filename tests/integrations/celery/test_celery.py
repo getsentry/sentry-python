@@ -1,6 +1,7 @@
 import threading
 import kombu
 from unittest import mock
+from urllib.parse import quote
 
 import pytest
 from celery import Celery, VERSION
@@ -518,6 +519,7 @@ def test_baggage_propagation(init_celery):
             [
                 "sentry-release=abcdef",
                 "sentry-trace_id={}".format(root_span.trace_id),
+                "sentry-transaction={}".format(quote("<unlabeled span>")),
                 "sentry-environment=production",
                 "sentry-sample_rate=1.0",
                 "sentry-sampled=true",
