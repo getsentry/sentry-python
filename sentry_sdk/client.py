@@ -483,7 +483,7 @@ class _Client(BaseClient):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = str(self.options[key]).strip()  # type: ignore[literal-required]
+                event[key] = str(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -532,7 +532,7 @@ class _Client(BaseClient):
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
                     )
-            event = new_event  # type: ignore
+            event = new_event
 
         before_send_transaction = self.options["before_send_transaction"]
         if (
@@ -562,7 +562,7 @@ class _Client(BaseClient):
                         reason="before_send", data_category="span", quantity=spans_delta
                     )
 
-            event = new_event  # type: ignore
+            event = new_event
 
         return event
 
