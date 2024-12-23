@@ -44,11 +44,11 @@ TraceState = Optional[Tuple[Optional[SentrySpan], SentrySpan]]
 
 
 class RustTracingLevel(Enum):
-    Trace: str = "TRACE"
-    Debug: str = "DEBUG"
-    Info: str = "INFO"
-    Warn: str = "WARN"
-    Error: str = "ERROR"
+    Trace = "TRACE"
+    Debug = "DEBUG"
+    Info = "INFO"
+    Warn = "WARN"
+    Error = "ERROR"
 
 
 class EventTypeMapping(Enum):
