@@ -237,6 +237,9 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "timestamp": submission_event["spans"][0]["timestamp"],
             "trace_id": str(span.trace_id),
             "status": "ok",
+            "tags": {
+                "status": "ok",
+            }
         }
     ]
 

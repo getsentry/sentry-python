@@ -322,9 +322,13 @@ def _wrap_tracer(task, f):
                     # for some reason, args[1] is a list if non-empty but a
                     # tuple if empty
                     attributes=_prepopulate_attributes(task, list(args[1]), args[2]),
-                ) as transaction:
-                    transaction.set_status(SPANSTATUS.OK)
-                    return f(*args, **kwargs)
+                ) as root_span:
+                    return_value = f(*args, **kwargs)
+
+                    if root_span.status is None:
+                        root_span.set_status(SPANSTATUS.OK)
+
+                    return return_value
 
     return _inner  # type: ignore
 

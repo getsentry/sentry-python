@@ -68,9 +68,7 @@ from sentry_sdk.integrations.opentelemetry.scope import (
 )
 
 
-# Disabling this, because this leads in Potel to Celery tests failing
-# TODO: Check if disabling this broke a bunch of other test (not sure how to do)
-# @pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True)
 def clean_scopes():
     """
     Resets the scopes for every test to avoid leaking data between tests.
