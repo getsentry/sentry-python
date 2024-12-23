@@ -10,9 +10,9 @@ original_get_variant = MockUnleashClient.get_variant
 
 
 @patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
-def test_is_enabled(sentry_init, capture_events, reset_integration):
+def test_is_enabled(sentry_init, capture_events, uninstall_integration):
     client = MockUnleashClient()
-    reset_integration(UnleashIntegration.identifier)
+    uninstall_integration(UnleashIntegration)
     sentry_init(integrations=[UnleashIntegration()])
 
     client.is_enabled("hello")
@@ -33,9 +33,9 @@ def test_is_enabled(sentry_init, capture_events, reset_integration):
 
 
 @patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
-def test_get_variant(sentry_init, capture_events, reset_integration):
+def test_get_variant(sentry_init, capture_events, uninstall_integration):
     client = MockUnleashClient()
-    reset_integration(UnleashIntegration.identifier)
+    uninstall_integration(UnleashIntegration)
     sentry_init(integrations=[UnleashIntegration()])
 
     client.get_variant("toggle_feature")
@@ -58,8 +58,8 @@ def test_get_variant(sentry_init, capture_events, reset_integration):
 
 
 @patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
-def test_wraps_original(sentry_init, reset_integration):
-    reset_integration(UnleashIntegration.identifier)
+def test_wraps_original(sentry_init, uninstall_integration):
+    uninstall_integration(UnleashIntegration)
 
     with patch(
         "sentry_sdk.integrations.unleash.UnleashClient.is_enabled"
@@ -88,8 +88,8 @@ def test_wraps_original(sentry_init, reset_integration):
 
 
 @patch("sentry_sdk.integrations.unleash.UnleashClient", MockUnleashClient)
-def test_wrapper_attributes(sentry_init, reset_integration):
-    reset_integration(UnleashIntegration.identifier)
+def test_wrapper_attributes(sentry_init, uninstall_integration):
+    uninstall_integration(UnleashIntegration)
     sentry_init(integrations=[UnleashIntegration()])
 
     client = MockUnleashClient()

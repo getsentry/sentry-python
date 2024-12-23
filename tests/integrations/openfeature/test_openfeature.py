@@ -10,8 +10,8 @@ import sentry_sdk
 from sentry_sdk.integrations.openfeature import OpenFeatureIntegration
 
 
-def test_openfeature_integration(sentry_init, capture_events, reset_integration):
-    reset_integration(OpenFeatureIntegration.identifier)
+def test_openfeature_integration(sentry_init, capture_events, uninstall_integration):
+    uninstall_integration(OpenFeatureIntegration.identifier)
     sentry_init(integrations=[OpenFeatureIntegration()])
 
     flags = {
@@ -39,9 +39,9 @@ def test_openfeature_integration(sentry_init, capture_events, reset_integration)
 
 
 def test_openfeature_integration_threaded(
-    sentry_init, capture_events, reset_integration
+    sentry_init, capture_events, uninstall_integration
 ):
-    reset_integration(OpenFeatureIntegration.identifier)
+    uninstall_integration(OpenFeatureIntegration.identifier)
     sentry_init(integrations=[OpenFeatureIntegration()])
     events = capture_events()
 
@@ -95,13 +95,13 @@ def test_openfeature_integration_threaded(
 
 @pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_openfeature_integration_asyncio(
-    sentry_init, capture_events, reset_integration
+    sentry_init, capture_events, uninstall_integration
 ):
     """Assert concurrently evaluated flags do not pollute one another."""
 
     asyncio = pytest.importorskip("asyncio")
 
-    reset_integration(OpenFeatureIntegration.identifier)
+    uninstall_integration(OpenFeatureIntegration.identifier)
     sentry_init(integrations=[OpenFeatureIntegration()])
     events = capture_events()
 
