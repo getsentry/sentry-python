@@ -17,4 +17,5 @@ pre-commit # local linting
 httpcore
 openfeature-sdk
 launchdarkly-server-sdk
+UnleashClient
 typer

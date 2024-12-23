@@ -10,6 +10,7 @@ from unittest import mock
 import pytest
 import jsonschema
 
+
 try:
     import gevent
 except ImportError:
@@ -186,9 +187,16 @@ def reset_integrations():
 
 @pytest.fixture
 def uninstall_integration():
-    """Use to force the next call to sentry_init to re-install/setup an integration."""
+    """
+    Forces the next call to sentry_init to re-install an integration and call `setup_once`.
+    No effect if the integration is not installed.
+    """
 
-    def inner(identifier):
+    def inner(name_or_cls):
+        if isinstance(name_or_cls, str):
+            identifier = name_or_cls
+        else:
+            identifier = name_or_cls.identifier
         _processed_integrations.discard(identifier)
         _installed_integrations.discard(identifier)
 

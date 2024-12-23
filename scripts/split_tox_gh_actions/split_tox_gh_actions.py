@@ -133,6 +133,7 @@ GROUPS = {
         "pure_eval",
         "trytond",
         "typer",
+        "unleash",
     ],
 }
 
