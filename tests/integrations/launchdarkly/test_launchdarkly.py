@@ -169,7 +169,13 @@ def test_launchdarkly_integration_asyncio(
 
 
 def test_launchdarkly_integration_did_not_enable(sentry_init, uninstall_integration):
-    # Using global client and set_config wasn't called.
+    """
+    Setup should fail when using global client and ldclient.set_config wasn't called.
+
+    We're accessing ldclient internals to set up this test, so it might break if launchdarkly's
+    implementation changes.
+    """
+
     ldclient._reset_client()
     try:
         ldclient.__lock.lock()
