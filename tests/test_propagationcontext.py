@@ -1,4 +1,4 @@
-from sentry_sdk.tracing_utils import PropagationContext
+from sentry_sdk.tracing_utils import Baggage, PropagationContext
 
 
 def test_empty_context():
@@ -16,23 +16,26 @@ def test_empty_context():
 
 
 def test_context_with_values():
+    baggage = Baggage(
+        sentry_items={
+            "sentry-trace": "1234567890abcdef1234567890abcdef-1234567890abcdef-1"
+        },
+        third_party_items={"foo": "bar"},
+        mutable=False,
+    )
     ctx = PropagationContext(
         trace_id="1234567890abcdef1234567890abcdef",
         span_id="1234567890abcdef",
         parent_span_id="abcdef1234567890",
         parent_sampled=True,
-        dynamic_sampling_context={
-            "foo": "bar",
-        },
+        baggage=baggage,
     )
 
     assert ctx.trace_id == "1234567890abcdef1234567890abcdef"
     assert ctx.span_id == "1234567890abcdef"
     assert ctx.parent_span_id == "abcdef1234567890"
     assert ctx.parent_sampled
-    assert ctx.dynamic_sampling_context == {
-        "foo": "bar",
-    }
+    assert ctx.baggage == baggage
 
 
 def test_lacy_uuids():

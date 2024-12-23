@@ -21,7 +21,7 @@ def _get_headers(asgi_scope):
     Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
     """
     headers = {}  # type: Dict[str, str]
-    for raw_key, raw_value in asgi_scope["headers"]:
+    for raw_key, raw_value in asgi_scope.get("headers", {}):
         key = raw_key.decode("latin-1")
         value = raw_value.decode("latin-1")
         if key in headers:
@@ -32,8 +32,8 @@ def _get_headers(asgi_scope):
     return headers
 
 
-def _get_url(asgi_scope, default_scheme, host):
-    # type: (Dict[str, Any], Literal["ws", "http"], Optional[Union[AnnotatedValue, str]]) -> str
+def _get_url(asgi_scope, default_scheme=None, host=None):
+    # type: (Dict[str, Any], Optional[Literal["ws", "http"]], Optional[Union[AnnotatedValue, str]]) -> str
     """
     Extract URL from the ASGI scope, without also including the querystring.
     """

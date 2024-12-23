@@ -430,7 +430,7 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
 
 
 def test_traces_sampler_gets_task_info_in_sampling_context(
-    init_celery, celery_invocation, DictionaryContaining  # noqa:N803
+    init_celery, celery_invocation
 ):
     traces_sampler = mock.Mock()
     celery = init_celery(traces_sampler=traces_sampler)
@@ -445,11 +445,12 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
         walk_dogs, [["Maisey", "Charlie", "Bodhi", "Cory"], "Dog park round trip"], 1
     )
 
-    traces_sampler.assert_any_call(
-        # depending on the iteration of celery_invocation, the data might be
-        # passed as args or as kwargs, so make this generic
-        DictionaryContaining({"celery_job": dict(task="dog_walk", **args_kwargs)})
-    )
+    sampling_context = traces_sampler.call_args_list[1][0][0]
+    assert sampling_context["celery.job.task"] == "dog_walk"
+    for i, arg in enumerate(args_kwargs["args"]):
+        assert sampling_context[f"celery.job.args.{i}"] == str(arg)
+    for kwarg, value in args_kwargs["kwargs"].items():
+        assert sampling_context[f"celery.job.kwargs.{kwarg}"] == str(value)
 
 
 def test_abstract_task(capture_events, celery, celery_invocation):

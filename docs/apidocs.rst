@@ -2,9 +2,6 @@
 API Docs
 ========
 
-.. autoclass:: sentry_sdk.Hub
-    :members:
-
 .. autoclass:: sentry_sdk.Scope
     :members:
 
