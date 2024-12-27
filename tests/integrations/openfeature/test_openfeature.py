@@ -10,7 +10,13 @@ import sentry_sdk
 from sentry_sdk.integrations.openfeature import OpenFeatureIntegration
 
 
-def test_openfeature_integration(sentry_init, capture_events, uninstall_integration):
+@pytest.mark.parametrize(
+    "use_global_client",
+    (False, True),
+)
+def test_openfeature_integration(
+    sentry_init, use_global_client, capture_events, uninstall_integration
+):
     flags = {
         "hello": InMemoryFlag("on", {"on": True, "off": False}),
         "world": InMemoryFlag("off", {"on": True, "off": False}),
@@ -19,7 +25,10 @@ def test_openfeature_integration(sentry_init, capture_events, uninstall_integrat
     client = api.get_client()
 
     uninstall_integration(OpenFeatureIntegration.identifier)
-    sentry_init(integrations=[OpenFeatureIntegration(client)])
+    if use_global_client:
+        sentry_init(integrations=[OpenFeatureIntegration()])
+    else:
+        sentry_init(integrations=[OpenFeatureIntegration(client=client)])
 
     client.get_boolean_value("hello", default_value=False)
     client.get_boolean_value("world", default_value=False)
@@ -49,7 +58,7 @@ def test_openfeature_integration_threaded(
     client = api.get_client()
 
     uninstall_integration(OpenFeatureIntegration.identifier)
-    sentry_init(integrations=[OpenFeatureIntegration(client)])
+    sentry_init(integrations=[OpenFeatureIntegration(client=client)])
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
@@ -109,7 +118,7 @@ def test_openfeature_integration_asyncio(
     client = api.get_client()
 
     uninstall_integration(OpenFeatureIntegration.identifier)
-    sentry_init(integrations=[OpenFeatureIntegration(client)])
+    sentry_init(integrations=[OpenFeatureIntegration(client=client)])
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.

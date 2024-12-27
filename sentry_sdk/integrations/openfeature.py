@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from typing import Optional
 
 try:
+    from openfeature import api
     from openfeature.hook import Hook
 
     if TYPE_CHECKING:
@@ -22,8 +23,8 @@ class OpenFeatureIntegration(Integration):
     identifier = "openfeature"
     _client = None  # type: Optional[OpenFeatureClient]
 
-    def __init__(self, client):
-        # type: (OpenFeatureClient) -> None
+    def __init__(self, client=None):
+        # type: (Optional[OpenFeatureClient]) -> None
         self.__class__._client = client
 
     @staticmethod
@@ -31,11 +32,12 @@ class OpenFeatureIntegration(Integration):
         # type: () -> None
 
         client = OpenFeatureIntegration._client
-        if not client:
-            raise DidNotEnable("Error getting OpenFeatureClient instance")
-
-        # Register the hook within the openfeature client.
-        client.add_hooks(hooks=[OpenFeatureHook()])
+        if client:
+            # Register the hook within the openfeature client.
+            client.add_hooks(hooks=[OpenFeatureHook()])
+        else:
+            # Register the hook within the global openfeature hooks list.
+            api.add_hooks(hooks=[OpenFeatureHook()])
 
         scope = sentry_sdk.get_current_scope()
         scope.add_error_processor(flag_error_processor)
