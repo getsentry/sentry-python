@@ -35,6 +35,7 @@ class OpenFeatureIntegration(Integration):
         if client:
             # Register the hook within the openfeature client.
             client.add_hooks(hooks=[OpenFeatureHook()])
+            print("added hook to", client)
         else:
             # Register the hook within the global openfeature hooks list.
             api.add_hooks(hooks=[OpenFeatureHook()])

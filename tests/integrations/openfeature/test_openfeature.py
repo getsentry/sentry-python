@@ -1,6 +1,5 @@
 import concurrent.futures as cf
 import sys
-
 import pytest
 
 from openfeature import api
@@ -10,12 +9,22 @@ import sentry_sdk
 from sentry_sdk.integrations.openfeature import OpenFeatureIntegration
 
 
+@pytest.fixture
+def reset_openfeature(uninstall_integration):
+    yield
+
+    # Teardown
+    uninstall_integration(OpenFeatureIntegration.identifier)
+    api.clear_hooks()
+    api.shutdown()  # provider clean up
+
+
 @pytest.mark.parametrize(
     "use_global_client",
     (False, True),
 )
 def test_openfeature_integration(
-    sentry_init, use_global_client, capture_events, uninstall_integration
+    sentry_init, use_global_client, capture_events, reset_openfeature
 ):
     flags = {
         "hello": InMemoryFlag("on", {"on": True, "off": False}),
@@ -24,7 +33,6 @@ def test_openfeature_integration(
     api.set_provider(InMemoryProvider(flags))
     client = api.get_client()
 
-    uninstall_integration(OpenFeatureIntegration.identifier)
     if use_global_client:
         sentry_init(integrations=[OpenFeatureIntegration()])
     else:
@@ -48,7 +56,7 @@ def test_openfeature_integration(
 
 
 def test_openfeature_integration_threaded(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init, capture_events, reset_openfeature
 ):
     flags = {
         "hello": InMemoryFlag("on", {"on": True, "off": False}),
@@ -57,7 +65,6 @@ def test_openfeature_integration_threaded(
     api.set_provider(InMemoryProvider(flags))
     client = api.get_client()
 
-    uninstall_integration(OpenFeatureIntegration.identifier)
     sentry_init(integrations=[OpenFeatureIntegration(client=client)])
     events = capture_events()
 
@@ -104,7 +111,7 @@ def test_openfeature_integration_threaded(
 
 @pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_openfeature_integration_asyncio(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init, capture_events, reset_openfeature
 ):
     """Assert concurrently evaluated flags do not pollute one another."""
 
@@ -117,7 +124,6 @@ def test_openfeature_integration_asyncio(
     api.set_provider(InMemoryProvider(flags))
     client = api.get_client()
 
-    uninstall_integration(OpenFeatureIntegration.identifier)
     sentry_init(integrations=[OpenFeatureIntegration(client=client)])
     events = capture_events()
 
@@ -160,3 +166,31 @@ def test_openfeature_integration_asyncio(
             {"flag": "world", "result": False},
         ]
     }
+
+
+def test_openfeature_integration_client_isolation(
+    sentry_init, capture_events, reset_openfeature
+):
+    """
+    If the integration is tracking a single client, evaluations from other clients should not be
+    captured.
+    """
+    flags = {
+        "hello": InMemoryFlag("on", {"on": True, "off": False}),
+        "world": InMemoryFlag("off", {"on": True, "off": False}),
+    }
+    api.set_provider(InMemoryProvider(flags))
+    client = api.get_client()
+    sentry_init(integrations=[OpenFeatureIntegration(client=client)])
+
+    other_client = api.get_client()
+    other_client.get_boolean_value("hello", default_value=False)
+    other_client.get_boolean_value("world", default_value=False)
+    other_client.get_boolean_value("other", default_value=True)
+
+    events = capture_events()
+    sentry_sdk.set_tag("apple", "0")
+    sentry_sdk.capture_exception(Exception("something wrong!"))
+
+    assert len(events) == 1
+    assert events[0]["contexts"]["flags"] == {"values": []}
