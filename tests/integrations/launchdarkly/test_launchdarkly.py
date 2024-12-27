@@ -18,9 +18,10 @@ from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
 def reset_launchdarkly(uninstall_integration):
     yield
 
-    # Teardown. We're using ldclient internals here, so this might break if their implementation
-    # changes.
     uninstall_integration(LaunchDarklyIntegration.identifier)
+
+    # Resets global client and config only. We're using ldclient internals here, so this might
+    # break if their implementation changes.
     ldclient._reset_client()
     try:
         ldclient.__lock.lock()
