@@ -14,17 +14,31 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
 
 
+@pytest.fixture
+def reset_launchdarkly(uninstall_integration):
+    yield
+
+    # Teardown. We're using ldclient internals here, so this might break if their implementation
+    # changes.
+    uninstall_integration(LaunchDarklyIntegration.identifier)
+    ldclient._reset_client()
+    try:
+        ldclient.__lock.lock()
+        ldclient.__config = None
+    finally:
+        ldclient.__lock.unlock()
+
+
 @pytest.mark.parametrize(
     "use_global_client",
     (False, True),
 )
 def test_launchdarkly_integration(
-    sentry_init, use_global_client, capture_events, uninstall_integration
+    sentry_init, use_global_client, capture_events, reset_launchdarkly
 ):
     td = TestData.data_source()
     config = Config("sdk-key", update_processor_class=td)
 
-    uninstall_integration(LaunchDarklyIntegration.identifier)
     if use_global_client:
         ldclient.set_config(config)
         sentry_init(integrations=[LaunchDarklyIntegration()])
@@ -56,13 +70,12 @@ def test_launchdarkly_integration(
 
 
 def test_launchdarkly_integration_threaded(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init, capture_events, reset_launchdarkly
 ):
     td = TestData.data_source()
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
     context = Context.create("user1")
 
-    uninstall_integration(LaunchDarklyIntegration.identifier)
     sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
     events = capture_events()
 
@@ -111,7 +124,7 @@ def test_launchdarkly_integration_threaded(
 
 @pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_launchdarkly_integration_asyncio(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init, capture_events, reset_launchdarkly
 ):
     """Assert concurrently evaluated flags do not pollute one another."""
 
@@ -121,7 +134,6 @@ def test_launchdarkly_integration_asyncio(
     client = LDClient(config=Config("sdk-key", update_processor_class=td))
     context = Context.create("user1")
 
-    uninstall_integration(LaunchDarklyIntegration.identifier)
     sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
     events = capture_events()
 
@@ -168,21 +180,35 @@ def test_launchdarkly_integration_asyncio(
     }
 
 
-def test_launchdarkly_integration_did_not_enable(sentry_init, uninstall_integration):
+def test_launchdarkly_integration_client_isolation(
+    sentry_init, capture_events, reset_launchdarkly
+):
+    """
+    If the integration is tracking a single client, evaluations from other clients should not be
+    captured.
+    """
+    td = TestData.data_source()
+    td.update(td.flag("hello").variation_for_all(True))
+    td.update(td.flag("world").variation_for_all(True))
+    client = LDClient(config=Config("sdk-key", update_processor_class=td))
+    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+
+    # For isolation you must use a new Config object, but data source can be the same.
+    other_client = LDClient(Config("sdk-key", update_processor_class=td))
+    other_client.variation("hello", Context.create("my-org", "organization"), False)
+    other_client.variation("world", Context.create("user1", "user"), False)
+    other_client.variation("other", Context.create("user2", "user"), False)
+
+    events = capture_events()
+    sentry_sdk.capture_exception(Exception("something wrong!"))
+
+    assert len(events) == 1
+    assert events[0]["contexts"]["flags"] == {"values": []}
+
+
+def test_launchdarkly_integration_did_not_enable(sentry_init, reset_launchdarkly):
     """
     Setup should fail when using global client and ldclient.set_config wasn't called.
-
-    We're accessing ldclient internals to set up this test, so it might break if launchdarkly's
-    implementation changes.
     """
-
-    ldclient._reset_client()
-    try:
-        ldclient.__lock.lock()
-        ldclient.__config = None
-    finally:
-        ldclient.__lock.unlock()
-
-    uninstall_integration(LaunchDarklyIntegration.identifier)
     with pytest.raises(DidNotEnable):
         sentry_init(integrations=[LaunchDarklyIntegration()])
