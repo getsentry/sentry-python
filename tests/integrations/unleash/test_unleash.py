@@ -254,6 +254,30 @@ def test_get_variant_asyncio(sentry_init, capture_events, uninstall_integration)
     }
 
 
+def test_client_isolation(sentry_init, capture_events, uninstall_integration):
+    """
+    If the integration is tracking a single client, evaluations from other clients should not be
+    captured.
+    """
+    client = MockUnleashClient()
+    uninstall_integration(UnleashIntegration)
+    sentry_init(integrations=[UnleashIntegration(client)])  # type: ignore
+
+    other_client = MockUnleashClient()
+
+    other_client.is_enabled("hello")
+    other_client.is_enabled("world")
+    other_client.is_enabled("other")
+    other_client.get_variant("no_payload_feature")
+    other_client.get_variant("json_feature")
+
+    events = capture_events()
+    sentry_sdk.capture_exception(Exception("something wrong!"))
+
+    assert len(events) == 1
+    assert events[0]["contexts"]["flags"] == {"values": []}
+
+
 def test_wraps_original(sentry_init, uninstall_integration):
     client = MockUnleashClient()
     mock_is_enabled = mock.Mock(return_value=random() < 0.5)

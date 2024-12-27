@@ -19,7 +19,7 @@ class UnleashIntegration(Integration):
     _unleash_client = None  # type: Optional[UnleashClient]
 
     def __init__(self, unleash_client):
-        # type: (Optional[UnleashClient]) -> None
+        # type: (UnleashClient) -> None
         self.__class__._unleash_client = unleash_client
 
     @staticmethod
