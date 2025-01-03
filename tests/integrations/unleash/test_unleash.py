@@ -12,7 +12,7 @@ from tests.integrations.unleash.testutils import mock_unleash_client
 
 
 def test_is_enabled(sentry_init, capture_events, uninstall_integration):
-    uninstall_integration(UnleashIntegration)
+    uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
         client = UnleashClient()
@@ -35,7 +35,7 @@ def test_is_enabled(sentry_init, capture_events, uninstall_integration):
 
 
 def test_get_variant(sentry_init, capture_events, uninstall_integration):
-    uninstall_integration(UnleashIntegration)
+    uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
         client = UnleashClient()
@@ -64,7 +64,7 @@ def test_get_variant(sentry_init, capture_events, uninstall_integration):
 
 
 def test_is_enabled_threaded(sentry_init, capture_events, uninstall_integration):
-    uninstall_integration(UnleashIntegration)
+    uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
         client = UnleashClient()
@@ -113,7 +113,7 @@ def test_is_enabled_threaded(sentry_init, capture_events, uninstall_integration)
 
 
 def test_get_variant_threaded(sentry_init, capture_events, uninstall_integration):
-    uninstall_integration(UnleashIntegration)
+    uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
         client = UnleashClient()
@@ -164,7 +164,7 @@ def test_get_variant_threaded(sentry_init, capture_events, uninstall_integration
 @pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_is_enabled_asyncio(sentry_init, capture_events, uninstall_integration):
     asyncio = pytest.importorskip("asyncio")
-    uninstall_integration(UnleashIntegration)
+    uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
         client = UnleashClient()
@@ -216,7 +216,7 @@ def test_is_enabled_asyncio(sentry_init, capture_events, uninstall_integration):
 def test_get_variant_asyncio(sentry_init, capture_events, uninstall_integration):
     asyncio = pytest.importorskip("asyncio")
 
-    uninstall_integration(UnleashIntegration)
+    uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
         client = UnleashClient()
@@ -273,7 +273,7 @@ def test_wraps_original(sentry_init, uninstall_integration):
         client.is_enabled = mock_is_enabled
         client.get_variant = mock_get_variant
 
-        uninstall_integration(UnleashIntegration)
+        uninstall_integration(UnleashIntegration.identifier)
         sentry_init(integrations=[UnleashIntegration()])  # type: ignore
 
     res = client.is_enabled("test-flag", "arg", kwarg=1)
@@ -298,7 +298,7 @@ def test_wrapper_attributes(sentry_init, uninstall_integration):
         original_is_enabled = client.is_enabled
         original_get_variant = client.get_variant
 
-        uninstall_integration(UnleashIntegration)
+        uninstall_integration(UnleashIntegration.identifier)
         sentry_init(integrations=[UnleashIntegration()])  # type: ignore
 
         # Mock clients methods have not lost their qualified names after decoration.
