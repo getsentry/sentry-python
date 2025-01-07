@@ -1,7 +1,7 @@
 import os
 import sys
 import warnings
-from copy import copy
+from copy import copy, deepcopy
 from collections import deque
 from contextlib import contextmanager
 from enum import Enum
@@ -252,7 +252,7 @@ class Scope:
 
         rv._last_event_id = self._last_event_id
 
-        rv._flags = copy(self._flags)
+        rv._flags = deepcopy(self._flags)
 
         return rv
 
