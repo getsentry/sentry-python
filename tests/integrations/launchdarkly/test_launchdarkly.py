@@ -183,14 +183,10 @@ def test_launchdarkly_integration_asyncio(
     }
 
 
-def test_launchdarkly_integration_did_not_enable(sentry_init, uninstall_integration):
-    """
-    Setup should fail when using global client and ldclient.set_config wasn't called.
-
-    We're accessing ldclient internals to set up this test, so it might break if launchdarkly's
-    implementation changes.
-    """
-
+def test_launchdarkly_integration_did_not_enable(monkeypatch):
+    # Client is not passed in and set_config wasn't called.
+    # TODO: Bad practice to access internals like this. We can skip this test, or remove this
+    #  case entirely (force user to pass in a client instance).
     ldclient._reset_client()
     try:
         ldclient.__lock.lock()
@@ -198,6 +194,11 @@ def test_launchdarkly_integration_did_not_enable(sentry_init, uninstall_integrat
     finally:
         ldclient.__lock.unlock()
 
-    uninstall_integration(LaunchDarklyIntegration.identifier)
     with pytest.raises(DidNotEnable):
-        sentry_init(integrations=[LaunchDarklyIntegration()])
+        LaunchDarklyIntegration()
+
+    # Client not initialized.
+    client = LDClient(config=Config("sdk-key"))
+    monkeypatch.setattr(client, "is_initialized", lambda: False)
+    with pytest.raises(DidNotEnable):
+        LaunchDarklyIntegration(ld_client=client)
