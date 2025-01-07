@@ -5,91 +5,9 @@ from pathlib import Path
 
 import requests
 
-# XXX FIX THIS
-# from ..scripts.split_tox_gh_actions.split_tox_gh_actions import GROUPS
+from ..split_tox_gh_actions.split_tox_gh_actions import GROUPS
 
-
-GROUPS = {
-    "Common": [
-        "common",
-    ],
-    "AI": [
-        "anthropic",
-        "cohere",
-        "langchain",
-        "openai",
-        "huggingface_hub",
-    ],
-    "AWS": [
-        # this is separate from Cloud Computing because only this one test suite
-        # needs to run with access to GitHub secrets
-        "aws_lambda",
-    ],
-    "Cloud": [
-        "boto3",
-        "chalice",
-        "cloud_resource_context",
-        "gcp",
-    ],
-    "Tasks": [
-        "arq",
-        "beam",
-        "celery",
-        "dramatiq",
-        "huey",
-        "ray",
-        "rq",
-        "spark",
-    ],
-    "DBs": [
-        "asyncpg",
-        "clickhouse_driver",
-        "pymongo",
-        "redis",
-        "redis_py_cluster_legacy",
-        "sqlalchemy",
-    ],
-    "GraphQL": [
-        "ariadne",
-        "gql",
-        "graphene",
-        "strawberry",
-    ],
-    "Network": [
-        "gevent",
-        "grpc",
-        "httpx",
-        "requests",
-    ],
-    "Web 1": [
-        "django",
-        "flask",
-        "starlette",
-        "fastapi",
-    ],
-    "Web 2": [
-        "aiohttp",
-        "asgi",
-        "bottle",
-        "falcon",
-        "litestar",
-        "pyramid",
-        "quart",
-        "sanic",
-        "starlite",
-        "tornado",
-    ],
-    "Misc": [
-        "launchdarkly",
-        "loguru",
-        "openfeature",
-        "opentelemetry",
-        "potel",
-        "pure_eval",
-        "trytond",
-        "typer",
-    ],
-}
+print(GROUPS)
 
 # Only consider package versions going back this far
 CUTOFF = datetime.now() - timedelta(days=365 * 3)
