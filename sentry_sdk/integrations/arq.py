@@ -71,6 +71,7 @@ class ArqIntegration(Integration):
 def patch_enqueue_job():
     # type: () -> None
     old_enqueue_job = ArqRedis.enqueue_job
+    original_kwdefaults = old_enqueue_job.__kwdefaults__
 
     async def _sentry_enqueue_job(self, function, *args, **kwargs):
         # type: (ArqRedis, str, *Any, **Any) -> Optional[Job]
@@ -83,6 +84,7 @@ def patch_enqueue_job():
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
+    _sentry_enqueue_job.__kwdefaults__ = original_kwdefaults
     ArqRedis.enqueue_job = _sentry_enqueue_job
 
 
