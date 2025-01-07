@@ -44,6 +44,7 @@ class UnleashIntegration(Integration):
             # variant as a boolean toggle, using the `enabled` field.
             flags = sentry_sdk.get_current_scope().flags
             flags.set(feature, enabled)
+
             return variant
 
         UnleashClient.is_enabled = sentry_is_enabled  # type: ignore
