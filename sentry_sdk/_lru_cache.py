@@ -17,15 +17,6 @@ class LRUCache:
         self.hits = self.misses = 0
         self.full = False
 
-    def __copy__(self):
-        # type: () -> LRUCache
-        new = LRUCache(max_size=self.max_size)
-        new.hits = self.hits
-        new.misses = self.misses
-        new.full = self.full
-        new._data = self._data.copy()
-        return new
-
     def set(self, key, value):
         # type: (Any, Any) -> None
         current = self._data.pop(key, _SENTINEL)
