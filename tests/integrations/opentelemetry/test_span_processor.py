@@ -287,7 +287,16 @@ def test_update_span_with_otel_data_db_query():
     )
 
 
-def test_on_start_transaction():
+@pytest.mark.parametrize(
+    ["dsn"],
+    [
+        pytest.param(
+            "https://1234567890abcdef@o123456.ingest.sentry.io/123456", id="with a DSN"
+        ),
+        pytest.param(None, id="with no DSN"),
+    ],
+)
+def test_on_start_transaction(dsn):
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
     otel_span.start_time = time.time_ns()
@@ -306,7 +315,7 @@ def test_on_start_transaction():
 
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
-    fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
+    fake_client.dsn = dsn
     sentry_sdk.get_global_scope().set_client(fake_client)
 
     with mock.patch(
