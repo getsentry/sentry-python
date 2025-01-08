@@ -109,12 +109,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned Tasks tests passed
+    name: All Tasks tests passed
+    needs: test-tasks
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-tasks-pinned.result, 'failure') || contains(needs.test-tasks-pinned.result, 'skipped')
+        if: contains(needs.test-tasks.result, 'failure') || contains(needs.test-tasks.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

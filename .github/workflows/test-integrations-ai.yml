@@ -95,12 +95,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned AI tests passed
+    name: All AI tests passed
+    needs: test-ai
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-ai-pinned.result, 'failure') || contains(needs.test-ai-pinned.result, 'skipped')
+        if: contains(needs.test-ai.result, 'failure') || contains(needs.test-ai.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

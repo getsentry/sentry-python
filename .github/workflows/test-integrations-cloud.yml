@@ -91,12 +91,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned Cloud tests passed
+    name: All Cloud tests passed
+    needs: test-cloud
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-cloud-pinned.result, 'failure') || contains(needs.test-cloud-pinned.result, 'skipped')
+        if: contains(needs.test-cloud.result, 'failure') || contains(needs.test-cloud.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

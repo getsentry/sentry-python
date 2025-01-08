@@ -118,12 +118,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned DBs tests passed
+    name: All DBs tests passed
+    needs: test-dbs
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-dbs-pinned.result, 'failure') || contains(needs.test-dbs-pinned.result, 'skipped')
+        if: contains(needs.test-dbs.result, 'failure') || contains(needs.test-dbs.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
