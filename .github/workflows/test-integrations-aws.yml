@@ -54,14 +54,14 @@ jobs:
       - name: Check permissions on repo branch
         if: github.event_name == 'push'
         run: true
-  test-aws-pinned:
-    name: AWS (pinned)
+  test-aws:
+    name: AWS
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9"]
+        python-version: ["3.5","3.8"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -82,10 +82,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test aws_lambda pinned
+      - name: Test aws_lambda
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -115,7 +115,6 @@ jobs:
           verbose: true
   check_required_tests:
     name: All pinned AWS tests passed
-    needs: test-aws-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04

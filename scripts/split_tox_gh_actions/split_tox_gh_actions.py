@@ -148,13 +148,11 @@ def main(fail_on_changes):
         old_hash = get_files_hash()
 
     print("Parsing tox.ini...")
-    py_versions_pinned, py_versions_latest = parse_tox()
+    py_versions = parse_tox()
 
     if fail_on_changes:
         print("Checking if all frameworks belong in a group...")
-        missing_frameworks = find_frameworks_missing_from_groups(
-            py_versions_pinned, py_versions_latest
-        )
+        missing_frameworks = find_frameworks_missing_from_groups(py_versions)
         if missing_frameworks:
             raise RuntimeError(
                 "Please add the following frameworks to the corresponding group "
@@ -164,9 +162,7 @@ def main(fail_on_changes):
 
     print("Rendering templates...")
     for group, frameworks in GROUPS.items():
-        contents = render_template(
-            group, frameworks, py_versions_pinned, py_versions_latest
-        )
+        contents = render_template(group, frameworks, py_versions)
         filename = write_file(contents, group)
         print(f"Created {filename}")
 
@@ -194,8 +190,7 @@ def parse_tox():
         if line.strip() and not line.strip().startswith("#")
     ]
 
-    py_versions_pinned = defaultdict(set)
-    py_versions_latest = defaultdict(set)
+    py_versions = defaultdict(set)
 
     for line in lines:
         # normalize lines
@@ -203,33 +198,25 @@ def parse_tox():
 
         try:
             # parse tox environment definition
-            try:
-                (raw_python_versions, framework, framework_versions) = line.split("-")
-            except ValueError:
-                (raw_python_versions, framework) = line.split("-")
-                framework_versions = []
+            raw_python_versions, framework = line.split("-")[0], line.split("-")[1]
 
             # collect python versions to test the framework in
             raw_python_versions = set(
                 raw_python_versions.replace("{", "").replace("}", "").split(",")
             )
-            if "latest" in framework_versions:
-                py_versions_latest[framework] |= raw_python_versions
-            else:
-                py_versions_pinned[framework] |= raw_python_versions
+            py_versions[framework] |= raw_python_versions
 
         except ValueError:
             print(f"ERROR reading line {line}")
 
-    py_versions_pinned = _normalize_py_versions(py_versions_pinned)
-    py_versions_latest = _normalize_py_versions(py_versions_latest)
+    py_versions = _normalize_py_versions(py_versions)
 
-    return py_versions_pinned, py_versions_latest
+    return py_versions
 
 
-def find_frameworks_missing_from_groups(py_versions_pinned, py_versions_latest):
+def find_frameworks_missing_from_groups(py_versions):
     frameworks_in_a_group = _union(GROUPS.values())
-    all_frameworks = set(py_versions_pinned.keys()) | set(py_versions_latest.keys())
+    all_frameworks = set(py_versions.keys())
     return all_frameworks - frameworks_in_a_group
 
 
@@ -269,23 +256,17 @@ def _union(seq):
     return reduce(lambda x, y: set(x) | set(y), seq)
 
 
-def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
+def render_template(group, frameworks, py_versions):
     template = ENV.get_template("base.jinja")
 
-    categories = set()
-    py_versions = defaultdict(set)
+    all_py_versions = set()
     for framework in frameworks:
-        if py_versions_pinned[framework]:
-            categories.add("pinned")
-            py_versions["pinned"] |= set(py_versions_pinned[framework])
-        if py_versions_latest[framework]:
-            categories.add("latest")
-            py_versions["latest"] |= set(py_versions_latest[framework])
+        if py_versions[framework]:
+            all_py_versions |= set(py_versions[framework])
 
     context = {
         "group": group,
         "frameworks": frameworks,
-        "categories": sorted(categories),
         "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
@@ -293,10 +274,9 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "needs_github_secrets": bool(
             set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
         ),
-        "py_versions": {
-            category: [f'"{version}"' for version in _normalize_py_versions(versions)]
-            for category, versions in py_versions.items()
-        },
+        "py_versions": [
+            f'"{version}"' for version in _normalize_py_versions(all_py_versions)
+        ],
     }
     rendered = template.render(context)
     rendered = postprocess_template(rendered)

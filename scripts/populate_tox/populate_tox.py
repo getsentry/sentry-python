@@ -1,25 +1,128 @@
-import configparser
 import functools
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 import requests
+from jinja2 import Environment, FileSystemLoader
 
+from dependencies import DEPENDENCIES
 
 # Only consider package versions going back this far
 CUTOFF = datetime.now() - timedelta(days=365 * 5)
-LOWEST_SUPPORTED_PY_VERSION = "3.6"
 
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
+ENV = Environment(
+    loader=FileSystemLoader(Path(__file__).resolve().parent),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
-EXCLUDE = {
+
+# XXX for each, we need:
+# package
+# name (opt)
+# minimal supported version
+# deal with variants like notiktoken (if name, package are separate, this is just a new test suite)
+GROUPS = {
+    # Group: [(Test Suite Name, main package name)]
+    "Common": [
+        "common",
+    ],
+    "AI": [
+        "anthropic",
+        "cohere",
+        "langchain",
+        "langchain-notiktoken",
+        "openai",
+        "openai-notiktoken",
+        "huggingface_hub",
+    ],
+    "AWS": [
+        # this is separate from Cloud Computing because only this one test suite
+        # needs to run with access to GitHub secrets
+        "aws_lambda",
+    ],
+    "Cloud": [
+        "boto3",
+        "chalice",
+        "cloud_resource_context",
+        "gcp",
+    ],
+    "Tasks": [
+        "arq",
+        "beam",
+        "celery",
+        "dramatiq",
+        "huey",
+        "ray",
+        "rq",
+        "spark",
+    ],
+    "DBs": [
+        "asyncpg",
+        "clickhouse-driver",
+        "pymongo",
+        "redis",
+        "redis-py-cluster-legacy",
+        "sqlalchemy",
+    ],
+    "GraphQL": [
+        "ariadne",
+        "gql",
+        "graphene",
+        "strawberry",
+    ],
+    "Network": [
+        "gevent",
+        "grpc",
+        "httpx",
+        "requests",
+    ],
+    "Web 1": [
+        "django",
+        "flask",
+        "starlette",
+        "fastapi",
+    ],
+    "Web 2": [
+        "aiohttp",
+        "asgi",
+        "bottle",
+        "falcon",
+        "litestar",
+        "pyramid",
+        "quart",
+        "sanic",
+        "starlite",
+        "tornado",
+    ],
+    "Misc": [
+        "launchdarkly",
+        "loguru",
+        "openfeature",
+        "opentelemetry",
+        "potel",
+        "pure_eval",
+        "trytond",
+        "typer",
+    ],
+}
+
+# Do not try auto-generating the tox entries for these
+IGNORE = {
     "common",
+    "gevent",
+    "asgi",
+    "cloud_resource_context",
+    "potel",
+    "gcp",
 }
 
 packages = {}
@@ -47,6 +150,7 @@ class Version:
         except Exception:
             # This will fail for e.g. prereleases, but we don't care about those
             # for now
+            # TODO: add support for some prereleases (if not too old)
             pass
 
         self.parsed = (self.major, self.minor, self.patch or 0)
@@ -54,6 +158,10 @@ class Version:
     @property
     def valid(self):
         return self.major is not None and self.minor is not None
+
+    @property
+    def rendered_python_versions(self):
+        return "{" + ",".join(f"py{version}" for version in self.python_versions) + "}"
 
     def __str__(self):
         return self.raw
@@ -67,38 +175,8 @@ class Version:
     def __lt__(self, other):
         return self.parsed < other.parsed
 
-
-def parse_tox():
-    config = configparser.ConfigParser()
-    config.read(TOX_FILE)
-    lines = [
-        line
-        for line in config["tox"]["envlist"].split("\n")
-        if line.strip() and not line.strip().startswith("#")
-    ]
-
-    for line in lines:
-        # normalize lines
-        line = line.strip().lower()
-
-        try:
-            # parse tox environment definition
-            try:
-                (raw_python_versions, framework, framework_versions) = line.split("-")
-            except ValueError:
-                (raw_python_versions, framework) = line.split("-")
-                framework_versions = []
-
-            framework_versions
-            packages[framework] = {}
-
-            # collect python versions to test the framework in
-            raw_python_versions = set(
-                raw_python_versions.replace("{", "").replace("}", "").split(",")
-            )
-
-        except ValueError:
-            print(f"ERROR reading line {line}")
+    def bump_minor(self):
+        return Version(f"{self.major}.{self.minor + 1}")
 
 
 def fetch_package(package: str) -> dict:
@@ -113,8 +191,6 @@ def fetch_package(package: str) -> dict:
 
 
 def get_releases(pypi_data: dict) -> list[Version]:
-    package = pypi_data["info"]["name"]
-
     versions = []
 
     for release, metadata in pypi_data["releases"].items():
@@ -127,12 +203,21 @@ def get_releases(pypi_data: dict) -> list[Version]:
 
         version = Version(release, meta)
         if not version.valid:
-            print(
-                f"Failed to parse version {release} of package {package}. Ignoring..."
-            )
             continue
 
-        versions.append(version)
+        # XXX don't consider yanked stuff
+
+        for i, saved_version in enumerate(versions):
+            if (
+                version.major == saved_version.major
+                and version.minor == saved_version.minor
+                and version.patch > (saved_version.patch or 0)
+            ):
+                # don't save all patch versions of a release, just the newest one
+                versions[i] = version
+                break
+        else:
+            versions.append(version)
 
     return sorted(versions)
 
@@ -144,7 +229,30 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
         len(releases) // 3 * 2,
         -1,  # latest
     ]
-    return [releases[i] for i in indexes]
+
+    filtered_releases = []
+
+    for i in indexes:
+        if releases[i] not in filtered_releases:
+            filtered_releases.append(releases[i])
+
+    return filtered_releases
+
+
+def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version]:
+    if not python_versions:
+        return []
+
+    python_versions.sort()
+
+    filtered_python_versions = [
+        python_versions[0],
+    ]
+
+    if len(python_versions) > 1:
+        filtered_python_versions.append(python_versions[-1])
+
+    return filtered_python_versions
 
 
 def fetch_release(package: str, version: Version) -> dict:
@@ -157,13 +265,33 @@ def fetch_release(package: str, version: Version) -> dict:
     return pypi_data.json()
 
 
+def _requires_python_to_python_versions(
+    lowest_requires_python: Version,
+) -> list[Version]:
+    if lowest_requires_python < LOWEST_SUPPORTED_PYTHON_VERSION:
+        lowest_requires_python = LOWEST_SUPPORTED_PYTHON_VERSION
+
+    versions = []
+    curr = lowest_requires_python
+    while True:
+        if curr > HIGHEST_SUPPORTED_PYTHON_VERSION:
+            break
+        versions.append(curr)
+        curr = curr.bump_minor()
+
+    return versions
+
+
 def determine_python_versions(
-    package: str, version: Version, pypi_data: dict
+    pypi_data: dict,
+    version: Optional[Version] = None,
 ) -> list[str]:
+    package = pypi_data["info"]["name"]
+
     try:
         classifiers = pypi_data["info"]["classifiers"]
-    except (AttributeError, IndexError):
-        print(f"{package} {version} has no classifiers")
+    except (AttributeError, KeyError):
+        print(f"{package} has no classifiers")
         return []
 
     python_versions = []
@@ -171,55 +299,113 @@ def determine_python_versions(
         if classifier.startswith(CLASSIFIER_PREFIX):
             python_version = classifier[len(CLASSIFIER_PREFIX) :]
             if "." in python_version:
-                # we don't care about stuff like
-                # Programming Language :: Python :: 3 :: Only
-                # Programming Language :: Python :: 3
-                # etc., we're only interested in specific versions like 3.13
-                python_versions.append(python_version)
+                # We don't care about stuff like
+                # Programming Language :: Python :: 3 :: Only,
+                # Programming Language :: Python :: 3,
+                # etc., we're only interested in specific versions, like 3.13
+                python_versions.append(Version(python_version))
 
-    python_versions = [
-        version
-        for version in python_versions
-        if Version(version) >= Version(LOWEST_SUPPORTED_PY_VERSION)
-    ]
+    if not python_versions:
+        try:
+            requires_python = pypi_data["info"]["requires_python"]
+        except (AttributeError, KeyError):
+            pass
 
+        if requires_python.startswith(">="):
+            try:
+                lowest = Version(requires_python[len(">=") :])
+            except Exception:
+                print(f"Failed to parse requires_python: {requires_python}")
+            else:
+                print(
+                    f"Used requires_python instead of classifiers for Python versions: {lowest}"
+                )
+                python_versions = _requires_python_to_python_versions(lowest)
+
+    python_versions.sort()
     return python_versions
 
 
-def write_tox_file(package, versions):
-    for version in versions:
-        print(
-            "{python_versions}-{package}-v{version}".format(
-                python_versions=",".join([f"py{v}" for v in version.python_versions]),
-                package=package,
-                version=version,
-            )
+def write_tox_file(packages: dict) -> None:
+    template = ENV.get_template("tox.jinja")
+
+    context = {"integrations": []}
+    for data in packages.values():
+        context["integrations"].append(
+            {
+                "name": data["name"],
+                "package": data["package"],
+                "extra": data["extra"],
+                "releases": data["releases"],
+                "dependencies": DEPENDENCIES[data["name"]][1:],
+            }
         )
 
-    print()
+    rendered = template.render(context)
 
-    for version in versions:
-        print(f"{package}-v{version}: {package}=={version.raw}")
+    with open(TOX_FILE, "w") as file:
+        file.write(rendered)
 
 
 if __name__ == "__main__":
-    for package in ("celery", "django"):
-        pypi_data = fetch_package(package)
-        releases = get_releases(pypi_data)
-        test_releases = pick_releases_to_test(releases)
-        for release in test_releases:
-            release_pypi_data = fetch_release(package, release)
-            release.python_versions = determine_python_versions(
-                package, release, release_pypi_data
-            )
-            # XXX if no supported python versions -> delete
+    sentry_sdk_python_support = determine_python_versions(fetch_package("sentry_sdk"))
+    LOWEST_SUPPORTED_PYTHON_VERSION = sentry_sdk_python_support[0]
+    HIGHEST_SUPPORTED_PYTHON_VERSION = sentry_sdk_python_support[-1]
+    print(
+        f"The SDK supports Python versions {LOWEST_SUPPORTED_PYTHON_VERSION} to {HIGHEST_SUPPORTED_PYTHON_VERSION}. Only considering framework releases that overlap..."
+    )
 
-            print(release, " on ", release.python_versions)
-            time.sleep(0.1)
+    packages = {}
 
-        print(releases)
-        print(test_releases)
+    for group, integrations in GROUPS.items():
+        for integration in integrations:
+            if integration in IGNORE:
+                continue
 
-        write_tox_file(package, test_releases)
+            print(f"Processing {integration}...")
+            package = DEPENDENCIES[integration][0]
+            extra = None
+            if "[" in package:
+                extra = package[package.find("[") + 1 : package.find("]")]
+                package = package[: package.find("[")]
 
-    print(parse_tox())
+            pypi_data = fetch_package(package)
+
+            releases = get_releases(pypi_data)
+            if not releases:
+                print("Found no releases.")
+                continue
+
+            test_releases = pick_releases_to_test(releases)
+            if not test_releases:
+                print(
+                    "No releases recent enough or for a recent enough Python version."
+                )
+                continue
+
+            for release in test_releases:
+                release_pypi_data = fetch_release(package, release)
+                release.python_versions = pick_python_versions_to_test(
+                    determine_python_versions(
+                        release_pypi_data,
+                        release,
+                    )
+                )
+                if not release.python_versions:
+                    print(f"Release {release} has no Python versions, skipping.")
+
+                # Give PYPI some breathing room
+                time.sleep(0.25)
+
+            test_releases = [
+                release for release in test_releases if release.python_versions
+            ]
+            if test_releases:
+                packages[integration] = {
+                    "name": integration,
+                    "package": package,
+                    "extra": extra,
+                    "releases": test_releases,
+                }
+
+    write_tox_file(packages)
