@@ -245,6 +245,12 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
 
 
 def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version]:
+    python_versions = [
+        version
+        for version in python_versions
+        if version >= LOWEST_SUPPORTED_PYTHON_VERSION
+    ]
+
     if not python_versions:
         return []
 
