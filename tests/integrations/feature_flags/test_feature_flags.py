@@ -4,7 +4,7 @@ import sys
 import pytest
 
 import sentry_sdk
-from sentry_sdk.integrations.featureflags import (
+from sentry_sdk.integrations.feature_flags import (
     FeatureFlagsIntegration,
     add_feature_flag,
 )

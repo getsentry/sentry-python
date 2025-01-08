@@ -1,5 +1,6 @@
 import functools
 import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -25,13 +26,7 @@ PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
 
-# XXX for each, we need:
-# package
-# name (opt)
-# minimal supported version
-# deal with variants like notiktoken (if name, package are separate, this is just a new test suite)
 GROUPS = {
-    # Group: [(Test Suite Name, main package name)]
     "Common": [
         "common",
     ],
@@ -55,16 +50,6 @@ GROUPS = {
         "cloud_resource_context",
         "gcp",
     ],
-    "Tasks": [
-        "arq",
-        "beam",
-        "celery",
-        "dramatiq",
-        "huey",
-        "ray",
-        "rq",
-        "spark",
-    ],
     "DBs": [
         "asyncpg",
         "clickhouse-driver",
@@ -72,6 +57,11 @@ GROUPS = {
         "redis",
         "redis-py-cluster-legacy",
         "sqlalchemy",
+    ],
+    "Flags": [
+        "launchdarkly",
+        "openfeature",
+        "unleash",
     ],
     "GraphQL": [
         "ariadne",
@@ -84,6 +74,16 @@ GROUPS = {
         "grpc",
         "httpx",
         "requests",
+    ],
+    "Tasks": [
+        "arq",
+        "beam",
+        "celery",
+        "dramatiq",
+        "huey",
+        "ray",
+        "rq",
+        "spark",
     ],
     "Web 1": [
         "django",
@@ -104,9 +104,7 @@ GROUPS = {
         "tornado",
     ],
     "Misc": [
-        "launchdarkly",
         "loguru",
-        "openfeature",
         "opentelemetry",
         "potel",
         "pure_eval",
@@ -115,8 +113,9 @@ GROUPS = {
     ],
 }
 
-# Do not try auto-generating the tox entries for these
 IGNORE = {
+    # Do not try auto-generating the tox entries for these. They will be
+    # hardcoded in tox.ini.
     "common",
     "gevent",
     "asgi",
@@ -335,17 +334,19 @@ def determine_python_versions(
 def write_tox_file(packages: dict) -> None:
     template = ENV.get_template("tox.jinja")
 
-    context = {"integrations": []}
-    for data in packages.values():
-        context["integrations"].append(
-            {
-                "name": data["name"],
-                "package": data["package"],
-                "extra": data["extra"],
-                "releases": data["releases"],
-                "dependencies": DEPENDENCIES[data["name"]][1:],
-            }
-        )
+    context = {"groups": {}}
+    for group, integrations in packages.items():
+        context["groups"][group] = []
+        for integration in integrations:
+            context["groups"][group].append(
+                {
+                    "name": integration["name"],
+                    "package": integration["package"],
+                    "extra": integration["extra"],
+                    "releases": integration["releases"],
+                    "dependencies": DEPENDENCIES[integration["name"]][1:],
+                }
+            )
 
     rendered = template.render(context)
 
@@ -361,7 +362,7 @@ if __name__ == "__main__":
         f"The SDK supports Python versions {LOWEST_SUPPORTED_PYTHON_VERSION} to {HIGHEST_SUPPORTED_PYTHON_VERSION}. Only considering framework releases that overlap..."
     )
 
-    packages = {}
+    packages = defaultdict(list)
 
     for group, integrations in GROUPS.items():
         for integration in integrations:
@@ -407,11 +408,13 @@ if __name__ == "__main__":
                 release for release in test_releases if release.python_versions
             ]
             if test_releases:
-                packages[integration] = {
-                    "name": integration,
-                    "package": package,
-                    "extra": extra,
-                    "releases": test_releases,
-                }
+                packages[group].append(
+                    {
+                        "name": integration,
+                        "package": package,
+                        "extra": extra,
+                        "releases": test_releases,
+                    }
+                )
 
     write_tox_file(packages)

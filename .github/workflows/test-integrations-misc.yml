@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["2.7","3.4","3.5","3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
+        python-version: ["3.4","3.5","3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -47,18 +47,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test launchdarkly
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-launchdarkly"
       - name: Test loguru
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru"
-      - name: Test openfeature
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openfeature"
       - name: Test opentelemetry
         run: |
           set -x # print commands that are executed
