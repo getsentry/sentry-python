@@ -161,7 +161,13 @@ class Version:
 
     @property
     def rendered_python_versions(self):
-        return "{" + ",".join(f"py{version}" for version in self.python_versions) + "}"
+        return (
+            "{"
+            + ",".join(
+                f"py{version.major}.{version.minor}" for version in self.python_versions
+            )
+            + "}"
+        )
 
     def __str__(self):
         return self.raw
