@@ -1,15 +1,13 @@
 import functools
-import subprocess
-import sys
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from importlib import import_module
 from pathlib import Path
 
 import requests
 from jinja2 import Environment, FileSystemLoader
 
+from sentry_sdk.integrations import _MIN_VERSIONS
 from sentry_sdk.utils import parse_version
 
 from dependencies import DEPENDENCIES
@@ -147,15 +145,19 @@ class Version:
         self.parsed = None
         self.python_versions = []
 
-        if not self.raw.split('.')[-1].isnumeric():
-            # TODO: allow some prereleases (only the most recent one, not too old and not when an equivalent/newer stable release is available)
-            return
+        if isinstance(version, tuple):
+            self.parsed = version
+            self.raw = ".".join([str(v) for v in self.parsed])
+        else:
+            if not self.raw.split(".")[-1].isnumeric():
+                # TODO: allow some prereleases (only the most recent one, not too old and not when an equivalent/newer stable release is available)
+                return
 
-        try:
-            self.parsed = parse_version(version)
-        except Exception:
-            print(f'Failed to parse version {version}')
-            pass
+            try:
+                self.parsed = parse_version(version)
+            except Exception:
+                print(f"Failed to parse version {version}")
+                pass
 
     @property
     def major(self):
@@ -210,7 +212,16 @@ def fetch_package(package: str) -> dict:
     return pypi_data.json()
 
 
-def get_releases(pypi_data: dict) -> list[Version]:
+def get_releases(integration: str, pypi_data: dict) -> list[Version]:
+    min_supported = _MIN_VERSIONS.get(integration)
+    if min_supported:
+        min_supported = Version(min_supported)
+        print(f"Minimum supported version for {integration} is {min_supported}.")
+    else:
+        print(
+            f"{integration} doesn't have a minimum version. Maybe we should define one?"
+        )
+
     versions = []
 
     for release, metadata in pypi_data["releases"].items():
@@ -223,6 +234,9 @@ def get_releases(pypi_data: dict) -> list[Version]:
 
         version = Version(release, meta)
         if not version.valid:
+            continue
+
+        if min_supported and version < min_supported:
             continue
 
         # XXX don't consider yanked stuff
@@ -308,9 +322,7 @@ def _requires_python_to_python_versions(
     return versions
 
 
-def determine_python_versions(
-    pypi_data: dict
-) -> list[str]:
+def determine_python_versions(pypi_data: dict) -> list[str]:
     package = pypi_data["info"]["name"]
 
     try:
@@ -375,7 +387,7 @@ def write_tox_file(packages: dict) -> None:
 
 
 if __name__ == "__main__":
-    print('Finding out the lowest and highest Python version supported by the SDK...')
+    print("Finding out the lowest and highest Python version supported by the SDK...")
     sentry_sdk_python_support = determine_python_versions(fetch_package("sentry_sdk"))
     LOWEST_SUPPORTED_PYTHON_VERSION = sentry_sdk_python_support[0]
     HIGHEST_SUPPORTED_PYTHON_VERSION = sentry_sdk_python_support[-1]
@@ -401,7 +413,7 @@ if __name__ == "__main__":
 
             pypi_data = fetch_package(package)
 
-            releases = get_releases(pypi_data)
+            releases = get_releases(integration, pypi_data)
             if not releases:
                 print("Found no supported releases.")
                 continue
@@ -416,9 +428,7 @@ if __name__ == "__main__":
             for release in test_releases:
                 release_pypi_data = fetch_release(package, release)
                 release.python_versions = pick_python_versions_to_test(
-                    determine_python_versions(
-                        release_pypi_data
-                    )
+                    determine_python_versions(release_pypi_data)
                 )
                 if not release.python_versions:
                     print(f"Release {release} has no Python versions, skipping.")
