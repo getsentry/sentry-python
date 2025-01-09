@@ -13,7 +13,6 @@ from sentry_sdk.utils import parse_version
 from dependencies import DEPENDENCIES
 
 # TODO:
-# - encode lowest supported versions somewhere and consider them here
 # - put GROUPS someplace where both this script and split_tox_actions can use it
 # - allow to specify version dependent dependencies
 # - (optional) use a proper version parser for requires_python
