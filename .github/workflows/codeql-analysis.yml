@@ -15,7 +15,7 @@ on:
   push:
     branches:
       - master
-      - sentry-sdk-2.0
+      - potel-base
   pull_request:
   schedule:
     - cron: '18 18 * * 3'
