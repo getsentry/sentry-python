@@ -4,7 +4,7 @@ from inspect import isawaitable
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
@@ -75,14 +75,7 @@ class StrawberryIntegration(Integration):
     def setup_once():
         # type: () -> None
         version = package_version("strawberry-graphql")
-
-        if version is None:
-            raise DidNotEnable(
-                "Unparsable strawberry-graphql version: {}".format(version)
-            )
-
-        if version < (0, 209, 5):
-            raise DidNotEnable("strawberry-graphql 0.209.5 or newer required.")
+        _check_minimum_version(StrawberryIntegration, version, "strawberry-graphql")
 
         _patch_schema_init()
         _patch_execute()

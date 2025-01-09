@@ -3,7 +3,7 @@ import sys
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     event_from_exception,
@@ -136,11 +136,6 @@ class RayIntegration(Integration):
     def setup_once():
         # type: () -> None
         version = package_version("ray")
-
-        if version is None:
-            raise DidNotEnable("Unparsable ray version: {}".format(version))
-
-        if version < (2, 7, 0):
-            raise DidNotEnable("Ray 2.7.0 or newer required")
+        _check_minimum_version(RayIntegration, version)
 
         _patch_ray_remote()

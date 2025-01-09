@@ -4,7 +4,7 @@ from typing import Any, TypeVar, Callable, Awaitable, Iterator
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
@@ -37,6 +37,11 @@ class AsyncPGIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        # asyncpg.__version__ is a string containing the semantic version in the form of "<major>.<minor>.<patch>"
+        asyncpg_version = parse_version(asyncpg.__version__)
+
+        _check_minimum_version(AsyncPGIntegration, asyncpg_version)
+
         asyncpg.Connection.execute = _wrap_execute(
             asyncpg.Connection.execute,
         )
