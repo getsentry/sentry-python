@@ -96,7 +96,7 @@ class SanicIntegration(Integration):
             # https://github.com/huge-success/sanic/issues/1332
             ignore_logger("root")
 
-        if SanicIntegration.version < (21, 9):
+        if SanicIntegration.version is not None and SanicIntegration.version < (21, 9):
             _setup_legacy_sanic()
             return
 
