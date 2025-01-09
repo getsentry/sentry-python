@@ -73,9 +73,8 @@ class SanicIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         SanicIntegration.version = parse_version(SANIC_VERSION)
-        _check_minimum_version(SanicIntegration.identifier, SanicIntegration.version)
+        _check_minimum_version(SanicIntegration, SanicIntegration.version)
 
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between

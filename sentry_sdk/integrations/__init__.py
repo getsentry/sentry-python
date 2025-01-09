@@ -219,7 +219,7 @@ def setup_integrations(
 
 
 def _check_minimum_version(integration, version, package=None):
-    # type: (Integration, Optional[tuple[int]], Optional[str]) -> None
+    # type: (type[Integration], Optional[tuple[int, ...]], Optional[str]) -> None
     package = package or integration.identifier
 
     if version is None:
