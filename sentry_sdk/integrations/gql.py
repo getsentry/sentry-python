@@ -24,8 +24,6 @@ if TYPE_CHECKING:
 
     EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
 
-MIN_GQL_VERSION = (3, 4, 1)
-
 
 class GQLIntegration(Integration):
     identifier = "gql"
