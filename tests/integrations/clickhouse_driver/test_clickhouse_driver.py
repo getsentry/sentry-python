@@ -8,7 +8,7 @@ docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=2
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 
-from sentry_sdk import start_transaction, capture_message
+from sentry_sdk import start_span, capture_message
 from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
 from tests.conftest import ApproxDict
 
@@ -227,7 +227,7 @@ def test_clickhouse_client_spans(
     transaction_trace_id = None
     transaction_span_id = None
 
-    with start_transaction(name="test_clickhouse_transaction") as transaction:
+    with start_span(name="test_clickhouse_transaction") as transaction:
         transaction_trace_id = transaction.trace_id
         transaction_span_id = transaction.span_id
 
@@ -360,7 +360,7 @@ def test_clickhouse_client_spans_with_pii(sentry_init, capture_events) -> None:
     transaction_trace_id = None
     transaction_span_id = None
 
-    with start_transaction(name="test_clickhouse_transaction") as transaction:
+    with start_span(name="test_clickhouse_transaction") as transaction:
         transaction_trace_id = transaction.trace_id
         transaction_span_id = transaction.span_id
 
@@ -701,7 +701,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
     transaction_trace_id = None
     transaction_span_id = None
 
-    with start_transaction(name="test_clickhouse_transaction") as transaction:
+    with start_span(name="test_clickhouse_transaction") as transaction:
         transaction_trace_id = transaction.trace_id
         transaction_span_id = transaction.span_id
 
@@ -835,7 +835,7 @@ def test_clickhouse_dbapi_spans_with_pii(
     transaction_trace_id = None
     transaction_span_id = None
 
-    with start_transaction(name="test_clickhouse_transaction") as transaction:
+    with start_span(name="test_clickhouse_transaction") as transaction:
         transaction_trace_id = transaction.trace_id
         transaction_span_id = transaction.span_id
 
@@ -975,7 +975,7 @@ def test_span_origin(sentry_init, capture_events, capture_envelopes) -> None:
 
     events = capture_events()
 
-    with start_transaction(name="test_clickhouse_transaction"):
+    with start_span(name="test_clickhouse_transaction"):
         conn = connect("clickhouse://localhost")
         cursor = conn.cursor()
         cursor.execute("SELECT 1")

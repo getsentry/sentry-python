@@ -15,7 +15,7 @@ from aiohttp.web_exceptions import (
     HTTPUnavailableForLegalReasons,
 )
 
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message, start_span
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from tests.conftest import ApproxDict
 
@@ -417,7 +417,7 @@ async def test_trace_from_headers_if_performance_enabled(
     # The aiohttp_client is instrumented so will generate the sentry-trace header and add request.
     # Get the sentry-trace header from the request so we can later compare with transaction events.
     client = await aiohttp_client(app)
-    with start_transaction():
+    with start_span(name="request"):
         # Headers are only added to the span if there is an active transaction
         resp = await client.get("/")
 
@@ -496,7 +496,7 @@ async def test_crumb_capture(
 
     raw_server = await aiohttp_raw_server(handler)
 
-    with start_transaction():
+    with start_span(name="breadcrumb"):
         events = capture_events()
 
         client = await aiohttp_client(raw_server)
@@ -538,7 +538,7 @@ async def test_outgoing_trace_headers(
 
     raw_server = await aiohttp_raw_server(handler)
 
-    with start_transaction(
+    with start_span(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
     ) as transaction:
@@ -573,7 +573,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
 
     raw_server = await aiohttp_raw_server(handler)
 
-    with start_transaction(
+    with start_span(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
     ) as transaction:
