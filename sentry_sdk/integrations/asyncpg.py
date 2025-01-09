@@ -33,7 +33,6 @@ class AsyncPGIntegration(Integration):
     def setup_once() -> None:
         # asyncpg.__version__ is a string containing the semantic version in the form of "<major>.<minor>.<patch>"
         asyncpg_version = parse_version(asyncpg.__version__)
-
         _check_minimum_version(AsyncPGIntegration, asyncpg_version)
 
         asyncpg.Connection.execute = _wrap_execute(

@@ -36,7 +36,7 @@ class Boto3Integration(Integration):
     def setup_once():
         # type: () -> None
         version = parse_version(BOTOCORE_VERSION)
-        _check_minimum_version(Boto3Integration, version, 'botocore')
+        _check_minimum_version(Boto3Integration, version, "botocore")
 
         orig_init = BaseClient.__init__
 

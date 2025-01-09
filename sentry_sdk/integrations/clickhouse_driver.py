@@ -35,7 +35,6 @@ except ImportError:
     raise DidNotEnable("clickhouse-driver not installed.")
 
 
-
 class ClickhouseDriverIntegration(Integration):
     identifier = "clickhouse_driver"
     origin = f"auto.db.{identifier}"
