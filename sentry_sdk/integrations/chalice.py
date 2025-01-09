@@ -101,7 +101,6 @@ class ChaliceIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         version = parse_version(CHALICE_VERSION)
 
         if version is None:

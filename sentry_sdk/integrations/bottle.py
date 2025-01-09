@@ -13,6 +13,7 @@ from sentry_sdk.integrations import (
     Integration,
     DidNotEnable,
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    _MIN_VERSIONS,
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
@@ -76,8 +77,9 @@ class BottleIntegration(Integration):
         if version is None:
             raise DidNotEnable("Unparsable Bottle version: {}".format(BOTTLE_VERSION))
 
-        if version < (0, 12):
-            raise DidNotEnable("Bottle 0.12 or newer required.")
+        min_version = _MIN_VERSIONS[BottleIntegration.identifier]
+        if version < min_version:
+            raise DidNotEnable(f"Bottle {'.'.join(map(str, min_version))} or newer required.")
 
         old_app = Bottle.__call__
 

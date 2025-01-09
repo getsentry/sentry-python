@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 import sentry_sdk
 from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _MIN_VERSIONS, Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
@@ -79,8 +79,9 @@ class SanicIntegration(Integration):
         if SanicIntegration.version is None:
             raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
 
-        if SanicIntegration.version < (0, 8):
-            raise DidNotEnable("Sanic 0.8 or newer required.")
+        min_version = _MIN_VERSIONS[SanicIntegration.identifier]
+        if SanicIntegration.version < min_version:
+            raise DidNotEnable(f"Sanic {'.'.join(map(str, min_version))} or newer required.")
 
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between

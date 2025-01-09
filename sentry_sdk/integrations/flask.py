@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _MIN_VERSIONS, DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
@@ -77,8 +77,9 @@ class FlaskIntegration(Integration):
         if version is None:
             raise DidNotEnable("Unparsable Flask version.")
 
-        if version < (0, 10):
-            raise DidNotEnable("Flask 0.10 or newer is required.")
+        min_version = _MIN_VERSIONS[FlaskIntegration.identifier]
+        if version < min_version:
+            raise DidNotEnable(f"Flask {'.'.join(map(str, min_version))} or newer is required.")
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)

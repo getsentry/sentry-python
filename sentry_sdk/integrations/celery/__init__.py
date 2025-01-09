@@ -6,7 +6,7 @@ import sentry_sdk
 from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _MIN_VERSIONS, Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
     _patch_redbeat_maybe_due,
@@ -79,8 +79,9 @@ class CeleryIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if CELERY_VERSION < (4, 4, 7):
-            raise DidNotEnable("Celery 4.4.7 or newer required.")
+        min_version = _MIN_VERSIONS[CeleryIntegration.identifier]
+        if CELERY_VERSION < min_version:
+            raise DidNotEnable(f"Celery {'.'.join(map(str, min_version))} or newer required.")
 
         _patch_build_tracer()
         _patch_task_apply_async()

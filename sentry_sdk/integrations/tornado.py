@@ -18,7 +18,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     transaction_from_function,
 )
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _MIN_VERSIONS, Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
     _filter_headers,
@@ -52,8 +52,9 @@ class TornadoIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if TORNADO_VERSION < (6, 0):
-            raise DidNotEnable("Tornado 6.0+ required")
+        min_version = _MIN_VERSIONS[TornadoIntegration.identifier]
+        if TORNADO_VERSION < min_version:
+            raise DidNotEnable(f"Tornado {'.'.join(map(str, min_version))}+ required")
 
         if not HAS_REAL_CONTEXTVARS:
             # Tornado is async. We better have contextvars or we're going to leak

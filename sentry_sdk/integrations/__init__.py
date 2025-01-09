@@ -119,6 +119,29 @@ iter_default_integrations = _generate_default_integrations_iterator(
 
 del _generate_default_integrations_iterator
 
+_MIN_VERSIONS = {
+    'aiohttp': (3, 4),
+    'anthropic': (0, 16),
+    'ariadne': (0, 20),
+    'arq': (0, 23),
+    'asyncpg': (0, 23),
+    'boto3': (1, 12),   # this is actually the botocore version
+    "bottle": (0, 12),
+    "celery": (4, 4, 7),
+    "clickhouse_driver": (0, 2, 0),
+    "django": (1, 8),
+    "falcon": (1, 4),
+    "flask": (0, 10),
+    "gql": (3, 4, 1),
+    "graphene": (3, 3),
+    "ray": (2, 7, 0),
+    "rq": (0, 6),
+    "sanic": (0, 8),
+    "sqlalchemy": (1, 2),
+    "strawberry": (0, 209, 5),
+    "tornado": (6, 0),
+}
+
 
 def setup_integrations(
     integrations,

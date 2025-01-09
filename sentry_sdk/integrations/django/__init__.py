@@ -22,7 +22,7 @@ from sentry_sdk.utils import (
     transaction_from_function,
     walk_exception_chain,
 )
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _MIN_VERSIONS, Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import (
@@ -154,9 +154,9 @@ class DjangoIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
-        if DJANGO_VERSION < (1, 8):
-            raise DidNotEnable("Django 1.8 or newer is required.")
+        min_version = _MIN_VERSIONS[DjangoIntegration.identifier]
+        if DJANGO_VERSION < min_version:
+            raise DidNotEnable(f"Django {'.'.join(map(str, min_version))} or newer is required.")
 
         install_sql_hook()
         # Patch in our custom middleware.
