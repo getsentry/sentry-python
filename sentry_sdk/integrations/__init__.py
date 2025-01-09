@@ -223,7 +223,7 @@ def _check_minimum_version(integration, version, package=None):
     package = package or integration.identifier
 
     if version is None:
-        raise DidNotEnable(f"Unparsable {package} version: {version}")
+        raise DidNotEnable(f"Unparsable {package} version.")
 
     min_version = _MIN_VERSIONS.get(integration.identifier)
     if min_version is None:
