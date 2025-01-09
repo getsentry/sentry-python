@@ -34,9 +34,6 @@ try:
 except ImportError:
     raise DidNotEnable("clickhouse-driver not installed.")
 
-if clickhouse_driver.VERSION < (0, 2, 0):
-    raise DidNotEnable("clickhouse-driver >= 0.2.0 required")
-
 
 class ClickhouseDriverIntegration(Integration):
     identifier = "clickhouse_driver"

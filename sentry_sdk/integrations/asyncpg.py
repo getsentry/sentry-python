@@ -20,12 +20,6 @@ try:
 except ImportError:
     raise DidNotEnable("asyncpg not installed.")
 
-# asyncpg.__version__ is a string containing the semantic version in the form of "<major>.<minor>.<patch>"
-asyncpg_version = parse_version(asyncpg.__version__)
-
-if asyncpg_version is not None and asyncpg_version < (0, 23, 0):
-    raise DidNotEnable("asyncpg >= 0.23.0 required")
-
 
 class AsyncPGIntegration(Integration):
     identifier = "asyncpg"
