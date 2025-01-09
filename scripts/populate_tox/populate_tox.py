@@ -17,6 +17,9 @@ from dependencies import DEPENDENCIES
 # - allow to specify version dependent dependencies
 # - (optional) use a proper version parser for requires_python
 # - (optional) order by alphabet, not group then alphabet
+# - clean up the hardcoded stuff in tox.ini
+# - fix otel (since it only has prereleases)
+# - better picking of releases (e.g., if multiple majors, pick from each, etc.)
 
 # Only consider package versions going back this far
 CUTOFF = datetime.now() - timedelta(days=365 * 5)
@@ -31,8 +34,6 @@ ENV = Environment(
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
-
-INTEGRATIONS_MIN_VERSIONS = {}
 
 GROUPS = {
     "Common": [
@@ -124,12 +125,13 @@ GROUPS = {
 IGNORE = {
     # Do not try auto-generating the tox entries for these. They will be
     # hardcoded in tox.ini.
-    "common",
-    "gevent",
     "asgi",
+    "aws_lambda",
     "cloud_resource_context",
-    "potel",
+    "common",
     "gcp",
+    "gevent",
+    "potel",
 }
 
 packages = {}
@@ -393,8 +395,6 @@ if __name__ == "__main__":
     print(
         f"The SDK supports Python versions {LOWEST_SUPPORTED_PYTHON_VERSION} to {HIGHEST_SUPPORTED_PYTHON_VERSION}."
     )
-
-    print(INTEGRATIONS_MIN_VERSIONS)
 
     packages = defaultdict(list)
 

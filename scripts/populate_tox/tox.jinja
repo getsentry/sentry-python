@@ -30,6 +30,12 @@ envlist =
     # OpenTelemetry Experimental (POTel)
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
 
+    # AWS Lambda
+    # The aws_lambda tests deploy to the real AWS and have their own
+    # matrix of Python versions to run the test lambda function in.
+    # see `lambda_runtime` fixture in tests/integrations/aws_lambda.py
+    {py3.9}-aws_lambda
+
     # === Integrations ===
     {% for group, integrations in groups.items() %}
     # ~~~ {{ group }} ~~~
@@ -75,6 +81,9 @@ deps =
 
     # OpenTelemetry Experimental (POTel)
     potel: -e .[opentelemetry-experimental]
+
+    # AWS Lambda
+    aws_lambda: boto3
 
     # === Integrations ===
     {% for group, integrations in groups.items() %}
