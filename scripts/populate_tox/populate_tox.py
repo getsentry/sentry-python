@@ -1,14 +1,25 @@
 import functools
+import subprocess
+import sys
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from importlib import import_module
 from pathlib import Path
-from typing import Optional
 
 import requests
 from jinja2 import Environment, FileSystemLoader
 
+from sentry_sdk.utils import parse_version
+
 from dependencies import DEPENDENCIES
+
+# TODO:
+# - encode lowest supported versions somewhere and consider them here
+# - put GROUPS someplace where both this script and split_tox_actions can use it
+# - allow to specify version dependent dependencies
+# - (optional) use a proper version parser for requires_python
+# - (optional) order by alphabet, not group then alphabet
 
 # Only consider package versions going back this far
 CUTOFF = datetime.now() - timedelta(days=365 * 5)
@@ -22,9 +33,9 @@ ENV = Environment(
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
-
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
+INTEGRATIONS_MIN_VERSIONS = {}
 
 GROUPS = {
     "Common": [
@@ -133,30 +144,34 @@ class Version:
         self.raw = version
         self.metadata = metadata
 
-        self.major = None
-        self.minor = None
-        self.patch = None
         self.parsed = None
-
         self.python_versions = []
 
+        if not self.raw.split('.')[-1].isnumeric():
+            # TODO: allow some prereleases (only the most recent one, not too old and not when an equivalent/newer stable release is available)
+            return
+
         try:
-            parsed = version.split(".")
-            if len(parsed) == 3 and parsed[2].isnumeric():
-                self.major, self.minor, self.patch = (int(p) for p in parsed)
-            elif len(parsed) == 2 and parsed[1].isnumeric():
-                self.major, self.minor = (int(p) for p in parsed)
+            self.parsed = parse_version(version)
         except Exception:
-            # This will fail for e.g. prereleases, but we don't care about those
-            # for now
-            # TODO: add support for some prereleases (if not too old)
+            print(f'Failed to parse version {version}')
             pass
 
-        self.parsed = (self.major, self.minor, self.patch or 0)
+    @property
+    def major(self):
+        return self.parsed[0]
+
+    @property
+    def minor(self):
+        return self.parsed[1]
+
+    @property
+    def patch(self):
+        return self.parsed[2] if len(self.parsed) == 3 else 0
 
     @property
     def valid(self):
-        return self.major is not None and self.minor is not None
+        return self.parsed is not None
 
     @property
     def rendered_python_versions(self):
@@ -294,8 +309,7 @@ def _requires_python_to_python_versions(
 
 
 def determine_python_versions(
-    pypi_data: dict,
-    version: Optional[Version] = None,
+    pypi_data: dict
 ) -> list[str]:
     package = pypi_data["info"]["name"]
 
@@ -361,12 +375,15 @@ def write_tox_file(packages: dict) -> None:
 
 
 if __name__ == "__main__":
+    print('Finding out the lowest and highest Python version supported by the SDK...')
     sentry_sdk_python_support = determine_python_versions(fetch_package("sentry_sdk"))
     LOWEST_SUPPORTED_PYTHON_VERSION = sentry_sdk_python_support[0]
     HIGHEST_SUPPORTED_PYTHON_VERSION = sentry_sdk_python_support[-1]
     print(
-        f"The SDK supports Python versions {LOWEST_SUPPORTED_PYTHON_VERSION} to {HIGHEST_SUPPORTED_PYTHON_VERSION}. Only considering framework releases that overlap..."
+        f"The SDK supports Python versions {LOWEST_SUPPORTED_PYTHON_VERSION} to {HIGHEST_SUPPORTED_PYTHON_VERSION}."
     )
+
+    print(INTEGRATIONS_MIN_VERSIONS)
 
     packages = defaultdict(list)
 
@@ -386,7 +403,7 @@ if __name__ == "__main__":
 
             releases = get_releases(pypi_data)
             if not releases:
-                print("Found no releases.")
+                print("Found no supported releases.")
                 continue
 
             test_releases = pick_releases_to_test(releases)
@@ -400,8 +417,7 @@ if __name__ == "__main__":
                 release_pypi_data = fetch_release(package, release)
                 release.python_versions = pick_python_versions_to_test(
                     determine_python_versions(
-                        release_pypi_data,
-                        release,
+                        release_pypi_data
                     )
                 )
                 if not release.python_versions:

@@ -1,1 +1,2 @@
 requests
+sentry_sdk
