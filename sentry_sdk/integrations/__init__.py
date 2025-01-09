@@ -111,7 +111,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.tornado.TornadoIntegration",
 ]
 
-
 iter_default_integrations = _generate_default_integrations_iterator(
     integrations=_DEFAULT_INTEGRATIONS,
     auto_enabling_integrations=_AUTO_ENABLING_INTEGRATIONS,
@@ -216,6 +215,21 @@ def setup_integrations(
         logger.debug("Enabling integration %s", identifier)
 
     return integrations
+
+
+def _check_minimum_version(integration, version, package=None):
+    # type: (Integration, Optional[tuple[int]], Optional[str]) -> None
+    package = package or integration.identifier
+
+    if version is None:
+        raise DidNotEnable(f"Unparsable {package} version: {version}")
+
+    min_version = _MIN_VERSIONS.get(integration.identifier)
+    if min_version is None:
+        return
+
+    if version < min_version:
+        raise DidNotEnable(f"Integration only supports {package} {'.'.join(map(str, min_version))} or newer.")
 
 
 class DidNotEnable(Exception):  # noqa: N818

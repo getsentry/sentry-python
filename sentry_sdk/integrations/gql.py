@@ -5,7 +5,7 @@ from sentry_sdk.utils import (
     parse_version,
 )
 
-from sentry_sdk.integrations import _MIN_VERSIONS, DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 
 try:
@@ -32,10 +32,7 @@ class GQLIntegration(Integration):
     def setup_once():
         # type: () -> None
         gql_version = parse_version(gql.__version__)
-        min_version = _MIN_VERSIONS[GQLIntegration.identifier]
-        if gql_version is None or gql_version < min_version:
-            raise DidNotEnable(
-                f"GQLIntegration is only supported for GQL versions {'.'.join(map(str, min_version))} and above.")
+        _check_minimum_version(GQLIntegration, gql_version)
 
         _patch_execute()
 

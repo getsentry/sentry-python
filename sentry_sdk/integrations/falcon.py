@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.integrations import _MIN_VERSIONS, Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
@@ -135,13 +135,7 @@ class FalconIntegration(Integration):
         # type: () -> None
 
         version = parse_version(FALCON_VERSION)
-
-        if version is None:
-            raise DidNotEnable("Unparsable Falcon version: {}".format(FALCON_VERSION))
-
-        min_version = _MIN_VERSIONS[FalconIntegration.identifier]
-        if version < min_version:
-            raise DidNotEnable(f"Falcon {'.'.join(map(str, min_version))} or newer required.")
+        _check_minimum_version(FalconIntegration, version)
 
         _patch_wsgi_app()
         _patch_handle_exception()

@@ -1,6 +1,6 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import _MIN_VERSIONS, Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
@@ -42,10 +42,7 @@ class ClickhouseDriverIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        min_version = _MIN_VERSIONS[ClickhouseDriverIntegration.identifier]
-
-        if clickhouse_driver.VERSION < min_version:
-            raise DidNotEnable(f"clickhouse-driver >= {'.'.join(map(str, min_version))} required")
+        _check_minimum_version(ClickhouseDriverIntegration, clickhouse_driver.VERSION)
 
         # Every query is done using the Connection's `send_query` function
         clickhouse_driver.connection.Connection.send_query = _wrap_start(

@@ -2,7 +2,7 @@ import sys
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
-from sentry_sdk.integrations import _MIN_VERSIONS, DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
@@ -55,12 +55,7 @@ class ArqIntegration(Integration):
         except (TypeError, ValueError):
             version = None
 
-        if version is None:
-            raise DidNotEnable("Unparsable arq version: {}".format(ARQ_VERSION))
-
-        min_version = _MIN_VERSIONS[ArqIntegration.identifier]
-        if version < min_version:
-            raise DidNotEnable(f"arq {'.'.join(map(str, min_version))} or newer required.")
+        _check_minimum_version(ArqIntegration, version)
 
         patch_enqueue_job()
         patch_run_job()

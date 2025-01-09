@@ -7,7 +7,7 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
-    _MIN_VERSIONS,
+    _check_minimum_version,
     Integration,
     DidNotEnable,
 )
@@ -92,13 +92,7 @@ class AioHttpIntegration(Integration):
         # type: () -> None
 
         version = parse_version(AIOHTTP_VERSION)
-
-        if version is None:
-            raise DidNotEnable("Unparsable AIOHTTP version: {}".format(AIOHTTP_VERSION))
-
-        min_version = _MIN_VERSIONS[AioHttpIntegration.identifier]
-        if version < min_version:
-            raise DidNotEnable(f"AIOHTTP {'.'.join(map(str, min_version))} or newer required.")
+        _check_minimum_version(AioHttpIntegration, version)
 
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between

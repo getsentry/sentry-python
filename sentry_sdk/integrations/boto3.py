@@ -2,7 +2,7 @@ from functools import partial
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import _MIN_VERSIONS, Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -35,17 +35,8 @@ class Boto3Integration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         version = parse_version(BOTOCORE_VERSION)
-
-        if version is None:
-            raise DidNotEnable(
-                "Unparsable botocore version: {}".format(BOTOCORE_VERSION)
-            )
-
-        min_version = _MIN_VERSIONS[Boto3Integration.identifier]
-        if version < min_version:
-            raise DidNotEnable(f"Botocore {'.'.join(map(str, min_version))} or newer is required.")
+        _check_minimum_version(Boto3Integration, version, 'botocore')
 
         orig_init = BaseClient.__init__
 
