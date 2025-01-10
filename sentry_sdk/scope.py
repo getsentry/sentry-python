@@ -1379,7 +1379,9 @@ class Scope:
                 contexts["trace"] = self.get_trace_context()
 
         # Add "flags" context
-        contexts.setdefault("flags", {}).update({"values": self.flags.get()})
+        flags = self.flags.get()
+        if len(flags) > 0:
+            contexts.setdefault("flags", {}).update({"values": flags})
 
     def _drop(self, cause, ty):
         # type: (Any, str) -> Optional[Any]
