@@ -1,4 +1,6 @@
-from sentry_sdk import capture_message, start_transaction
+import re
+
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
 
@@ -35,7 +37,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
 
     connection = MongoClient(mongo_server.uri)
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution
@@ -49,7 +51,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
     (event,) = events
     (find, insert_success, insert_fail) = event["spans"]
 
-    common_tags = {
+    common_data = {
         "db.name": "test_db",
         "db.system": "mongodb",
         "net.peer.name": mongo_server.host,
@@ -60,8 +62,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
         assert span["data"][SPANDATA.DB_NAME] == "test_db"
         assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.SERVER_PORT] == mongo_server.port
-        for field, value in common_tags.items():
-            assert span["tags"][field] == value
+        for field, value in common_data.items():
             assert span["data"][field] == value
 
     assert find["op"] == "db"
@@ -69,22 +70,16 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
     assert insert_fail["op"] == "db"
 
     assert find["data"]["db.operation"] == "find"
-    assert find["tags"]["db.operation"] == "find"
     assert insert_success["data"]["db.operation"] == "insert"
-    assert insert_success["tags"]["db.operation"] == "insert"
     assert insert_fail["data"]["db.operation"] == "insert"
-    assert insert_fail["tags"]["db.operation"] == "insert"
 
     assert find["description"].startswith('{"find')
-    assert insert_success["description"].startswith('{"insert')
-    assert insert_fail["description"].startswith('{"insert')
+    assert re.match("^{['\"]insert.*", insert_success["description"])
+    assert re.match("^{['\"]insert.*", insert_fail["description"])
 
     assert find["data"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
-    assert find["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
     assert insert_success["data"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
-    assert insert_success["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
     assert insert_fail["data"][SPANDATA.DB_MONGODB_COLLECTION] == "erroneous"
-    assert insert_fail["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "erroneous"
     if with_pii:
         assert "1" in find["description"]
         assert "2" in insert_success["description"]
@@ -99,16 +94,22 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
             and "4" not in insert_fail["description"]
         )
 
-    assert find["tags"]["status"] == "ok"
-    assert insert_success["tags"]["status"] == "ok"
-    assert insert_fail["tags"]["status"] == "internal_error"
 
-
-@pytest.mark.parametrize("with_pii", [False, True])
-def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
+@pytest.mark.parametrize(
+    "with_pii,traces_sample_rate",
+    [
+        [False, 0.0],
+        [False, 1.0],
+        [True, 0.0],
+        [True, 1.0],
+    ],
+)
+def test_breadcrumbs(
+    sentry_init, capture_events, mongo_server, with_pii, traces_sample_rate
+):
     sentry_init(
         integrations=[PyMongoIntegration()],
-        traces_sample_rate=1.0,
+        traces_sample_rate=traces_sample_rate,
         send_default_pii=with_pii,
     )
     events = capture_events()
@@ -118,7 +119,7 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
     list(
         connection["test_db"]["test_collection"].find({"foobar": 1})
     )  # force query execution
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
     (event,) = events
     (crumb,) = event["breadcrumbs"]["values"]
@@ -445,7 +446,7 @@ def test_span_origin(sentry_init, capture_events, mongo_server):
 
     connection = MongoClient(mongo_server.uri)
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution

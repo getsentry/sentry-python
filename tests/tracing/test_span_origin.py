@@ -1,11 +1,11 @@
-from sentry_sdk import start_transaction, start_span
+from sentry_sdk import start_span
 
 
 def test_span_origin_manual(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction(name="hi"):
+    with start_span(name="hi"):
         with start_span(op="foo", name="bar"):
             pass
 
@@ -20,11 +20,11 @@ def test_span_origin_custom(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction(name="hi"):
+    with start_span(name="hi"):
         with start_span(op="foo", name="bar", origin="foo.foo2.foo3"):
             pass
 
-    with start_transaction(name="ho", origin="ho.ho2.ho3"):
+    with start_span(name="ho", origin="ho.ho2.ho3"):
         with start_span(op="baz", name="qux", origin="baz.baz2.baz3"):
             pass
 

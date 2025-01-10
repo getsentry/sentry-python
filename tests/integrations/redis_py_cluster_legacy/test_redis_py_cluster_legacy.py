@@ -4,7 +4,7 @@ import pytest
 import rediscluster
 
 from sentry_sdk import capture_message
-from sentry_sdk.api import start_transaction
+from sentry_sdk.api import start_span
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
@@ -84,7 +84,7 @@ def test_rediscluster_pipeline(
     events = capture_events()
 
     rc = rediscluster.RedisCluster(connection_pool=MOCK_CONNECTION_POOL)
-    with start_transaction():
+    with start_span(name="redis"):
         pipeline = rc.pipeline()
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -95,12 +95,10 @@ def test_rediscluster_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
+    assert span["data"]["redis.commands.count"] == 3
+    assert span["data"]["redis.commands.first_ten"] == expected_first_ten
     assert span["data"] == ApproxDict(
         {
-            "redis.commands": {
-                "count": 3,
-                "first_ten": expected_first_ten,
-            },
             SPANDATA.DB_SYSTEM: "redis",
             SPANDATA.DB_NAME: "1",
             SPANDATA.SERVER_ADDRESS: "localhost",
@@ -122,7 +120,7 @@ def test_db_connection_attributes_client(sentry_init, capture_events, redisclust
     events = capture_events()
 
     rc = rediscluster_cls(connection_pool=MOCK_CONNECTION_POOL)
-    with start_transaction():
+    with start_span(name="redis"):
         rc.get("foobar")
 
     (event,) = events
@@ -149,7 +147,7 @@ def test_db_connection_attributes_pipeline(
     events = capture_events()
 
     rc = rediscluster.RedisCluster(connection_pool=MOCK_CONNECTION_POOL)
-    with start_transaction():
+    with start_span(name="redis"):
         pipeline = rc.pipeline()
         pipeline.get("foo")
         pipeline.execute()
@@ -158,12 +156,11 @@ def test_db_connection_attributes_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
+    assert span["data"]["redis.commands.count"] == 1
+    assert span["data"]["redis.commands.first_ten"] == ["GET 'foo'"]
+
     assert span["data"] == ApproxDict(
         {
-            "redis.commands": {
-                "count": 1,
-                "first_ten": ["GET 'foo'"],
-            },
             SPANDATA.DB_SYSTEM: "redis",
             SPANDATA.DB_NAME: "1",
             SPANDATA.SERVER_ADDRESS: "localhost",

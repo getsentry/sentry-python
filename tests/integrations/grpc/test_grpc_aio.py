@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 import sentry_sdk
 
-from sentry_sdk import start_span, start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
 from tests.conftest import ApproxDict
@@ -60,7 +60,7 @@ async def test_noop_for_unimplemented_method(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_grpc_server_starts_transaction(grpc_server, capture_events):
+async def test_grpc_server_starts_root_span(grpc_server, capture_events):
     events = capture_events()
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
@@ -79,26 +79,26 @@ async def test_grpc_server_starts_transaction(grpc_server, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_grpc_server_continues_transaction(grpc_server, capture_events):
+async def test_grpc_server_continues_trace(grpc_server, capture_events):
     events = capture_events()
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
-        with sentry_sdk.start_transaction() as transaction:
+        with sentry_sdk.start_span() as root_span:
             metadata = (
                 (
                     "baggage",
                     "sentry-trace_id={trace_id},sentry-environment=test,"
                     "sentry-transaction=test-transaction,sentry-sample_rate=1.0".format(
-                        trace_id=transaction.trace_id
+                        trace_id=root_span.trace_id
                     ),
                 ),
                 (
                     "sentry-trace",
                     "{trace_id}-{parent_span_id}-{sampled}".format(
-                        trace_id=transaction.trace_id,
-                        parent_span_id=transaction.span_id,
+                        trace_id=root_span.trace_id,
+                        parent_span_id=root_span.span_id,
                         sampled=1,
                     ),
                 ),
@@ -114,7 +114,7 @@ async def test_grpc_server_continues_transaction(grpc_server, capture_events):
         "source": "custom",
     }
     assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
-    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert event["contexts"]["trace"]["trace_id"] == root_span.trace_id
     assert span["op"] == "test"
 
 
@@ -159,15 +159,15 @@ async def test_grpc_client_starts_span(grpc_server, capture_events_forksafe):
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
-        with start_transaction():
+        with start_span():
             await stub.TestServe(gRPCTestMessage(text="test"))
 
     events.write_file.close()
     events.read_event()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+    local_root_span = events.read_event()
+    span = local_root_span["spans"][0]
 
-    assert len(local_transaction["spans"]) == 1
+    assert len(local_root_span["spans"]) == 1
     assert span["op"] == OP.GRPC_CLIENT
     assert (
         span["description"]
@@ -190,15 +190,15 @@ async def test_grpc_client_unary_stream_starts_span(
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
-        with start_transaction():
+        with start_span():
             response = stub.TestUnaryStream(gRPCTestMessage(text="test"))
             [_ async for _ in response]
 
     events.write_file.close()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+    local_root_span = events.read_event()
+    span = local_root_span["spans"][0]
 
-    assert len(local_transaction["spans"]) == 1
+    assert len(local_root_span["spans"]) == 1
     assert span["op"] == OP.GRPC_CLIENT
     assert (
         span["description"]
@@ -243,24 +243,22 @@ async def test_span_origin(grpc_server, capture_events_forksafe):
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
-        with start_transaction(name="custom_transaction"):
+        with start_span(name="custom_root"):
             await stub.TestServe(gRPCTestMessage(text="test"))
 
     events.write_file.close()
 
-    transaction_from_integration = events.read_event()
-    custom_transaction = events.read_event()
+    root_span_from_integration = events.read_event()
+    custom_root_span = events.read_event()
 
+    assert root_span_from_integration["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
     assert (
-        transaction_from_integration["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
-    )
-    assert (
-        transaction_from_integration["spans"][0]["origin"]
+        root_span_from_integration["spans"][0]["origin"]
         == "auto.grpc.grpc.TestService.aio"
     )  # manually created in TestService, not the instrumentation
 
-    assert custom_transaction["contexts"]["trace"]["origin"] == "manual"
-    assert custom_transaction["spans"][0]["origin"] == "auto.grpc.grpc"
+    assert custom_root_span["contexts"]["trace"]["origin"] == "manual"
+    assert custom_root_span["spans"][0]["origin"] == "auto.grpc.grpc"
 
 
 class TestService(gRPCTestServiceServicer):

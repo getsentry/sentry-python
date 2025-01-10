@@ -143,7 +143,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 watched_span = WatchedSpan(parent_span.span.start_child(**kwargs))
                 parent_span.children.append(watched_span)
         if watched_span is None:
-            watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
+            watched_span = WatchedSpan(
+                sentry_sdk.start_span(only_if_parent=True, **kwargs)
+            )
 
         if kwargs.get("op", "").startswith("ai.pipeline."):
             if kwargs.get("name"):
