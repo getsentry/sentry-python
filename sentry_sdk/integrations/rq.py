@@ -2,7 +2,7 @@ import weakref
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
@@ -51,14 +51,8 @@ class RqIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         version = parse_version(RQ_VERSION)
-
-        if version is None:
-            raise DidNotEnable("Unparsable RQ version: {}".format(RQ_VERSION))
-
-        if version < (0, 6):
-            raise DidNotEnable("RQ 0.6 or newer is required.")
+        _check_minimum_version(RqIntegration, version)
 
         old_perform_job = Worker.perform_job
 

@@ -4,7 +4,7 @@ from typing import Any, TypeVar, Callable, Awaitable, Iterator, Optional
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
@@ -22,13 +22,6 @@ except ImportError:
     raise DidNotEnable("asyncpg not installed.")
 
 
-# asyncpg.__version__ is a string containing the semantic version in the form of "<major>.<minor>.<patch>"
-asyncpg_version = parse_version(asyncpg.__version__)
-
-if asyncpg_version is not None and asyncpg_version < (0, 23, 0):
-    raise DidNotEnable("asyncpg >= 0.23.0 required")
-
-
 class AsyncPGIntegration(Integration):
     identifier = "asyncpg"
     origin = f"auto.db.{identifier}"
@@ -39,6 +32,10 @@ class AsyncPGIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        # asyncpg.__version__ is a string containing the semantic version in the form of "<major>.<minor>.<patch>"
+        asyncpg_version = parse_version(asyncpg.__version__)
+        _check_minimum_version(AsyncPGIntegration, asyncpg_version)
+
         asyncpg.Connection.execute = _wrap_execute(
             asyncpg.Connection.execute,
         )

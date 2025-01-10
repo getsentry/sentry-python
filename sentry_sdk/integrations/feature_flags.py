@@ -16,7 +16,7 @@ class FeatureFlagsIntegration(Integration):
     @example
     ```
     import sentry_sdk
-    from sentry_sdk.integrations.featureflags import FeatureFlagsIntegration, add_feature_flag
+    from sentry_sdk.integrations.feature_flags import FeatureFlagsIntegration, add_feature_flag
 
     sentry_sdk.init(dsn="my_dsn", integrations=[FeatureFlagsIntegration()]);
 
@@ -25,7 +25,7 @@ class FeatureFlagsIntegration(Integration):
     ```
     """
 
-    identifier = "featureflags"
+    identifier = "feature_flags"
 
     @staticmethod
     def setup_once():

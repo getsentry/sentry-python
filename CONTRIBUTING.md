@@ -126,7 +126,7 @@ pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integr
 
 ## Releasing a New Version
 
-_(only relevant for Sentry employees)_
+_(only relevant for Python SDK core team)_
 
 ### Prerequisites
 

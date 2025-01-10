@@ -112,13 +112,36 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.tornado.TornadoIntegration",
 ]
 
-
 iter_default_integrations = _generate_default_integrations_iterator(
     integrations=_DEFAULT_INTEGRATIONS,
     auto_enabling_integrations=_AUTO_ENABLING_INTEGRATIONS,
 )
 
 del _generate_default_integrations_iterator
+
+
+_MIN_VERSIONS = {
+    "aiohttp": (3, 4),
+    "anthropic": (0, 16),
+    "ariadne": (0, 20),
+    "arq": (0, 23),
+    "asyncpg": (0, 23),
+    "boto3": (1, 12),  # this is actually the botocore version
+    "bottle": (0, 12),
+    "celery": (4, 4, 7),
+    "clickhouse_driver": (0, 2, 0),
+    "django": (1, 8),
+    "falcon": (1, 4),
+    "flask": (0, 10),
+    "gql": (3, 4, 1),
+    "graphene": (3, 3),
+    "ray": (2, 7, 0),
+    "rq": (0, 6),
+    "sanic": (0, 8),
+    "sqlalchemy": (1, 2),
+    "strawberry": (0, 209, 5),
+    "tornado": (6, 0),
+}
 
 
 def setup_integrations(
@@ -194,6 +217,23 @@ def setup_integrations(
         logger.debug("Enabling integration %s", identifier)
 
     return integrations
+
+
+def _check_minimum_version(integration, version, package=None):
+    # type: (type[Integration], Optional[tuple[int, ...]], Optional[str]) -> None
+    package = package or integration.identifier
+
+    if version is None:
+        raise DidNotEnable(f"Unparsable {package} version.")
+
+    min_version = _MIN_VERSIONS.get(integration.identifier)
+    if min_version is None:
+        return
+
+    if version < min_version:
+        raise DidNotEnable(
+            f"Integration only supports {package} {'.'.join(map(str, min_version))} or newer."
+        )
 
 
 class DidNotEnable(Exception):  # noqa: N818
