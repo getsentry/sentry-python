@@ -16,7 +16,7 @@ except ImportError:
 from freezegun import freeze_time
 from werkzeug.test import Client
 
-from sentry_sdk import start_transaction, start_span
+from sentry_sdk import start_span
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
@@ -496,7 +496,7 @@ def test_db_span_origin_executemany(sentry_init, client, capture_events):
     if "postgres" not in connections:
         pytest.skip("postgres tests disabled")
 
-    with start_transaction(name="test_transaction"):
+    with start_span(name="test_transaction"):
         from django.db import connection, transaction
 
         cursor = connection.cursor()

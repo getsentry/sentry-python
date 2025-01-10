@@ -807,7 +807,7 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
         with sentry_sdk.new_scope() as scope2:
             scope2.set_tag("current_scope2", 1)
 
-            with sentry_sdk.start_transaction(name="trx") as trx:
+            with sentry_sdk.start_span(name="trx") as trx:
                 trx.set_tag("trx", 1)
 
                 with sentry_sdk.start_span(op="span1") as span1:
@@ -898,7 +898,7 @@ def test_last_event_id_transaction(sentry_init):
 
     assert Scope.last_event_id() is None
 
-    with sentry_sdk.start_transaction(name="test"):
+    with sentry_sdk.start_span(name="test"):
         pass
 
     assert Scope.last_event_id() is None, "Transaction should not set last_event_id"

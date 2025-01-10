@@ -274,7 +274,7 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with sentry_sdk.start_span() as root_span:
+    with sentry_sdk.start_span(name="task") as root_span:
         dummy_task.delay()
 
     (event,) = events
@@ -468,7 +468,7 @@ def test_abstract_task(capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with sentry_sdk.start_span():
+    with sentry_sdk.start_span(name="celery"):
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
@@ -509,7 +509,7 @@ def test_baggage_propagation(init_celery):
     def dummy_task(self, x, y):
         return _get_headers(self)
 
-    with sentry_sdk.start_span() as root_span:
+    with sentry_sdk.start_span(name="task") as root_span:
         result = dummy_task.apply_async(
             args=(1, 0),
             headers={"baggage": "custom=value"},
@@ -542,7 +542,7 @@ def test_sentry_propagate_traces_override(init_celery):
         trace_id = get_current_span().trace_id
         return trace_id
 
-    with sentry_sdk.start_span() as root_span:
+    with sentry_sdk.start_span(name="task") as root_span:
         transaction_trace_id = root_span.trace_id
 
         # should propagate trace
@@ -710,7 +710,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
     @celery.task()
     def task(): ...
 
-    with sentry_sdk.start_span():
+    with sentry_sdk.start_span(name="task"):
         task.apply_async()
 
     (event,) = events
@@ -799,7 +799,7 @@ def test_send_task_wrapped(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="custom_transaction"):
+    with sentry_sdk.start_span(name="custom_transaction"):
         celery.send_task("very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"})
 
     (call,) = patched_send_task.call_args_list  # We should have exactly one call
