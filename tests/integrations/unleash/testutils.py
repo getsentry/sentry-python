@@ -81,10 +81,11 @@ class MockUnleashClient:
             },
         }
 
-        self.nonexistent_variant = {"name": "disabled", "enabled": False}
+        # Returned when the feature does not exist.
+        self.fallback_variant = {"name": "disabled", "enabled": False}
 
     def is_enabled(self, feature, *a, **kw):
         return self.features.get(feature, False)
 
     def get_variant(self, feature, *a, **kw):
-        return self.feature_to_variant.get(feature, self.nonexistent_variant)
+        return self.feature_to_variant.get(feature, self.fallback_variant)
