@@ -1,5 +1,3 @@
-from sentry_sdk.flag_utils import flag_error_processor
-
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 
@@ -26,12 +24,6 @@ class FeatureFlagsIntegration(Integration):
     """
 
     identifier = "feature_flags"
-
-    @staticmethod
-    def setup_once():
-        # type: () -> None
-        scope = sentry_sdk.get_current_scope()
-        scope.add_error_processor(flag_error_processor)
 
 
 def add_feature_flag(flag, result):

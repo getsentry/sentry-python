@@ -1378,6 +1378,9 @@ class Scope:
             else:
                 contexts["trace"] = self.get_trace_context()
 
+        # Add "flags" context
+        contexts.setdefault("flags", {}).update({"values": self.flags.get()})
+
     def _drop(self, cause, ty):
         # type: (Any, str) -> Optional[Any]
         logger.info("%s (%s) dropped event", ty, cause)
