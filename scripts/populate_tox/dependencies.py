@@ -1,21 +1,3 @@
-{
-    "anthropic": {
-        "main": "anthropic",
-        "dependencies": {
-            "*": ["anthropic", "pytest-asyncio"],
-            "anthropic<0.35": "httpx<0.28.0",
-        },
-    },
-    "celery": {"deps": [], "conditions": {"py3.7": "importlib-metadata<5.0"}},
-    "httpx": {
-        "deps": [],
-        "conditions": {
-            "httpx==0.16": "pytest-httpx==0.16",
-        },
-    },
-}
-
-
 DEPENDENCIES = {
     "aiohttp": {
         "package": "aiohttp",
@@ -34,7 +16,6 @@ DEPENDENCIES = {
             "*": ["fastapi", "flask", "httpx"],
         },
     },
-    # XXX arq-v0.23: pydantic<2
     "arq": {
         "package": "arq",
         "deps": {
@@ -91,34 +72,22 @@ DEPENDENCIES = {
             "*": ["httpx"],
         },
     },
-    # XXX
-    # django: psycopg2-binary
-    # django-v{1.11,2.0,2.1,2.2,3.0,3.1,3.2}: djangorestframework>=3.0.0,<4.0.0
-    # django-v{2.0,2.2,3.0,3.2,4.0,4.1,4.2,5.0,5.1}: channels[daphne]
-    # django-v{2.2,3.0}: six
-    # django-v{1.11,2.0,2.2,3.0,3.2}: Werkzeug<2.1.0
-    # django-v{1.11,2.0,2.2,3.0}: pytest-django<4.0
-    # django-v{3.2,4.0,4.1,4.2,5.0,5.1}: pytest-django
-    # django-v{4.0,4.1,4.2,5.0,5.1}: djangorestframework
-    # django-v{4.0,4.1,4.2,5.0,5.1}: pytest-asyncio
-    # django-v{4.0,4.1,4.2,5.0,5.1}: Werkzeug
-    # django-latest: djangorestframework
-    # django-latest: pytest-asyncio
-    # django-latest: pytest-django
-    # django-latest: Werkzeug
-    # django-latest: channels[daphne]
     "django": {
         "package": "django",
         "deps": {
             "*": [
-                "channels[daphne]",
-                "djangorestframework",
                 "psycopg2-binary",
-                "pytest-asyncio",
-                "pytest-django",
-                "six",
                 "werkzeug",
-            ]
+            ],
+            ">=2.0,<3.0": ["six"],
+            "<=3.2": [
+                "werkzeug<2.1.0",
+                "djangorestframework>=3.0.0,<4.0.0]",
+                "pytest-django",
+            ],
+            ">=2.0": ["channels[daphne]"],
+            "<=3.0": ["pytest-django<4.0"],
+            ">=4.0": ["djangorestframework", "pytest-asyncio"],
         },
     },
     "dramatiq": {
@@ -162,21 +131,17 @@ DEPENDENCIES = {
             "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"]
         },
     },
-    # XXX
-    # httpx-v0.16: pytest-httpx==0.10.0
-    # httpx-v0.18: pytest-httpx==0.12.0
-    # httpx-v0.20: pytest-httpx==0.14.0
-    # httpx-v0.22: pytest-httpx==0.19.0
-    # httpx-v0.23: pytest-httpx==0.21.0
-    # httpx-v0.24: pytest-httpx==0.22.0
-    # httpx-v0.25: pytest-httpx==0.25.0
-    # httpx: pytest-httpx
-    # anyio is a dep of httpx
-    # httpx: anyio<4.0.0
     "httpx": {
         "package": "httpx",
         "deps": {
-            "*": ["anyio<4.0.0"],
+            "*": ["anyio<4.0.0", "pytest-httpx"],
+            "==0.16": ["pytest-httpx==0.10.0"],
+            "==0.18": ["pytest-httpx==0.12.0"],
+            "==0.20": ["pytest-httpx==0.14.0"],
+            "==0.22": ["pytest-httpx==0.19.0"],
+            "==0.23": ["pytest-httpx==0.21.0"],
+            "==0.24": ["pytest-httpx==0.22.0"],
+            "==0.25": ["pytest-httpx==0.25.0"],
         },
     },
     "huey": {
@@ -191,10 +156,8 @@ DEPENDENCIES = {
     },
     # XXX
     # langchain-v0.1: openai~=1.0.0
-    # langchain-v0.1: langchain~=0.1.11
     # langchain-v0.1: tiktoken~=0.6.0
     # langchain-v0.1: httpx<0.28.0
-    # langchain-v0.3: langchain~=0.3.0
     # langchain-v0.3: langchain-community
     # langchain-v0.3: tiktoken
     # langchain-v0.3: openai
@@ -205,13 +168,15 @@ DEPENDENCIES = {
     "langchain": {
         "package": "langchain",
         "deps": {
-            "*": ["langchain-community", "openai", "tiktoken", "httpx"],
+            "*": ["openai", "tiktoken", "httpx"],
+            ">=0.3": ["langchain-community"],
         },
     },
     "langchain_notiktoken": {
         "package": "langchain",
         "deps": {
-            "*": ["langchain-openai", "openai"],
+            "*": ["openai", "httpx"],
+            ">=0.3": ["langchain-community"],
         },
     },
     "litestar": {
@@ -228,25 +193,19 @@ DEPENDENCIES = {
         },
     },
     # XXX
-    # openai-v1.0: openai~=1.0.0
-    # openai-v1.0: tiktoken
-    # openai-v1.0: httpx<0.28.0
-    # openai-v1.22: openai~=1.22.0
-    # openai-v1.22: tiktoken
-    # openai-v1.22: httpx<0.28.0
-    # openai-v1.55: openai~=1.55.0
-    # openai-v1.55: tiktoken
-    # openai-latest: openai
     # openai-latest: tiktoken~=0.6.0
-    # openai-notiktoken: openai
     "openai": {
         "package": "openai",
-        "deps": {"*": ["pytest-asyncio", "tiktoken", "httpx"]},
+        "deps": {
+            "*": ["pytest-asyncio", "tiktoken", "httpx"],
+            "<=1.22": ["httpx<0.28.0"],
+        },
     },
     "openai_notiktoken": {
         "package": "openai",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
+            "<=1.22": ["httpx<0.28.0"],
         },
     },
     "openfeature": {
@@ -285,22 +244,21 @@ DEPENDENCIES = {
             "*": ["werkzeug<2.1.0"],
         },
     },
-    # XXX
-    # quart-v0.16: blinker<1.6
-    # quart-v0.16: jinja2<3.1.0
-    # quart-v0.16: Werkzeug<2.1.0
-    # quart-v0.16: hypercorn<0.15.0
-    # quart-v0.16: quart~=0.16.0
-    # quart-v0.19: Werkzeug>=3.0.0
-    # quart-v0.19: quart~=0.19.0
-    # {py3.8}-quart: taskgroup==0.0.0a4
     "quart": {
         "package": "quart",
         "deps": {
             "*": [
                 "quart-auth",
                 "pytest-asyncio",
+                "werkzeug",
             ],
+            "<=0.16": [
+                "blinker<1.6",
+                "jinja2<3.1.0",
+                "Werkzeug<2.1.0",
+                "hypercorn<0.15.0",
+            ],
+            "py3.8": ["taskgroup==0.0.0a4"],
         },
     },
     "ray": {
@@ -324,19 +282,18 @@ DEPENDENCIES = {
         "package": "requests",
         "deps": {},
     },
-    # XXX
-    # https://github.com/jamesls/fakeredis/issues/245
-    # rq-v{0.6}: fakeredis<1.0
-    # rq-v{0.6}: redis<3.2.2
-    # rq-v{0.13,1.0,1.5,1.10}: fakeredis>=1.0,<1.7.4
-    # rq-v{1.15,1.16}: fakeredis
-    # {py3.6,py3.7}-rq-v{1.15,1.16}: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
-    # rq-latest: fakeredis
-    # {py3.6,py3.7}-rq-latest: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
     "rq": {
         "package": "rq",
         "deps": {
             "*": ["fakeredis"],
+            "<0.13": [
+                "fakeredis<1.0",
+                "redis<3.2.2",
+            ],  # https://github.com/jamesls/fakeredis/issues/245
+            ">=0.13,<=1.10": ["fakeredis>=1.0,<1.7.4"],
+            "py3.6,py3.7": [
+                "fakeredis!=2.26.0"
+            ],  # https://github.com/cunla/fakeredis-py/issues/341
         },
     },
     "sanic": {
