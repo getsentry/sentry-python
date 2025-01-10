@@ -212,6 +212,7 @@ def get_releases(integration: str, pypi_data: dict) -> list[Version]:
         else:
             print(f"  {version} has no requires python. Fetching classifiers")
             # No requires_python. Let's fetch the metadata to see the classifiers.
+            # XXX do something with this
             release_metadata = fetch_release(package, version)
             version.python_versions = supported_python_versions(
                 determine_python_versions(release_metadata)
