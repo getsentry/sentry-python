@@ -96,8 +96,8 @@ deps =
     {{ integration.name }}-v{{ release }}: {{ integration.package }}=={{ release }}
     {% endif %}
     {% endfor %}
-    {% for dependency in integration.dependencies %}
-    {{ integration.name }}: {{ dependency }}
+    {% for dep in integration.dependencies %}
+    {{ dep }}
     {% endfor %}
 
     {% endfor %}

@@ -125,7 +125,7 @@ _MIN_VERSIONS = {
     "arq": (0, 23),
     "asyncpg": (0, 23),
     "beam": (2, 12),
-    "boto3": (1, 12),  # this is actually the botocore version
+    "boto3": (1, 12),  # botocore
     "bottle": (0, 12),
     "celery": (4, 4, 7),
     "chalice": (1, 16, 0),
@@ -136,7 +136,7 @@ _MIN_VERSIONS = {
     "flask": (0, 10),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
-    "grpcio": (1, 21, 1),
+    "grpc": (1, 21, 1),  # grpcio
     "huggingface_hub": (0, 22),
     "langchain": (0, 0, 210),
     "launchdarkly": (9, 8, 0),

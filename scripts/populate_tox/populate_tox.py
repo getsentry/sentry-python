@@ -1,3 +1,11 @@
+"""
+This scripts populates tox.ini automatically using release data from PYPI.
+
+To add a new test target:
+- add it to a group in GROUPs
+- add it to DEPENDENCIES
+"""
+
 import functools
 import time
 from collections import defaultdict
@@ -46,9 +54,9 @@ GROUPS = {
         "anthropic",
         "cohere",
         "langchain",
-        "langchain-notiktoken",
+        "langchain_notiktoken",
         "openai",
-        "openai-notiktoken",
+        "openai_notiktoken",
         "huggingface_hub",
     ],
     "AWS": [
@@ -64,10 +72,10 @@ GROUPS = {
     ],
     "DBs": [
         "asyncpg",
-        "clickhouse-driver",
+        "clickhouse_driver",
         "pymongo",
         "redis",
-        "redis-py-cluster-legacy",
+        "redis_py_cluster_legacy",
         "sqlalchemy",
     ],
     "Flags": [
@@ -202,7 +210,6 @@ def get_releases(integration: str, pypi_data: dict) -> list[Version]:
         version.python_versions = None
         requires_python = meta.get("requires_python")
         if requires_python:
-            print(f"  {version} has a requires python {requires_python}")
             try:
                 version.python_versions = supported_python_versions(
                     SpecifierSet(requires_python)
@@ -210,14 +217,12 @@ def get_releases(integration: str, pypi_data: dict) -> list[Version]:
             except InvalidSpecifier:
                 continue
         else:
-            print(f"  {version} has no requires python. Fetching classifiers")
             # No requires_python. Let's fetch the metadata to see the classifiers.
-            # XXX do something with this
+            # XXX do something with this. no need to fetch every release ever
             release_metadata = fetch_release(package, version)
             version.python_versions = supported_python_versions(
                 determine_python_versions(release_metadata)
             )
-            print(f"     Fetched {version.python_versions}")
             time.sleep(0.1)
 
         if not version.python_versions:
@@ -317,12 +322,31 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
     return []
 
 
-def _render_python_versions(python_versions):
+def _render_python_versions(python_versions: list[Version]) -> str:
     return (
         "{"
         + ",".join(f"py{version.major}.{version.minor}" for version in python_versions)
         + "}"
     )
+
+
+def _render_dependencies(integration: str, releases: list[Version]) -> list[str]:
+    rendered = []
+    for constraint, deps in DEPENDENCIES[integration]["deps"].items():
+        if constraint == "*":
+            for dep in deps:
+                rendered.append(f"{integration}: {dep}")
+        elif constraint.startswith("py3"):
+            for dep in deps:
+                rendered.append(f"{constraint}-{integration}: {dep}")
+        else:
+            restriction = SpecifierSet(constraint)
+            for release in releases:
+                if release in restriction:
+                    for dep in deps:
+                        rendered.append(f"{integration}-v{release}: {dep}")
+
+    return rendered
 
 
 def write_tox_file(packages: dict) -> None:
@@ -338,7 +362,9 @@ def write_tox_file(packages: dict) -> None:
                     "package": integration["package"],
                     "extra": integration["extra"],
                     "releases": integration["releases"],
-                    "dependencies": DEPENDENCIES[integration["name"]][1:],
+                    "dependencies": _render_dependencies(
+                        integration["name"], integration["releases"]
+                    ),
                 }
             )
 
@@ -367,7 +393,7 @@ if __name__ == "__main__":
             print(f"Processing {integration}...")
 
             # Figure out the actual main package
-            package = DEPENDENCIES[integration][0]
+            package = DEPENDENCIES[integration]["package"]
             extra = None
             if "[" in package:
                 extra = package[package.find("[") + 1 : package.find("]")]
