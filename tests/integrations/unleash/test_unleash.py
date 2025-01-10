@@ -15,7 +15,7 @@ def test_is_enabled(sentry_init, capture_events, uninstall_integration):
     uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
-        client = UnleashClient()
+        client = UnleashClient()  # type: ignore[arg-type]
         sentry_init(integrations=[UnleashIntegration()])
         client.is_enabled("hello")
         client.is_enabled("world")
@@ -38,9 +38,10 @@ def test_get_variant(sentry_init, capture_events, uninstall_integration):
     uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
-        client = UnleashClient()
-        sentry_init(integrations=[UnleashIntegration()])  # type: ignore
+        client = UnleashClient()  # type: ignore[arg-type]
+        sentry_init(integrations=[UnleashIntegration()])
         client.get_variant("no_payload_feature")
+        client.get_variant("no_variant_feature")
         client.get_variant("string_feature")
         client.get_variant("json_feature")
         client.get_variant("csv_feature")
@@ -54,6 +55,7 @@ def test_get_variant(sentry_init, capture_events, uninstall_integration):
     assert events[0]["contexts"]["flags"] == {
         "values": [
             {"flag": "no_payload_feature", "result": True},
+            {"flag": "no_variant_feature", "result": True},
             {"flag": "string_feature", "result": True},
             {"flag": "json_feature", "result": True},
             {"flag": "csv_feature", "result": True},
@@ -67,8 +69,8 @@ def test_is_enabled_threaded(sentry_init, capture_events, uninstall_integration)
     uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
-        client = UnleashClient()
-        sentry_init(integrations=[UnleashIntegration()])  # type: ignore
+        client = UnleashClient()  # type: ignore[arg-type]
+        sentry_init(integrations=[UnleashIntegration()])
         events = capture_events()
 
         def task(flag_key):
@@ -116,8 +118,8 @@ def test_get_variant_threaded(sentry_init, capture_events, uninstall_integration
     uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
-        client = UnleashClient()
-        sentry_init(integrations=[UnleashIntegration()])  # type: ignore
+        client = UnleashClient()  # type: ignore[arg-type]
+        sentry_init(integrations=[UnleashIntegration()])
         events = capture_events()
 
         def task(flag_key):
@@ -167,8 +169,8 @@ def test_is_enabled_asyncio(sentry_init, capture_events, uninstall_integration):
     uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
-        client = UnleashClient()
-        sentry_init(integrations=[UnleashIntegration()])  # type: ignore
+        client = UnleashClient()  # type: ignore[arg-type]
+        sentry_init(integrations=[UnleashIntegration()])
         events = capture_events()
 
         async def task(flag_key):
@@ -219,8 +221,8 @@ def test_get_variant_asyncio(sentry_init, capture_events, uninstall_integration)
     uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
-        client = UnleashClient()
-        sentry_init(integrations=[UnleashIntegration()])  # type: ignore
+        client = UnleashClient()  # type: ignore[arg-type]
+        sentry_init(integrations=[UnleashIntegration()])
         events = capture_events()
 
         async def task(flag_key):
@@ -266,7 +268,7 @@ def test_get_variant_asyncio(sentry_init, capture_events, uninstall_integration)
 
 def test_wraps_original(sentry_init, uninstall_integration):
     with mock_unleash_client():
-        client = UnleashClient()
+        client = UnleashClient()  # type: ignore[arg-type]
 
         mock_is_enabled = mock.Mock(return_value=random() < 0.5)
         mock_get_variant = mock.Mock(return_value={"enabled": random() < 0.5})
@@ -293,7 +295,7 @@ def test_wraps_original(sentry_init, uninstall_integration):
 
 def test_wrapper_attributes(sentry_init, uninstall_integration):
     with mock_unleash_client():
-        client = UnleashClient()  # <- Returns a MockUnleashClient
+        client = UnleashClient()  # type: ignore[arg-type]
 
         original_is_enabled = client.is_enabled
         original_get_variant = client.get_variant

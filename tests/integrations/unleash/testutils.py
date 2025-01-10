@@ -48,30 +48,43 @@ class MockUnleashClient:
             "string_feature": {
                 "name": "variant1",
                 "enabled": True,
+                "feature_enabled": True,
                 "payload": {"type": "string", "value": "val1"},
             },
             "json_feature": {
                 "name": "variant1",
                 "enabled": True,
+                "feature_enabled": True,
                 "payload": {"type": "json", "value": '{"key1": 0.53}'},
             },
             "number_feature": {
                 "name": "variant1",
                 "enabled": True,
+                "feature_enabled": True,
                 "payload": {"type": "number", "value": "134.5"},
             },
             "csv_feature": {
                 "name": "variant1",
                 "enabled": True,
+                "feature_enabled": True,
                 "payload": {"type": "csv", "value": "abc 123\ncsbq 94"},
             },
-            "no_payload_feature": {"name": "variant1", "enabled": True},
+            "no_payload_feature": {
+                "name": "variant1",
+                "enabled": True,
+                "feature_enabled": True,
+            },
+            "no_variant_feature": {
+                "name": "disabled",
+                "enabled": False,
+                "feature_enabled": True,
+            },
         }
 
-        self.disabled_variant = {"name": "disabled", "enabled": False}
+        self.nonexistent_variant = {"name": "disabled", "enabled": False}
 
     def is_enabled(self, feature, *a, **kw):
         return self.features.get(feature, False)
 
     def get_variant(self, feature, *a, **kw):
-        return self.feature_to_variant.get(feature, self.disabled_variant)
+        return self.feature_to_variant.get(feature, self.nonexistent_variant)

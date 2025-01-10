@@ -37,7 +37,7 @@ class UnleashIntegration(Integration):
         def sentry_get_variant(self, feature, *args, **kwargs):
             # type: (UnleashClient, str, *Any, **Any) -> Any
             variant = old_get_variant(self, feature, *args, **kwargs)
-            enabled = variant.get("enabled", False)
+            enabled = variant.get("feature_enabled", False)
 
             # Payloads are not always used as the feature's value for application logic. They
             # may be used for metrics or debugging context instead. Therefore, we treat every
