@@ -25,6 +25,10 @@ class FeatureFlagsIntegration(Integration):
 
     identifier = "feature_flags"
 
+    def setup_once():
+        # type: () -> None
+        pass
+
 
 def add_feature_flag(flag, result):
     # type: (str, bool) -> None
