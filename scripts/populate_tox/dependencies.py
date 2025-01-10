@@ -57,6 +57,7 @@ DEPENDENCIES = {
     ],
     "cohere": [
         "cohere",
+        "httpx",
     ],
     # XXX
     # django: psycopg2-binary
