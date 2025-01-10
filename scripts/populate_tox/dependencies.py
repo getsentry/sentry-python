@@ -82,7 +82,7 @@ DEPENDENCIES = {
             ">=2.0,<3.0": ["six"],
             "<=3.2": [
                 "werkzeug<2.1.0",
-                "djangorestframework>=3.0.0,<4.0.0]",
+                "djangorestframework>=3.0.0,<4.0.0",
                 "pytest-django",
             ],
             ">=2.0": ["channels[daphne]"],
