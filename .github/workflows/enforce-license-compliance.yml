@@ -6,7 +6,7 @@ on:
       - master
       - main
       - release/*
-      - sentry-sdk-2.0
+      - potel-base
   pull_request:
 
 # Cancel in progress workflows on pull_requests.

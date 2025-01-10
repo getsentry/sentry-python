@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
@@ -72,14 +72,8 @@ class SanicIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         SanicIntegration.version = parse_version(SANIC_VERSION)
-
-        if SanicIntegration.version is None:
-            raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
-
-        if SanicIntegration.version < (0, 8):
-            raise DidNotEnable("Sanic 0.8 or newer required.")
+        _check_minimum_version(SanicIntegration, SanicIntegration.version)
 
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
@@ -101,7 +95,7 @@ class SanicIntegration(Integration):
             # https://github.com/huge-success/sanic/issues/1332
             ignore_logger("root")
 
-        if SanicIntegration.version < (21, 9):
+        if SanicIntegration.version is not None and SanicIntegration.version < (21, 9):
             _setup_legacy_sanic()
             return
 
