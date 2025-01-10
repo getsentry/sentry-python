@@ -189,6 +189,10 @@ def get_releases(integration: str, pypi_data: dict) -> list[Version]:
         if min_supported and version < min_supported:
             continue
 
+        if version.is_prerelease or version.is_postrelease:
+            # TODO: consider the newest prerelease unless obsolete
+            continue
+
         # The release listing that you get via the package endpoint doesn't
         # contain all metadata for a release. `requires_python` is included,
         # but classifiers are not (they require a separate call to the release
@@ -216,10 +220,6 @@ def get_releases(integration: str, pypi_data: dict) -> list[Version]:
             time.sleep(0.1)
 
         if not version.python_versions:
-            continue
-
-        if version.is_prerelease or version.is_postrelease:
-            # TODO: consider the newest prerelease unless obsolete
             continue
 
         for i, saved_version in enumerate(releases):
