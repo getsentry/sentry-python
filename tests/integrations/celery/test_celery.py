@@ -268,7 +268,9 @@ def test_no_stackoverflows(celery):
 
 
 def test_simple_no_propagation(capture_events, init_celery):
-    celery = init_celery(propagate_traces=False)
+    with pytest.warns(DeprecationWarning):
+        celery = init_celery(propagate_traces=False)
+
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -532,9 +534,10 @@ def test_sentry_propagate_traces_override(init_celery):
     Test if the `sentry-propagate-traces` header given to `apply_async`
     overrides the `propagate_traces` parameter in the integration constructor.
     """
-    celery = init_celery(
-        propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
-    )
+    with pytest.warns(DeprecationWarning):
+        celery = init_celery(
+            propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
+        )
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
