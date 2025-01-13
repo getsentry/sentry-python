@@ -43,8 +43,8 @@ IGNORE = {
     # suites over to this script. Some entries will probably stay forever
     # as they don't fit the mold (e.g. common, asgi).
     "aiohttp",
+    "anthropic",
     "asgi",
-    "asyncpg",
     "aws_lambda",
     "beam",
     "boto3",
