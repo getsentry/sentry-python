@@ -125,21 +125,31 @@ _MIN_VERSIONS = {
     "ariadne": (0, 20),
     "arq": (0, 23),
     "asyncpg": (0, 23),
-    "boto3": (1, 12),  # this is actually the botocore version
+    "beam": (2, 12),
+    "boto3": (1, 12),  # botocore
     "bottle": (0, 12),
     "celery": (4, 4, 7),
+    "chalice": (1, 16, 0),
     "clickhouse_driver": (0, 2, 0),
     "django": (1, 8),
     "falcon": (1, 4),
+    "fastapi": (0, 79, 0),
     "flask": (0, 10),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
+    "grpc": (1, 21, 1),  # grpcio
+    "huggingface_hub": (0, 22),
+    "langchain": (0, 0, 210),
+    "launchdarkly": (9, 8, 0),
+    "openai": (1, 0, 0),
+    "openfeature": (0, 7, 1),
     "ray": (2, 7, 0),
     "rq": (0, 6),
     "sanic": (0, 8),
     "sqlalchemy": (1, 2),
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
+    "unleash": (6, 0, 1),
 }
 
 
