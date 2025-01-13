@@ -1378,10 +1378,10 @@ class Scope:
             else:
                 contexts["trace"] = self.get_trace_context()
 
-        # Add "flags" context
+    def _apply_flags_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         flags = self.flags.get()
-        if len(flags) > 0:
-            contexts.setdefault("flags", {}).update({"values": flags})
+        event.setdefault("contexts", {}).setdefault("flags", {}).update({"values": flags})
 
     def _drop(self, cause, ty):
         # type: (Any, str) -> Optional[Any]
@@ -1481,6 +1481,7 @@ class Scope:
 
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
+            self._apply_flags_to_event(event, hint, options)
 
         event = self.run_error_processors(event, hint)
         if event is None:
