@@ -42,7 +42,7 @@ IGNORE = {
     # This set should be getting smaller over time as we migrate more test
     # suites over to this script. Some entries will probably stay forever
     # as they don't fit the mold (e.g. common, asgi).
-    "anthropic",
+    "aiohttp",
     "arq",
     "asgi",
     "asyncpg",
@@ -172,7 +172,7 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
             except InvalidSpecifier:
                 continue
         else:
-            # No `requires_python``. Let's fetch the metadata to see
+            # No `requires_python`. Let's fetch the metadata to see
             # the classifiers.
             # XXX do something with this. no need to fetch every release ever
             release_metadata = fetch_release(package, version)
@@ -190,7 +190,7 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
                 and version.minor == saved_version.minor
                 and version.micro > saved_version.micro
             ):
-                # don't save all patch versions of a release, just the newest one
+                # Don't save all patch versions of a release, just the newest one
                 releases[i] = version
                 break
         else:
@@ -208,6 +208,9 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
     filtered_releases = set()
 
     if has_majors:
+        # Always check the very first supported release
+        filtered_releases.add(releases[0])
+
         # Find out the min and max release by each major
         releases_by_major = {}
         for release in releases:
@@ -217,9 +220,12 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
                 releases_by_major[release.major][0] = release
             if release > releases_by_major[release.major][1]:
                 releases_by_major[release.major][1] = release
-        for min_version, max_version in releases_by_major.values():
-            filtered_releases.add(min_version)
+        for i, (min_version, max_version) in enumerate(releases_by_major.values()):
             filtered_releases.add(max_version)
+            if i == len(releases_by_major) - 1:
+                # If this is the latest major release, also check the lowest
+                # version of this version
+                filtered_releases.add(min_version)
 
     else:
         indexes = [

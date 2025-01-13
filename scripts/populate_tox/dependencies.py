@@ -35,10 +35,6 @@
 
 
 DEPENDENCIES = {
-    "aiohttp": {
-        "package": "aiohttp",
-        "deps": {"*": ["pytest-aiohttp", "pytest-asyncio"]},
-    },
     "anthropic": {
         "package": "anthropic",
         "deps": {

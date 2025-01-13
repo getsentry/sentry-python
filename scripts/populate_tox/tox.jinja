@@ -31,9 +31,10 @@ envlist =
     # At a minimum, we should test against at least the lowest
     # and the latest supported version of a framework.
 
-    # Anthropic
-    {py3.8,py3.11,py3.12}-anthropic-v{0.16,0.28,0.40}
-    {py3.7,py3.11,py3.12}-anthropic-latest
+    # AIOHTTP
+    {py3.7}-aiohttp-v{3.4}
+    {py3.7,py3.9,py3.11}-aiohttp-v{3.8}
+    {py3.8,py3.12,py3.13}-aiohttp-latest
 
     # Arq
     {py3.7,py3.11}-arq-v{0.23}
@@ -292,7 +293,6 @@ envlist =
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
     # integration tests there.
-
     {% for group, integrations in groups.items() %}
     # ~~~ {{ group }} ~~~
     {% for integration in integrations %}
@@ -334,13 +334,13 @@ deps =
 
     # === Integrations ===
 
-    # Anthropic
-    anthropic: pytest-asyncio
-    anthropic-v{0.16,0.28}: httpx<0.28.0
-    anthropic-v0.16: anthropic~=0.16.0
-    anthropic-v0.28: anthropic~=0.28.0
-    anthropic-v0.40: anthropic~=0.40.0
-    anthropic-latest: anthropic
+    # AIOHTTP
+    aiohttp-v3.4: aiohttp~=3.4.0
+    aiohttp-v3.8: aiohttp~=3.8.0
+    aiohttp-latest: aiohttp
+    aiohttp: pytest-aiohttp
+    aiohttp-v3.8: pytest-asyncio
+    aiohttp-latest: pytest-asyncio
 
     # Arq
     arq-v0.23: arq~=0.23.0
