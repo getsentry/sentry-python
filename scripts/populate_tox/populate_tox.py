@@ -1,9 +1,5 @@
 """
 This scripts populates tox.ini automatically using release data from PYPI.
-
-To add a new test target:
-- add it to a group in GROUPs
-- add it to DEPENDENCIES
 """
 
 import functools
@@ -21,10 +17,8 @@ from jinja2 import Environment, FileSystemLoader
 from sentry_sdk.integrations import _MIN_VERSIONS
 
 from dependencies import DEPENDENCIES
+from scripts.split_tox_gh_actions.split_tox_gh_actions import GROUPS
 
-# TODO:
-# - put GROUPS someplace where both this script and split_tox_actions can use it
-# - (optional) order by alphabet, not group then alphabet
 
 # Only consider package versions going back this far
 CUTOFF = datetime.now() - timedelta(days=365 * 5)
@@ -40,103 +34,72 @@ PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
 CLASSIFIER_PREFIX = "Programming Language :: Python :: "
 
-GROUPS = {
-    "Common": [
-        "common",
-    ],
-    "AI": [
-        "anthropic",
-        "cohere",
-        "langchain",
-        "langchain_notiktoken",
-        "openai",
-        "openai_notiktoken",
-        "huggingface_hub",
-    ],
-    "AWS": [
-        # this is separate from Cloud Computing because only this one test suite
-        # needs to run with access to GitHub secrets
-        "aws_lambda",
-    ],
-    "Cloud": [
-        "boto3",
-        "chalice",
-        "cloud_resource_context",
-        "gcp",
-    ],
-    "DBs": [
-        "asyncpg",
-        "clickhouse_driver",
-        "pymongo",
-        "redis",
-        "redis_py_cluster_legacy",
-        "sqlalchemy",
-    ],
-    "Flags": [
-        "launchdarkly",
-        "openfeature",
-        "unleash",
-    ],
-    "GraphQL": [
-        "ariadne",
-        "gql",
-        "graphene",
-        "strawberry",
-    ],
-    "Network": [
-        "gevent",
-        "grpc",
-        "httpx",
-        "requests",
-    ],
-    "Tasks": [
-        "arq",
-        "beam",
-        "celery",
-        "dramatiq",
-        "huey",
-        "ray",
-        "rq",
-        "spark",
-    ],
-    "Web 1": [
-        "django",
-        "flask",
-        "starlette",
-        "fastapi",
-    ],
-    "Web 2": [
-        "aiohttp",
-        "asgi",
-        "bottle",
-        "falcon",
-        "litestar",
-        "pyramid",
-        "quart",
-        "sanic",
-        "starlite",
-        "tornado",
-    ],
-    "Misc": [
-        "loguru",
-        "opentelemetry",
-        "potel",
-        "pure_eval",
-        "trytond",
-        "typer",
-    ],
-}
 
 IGNORE = {
     # Do not try auto-generating the tox entries for these. They will be
     # hardcoded in tox.ini.
+    #
+    # This set should be getting smaller over time as we migrate more test
+    # suites over to this script. Some entries will probably stay forever
+    # as they don't fit the mold (e.g. common, asgi).
+    "aiohttp",
+    "anthropic",
+    "ariadne",
+    "arq",
     "asgi",
+    "asyncpg",
     "aws_lambda",
-    "cloud_resource_context",
+    "beam",
+    "boto3",
+    "bottle",
+    "celery",
+    "chalice",
+    "clickhouse_driver",
+    "cohere",
     "common",
+    "cloud_resource_context",
+    "django",
+    "dramatiq",
+    "falcon",
+    "fastapi",
+    "flask",
     "gcp",
     "gevent",
+    "gql",
+    "graphene",
+    "grpc",
+    "httpx",
+    "huey",
+    "huggingface_hub",
+    "langchain",
+    "langchain_notiktoken",
+    "litestar",
+    "loguru",
+    "openai",
+    "openai_notiktoken",
+    "openfeature",
+    "launchdarkly",
+    "opentelemetry",
     "potel",
+    "pure_eval",
+    "pymongo",
+    "pyramid",
+    "quart",
+    "ray",
+    "redis",
+    "redis_py_cluster_legacy",
+    "requests",
+    "rq",
+    "sanic",
+    "spark",
+    "starlette",
+    "starlite",
+    "sqlalchemy",
+    "strawberry",
+    "tornado",
+    "trytond",
+    "typer",
+    "unleash",
 }
 
 
