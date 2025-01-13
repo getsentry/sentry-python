@@ -8,7 +8,7 @@ on:
     branches:
       - master
       - release/**
-      - sentry-sdk-2.0
+      - potel-base
   pull_request:
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
@@ -30,7 +30,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.7","3.8","3.10","3.11","3.12","3.13"]
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
@@ -106,7 +106,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.7","3.8","3.9","3.10","3.11","3.12"]
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5

@@ -8,7 +8,7 @@ on:
     branches:
       - master
       - release/**
-      - sentry-sdk-2.0
+      - potel-base
   # XXX: We are using `pull_request_target` instead of `pull_request` because we want
   # this to run on forks with access to the secrets necessary to run the test suite.
   # Prefer to use `pull_request` when possible.
@@ -62,7 +62,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.9"]
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
     needs: check-permissions
     steps:
       - uses: actions/checkout@v4.2.2

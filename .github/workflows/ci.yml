@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - release/**
-      - sentry-sdk-2.0
+      - potel-base
 
   pull_request:
 

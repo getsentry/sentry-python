@@ -23,9 +23,9 @@ def _init(*args, **kwargs):
 
     This takes the same arguments as the client constructor.
     """
+    setup_scope_context_management()
     client = sentry_sdk.Client(*args, **kwargs)
     sentry_sdk.get_global_scope().set_client(client)
-    setup_scope_context_management()
     _check_python_deprecations()
 
 

@@ -2,7 +2,7 @@ from importlib import import_module
 
 import sentry_sdk
 from sentry_sdk import get_client, capture_event
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.scope import should_send_default_pii
@@ -36,12 +36,7 @@ class AriadneIntegration(Integration):
     def setup_once():
         # type: () -> None
         version = package_version("ariadne")
-
-        if version is None:
-            raise DidNotEnable("Unparsable ariadne version.")
-
-        if version < (0, 20):
-            raise DidNotEnable("ariadne 0.20 or newer required.")
+        _check_minimum_version(AriadneIntegration, version)
 
         ignore_logger("ariadne")
 

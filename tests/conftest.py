@@ -10,6 +10,7 @@ from unittest import mock
 import pytest
 import jsonschema
 
+
 try:
     import gevent
 except ImportError:
@@ -198,10 +199,10 @@ def uninstall_integration():
 @pytest.fixture
 def sentry_init(request):
     def inner(*a, **kw):
+        setup_scope_context_management()
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
         sentry_sdk.get_global_scope().set_client(client)
-        setup_scope_context_management()
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
