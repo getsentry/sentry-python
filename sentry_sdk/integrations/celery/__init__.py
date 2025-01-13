@@ -312,7 +312,7 @@ def _wrap_tracer(task, f):
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
             headers = args[3].get("headers") or {}
-            import ipdb; ipdb.set_trace()
+
             with sentry_sdk.continue_trace(headers):
                 with sentry_sdk.start_span(
                     op=OP.QUEUE_TASK_CELERY,
