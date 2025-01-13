@@ -1,4 +1,4 @@
-from sentry_sdk.flag_utils import FlagBuffer
+from sentry_sdk.feature_flags import FlagBuffer
 
 
 def test_flag_tracking():

@@ -11,7 +11,7 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.flag_utils import FlagBuffer, DEFAULT_FLAG_CAPACITY
+from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
