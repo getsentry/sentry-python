@@ -95,6 +95,12 @@ GROUPS = {
         "graphene",
         "strawberry",
     ],
+    "Network": [
+        "gevent",
+        "grpc",
+        "httpx",
+        "requests",
+    ],
     "Tasks": [
         "arq",
         "beam",
@@ -104,12 +110,6 @@ GROUPS = {
         "ray",
         "rq",
         "spark",
-    ],
-    "Network": [
-        "gevent",
-        "grpc",
-        "httpx",
-        "requests",
     ],
     "Web 1": [
         "django",
