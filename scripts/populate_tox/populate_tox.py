@@ -1,5 +1,5 @@
 """
-This scripts populates tox.ini automatically using release data from PYPI.
+This script populates tox.ini automatically using release data from PYPI.
 """
 
 import functools
@@ -44,7 +44,6 @@ IGNORE = {
     # as they don't fit the mold (e.g. common, asgi).
     "aiohttp",
     "anthropic",
-    "ariadne",
     "arq",
     "asgi",
     "asyncpg",
