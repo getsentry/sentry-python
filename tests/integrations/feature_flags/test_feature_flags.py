@@ -4,15 +4,11 @@ import sys
 import pytest
 
 import sentry_sdk
-from sentry_sdk.integrations.feature_flags import (
-    FeatureFlagsIntegration,
-    add_feature_flag,
-)
+from sentry_sdk.integrations.feature_flags import add_feature_flag
 
 
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
-    uninstall_integration(FeatureFlagsIntegration.identifier)
-    sentry_init(integrations=[FeatureFlagsIntegration()])
+    sentry_init()
 
     add_feature_flag("hello", False)
     add_feature_flag("world", True)
@@ -34,8 +30,7 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
 def test_featureflags_integration_threaded(
     sentry_init, capture_events, uninstall_integration
 ):
-    uninstall_integration(FeatureFlagsIntegration.identifier)
-    sentry_init(integrations=[FeatureFlagsIntegration()])
+    sentry_init()
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
@@ -86,8 +81,7 @@ def test_featureflags_integration_asyncio(
 ):
     asyncio = pytest.importorskip("asyncio")
 
-    uninstall_integration(FeatureFlagsIntegration.identifier)
-    sentry_init(integrations=[FeatureFlagsIntegration()])
+    sentry_init()
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
