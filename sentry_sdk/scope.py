@@ -1524,6 +1524,12 @@ class Scope:
             self._propagation_context = scope._propagation_context
         if scope._session:
             self._session = scope._session
+        if scope._flags:
+            if not self._flags:
+                self._flags = deepcopy(scope._flags)
+            else:
+                for flag in scope._flags.get():
+                    self._flags.set(flag["flag"], flag["result"])
 
     def update_from_kwargs(
         self,
