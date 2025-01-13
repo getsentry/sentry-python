@@ -2,7 +2,6 @@ from functools import wraps
 from typing import Any
 
 import sentry_sdk
-from sentry_sdk.flag_utils import flag_error_processor
 from sentry_sdk.integrations import Integration, DidNotEnable
 
 try:
@@ -33,7 +32,3 @@ class UnleashIntegration(Integration):
             return enabled
 
         UnleashClient.is_enabled = sentry_is_enabled  # type: ignore
-
-        # Error processor
-        scope = sentry_sdk.get_current_scope()
-        scope.add_error_processor(flag_error_processor)
