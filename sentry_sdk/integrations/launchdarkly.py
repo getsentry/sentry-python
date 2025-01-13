@@ -37,6 +37,7 @@ class LaunchDarklyIntegration(Integration):
         # Register the flag collection hook with the LD client.
         client.add_hook(LaunchDarklyHook())
 
+    @staticmethod
     def setup_once():
         # type: () -> None
         pass

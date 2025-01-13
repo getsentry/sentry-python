@@ -1,33 +1,4 @@
 import sentry_sdk
-from sentry_sdk.integrations import Integration
-
-
-class FeatureFlagsIntegration(Integration):
-    """
-    Sentry integration for capturing feature flags on error events. To manually buffer flag data,
-    call `integrations.featureflags.add_feature_flag`. We recommend you do this on each flag
-    evaluation.
-
-    See the [feature flag documentation](https://develop.sentry.dev/sdk/expected-features/#feature-flags)
-    for more information.
-
-    @example
-    ```
-    import sentry_sdk
-    from sentry_sdk.integrations.feature_flags import FeatureFlagsIntegration, add_feature_flag
-
-    sentry_sdk.init(dsn="my_dsn", integrations=[FeatureFlagsIntegration()]);
-
-    add_feature_flag('my-flag', true);
-    sentry_sdk.capture_exception(Exception('broke')); // 'my-flag' should be captured on this Sentry event.
-    ```
-    """
-
-    identifier = "feature_flags"
-
-    def setup_once():
-        # type: () -> None
-        pass
 
 
 def add_feature_flag(flag, result):
