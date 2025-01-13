@@ -187,17 +187,11 @@ def test_langchain_agent(
         assert "measurements" not in chat_spans[0]
 
     if send_default_pii and include_prompts:
-        assert (
-            "You are very powerful"
-            in chat_spans[0]["data"]["ai.input_messages"][0]["content"]
-        )
+        assert "You are very powerful" in chat_spans[0]["data"]["ai.input_messages"]
         assert "5" in chat_spans[0]["data"]["ai.responses"]
         assert "word" in tool_exec_span["data"]["ai.input_messages"]
         assert 5 == int(tool_exec_span["data"]["ai.responses"])
-        assert (
-            "You are very powerful"
-            in chat_spans[1]["data"]["ai.input_messages"][0]["content"]
-        )
+        assert "You are very powerful" in chat_spans[1]["data"]["ai.input_messages"]
         assert "5" in chat_spans[1]["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in chat_spans[0].get("data", {})

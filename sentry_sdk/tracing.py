@@ -1213,6 +1213,7 @@ class POTelSpan:
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
         attributes=None,  # type: OTelSpanAttributes
         only_if_parent=False,  # type: bool
+        parent_span=None,  # type: Optional[POTelSpan]
         otel_span=None,  # type: Optional[OtelSpan]
         **_,  # type: dict[str, object]
     ):
@@ -1231,7 +1232,7 @@ class POTelSpan:
             self._otel_span = otel_span
         else:
             skip_span = False
-            if only_if_parent:
+            if only_if_parent and parent_span is None:
                 parent_span_context = get_current_span().get_span_context()
                 skip_span = (
                     not parent_span_context.is_valid or parent_span_context.is_remote
@@ -1262,8 +1263,17 @@ class POTelSpan:
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
+                parent_context = None
+                if parent_span is not None:
+                    parent_context = otel_trace.set_span_in_context(
+                        parent_span._otel_span
+                    )
+
                 self._otel_span = tracer.start_span(
-                    span_name, start_time=start_timestamp, attributes=attributes
+                    span_name,
+                    context=parent_context,
+                    start_time=start_timestamp,
+                    attributes=attributes,
                 )
 
                 self.origin = origin or DEFAULT_SPAN_ORIGIN
@@ -1506,10 +1516,7 @@ class POTelSpan:
 
     def start_child(self, **kwargs):
         # type: (**Any) -> POTelSpan
-        kwargs.setdefault("sampled", self.sampled)
-
-        span = POTelSpan(only_if_parent=True, **kwargs)
-        return span
+        return POTelSpan(sampled=self.sampled, parent_span=self, **kwargs)
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
