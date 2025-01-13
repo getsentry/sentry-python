@@ -54,8 +54,8 @@ jobs:
       - name: Check permissions on repo branch
         if: github.event_name == 'push'
         run: true
-  test-aws-pinned:
-    name: AWS (pinned)
+  test-aws:
+    name: AWS
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -82,10 +82,11 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test aws_lambda pinned
+      - name: Test aws_lambda
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -114,13 +115,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned AWS tests passed
-    needs: test-aws-pinned
+    name: All AWS tests passed
+    needs: test-aws
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-aws-pinned.result, 'failure') || contains(needs.test-aws-pinned.result, 'skipped')
+        if: contains(needs.test-aws.result, 'failure') || contains(needs.test-aws.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

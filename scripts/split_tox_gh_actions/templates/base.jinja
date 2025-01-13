@@ -52,9 +52,7 @@ jobs:
 {% include "check_permissions.jinja" %}
 {% endif %}
 
-{% for category in categories %}
 {% include "test_group.jinja" %}
-{% endfor %}
 
 {% include "check_required.jinja" %}
 {% endwith %}

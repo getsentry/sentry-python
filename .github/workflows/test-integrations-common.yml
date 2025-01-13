@@ -22,8 +22,8 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-common-pinned:
-    name: Common (pinned)
+  test-common:
+    name: Common
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
@@ -47,10 +47,11 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test common pinned
+      - name: Test common
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-common"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-common"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
         run: |
@@ -79,13 +80,13 @@ jobs:
           files: .junitxml
           verbose: true
   check_required_tests:
-    name: All pinned Common tests passed
-    needs: test-common-pinned
+    name: All Common tests passed
+    needs: test-common
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-common-pinned.result, 'failure') || contains(needs.test-common-pinned.result, 'skipped')
+        if: contains(needs.test-common.result, 'failure') || contains(needs.test-common.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
