@@ -42,7 +42,6 @@ IGNORE = {
     # This set should be getting smaller over time as we migrate more test
     # suites over to this script. Some entries will probably stay forever
     # as they don't fit the mold (e.g. common, asgi).
-    "aiohttp",
     "anthropic",
     "arq",
     "asgi",

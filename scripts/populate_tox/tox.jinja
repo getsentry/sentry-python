@@ -31,18 +31,9 @@ envlist =
     # At a minimum, we should test against at least the lowest
     # and the latest supported version of a framework.
 
-    # AIOHTTP
-    {py3.7}-aiohttp-v{3.4}
-    {py3.7,py3.9,py3.11}-aiohttp-v{3.8}
-    {py3.8,py3.12,py3.13}-aiohttp-latest
-
     # Anthropic
     {py3.8,py3.11,py3.12}-anthropic-v{0.16,0.28,0.40}
     {py3.7,py3.11,py3.12}-anthropic-latest
-
-    # Ariadne
-    #{py3.8,py3.11}-ariadne-v{0.20}
-    #{py3.8,py3.12,py3.13}-ariadne-latest
 
     # Arq
     {py3.7,py3.11}-arq-v{0.23}
@@ -301,12 +292,14 @@ envlist =
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
     # integration tests there.
+
     {% for group, integrations in groups.items() %}
     # ~~~ {{ group }} ~~~
     {% for integration in integrations %}
     {% for release in integration.releases %}
     {{ release.rendered_python_versions }}-{{ integration.name }}-v{{ release }}
     {% endfor %}
+
     {% endfor %}
 
     {% endfor %}
@@ -341,14 +334,6 @@ deps =
 
     # === Integrations ===
 
-    # AIOHTTP
-    aiohttp-v3.4: aiohttp~=3.4.0
-    aiohttp-v3.8: aiohttp~=3.8.0
-    aiohttp-latest: aiohttp
-    aiohttp: pytest-aiohttp
-    aiohttp-v3.8: pytest-asyncio
-    aiohttp-latest: pytest-asyncio
-
     # Anthropic
     anthropic: pytest-asyncio
     anthropic-v{0.16,0.28}: httpx<0.28.0
@@ -356,13 +341,6 @@ deps =
     anthropic-v0.28: anthropic~=0.28.0
     anthropic-v0.40: anthropic~=0.40.0
     anthropic-latest: anthropic
-
-    # Ariadne
-    ariadne-v0.20: ariadne~=0.20.0
-    ariadne-latest: ariadne
-    ariadne: fastapi
-    ariadne: flask
-    ariadne: httpx
 
     # Arq
     arq-v0.23: arq~=0.23.0
@@ -773,6 +751,7 @@ deps =
     {% endfor %}
 
     {% endfor %}
+
     {% endfor %}
 
 setenv =
