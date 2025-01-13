@@ -122,8 +122,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         span_data = self.span_map[run_id]
         if not span_data:
             return
-        sentry_sdk.capture_exception(error, span_data.span.scope)
-        span_data.span.__exit__(None, None, None)
+        sentry_sdk.capture_exception(error)
+        span_data.span.finish()
         del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message):
@@ -151,7 +151,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 set_ai_pipeline_name(kwargs.get("name"))
             watched_span.is_pipeline = True
 
-        watched_span.span.__enter__()
+        # the same run_id is reused for the pipeline it seems
+        # so we need to end the older span to avoid orphan spans
+        existing_watched_span = self.span_map.get(run_id)
+        if existing_watched_span is not None:
+            existing_watched_span.span.finish()
+
         self.span_map[run_id] = watched_span
         self.gc_span_map()
         return watched_span
@@ -162,7 +167,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         if span_data.is_pipeline:
             set_ai_pipeline_name(None)
 
-        span_data.span.__exit__(None, None, None)
+        span_data.span.finish()
         del self.span_map[run_id]
 
     def on_llm_start(
