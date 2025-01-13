@@ -39,7 +39,7 @@ DEPENDENCIES = {
         "package": "anthropic",
         "deps": {
             "*": ["pytest-asyncio"],
-            "<=0.32": ["httpx<0.28.0"],
+            "<0.35": ["httpx<0.28.0"],
         },
     },
     "ariadne": {

@@ -355,6 +355,7 @@ def write_tox_file(packages: dict) -> None:
 
     with open(TOX_FILE, "w") as file:
         file.write(rendered)
+        file.write("\n")
 
 
 if __name__ == "__main__":
