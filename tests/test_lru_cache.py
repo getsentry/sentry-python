@@ -1,5 +1,4 @@
 import pytest
-from copy import copy
 
 from sentry_sdk._lru_cache import LRUCache
 
@@ -58,21 +57,4 @@ def test_cache_get_all():
     cache.set(3, 3)
     assert cache.get_all() == [(1, 1), (2, 2), (3, 3)]
     cache.get(1)
-    assert cache.get_all() == [(2, 2), (3, 3), (1, 1)]
-
-
-def test_cache_copy():
-    cache = LRUCache(3)
-    cache.set(0, 0)
-    cache.set(1, 1)
-
-    copied = copy(cache)
-    cache.set(2, 2)
-    cache.set(3, 3)
-    assert copied.get_all() == [(0, 0), (1, 1)]
-    assert cache.get_all() == [(1, 1), (2, 2), (3, 3)]
-
-    copied = copy(cache)
-    cache.get(1)
-    assert copied.get_all() == [(1, 1), (2, 2), (3, 3)]
     assert cache.get_all() == [(2, 2), (3, 3), (1, 1)]

@@ -42,11 +42,11 @@ from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
 class RustTracingLevel(Enum):
-    Trace: str = "TRACE"
-    Debug: str = "DEBUG"
-    Info: str = "INFO"
-    Warn: str = "WARN"
-    Error: str = "ERROR"
+    Trace = "TRACE"
+    Debug = "DEBUG"
+    Info = "INFO"
+    Warn = "WARN"
+    Error = "ERROR"
 
 
 class EventTypeMapping(Enum):

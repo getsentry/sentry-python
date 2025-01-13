@@ -2,7 +2,7 @@ import sys
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
@@ -57,11 +57,7 @@ class ArqIntegration(Integration):
         except (TypeError, ValueError):
             version = None
 
-        if version is None:
-            raise DidNotEnable("Unparsable arq version: {}".format(ARQ_VERSION))
-
-        if version < (0, 23):
-            raise DidNotEnable("arq 0.23 or newer required.")
+        _check_minimum_version(ArqIntegration, version)
 
         patch_enqueue_job()
         patch_run_job()
@@ -73,6 +69,7 @@ class ArqIntegration(Integration):
 def patch_enqueue_job():
     # type: () -> None
     old_enqueue_job = ArqRedis.enqueue_job
+    original_kwdefaults = old_enqueue_job.__kwdefaults__
 
     async def _sentry_enqueue_job(self, function, *args, **kwargs):
         # type: (ArqRedis, str, *Any, **Any) -> Optional[Job]
@@ -88,6 +85,7 @@ def patch_enqueue_job():
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
+    _sentry_enqueue_job.__kwdefaults__ = original_kwdefaults
     ArqRedis.enqueue_job = _sentry_enqueue_job
 
 
@@ -116,7 +114,10 @@ def patch_run_job():
                 origin=ArqIntegration.origin,
             ) as span:
                 return_value = await old_run_job(self, job_id, score)
-                span.set_status(SPANSTATUS.OK)
+
+                if span.status is None:
+                    span.set_status(SPANSTATUS.OK)
+
                 return return_value
 
     Worker.run_job = _sentry_run_job

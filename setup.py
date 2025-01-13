@@ -81,6 +81,7 @@ setup(
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
         "tornado": ["tornado>=6"],
+        "unleash": ["UnleashClient>=6.0.1"],
     },
     entry_points={
         "opentelemetry_propagator": [

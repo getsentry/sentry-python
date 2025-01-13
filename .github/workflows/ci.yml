@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - release/**
-      - sentry-sdk-2.0
+      - potel-base
 
   pull_request:
 
@@ -45,8 +45,8 @@ jobs:
           python-version: 3.12
 
       - run: |
-          pip install jinja2
-          python scripts/split-tox-gh-actions/split-tox-gh-actions.py --fail-on-changes
+          pip install -r scripts/split_tox_gh_actions/requirements.txt
+          python scripts/split_tox_gh_actions/split_tox_gh_actions.py --fail-on-changes
 
   build_lambda_layer:
     name: Build Package
