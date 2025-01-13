@@ -48,14 +48,17 @@ jobs:
         run: |
           coverage erase
       - name: Test launchdarkly
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-launchdarkly"
       - name: Test openfeature
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-openfeature"
       - name: Test unleash
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-unleash"

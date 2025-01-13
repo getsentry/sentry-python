@@ -68,6 +68,7 @@
 
       {% for framework in frameworks %}
       - name: Test {{ framework }}
+        {% raw %}if: ${{ !cancelled() }}{% endraw %}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"

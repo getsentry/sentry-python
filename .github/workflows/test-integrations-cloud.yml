@@ -48,18 +48,22 @@ jobs:
         run: |
           coverage erase
       - name: Test boto3
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3"
       - name: Test chalice
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice"
       - name: Test cloud_resource_context
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context"
       - name: Test gcp
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp"
