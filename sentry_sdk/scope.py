@@ -1381,7 +1381,9 @@ class Scope:
     def _apply_flags_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         flags = self.flags.get()
-        event.setdefault("contexts", {}).setdefault("flags", {}).update({"values": flags})
+        event.setdefault("contexts", {}).setdefault("flags", {}).update(
+            {"values": flags}
+        )
 
     def _drop(self, cause, ty):
         # type: (Any, str) -> Optional[Any]
