@@ -585,6 +585,11 @@ class Span:
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
+        warnings.warn(
+            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_thread(self, thread_id, thread_name):
@@ -1013,6 +1018,11 @@ class Transaction(Span):
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
+        warnings.warn(
+            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key, value):
