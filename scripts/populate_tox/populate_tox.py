@@ -16,7 +16,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from sentry_sdk.integrations import _MIN_VERSIONS
 
-from dependencies import DEPENDENCIES
+from dependencies import TEST_SUITE_CONFIG
 from scripts.split_tox_gh_actions.split_tox_gh_actions import GROUPS
 
 
@@ -41,7 +41,8 @@ IGNORE = {
     #
     # This set should be getting smaller over time as we migrate more test
     # suites over to this script. Some entries will probably stay forever
-    # as they don't fit the mold (e.g. common, asgi).
+    # as they don't fit the mold (e.g. common, asgi, which don't have a 3rd party
+    # pypi package to install in different versions).
     "aiohttp",
     "anthropic",
     "asgi",
@@ -314,7 +315,7 @@ def _render_python_versions(python_versions: list[Version]) -> str:
 
 def _render_dependencies(integration: str, releases: list[Version]) -> list[str]:
     rendered = []
-    for constraint, deps in DEPENDENCIES[integration]["deps"].items():
+    for constraint, deps in TEST_SUITE_CONFIG[integration]["deps"].items():
         if constraint == "*":
             for dep in deps:
                 rendered.append(f"{integration}: {dep}")
@@ -376,7 +377,7 @@ if __name__ == "__main__":
             print(f"Processing {integration}...")
 
             # Figure out the actual main package
-            package = DEPENDENCIES[integration]["package"]
+            package = TEST_SUITE_CONFIG[integration]["package"]
             extra = None
             if "[" in package:
                 extra = package[package.find("[") + 1 : package.find("]")]

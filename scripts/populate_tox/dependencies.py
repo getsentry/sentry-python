@@ -1,5 +1,7 @@
-# The DEPENDENCIES dictionary defines the test dependencies of each integration
-# test suite.
+# The TEST_SUITE_CONFIG dictionary defines, for each integration test suite,
+# the main package (framework, library) to test with; any additional test
+# dependencies, optionally gated behind specific conditions; and optionally
+# the Python versions to test on.
 #
 # The format is:
 # ```
@@ -8,14 +10,15 @@
 #     "deps": {
 #          rule1: [package1, package2, ...],
 #          rule2: [package3, package4, ...],
-#      }
+#      },
+#      "python": python_version_specifier,
 # }
 # ```
 #
 # The following can be set as a rule:
 #   - `*`: packages will be always installed
-#   - a version bound on the main package (e.g. `<=0.32`): packages will only be
-#     installed if the main package falls into the version bounds specified
+#   - a version specifier on the main package (e.g. `<=0.32`): packages will only
+#     be installed if the main package falls into the version bounds specified
 #   - specific Python version(s) in the form `py3.8,py3.9`: packages will only be
 #     installed if the Python version matches one from the list
 #
@@ -34,7 +37,7 @@
 # ````
 
 
-DEPENDENCIES = {
+TEST_SUITE_CONFIG = {
     "ariadne": {
         "package": "ariadne",
         "deps": {
