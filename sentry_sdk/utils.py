@@ -571,7 +571,7 @@ def get_lines_from_file(
 
 def get_source_context(
     frame,  # type: FrameType
-    tb_lineno,  # type: int
+    tb_lineno,  # type: Optional[int]
     max_value_length=None,  # type: Optional[int]
 ):
     # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
@@ -587,11 +587,13 @@ def get_source_context(
         loader = frame.f_globals["__loader__"]
     except Exception:
         loader = None
-    lineno = tb_lineno - 1
-    if lineno is not None and abs_path:
+
+    if tb_lineno is not None and abs_path:
+        lineno = tb_lineno - 1
         return get_lines_from_file(
             abs_path, lineno, max_value_length, loader=loader, module=module
         )
+
     return [], None, []
 
 
