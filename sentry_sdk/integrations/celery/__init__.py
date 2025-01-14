@@ -254,6 +254,10 @@ def _wrap_task_run(f):
             return f(*args, **kwargs)
 
         kwarg_headers = kwargs.get("headers") or {}
+        propagate_traces = kwarg_headers.pop("sentry-propagate-traces", True)
+
+        if not propagate_traces:
+            return f(*args, **kwargs)
 
         if isinstance(args[0], Task):
             task_name = args[0].name  # type: str
