@@ -528,6 +528,13 @@ def test_sentry_propagate_traces_override(init_celery):
         ).get()
         assert transaction_trace_id == task_transaction_id
 
+        # should NOT propagate trace (overrides `propagate_traces` parameter in integration constructor)
+        task_transaction_id = dummy_task.apply_async(
+            args=("another message",),
+            headers={"sentry-propagate-traces": False},
+        ).get()
+        assert transaction_trace_id != task_transaction_id
+
 
 def test_apply_async_manually_span(sentry_init):
     sentry_init(
