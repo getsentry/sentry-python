@@ -56,6 +56,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["fastapi", "flask", "httpx"],
         },
+        "python": ">=3.8",
     },
     "arq": {
         "package": "arq",
@@ -63,18 +64,21 @@ TEST_SUITE_CONFIG = {
             "*": ["fakeredis>=2.2.0,<2.8", "pytest-asyncio", "async-timeout"],
             "<=0.25": ["pydantic<2"],
         },
+        "python": ">=3.7",
     },
     "asyncpg": {
         "package": "asyncpg",
         "deps": {
             "*": ["pytest-asyncio"],
         },
+        "python": ">=3.7",
     },
     "beam": {
         "package": "apache-beam",
         "deps": {
             "*": [],
         },
+        "python": ">=3.7",
     },
     "boto3": {
         "package": "boto3",
