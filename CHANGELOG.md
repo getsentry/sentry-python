@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.20.0
+
+- **New integration:** Add [Typer](https://typer.tiangolo.com/) integration (#3869) by @patrick91
+  
+  For more information, see the documentation for the [TyperIntegration](https://docs.sentry.io/platforms/python/integrations/typer/).
+
+- **New integration:** Add [Unleash](https://www.getunleash.io/) feature flagging integration (#3888) by @aliu39
+
+  For more information, see the documentation for the [UnleashIntegration](https://docs.sentry.io/platforms/python/integrations/unleash/).
+
+- Add custom tracking of feature flag evaluations (#3860) by @aliu39
+- Feature Flags: Register LD hook in setup instead of init, and don't check for initialization (#3890) by @aliu39
+- Feature Flags: Moved adding of `flags` context into Scope (#3917) by @antonpirker
+- Create a separate group for feature flag test suites (#3911) by @sentrivana
+- Fix flaky LaunchDarkly tests (#3896) by @aliu39
+- Fix LRU cache copying (#3883) by @ffelixg
+- Fix cache pollution from mutable reference (#3887) by @cmanallen
+- Centralize minimum version checking (#3910) by @sentrivana
+- Support SparkIntegration activation after SparkContext created (#3411) by @seyoon-lim
+- Preserve ARQ enqueue_job __kwdefaults__ after patching (#3903) by @danmr
+- Add Github workflow to comment on issues when a fix was released (#3866) by @antonpirker
+- Update test matrix for Sanic (#3904) by @antonpirker
+- Rename scripts (#3885) by @sentrivana
+- Fix CI (#3878) by @sentrivana
+- Treat `potel-base` as release branch in CI (#3912) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 1.11.0 to 1.11.1 (#3893) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.0.7 to 5.1.1 (#3867) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.1.1 to 5.1.2 (#3892) by @dependabot
+
 ## 2.19.2
 
 ### Various fixes & improvements
@@ -54,6 +83,14 @@
 ## 2.18.0
 
 ### Various fixes & improvements
+
+- **New integration:** Add [LaunchDarkly](https://launchdarkly.com/) integration (#3648) by @cmanallen
+  
+  For more information, see the documentation for the [LaunchDarklyIntegration](https://docs.sentry.io/platforms/python/integrations/launchdarkly/).
+
+- **New integration:** Add [OpenFeature](https://openfeature.dev/) feature flagging integration (#3648) by @cmanallen
+
+  For more information, see the documentation for the [OpenFeatureIntegration](https://docs.sentry.io/platforms/python/integrations/opoenfeature/).
 
 - Add LaunchDarkly and OpenFeature integration (#3648) by @cmanallen
 - Correct typo in a comment (#3726) by @szokeasaurusrex
