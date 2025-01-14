@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -34,12 +34,7 @@ class GrapheneIntegration(Integration):
     def setup_once():
         # type: () -> None
         version = package_version("graphene")
-
-        if version is None:
-            raise DidNotEnable("Unparsable graphene version.")
-
-        if version < (3, 3):
-            raise DidNotEnable("graphene 3.3 or newer required.")
+        _check_minimum_version(GrapheneIntegration, version)
 
         _patch_graphql()
 

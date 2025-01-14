@@ -8,7 +8,7 @@ This will generate/update several configuration files, that need to be commited 
 Whenever tox.ini is changed, this script needs to be run.
 
 Usage:
-    python split-tox-gh-actions.py [--fail-on-changes]
+    python split_tox_gh_actions.py [--fail-on-changes]
 
 If the parameter `--fail-on-changes` is set, the script will raise a RuntimeError in case the yaml
 files have been changed by the scripts execution. This is used in CI to check if the yaml files
@@ -76,16 +76,6 @@ GROUPS = {
         "cloud_resource_context",
         "gcp",
     ],
-    "Tasks": [
-        "arq",
-        "beam",
-        "celery",
-        "dramatiq",
-        "huey",
-        "ray",
-        "rq",
-        "spark",
-    ],
     "DBs": [
         "asyncpg",
         "clickhouse_driver",
@@ -93,6 +83,11 @@ GROUPS = {
         "redis",
         "redis_py_cluster_legacy",
         "sqlalchemy",
+    ],
+    "Flags": [
+        "launchdarkly",
+        "openfeature",
+        "unleash",
     ],
     "GraphQL": [
         "ariadne",
@@ -105,6 +100,16 @@ GROUPS = {
         "grpc",
         "httpx",
         "requests",
+    ],
+    "Tasks": [
+        "arq",
+        "beam",
+        "celery",
+        "dramatiq",
+        "huey",
+        "ray",
+        "rq",
+        "spark",
     ],
     "Web 1": [
         "django",
@@ -125,9 +130,7 @@ GROUPS = {
         "tornado",
     ],
     "Misc": [
-        "launchdarkly",
         "loguru",
-        "openfeature",
         "opentelemetry",
         "potel",
         "pure_eval",
@@ -158,7 +161,7 @@ def main(fail_on_changes):
         if missing_frameworks:
             raise RuntimeError(
                 "Please add the following frameworks to the corresponding group "
-                "in `GROUPS` in `scripts/split-tox-gh-actions/split-tox-gh-actions.py: "
+                "in `GROUPS` in `scripts/split_tox_gh_actions/split_tox_gh_actions.py: "
                 + ", ".join(missing_frameworks)
             )
 
@@ -176,9 +179,9 @@ def main(fail_on_changes):
         if old_hash != new_hash:
             raise RuntimeError(
                 "The yaml configuration files have changed. This means that either `tox.ini` "
-                "or one of the constants in `split-tox-gh-actions.py` has changed "
+                "or one of the constants in `split_tox_gh_actions.py` has changed "
                 "but the changes have not been propagated to the GitHub actions config files. "
-                "Please run `python scripts/split-tox-gh-actions/split-tox-gh-actions.py` "
+                "Please run `python scripts/split_tox_gh_actions/split_tox_gh_actions.py` "
                 "locally and commit the changes of the yaml configuration files to continue. "
             )
 

@@ -10,6 +10,7 @@ from unittest import mock
 import pytest
 import jsonschema
 
+
 try:
     import gevent
 except ImportError:

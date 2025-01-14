@@ -1,7 +1,7 @@
 import os
 import sys
 import warnings
-from copy import copy
+from copy import copy, deepcopy
 from collections import deque
 from contextlib import contextmanager
 from enum import Enum
@@ -11,7 +11,7 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.flag_utils import FlagBuffer, DEFAULT_FLAG_CAPACITY
+from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
@@ -252,7 +252,7 @@ class Scope:
 
         rv._last_event_id = self._last_event_id
 
-        rv._flags = copy(self._flags)
+        rv._flags = deepcopy(self._flags)
 
         return rv
 
@@ -1376,6 +1376,14 @@ class Scope:
             else:
                 contexts["trace"] = self.get_trace_context()
 
+    def _apply_flags_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+        flags = self.flags.get()
+        if len(flags) > 0:
+            event.setdefault("contexts", {}).setdefault("flags", {}).update(
+                {"values": flags}
+            )
+
     def _drop(self, cause, ty):
         # type: (Any, str) -> Optional[Any]
         logger.info("%s (%s) dropped event", ty, cause)
@@ -1474,6 +1482,7 @@ class Scope:
 
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
+            self._apply_flags_to_event(event, hint, options)
 
         event = self.run_error_processors(event, hint)
         if event is None:
@@ -1516,6 +1525,12 @@ class Scope:
             self._propagation_context = scope._propagation_context
         if scope._session:
             self._session = scope._session
+        if scope._flags:
+            if not self._flags:
+                self._flags = deepcopy(scope._flags)
+            else:
+                for flag in scope._flags.get():
+                    self._flags.set(flag["flag"], flag["result"])
 
     def update_from_kwargs(
         self,
