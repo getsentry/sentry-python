@@ -5,6 +5,7 @@ import sys
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from os import environ
+from urllib.parse import urlencode
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -120,6 +121,9 @@ def _wrap_handler(handler):
         configured_time = aws_context.get_remaining_time_in_millis()
 
         with sentry_sdk.isolation_scope() as scope:
+            scope.set_transaction_name(
+                aws_context.function_name, source=TRANSACTION_SOURCE_COMPONENT
+            )
             timeout_thread = None
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
@@ -333,7 +337,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
         request["url"] = _get_url(aws_event, aws_context)
 
         if "queryStringParameters" in aws_event:
-            request["query_string"] = aws_event["queryStringParameters"]
+            request["query_string"] = urlencode(aws_event["queryStringParameters"])
 
         if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
@@ -373,7 +377,9 @@ def _get_url(aws_event, aws_context):
     path = aws_event.get("path", None)
 
     headers = aws_event.get("headers")
-    if headers is None:
+    # Some AWS Services (ie. EventBridge) set headers as a list
+    # or None, so we must ensure it is a dict
+    if not isinstance(headers, dict):
         headers = {}
 
     host = headers.get("Host", None)
@@ -478,7 +484,10 @@ def _prepopulate_attributes(aws_event, aws_context):
 
     for prop, attr in EVENT_TO_ATTRIBUTES.items():
         if aws_event.get(prop) is not None:
-            attributes[attr] = aws_event[prop]
+            if prop == "queryStringParameters":
+                attributes[attr] = urlencode(aws_event[prop])
+            else:
+                attributes[attr] = aws_event[prop]
 
     for prop, attr in CONTEXT_TO_ATTRIBUTES.items():
         if getattr(aws_context, prop, None) is not None:
@@ -487,7 +496,7 @@ def _prepopulate_attributes(aws_event, aws_context):
     url = _get_url(aws_event, aws_context)
     if url:
         if aws_event.get("queryStringParameters"):
-            url += f"?{aws_event['queryStringParameters']}"
+            url += f"?{urlencode(aws_event['queryStringParameters'])}"
         attributes["url.full"] = url
 
     headers = {}
