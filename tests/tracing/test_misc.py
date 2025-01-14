@@ -295,6 +295,21 @@ def test_set_meaurement_public_api(sentry_init, capture_events):
     assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
 
 
+def test_set_measurement_deprecated(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+
+    with start_transaction(name="measuring stuff") as trx:
+        with pytest.warns(DeprecationWarning):
+            set_measurement("metric.foo", 123)
+
+        with pytest.warns(DeprecationWarning):
+            trx.set_measurement("metric.bar", 456)
+
+        with start_span(op="measuring span") as span:
+            with pytest.warns(DeprecationWarning):
+                span.set_measurement("metric.baz", 420.69, unit="custom")
+
+
 @pytest.mark.parametrize(
     "trace_propagation_targets,url,expected_propagation_decision",
     [
