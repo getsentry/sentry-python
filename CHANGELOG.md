@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.20.0
+
+### Various fixes & improvements
+
+- feat(flags): remove Unleash get_variant patching code (#3914) by @aliu39
+- Moved adding of `flags` context into Scope (#3917) by @antonpirker
+- tests: Create a separate group for feature flag suites (#3911) by @sentrivana
+- Treat potel-base as release branch in CI (#3912) by @sentrivana
+- Centralize minimum version checking (#3910) by @sentrivana
+- Small contribution docs update (#3909) by @antonpirker
+- feat(flags): add Unleash feature flagging integration (#3888) by @aliu39
+- ref(flags): Beter naming for featureflags module and identifier (#3902) by @aliu39
+- Revert "ref(flags): register LD hook in setup instead of init, and don't chec…" (#3900) by @cmanallen
+- Update test matrix for Sanic (#3904) by @antonpirker
+- fix: preserve ARQ enqueue_job __kwdefaults__ after patching (#3903) by @danmr
+- fix(flags): fix/refactor flaky launchdarkly tests (#3896) by @aliu39
+- Fix cache pollution from mutable reference (#3887) by @cmanallen
+- ref(flags): register LD hook in setup instead of init, and don't check for initialization (#3890) by @aliu39
+- build(deps): bump actions/create-github-app-token from 1.11.0 to 1.11.1 (#3893) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.1.1 to 5.1.2 (#3892) by @dependabot
+- Fix lru cache copying (#3883) by @ffelixg
+- Rename scripts (#3885) by @sentrivana
+- Support SparkIntegration activation after SparkContext created (#3411) by @seyoon-lim
+- build(deps): bump codecov/codecov-action from 5.0.7 to 5.1.1 (#3867) by @dependabot
+- Add github workflow to comment on issues when a fix was released (#3866) by @antonpirker
+- feat(flags): Add integration for custom tracking of flag evaluations (#3860) by @aliu39
+- ✨ Add Typer integration (#3869) by @patrick91
+- Fix CI (#3878) by @sentrivana
+
+_Plus 3 more_
+
 ## 2.19.2
 
 ### Various fixes & improvements
