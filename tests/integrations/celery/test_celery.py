@@ -510,7 +510,7 @@ def test_baggage_propagation(init_celery):
 def test_sentry_propagate_traces_override(init_celery):
     """
     Test if the `sentry-propagate-traces` header given to `apply_async`
-    overrides the `propagate_traces` parameter in the integration constructor.
+    overrides the default trace propagation behavior.
     """
     celery = init_celery(traces_sample_rate=1.0, release="abcdef")
 
@@ -528,7 +528,7 @@ def test_sentry_propagate_traces_override(init_celery):
         ).get()
         assert transaction_trace_id == task_transaction_id
 
-        # should NOT propagate trace (overrides `propagate_traces` parameter in integration constructor)
+        # should NOT propagate trace 
         task_transaction_id = dummy_task.apply_async(
             args=("another message",),
             headers={"sentry-propagate-traces": False},
