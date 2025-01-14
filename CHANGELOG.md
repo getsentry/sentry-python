@@ -90,7 +90,7 @@
 
 - **New integration:** Add [OpenFeature](https://openfeature.dev/) feature flagging integration (#3648) by @cmanallen
 
-  For more information, see the documentation for the [OpenFeatureIntegration](https://docs.sentry.io/platforms/python/integrations/opoenfeature/).
+  For more information, see the documentation for the [OpenFeatureIntegration](https://docs.sentry.io/platforms/python/integrations/openfeature/).
 
 - Add LaunchDarkly and OpenFeature integration (#3648) by @cmanallen
 - Correct typo in a comment (#3726) by @szokeasaurusrex
