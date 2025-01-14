@@ -291,3 +291,17 @@ class SentrySpanProcessor(SpanProcessor):
             common_json["tags"] = tags
 
         return common_json
+
+    def _log_debug_info(self):
+        # type: () -> None
+        import pprint
+
+        pprint.pprint(
+            {
+                format_span_id(span_id): [
+                    (format_span_id(child.context.span_id), child.name)
+                    for child in children
+                ]
+                for span_id, children in self._children_spans.items()
+            }
+        )

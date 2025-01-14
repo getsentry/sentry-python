@@ -67,6 +67,8 @@ def truncate_data(data):
 
         if data["contexts"].get("trace") is not None:
             cleaned_data["contexts"]["trace"] = data["contexts"].get("trace")
+            if cleaned_data["contexts"]["trace"].get("data", {}) != {}:
+                cleaned_data["contexts"]["trace"]["data"] = {"removed": "by truncate_data()"}
 
     if data.get("transaction") is not None:
         cleaned_data["transaction"] = data.get("transaction")
@@ -287,7 +289,8 @@ def test_request_data(run_lambda_function):
             "X-Forwarded-Proto": "https"
           },
           "queryStringParameters": {
-            "bonkers": "true"
+            "bonkers": "true",
+            "wild": "false"
           },
           "pathParameters": null,
           "stageVariables": null,
@@ -312,7 +315,7 @@ def test_request_data(run_lambda_function):
             "X-Forwarded-Proto": "https",
         },
         "method": "GET",
-        "query_string": {"bonkers": "true"},
+        "query_string": "bonkers=true&wild=false",
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
     }
 
@@ -487,6 +490,15 @@ def test_performance_error(run_lambda_function):
         ),
         (b"[]", False, 1),
     ],
+    ids=[
+        "int",
+        "float",
+        "string",
+        "bool",
+        "list",
+        "list_with_request_data",
+        "empty_list",
+    ],
 )
 def test_non_dict_event(
     run_lambda_function,
@@ -539,9 +551,7 @@ def test_non_dict_event(
             "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
             "method": "GET",
             "url": "https://x1.io/1",
-            "query_string": {
-                "done": "f",
-            },
+            "query_string": "done=f",
         }
     else:
         request_data = {"url": "awslambda:///{}".format(function_name)}
@@ -590,7 +600,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     import inspect
 
-    _, response = run_lambda_function(
+    function_code = (
         LAMBDA_PRELUDE
         + dedent(inspect.getsource(StringContaining))
         + dedent(inspect.getsource(DictionaryContaining))
@@ -621,7 +631,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                             {
                                 "http.request.method": "GET",
                                 "url.path": "/sit/stay/rollover",
-                                "url.query": "repeat=again",
+                                "url.query": "repeat=twice",
                                 "url.full": "http://x.io/sit/stay/rollover?repeat=twice",
                                 "network.protocol.name": "http",
                                 "server.address": "x.io",
@@ -643,10 +653,15 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                 traces_sampler=traces_sampler,
             )
         """
-        ),
-        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "query_string": {"repeat": "again"}, "headers": {"Host": "x.io", "X-Forwarded-Proto": "http", "Custom-Header": "Custom Value"}}',
+        )
     )
 
+    payload = b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "queryStringParameters": {"repeat": "twice"}, "headers": {"Host": "x.io", "X-Forwarded-Proto": "http", "Custom-Header": "Custom Value"}}'
+
+    _, response = run_lambda_function(
+        code=function_code,
+        payload=payload,
+    )
     assert response["Payload"]["AssertionError raised"] is False
 
 
