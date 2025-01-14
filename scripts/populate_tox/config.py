@@ -38,6 +38,19 @@
 
 
 TEST_SUITE_CONFIG = {
+    "aiohttp": {
+        "package": "aiohttp",
+        "deps": {"*": ["pytest-aiohttp", "pytest-asyncio"]},
+        "python": ">=3.7",
+    },
+    "anthropic": {
+        "package": "anthropic",
+        "deps": {
+            "*": ["pytest-asyncio"],
+            "<=0.32": ["httpx<0.28.0"],
+        },
+        "python": ">=3.7",
+    },
     "ariadne": {
         "package": "ariadne",
         "deps": {

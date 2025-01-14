@@ -9,14 +9,14 @@ from datetime import datetime, timedelta
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import Version
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import requests
 from jinja2 import Environment, FileSystemLoader
 
 from sentry_sdk.integrations import _MIN_VERSIONS
 
-from dependencies import TEST_SUITE_CONFIG
+from config import TEST_SUITE_CONFIG
 from scripts.split_tox_gh_actions.split_tox_gh_actions import GROUPS
 
 
@@ -43,8 +43,6 @@ IGNORE = {
     # suites over to this script. Some entries will probably stay forever
     # as they don't fit the mold (e.g. common, asgi, which don't have a 3rd party
     # pypi package to install in different versions).
-    "aiohttp",
-    "anthropic",
     "asgi",
     "aws_lambda",
     "beam",
@@ -134,6 +132,10 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
             f"  {integration} doesn't have a minimum version. Maybe we should define one?"
         )
 
+    custom_python_versions = TEST_SUITE_CONFIG[integration].get("python")
+    if custom_python_versions:
+        custom_python_versions = SpecifierSet(custom_python_versions)
+
     releases = []
 
     for release, metadata in pypi_data["releases"].items():
@@ -167,7 +169,7 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
         if requires_python:
             try:
                 version.python_versions = supported_python_versions(
-                    SpecifierSet(requires_python)
+                    SpecifierSet(requires_python), custom_python_versions
                 )
             except InvalidSpecifier:
                 continue
@@ -177,7 +179,7 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
             # XXX do something with this. no need to fetch every release ever
             release_metadata = fetch_release(package, version)
             version.python_versions = supported_python_versions(
-                determine_python_versions(release_metadata)
+                determine_python_versions(release_metadata), custom_python_versions
             )
             time.sleep(0.1)
 
@@ -244,14 +246,18 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
     return sorted(filtered_releases)
 
 
-def supported_python_versions(python_versions: SpecifierSet) -> list[Version]:
+def supported_python_versions(
+    python_versions: SpecifierSet, custom_versions: Optional[SpecifierSet] = None
+) -> list[Version]:
     """Get an intersection of python_versions and Python versions supported in the SDK."""
     supported = []
 
     curr = MIN_PYTHON_VERSION
     while curr <= MAX_PYTHON_VERSION:
         if curr in python_versions:
-            supported.append(curr)
+            if not custom_versions or curr in custom_versions:
+                supported.append(curr)
+
         next = [int(v) for v in str(curr).split(".")]
         next[1] += 1
         curr = Version(".".join(map(str, next)))
