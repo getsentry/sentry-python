@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.transport - sentry-python 2.19.2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.transport - sentry-python 2.20.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=83eaa723" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=10d1008b" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,52 +105,52 @@ data-aria-dark="Switch to auto color mode">
       <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.transport</h1><div class="highlight"><pre>
-<span></span><span data-line="1"><span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
-</span><span data-line="2"><span class="kn">import</span> <span class="nn">io</span>
-</span><span data-line="3"><span class="kn">import</span> <span class="nn">os</span>
-</span><span data-line="4"><span class="kn">import</span> <span class="nn">gzip</span>
-</span><span data-line="5"><span class="kn">import</span> <span class="nn">socket</span>
-</span><span data-line="6"><span class="kn">import</span> <span class="nn">ssl</span>
-</span><span data-line="7"><span class="kn">import</span> <span class="nn">time</span>
-</span><span data-line="8"><span class="kn">import</span> <span class="nn">warnings</span>
-</span><span data-line="9"><span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">timezone</span>
-</span><span data-line="10"><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
-</span><span data-line="11"><span class="kn">from</span> <span class="nn">urllib.request</span> <span class="kn">import</span> <span class="n">getproxies</span>
+<span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+</span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+</span><span data-line="3"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+</span><span data-line="4"><span class="kn">import</span><span class="w"> </span><span class="nn">gzip</span>
+</span><span data-line="5"><span class="kn">import</span><span class="w"> </span><span class="nn">socket</span>
+</span><span data-line="6"><span class="kn">import</span><span class="w"> </span><span class="nn">ssl</span>
+</span><span data-line="7"><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span data-line="8"><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+</span><span data-line="9"><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">timezone</span>
+</span><span data-line="10"><span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
+</span><span data-line="11"><span class="kn">from</span><span class="w"> </span><span class="nn">urllib.request</span><span class="w"> </span><span class="kn">import</span> <span class="n">getproxies</span>
 </span><span data-line="12">
 </span><span data-line="13"><span class="k">try</span><span class="p">:</span>
-</span><span data-line="14">    <span class="kn">import</span> <span class="nn">brotli</span>  <span class="c1"># type: ignore</span>
+</span><span data-line="14">    <span class="kn">import</span><span class="w"> </span><span class="nn">brotli</span>  <span class="c1"># type: ignore</span>
 </span><span data-line="15"><span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
 </span><span data-line="16">    <span class="n">brotli</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="17">
-</span><span data-line="18"><span class="kn">import</span> <span class="nn">urllib3</span>
-</span><span data-line="19"><span class="kn">import</span> <span class="nn">certifi</span>
+</span><span data-line="18"><span class="kn">import</span><span class="w"> </span><span class="nn">urllib3</span>
+</span><span data-line="19"><span class="kn">import</span><span class="w"> </span><span class="nn">certifi</span>
 </span><span data-line="20">
-</span><span data-line="21"><span class="kn">import</span> <span class="nn">sentry_sdk</span>
-</span><span data-line="22"><span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">EndpointType</span>
-</span><span data-line="23"><span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
-</span><span data-line="24"><span class="kn">from</span> <span class="nn">sentry_sdk.worker</span> <span class="kn">import</span> <span class="n">BackgroundWorker</span>
-</span><span data-line="25"><span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span><span class="p">,</span> <span class="n">Item</span><span class="p">,</span> <span class="n">PayloadRef</span>
+</span><span data-line="21"><span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
+</span><span data-line="22"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.consts</span><span class="w"> </span><span class="kn">import</span> <span class="n">EndpointType</span>
+</span><span data-line="23"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
+</span><span data-line="24"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.worker</span><span class="w"> </span><span class="kn">import</span> <span class="n">BackgroundWorker</span>
+</span><span data-line="25"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.envelope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Envelope</span><span class="p">,</span> <span class="n">Item</span><span class="p">,</span> <span class="n">PayloadRef</span>
 </span><span data-line="26">
-</span><span data-line="27"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="27"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span data-line="28">
 </span><span data-line="29"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="30">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
-</span><span data-line="31">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
-</span><span data-line="32">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
-</span><span data-line="33">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">DefaultDict</span>
-</span><span data-line="34">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterable</span>
-</span><span data-line="35">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
-</span><span data-line="36">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Mapping</span>
-</span><span data-line="37">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
-</span><span data-line="38">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Self</span>
-</span><span data-line="39">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
-</span><span data-line="40">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
-</span><span data-line="41">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
+</span><span data-line="30">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+</span><span data-line="31">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+</span><span data-line="32">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
+</span><span data-line="33">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">DefaultDict</span>
+</span><span data-line="34">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span>
+</span><span data-line="35">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+</span><span data-line="36">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+</span><span data-line="37">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+</span><span data-line="38">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Self</span>
+</span><span data-line="39">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
+</span><span data-line="40">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span>
+</span><span data-line="41">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
 </span><span data-line="42">
-</span><span data-line="43">    <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="kn">import</span> <span class="n">PoolManager</span>
-</span><span data-line="44">    <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="kn">import</span> <span class="n">ProxyManager</span>
+</span><span data-line="43">    <span class="kn">from</span><span class="w"> </span><span class="nn">urllib3.poolmanager</span><span class="w"> </span><span class="kn">import</span> <span class="n">PoolManager</span>
+</span><span data-line="44">    <span class="kn">from</span><span class="w"> </span><span class="nn">urllib3.poolmanager</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProxyManager</span>
 </span><span data-line="45">
-</span><span data-line="46">    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">EventDataCategory</span>
+</span><span data-line="46">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">EventDataCategory</span>
 </span><span data-line="47">
 </span><span data-line="48"><span class="n">KEEP_ALIVE_SOCKET_OPTIONS</span> <span class="o">=</span> <span class="p">[]</span>
 </span><span data-line="49"><span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="p">[</span>
@@ -169,7 +169,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="62">
 <div class="viewcode-block" id="Transport">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport">[docs]</a>
-</span><span data-line="63"><span class="k">class</span> <span class="nc">Transport</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+</span><span data-line="63"><span class="k">class</span><span class="w"> </span><span class="nc">Transport</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 </span><span data-line="64"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Baseclass for all transports.</span>
 </span><span data-line="65">
 </span><span data-line="66"><span class="sd">    A transport is used to send an event to sentry.</span>
@@ -177,7 +177,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="68">
 </span><span data-line="69">    <span class="n">parsed_dsn</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Dsn]</span>
 </span><span data-line="70">
-</span><span data-line="71">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span data-line="71">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span data-line="72">        <span class="c1"># type: (Self, Optional[Dict[str, Any]]) -&gt; None</span>
 </span><span data-line="73">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
 </span><span data-line="74">        <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
@@ -187,7 +187,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="78">
 <div class="viewcode-block" id="Transport.capture_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.capture_event">[docs]</a>
-</span><span data-line="79">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="79">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
 </span><span data-line="80">        <span class="c1"># type: (Self, Event) -&gt; None</span>
 </span><span data-line="81"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="82"><span class="sd">        DEPRECATED: Please use capture_envelope instead.</span>
@@ -210,7 +210,7 @@ data-aria-dark="Switch to auto color mode">
 <div class="viewcode-block" id="Transport.capture_envelope">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.capture_envelope">[docs]</a>
 </span><span data-line="98">    <span class="nd">@abstractmethod</span>
-</span><span data-line="99">    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">):</span>
+</span><span data-line="99">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">):</span>
 </span><span data-line="100">        <span class="c1"># type: (Self, Envelope) -&gt; None</span>
 </span><span data-line="101"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="102"><span class="sd">        Send an envelope to Sentry.</span>
@@ -224,7 +224,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="109">
 <div class="viewcode-block" id="Transport.flush">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.flush">[docs]</a>
-</span><span data-line="110">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+</span><span data-line="110">    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span>
 </span><span data-line="111">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="112">        <span class="n">timeout</span><span class="p">,</span>
 </span><span data-line="113">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -241,7 +241,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="123">
 <div class="viewcode-block" id="Transport.kill">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.kill">[docs]</a>
-</span><span data-line="124">    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="124">    <span class="k">def</span><span class="w"> </span><span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="125">        <span class="c1"># type: (Self) -&gt; None</span>
 </span><span data-line="126"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="127"><span class="sd">        Forcefully kills the transport.</span>
@@ -254,7 +254,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="133">
 <div class="viewcode-block" id="Transport.record_lost_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.record_lost_event">[docs]</a>
-</span><span data-line="134">    <span class="k">def</span> <span class="nf">record_lost_event</span><span class="p">(</span>
+</span><span data-line="134">    <span class="k">def</span><span class="w"> </span><span class="nf">record_lost_event</span><span class="p">(</span>
 </span><span data-line="135">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="136">        <span class="n">reason</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span data-line="137">        <span class="n">data_category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[EventDataCategory]</span>
@@ -280,11 +280,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="157">        <span class="k">return</span> <span class="kc">None</span></div>
 
 </span><span data-line="158">
-</span><span data-line="159">    <span class="k">def</span> <span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="159">    <span class="k">def</span><span class="w"> </span><span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="160">        <span class="c1"># type: (Self) -&gt; bool</span>
 </span><span data-line="161">        <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="162">
-</span><span data-line="163">    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="163">    <span class="k">def</span><span class="w"> </span><span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="164">        <span class="c1"># type: (Self) -&gt; None</span>
 </span><span data-line="165">        <span class="k">try</span><span class="p">:</span>
 </span><span data-line="166">            <span class="bp">self</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
@@ -293,7 +293,7 @@ data-aria-dark="Switch to auto color mode">
 
 </span><span data-line="169">
 </span><span data-line="170">
-</span><span data-line="171"><span class="k">def</span> <span class="nf">_parse_rate_limits</span><span class="p">(</span><span class="n">header</span><span class="p">,</span> <span class="n">now</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span data-line="171"><span class="k">def</span><span class="w"> </span><span class="nf">_parse_rate_limits</span><span class="p">(</span><span class="n">header</span><span class="p">,</span> <span class="n">now</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span data-line="172">    <span class="c1"># type: (str, Optional[datetime]) -&gt; Iterable[Tuple[Optional[EventDataCategory], datetime]]</span>
 </span><span data-line="173">    <span class="k">if</span> <span class="n">now</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="174">        <span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
@@ -320,12 +320,12 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="195">            <span class="k">continue</span>
 </span><span data-line="196">
 </span><span data-line="197">
-</span><span data-line="198"><span class="k">class</span> <span class="nc">BaseHttpTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
+</span><span data-line="198"><span class="k">class</span><span class="w"> </span><span class="nc">BaseHttpTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
 </span><span data-line="199"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The base HTTP transport.&quot;&quot;&quot;</span>
 </span><span data-line="200">
-</span><span data-line="201">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+</span><span data-line="201">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
 </span><span data-line="202">        <span class="c1"># type: (Self, Dict[str, Any]) -&gt; None</span>
-</span><span data-line="203">        <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">VERSION</span>
+</span><span data-line="203">        <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.consts</span><span class="w"> </span><span class="kn">import</span> <span class="n">VERSION</span>
 </span><span data-line="204">
 </span><span data-line="205">        <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
 </span><span data-line="206">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -384,7 +384,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="259">        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compression_algo</span> <span class="o">==</span> <span class="s2">&quot;br&quot;</span><span class="p">:</span>
 </span><span data-line="260">            <span class="bp">self</span><span class="o">.</span><span class="n">_compression_level</span> <span class="o">=</span> <span class="mi">4</span>
 </span><span data-line="261">
-</span><span data-line="262">    <span class="k">def</span> <span class="nf">record_lost_event</span><span class="p">(</span>
+</span><span data-line="262">    <span class="k">def</span><span class="w"> </span><span class="nf">record_lost_event</span><span class="p">(</span>
 </span><span data-line="263">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="264">        <span class="n">reason</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span data-line="265">        <span class="n">data_category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[EventDataCategory]</span>
@@ -418,11 +418,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="293">
 </span><span data-line="294">        <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span><span class="p">[</span><span class="n">data_category</span><span class="p">,</span> <span class="n">reason</span><span class="p">]</span> <span class="o">+=</span> <span class="n">quantity</span>
 </span><span data-line="295">
-</span><span data-line="296">    <span class="k">def</span> <span class="nf">_get_header_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">header</span><span class="p">):</span>
+</span><span data-line="296">    <span class="k">def</span><span class="w"> </span><span class="nf">_get_header_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">header</span><span class="p">):</span>
 </span><span data-line="297">        <span class="c1"># type: (Self, Any, str) -&gt; Optional[str]</span>
 </span><span data-line="298">        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
 </span><span data-line="299">
-</span><span data-line="300">    <span class="k">def</span> <span class="nf">_update_rate_limits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">):</span>
+</span><span data-line="300">    <span class="k">def</span><span class="w"> </span><span class="nf">_update_rate_limits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">):</span>
 </span><span data-line="301">        <span class="c1"># type: (Self, Union[urllib3.BaseHTTPResponse, httpcore.Response]) -&gt; None</span>
 </span><span data-line="302">
 </span><span data-line="303">        <span class="c1"># new sentries with more rate limit insights.  We honor this header</span>
@@ -447,7 +447,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="322">                <span class="n">seconds</span><span class="o">=</span><span class="n">retry_after</span>
 </span><span data-line="323">            <span class="p">)</span>
 </span><span data-line="324">
-</span><span data-line="325">    <span class="k">def</span> <span class="nf">_send_request</span><span class="p">(</span>
+</span><span data-line="325">    <span class="k">def</span><span class="w"> </span><span class="nf">_send_request</span><span class="p">(</span>
 </span><span data-line="326">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="327">        <span class="n">body</span><span class="p">,</span>
 </span><span data-line="328">        <span class="n">headers</span><span class="p">,</span>
@@ -456,7 +456,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="331">    <span class="p">):</span>
 </span><span data-line="332">        <span class="c1"># type: (Self, bytes, Dict[str, str], EndpointType, Optional[Envelope]) -&gt; None</span>
 </span><span data-line="333">
-</span><span data-line="334">        <span class="k">def</span> <span class="nf">record_loss</span><span class="p">(</span><span class="n">reason</span><span class="p">):</span>
+</span><span data-line="334">        <span class="k">def</span><span class="w"> </span><span class="nf">record_loss</span><span class="p">(</span><span class="n">reason</span><span class="p">):</span>
 </span><span data-line="335">            <span class="c1"># type: (str) -&gt; None</span>
 </span><span data-line="336">            <span class="k">if</span> <span class="n">envelope</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="337">                <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="n">reason</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">)</span>
@@ -504,11 +504,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="379">        <span class="k">finally</span><span class="p">:</span>
 </span><span data-line="380">            <span class="n">response</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </span><span data-line="381">
-</span><span data-line="382">    <span class="k">def</span> <span class="nf">on_dropped_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_reason</span><span class="p">):</span>
+</span><span data-line="382">    <span class="k">def</span><span class="w"> </span><span class="nf">on_dropped_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_reason</span><span class="p">):</span>
 </span><span data-line="383">        <span class="c1"># type: (Self, str) -&gt; None</span>
 </span><span data-line="384">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="385">
-</span><span data-line="386">    <span class="k">def</span> <span class="nf">_fetch_pending_client_report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">60</span><span class="p">):</span>
+</span><span data-line="386">    <span class="k">def</span><span class="w"> </span><span class="nf">_fetch_pending_client_report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">60</span><span class="p">):</span>
 </span><span data-line="387">        <span class="c1"># type: (Self, bool, int) -&gt; Optional[Item]</span>
 </span><span data-line="388">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;send_client_reports&quot;</span><span class="p">]:</span>
 </span><span data-line="389">            <span class="k">return</span> <span class="kc">None</span>
@@ -539,15 +539,15 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="414">            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;client_report&quot;</span><span class="p">,</span>
 </span><span data-line="415">        <span class="p">)</span>
 </span><span data-line="416">
-</span><span data-line="417">    <span class="k">def</span> <span class="nf">_flush_client_reports</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+</span><span data-line="417">    <span class="k">def</span><span class="w"> </span><span class="nf">_flush_client_reports</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 </span><span data-line="418">        <span class="c1"># type: (Self, bool) -&gt; None</span>
 </span><span data-line="419">        <span class="n">client_report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fetch_pending_client_report</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">60</span><span class="p">)</span>
 </span><span data-line="420">        <span class="k">if</span> <span class="n">client_report</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="421">            <span class="bp">self</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">Envelope</span><span class="p">(</span><span class="n">items</span><span class="o">=</span><span class="p">[</span><span class="n">client_report</span><span class="p">]))</span>
 </span><span data-line="422">
-</span><span data-line="423">    <span class="k">def</span> <span class="nf">_check_disabled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">category</span><span class="p">):</span>
+</span><span data-line="423">    <span class="k">def</span><span class="w"> </span><span class="nf">_check_disabled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">category</span><span class="p">):</span>
 </span><span data-line="424">        <span class="c1"># type: (str) -&gt; bool</span>
-</span><span data-line="425">        <span class="k">def</span> <span class="nf">_disabled</span><span class="p">(</span><span class="n">bucket</span><span class="p">):</span>
+</span><span data-line="425">        <span class="k">def</span><span class="w"> </span><span class="nf">_disabled</span><span class="p">(</span><span class="n">bucket</span><span class="p">):</span>
 </span><span data-line="426">            <span class="c1"># type: (Any) -&gt; bool</span>
 </span><span data-line="427">
 </span><span data-line="428">            <span class="c1"># The envelope item type used for metrics is statsd</span>
@@ -560,21 +560,21 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="435">
 </span><span data-line="436">        <span class="k">return</span> <span class="n">_disabled</span><span class="p">(</span><span class="n">category</span><span class="p">)</span> <span class="ow">or</span> <span class="n">_disabled</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 </span><span data-line="437">
-</span><span data-line="438">    <span class="k">def</span> <span class="nf">_is_rate_limited</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="438">    <span class="k">def</span><span class="w"> </span><span class="nf">_is_rate_limited</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="439">        <span class="c1"># type: (Self) -&gt; bool</span>
 </span><span data-line="440">        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span>
 </span><span data-line="441">            <span class="n">ts</span> <span class="o">&gt;</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span> <span class="k">for</span> <span class="n">ts</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
 </span><span data-line="442">        <span class="p">)</span>
 </span><span data-line="443">
-</span><span data-line="444">    <span class="k">def</span> <span class="nf">_is_worker_full</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="444">    <span class="k">def</span><span class="w"> </span><span class="nf">_is_worker_full</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="445">        <span class="c1"># type: (Self) -&gt; bool</span>
 </span><span data-line="446">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">full</span><span class="p">()</span>
 </span><span data-line="447">
-</span><span data-line="448">    <span class="k">def</span> <span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="448">    <span class="k">def</span><span class="w"> </span><span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="449">        <span class="c1"># type: (Self) -&gt; bool</span>
 </span><span data-line="450">        <span class="k">return</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_is_worker_full</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_rate_limited</span><span class="p">())</span>
 </span><span data-line="451">
-</span><span data-line="452">    <span class="k">def</span> <span class="nf">_send_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">):</span>
+</span><span data-line="452">    <span class="k">def</span><span class="w"> </span><span class="nf">_send_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">):</span>
 </span><span data-line="453">        <span class="c1"># type: (Self, Envelope) -&gt; None</span>
 </span><span data-line="454">
 </span><span data-line="455">        <span class="c1"># remove all items from the envelope which are over quota</span>
@@ -627,7 +627,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="502">        <span class="p">)</span>
 </span><span data-line="503">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="504">
-</span><span data-line="505">    <span class="k">def</span> <span class="nf">_serialize_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">):</span>
+</span><span data-line="505">    <span class="k">def</span><span class="w"> </span><span class="nf">_serialize_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">):</span>
 </span><span data-line="506">        <span class="c1"># type: (Self, Envelope) -&gt; tuple[Optional[str], io.BytesIO]</span>
 </span><span data-line="507">        <span class="n">content_encoding</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="508">        <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
@@ -649,11 +649,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="524">
 </span><span data-line="525">        <span class="k">return</span> <span class="n">content_encoding</span><span class="p">,</span> <span class="n">body</span>
 </span><span data-line="526">
-</span><span data-line="527">    <span class="k">def</span> <span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="527">    <span class="k">def</span><span class="w"> </span><span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="528">        <span class="c1"># type: (Self) -&gt; Dict[str, Any]</span>
 </span><span data-line="529">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
 </span><span data-line="530">
-</span><span data-line="531">    <span class="k">def</span> <span class="nf">_in_no_proxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parsed_dsn</span><span class="p">):</span>
+</span><span data-line="531">    <span class="k">def</span><span class="w"> </span><span class="nf">_in_no_proxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parsed_dsn</span><span class="p">):</span>
 </span><span data-line="532">        <span class="c1"># type: (Self, Dsn) -&gt; bool</span>
 </span><span data-line="533">        <span class="n">no_proxy</span> <span class="o">=</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;no&quot;</span><span class="p">)</span>
 </span><span data-line="534">        <span class="k">if</span> <span class="ow">not</span> <span class="n">no_proxy</span><span class="p">:</span>
@@ -664,11 +664,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="539">                <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="540">        <span class="k">return</span> <span class="kc">False</span>
 </span><span data-line="541">
-</span><span data-line="542">    <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="542">    <span class="k">def</span><span class="w"> </span><span class="nf">_make_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="543">        <span class="c1"># type: (Self) -&gt; Union[PoolManager, ProxyManager, httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]</span>
 </span><span data-line="544">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
 </span><span data-line="545">
-</span><span data-line="546">    <span class="k">def</span> <span class="nf">_request</span><span class="p">(</span>
+</span><span data-line="546">    <span class="k">def</span><span class="w"> </span><span class="nf">_request</span><span class="p">(</span>
 </span><span data-line="547">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="548">        <span class="n">method</span><span class="p">,</span>
 </span><span data-line="549">        <span class="n">endpoint_type</span><span class="p">,</span>
@@ -678,11 +678,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="553">        <span class="c1"># type: (Self, str, EndpointType, Any, Mapping[str, str]) -&gt; Union[urllib3.BaseHTTPResponse, httpcore.Response]</span>
 </span><span data-line="554">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
 </span><span data-line="555">
-</span><span data-line="556">    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span>
+</span><span data-line="556">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_envelope</span><span class="p">(</span>
 </span><span data-line="557">        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
 </span><span data-line="558">    <span class="p">):</span>
 </span><span data-line="559">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span data-line="560">        <span class="k">def</span> <span class="nf">send_envelope_wrapper</span><span class="p">():</span>
+</span><span data-line="560">        <span class="k">def</span><span class="w"> </span><span class="nf">send_envelope_wrapper</span><span class="p">():</span>
 </span><span data-line="561">            <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="562">            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="563">                <span class="bp">self</span><span class="o">.</span><span class="n">_send_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
@@ -693,7 +693,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="568">            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
 </span><span data-line="569">                <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;queue_overflow&quot;</span><span class="p">,</span> <span class="n">item</span><span class="o">=</span><span class="n">item</span><span class="p">)</span>
 </span><span data-line="570">
-</span><span data-line="571">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+</span><span data-line="571">    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span>
 </span><span data-line="572">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="573">        <span class="n">timeout</span><span class="p">,</span>
 </span><span data-line="574">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -705,13 +705,13 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="580">            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flush_client_reports</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </span><span data-line="581">            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
 </span><span data-line="582">
-</span><span data-line="583">    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="583">    <span class="k">def</span><span class="w"> </span><span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="584">        <span class="c1"># type: (Self) -&gt; None</span>
 </span><span data-line="585">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
 </span><span data-line="586">        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
 </span><span data-line="587">
 </span><span data-line="588">    <span class="nd">@staticmethod</span>
-</span><span data-line="589">    <span class="k">def</span> <span class="nf">_warn_hub_cls</span><span class="p">():</span>
+</span><span data-line="589">    <span class="k">def</span><span class="w"> </span><span class="nf">_warn_hub_cls</span><span class="p">():</span>
 </span><span data-line="590">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="591"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Convenience method to warn users about the deprecation of the `hub_cls` attribute.&quot;&quot;&quot;</span>
 </span><span data-line="592">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
@@ -721,14 +721,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="596">        <span class="p">)</span>
 </span><span data-line="597">
 </span><span data-line="598">    <span class="nd">@property</span>
-</span><span data-line="599">    <span class="k">def</span> <span class="nf">hub_cls</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="599">    <span class="k">def</span><span class="w"> </span><span class="nf">hub_cls</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="600">        <span class="c1"># type: (Self) -&gt; type[sentry_sdk.Hub]</span>
 </span><span data-line="601"><span class="w">        </span><span class="sd">&quot;&quot;&quot;DEPRECATED: This attribute is deprecated and will be removed in a future release.&quot;&quot;&quot;</span>
 </span><span data-line="602">        <span class="n">HttpTransport</span><span class="o">.</span><span class="n">_warn_hub_cls</span><span class="p">()</span>
 </span><span data-line="603">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hub_cls</span>
 </span><span data-line="604">
 </span><span data-line="605">    <span class="nd">@hub_cls</span><span class="o">.</span><span class="n">setter</span>
-</span><span data-line="606">    <span class="k">def</span> <span class="nf">hub_cls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="606">    <span class="k">def</span><span class="w"> </span><span class="nf">hub_cls</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="607">        <span class="c1"># type: (Self, type[sentry_sdk.Hub]) -&gt; None</span>
 </span><span data-line="608"><span class="w">        </span><span class="sd">&quot;&quot;&quot;DEPRECATED: This attribute is deprecated and will be removed in a future release.&quot;&quot;&quot;</span>
 </span><span data-line="609">        <span class="n">HttpTransport</span><span class="o">.</span><span class="n">_warn_hub_cls</span><span class="p">()</span>
@@ -737,11 +737,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="612">
 <div class="viewcode-block" id="HttpTransport">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.HttpTransport">[docs]</a>
-</span><span data-line="613"><span class="k">class</span> <span class="nc">HttpTransport</span><span class="p">(</span><span class="n">BaseHttpTransport</span><span class="p">):</span>
+</span><span data-line="613"><span class="k">class</span><span class="w"> </span><span class="nc">HttpTransport</span><span class="p">(</span><span class="n">BaseHttpTransport</span><span class="p">):</span>
 </span><span data-line="614">    <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
 </span><span data-line="615">        <span class="n">_pool</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">PoolManager</span><span class="p">,</span> <span class="n">ProxyManager</span><span class="p">]</span>
 </span><span data-line="616">
-</span><span data-line="617">    <span class="k">def</span> <span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="617">    <span class="k">def</span><span class="w"> </span><span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="618">        <span class="c1"># type: (Self) -&gt; Dict[str, Any]</span>
 </span><span data-line="619">
 </span><span data-line="620">        <span class="n">num_pools</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;_experiments&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;transport_num_pools&quot;</span><span class="p">)</span>
@@ -783,7 +783,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="656">
 </span><span data-line="657">        <span class="k">return</span> <span class="n">options</span>
 </span><span data-line="658">
-</span><span data-line="659">    <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="659">    <span class="k">def</span><span class="w"> </span><span class="nf">_make_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="660">        <span class="c1"># type: (Self) -&gt; Union[PoolManager, ProxyManager]</span>
 </span><span data-line="661">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="662">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot create HTTP-based transport without valid DSN&quot;</span><span class="p">)</span>
@@ -812,7 +812,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="685">                <span class="n">use_socks_proxy</span> <span class="o">=</span> <span class="kc">True</span>
 </span><span data-line="686">                <span class="k">try</span><span class="p">:</span>
 </span><span data-line="687">                    <span class="c1"># Check if PySocks dependency is available</span>
-</span><span data-line="688">                    <span class="kn">from</span> <span class="nn">urllib3.contrib.socks</span> <span class="kn">import</span> <span class="n">SOCKSProxyManager</span>
+</span><span data-line="688">                    <span class="kn">from</span><span class="w"> </span><span class="nn">urllib3.contrib.socks</span><span class="w"> </span><span class="kn">import</span> <span class="n">SOCKSProxyManager</span>
 </span><span data-line="689">                <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
 </span><span data-line="690">                    <span class="n">use_socks_proxy</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="691">                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -829,7 +829,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="702">        <span class="k">else</span><span class="p">:</span>
 </span><span data-line="703">            <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">PoolManager</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
 </span><span data-line="704">
-</span><span data-line="705">    <span class="k">def</span> <span class="nf">_request</span><span class="p">(</span>
+</span><span data-line="705">    <span class="k">def</span><span class="w"> </span><span class="nf">_request</span><span class="p">(</span>
 </span><span data-line="706">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="707">        <span class="n">method</span><span class="p">,</span>
 </span><span data-line="708">        <span class="n">endpoint_type</span><span class="p">,</span>
@@ -847,12 +847,12 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="719">
 </span><span data-line="720">
 </span><span data-line="721"><span class="k">try</span><span class="p">:</span>
-</span><span data-line="722">    <span class="kn">import</span> <span class="nn">httpcore</span>
-</span><span data-line="723">    <span class="kn">import</span> <span class="nn">h2</span>  <span class="c1"># type: ignore # noqa: F401</span>
+</span><span data-line="722">    <span class="kn">import</span><span class="w"> </span><span class="nn">httpcore</span>
+</span><span data-line="723">    <span class="kn">import</span><span class="w"> </span><span class="nn">h2</span>  <span class="c1"># type: ignore # noqa: F401</span>
 </span><span data-line="724"><span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
 </span><span data-line="725">    <span class="c1"># Sorry, no Http2Transport for you</span>
-</span><span data-line="726">    <span class="k">class</span> <span class="nc">Http2Transport</span><span class="p">(</span><span class="n">HttpTransport</span><span class="p">):</span>
-</span><span data-line="727">        <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+</span><span data-line="726">    <span class="k">class</span><span class="w"> </span><span class="nc">Http2Transport</span><span class="p">(</span><span class="n">HttpTransport</span><span class="p">):</span>
+</span><span data-line="727">        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
 </span><span data-line="728">            <span class="c1"># type: (Self, Dict[str, Any]) -&gt; None</span>
 </span><span data-line="729">            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
 </span><span data-line="730">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -861,7 +861,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="733">
 </span><span data-line="734"><span class="k">else</span><span class="p">:</span>
 </span><span data-line="735">
-</span><span data-line="736">    <span class="k">class</span> <span class="nc">Http2Transport</span><span class="p">(</span><span class="n">BaseHttpTransport</span><span class="p">):</span>  <span class="c1"># type: ignore</span>
+</span><span data-line="736">    <span class="k">class</span><span class="w"> </span><span class="nc">Http2Transport</span><span class="p">(</span><span class="n">BaseHttpTransport</span><span class="p">):</span>  <span class="c1"># type: ignore</span>
 </span><span data-line="737"><span class="w">        </span><span class="sd">&quot;&quot;&quot;The HTTP2 transport based on httpcore.&quot;&quot;&quot;</span>
 </span><span data-line="738">
 </span><span data-line="739">        <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
@@ -869,7 +869,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="741">                <span class="n">httpcore</span><span class="o">.</span><span class="n">SOCKSProxy</span><span class="p">,</span> <span class="n">httpcore</span><span class="o">.</span><span class="n">HTTPProxy</span><span class="p">,</span> <span class="n">httpcore</span><span class="o">.</span><span class="n">ConnectionPool</span>
 </span><span data-line="742">            <span class="p">]</span>
 </span><span data-line="743">
-</span><span data-line="744">        <span class="k">def</span> <span class="nf">_get_header_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">header</span><span class="p">):</span>
+</span><span data-line="744">        <span class="k">def</span><span class="w"> </span><span class="nf">_get_header_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">header</span><span class="p">):</span>
 </span><span data-line="745">            <span class="c1"># type: (Self, httpcore.Response, str) -&gt; Optional[str]</span>
 </span><span data-line="746">            <span class="k">return</span> <span class="nb">next</span><span class="p">(</span>
 </span><span data-line="747">                <span class="p">(</span>
@@ -880,7 +880,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="752">                <span class="kc">None</span><span class="p">,</span>
 </span><span data-line="753">            <span class="p">)</span>
 </span><span data-line="754">
-</span><span data-line="755">        <span class="k">def</span> <span class="nf">_request</span><span class="p">(</span>
+</span><span data-line="755">        <span class="k">def</span><span class="w"> </span><span class="nf">_request</span><span class="p">(</span>
 </span><span data-line="756">            <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="757">            <span class="n">method</span><span class="p">,</span>
 </span><span data-line="758">            <span class="n">endpoint_type</span><span class="p">,</span>
@@ -896,7 +896,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="768">            <span class="p">)</span>
 </span><span data-line="769">            <span class="k">return</span> <span class="n">response</span>
 </span><span data-line="770">
-</span><span data-line="771">        <span class="k">def</span> <span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="771">        <span class="k">def</span><span class="w"> </span><span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="772">            <span class="c1"># type: (Self) -&gt; Dict[str, Any]</span>
 </span><span data-line="773">            <span class="n">options</span> <span class="o">=</span> <span class="p">{</span>
 </span><span data-line="774">                <span class="s2">&quot;http2&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -933,7 +933,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="805">
 </span><span data-line="806">            <span class="k">return</span> <span class="n">options</span>
 </span><span data-line="807">
-</span><span data-line="808">        <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="808">        <span class="k">def</span><span class="w"> </span><span class="nf">_make_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="809">            <span class="c1"># type: (Self) -&gt; Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]</span>
 </span><span data-line="810">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="811">                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot create HTTP-based transport without valid DSN&quot;</span><span class="p">)</span>
@@ -977,27 +977,27 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="849">            <span class="k">return</span> <span class="n">httpcore</span><span class="o">.</span><span class="n">ConnectionPool</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
 </span><span data-line="850">
 </span><span data-line="851">
-</span><span data-line="852"><span class="k">class</span> <span class="nc">_FunctionTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
+</span><span data-line="852"><span class="k">class</span><span class="w"> </span><span class="nc">_FunctionTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
 </span><span data-line="853"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="854"><span class="sd">    DEPRECATED: Users wishing to provide a custom transport should subclass</span>
 </span><span data-line="855"><span class="sd">    the Transport class, rather than providing a function.</span>
 </span><span data-line="856"><span class="sd">    &quot;&quot;&quot;</span>
 </span><span data-line="857">
-</span><span data-line="858">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="858">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span data-line="859">        <span class="bp">self</span><span class="p">,</span> <span class="n">func</span>  <span class="c1"># type: Callable[[Event], None]</span>
 </span><span data-line="860">    <span class="p">):</span>
 </span><span data-line="861">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span data-line="862">        <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 </span><span data-line="863">        <span class="bp">self</span><span class="o">.</span><span class="n">_func</span> <span class="o">=</span> <span class="n">func</span>
 </span><span data-line="864">
-</span><span data-line="865">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+</span><span data-line="865">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_event</span><span class="p">(</span>
 </span><span data-line="866">        <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
 </span><span data-line="867">    <span class="p">):</span>
 </span><span data-line="868">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span data-line="869">        <span class="bp">self</span><span class="o">.</span><span class="n">_func</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 </span><span data-line="870">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="871">
-</span><span data-line="872">    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">:</span> <span class="n">Envelope</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="872">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">:</span> <span class="n">Envelope</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="873">        <span class="c1"># Since function transports expect to be called with an event, we need</span>
 </span><span data-line="874">        <span class="c1"># to iterate over the envelope and call the function for each event, via</span>
 </span><span data-line="875">        <span class="c1"># the deprecated capture_event method.</span>
@@ -1006,7 +1006,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="878">            <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 </span><span data-line="879">
 </span><span data-line="880">
-</span><span data-line="881"><span class="k">def</span> <span class="nf">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
+</span><span data-line="881"><span class="k">def</span><span class="w"> </span><span class="nf">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
 </span><span data-line="882">    <span class="c1"># type: (Dict[str, Any]) -&gt; Optional[Transport]</span>
 </span><span data-line="883">    <span class="n">ref_transport</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;transport&quot;</span><span class="p">]</span>
 </span><span data-line="884">
@@ -1049,7 +1049,7 @@ data-aria-dark="Switch to auto color mode">
 <footer class="sy-foot">
   <div class="sy-foot-inner sy-container mx-auto">
     <div class="sy-foot-reserved md:flex justify-between items-center">
-      <div class="sy-foot-copyright"><p>2019-2024, Sentry Team and Contributors</p>
+      <div class="sy-foot-copyright"><p>2019-2025, Sentry Team and Contributors</p>
   
   <p>
     Made with
@@ -1066,8 +1066,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=bd8f1056"></script>
+      <script src="../../_static/documentation_options.js?v=50d84e18"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=e2e99575"></script></body>
+      <script src="../../_static/shibuya.js?v=55e26b35"></script></body>
 </html>

@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.client - sentry-python 2.19.2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.client - sentry-python 2.20.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=83eaa723" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=10d1008b" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,17 +105,17 @@ data-aria-dark="Switch to auto color mode">
       <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.client</h1><div class="highlight"><pre>
-<span></span><span data-line="1"><span class="kn">import</span> <span class="nn">os</span>
-</span><span data-line="2"><span class="kn">import</span> <span class="nn">uuid</span>
-</span><span data-line="3"><span class="kn">import</span> <span class="nn">random</span>
-</span><span data-line="4"><span class="kn">import</span> <span class="nn">socket</span>
-</span><span data-line="5"><span class="kn">from</span> <span class="nn">collections.abc</span> <span class="kn">import</span> <span class="n">Mapping</span>
-</span><span data-line="6"><span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timezone</span>
-</span><span data-line="7"><span class="kn">from</span> <span class="nn">importlib</span> <span class="kn">import</span> <span class="n">import_module</span>
-</span><span data-line="8"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">cast</span><span class="p">,</span> <span class="n">overload</span>
+<span></span><span data-line="1"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+</span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+</span><span data-line="3"><span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+</span><span data-line="4"><span class="kn">import</span><span class="w"> </span><span class="nn">socket</span>
+</span><span data-line="5"><span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
+</span><span data-line="6"><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timezone</span>
+</span><span data-line="7"><span class="kn">from</span><span class="w"> </span><span class="nn">importlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">import_module</span>
+</span><span data-line="8"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">cast</span><span class="p">,</span> <span class="n">overload</span>
 </span><span data-line="9">
-</span><span data-line="10"><span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">PY37</span><span class="p">,</span> <span class="n">check_uwsgi_thread_support</span>
-</span><span data-line="11"><span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="10"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">PY37</span><span class="p">,</span> <span class="n">check_uwsgi_thread_support</span>
+</span><span data-line="11"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="12">    <span class="n">ContextVar</span><span class="p">,</span>
 </span><span data-line="13">    <span class="n">capture_internal_exceptions</span><span class="p">,</span>
 </span><span data-line="14">    <span class="n">current_stacktrace</span><span class="p">,</span>
@@ -128,48 +128,48 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="21">    <span class="n">is_gevent</span><span class="p">,</span>
 </span><span data-line="22">    <span class="n">logger</span><span class="p">,</span>
 </span><span data-line="23"><span class="p">)</span>
-</span><span data-line="24"><span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="kn">import</span> <span class="n">serialize</span>
-</span><span data-line="25"><span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">trace</span>
-</span><span data-line="26"><span class="kn">from</span> <span class="nn">sentry_sdk.transport</span> <span class="kn">import</span> <span class="n">BaseHttpTransport</span><span class="p">,</span> <span class="n">make_transport</span>
-</span><span data-line="27"><span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="24"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.serializer</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialize</span>
+</span><span data-line="25"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.tracing</span><span class="w"> </span><span class="kn">import</span> <span class="n">trace</span>
+</span><span data-line="26"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.transport</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseHttpTransport</span><span class="p">,</span> <span class="n">make_transport</span>
+</span><span data-line="27"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.consts</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="28">    <span class="n">DEFAULT_MAX_VALUE_LENGTH</span><span class="p">,</span>
 </span><span data-line="29">    <span class="n">DEFAULT_OPTIONS</span><span class="p">,</span>
 </span><span data-line="30">    <span class="n">INSTRUMENTER</span><span class="p">,</span>
 </span><span data-line="31">    <span class="n">VERSION</span><span class="p">,</span>
 </span><span data-line="32">    <span class="n">ClientConstructor</span><span class="p">,</span>
 </span><span data-line="33"><span class="p">)</span>
-</span><span data-line="34"><span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">_DEFAULT_INTEGRATIONS</span><span class="p">,</span> <span class="n">setup_integrations</span>
-</span><span data-line="35"><span class="kn">from</span> <span class="nn">sentry_sdk.sessions</span> <span class="kn">import</span> <span class="n">SessionFlusher</span>
-</span><span data-line="36"><span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span>
-</span><span data-line="37"><span class="kn">from</span> <span class="nn">sentry_sdk.profiler.continuous_profiler</span> <span class="kn">import</span> <span class="n">setup_continuous_profiler</span>
-</span><span data-line="38"><span class="kn">from</span> <span class="nn">sentry_sdk.profiler.transaction_profiler</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="34"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.integrations</span><span class="w"> </span><span class="kn">import</span> <span class="n">_DEFAULT_INTEGRATIONS</span><span class="p">,</span> <span class="n">setup_integrations</span>
+</span><span data-line="35"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.sessions</span><span class="w"> </span><span class="kn">import</span> <span class="n">SessionFlusher</span>
+</span><span data-line="36"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.envelope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Envelope</span>
+</span><span data-line="37"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.profiler.continuous_profiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">setup_continuous_profiler</span>
+</span><span data-line="38"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.profiler.transaction_profiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="39">    <span class="n">has_profiling_enabled</span><span class="p">,</span>
 </span><span data-line="40">    <span class="n">Profile</span><span class="p">,</span>
 </span><span data-line="41">    <span class="n">setup_profiler</span><span class="p">,</span>
 </span><span data-line="42"><span class="p">)</span>
-</span><span data-line="43"><span class="kn">from</span> <span class="nn">sentry_sdk.scrubber</span> <span class="kn">import</span> <span class="n">EventScrubber</span>
-</span><span data-line="44"><span class="kn">from</span> <span class="nn">sentry_sdk.monitor</span> <span class="kn">import</span> <span class="n">Monitor</span>
-</span><span data-line="45"><span class="kn">from</span> <span class="nn">sentry_sdk.spotlight</span> <span class="kn">import</span> <span class="n">setup_spotlight</span>
+</span><span data-line="43"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.scrubber</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventScrubber</span>
+</span><span data-line="44"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.monitor</span><span class="w"> </span><span class="kn">import</span> <span class="n">Monitor</span>
+</span><span data-line="45"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.spotlight</span><span class="w"> </span><span class="kn">import</span> <span class="n">setup_spotlight</span>
 </span><span data-line="46">
-</span><span data-line="47"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="47"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span data-line="48">
 </span><span data-line="49"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="50">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
-</span><span data-line="51">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
-</span><span data-line="52">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
-</span><span data-line="53">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
-</span><span data-line="54">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Sequence</span>
-</span><span data-line="55">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
-</span><span data-line="56">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
-</span><span data-line="57">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TypeVar</span>
+</span><span data-line="50">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+</span><span data-line="51">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+</span><span data-line="52">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
+</span><span data-line="53">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+</span><span data-line="54">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequence</span>
+</span><span data-line="55">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span>
+</span><span data-line="56">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+</span><span data-line="57">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeVar</span>
 </span><span data-line="58">
-</span><span data-line="59">    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span><span class="p">,</span> <span class="n">SDKInfo</span>
-</span><span data-line="60">    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
-</span><span data-line="61">    <span class="kn">from</span> <span class="nn">sentry_sdk.metrics</span> <span class="kn">import</span> <span class="n">MetricsAggregator</span>
-</span><span data-line="62">    <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">Scope</span>
-</span><span data-line="63">    <span class="kn">from</span> <span class="nn">sentry_sdk.session</span> <span class="kn">import</span> <span class="n">Session</span>
-</span><span data-line="64">    <span class="kn">from</span> <span class="nn">sentry_sdk.spotlight</span> <span class="kn">import</span> <span class="n">SpotlightClient</span>
-</span><span data-line="65">    <span class="kn">from</span> <span class="nn">sentry_sdk.transport</span> <span class="kn">import</span> <span class="n">Transport</span>
+</span><span data-line="59">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span><span class="p">,</span> <span class="n">SDKInfo</span>
+</span><span data-line="60">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.integrations</span><span class="w"> </span><span class="kn">import</span> <span class="n">Integration</span>
+</span><span data-line="61">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">MetricsAggregator</span>
+</span><span data-line="62">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.scope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Scope</span>
+</span><span data-line="63">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.session</span><span class="w"> </span><span class="kn">import</span> <span class="n">Session</span>
+</span><span data-line="64">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.spotlight</span><span class="w"> </span><span class="kn">import</span> <span class="n">SpotlightClient</span>
+</span><span data-line="65">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.transport</span><span class="w"> </span><span class="kn">import</span> <span class="n">Transport</span>
 </span><span data-line="66">
 </span><span data-line="67">    <span class="n">I</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;I&quot;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">Integration</span><span class="p">)</span>  <span class="c1"># noqa: E741</span>
 </span><span data-line="68">
@@ -183,7 +183,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="76"><span class="p">}</span>  <span class="c1"># type: SDKInfo</span>
 </span><span data-line="77">
 </span><span data-line="78">
-</span><span data-line="79"><span class="k">def</span> <span class="nf">_get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="79"><span class="k">def</span><span class="w"> </span><span class="nf">_get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="80">    <span class="c1"># type: (*Optional[str], **Any) -&gt; Dict[str, Any]</span>
 </span><span data-line="81">    <span class="k">if</span> <span class="n">args</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">str</span><span class="p">))</span> <span class="ow">or</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">):</span>
 </span><span data-line="82">        <span class="n">dsn</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># type: Optional[str]</span>
@@ -260,7 +260,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="153">
 <div class="viewcode-block" id="BaseClient">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.BaseClient">[docs]</a>
-</span><span data-line="154"><span class="k">class</span> <span class="nc">BaseClient</span><span class="p">:</span>
+</span><span data-line="154"><span class="k">class</span><span class="w"> </span><span class="nc">BaseClient</span><span class="p">:</span>
 </span><span data-line="155"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="156"><span class="sd">    .. versionadded:: 2.0.0</span>
 </span><span data-line="157">
@@ -269,7 +269,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="160">
 </span><span data-line="161">    <span class="n">spotlight</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[SpotlightClient]</span>
 </span><span data-line="162">
-</span><span data-line="163">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span data-line="163">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span data-line="164">        <span class="c1"># type: (Optional[Dict[str, Any]]) -&gt; None</span>
 </span><span data-line="165">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="p">(</span>
 </span><span data-line="166">            <span class="n">options</span> <span class="k">if</span> <span class="n">options</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">DEFAULT_OPTIONS</span>
@@ -279,26 +279,26 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="170">        <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Monitor]</span>
 </span><span data-line="171">        <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[MetricsAggregator]</span>
 </span><span data-line="172">
-</span><span data-line="173">    <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="173">    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="174">        <span class="c1"># type: (*Any, **Any) -&gt; Any</span>
 </span><span data-line="175">        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;options&quot;</span><span class="p">:</span> <span class="p">{}}</span>
 </span><span data-line="176">
-</span><span data-line="177">    <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="177">    <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="178">        <span class="c1"># type: (*Any, **Any) -&gt; None</span>
 </span><span data-line="179">        <span class="k">pass</span>
 </span><span data-line="180">
 </span><span data-line="181">    <span class="nd">@property</span>
-</span><span data-line="182">    <span class="k">def</span> <span class="nf">dsn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="182">    <span class="k">def</span><span class="w"> </span><span class="nf">dsn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="183">        <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span data-line="184">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="185">
-</span><span data-line="186">    <span class="k">def</span> <span class="nf">should_send_default_pii</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="186">    <span class="k">def</span><span class="w"> </span><span class="nf">should_send_default_pii</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="187">        <span class="c1"># type: () -&gt; bool</span>
 </span><span data-line="188">        <span class="k">return</span> <span class="kc">False</span>
 </span><span data-line="189">
 <div class="viewcode-block" id="BaseClient.is_active">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.BaseClient.is_active">[docs]</a>
-</span><span data-line="190">    <span class="k">def</span> <span class="nf">is_active</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="190">    <span class="k">def</span><span class="w"> </span><span class="nf">is_active</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="191">        <span class="c1"># type: () -&gt; bool</span>
 </span><span data-line="192"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="193"><span class="sd">        .. versionadded:: 2.0.0</span>
@@ -308,43 +308,43 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="197">        <span class="k">return</span> <span class="kc">False</span></div>
 
 </span><span data-line="198">
-</span><span data-line="199">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="199">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="200">        <span class="c1"># type: (*Any, **Any) -&gt; Optional[str]</span>
 </span><span data-line="201">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="202">
-</span><span data-line="203">    <span class="k">def</span> <span class="nf">capture_session</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="203">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_session</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="204">        <span class="c1"># type: (*Any, **Any) -&gt; None</span>
 </span><span data-line="205">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="206">
 </span><span data-line="207">    <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
 </span><span data-line="208">
 </span><span data-line="209">        <span class="nd">@overload</span>
-</span><span data-line="210">        <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+</span><span data-line="210">        <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
 </span><span data-line="211">            <span class="c1"># type: (str) -&gt; Optional[Integration]</span>
 </span><span data-line="212">            <span class="o">...</span>
 </span><span data-line="213">
 </span><span data-line="214">        <span class="nd">@overload</span>
-</span><span data-line="215">        <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+</span><span data-line="215">        <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
 </span><span data-line="216">            <span class="c1"># type: (type[I]) -&gt; Optional[I]</span>
 </span><span data-line="217">            <span class="o">...</span>
 </span><span data-line="218">
-</span><span data-line="219">    <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+</span><span data-line="219">    <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
 </span><span data-line="220">        <span class="c1"># type: (Union[str, type[Integration]]) -&gt; Optional[Integration]</span>
 </span><span data-line="221">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="222">
-</span><span data-line="223">    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="223">    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="224">        <span class="c1"># type: (*Any, **Any) -&gt; None</span>
 </span><span data-line="225">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="226">
-</span><span data-line="227">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="227">    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="228">        <span class="c1"># type: (*Any, **Any) -&gt; None</span>
 </span><span data-line="229">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="230">
-</span><span data-line="231">    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="231">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="232">        <span class="c1"># type: () -&gt; BaseClient</span>
 </span><span data-line="233">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="234">
-</span><span data-line="235">    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+</span><span data-line="235">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
 </span><span data-line="236">        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
 </span><span data-line="237">        <span class="k">return</span> <span class="kc">None</span></div>
 
@@ -352,7 +352,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="239">
 <div class="viewcode-block" id="NonRecordingClient">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.NonRecordingClient">[docs]</a>
-</span><span data-line="240"><span class="k">class</span> <span class="nc">NonRecordingClient</span><span class="p">(</span><span class="n">BaseClient</span><span class="p">):</span>
+</span><span data-line="240"><span class="k">class</span><span class="w"> </span><span class="nc">NonRecordingClient</span><span class="p">(</span><span class="n">BaseClient</span><span class="p">):</span>
 </span><span data-line="241"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="242"><span class="sd">    .. versionadded:: 2.0.0</span>
 </span><span data-line="243">
@@ -365,7 +365,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="249">
 <div class="viewcode-block" id="_Client">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client">[docs]</a>
-</span><span data-line="250"><span class="k">class</span> <span class="nc">_Client</span><span class="p">(</span><span class="n">BaseClient</span><span class="p">):</span>
+</span><span data-line="250"><span class="k">class</span><span class="w"> </span><span class="nc">_Client</span><span class="p">(</span><span class="n">BaseClient</span><span class="p">):</span>
 </span><span data-line="251"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="252"><span class="sd">    The client is internally responsible for capturing the events and</span>
 </span><span data-line="253"><span class="sd">    forwarding them to sentry through the configured transport.  It takes</span>
@@ -375,21 +375,21 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="257"><span class="sd">    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)</span>
 </span><span data-line="258"><span class="sd">    &quot;&quot;&quot;</span>
 </span><span data-line="259">
-</span><span data-line="260">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="260">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="261">        <span class="c1"># type: (*Any, **Any) -&gt; None</span>
 </span><span data-line="262">        <span class="nb">super</span><span class="p">(</span><span class="n">_Client</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">options</span><span class="o">=</span><span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">))</span>
 </span><span data-line="263">        <span class="bp">self</span><span class="o">.</span><span class="n">_init_impl</span><span class="p">()</span>
 </span><span data-line="264">
-</span><span data-line="265">    <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="265">    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="266">        <span class="c1"># type: () -&gt; Any</span>
 </span><span data-line="267">        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;options&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">}</span>
 </span><span data-line="268">
-</span><span data-line="269">    <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+</span><span data-line="269">    <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
 </span><span data-line="270">        <span class="c1"># type: (Any) -&gt; None</span>
 </span><span data-line="271">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">&quot;options&quot;</span><span class="p">]</span>
 </span><span data-line="272">        <span class="bp">self</span><span class="o">.</span><span class="n">_init_impl</span><span class="p">()</span>
 </span><span data-line="273">
-</span><span data-line="274">    <span class="k">def</span> <span class="nf">_setup_instrumentation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">functions_to_trace</span><span class="p">):</span>
+</span><span data-line="274">    <span class="k">def</span><span class="w"> </span><span class="nf">_setup_instrumentation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">functions_to_trace</span><span class="p">):</span>
 </span><span data-line="275">        <span class="c1"># type: (Sequence[Dict[str, str]]) -&gt; None</span>
 </span><span data-line="276"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="277"><span class="sd">        Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.</span>
@@ -440,11 +440,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="322">                    <span class="n">e</span><span class="p">,</span>
 </span><span data-line="323">                <span class="p">)</span>
 </span><span data-line="324">
-</span><span data-line="325">    <span class="k">def</span> <span class="nf">_init_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="325">    <span class="k">def</span><span class="w"> </span><span class="nf">_init_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="326">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="327">        <span class="n">old_debug</span> <span class="o">=</span> <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
 </span><span data-line="328">
-</span><span data-line="329">        <span class="k">def</span> <span class="nf">_capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">):</span>
+</span><span data-line="329">        <span class="k">def</span><span class="w"> </span><span class="nf">_capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">):</span>
 </span><span data-line="330">            <span class="c1"># type: (Envelope) -&gt; None</span>
 </span><span data-line="331">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="332">                <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
@@ -467,7 +467,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="349">                <span class="c1"># with gevent.</span>
 </span><span data-line="350">                <span class="n">metrics_supported</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">is_gevent</span><span class="p">()</span> <span class="ow">or</span> <span class="n">PY37</span>
 </span><span data-line="351">                <span class="k">if</span> <span class="n">metrics_supported</span><span class="p">:</span>
-</span><span data-line="352">                    <span class="kn">from</span> <span class="nn">sentry_sdk.metrics</span> <span class="kn">import</span> <span class="n">MetricsAggregator</span>
+</span><span data-line="352">                    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">MetricsAggregator</span>
 </span><span data-line="353">
 </span><span data-line="354">                    <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span> <span class="o">=</span> <span class="n">MetricsAggregator</span><span class="p">(</span>
 </span><span data-line="355">                        <span class="n">capture_func</span><span class="o">=</span><span class="n">_capture_envelope</span><span class="p">,</span>
@@ -559,7 +559,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="441">
 <div class="viewcode-block" id="_Client.is_active">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.is_active">[docs]</a>
-</span><span data-line="442">    <span class="k">def</span> <span class="nf">is_active</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="442">    <span class="k">def</span><span class="w"> </span><span class="nf">is_active</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="443">        <span class="c1"># type: () -&gt; bool</span>
 </span><span data-line="444"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="445"><span class="sd">        .. versionadded:: 2.0.0</span>
@@ -571,7 +571,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="450">
 <div class="viewcode-block" id="_Client.should_send_default_pii">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.should_send_default_pii">[docs]</a>
-</span><span data-line="451">    <span class="k">def</span> <span class="nf">should_send_default_pii</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="451">    <span class="k">def</span><span class="w"> </span><span class="nf">should_send_default_pii</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="452">        <span class="c1"># type: () -&gt; bool</span>
 </span><span data-line="453"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="454"><span class="sd">        .. versionadded:: 2.0.0</span>
@@ -586,12 +586,12 @@ data-aria-dark="Switch to auto color mode">
 
 </span><span data-line="463">
 </span><span data-line="464">    <span class="nd">@property</span>
-</span><span data-line="465">    <span class="k">def</span> <span class="nf">dsn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="465">    <span class="k">def</span><span class="w"> </span><span class="nf">dsn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="466">        <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span data-line="467"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the configured DSN as string.&quot;&quot;&quot;</span>
 </span><span data-line="468">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span>
 </span><span data-line="469">
-</span><span data-line="470">    <span class="k">def</span> <span class="nf">_prepare_event</span><span class="p">(</span>
+</span><span data-line="470">    <span class="k">def</span><span class="w"> </span><span class="nf">_prepare_event</span><span class="p">(</span>
 </span><span data-line="471">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="472">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
 </span><span data-line="473">        <span class="n">hint</span><span class="p">,</span>  <span class="c1"># type: Hint</span>
@@ -656,7 +656,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="532">
 </span><span data-line="533">        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="s2">&quot;release&quot;</span><span class="p">,</span> <span class="s2">&quot;environment&quot;</span><span class="p">,</span> <span class="s2">&quot;server_name&quot;</span><span class="p">,</span> <span class="s2">&quot;dist&quot;</span><span class="p">:</span>
 </span><span data-line="534">            <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="535">                <span class="n">event</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>  <span class="c1"># type: ignore[literal-required]</span>
+</span><span data-line="535">                <span class="n">event</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
 </span><span data-line="536">        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sdk&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="537">            <span class="n">sdk_info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">SDK_INFO</span><span class="p">)</span>
 </span><span data-line="538">            <span class="n">sdk_info</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
@@ -705,7 +705,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="581">                    <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span>
 </span><span data-line="582">                        <span class="s2">&quot;before_send&quot;</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;error&quot;</span>
 </span><span data-line="583">                    <span class="p">)</span>
-</span><span data-line="584">            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>  <span class="c1"># type: ignore</span>
+</span><span data-line="584">            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
 </span><span data-line="585">
 </span><span data-line="586">        <span class="n">before_send_transaction</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_send_transaction&quot;</span><span class="p">]</span>
 </span><span data-line="587">        <span class="k">if</span> <span class="p">(</span>
@@ -735,11 +735,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="611">                        <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;before_send&quot;</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;span&quot;</span><span class="p">,</span> <span class="n">quantity</span><span class="o">=</span><span class="n">spans_delta</span>
 </span><span data-line="612">                    <span class="p">)</span>
 </span><span data-line="613">
-</span><span data-line="614">            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>  <span class="c1"># type: ignore</span>
+</span><span data-line="614">            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
 </span><span data-line="615">
 </span><span data-line="616">        <span class="k">return</span> <span class="n">event</span>
 </span><span data-line="617">
-</span><span data-line="618">    <span class="k">def</span> <span class="nf">_is_ignored_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+</span><span data-line="618">    <span class="k">def</span><span class="w"> </span><span class="nf">_is_ignored_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
 </span><span data-line="619">        <span class="c1"># type: (Event, Hint) -&gt; bool</span>
 </span><span data-line="620">        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">)</span>
 </span><span data-line="621">        <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -761,7 +761,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="637">
 </span><span data-line="638">        <span class="k">return</span> <span class="kc">False</span>
 </span><span data-line="639">
-</span><span data-line="640">    <span class="k">def</span> <span class="nf">_should_capture</span><span class="p">(</span>
+</span><span data-line="640">    <span class="k">def</span><span class="w"> </span><span class="nf">_should_capture</span><span class="p">(</span>
 </span><span data-line="641">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="642">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
 </span><span data-line="643">        <span class="n">hint</span><span class="p">,</span>  <span class="c1"># type: Hint</span>
@@ -783,7 +783,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="659">
 </span><span data-line="660">        <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="661">
-</span><span data-line="662">    <span class="k">def</span> <span class="nf">_should_sample_error</span><span class="p">(</span>
+</span><span data-line="662">    <span class="k">def</span><span class="w"> </span><span class="nf">_should_sample_error</span><span class="p">(</span>
 </span><span data-line="663">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="664">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
 </span><span data-line="665">        <span class="n">hint</span><span class="p">,</span>  <span class="c1"># type: Hint</span>
@@ -831,7 +831,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="707">
 </span><span data-line="708">        <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="709">
-</span><span data-line="710">    <span class="k">def</span> <span class="nf">_update_session_from_event</span><span class="p">(</span>
+</span><span data-line="710">    <span class="k">def</span><span class="w"> </span><span class="nf">_update_session_from_event</span><span class="p">(</span>
 </span><span data-line="711">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="712">        <span class="n">session</span><span class="p">,</span>  <span class="c1"># type: Session</span>
 </span><span data-line="713">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
@@ -870,7 +870,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="746">
 <div class="viewcode-block" id="_Client.capture_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.capture_event">[docs]</a>
-</span><span data-line="747">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+</span><span data-line="747">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_event</span><span class="p">(</span>
 </span><span data-line="748">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="749">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
 </span><span data-line="750">        <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
@@ -956,7 +956,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="830">        <span class="k">return</span> <span class="n">return_value</span></div>
 
 </span><span data-line="831">
-</span><span data-line="832">    <span class="k">def</span> <span class="nf">capture_session</span><span class="p">(</span>
+</span><span data-line="832">    <span class="k">def</span><span class="w"> </span><span class="nf">capture_session</span><span class="p">(</span>
 </span><span data-line="833">        <span class="bp">self</span><span class="p">,</span> <span class="n">session</span>  <span class="c1"># type: Session</span>
 </span><span data-line="834">    <span class="p">):</span>
 </span><span data-line="835">        <span class="c1"># type: (...) -&gt; None</span>
@@ -968,18 +968,18 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="841">    <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
 </span><span data-line="842">
 </span><span data-line="843">        <span class="nd">@overload</span>
-</span><span data-line="844">        <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+</span><span data-line="844">        <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
 </span><span data-line="845">            <span class="c1"># type: (str) -&gt; Optional[Integration]</span>
 </span><span data-line="846">            <span class="o">...</span>
 </span><span data-line="847">
 </span><span data-line="848">        <span class="nd">@overload</span>
-</span><span data-line="849">        <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+</span><span data-line="849">        <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
 </span><span data-line="850">            <span class="c1"># type: (type[I]) -&gt; Optional[I]</span>
 </span><span data-line="851">            <span class="o">...</span>
 </span><span data-line="852">
 <div class="viewcode-block" id="_Client.get_integration">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.get_integration">[docs]</a>
-</span><span data-line="853">    <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span>
+</span><span data-line="853">    <span class="k">def</span><span class="w"> </span><span class="nf">get_integration</span><span class="p">(</span>
 </span><span data-line="854">        <span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span>  <span class="c1"># type: Union[str, Type[Integration]]</span>
 </span><span data-line="855">    <span class="p">):</span>
 </span><span data-line="856">        <span class="c1"># type: (...) -&gt; Optional[Integration]</span>
@@ -998,7 +998,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="868">
 <div class="viewcode-block" id="_Client.close">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.close">[docs]</a>
-</span><span data-line="869">    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span>
+</span><span data-line="869">    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span>
 </span><span data-line="870">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="871">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
 </span><span data-line="872">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
@@ -1021,7 +1021,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="888">
 <div class="viewcode-block" id="_Client.flush">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client.flush">[docs]</a>
-</span><span data-line="889">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+</span><span data-line="889">    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span>
 </span><span data-line="890">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="891">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
 </span><span data-line="892">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
@@ -1043,17 +1043,17 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="908">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
 
 </span><span data-line="909">
-</span><span data-line="910">    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="910">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="911">        <span class="c1"># type: () -&gt; _Client</span>
 </span><span data-line="912">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="913">
-</span><span data-line="914">    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+</span><span data-line="914">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
 </span><span data-line="915">        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
 </span><span data-line="916">        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
 
 </span><span data-line="917">
 </span><span data-line="918">
-</span><span data-line="919"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="919"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span data-line="920">
 </span><span data-line="921"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
 </span><span data-line="922">    <span class="c1"># Make mypy, PyCharm and other static analyzers think `get_options` is a</span>
@@ -1062,12 +1062,12 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="925">    <span class="c1"># Use `ClientConstructor` to define the argument types of `init` and</span>
 </span><span data-line="926">    <span class="c1"># `Dict[str, Any]` to tell static analyzers about the return type.</span>
 </span><span data-line="927">
-</span><span data-line="928">    <span class="k">class</span> <span class="nc">get_options</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>  <span class="c1"># noqa: N801</span>
+</span><span data-line="928">    <span class="k">class</span><span class="w"> </span><span class="nc">get_options</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>  <span class="c1"># noqa: N801</span>
 </span><span data-line="929">        <span class="k">pass</span>
 </span><span data-line="930">
 <div class="viewcode-block" id="Client">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Client">[docs]</a>
-</span><span data-line="931">    <span class="k">class</span> <span class="nc">Client</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">_Client</span><span class="p">):</span>
+</span><span data-line="931">    <span class="k">class</span><span class="w"> </span><span class="nc">Client</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">_Client</span><span class="p">):</span>
 </span><span data-line="932">        <span class="k">pass</span></div>
 
 </span><span data-line="933">
@@ -1092,7 +1092,7 @@ data-aria-dark="Switch to auto color mode">
 <footer class="sy-foot">
   <div class="sy-foot-inner sy-container mx-auto">
     <div class="sy-foot-reserved md:flex justify-between items-center">
-      <div class="sy-foot-copyright"><p>2019-2024, Sentry Team and Contributors</p>
+      <div class="sy-foot-copyright"><p>2019-2025, Sentry Team and Contributors</p>
   
   <p>
     Made with
@@ -1109,8 +1109,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=bd8f1056"></script>
+      <script src="../../_static/documentation_options.js?v=50d84e18"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=e2e99575"></script></body>
+      <script src="../../_static/shibuya.js?v=55e26b35"></script></body>
 </html>

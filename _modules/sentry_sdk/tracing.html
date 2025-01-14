@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.tracing - sentry-python 2.19.2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.tracing - sentry-python 2.20.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=83eaa723" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=10d1008b" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,50 +105,50 @@ data-aria-dark="Switch to auto color mode">
       <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.tracing</h1><div class="highlight"><pre>
-<span></span><span data-line="1"><span class="kn">import</span> <span class="nn">uuid</span>
-</span><span data-line="2"><span class="kn">import</span> <span class="nn">random</span>
-</span><span data-line="3"><span class="kn">import</span> <span class="nn">warnings</span>
-</span><span data-line="4"><span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">timezone</span>
+<span></span><span data-line="1"><span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+</span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+</span><span data-line="3"><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+</span><span data-line="4"><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">timezone</span>
 </span><span data-line="5">
-</span><span data-line="6"><span class="kn">import</span> <span class="nn">sentry_sdk</span>
-</span><span data-line="7"><span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">INSTRUMENTER</span><span class="p">,</span> <span class="n">SPANSTATUS</span><span class="p">,</span> <span class="n">SPANDATA</span>
-</span><span data-line="8"><span class="kn">from</span> <span class="nn">sentry_sdk.profiler.continuous_profiler</span> <span class="kn">import</span> <span class="n">get_profiler_id</span>
-</span><span data-line="9"><span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="6"><span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
+</span><span data-line="7"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.consts</span><span class="w"> </span><span class="kn">import</span> <span class="n">INSTRUMENTER</span><span class="p">,</span> <span class="n">SPANSTATUS</span><span class="p">,</span> <span class="n">SPANDATA</span>
+</span><span data-line="8"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.profiler.continuous_profiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_profiler_id</span>
+</span><span data-line="9"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="10">    <span class="n">get_current_thread_meta</span><span class="p">,</span>
 </span><span data-line="11">    <span class="n">is_valid_sample_rate</span><span class="p">,</span>
 </span><span data-line="12">    <span class="n">logger</span><span class="p">,</span>
 </span><span data-line="13">    <span class="n">nanosecond_time</span><span class="p">,</span>
 </span><span data-line="14"><span class="p">)</span>
 </span><span data-line="15">
-</span><span data-line="16"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="16"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span data-line="17">
 </span><span data-line="18"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="19">    <span class="kn">from</span> <span class="nn">collections.abc</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">MutableMapping</span>
-</span><span data-line="20">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
-</span><span data-line="21">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
-</span><span data-line="22">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterator</span>
-</span><span data-line="23">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
-</span><span data-line="24">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
-</span><span data-line="25">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">overload</span>
-</span><span data-line="26">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">ParamSpec</span>
-</span><span data-line="27">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
-</span><span data-line="28">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
-</span><span data-line="29">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TypeVar</span>
+</span><span data-line="19">    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">MutableMapping</span>
+</span><span data-line="20">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+</span><span data-line="21">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
+</span><span data-line="22">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterator</span>
+</span><span data-line="23">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+</span><span data-line="24">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+</span><span data-line="25">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">overload</span>
+</span><span data-line="26">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParamSpec</span>
+</span><span data-line="27">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
+</span><span data-line="28">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+</span><span data-line="29">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeVar</span>
 </span><span data-line="30">
-</span><span data-line="31">    <span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">TypedDict</span><span class="p">,</span> <span class="n">Unpack</span>
+</span><span data-line="31">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypedDict</span><span class="p">,</span> <span class="n">Unpack</span>
 </span><span data-line="32">
 </span><span data-line="33">    <span class="n">P</span> <span class="o">=</span> <span class="n">ParamSpec</span><span class="p">(</span><span class="s2">&quot;P&quot;</span><span class="p">)</span>
 </span><span data-line="34">    <span class="n">R</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;R&quot;</span><span class="p">)</span>
 </span><span data-line="35">
-</span><span data-line="36">    <span class="kn">import</span> <span class="nn">sentry_sdk.profiler</span>
-</span><span data-line="37">    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="36">    <span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk.profiler</span>
+</span><span data-line="37">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="38">        <span class="n">Event</span><span class="p">,</span>
 </span><span data-line="39">        <span class="n">MeasurementUnit</span><span class="p">,</span>
 </span><span data-line="40">        <span class="n">SamplingContext</span><span class="p">,</span>
 </span><span data-line="41">        <span class="n">MeasurementValue</span><span class="p">,</span>
 </span><span data-line="42">    <span class="p">)</span>
 </span><span data-line="43">
-</span><span data-line="44">    <span class="k">class</span> <span class="nc">SpanKwargs</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+</span><span data-line="44">    <span class="k">class</span><span class="w"> </span><span class="nc">SpanKwargs</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 </span><span data-line="45">        <span class="n">trace_id</span><span class="p">:</span> <span class="nb">str</span>
 </span><span data-line="46"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="47"><span class="sd">        The trace ID of the root span. If this new span is to be the root span,</span>
@@ -207,7 +207,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="100">        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
 </span><span data-line="101"><span class="w">        </span><span class="sd">&quot;&quot;&quot;A string describing what operation is being performed within the span/transaction.&quot;&quot;&quot;</span>
 </span><span data-line="102">
-</span><span data-line="103">    <span class="k">class</span> <span class="nc">TransactionKwargs</span><span class="p">(</span><span class="n">SpanKwargs</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+</span><span data-line="103">    <span class="k">class</span><span class="w"> </span><span class="nc">TransactionKwargs</span><span class="p">(</span><span class="n">SpanKwargs</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 </span><span data-line="104">        <span class="n">source</span><span class="p">:</span> <span class="nb">str</span>
 </span><span data-line="105"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="106"><span class="sd">        A string describing the source of the transaction name. This will be used to determine the transaction&#39;s type.</span>
@@ -258,7 +258,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="151"><span class="p">}</span>
 </span><span data-line="152">
 </span><span data-line="153">
-</span><span data-line="154"><span class="k">def</span> <span class="nf">get_span_status_from_http_code</span><span class="p">(</span><span class="n">http_status_code</span><span class="p">):</span>
+</span><span data-line="154"><span class="k">def</span><span class="w"> </span><span class="nf">get_span_status_from_http_code</span><span class="p">(</span><span class="n">http_status_code</span><span class="p">):</span>
 </span><span data-line="155">    <span class="c1"># type: (int) -&gt; str</span>
 </span><span data-line="156"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="157"><span class="sd">    Returns the Sentry status corresponding to the given HTTP status code.</span>
@@ -297,12 +297,12 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="190">    <span class="k">return</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">UNKNOWN_ERROR</span>
 </span><span data-line="191">
 </span><span data-line="192">
-</span><span data-line="193"><span class="k">class</span> <span class="nc">_SpanRecorder</span><span class="p">:</span>
+</span><span data-line="193"><span class="k">class</span><span class="w"> </span><span class="nc">_SpanRecorder</span><span class="p">:</span>
 </span><span data-line="194"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Limits the number of spans recorded in a transaction.&quot;&quot;&quot;</span>
 </span><span data-line="195">
 </span><span data-line="196">    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;maxlen&quot;</span><span class="p">,</span> <span class="s2">&quot;spans&quot;</span><span class="p">)</span>
 </span><span data-line="197">
-</span><span data-line="198">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maxlen</span><span class="p">):</span>
+</span><span data-line="198">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maxlen</span><span class="p">):</span>
 </span><span data-line="199">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="200">        <span class="c1"># FIXME: this is `maxlen - 1` only to preserve historical behavior</span>
 </span><span data-line="201">        <span class="c1"># enforced by tests.</span>
@@ -312,7 +312,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="205">        <span class="bp">self</span><span class="o">.</span><span class="n">maxlen</span> <span class="o">=</span> <span class="n">maxlen</span> <span class="o">-</span> <span class="mi">1</span>
 </span><span data-line="206">        <span class="bp">self</span><span class="o">.</span><span class="n">spans</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[Span]</span>
 </span><span data-line="207">
-</span><span data-line="208">    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="p">):</span>
+</span><span data-line="208">    <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="p">):</span>
 </span><span data-line="209">        <span class="c1"># type: (Span) -&gt; None</span>
 </span><span data-line="210">        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spans</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">maxlen</span><span class="p">:</span>
 </span><span data-line="211">            <span class="n">span</span><span class="o">.</span><span class="n">_span_recorder</span> <span class="o">=</span> <span class="kc">None</span>
@@ -322,7 +322,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="215">
 <div class="viewcode-block" id="Span">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span">[docs]</a>
-</span><span data-line="216"><span class="k">class</span> <span class="nc">Span</span><span class="p">:</span>
+</span><span data-line="216"><span class="k">class</span><span class="w"> </span><span class="nc">Span</span><span class="p">:</span>
 </span><span data-line="217"><span class="w">    </span><span class="sd">&quot;&quot;&quot;A span holds timing information of a block of code.</span>
 </span><span data-line="218"><span class="sd">    Spans can have multiple child spans thus forming a span tree.</span>
 </span><span data-line="219">
@@ -377,7 +377,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="268">        <span class="s2">&quot;name&quot;</span><span class="p">,</span>
 </span><span data-line="269">    <span class="p">)</span>
 </span><span data-line="270">
-</span><span data-line="271">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="271">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span data-line="272">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="273">        <span class="n">trace_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
 </span><span data-line="274">        <span class="n">span_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
@@ -443,19 +443,19 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="334">
 </span><span data-line="335">    <span class="c1"># TODO this should really live on the Transaction class rather than the Span</span>
 </span><span data-line="336">    <span class="c1"># class</span>
-</span><span data-line="337">    <span class="k">def</span> <span class="nf">init_span_recorder</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maxlen</span><span class="p">):</span>
+</span><span data-line="337">    <span class="k">def</span><span class="w"> </span><span class="nf">init_span_recorder</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maxlen</span><span class="p">):</span>
 </span><span data-line="338">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="339">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span_recorder</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="340">            <span class="bp">self</span><span class="o">.</span><span class="n">_span_recorder</span> <span class="o">=</span> <span class="n">_SpanRecorder</span><span class="p">(</span><span class="n">maxlen</span><span class="p">)</span>
 </span><span data-line="341">
-</span><span data-line="342">    <span class="k">def</span> <span class="nf">_get_local_aggregator</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="342">    <span class="k">def</span><span class="w"> </span><span class="nf">_get_local_aggregator</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="343">        <span class="c1"># type: (...) -&gt; LocalAggregator</span>
 </span><span data-line="344">        <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_local_aggregator</span>
 </span><span data-line="345">        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="346">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_local_aggregator</span> <span class="o">=</span> <span class="n">LocalAggregator</span><span class="p">()</span>
 </span><span data-line="347">        <span class="k">return</span> <span class="n">rv</span>
 </span><span data-line="348">
-</span><span data-line="349">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="349">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="350">        <span class="c1"># type: () -&gt; str</span>
 </span><span data-line="351">        <span class="k">return</span> <span class="p">(</span>
 </span><span data-line="352">            <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2">(op=</span><span class="si">%r</span><span class="s2">, description:</span><span class="si">%r</span><span class="s2">, trace_id=</span><span class="si">%r</span><span class="s2">, span_id=</span><span class="si">%r</span><span class="s2">, parent_span_id=</span><span class="si">%r</span><span class="s2">, sampled=</span><span class="si">%r</span><span class="s2">, origin=</span><span class="si">%r</span><span class="s2">)&gt;&quot;</span>
@@ -471,7 +471,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="362">            <span class="p">)</span>
 </span><span data-line="363">        <span class="p">)</span>
 </span><span data-line="364">
-</span><span data-line="365">    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="365">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="366">        <span class="c1"># type: () -&gt; Span</span>
 </span><span data-line="367">        <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span> <span class="ow">or</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
 </span><span data-line="368">        <span class="n">old_span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span>
@@ -479,7 +479,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="370">        <span class="bp">self</span><span class="o">.</span><span class="n">_context_manager_state</span> <span class="o">=</span> <span class="p">(</span><span class="n">scope</span><span class="p">,</span> <span class="n">old_span</span><span class="p">)</span>
 </span><span data-line="371">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="372">
-</span><span data-line="373">    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+</span><span data-line="373">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
 </span><span data-line="374">        <span class="c1"># type: (Optional[Any], Optional[Any], Optional[Any]) -&gt; None</span>
 </span><span data-line="375">        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="376">            <span class="bp">self</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">INTERNAL_ERROR</span><span class="p">)</span>
@@ -490,7 +490,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="381">        <span class="n">scope</span><span class="o">.</span><span class="n">span</span> <span class="o">=</span> <span class="n">old_span</span>
 </span><span data-line="382">
 </span><span data-line="383">    <span class="nd">@property</span>
-</span><span data-line="384">    <span class="k">def</span> <span class="nf">containing_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="384">    <span class="k">def</span><span class="w"> </span><span class="nf">containing_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="385">        <span class="c1"># type: () -&gt; Optional[Transaction]</span>
 </span><span data-line="386"><span class="w">        </span><span class="sd">&quot;&quot;&quot;The ``Transaction`` that this span belongs to.</span>
 </span><span data-line="387"><span class="sd">        The ``Transaction`` is the root of the span tree,</span>
@@ -503,7 +503,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="394">
 <div class="viewcode-block" id="Span.start_child">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.start_child">[docs]</a>
-</span><span data-line="395">    <span class="k">def</span> <span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="395">    <span class="k">def</span><span class="w"> </span><span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="396">        <span class="c1"># type: (str, **Any) -&gt; Span</span>
 </span><span data-line="397"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="398"><span class="sd">        Start a sub-span from the current span or transaction.</span>
@@ -549,7 +549,7 @@ data-aria-dark="Switch to auto color mode">
 <div class="viewcode-block" id="Span.continue_from_environ">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.continue_from_environ">[docs]</a>
 </span><span data-line="437">    <span class="nd">@classmethod</span>
-</span><span data-line="438">    <span class="k">def</span> <span class="nf">continue_from_environ</span><span class="p">(</span>
+</span><span data-line="438">    <span class="k">def</span><span class="w"> </span><span class="nf">continue_from_environ</span><span class="p">(</span>
 </span><span data-line="439">        <span class="bp">cls</span><span class="p">,</span>
 </span><span data-line="440">        <span class="n">environ</span><span class="p">,</span>  <span class="c1"># type: Mapping[str, str]</span>
 </span><span data-line="441">        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>  <span class="c1"># type: Any</span>
@@ -578,7 +578,7 @@ data-aria-dark="Switch to auto color mode">
 <div class="viewcode-block" id="Span.continue_from_headers">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.continue_from_headers">[docs]</a>
 </span><span data-line="463">    <span class="nd">@classmethod</span>
-</span><span data-line="464">    <span class="k">def</span> <span class="nf">continue_from_headers</span><span class="p">(</span>
+</span><span data-line="464">    <span class="k">def</span><span class="w"> </span><span class="nf">continue_from_headers</span><span class="p">(</span>
 </span><span data-line="465">        <span class="bp">cls</span><span class="p">,</span>
 </span><span data-line="466">        <span class="n">headers</span><span class="p">,</span>  <span class="c1"># type: Mapping[str, str]</span>
 </span><span data-line="467">        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>  <span class="c1"># type: Any</span>
@@ -622,7 +622,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="504">
 <div class="viewcode-block" id="Span.iter_headers">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.iter_headers">[docs]</a>
-</span><span data-line="505">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="505">    <span class="k">def</span><span class="w"> </span><span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="506">        <span class="c1"># type: () -&gt; Iterator[Tuple[str, str]]</span>
 </span><span data-line="507"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="508"><span class="sd">        Creates a generator which returns the span&#39;s ``sentry-trace`` and ``baggage`` headers.</span>
@@ -646,7 +646,7 @@ data-aria-dark="Switch to auto color mode">
 <div class="viewcode-block" id="Span.from_traceparent">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.from_traceparent">[docs]</a>
 </span><span data-line="525">    <span class="nd">@classmethod</span>
-</span><span data-line="526">    <span class="k">def</span> <span class="nf">from_traceparent</span><span class="p">(</span>
+</span><span data-line="526">    <span class="k">def</span><span class="w"> </span><span class="nf">from_traceparent</span><span class="p">(</span>
 </span><span data-line="527">        <span class="bp">cls</span><span class="p">,</span>
 </span><span data-line="528">        <span class="n">traceparent</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
 </span><span data-line="529">        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>  <span class="c1"># type: Any</span>
@@ -671,7 +671,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="548">        <span class="p">)</span></div>
 
 </span><span data-line="549">
-</span><span data-line="550">    <span class="k">def</span> <span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="550">    <span class="k">def</span><span class="w"> </span><span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="551">        <span class="c1"># type: () -&gt; str</span>
 </span><span data-line="552">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
 </span><span data-line="553">            <span class="n">sampled</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
@@ -688,7 +688,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="564">
 <div class="viewcode-block" id="Span.to_baggage">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.to_baggage">[docs]</a>
-</span><span data-line="565">    <span class="k">def</span> <span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="565">    <span class="k">def</span><span class="w"> </span><span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="566">        <span class="c1"># type: () -&gt; Optional[Baggage]</span>
 </span><span data-line="567"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`</span>
 </span><span data-line="568"><span class="sd">        associated with this ``Span``, if any. (Taken from the root of the span tree.)</span>
@@ -698,23 +698,23 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="572">        <span class="k">return</span> <span class="kc">None</span></div>
 
 </span><span data-line="573">
-</span><span data-line="574">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="574">    <span class="k">def</span><span class="w"> </span><span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="575">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span data-line="576">        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 </span><span data-line="577">
-</span><span data-line="578">    <span class="k">def</span> <span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="578">    <span class="k">def</span><span class="w"> </span><span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="579">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span data-line="580">        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 </span><span data-line="581">
-</span><span data-line="582">    <span class="k">def</span> <span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="582">    <span class="k">def</span><span class="w"> </span><span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="583">        <span class="c1"># type: (str) -&gt; None</span>
 </span><span data-line="584">        <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">value</span>
 </span><span data-line="585">
-</span><span data-line="586">    <span class="k">def</span> <span class="nf">set_measurement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+</span><span data-line="586">    <span class="k">def</span><span class="w"> </span><span class="nf">set_measurement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
 </span><span data-line="587">        <span class="c1"># type: (str, float, MeasurementUnit) -&gt; None</span>
 </span><span data-line="588">        <span class="bp">self</span><span class="o">.</span><span class="n">_measurements</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span> <span class="s2">&quot;unit&quot;</span><span class="p">:</span> <span class="n">unit</span><span class="p">}</span>
 </span><span data-line="589">
-</span><span data-line="590">    <span class="k">def</span> <span class="nf">set_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">,</span> <span class="n">thread_name</span><span class="p">):</span>
+</span><span data-line="590">    <span class="k">def</span><span class="w"> </span><span class="nf">set_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">,</span> <span class="n">thread_name</span><span class="p">):</span>
 </span><span data-line="591">        <span class="c1"># type: (Optional[int], Optional[str]) -&gt; None</span>
 </span><span data-line="592">
 </span><span data-line="593">        <span class="k">if</span> <span class="n">thread_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -723,12 +723,12 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="596">            <span class="k">if</span> <span class="n">thread_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="597">                <span class="bp">self</span><span class="o">.</span><span class="n">set_data</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">THREAD_NAME</span><span class="p">,</span> <span class="n">thread_name</span><span class="p">)</span>
 </span><span data-line="598">
-</span><span data-line="599">    <span class="k">def</span> <span class="nf">set_profiler_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profiler_id</span><span class="p">):</span>
+</span><span data-line="599">    <span class="k">def</span><span class="w"> </span><span class="nf">set_profiler_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profiler_id</span><span class="p">):</span>
 </span><span data-line="600">        <span class="c1"># type: (Optional[str]) -&gt; None</span>
 </span><span data-line="601">        <span class="k">if</span> <span class="n">profiler_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="602">            <span class="bp">self</span><span class="o">.</span><span class="n">set_data</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">PROFILER_ID</span><span class="p">,</span> <span class="n">profiler_id</span><span class="p">)</span>
 </span><span data-line="603">
-</span><span data-line="604">    <span class="k">def</span> <span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
+</span><span data-line="604">    <span class="k">def</span><span class="w"> </span><span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
 </span><span data-line="605">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="606">        <span class="bp">self</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span>
 </span><span data-line="607">            <span class="s2">&quot;http.status_code&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">http_status</span><span class="p">)</span>
@@ -736,13 +736,13 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="609">        <span class="bp">self</span><span class="o">.</span><span class="n">set_data</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">HTTP_STATUS_CODE</span><span class="p">,</span> <span class="n">http_status</span><span class="p">)</span>
 </span><span data-line="610">        <span class="bp">self</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="n">get_span_status_from_http_code</span><span class="p">(</span><span class="n">http_status</span><span class="p">))</span>
 </span><span data-line="611">
-</span><span data-line="612">    <span class="k">def</span> <span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="612">    <span class="k">def</span><span class="w"> </span><span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="613">        <span class="c1"># type: () -&gt; bool</span>
 </span><span data-line="614">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">&quot;ok&quot;</span>
 </span><span data-line="615">
 <div class="viewcode-block" id="Span.finish">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.finish">[docs]</a>
-</span><span data-line="616">    <span class="k">def</span> <span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end_timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span data-line="616">    <span class="k">def</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end_timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span data-line="617">        <span class="c1"># type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -&gt; Optional[str]</span>
 </span><span data-line="618"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="619"><span class="sd">        Sets the end timestamp of the span.</span>
@@ -783,7 +783,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="653">
 <div class="viewcode-block" id="Span.to_json">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.to_json">[docs]</a>
-</span><span data-line="654">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="654">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="655">        <span class="c1"># type: () -&gt; Dict[str, Any]</span>
 </span><span data-line="656"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a JSON-compatible representation of the span.&quot;&quot;&quot;</span>
 </span><span data-line="657">
@@ -821,7 +821,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="689">        <span class="k">return</span> <span class="n">rv</span></div>
 
 </span><span data-line="690">
-</span><span data-line="691">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="691">    <span class="k">def</span><span class="w"> </span><span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="692">        <span class="c1"># type: () -&gt; Any</span>
 </span><span data-line="693">        <span class="n">rv</span> <span class="o">=</span> <span class="p">{</span>
 </span><span data-line="694">            <span class="s2">&quot;trace_id&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span>
@@ -854,7 +854,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="721">
 </span><span data-line="722">        <span class="k">return</span> <span class="n">rv</span>
 </span><span data-line="723">
-</span><span data-line="724">    <span class="k">def</span> <span class="nf">get_profile_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="724">    <span class="k">def</span><span class="w"> </span><span class="nf">get_profile_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="725">        <span class="c1"># type: () -&gt; Optional[ProfileContext]</span>
 </span><span data-line="726">        <span class="n">profiler_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">PROFILER_ID</span><span class="p">)</span>
 </span><span data-line="727">        <span class="k">if</span> <span class="n">profiler_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -864,7 +864,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="731">            <span class="s2">&quot;profiler_id&quot;</span><span class="p">:</span> <span class="n">profiler_id</span><span class="p">,</span>
 </span><span data-line="732">        <span class="p">}</span>
 </span><span data-line="733">
-</span><span data-line="734">    <span class="k">def</span> <span class="nf">update_active_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="734">    <span class="k">def</span><span class="w"> </span><span class="nf">update_active_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="735">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="736">        <span class="n">thread_id</span><span class="p">,</span> <span class="n">thread_name</span> <span class="o">=</span> <span class="n">get_current_thread_meta</span><span class="p">()</span>
 </span><span data-line="737">        <span class="bp">self</span><span class="o">.</span><span class="n">set_thread</span><span class="p">(</span><span class="n">thread_id</span><span class="p">,</span> <span class="n">thread_name</span><span class="p">)</span></div>
@@ -873,7 +873,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="739">
 <div class="viewcode-block" id="Transaction">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Transaction">[docs]</a>
-</span><span data-line="740"><span class="k">class</span> <span class="nc">Transaction</span><span class="p">(</span><span class="n">Span</span><span class="p">):</span>
+</span><span data-line="740"><span class="k">class</span><span class="w"> </span><span class="nc">Transaction</span><span class="p">(</span><span class="n">Span</span><span class="p">):</span>
 </span><span data-line="741"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The Transaction is the root element that holds all the spans</span>
 </span><span data-line="742"><span class="sd">    for Sentry performance instrumentation.</span>
 </span><span data-line="743">
@@ -903,7 +903,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="767">        <span class="s2">&quot;_baggage&quot;</span><span class="p">,</span>
 </span><span data-line="768">    <span class="p">)</span>
 </span><span data-line="769">
-</span><span data-line="770">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>  <span class="c1"># type: ignore[misc]</span>
+</span><span data-line="770">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>  <span class="c1"># type: ignore[misc]</span>
 </span><span data-line="771">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="772">        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span data-line="773">        <span class="n">parent_sampled</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
@@ -926,7 +926,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="790">        <span class="p">)</span>  <span class="c1"># type: Optional[sentry_sdk.profiler.transaction_profiler.Profile]</span>
 </span><span data-line="791">        <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span> <span class="o">=</span> <span class="n">baggage</span>
 </span><span data-line="792">
-</span><span data-line="793">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="793">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="794">        <span class="c1"># type: () -&gt; str</span>
 </span><span data-line="795">        <span class="k">return</span> <span class="p">(</span>
 </span><span data-line="796">            <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2">(name=</span><span class="si">%r</span><span class="s2">, op=</span><span class="si">%r</span><span class="s2">, trace_id=</span><span class="si">%r</span><span class="s2">, span_id=</span><span class="si">%r</span><span class="s2">, parent_span_id=</span><span class="si">%r</span><span class="s2">, sampled=</span><span class="si">%r</span><span class="s2">, source=</span><span class="si">%r</span><span class="s2">, origin=</span><span class="si">%r</span><span class="s2">)&gt;&quot;</span>
@@ -943,7 +943,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="807">            <span class="p">)</span>
 </span><span data-line="808">        <span class="p">)</span>
 </span><span data-line="809">
-</span><span data-line="810">    <span class="k">def</span> <span class="nf">_possibly_started</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="810">    <span class="k">def</span><span class="w"> </span><span class="nf">_possibly_started</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="811">        <span class="c1"># type: () -&gt; bool</span>
 </span><span data-line="812"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns whether the transaction might have been started.</span>
 </span><span data-line="813">
@@ -955,7 +955,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="819">        <span class="c1"># We must explicitly check self.sampled is False since self.sampled can be None</span>
 </span><span data-line="820">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span_recorder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">False</span>
 </span><span data-line="821">
-</span><span data-line="822">    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="822">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="823">        <span class="c1"># type: () -&gt; Transaction</span>
 </span><span data-line="824">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_possibly_started</span><span class="p">():</span>
 </span><span data-line="825">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
@@ -971,7 +971,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="835">
 </span><span data-line="836">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="837">
-</span><span data-line="838">    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+</span><span data-line="838">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
 </span><span data-line="839">        <span class="c1"># type: (Optional[Any], Optional[Any], Optional[Any]) -&gt; None</span>
 </span><span data-line="840">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="841">            <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">)</span>
@@ -979,7 +979,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="843">        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">)</span>
 </span><span data-line="844">
 </span><span data-line="845">    <span class="nd">@property</span>
-</span><span data-line="846">    <span class="k">def</span> <span class="nf">containing_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="846">    <span class="k">def</span><span class="w"> </span><span class="nf">containing_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="847">        <span class="c1"># type: () -&gt; Transaction</span>
 </span><span data-line="848"><span class="w">        </span><span class="sd">&quot;&quot;&quot;The root element of the span tree.</span>
 </span><span data-line="849"><span class="sd">        In the case of a transaction it is the transaction itself.</span>
@@ -990,7 +990,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="854">        <span class="c1"># reference.</span>
 </span><span data-line="855">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="856">
-</span><span data-line="857">    <span class="k">def</span> <span class="nf">_get_scope_from_finish_args</span><span class="p">(</span>
+</span><span data-line="857">    <span class="k">def</span><span class="w"> </span><span class="nf">_get_scope_from_finish_args</span><span class="p">(</span>
 </span><span data-line="858">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="859">        <span class="n">scope_arg</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]</span>
 </span><span data-line="860">        <span class="n">hub_arg</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]</span>
@@ -1025,7 +1025,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="889">
 <div class="viewcode-block" id="Transaction.finish">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Transaction.finish">[docs]</a>
-</span><span data-line="890">    <span class="k">def</span> <span class="nf">finish</span><span class="p">(</span>
+</span><span data-line="890">    <span class="k">def</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span>
 </span><span data-line="891">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="892">        <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[sentry_sdk.Scope]</span>
 </span><span data-line="893">        <span class="n">end_timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[float, datetime]]</span>
@@ -1150,13 +1150,13 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1012">        <span class="k">return</span> <span class="n">scope</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span></div>
 
 </span><span data-line="1013">
-</span><span data-line="1014">    <span class="k">def</span> <span class="nf">set_measurement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+</span><span data-line="1014">    <span class="k">def</span><span class="w"> </span><span class="nf">set_measurement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
 </span><span data-line="1015">        <span class="c1"># type: (str, float, MeasurementUnit) -&gt; None</span>
 </span><span data-line="1016">        <span class="bp">self</span><span class="o">.</span><span class="n">_measurements</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span> <span class="s2">&quot;unit&quot;</span><span class="p">:</span> <span class="n">unit</span><span class="p">}</span>
 </span><span data-line="1017">
 <div class="viewcode-block" id="Transaction.set_context">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Transaction.set_context">[docs]</a>
-</span><span data-line="1018">    <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="1018">    <span class="k">def</span><span class="w"> </span><span class="nf">set_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="1019">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span data-line="1020"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets a context. Transactions can have multiple contexts</span>
 </span><span data-line="1021"><span class="sd">        and they should follow the format described in the &quot;Contexts Interface&quot;</span>
@@ -1170,7 +1170,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1028">
 <div class="viewcode-block" id="Transaction.set_http_status">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Transaction.set_http_status">[docs]</a>
-</span><span data-line="1029">    <span class="k">def</span> <span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
+</span><span data-line="1029">    <span class="k">def</span><span class="w"> </span><span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
 </span><span data-line="1030">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="1031"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets the status of the Transaction according to the given HTTP status.</span>
 </span><span data-line="1032">
@@ -1181,7 +1181,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1036">
 <div class="viewcode-block" id="Transaction.to_json">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Transaction.to_json">[docs]</a>
-</span><span data-line="1037">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1037">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1038">        <span class="c1"># type: () -&gt; Dict[str, Any]</span>
 </span><span data-line="1039"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a JSON-compatible representation of the transaction.&quot;&quot;&quot;</span>
 </span><span data-line="1040">        <span class="n">rv</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
@@ -1193,7 +1193,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1046">        <span class="k">return</span> <span class="n">rv</span></div>
 
 </span><span data-line="1047">
-</span><span data-line="1048">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1048">    <span class="k">def</span><span class="w"> </span><span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1049">        <span class="c1"># type: () -&gt; Any</span>
 </span><span data-line="1050">        <span class="n">trace_context</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_trace_context</span><span class="p">()</span>
 </span><span data-line="1051">
@@ -1204,7 +1204,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1056">
 <div class="viewcode-block" id="Transaction.get_baggage">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Transaction.get_baggage">[docs]</a>
-</span><span data-line="1057">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1057">    <span class="k">def</span><span class="w"> </span><span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1058">        <span class="c1"># type: () -&gt; Baggage</span>
 </span><span data-line="1059"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`</span>
 </span><span data-line="1060"><span class="sd">        associated with the Transaction.</span>
@@ -1218,7 +1218,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1068">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span></div>
 
 </span><span data-line="1069">
-</span><span data-line="1070">    <span class="k">def</span> <span class="nf">_set_initial_sampling_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">):</span>
+</span><span data-line="1070">    <span class="k">def</span><span class="w"> </span><span class="nf">_set_initial_sampling_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">):</span>
 </span><span data-line="1071">        <span class="c1"># type: (SamplingContext) -&gt; None</span>
 </span><span data-line="1072"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="1073"><span class="sd">        Sets the transaction&#39;s sampling decision, according to the following</span>
@@ -1324,69 +1324,69 @@ data-aria-dark="Switch to auto color mode">
 
 </span><span data-line="1173">
 </span><span data-line="1174">
-</span><span data-line="1175"><span class="k">class</span> <span class="nc">NoOpSpan</span><span class="p">(</span><span class="n">Span</span><span class="p">):</span>
-</span><span data-line="1176">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1175"><span class="k">class</span><span class="w"> </span><span class="nc">NoOpSpan</span><span class="p">(</span><span class="n">Span</span><span class="p">):</span>
+</span><span data-line="1176">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1177">        <span class="c1"># type: () -&gt; str</span>
 </span><span data-line="1178">        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
 </span><span data-line="1179">
 </span><span data-line="1180">    <span class="nd">@property</span>
-</span><span data-line="1181">    <span class="k">def</span> <span class="nf">containing_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1181">    <span class="k">def</span><span class="w"> </span><span class="nf">containing_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1182">        <span class="c1"># type: () -&gt; Optional[Transaction]</span>
 </span><span data-line="1183">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="1184">
-</span><span data-line="1185">    <span class="k">def</span> <span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="1185">    <span class="k">def</span><span class="w"> </span><span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="1186">        <span class="c1"># type: (str, **Any) -&gt; NoOpSpan</span>
 </span><span data-line="1187">        <span class="k">return</span> <span class="n">NoOpSpan</span><span class="p">()</span>
 </span><span data-line="1188">
-</span><span data-line="1189">    <span class="k">def</span> <span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1189">    <span class="k">def</span><span class="w"> </span><span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1190">        <span class="c1"># type: () -&gt; str</span>
 </span><span data-line="1191">        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
 </span><span data-line="1192">
-</span><span data-line="1193">    <span class="k">def</span> <span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1193">    <span class="k">def</span><span class="w"> </span><span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1194">        <span class="c1"># type: () -&gt; Optional[Baggage]</span>
 </span><span data-line="1195">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="1196">
-</span><span data-line="1197">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1197">    <span class="k">def</span><span class="w"> </span><span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1198">        <span class="c1"># type: () -&gt; Optional[Baggage]</span>
 </span><span data-line="1199">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="1200">
-</span><span data-line="1201">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1201">    <span class="k">def</span><span class="w"> </span><span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1202">        <span class="c1"># type: () -&gt; Iterator[Tuple[str, str]]</span>
 </span><span data-line="1203">        <span class="k">return</span> <span class="nb">iter</span><span class="p">(())</span>
 </span><span data-line="1204">
-</span><span data-line="1205">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="1205">    <span class="k">def</span><span class="w"> </span><span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="1206">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span data-line="1207">        <span class="k">pass</span>
 </span><span data-line="1208">
-</span><span data-line="1209">    <span class="k">def</span> <span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="1209">    <span class="k">def</span><span class="w"> </span><span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="1210">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span data-line="1211">        <span class="k">pass</span>
 </span><span data-line="1212">
-</span><span data-line="1213">    <span class="k">def</span> <span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="1213">    <span class="k">def</span><span class="w"> </span><span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="1214">        <span class="c1"># type: (str) -&gt; None</span>
 </span><span data-line="1215">        <span class="k">pass</span>
 </span><span data-line="1216">
-</span><span data-line="1217">    <span class="k">def</span> <span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
+</span><span data-line="1217">    <span class="k">def</span><span class="w"> </span><span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
 </span><span data-line="1218">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="1219">        <span class="k">pass</span>
 </span><span data-line="1220">
-</span><span data-line="1221">    <span class="k">def</span> <span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1221">    <span class="k">def</span><span class="w"> </span><span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1222">        <span class="c1"># type: () -&gt; bool</span>
 </span><span data-line="1223">        <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="1224">
-</span><span data-line="1225">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1225">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1226">        <span class="c1"># type: () -&gt; Dict[str, Any]</span>
 </span><span data-line="1227">        <span class="k">return</span> <span class="p">{}</span>
 </span><span data-line="1228">
-</span><span data-line="1229">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1229">    <span class="k">def</span><span class="w"> </span><span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1230">        <span class="c1"># type: () -&gt; Any</span>
 </span><span data-line="1231">        <span class="k">return</span> <span class="p">{}</span>
 </span><span data-line="1232">
-</span><span data-line="1233">    <span class="k">def</span> <span class="nf">get_profile_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="1233">    <span class="k">def</span><span class="w"> </span><span class="nf">get_profile_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="1234">        <span class="c1"># type: () -&gt; Any</span>
 </span><span data-line="1235">        <span class="k">return</span> <span class="p">{}</span>
 </span><span data-line="1236">
-</span><span data-line="1237">    <span class="k">def</span> <span class="nf">finish</span><span class="p">(</span>
+</span><span data-line="1237">    <span class="k">def</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span>
 </span><span data-line="1238">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="1239">        <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[sentry_sdk.Scope]</span>
 </span><span data-line="1240">        <span class="n">end_timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[float, datetime]]</span>
@@ -1399,19 +1399,19 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1247"><span class="sd">        &quot;&quot;&quot;</span>
 </span><span data-line="1248">        <span class="k">pass</span>
 </span><span data-line="1249">
-</span><span data-line="1250">    <span class="k">def</span> <span class="nf">set_measurement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+</span><span data-line="1250">    <span class="k">def</span><span class="w"> </span><span class="nf">set_measurement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
 </span><span data-line="1251">        <span class="c1"># type: (str, float, MeasurementUnit) -&gt; None</span>
 </span><span data-line="1252">        <span class="k">pass</span>
 </span><span data-line="1253">
-</span><span data-line="1254">    <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="1254">    <span class="k">def</span><span class="w"> </span><span class="nf">set_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="1255">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span data-line="1256">        <span class="k">pass</span>
 </span><span data-line="1257">
-</span><span data-line="1258">    <span class="k">def</span> <span class="nf">init_span_recorder</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maxlen</span><span class="p">):</span>
+</span><span data-line="1258">    <span class="k">def</span><span class="w"> </span><span class="nf">init_span_recorder</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maxlen</span><span class="p">):</span>
 </span><span data-line="1259">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="1260">        <span class="k">pass</span>
 </span><span data-line="1261">
-</span><span data-line="1262">    <span class="k">def</span> <span class="nf">_set_initial_sampling_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">):</span>
+</span><span data-line="1262">    <span class="k">def</span><span class="w"> </span><span class="nf">_set_initial_sampling_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">):</span>
 </span><span data-line="1263">        <span class="c1"># type: (SamplingContext) -&gt; None</span>
 </span><span data-line="1264">        <span class="k">pass</span>
 </span><span data-line="1265">
@@ -1419,17 +1419,17 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1267"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
 </span><span data-line="1268">
 </span><span data-line="1269">    <span class="nd">@overload</span>
-</span><span data-line="1270">    <span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span data-line="1270">    <span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span data-line="1271">        <span class="c1"># type: (None) -&gt; Callable[[Callable[P, R]], Callable[P, R]]</span>
 </span><span data-line="1272">        <span class="k">pass</span>
 </span><span data-line="1273">
 </span><span data-line="1274">    <span class="nd">@overload</span>
-</span><span data-line="1275">    <span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+</span><span data-line="1275">    <span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
 </span><span data-line="1276">        <span class="c1"># type: (Callable[P, R]) -&gt; Callable[P, R]</span>
 </span><span data-line="1277">        <span class="k">pass</span>
 </span><span data-line="1278">
 </span><span data-line="1279">
-</span><span data-line="1280"><span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span data-line="1280"><span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span data-line="1281">    <span class="c1"># type: (Optional[Callable[P, R]]) -&gt; Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]</span>
 </span><span data-line="1282"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="1283"><span class="sd">    Decorator to start a child span under the existing current transaction.</span>
@@ -1448,7 +1448,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1296"><span class="sd">        async def my_async_function():</span>
 </span><span data-line="1297"><span class="sd">            ...</span>
 </span><span data-line="1298"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="1299">    <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
+</span><span data-line="1299">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.tracing_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">start_child_span_decorator</span>
 </span><span data-line="1300">
 </span><span data-line="1301">    <span class="c1"># This patterns allows usage of both @sentry_traced and @sentry_traced(...)</span>
 </span><span data-line="1302">    <span class="c1"># See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278</span>
@@ -1460,7 +1460,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1308">
 </span><span data-line="1309"><span class="c1"># Circular imports</span>
 </span><span data-line="1310">
-</span><span data-line="1311"><span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="1311"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.tracing_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="1312">    <span class="n">Baggage</span><span class="p">,</span>
 </span><span data-line="1313">    <span class="n">EnvironHeaders</span><span class="p">,</span>
 </span><span data-line="1314">    <span class="n">extract_sentrytrace_data</span><span class="p">,</span>
@@ -1471,7 +1471,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1319"><span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
 </span><span data-line="1320">    <span class="c1"># The code in this file which uses `LocalAggregator` is only called from the deprecated `metrics` module.</span>
 </span><span data-line="1321">    <span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">)</span>
-</span><span data-line="1322">    <span class="kn">from</span> <span class="nn">sentry_sdk.metrics</span> <span class="kn">import</span> <span class="n">LocalAggregator</span>
+</span><span data-line="1322">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocalAggregator</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -1485,7 +1485,7 @@ data-aria-dark="Switch to auto color mode">
 <footer class="sy-foot">
   <div class="sy-foot-inner sy-container mx-auto">
     <div class="sy-foot-reserved md:flex justify-between items-center">
-      <div class="sy-foot-copyright"><p>2019-2024, Sentry Team and Contributors</p>
+      <div class="sy-foot-copyright"><p>2019-2025, Sentry Team and Contributors</p>
   
   <p>
     Made with
@@ -1502,8 +1502,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=bd8f1056"></script>
+      <script src="../../_static/documentation_options.js?v=50d84e18"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=e2e99575"></script></body>
+      <script src="../../_static/shibuya.js?v=55e26b35"></script></body>
 </html>

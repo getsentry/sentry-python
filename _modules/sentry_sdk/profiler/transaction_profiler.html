@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.profiler.transaction_profiler - sentry-python 2.19.2 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.profiler.transaction_profiler - sentry-python 2.20.0 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/shibuya.css?v=83eaa723" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/shibuya.css?v=10d1008b" />
     <link media="print" rel="stylesheet" type="text/css" href="../../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -132,25 +132,25 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="25"><span class="sd">SOFTWARE.</span>
 </span><span data-line="26"><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="27">
-</span><span data-line="28"><span class="kn">import</span> <span class="nn">atexit</span>
-</span><span data-line="29"><span class="kn">import</span> <span class="nn">os</span>
-</span><span data-line="30"><span class="kn">import</span> <span class="nn">platform</span>
-</span><span data-line="31"><span class="kn">import</span> <span class="nn">random</span>
-</span><span data-line="32"><span class="kn">import</span> <span class="nn">sys</span>
-</span><span data-line="33"><span class="kn">import</span> <span class="nn">threading</span>
-</span><span data-line="34"><span class="kn">import</span> <span class="nn">time</span>
-</span><span data-line="35"><span class="kn">import</span> <span class="nn">uuid</span>
-</span><span data-line="36"><span class="kn">import</span> <span class="nn">warnings</span>
-</span><span data-line="37"><span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
-</span><span data-line="38"><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">deque</span>
+</span><span data-line="28"><span class="kn">import</span><span class="w"> </span><span class="nn">atexit</span>
+</span><span data-line="29"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+</span><span data-line="30"><span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+</span><span data-line="31"><span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
+</span><span data-line="32"><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+</span><span data-line="33"><span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+</span><span data-line="34"><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span data-line="35"><span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+</span><span data-line="36"><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+</span><span data-line="37"><span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+</span><span data-line="38"><span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">deque</span>
 </span><span data-line="39">
-</span><span data-line="40"><span class="kn">import</span> <span class="nn">sentry_sdk</span>
-</span><span data-line="41"><span class="kn">from</span> <span class="nn">sentry_sdk._lru_cache</span> <span class="kn">import</span> <span class="n">LRUCache</span>
-</span><span data-line="42"><span class="kn">from</span> <span class="nn">sentry_sdk.profiler.utils</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="40"><span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
+</span><span data-line="41"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._lru_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">LRUCache</span>
+</span><span data-line="42"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.profiler.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="43">    <span class="n">DEFAULT_SAMPLING_FREQUENCY</span><span class="p">,</span>
 </span><span data-line="44">    <span class="n">extract_stack</span><span class="p">,</span>
 </span><span data-line="45"><span class="p">)</span>
-</span><span data-line="46"><span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="46"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="47">    <span class="n">capture_internal_exception</span><span class="p">,</span>
 </span><span data-line="48">    <span class="n">get_current_thread_meta</span><span class="p">,</span>
 </span><span data-line="49">    <span class="n">is_gevent</span><span class="p">,</span>
@@ -160,20 +160,20 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="53">    <span class="n">set_in_app_in_frames</span><span class="p">,</span>
 </span><span data-line="54"><span class="p">)</span>
 </span><span data-line="55">
-</span><span data-line="56"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="56"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span data-line="57">
 </span><span data-line="58"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="59">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
-</span><span data-line="60">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
-</span><span data-line="61">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Deque</span>
-</span><span data-line="62">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
-</span><span data-line="63">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
-</span><span data-line="64">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
-</span><span data-line="65">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
-</span><span data-line="66">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
-</span><span data-line="67">    <span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">TypedDict</span>
+</span><span data-line="59">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+</span><span data-line="60">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+</span><span data-line="61">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Deque</span>
+</span><span data-line="62">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
+</span><span data-line="63">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+</span><span data-line="64">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+</span><span data-line="65">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Set</span>
+</span><span data-line="66">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span>
+</span><span data-line="67">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypedDict</span>
 </span><span data-line="68">
-</span><span data-line="69">    <span class="kn">from</span> <span class="nn">sentry_sdk.profiler.utils</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="69">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.profiler.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="70">        <span class="n">ProcessedStack</span><span class="p">,</span>
 </span><span data-line="71">        <span class="n">ProcessedFrame</span><span class="p">,</span>
 </span><span data-line="72">        <span class="n">ProcessedThreadMetadata</span><span class="p">,</span>
@@ -182,7 +182,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="75">        <span class="n">ThreadId</span><span class="p">,</span>
 </span><span data-line="76">        <span class="n">ExtractedSample</span><span class="p">,</span>
 </span><span data-line="77">    <span class="p">)</span>
-</span><span data-line="78">    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">SamplingContext</span><span class="p">,</span> <span class="n">ProfilerMode</span>
+</span><span data-line="78">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">SamplingContext</span><span class="p">,</span> <span class="n">ProfilerMode</span>
 </span><span data-line="79">
 </span><span data-line="80">    <span class="n">ProcessedSample</span> <span class="o">=</span> <span class="n">TypedDict</span><span class="p">(</span>
 </span><span data-line="81">        <span class="s2">&quot;ProcessedSample&quot;</span><span class="p">,</span>
@@ -205,8 +205,8 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="98">
 </span><span data-line="99">
 </span><span data-line="100"><span class="k">try</span><span class="p">:</span>
-</span><span data-line="101">    <span class="kn">from</span> <span class="nn">gevent.monkey</span> <span class="kn">import</span> <span class="n">get_original</span>
-</span><span data-line="102">    <span class="kn">from</span> <span class="nn">gevent.threadpool</span> <span class="kn">import</span> <span class="n">ThreadPool</span> <span class="k">as</span> <span class="n">_ThreadPool</span>
+</span><span data-line="101">    <span class="kn">from</span><span class="w"> </span><span class="nn">gevent.monkey</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_original</span>
+</span><span data-line="102">    <span class="kn">from</span><span class="w"> </span><span class="nn">gevent.threadpool</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPool</span> <span class="k">as</span> <span class="n">_ThreadPool</span>
 </span><span data-line="103">
 </span><span data-line="104">    <span class="n">ThreadPool</span> <span class="o">=</span> <span class="n">_ThreadPool</span>  <span class="c1"># type: Optional[Type[_ThreadPool]]</span>
 </span><span data-line="105">    <span class="n">thread_sleep</span> <span class="o">=</span> <span class="n">get_original</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="s2">&quot;sleep&quot;</span><span class="p">)</span>
@@ -224,7 +224,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="117"><span class="n">PROFILE_MINIMUM_SAMPLES</span> <span class="o">=</span> <span class="mi">2</span>
 </span><span data-line="118">
 </span><span data-line="119">
-</span><span data-line="120"><span class="k">def</span> <span class="nf">has_profiling_enabled</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
+</span><span data-line="120"><span class="k">def</span><span class="w"> </span><span class="nf">has_profiling_enabled</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
 </span><span data-line="121">    <span class="c1"># type: (Dict[str, Any]) -&gt; bool</span>
 </span><span data-line="122">    <span class="n">profiles_sampler</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;profiles_sampler&quot;</span><span class="p">]</span>
 </span><span data-line="123">    <span class="k">if</span> <span class="n">profiles_sampler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -247,7 +247,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="140">    <span class="k">return</span> <span class="kc">False</span>
 </span><span data-line="141">
 </span><span data-line="142">
-</span><span data-line="143"><span class="k">def</span> <span class="nf">setup_profiler</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
+</span><span data-line="143"><span class="k">def</span><span class="w"> </span><span class="nf">setup_profiler</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
 </span><span data-line="144">    <span class="c1"># type: (Dict[str, Any]) -&gt; bool</span>
 </span><span data-line="145">    <span class="k">global</span> <span class="n">_scheduler</span>
 </span><span data-line="146">
@@ -298,7 +298,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="191">    <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="192">
 </span><span data-line="193">
-</span><span data-line="194"><span class="k">def</span> <span class="nf">teardown_profiler</span><span class="p">():</span>
+</span><span data-line="194"><span class="k">def</span><span class="w"> </span><span class="nf">teardown_profiler</span><span class="p">():</span>
 </span><span data-line="195">    <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="196">
 </span><span data-line="197">    <span class="k">global</span> <span class="n">_scheduler</span>
@@ -314,8 +314,8 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="207">
 <div class="viewcode-block" id="Profile">
 <a class="viewcode-back" href="../../../apidocs.html#sentry_sdk.profiler.transaction_profiler.Profile">[docs]</a>
-</span><span data-line="208"><span class="k">class</span> <span class="nc">Profile</span><span class="p">:</span>
-</span><span data-line="209">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="208"><span class="k">class</span><span class="w"> </span><span class="nc">Profile</span><span class="p">:</span>
+</span><span data-line="209">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span data-line="210">        <span class="bp">self</span><span class="p">,</span>
 </span><span data-line="211">        <span class="n">sampled</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
 </span><span data-line="212">        <span class="n">start_ns</span><span class="p">,</span>  <span class="c1"># type: int</span>
@@ -360,7 +360,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="251">                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
 </span><span data-line="252">            <span class="p">)</span>
 </span><span data-line="253">
-</span><span data-line="254">    <span class="k">def</span> <span class="nf">update_active_thread_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="254">    <span class="k">def</span><span class="w"> </span><span class="nf">update_active_thread_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="255">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="256">        <span class="bp">self</span><span class="o">.</span><span class="n">active_thread_id</span> <span class="o">=</span> <span class="n">get_current_thread_meta</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
 </span><span data-line="257">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
@@ -369,7 +369,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="260">            <span class="p">)</span>
 </span><span data-line="261">        <span class="p">)</span>
 </span><span data-line="262">
-</span><span data-line="263">    <span class="k">def</span> <span class="nf">_set_initial_sampling_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">):</span>
+</span><span data-line="263">    <span class="k">def</span><span class="w"> </span><span class="nf">_set_initial_sampling_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">):</span>
 </span><span data-line="264">        <span class="c1"># type: (SamplingContext) -&gt; None</span>
 </span><span data-line="265"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="266"><span class="sd">        Sets the profile&#39;s sampling decision according to the following</span>
@@ -442,7 +442,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="333">                <span class="p">)</span>
 </span><span data-line="334">            <span class="p">)</span>
 </span><span data-line="335">
-</span><span data-line="336">    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="336">    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="337">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="338">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
 </span><span data-line="339">            <span class="k">return</span>
@@ -454,7 +454,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="345">            <span class="bp">self</span><span class="o">.</span><span class="n">start_ns</span> <span class="o">=</span> <span class="n">nanosecond_time</span><span class="p">()</span>
 </span><span data-line="346">        <span class="bp">self</span><span class="o">.</span><span class="n">scheduler</span><span class="o">.</span><span class="n">start_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 </span><span data-line="347">
-</span><span data-line="348">    <span class="k">def</span> <span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="348">    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="349">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="350">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
 </span><span data-line="351">            <span class="k">return</span>
@@ -464,7 +464,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="355">        <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="356">        <span class="bp">self</span><span class="o">.</span><span class="n">stop_ns</span> <span class="o">=</span> <span class="n">nanosecond_time</span><span class="p">()</span>
 </span><span data-line="357">
-</span><span data-line="358">    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="358">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="359">        <span class="c1"># type: () -&gt; Profile</span>
 </span><span data-line="360">        <span class="n">scope</span> <span class="o">=</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span>
 </span><span data-line="361">        <span class="n">old_profile</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">profile</span>
@@ -476,7 +476,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="367">
 </span><span data-line="368">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="369">
-</span><span data-line="370">    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+</span><span data-line="370">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
 </span><span data-line="371">        <span class="c1"># type: (Optional[Any], Optional[Any], Optional[Any]) -&gt; None</span>
 </span><span data-line="372">        <span class="bp">self</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
 </span><span data-line="373">
@@ -485,7 +485,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="376">
 </span><span data-line="377">        <span class="n">scope</span><span class="o">.</span><span class="n">profile</span> <span class="o">=</span> <span class="n">old_profile</span>
 </span><span data-line="378">
-</span><span data-line="379">    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">sample</span><span class="p">):</span>
+</span><span data-line="379">    <span class="k">def</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">sample</span><span class="p">):</span>
 </span><span data-line="380">        <span class="c1"># type: (int, ExtractedSample) -&gt; None</span>
 </span><span data-line="381">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
 </span><span data-line="382">            <span class="k">return</span>
@@ -529,7 +529,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="420">                <span class="c1"># When this happens, we abandon the current sample as it&#39;s bad.</span>
 </span><span data-line="421">                <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
 </span><span data-line="422">
-</span><span data-line="423">    <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="423">    <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="424">        <span class="c1"># type: () -&gt; ProcessedProfile</span>
 </span><span data-line="425">
 </span><span data-line="426">        <span class="c1"># This collects the thread metadata at the end of a profile. Doing it</span>
@@ -549,7 +549,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="440">            <span class="s2">&quot;thread_metadata&quot;</span><span class="p">:</span> <span class="n">thread_metadata</span><span class="p">,</span>
 </span><span data-line="441">        <span class="p">}</span>
 </span><span data-line="442">
-</span><span data-line="443">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_opt</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+</span><span data-line="443">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_opt</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
 </span><span data-line="444">        <span class="c1"># type: (Event, Dict[str, Any]) -&gt; Dict[str, Any]</span>
 </span><span data-line="445">        <span class="n">profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">process</span><span class="p">()</span>
 </span><span data-line="446">
@@ -600,7 +600,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="491">            <span class="p">],</span>
 </span><span data-line="492">        <span class="p">}</span>
 </span><span data-line="493">
-</span><span data-line="494">    <span class="k">def</span> <span class="nf">valid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="494">    <span class="k">def</span><span class="w"> </span><span class="nf">valid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="495">        <span class="c1"># type: () -&gt; bool</span>
 </span><span data-line="496">        <span class="n">client</span> <span class="o">=</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">get_client</span><span class="p">()</span>
 </span><span data-line="497">        <span class="k">if</span> <span class="ow">not</span> <span class="n">client</span><span class="o">.</span><span class="n">is_active</span><span class="p">():</span>
@@ -627,7 +627,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="518">        <span class="k">return</span> <span class="kc">True</span>
 </span><span data-line="519">
 </span><span data-line="520">    <span class="nd">@property</span>
-</span><span data-line="521">    <span class="k">def</span> <span class="nf">hub</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="521">    <span class="k">def</span><span class="w"> </span><span class="nf">hub</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="522">        <span class="c1"># type: () -&gt; Optional[sentry_sdk.Hub]</span>
 </span><span data-line="523">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
 </span><span data-line="524">            <span class="s2">&quot;The `hub` attribute is deprecated. Please do not access it.&quot;</span><span class="p">,</span>
@@ -637,7 +637,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="528">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span>
 </span><span data-line="529">
 </span><span data-line="530">    <span class="nd">@hub</span><span class="o">.</span><span class="n">setter</span>
-</span><span data-line="531">    <span class="k">def</span> <span class="nf">hub</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span data-line="531">    <span class="k">def</span><span class="w"> </span><span class="nf">hub</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span data-line="532">        <span class="c1"># type: (Optional[sentry_sdk.Hub]) -&gt; None</span>
 </span><span data-line="533">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
 </span><span data-line="534">            <span class="s2">&quot;The `hub` attribute is deprecated. Please do not set it.&quot;</span><span class="p">,</span>
@@ -648,10 +648,10 @@ data-aria-dark="Switch to auto color mode">
 
 </span><span data-line="539">
 </span><span data-line="540">
-</span><span data-line="541"><span class="k">class</span> <span class="nc">Scheduler</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+</span><span data-line="541"><span class="k">class</span><span class="w"> </span><span class="nc">Scheduler</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 </span><span data-line="542">    <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>  <span class="c1"># type: ProfilerMode</span>
 </span><span data-line="543">
-</span><span data-line="544">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
+</span><span data-line="544">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
 </span><span data-line="545">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="546">        <span class="bp">self</span><span class="o">.</span><span class="n">interval</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">frequency</span>
 </span><span data-line="547">
@@ -661,26 +661,26 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="551">        <span class="bp">self</span><span class="o">.</span><span class="n">new_profiles</span> <span class="o">=</span> <span class="n">deque</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>  <span class="c1"># type: Deque[Profile]</span>
 </span><span data-line="552">        <span class="bp">self</span><span class="o">.</span><span class="n">active_profiles</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># type: Set[Profile]</span>
 </span><span data-line="553">
-</span><span data-line="554">    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="554">    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="555">        <span class="c1"># type: () -&gt; Scheduler</span>
 </span><span data-line="556">        <span class="bp">self</span><span class="o">.</span><span class="n">setup</span><span class="p">()</span>
 </span><span data-line="557">        <span class="k">return</span> <span class="bp">self</span>
 </span><span data-line="558">
-</span><span data-line="559">    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+</span><span data-line="559">    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
 </span><span data-line="560">        <span class="c1"># type: (Optional[Any], Optional[Any], Optional[Any]) -&gt; None</span>
 </span><span data-line="561">        <span class="bp">self</span><span class="o">.</span><span class="n">teardown</span><span class="p">()</span>
 </span><span data-line="562">
 </span><span data-line="563">    <span class="nd">@abstractmethod</span>
-</span><span data-line="564">    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="564">    <span class="k">def</span><span class="w"> </span><span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="565">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="566">        <span class="k">pass</span>
 </span><span data-line="567">
 </span><span data-line="568">    <span class="nd">@abstractmethod</span>
-</span><span data-line="569">    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="569">    <span class="k">def</span><span class="w"> </span><span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="570">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="571">        <span class="k">pass</span>
 </span><span data-line="572">
-</span><span data-line="573">    <span class="k">def</span> <span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="573">    <span class="k">def</span><span class="w"> </span><span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="574">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="575"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="576"><span class="sd">        Ensure the scheduler is running. By default, this method is a no-op.</span>
@@ -689,18 +689,18 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="579"><span class="sd">        &quot;&quot;&quot;</span>
 </span><span data-line="580">        <span class="k">return</span> <span class="kc">None</span>
 </span><span data-line="581">
-</span><span data-line="582">    <span class="k">def</span> <span class="nf">start_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profile</span><span class="p">):</span>
+</span><span data-line="582">    <span class="k">def</span><span class="w"> </span><span class="nf">start_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profile</span><span class="p">):</span>
 </span><span data-line="583">        <span class="c1"># type: (Profile) -&gt; None</span>
 </span><span data-line="584">        <span class="bp">self</span><span class="o">.</span><span class="n">ensure_running</span><span class="p">()</span>
 </span><span data-line="585">        <span class="bp">self</span><span class="o">.</span><span class="n">new_profiles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span>
 </span><span data-line="586">
-</span><span data-line="587">    <span class="k">def</span> <span class="nf">make_sampler</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="587">    <span class="k">def</span><span class="w"> </span><span class="nf">make_sampler</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="588">        <span class="c1"># type: () -&gt; Callable[..., None]</span>
 </span><span data-line="589">        <span class="n">cwd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
 </span><span data-line="590">
 </span><span data-line="591">        <span class="n">cache</span> <span class="o">=</span> <span class="n">LRUCache</span><span class="p">(</span><span class="n">max_size</span><span class="o">=</span><span class="mi">256</span><span class="p">)</span>
 </span><span data-line="592">
-</span><span data-line="593">        <span class="k">def</span> <span class="nf">_sample_stack</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span data-line="593">        <span class="k">def</span><span class="w"> </span><span class="nf">_sample_stack</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span data-line="594">            <span class="c1"># type: (*Any, **Any) -&gt; None</span>
 </span><span data-line="595"><span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="596"><span class="sd">            Take a sample of the stack on all the threads in the process.</span>
@@ -766,7 +766,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="656">        <span class="k">return</span> <span class="n">_sample_stack</span>
 </span><span data-line="657">
 </span><span data-line="658">
-</span><span data-line="659"><span class="k">class</span> <span class="nc">ThreadScheduler</span><span class="p">(</span><span class="n">Scheduler</span><span class="p">):</span>
+</span><span data-line="659"><span class="k">class</span><span class="w"> </span><span class="nc">ThreadScheduler</span><span class="p">(</span><span class="n">Scheduler</span><span class="p">):</span>
 </span><span data-line="660"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="661"><span class="sd">    This scheduler is based on running a daemon thread that will call</span>
 </span><span data-line="662"><span class="sd">    the sampler at a regular interval.</span>
@@ -775,7 +775,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="665">    <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;thread&quot;</span>  <span class="c1"># type: ProfilerMode</span>
 </span><span data-line="666">    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;sentry.profiler.ThreadScheduler&quot;</span>
 </span><span data-line="667">
-</span><span data-line="668">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
+</span><span data-line="668">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
 </span><span data-line="669">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="670">        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">frequency</span><span class="p">)</span>
 </span><span data-line="671">
@@ -785,18 +785,18 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="675">        <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[int]</span>
 </span><span data-line="676">        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
 </span><span data-line="677">
-</span><span data-line="678">    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="678">    <span class="k">def</span><span class="w"> </span><span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="679">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="680">        <span class="k">pass</span>
 </span><span data-line="681">
-</span><span data-line="682">    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="682">    <span class="k">def</span><span class="w"> </span><span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="683">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="684">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
 </span><span data-line="685">            <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="686">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="687">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
 </span><span data-line="688">
-</span><span data-line="689">    <span class="k">def</span> <span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="689">    <span class="k">def</span><span class="w"> </span><span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="690">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="691"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="692"><span class="sd">        Check that the profiler has an active thread to run in, and start one if</span>
@@ -835,7 +835,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="725">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="726">                <span class="k">return</span>
 </span><span data-line="727">
-</span><span data-line="728">    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="728">    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="729">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="730">        <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 </span><span data-line="731">
@@ -854,7 +854,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="744">            <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 </span><span data-line="745">
 </span><span data-line="746">
-</span><span data-line="747"><span class="k">class</span> <span class="nc">GeventScheduler</span><span class="p">(</span><span class="n">Scheduler</span><span class="p">):</span>
+</span><span data-line="747"><span class="k">class</span><span class="w"> </span><span class="nc">GeventScheduler</span><span class="p">(</span><span class="n">Scheduler</span><span class="p">):</span>
 </span><span data-line="748"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="749"><span class="sd">    This scheduler is based on the thread scheduler but adapted to work with</span>
 </span><span data-line="750"><span class="sd">    gevent. When using gevent, it may monkey patch the threading modules</span>
@@ -871,7 +871,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="761">    <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;gevent&quot;</span>  <span class="c1"># type: ProfilerMode</span>
 </span><span data-line="762">    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;sentry.profiler.GeventScheduler&quot;</span>
 </span><span data-line="763">
-</span><span data-line="764">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
+</span><span data-line="764">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
 </span><span data-line="765">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span data-line="766">
 </span><span data-line="767">        <span class="k">if</span> <span class="n">ThreadPool</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -889,18 +889,18 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="779">        <span class="c1"># as we need to spawn the profiler thread from the greenlets.</span>
 </span><span data-line="780">        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
 </span><span data-line="781">
-</span><span data-line="782">    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="782">    <span class="k">def</span><span class="w"> </span><span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="783">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="784">        <span class="k">pass</span>
 </span><span data-line="785">
-</span><span data-line="786">    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="786">    <span class="k">def</span><span class="w"> </span><span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="787">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="788">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
 </span><span data-line="789">            <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span data-line="790">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="791">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
 </span><span data-line="792">
-</span><span data-line="793">    <span class="k">def</span> <span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="793">    <span class="k">def</span><span class="w"> </span><span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="794">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="795">        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
 </span><span data-line="796">
@@ -928,7 +928,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="818">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span data-line="819">                <span class="k">return</span>
 </span><span data-line="820">
-</span><span data-line="821">    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="821">    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span data-line="822">        <span class="c1"># type: () -&gt; None</span>
 </span><span data-line="823">        <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 </span><span data-line="824">
@@ -958,7 +958,7 @@ data-aria-dark="Switch to auto color mode">
 <footer class="sy-foot">
   <div class="sy-foot-inner sy-container mx-auto">
     <div class="sy-foot-reserved md:flex justify-between items-center">
-      <div class="sy-foot-copyright"><p>2019-2024, Sentry Team and Contributors</p>
+      <div class="sy-foot-copyright"><p>2019-2025, Sentry Team and Contributors</p>
   
   <p>
     Made with
@@ -975,8 +975,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../../_static/documentation_options.js?v=bd8f1056"></script>
+      <script src="../../../_static/documentation_options.js?v=50d84e18"></script>
       <script src="../../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../../_static/shibuya.js?v=e2e99575"></script></body>
+      <script src="../../../_static/shibuya.js?v=55e26b35"></script></body>
 </html>

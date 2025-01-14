@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scrubber - sentry-python 2.19.2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scrubber - sentry-python 2.20.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=83eaa723" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=10d1008b" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,18 +105,18 @@ data-aria-dark="Switch to auto color mode">
       <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.scrubber</h1><div class="highlight"><pre>
-<span></span><span data-line="1"><span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
+<span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span data-line="2">    <span class="n">capture_internal_exceptions</span><span class="p">,</span>
 </span><span data-line="3">    <span class="n">AnnotatedValue</span><span class="p">,</span>
 </span><span data-line="4">    <span class="n">iter_event_frames</span><span class="p">,</span>
 </span><span data-line="5"><span class="p">)</span>
 </span><span data-line="6">
-</span><span data-line="7"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="7"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span data-line="8">
 </span><span data-line="9"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="10">    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span>
-</span><span data-line="11">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
-</span><span data-line="12">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+</span><span data-line="10">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span>
+</span><span data-line="11">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+</span><span data-line="12">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
 </span><span data-line="13">
 </span><span data-line="14">
 </span><span data-line="15"><span class="n">DEFAULT_DENYLIST</span> <span class="o">=</span> <span class="p">[</span>
@@ -168,8 +168,8 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="61">
 <div class="viewcode-block" id="EventScrubber">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.scrubber.EventScrubber">[docs]</a>
-</span><span data-line="62"><span class="k">class</span> <span class="nc">EventScrubber</span><span class="p">:</span>
-</span><span data-line="63">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="62"><span class="k">class</span><span class="w"> </span><span class="nc">EventScrubber</span><span class="p">:</span>
+</span><span data-line="63">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
 </span><span data-line="64">        <span class="bp">self</span><span class="p">,</span> <span class="n">denylist</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">send_default_pii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">pii_denylist</span><span class="o">=</span><span class="kc">None</span>
 </span><span data-line="65">    <span class="p">):</span>
 </span><span data-line="66">        <span class="c1"># type: (Optional[List[str]], bool, bool, Optional[List[str]]) -&gt; None</span>
@@ -194,7 +194,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="85">
 <div class="viewcode-block" id="EventScrubber.scrub_list">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.scrubber.EventScrubber.scrub_list">[docs]</a>
-</span><span data-line="86">    <span class="k">def</span> <span class="nf">scrub_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lst</span><span class="p">):</span>
+</span><span data-line="86">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lst</span><span class="p">):</span>
 </span><span data-line="87">        <span class="c1"># type: (object) -&gt; None</span>
 </span><span data-line="88"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="89"><span class="sd">        If a list is passed to this method, the method recursively searches the list and any</span>
@@ -212,7 +212,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="100">
 <div class="viewcode-block" id="EventScrubber.scrub_dict">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.scrubber.EventScrubber.scrub_dict">[docs]</a>
-</span><span data-line="101">    <span class="k">def</span> <span class="nf">scrub_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+</span><span data-line="101">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
 </span><span data-line="102">        <span class="c1"># type: (object) -&gt; None</span>
 </span><span data-line="103"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span data-line="104"><span class="sd">        If a dictionary is passed to this method, the method scrubs the dictionary of any</span>
@@ -233,7 +233,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="119">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_list</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a list</span></div>
 
 </span><span data-line="120">
-</span><span data-line="121">    <span class="k">def</span> <span class="nf">scrub_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="121">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
 </span><span data-line="122">        <span class="c1"># type: (Event) -&gt; None</span>
 </span><span data-line="123">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="124">            <span class="k">if</span> <span class="s2">&quot;request&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
@@ -244,19 +244,19 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="129">                <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">]:</span>
 </span><span data-line="130">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
 </span><span data-line="131">
-</span><span data-line="132">    <span class="k">def</span> <span class="nf">scrub_extra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="132">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_extra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
 </span><span data-line="133">        <span class="c1"># type: (Event) -&gt; None</span>
 </span><span data-line="134">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="135">            <span class="k">if</span> <span class="s2">&quot;extra&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
 </span><span data-line="136">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">])</span>
 </span><span data-line="137">
-</span><span data-line="138">    <span class="k">def</span> <span class="nf">scrub_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="138">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
 </span><span data-line="139">        <span class="c1"># type: (Event) -&gt; None</span>
 </span><span data-line="140">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="141">            <span class="k">if</span> <span class="s2">&quot;user&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
 </span><span data-line="142">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">])</span>
 </span><span data-line="143">
-</span><span data-line="144">    <span class="k">def</span> <span class="nf">scrub_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="144">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
 </span><span data-line="145">        <span class="c1"># type: (Event) -&gt; None</span>
 </span><span data-line="146">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="147">            <span class="k">if</span> <span class="s2">&quot;breadcrumbs&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
@@ -265,14 +265,14 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="150">                        <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
 </span><span data-line="151">                            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
 </span><span data-line="152">
-</span><span data-line="153">    <span class="k">def</span> <span class="nf">scrub_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="153">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
 </span><span data-line="154">        <span class="c1"># type: (Event) -&gt; None</span>
 </span><span data-line="155">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="156">            <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">iter_event_frames</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
 </span><span data-line="157">                <span class="k">if</span> <span class="s2">&quot;vars&quot;</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">:</span>
 </span><span data-line="158">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">&quot;vars&quot;</span><span class="p">])</span>
 </span><span data-line="159">
-</span><span data-line="160">    <span class="k">def</span> <span class="nf">scrub_spans</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="160">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_spans</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
 </span><span data-line="161">        <span class="c1"># type: (Event) -&gt; None</span>
 </span><span data-line="162">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="163">            <span class="k">if</span> <span class="s2">&quot;spans&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
@@ -280,7 +280,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="165">                    <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">span</span><span class="p">:</span>
 </span><span data-line="166">                        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">span</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
 </span><span data-line="167">
-</span><span data-line="168">    <span class="k">def</span> <span class="nf">scrub_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="168">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
 </span><span data-line="169">        <span class="c1"># type: (Event) -&gt; None</span>
 </span><span data-line="170">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_request</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 </span><span data-line="171">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_extra</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
@@ -302,7 +302,7 @@ data-aria-dark="Switch to auto color mode">
 <footer class="sy-foot">
   <div class="sy-foot-inner sy-container mx-auto">
     <div class="sy-foot-reserved md:flex justify-between items-center">
-      <div class="sy-foot-copyright"><p>2019-2024, Sentry Team and Contributors</p>
+      <div class="sy-foot-copyright"><p>2019-2025, Sentry Team and Contributors</p>
   
   <p>
     Made with
@@ -319,8 +319,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=bd8f1056"></script>
+      <script src="../../_static/documentation_options.js?v=50d84e18"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=e2e99575"></script></body>
+      <script src="../../_static/shibuya.js?v=55e26b35"></script></body>
 </html>
