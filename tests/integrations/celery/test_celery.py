@@ -28,7 +28,6 @@ def connect_signal(request):
 @pytest.fixture
 def init_celery(sentry_init, request):
     def inner(
-        propagate_traces=True,
         backend="always_eager",
         monitor_beat_tasks=False,
         **kwargs,
@@ -36,7 +35,6 @@ def init_celery(sentry_init, request):
         sentry_init(
             integrations=[
                 CeleryIntegration(
-                    propagate_traces=propagate_traces,
                     monitor_beat_tasks=monitor_beat_tasks,
                 )
             ],
@@ -265,24 +263,6 @@ def test_no_stackoverflows(celery):
 
     assert results == [42] * 10000
     assert not sentry_sdk.get_isolation_scope()._tags
-
-
-def test_simple_no_propagation(capture_events, init_celery):
-    celery = init_celery(propagate_traces=False)
-    events = capture_events()
-
-    @celery.task(name="dummy_task")
-    def dummy_task():
-        1 / 0
-
-    with start_transaction() as transaction:
-        dummy_task.delay()
-
-    (event,) = events
-    assert event["contexts"]["trace"]["trace_id"] != transaction.trace_id
-    assert event["transaction"] == "dummy_task"
-    (exception,) = event["exception"]["values"]
-    assert exception["type"] == "ZeroDivisionError"
 
 
 def test_ignore_expected(capture_events, celery):
@@ -530,11 +510,9 @@ def test_baggage_propagation(init_celery):
 def test_sentry_propagate_traces_override(init_celery):
     """
     Test if the `sentry-propagate-traces` header given to `apply_async`
-    overrides the `propagate_traces` parameter in the integration constructor.
+    overrides the default trace propagation behavior.
     """
-    celery = init_celery(
-        propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
-    )
+    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
@@ -550,7 +528,7 @@ def test_sentry_propagate_traces_override(init_celery):
         ).get()
         assert transaction_trace_id == task_transaction_id
 
-        # should NOT propagate trace (overrides `propagate_traces` parameter in integration constructor)
+        # should NOT propagate trace 
         task_transaction_id = dummy_task.apply_async(
             args=("another message",),
             headers={"sentry-propagate-traces": False},
