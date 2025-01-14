@@ -76,16 +76,6 @@ GROUPS = {
         "cloud_resource_context",
         "gcp",
     ],
-    "Tasks": [
-        "arq",
-        "beam",
-        "celery",
-        "dramatiq",
-        "huey",
-        "ray",
-        "rq",
-        "spark",
-    ],
     "DBs": [
         "asyncpg",
         "clickhouse_driver",
@@ -93,6 +83,11 @@ GROUPS = {
         "redis",
         "redis_py_cluster_legacy",
         "sqlalchemy",
+    ],
+    "Flags": [
+        "launchdarkly",
+        "openfeature",
+        "unleash",
     ],
     "GraphQL": [
         "ariadne",
@@ -105,6 +100,16 @@ GROUPS = {
         "grpc",
         "httpx",
         "requests",
+    ],
+    "Tasks": [
+        "arq",
+        "beam",
+        "celery",
+        "dramatiq",
+        "huey",
+        "ray",
+        "rq",
+        "spark",
     ],
     "Web 1": [
         "django",
@@ -125,15 +130,12 @@ GROUPS = {
         "tornado",
     ],
     "Misc": [
-        "launchdarkly",
         "loguru",
-        "openfeature",
         "opentelemetry",
         "potel",
         "pure_eval",
         "trytond",
         "typer",
-        "unleash",
     ],
 }
 
