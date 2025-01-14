@@ -50,7 +50,7 @@ IGNORE = {
     "asyncpg",
     "aws_lambda",
     "beam",
-    "celery",
+    "boto3",
     "chalice",
     "clickhouse_driver",
     "cohere",
