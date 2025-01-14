@@ -49,7 +49,6 @@ IGNORE = {
     "asgi",
     "asyncpg",
     "aws_lambda",
-    "beam",
     "boto3",
     "bottle",
     "celery",
