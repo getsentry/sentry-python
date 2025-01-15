@@ -130,6 +130,30 @@ def extract_span_data(span):
     if db_query:
         return span_data_for_db_query(span)
 
+    rpc_service = span.attributes.get(SpanAttributes.RPC_SERVICE)
+    if rpc_service:
+        return (
+            span.attributes.get(SentrySpanAttribute.OP) or "rpc",
+            description,
+            status,
+            http_status,
+            origin,
+        )
+
+    messaging_system = span.attributes.get(SpanAttributes.MESSAGING_SYSTEM)
+    if messaging_system:
+        return (
+            span.attributes.get(SentrySpanAttribute.OP) or "message",
+            description,
+            status,
+            http_status,
+            origin,
+        )
+
+    faas_trigger = span.attributes.get(SpanAttributes.FAAS_TRIGGER)
+    if faas_trigger:
+        return (str(faas_trigger), description, status, http_status, origin)
+
     return (op, description, status, http_status, origin)
 
 
