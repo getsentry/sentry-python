@@ -310,6 +310,29 @@ def test_set_measurement_deprecated(sentry_init):
                 span.set_measurement("metric.baz", 420.69, unit="custom")
 
 
+def test_set_meaurement_compared_to_set_data(sentry_init, capture_events):
+    """
+    This is just a test to see if we can use set_data() instead of set_measurement() with
+    the same result in the backend.
+    """
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with start_transaction(name="measuring stuff") as transaction:
+        transaction.set_measurement("metric.foo", 123)
+        transaction.set_data("metric.bar", 456)
+        with start_span(op="measuring span") as span:
+            span.set_measurement("metric.baz", 420.69, unit="custom")
+            span.set_data("metric.qux", 789)
+
+    (event,) = events
+    from pprint import pprint
+
+    pprint(event)
+    raise AssertionError("This test is not finished yet.")
+
+
 @pytest.mark.parametrize(
     "trace_propagation_targets,url,expected_propagation_decision",
     [
