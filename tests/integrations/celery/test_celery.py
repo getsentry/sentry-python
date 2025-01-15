@@ -1,11 +1,12 @@
 import threading
 import kombu
 from unittest import mock
-from urllib.parse import quote
 
 import pytest
 from celery import Celery, VERSION
 from celery.bin import worker
+from celery.app.task import Task
+from opentelemetry import trace as otel_trace, context
 
 import sentry_sdk
 from sentry_sdk import get_current_span
@@ -191,9 +192,6 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     def dummy_task(x, y):
         return x / y
 
-    # XXX: For some reason the first call does not get instrumented properly.
-    # celery_invocation(dummy_task, 1, 1)
-
     events = capture_events()
 
     with sentry_sdk.start_span(name="submission") as root_span:
@@ -221,11 +219,13 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
         assert execution_event["contexts"]["trace"]["status"] == "ok"
 
     assert len(execution_event["spans"]) == 1
-    assert execution_event["spans"][0] == ApproxDict({
-        "trace_id": str(root_span.trace_id),
-        "op": "queue.process",
-        "description": "dummy_task",
-    })
+    assert execution_event["spans"][0] == ApproxDict(
+        {
+            "trace_id": str(root_span.trace_id),
+            "op": "queue.process",
+            "description": "dummy_task",
+        }
+    )
     assert submission_event["spans"] == [
         {
             "data": ApproxDict(),
@@ -240,7 +240,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "status": "ok",
             "tags": {
                 "status": "ok",
-            }
+            },
         }
     ]
 
@@ -537,6 +537,20 @@ def test_sentry_propagate_traces_override(init_celery):
         propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
     )
 
+    # Since we're applying the task inline eagerly,
+    # we need to cleanup the otel context for this test.
+    # and since we patch build_tracer, we need to do this before that runs...
+    # TODO: the right way is to not test this inline
+    original_apply = Task.apply
+
+    def cleaned_apply(*args, **kwargs):
+        token = context.attach(otel_trace.set_span_in_context(otel_trace.INVALID_SPAN))
+        rv = original_apply(*args, **kwargs)
+        context.detach(token)
+        return rv
+
+    Task.apply = cleaned_apply
+
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
         trace_id = get_current_span().trace_id
@@ -557,6 +571,8 @@ def test_sentry_propagate_traces_override(init_celery):
             headers={"sentry-propagate-traces": False},
         ).get()
         assert root_span_trace_id != task_trace_id, "Trace should NOT be propagated"
+
+    Task.apply = original_apply
 
 
 def test_apply_async_manually_span(sentry_init):
