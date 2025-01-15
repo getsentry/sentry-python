@@ -82,10 +82,6 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-typer-latest"
-      - name: Test unleash latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-unleash-latest"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |
@@ -167,10 +163,6 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-typer"
-      - name: Test unleash pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-unleash"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |

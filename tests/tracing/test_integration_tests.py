@@ -121,7 +121,7 @@ def test_continue_trace(
 def test_propagate_traces_deprecation_warning(sentry_init, sample_rate):
     sentry_init(traces_sample_rate=sample_rate, propagate_traces=False)
 
-    with start_transaction(name="hi"):
+    with start_span(name="hi"):
         with start_span() as old_span:
             with pytest.warns(DeprecationWarning):
                 dict(
