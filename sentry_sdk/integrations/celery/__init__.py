@@ -1,4 +1,6 @@
 import sys
+import warnings
+
 from collections.abc import Mapping
 from functools import wraps
 
@@ -67,6 +69,11 @@ class CeleryIntegration(Integration):
         exclude_beat_tasks=None,
     ):
         # type: (bool, bool, Optional[List[str]]) -> None
+        warnings.warn(
+            "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
@@ -112,7 +119,6 @@ def _capture_exception(task, exc_info):
         return
 
     if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
-        # ??? Doesn't map to anything
         _set_status("aborted")
         return
 
@@ -276,6 +282,7 @@ def _wrap_task_run(f):
                 op=OP.QUEUE_SUBMIT_CELERY,
                 name=task_name,
                 origin=CeleryIntegration.origin,
+                only_if_parent=True,
             )
             if not task_started_from_beat
             else NoOpMgr()
@@ -306,11 +313,13 @@ def _wrap_tracer(task, f):
         with isolation_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
+            scope.set_transaction_name(task.name, source=TRANSACTION_SOURCE_TASK)
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
             headers = args[3].get("headers") or {}
+
             with sentry_sdk.continue_trace(headers):
                 with sentry_sdk.start_span(
                     op=OP.QUEUE_TASK_CELERY,
@@ -320,9 +329,13 @@ def _wrap_tracer(task, f):
                     # for some reason, args[1] is a list if non-empty but a
                     # tuple if empty
                     attributes=_prepopulate_attributes(task, list(args[1]), args[2]),
-                ) as transaction:
-                    transaction.set_status(SPANSTATUS.OK)
-                    return f(*args, **kwargs)
+                ) as root_span:
+                    return_value = f(*args, **kwargs)
+
+                    if root_span.status is None:
+                        root_span.set_status(SPANSTATUS.OK)
+
+                    return return_value
 
     return _inner  # type: ignore
 
@@ -359,6 +372,7 @@ def _wrap_task_call(task, f):
                 op=OP.QUEUE_PROCESS,
                 name=task.name,
                 origin=CeleryIntegration.origin,
+                only_if_parent=True,
             ) as span:
                 _set_messaging_destination_name(task, span)
 
@@ -390,6 +404,7 @@ def _wrap_task_call(task, f):
                     )
 
                 return f(*args, **kwargs)
+
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
