@@ -1,4 +1,6 @@
 import sys
+import warnings
+
 from collections.abc import Mapping
 from functools import wraps
 
@@ -67,6 +69,11 @@ class CeleryIntegration(Integration):
         exclude_beat_tasks=None,
     ):
         # type: (bool, bool, Optional[List[str]]) -> None
+        warnings.warn(
+            "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
