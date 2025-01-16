@@ -142,6 +142,7 @@ TEST_SUITE_CONFIG = {
     "falcon": {
         "package": "falcon",
         "deps": {},
+        "python": "<3.13",
     },
     "fastapi": {
         "package": "fastapi",
