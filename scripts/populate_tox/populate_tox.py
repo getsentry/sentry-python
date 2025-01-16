@@ -57,7 +57,7 @@ IGNORE = {
     "common",
     "cloud_resource_context",
     "django",
-    "falcon",
+    "dramatiq",
     "fastapi",
     "flask",
     "gcp",

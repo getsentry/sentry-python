@@ -100,11 +100,11 @@ envlist =
     {py3.10,py3.11,py3.12}-django-v{5.0,5.1}
     {py3.10,py3.12,py3.13}-django-latest
 
-    # Falcon
-    {py3.6,py3.7}-falcon-v{1,1.4,2}
-    {py3.6,py3.11,py3.12}-falcon-v{3}
-    {py3.8,py3.11,py3.12}-falcon-v{4}
-    {py3.7,py3.11,py3.12}-falcon-latest
+    # dramatiq
+    {py3.6,py3.9}-dramatiq-v{1.13}
+    {py3.7,py3.10,py3.11}-dramatiq-v{1.15}
+    {py3.8,py3.11,py3.12}-dramatiq-v{1.17}
+    {py3.8,py3.11,py3.12}-dramatiq-latest
 
     # FastAPI
     {py3.7,py3.10}-fastapi-v{0.79}
@@ -423,13 +423,11 @@ deps =
     django-v5.1: Django==5.1rc1
     django-latest: Django
 
-    # Falcon
-    falcon-v1.4: falcon~=1.4.0
-    falcon-v1: falcon~=1.0
-    falcon-v2: falcon~=2.0
-    falcon-v3: falcon~=3.0
-    falcon-v4: falcon~=4.0
-    falcon-latest: falcon
+    # dramatiq
+    dramatiq-v1.13: dramatiq>=1.13,<1.14
+    dramatiq-v1.15: dramatiq>=1.15,<1.16
+    dramatiq-v1.17: dramatiq>=1.17,<1.18
+    dramatiq-latest: dramatiq
 
     # FastAPI
     fastapi: httpx
