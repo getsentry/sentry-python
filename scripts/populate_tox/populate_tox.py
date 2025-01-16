@@ -4,9 +4,10 @@ This script populates tox.ini automatically using release data from PYPI.
 
 import functools
 import time
+from bisect import bisect_left
 from collections import defaultdict
 from datetime import datetime, timedelta
-from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pathlib import Path
 from typing import Optional, Union
@@ -122,23 +123,18 @@ def fetch_release(package: str, version: Version) -> dict:
     return pypi_data.json()
 
 
-def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
+def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Version]:
+    """Drop versions that are unsupported without making additional API calls."""
     min_supported = _MIN_VERSIONS.get(integration)
     if min_supported:
         min_supported = Version(".".join(map(str, min_supported)))
         print(f"  Minimum supported version for {integration} is {min_supported}.")
     else:
-        print(
-            f"  {integration} doesn't have a minimum version. Maybe we should define one?"
-        )
+        print(f"  {integration} doesn't have a minimum version. Consider defining one")
 
-    custom_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-    if custom_python_versions:
-        custom_python_versions = SpecifierSet(custom_python_versions)
+    filtered_releases = []
 
-    releases = []
-
-    for release, metadata in pypi_data["releases"].items():
+    for release, metadata in releases.items():
         if not metadata:
             continue
 
@@ -158,47 +154,56 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
             # TODO: consider the newest prerelease unless obsolete
             continue
 
-        # The release listing that you get via the package endpoint doesn't
-        # contain all metadata for a release. `requires_python` is included,
-        # but classifiers are not (they require a separate call to the release
-        # endpoint).
-        # Some packages don't use `requires_python`, they supply classifiers
-        # instead.
-        version.python_versions = None
-        requires_python = meta.get("requires_python")
-        if requires_python:
-            try:
-                version.python_versions = supported_python_versions(
-                    SpecifierSet(requires_python), custom_python_versions
-                )
-            except InvalidSpecifier:
-                continue
-        else:
-            # No `requires_python`. Let's fetch the metadata to see
-            # the classifiers.
-            # XXX do something with this. no need to fetch every release ever
-            release_metadata = fetch_release(package, version)
-            version.python_versions = supported_python_versions(
-                determine_python_versions(release_metadata), custom_python_versions
-            )
-            time.sleep(0.1)
-
-        if not version.python_versions:
-            continue
-
-        for i, saved_version in enumerate(releases):
+        for i, saved_version in enumerate(filtered_releases):
             if (
                 version.major == saved_version.major
                 and version.minor == saved_version.minor
                 and version.micro > saved_version.micro
             ):
                 # Don't save all patch versions of a release, just the newest one
-                releases[i] = version
+                filtered_releases[i] = version
                 break
         else:
-            releases.append(version)
+            filtered_releases.append(version)
 
-    return sorted(releases)
+    return sorted(filtered_releases)
+
+
+def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
+    """
+    Get a list of releases that are currently supported by the SDK.
+
+    This takes into account a handful of parameters (Python support, the lowest
+    version we've defined for the framework, the date of the release).
+    """
+    # Get a consolidated list without taking into account Python support yet
+    # (because that might require an additional API call for some
+    # of the releases)
+    releases = _prefilter_releases(integration, pypi_data["releases"])
+
+    # Determine Python support
+    expected_python_versions = TEST_SUITE_CONFIG[integration].get("python")
+    if expected_python_versions:
+        expected_python_versions = SpecifierSet(expected_python_versions)
+    else:
+        expected_python_versions = SpecifierSet(f">={MIN_PYTHON_VERSION}")
+
+    def _supports_lowest(release: Version) -> bool:
+        time.sleep(0.1)  # don't DoS PYPI
+        py_versions = determine_python_versions(fetch_release(package, release))
+        target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
+        if target_python_versions:
+            target_python_versions = SpecifierSet(target_python_versions)
+        return bool(supported_python_versions(py_versions, target_python_versions))
+
+    i = bisect_left(releases, True, key=_supports_lowest)
+    if i != len(releases) and _supports_lowest(releases[i]):
+        print(i)
+        # we found the lowest version that supports at least some Python
+        # version(s) that we do, cut off the rest
+        releases = releases[i:]
+
+    return releases
 
 
 def pick_releases_to_test(releases: list[Version]) -> list[Version]:
@@ -222,6 +227,7 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
                 releases_by_major[release.major][0] = release
             if release > releases_by_major[release.major][1]:
                 releases_by_major[release.major][1] = release
+
         for i, (min_version, max_version) in enumerate(releases_by_major.values()):
             filtered_releases.add(max_version)
             if i == len(releases_by_major) - 1:
@@ -247,15 +253,16 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
 
 
 def supported_python_versions(
-    python_versions: SpecifierSet, custom_versions: Optional[SpecifierSet] = None
+    package_python_versions: Union[SpecifierSet, list[Version]],
+    custom_supported_versions: Optional[SpecifierSet] = None,
 ) -> list[Version]:
     """Get an intersection of python_versions and Python versions supported in the SDK."""
     supported = []
 
     curr = MIN_PYTHON_VERSION
     while curr <= MAX_PYTHON_VERSION:
-        if curr in python_versions:
-            if not custom_versions or curr in custom_versions:
+        if curr in package_python_versions:
+            if not custom_supported_versions or curr in custom_supported_versions:
                 supported.append(curr)
 
         next = [int(v) for v in str(curr).split(".")]
@@ -283,6 +290,9 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
     try:
         classifiers = pypi_data["info"]["classifiers"]
     except (AttributeError, KeyError):
+        # This function assumes `pypi_data` contains classifiers. This is the case
+        # for the most recent release in the /{project} endpoint or for any release
+        # fetched via the /{project}/{version} endpoint.
         return []
 
     python_versions = []
@@ -300,6 +310,9 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
         python_versions.sort()
         return python_versions
 
+    # We only use `requires_python` if there are no classifiers. This is because
+    # `requires_python` doesn't tell us anything about the upper bound, which
+    # depends on when the release first came out
     try:
         requires_python = pypi_data["info"]["requires_python"]
     except (AttributeError, KeyError):
@@ -404,9 +417,15 @@ if __name__ == "__main__":
             test_releases = pick_releases_to_test(releases)
 
             for release in test_releases:
+                target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
+                if target_python_versions:
+                    target_python_versions = SpecifierSet(target_python_versions)
                 release_pypi_data = fetch_release(package, release)
                 release.python_versions = pick_python_versions_to_test(
-                    release.python_versions
+                    supported_python_versions(
+                        determine_python_versions(release_pypi_data),
+                        target_python_versions,
+                    )
                 )
                 if not release.python_versions:
                     print(f"  Release {release} has no Python versions, skipping.")
