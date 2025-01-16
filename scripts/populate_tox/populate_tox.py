@@ -68,12 +68,12 @@ IGNORE = {
     "openai",
     "openai_notiktoken",
     "openfeature",
-    "launchdarkly",
+    "langchain",
+    "langchain_notiktoken",
     "opentelemetry",
     "potel",
     "pure_eval",
     "pymongo",
-    "pyramid",
     "quart",
     "ray",
     "redis",
@@ -189,12 +189,13 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
             target_python_versions = SpecifierSet(target_python_versions)
         return bool(supported_python_versions(py_versions, target_python_versions))
 
-    i = bisect_left(releases, True, key=_supports_lowest)
-    if i != len(releases) and _supports_lowest(releases[i]):
-        print(i)
-        # we found the lowest version that supports at least some Python
-        # version(s) that we do, cut off the rest
-        releases = releases[i:]
+    if not _supports_lowest(releases[0]):
+        i = bisect_left(releases, True, key=_supports_lowest)
+        if i != len(releases) and _supports_lowest(releases[i]):
+            print(i)
+            # we found the lowest version that supports at least some Python
+            # version(s) that we do, cut off the rest
+            releases = releases[i:]
 
     return releases
 
@@ -403,6 +404,14 @@ if __name__ == "__main__":
             if not releases:
                 print("  Found no supported releases.")
                 continue
+
+            if (
+                _MIN_VERSIONS.get("integration")
+                and Version(_MIN_VERSIONS["integration"]) != releases[0]
+            ):
+                print(
+                    f"  Integration defines {_MIN_VERSIONS['integrations']} as minimum version, but the effective minimum version is {releases[0]}."
+                )
 
             # Pick a handful of the supported releases to actually test against
             # and fetch the PYPI data for each to determine which Python versions

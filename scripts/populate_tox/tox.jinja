@@ -117,9 +117,11 @@ envlist =
     {py3.9,py3.11,py3.12}-httpx-v{0.25,0.27}
     {py3.9,py3.12,py3.13}-httpx-latest
 
-    # LaunchDarkly
-    {py3.8,py3.12,py3.13}-launchdarkly-v9.8.0
-    {py3.8,py3.12,py3.13}-launchdarkly-latest
+    # Langchain
+    {py3.9,py3.11,py3.12}-langchain-v0.1
+    {py3.9,py3.11,py3.12}-langchain-v0.3
+    {py3.9,py3.11,py3.12}-langchain-latest
+    {py3.9,py3.11,py3.12}-langchain-notiktoken
 
     # Litestar
     {py3.8,py3.11}-litestar-v{2.0}
@@ -157,12 +159,6 @@ envlist =
     {py3.6,py3.11}-pymongo-v{4.0}
     {py3.7,py3.11,py3.12}-pymongo-v{4.3,4.7}
     {py3.7,py3.12,py3.13}-pymongo-latest
-
-    # Pyramid
-    {py3.6,py3.11}-pyramid-v{1.6}
-    {py3.6,py3.11,py3.12}-pyramid-v{1.10}
-    {py3.6,py3.11,py3.12}-pyramid-v{2.0}
-    {py3.6,py3.11,py3.12}-pyramid-latest
 
     # Quart
     {py3.7,py3.11}-quart-v{0.16}
@@ -421,6 +417,20 @@ deps =
     httpx-v0.27: httpx~=0.27.0
     httpx-latest: httpx
 
+    # Langchain
+    langchain-v0.1: openai~=1.0.0
+    langchain-v0.1: langchain~=0.1.11
+    langchain-v0.1: tiktoken~=0.6.0
+    langchain-v0.1: httpx<0.28.0
+    langchain-v0.3: langchain~=0.3.0
+    langchain-v0.3: langchain-community
+    langchain-v0.3: tiktoken
+    langchain-v0.3: openai
+    langchain-{latest,notiktoken}: langchain
+    langchain-{latest,notiktoken}: langchain-openai
+    langchain-{latest,notiktoken}: openai>=1.6.1
+    langchain-latest: tiktoken~=0.6.0
+
     # Litestar
     litestar: pytest-asyncio
     litestar: python-multipart
@@ -454,10 +464,6 @@ deps =
     openfeature-v0.7: openfeature-sdk~=0.7.1
     openfeature-latest: openfeature-sdk
 
-    # LaunchDarkly
-    launchdarkly-v9.8.0: launchdarkly-server-sdk~=9.8.0
-    launchdarkly-latest: launchdarkly-server-sdk
-
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
 
@@ -475,13 +481,6 @@ deps =
     pymongo-v4.3: pymongo~=4.3.0
     pymongo-v4.7: pymongo~=4.7.0
     pymongo-latest: pymongo
-
-    # Pyramid
-    pyramid: Werkzeug<2.1.0
-    pyramid-v1.6: pyramid~=1.6.0
-    pyramid-v1.10: pyramid~=1.10.0
-    pyramid-v2.0: pyramid~=2.0.0
-    pyramid-latest: pyramid
 
     # Quart
     quart: quart-auth
