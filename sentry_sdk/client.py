@@ -474,12 +474,13 @@ class _Client(BaseClient):
         scope,  # type: Optional[Scope]
     ):
         # type: (...) -> Optional[Event]
+        is_transaction = event.get("type") == "transaction"
+        is_checkin = event.get("type") == "check_in"
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
-            is_transaction = event.get("type") == "transaction"
             spans_before = len(event.get("spans", []))
             event_ = scope.apply_to_event(event, hint, self.options)
 
@@ -540,6 +541,11 @@ class _Client(BaseClient):
 
         if event.get("platform") is None:
             event["platform"] = "python"
+
+        if not is_transaction and not is_checkin:
+            event.setdefault("debug_meta", {}).update(
+                {"project_root": self.options["project_root"]}
+            )
 
         event = handle_in_app(
             event,
