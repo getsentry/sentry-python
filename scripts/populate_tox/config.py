@@ -161,7 +161,7 @@ TEST_SUITE_CONFIG = {
         "package": "flask",
         "deps": {
             "*": ["flask-login", "werkzeug"],
-            "<3.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
+            "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
         },
     },
     "gql": {
