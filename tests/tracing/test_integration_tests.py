@@ -10,6 +10,7 @@ from sentry_sdk import (
 )
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport
+from tests.conftest import SortedBaggage
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
@@ -51,7 +52,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_continue_trace(
-    sentry_init, capture_envelopes, sample_rate, SortedBaggage
+    sentry_init, capture_envelopes, sample_rate
 ):  # noqa:N803
     """
     Ensure data is actually passed along via headers, and that they are read
@@ -137,7 +138,6 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     capture_envelopes,
     sample_rate,
     monkeypatch,
-    SortedBaggage,  # noqa: N803
 ):
     sentry_init(traces_sample_rate=sample_rate, release="foo")
     envelopes = capture_envelopes()

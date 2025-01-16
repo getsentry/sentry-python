@@ -9,7 +9,7 @@ import sentry_sdk
 from sentry_sdk import capture_message, start_span
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
-from tests.conftest import ApproxDict
+from tests.conftest import ApproxDict, SortedBaggage
 
 
 @pytest.mark.parametrize(
@@ -75,7 +75,7 @@ def test_outgoing_trace_headers(sentry_init, httpx_client, capture_envelopes):
     with start_span(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
-    ) as span:
+    ):
         if asyncio.iscoroutinefunction(httpx_client.get):
             response = asyncio.get_event_loop().run_until_complete(
                 httpx_client.get(url)
@@ -104,7 +104,6 @@ def test_outgoing_trace_headers_append_to_baggage(
     sentry_init,
     httpx_client,
     capture_envelopes,
-    SortedBaggage,  # noqa: N803
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -141,7 +140,7 @@ def test_outgoing_trace_headers_append_to_baggage(
         sampled=1,
     )
     assert response.request.headers["baggage"] == SortedBaggage(
-        f"custom=data,sentry-trace_id={trace_id},sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
+        f"custom=data,sentry-trace_id={trace_id},sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"  # noqa: E231
     )
 
 
