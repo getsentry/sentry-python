@@ -144,6 +144,7 @@ _MIN_VERSIONS = {
     "launchdarkly": (9, 8, 0),
     "openai": (1, 0, 0),
     "openfeature": (0, 7, 1),
+    "quart": (0, 16, 0),
     "ray": (2, 7, 0),
     "rq": (0, 6),
     "sanic": (0, 8),
@@ -151,6 +152,7 @@ _MIN_VERSIONS = {
     "starlite": (1, 48),
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
+    "typer": (0, 15),
     "unleash": (6, 0, 1),
 }
 
