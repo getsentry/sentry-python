@@ -146,6 +146,7 @@ _MIN_VERSIONS = {
     "openfeature": (0, 7, 1),
     "quart": (0, 16, 0),
     "ray": (2, 7, 0),
+    "requests": (2, 0, 0),
     "rq": (0, 6),
     "sanic": (0, 8),
     "sqlalchemy": (1, 2),
