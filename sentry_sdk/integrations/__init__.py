@@ -132,6 +132,7 @@ _MIN_VERSIONS = {
     "chalice": (1, 16, 0),
     "clickhouse_driver": (0, 2, 0),
     "django": (1, 8),
+    "dramatiq": (1, 9),
     "falcon": (1, 4),
     "fastapi": (0, 79, 0),
     "flask": (0, 10),
