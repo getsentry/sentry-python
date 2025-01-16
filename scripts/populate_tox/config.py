@@ -299,7 +299,7 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "werkzeug",
             ],
-            "<=0.18": [
+            "<=0.19": [
                 "blinker<1.6",
                 "jinja2<3.1.0",
                 "Werkzeug<2.1.0",
