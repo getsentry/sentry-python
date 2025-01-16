@@ -121,7 +121,6 @@ def test_nested_on_new_span_on_close(sentry_init, capture_events):
 
         rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
         sentry_first_rust_span = sentry_sdk.get_current_span()
-        rust_first_rust_span = rust_tracing.spans[3]
 
         # Use a different `index_arg` value for the inner span to help
         # distinguish the two at the end of the test

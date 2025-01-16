@@ -8,10 +8,9 @@ import pytest
 
 from sentry_sdk import capture_message, start_span, continue_trace, isolation_scope
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
-from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
-from tests.conftest import ApproxDict, create_mock_http_server
+from tests.conftest import ApproxDict, SortedBaggage, create_mock_http_server
 
 PORT = create_mock_http_server()
 
@@ -157,7 +156,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
 
 def test_outgoing_trace_headers(
-    sentry_init, capture_envelopes, capture_request_headers, SortedBaggage
+    sentry_init, capture_envelopes, capture_request_headers
 ):
     sentry_init(traces_sample_rate=1.0)
     envelopes = capture_envelopes()
@@ -202,7 +201,7 @@ def test_outgoing_trace_headers(
 
 
 def test_outgoing_trace_headers_head_sdk(
-    sentry_init, monkeypatch, capture_request_headers, capture_envelopes, SortedBaggage
+    sentry_init, monkeypatch, capture_request_headers, capture_envelopes
 ):
     # make sure transaction is always sampled
     monkeypatch.setattr(random, "random", lambda: 0.1)
@@ -230,7 +229,7 @@ def test_outgoing_trace_headers_head_sdk(
     assert request_headers["sentry-trace"] == expected_sentry_trace
 
     expected_outgoing_baggage = (
-        f"sentry-trace_id={root_span.trace_id},"
+        f"sentry-trace_id={root_span.trace_id},"  # noqa: E231
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-sample_rate=0.5,"
@@ -372,4 +371,4 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     span = transaction["spans"][0]
     assert span["op"] == "http.client"
-    assert span["description"] == f"GET http://localhost:{PORT}/top-chasers"
+    assert span["description"] == f"GET http://localhost:{PORT}/top-chasers"  # noqa: E231

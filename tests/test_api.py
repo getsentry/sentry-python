@@ -17,6 +17,7 @@ from sentry_sdk import (
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
+from tests.conftest import SortedBaggage
 
 
 @pytest.mark.forked
@@ -77,7 +78,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
 
 
 @pytest.mark.forked
-def test_baggage_with_tracing_disabled(sentry_init, SortedBaggage):
+def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
     expected_baggage = (
@@ -89,7 +90,7 @@ def test_baggage_with_tracing_disabled(sentry_init, SortedBaggage):
 
 
 @pytest.mark.forked
-def test_baggage_with_tracing_enabled(sentry_init, SortedBaggage):
+def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_span(name="foo") as span:
         expected_baggage = "sentry-transaction=foo,sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={}".format(
