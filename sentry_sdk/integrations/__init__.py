@@ -148,6 +148,7 @@ _MIN_VERSIONS = {
     "rq": (0, 6),
     "sanic": (0, 8),
     "sqlalchemy": (1, 2),
+    "starlite": (1, 48),
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
     "unleash": (6, 0, 1),
