@@ -74,9 +74,9 @@ envlist =
     {py3.8,py3.11,py3.12}-celery-v{5.3,5.4,5.5}
     {py3.8,py3.12,py3.13}-celery-latest
 
-    # Clickhouse Driver
-    {py3.8,py3.11}-clickhouse_driver-v{0.2.0}
-    {py3.8,py3.12,py3.13}-clickhouse_driver-latest
+    # Chalice
+    {py3.6,py3.9}-chalice-v{1.16}
+    {py3.8,py3.12,py3.13}-chalice-latest
 
     # Cloud Resource Context
     {py3.6,py3.12,py3.13}-cloud_resource_context
@@ -391,9 +391,10 @@ deps =
     celery: newrelic
     {py3.7}-celery: importlib-metadata<5.0
 
-    # Clickhouse Driver
-    clickhouse_driver-v0.2.0: clickhouse_driver~=0.2.0
-    clickhouse_driver-latest: clickhouse_driver
+    # Chalice
+    chalice: pytest-chalice==0.0.5
+    chalice-v1.16: chalice~=1.16.0
+    chalice-latest: chalice
 
     # Cohere
     cohere-v5: cohere~=5.3.3

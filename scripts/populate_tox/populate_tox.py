@@ -52,7 +52,7 @@ IGNORE = {
     "beam",
     "boto3",
     "celery",
-    "clickhouse_driver",
+    "chalice",
     "cohere",
     "common",
     "cloud_resource_context",
