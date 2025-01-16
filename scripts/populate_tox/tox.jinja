@@ -100,10 +100,6 @@ envlist =
     # GCP
     {py3.7}-gcp
 
-    # GQL
-    {py3.7,py3.11}-gql-v{3.4}
-    {py3.7,py3.12,py3.13}-gql-latest
-
     # Graphene
     {py3.7,py3.11}-graphene-v{3.3}
     {py3.7,py3.12,py3.13}-graphene-latest
@@ -120,12 +116,6 @@ envlist =
     {py3.7,py3.11,py3.12}-httpx-v{0.23,0.24}
     {py3.9,py3.11,py3.12}-httpx-v{0.25,0.27}
     {py3.9,py3.12,py3.13}-httpx-latest
-
-    # Langchain
-    {py3.9,py3.11,py3.12}-langchain-v0.1
-    {py3.9,py3.11,py3.12}-langchain-v0.3
-    {py3.9,py3.11,py3.12}-langchain-latest
-    {py3.9,py3.11,py3.12}-langchain-notiktoken
 
     # LaunchDarkly
     {py3.8,py3.12,py3.13}-launchdarkly-v9.8.0
@@ -392,10 +382,6 @@ deps =
     fastapi-v{0.79}: fastapi~=0.79.0
     fastapi-latest: fastapi
 
-    # GQL
-    gql-v{3.4}: gql[all]~=3.4.0
-    gql-latest: gql[all]
-
     # Graphene
     graphene: blinker
     graphene: fastapi
@@ -434,20 +420,6 @@ deps =
     httpx-v0.25: httpx~=0.25.0
     httpx-v0.27: httpx~=0.27.0
     httpx-latest: httpx
-
-    # Langchain
-    langchain-v0.1: openai~=1.0.0
-    langchain-v0.1: langchain~=0.1.11
-    langchain-v0.1: tiktoken~=0.6.0
-    langchain-v0.1: httpx<0.28.0
-    langchain-v0.3: langchain~=0.3.0
-    langchain-v0.3: langchain-community
-    langchain-v0.3: tiktoken
-    langchain-v0.3: openai
-    langchain-{latest,notiktoken}: langchain
-    langchain-{latest,notiktoken}: langchain-openai
-    langchain-{latest,notiktoken}: openai>=1.6.1
-    langchain-latest: tiktoken~=0.6.0
 
     # Litestar
     litestar: pytest-asyncio
