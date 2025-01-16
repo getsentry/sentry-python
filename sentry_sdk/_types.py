@@ -77,6 +77,7 @@ if TYPE_CHECKING:
             ],  # TODO: We can expand on this type
             "check_in_id": str,
             "contexts": dict[str, dict[str, object]],
+            "debug_meta": dict[str, Any],
             "dist": str,
             "duration": Optional[float],
             "environment": str,
