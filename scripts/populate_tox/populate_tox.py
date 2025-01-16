@@ -51,7 +51,7 @@ IGNORE = {
     "aws_lambda",
     "beam",
     "boto3",
-    "chalice",
+    "celery",
     "clickhouse_driver",
     "cohere",
     "common",
