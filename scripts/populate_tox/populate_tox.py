@@ -73,7 +73,6 @@ IGNORE = {
     "opentelemetry",
     "potel",
     "pure_eval",
-    "pymongo",
     "quart",
     "ray",
     "redis",
