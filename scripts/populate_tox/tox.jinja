@@ -163,10 +163,6 @@ envlist =
     {py3.7,py3.11,py3.12}-redis-v{5}
     {py3.7,py3.12,py3.13}-redis-latest
 
-    # Redis Cluster
-    {py3.6,py3.8}-redis_py_cluster_legacy-v{1,2}
-    # no -latest, not developed anymore
-
     # Requests
     {py3.6,py3.8,py3.12,py3.13}-requests
 
@@ -193,19 +189,10 @@ envlist =
     {py3.8,py3.11,py3.12}-starlette-v{0.32,0.36,0.40}
     {py3.8,py3.12,py3.13}-starlette-latest
 
-    # Starlite
-    {py3.8,py3.11}-starlite-v{1.48,1.51}
-    # 1.51.14 is the last starlite version; the project continues as litestar
-
     # SQL Alchemy
     {py3.6,py3.9}-sqlalchemy-v{1.2,1.4}
     {py3.7,py3.11}-sqlalchemy-v{2.0}
     {py3.7,py3.12,py3.13}-sqlalchemy-latest
-
-    # Strawberry
-    {py3.8,py3.11}-strawberry-v{0.209}
-    {py3.8,py3.11,py3.12}-strawberry-v{0.222}
-    {py3.8,py3.12,py3.13}-strawberry-latest
 
     # Tornado
     {py3.8,py3.11,py3.12}-tornado-v{6.0}
@@ -475,10 +462,6 @@ deps =
     redis-v5: redis~=5.0
     redis-latest: redis
 
-    # Redis Cluster
-    redis_py_cluster_legacy-v1: redis-py-cluster~=1.0
-    redis_py_cluster_legacy-v2: redis-py-cluster~=2.0
-
     # Requests
     requests: requests>=2.0
 
@@ -537,29 +520,11 @@ deps =
     starlette-v0.40: starlette~=0.40.0
     starlette-latest: starlette
 
-    # Starlite
-    starlite: pytest-asyncio
-    starlite: python-multipart
-    starlite: requests
-    starlite: cryptography
-    starlite: pydantic<2.0.0
-    starlite: httpx<0.28
-    starlite-v{1.48}: starlite~=1.48.0
-    starlite-v{1.51}: starlite~=1.51.0
-
     # SQLAlchemy
     sqlalchemy-v1.2: sqlalchemy~=1.2.0
     sqlalchemy-v1.4: sqlalchemy~=1.4.0
     sqlalchemy-v2.0: sqlalchemy~=2.0.0
     sqlalchemy-latest: sqlalchemy
-
-    # Strawberry
-    strawberry: fastapi
-    strawberry: flask
-    strawberry: httpx
-    strawberry-v0.209: strawberry-graphql[fastapi,flask]~=0.209.0
-    strawberry-v0.222: strawberry-graphql[fastapi,flask]~=0.222.0
-    strawberry-latest: strawberry-graphql[fastapi,flask]
 
     # Tornado
     # Tornado <6.4.1 is incompatible with Pytest ≥8.2
