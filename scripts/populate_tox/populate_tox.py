@@ -83,8 +83,6 @@ IGNORE = {
     "sqlalchemy",
     "tornado",
     "trytond",
-    "typer",
-    "unleash",
 }
 
 
