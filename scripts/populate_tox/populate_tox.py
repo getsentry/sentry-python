@@ -80,8 +80,6 @@ IGNORE = {
     "sanic",
     "spark",
     "starlette",
-    "sqlalchemy",
-    "tornado",
     "trytond",
 }
 
