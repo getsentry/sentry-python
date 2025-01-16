@@ -64,7 +64,6 @@ IGNORE = {
     "graphene",
     "grpc",
     "httpx",
-    "huggingface_hub",
     "langchain",
     "langchain_notiktoken",
     "litestar",
