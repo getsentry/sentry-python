@@ -73,6 +73,7 @@ IGNORE = {
     "opentelemetry",
     "potel",
     "pure_eval",
+    "ray",
     "redis",
     "redis_py_cluster_legacy",
     "requests",
