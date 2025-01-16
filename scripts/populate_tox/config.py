@@ -155,6 +155,7 @@ TEST_SUITE_CONFIG = {
                 "requests",
             ]
         },
+        "python": ">=3.7",
     },
     "flask": {
         "package": "flask",
