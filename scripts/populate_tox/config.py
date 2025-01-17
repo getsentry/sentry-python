@@ -379,8 +379,9 @@ TEST_SUITE_CONFIG = {
                 "cryptography",
                 "pydantic<2.0.0",
                 "httpx<0.28",
-            ]
+            ],
         },
+        "python": "<=3.11",
     },
     "sqlalchemy": {
         "package": "sqlalchemy",

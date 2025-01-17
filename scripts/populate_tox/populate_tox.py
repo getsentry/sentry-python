@@ -64,7 +64,6 @@ IGNORE = {
     "grpc",
     "httpx",
     "litestar",
-    "loguru",
     "openai",
     "openai_notiktoken",
     "openfeature",
@@ -396,13 +395,18 @@ if __name__ == "__main__":
                 print("  Found no supported releases.")
                 continue
 
-            if (
-                _MIN_VERSIONS.get("integration")
-                and Version(_MIN_VERSIONS["integration"]) != releases[0]
-            ):
-                print(
-                    f"  Integration defines {_MIN_VERSIONS['integrations']} as minimum version, but the effective minimum version is {releases[0]}."
+            defined_min_version = _MIN_VERSIONS.get(integration)
+            if defined_min_version:
+                defined_min_version = Version(
+                    ".".join([str(v) for v in defined_min_version])
                 )
+                if (
+                    defined_min_version.major != releases[0].major
+                    or defined_min_version.minor != releases[0].minor
+                ):
+                    print(
+                        f"  Integration defines {defined_min_version} as minimum version, but the effective minimum version is {releases[0]}."
+                    )
 
             # Pick a handful of the supported releases to actually test against
             # and fetch the PYPI data for each to determine which Python versions
