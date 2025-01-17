@@ -76,9 +76,7 @@ IGNORE = {
     "ray",
     "redis",
     "rq",
-    "sanic",
     "spark",
-    "starlette",
     "trytond",
 }
 

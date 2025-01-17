@@ -346,7 +346,7 @@ TEST_SUITE_CONFIG = {
     "sanic": {
         "package": "sanic",
         "deps": {
-            "*": ["websockets<11.0", "aiohttp", "sanic_testing", "aiocontextvars"],
+            "*": ["websockets<11.0", "aiohttp", "sanic_testing"],
             ">=22.0": ["sanic_testing"],
             "py3.6": ["aiocontextvars==0.2.1"],
         },
