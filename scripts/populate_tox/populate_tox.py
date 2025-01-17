@@ -44,7 +44,6 @@ IGNORE = {
     # suites over to this script. Some entries will probably stay forever
     # as they don't fit the mold (e.g. common, asgi, which don't have a 3rd party
     # pypi package to install in different versions).
-    "aiohttp",
     "anthropic",
     "arq",
     "asgi",
@@ -74,7 +73,6 @@ IGNORE = {
     "redis",
     "rq",
     "sanic",
-    "trytond",
 }
 
 

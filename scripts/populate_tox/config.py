@@ -180,6 +180,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"],
         },
+        "python": ">=3.7",
     },
     "httpx": {
         "package": "httpx",
