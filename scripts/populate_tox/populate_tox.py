@@ -60,7 +60,6 @@ IGNORE = {
     "fastapi",
     "gcp",
     "gevent",
-    "graphene",
     "grpc",
     "httpx",
     "litestar",
@@ -77,7 +76,6 @@ IGNORE = {
     "redis",
     "rq",
     "sanic",
-    "spark",
     "trytond",
 }
 

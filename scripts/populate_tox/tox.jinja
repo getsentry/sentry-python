@@ -100,10 +100,6 @@ envlist =
     # GCP
     {py3.7}-gcp
 
-    # Graphene
-    {py3.7,py3.11}-graphene-v{3.3}
-    {py3.7,py3.12,py3.13}-graphene-latest
-
     # gRPC
     {py3.7,py3.9}-grpc-v{1.39}
     {py3.7,py3.10}-grpc-v{1.49}
@@ -176,10 +172,6 @@ envlist =
     {py3.6,py3.8}-sanic-v{20}
     {py3.8,py3.11,py3.12}-sanic-v{24.6}
     {py3.9,py3.12,py3.13}-sanic-latest
-
-    # Spark
-    {py3.8,py3.10,py3.11}-spark-v{3.1,3.3,3.5}
-    {py3.8,py3.10,py3.11,py3.12}-spark-latest
 
     # Trytond
     {py3.6}-trytond-v{4}
@@ -327,14 +319,6 @@ deps =
     fastapi-v{0.79}: fastapi~=0.79.0
     fastapi-latest: fastapi
 
-    # Graphene
-    graphene: blinker
-    graphene: fastapi
-    graphene: flask
-    graphene: httpx
-    graphene-v{3.3}: graphene~=3.3.0
-    graphene-latest: graphene
-
     # gRPC
     grpc: protobuf
     grpc: mypy-protobuf
@@ -473,14 +457,6 @@ deps =
     sanic-v20: sanic~=20.0
     sanic-v24.6: sanic~=24.6.0
     sanic-latest: sanic
-
-    # Spark
-    spark-v3.1: pyspark~=3.1.0
-    spark-v3.3: pyspark~=3.3.0
-    spark-v3.5: pyspark~=3.5.0
-    # TODO: update to ~=4.0.0 once stable is out
-    spark-v4.0: pyspark==4.0.0.dev2
-    spark-latest: pyspark
 
     # Trytond
     trytond: werkzeug
