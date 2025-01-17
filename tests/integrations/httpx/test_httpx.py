@@ -12,7 +12,7 @@ from sentry_sdk.integrations.httpx import HttpxIntegration
 from tests.conftest import ApproxDict
 
 
-timeout = httpx.Timeout(read=None, connect=None)
+timeout = httpx.Timeout(read=None, write=None, connect=None, pool=None)
 
 
 @pytest.mark.parametrize(
