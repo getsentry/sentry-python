@@ -36,6 +36,10 @@ envlist =
     {py3.7,py3.9,py3.11}-aiohttp-v{3.8}
     {py3.8,py3.12,py3.13}-aiohttp-latest
 
+    # Anthropic
+    {py3.8,py3.11,py3.12}-anthropic-v{0.16,0.28,0.40}
+    {py3.7,py3.11,py3.12}-anthropic-latest
+
     # Arq
     {py3.7,py3.11}-arq-v{0.23}
     {py3.7,py3.12,py3.13}-arq-latest
@@ -211,6 +215,14 @@ deps =
     aiohttp: pytest-aiohttp
     aiohttp-v3.8: pytest-asyncio
     aiohttp-latest: pytest-asyncio
+
+    # Anthropic
+    anthropic: pytest-asyncio
+    anthropic-v{0.16,0.28}: httpx<0.28.0
+    anthropic-v0.16: anthropic~=0.16.0
+    anthropic-v0.28: anthropic~=0.28.0
+    anthropic-v0.40: anthropic~=0.40.0
+    anthropic-latest: Anthropic
 
     # Arq
     arq-v0.23: arq~=0.23.0
