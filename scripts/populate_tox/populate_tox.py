@@ -424,8 +424,7 @@ if __name__ == "__main__":
                     release.python_versions
                 )
 
-                # Give PYPI some breathing room
-                time.sleep(0.25)
+                time.sleep(0.1)  # give PYPI some breathing room
 
             test_releases = [
                 release for release in test_releases if release.python_versions

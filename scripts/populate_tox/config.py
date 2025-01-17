@@ -3,39 +3,7 @@
 # dependencies, optionally gated behind specific conditions; and optionally
 # the Python versions to test on.
 #
-# The format is:
-# ```
-# integration_name: {
-#     "package": name_of_main_package_on_pypi,
-#     "deps": {
-#          rule1: [package1, package2, ...],
-#          rule2: [package3, package4, ...],
-#      },
-#      "python": python_version_specifier,
-# }
-# ```
-#
-# The following can be set as a rule:
-#   - `*`: packages will be always installed
-#   - a version specifier on the main package (e.g. `<=0.32`): packages will only
-#     be installed if the main package falls into the version bounds specified
-#   - specific Python version(s) in the form `py3.8,py3.9`: packages will only be
-#     installed if the Python version matches one from the list
-#
-# Rules can be used to specify version bounds on older versions of the main
-# package's dependencies, for example. If e.g. Flask tests generally need
-# Werkzeug and don't care about its version, but Flask older than 3.0 needs
-# a specific Werkzeug version to work, you can say:
-#
-# ```
-#     "flask": {
-#         "deps": {
-#             "*": ["Werkzeug"],
-#             "<3.0": ["Werkzeug<2.1.0"],
-#         }
-#     }
-# ````
-
+# See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
     "aiohttp": {
