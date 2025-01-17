@@ -34,7 +34,10 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
 
         if asyncio.iscoroutinefunction(httpx_client.get):
             response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url, timeout=timeout, verify=False)
+                httpx_client.get(
+                    url,
+                    timeout=timeout,
+                )
             )
         else:
             response = httpx_client.get(url)
@@ -77,7 +80,10 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
     ) as transaction:
         if asyncio.iscoroutinefunction(httpx_client.get):
             response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url, timeout=timeout, verify=False)
+                httpx_client.get(
+                    url,
+                    timeout=timeout,
+                )
             )
         else:
             response = httpx_client.get(url)
@@ -117,7 +123,6 @@ def test_outgoing_trace_headers_append_to_baggage(sentry_init, httpx_client):
                     url,
                     headers={"baGGage": "custom=data"},
                     timeout=timeout,
-                    verify=False,
                 )
             )
         else:
@@ -270,7 +275,10 @@ def test_option_trace_propagation_targets(
     with sentry_sdk.start_transaction():  # Must be in a transaction to propagate headers
         if asyncio.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url, timeout=timeout, verify=False)
+                httpx_client.get(
+                    url,
+                    timeout=timeout,
+                )
             )
         else:
             httpx_client.get(url)
@@ -350,7 +358,10 @@ def test_span_origin(sentry_init, capture_events, httpx_client):
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url, timeout=timeout, verify=False)
+                httpx_client.get(
+                    url,
+                    timeout=timeout,
+                )
             )
         else:
             httpx_client.get(url)
