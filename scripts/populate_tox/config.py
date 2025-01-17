@@ -357,6 +357,7 @@ TEST_SUITE_CONFIG = {
     "spark": {
         "package": "pyspark",
         "deps": {},
+        "python": ">=3.8",
     },
     "starlette": {
         "package": "starlette",

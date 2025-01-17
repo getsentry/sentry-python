@@ -138,7 +138,7 @@ _MIN_VERSIONS = {
     "flask": (0, 10),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
-    "grpc": (1, 21, 1),  # grpcio
+    "grpc": (1, 32, 0),  # grpcio
     "huggingface_hub": (0, 22),
     "langchain": (0, 0, 210),
     "launchdarkly": (9, 8, 0),

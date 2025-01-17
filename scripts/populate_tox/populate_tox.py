@@ -106,9 +106,10 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
     min_supported = _MIN_VERSIONS.get(integration)
     if min_supported:
         min_supported = Version(".".join(map(str, min_supported)))
-        print(f"  Minimum supported version for {integration} is {min_supported}.")
     else:
-        print(f"  {integration} doesn't have a minimum version. Consider defining one")
+        print(
+            f"  {integration} doesn't have a minimum version defined in sentry_sdk/integrations/__init__.py. Consider defining one"
+        )
 
     filtered_releases = []
 
@@ -177,7 +178,6 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
     if not _supports_lowest(releases[0]):
         i = bisect_left(releases, True, key=_supports_lowest)
         if i != len(releases) and _supports_lowest(releases[i]):
-            print(i)
             # we found the lowest version that supports at least some Python
             # version(s) that we do, cut off the rest
             releases = releases[i:]
