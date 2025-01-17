@@ -170,12 +170,15 @@ TEST_SUITE_CONFIG = {
     },
     "graphene": {
         "package": "graphene",
-        "deps": {"*": ["blinker", "fastapi", "flask", "httpx"]},
+        "deps": {
+            "*": ["blinker", "fastapi", "flask", "httpx"],
+            "py3.6": ["aiocontextvars"],
+        },
     },
     "grpc": {
         "package": "grpcio",
         "deps": {
-            "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"]
+            "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"],
         },
     },
     "httpx": {
