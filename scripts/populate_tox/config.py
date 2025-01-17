@@ -374,7 +374,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": [
                 "pytest-asyncio",
-                "pytest-multipart",
+                "python-multipart",
                 "requests",
                 "cryptography",
                 "pydantic<2.0.0",
@@ -399,6 +399,7 @@ TEST_SUITE_CONFIG = {
             "<=6.4.1": [
                 "pytest<8.2"
             ],  # https://github.com/tornadoweb/tornado/pull/3382
+            "py3.6": ["aiocontextvars"],
         },
     },
     "trytond": {
