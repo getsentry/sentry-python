@@ -367,6 +367,8 @@ TEST_SUITE_CONFIG = {
                 "httpx",
             ],
             "<=0.36": ["httpx<0.28.0"],
+            "<0.15": ["jinja2<3.1"],
+            "py3.6": ["aiocontextvars"],
         },
     },
     "starlite": {
