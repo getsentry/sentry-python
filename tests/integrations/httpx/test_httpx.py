@@ -12,7 +12,7 @@ from sentry_sdk.integrations.httpx import HttpxIntegration
 from tests.conftest import ApproxDict
 
 
-timeout = httpx.Timeout(5.0, read=None, connect=None)
+timeout = httpx.Timeout(10)
 
 
 @pytest.mark.parametrize(
@@ -40,7 +40,7 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
                 )
             )
         else:
-            response = httpx_client.get(url)
+            response = httpx_client.get(url, timeout=timeout)
 
         assert response.status_code == 200
         capture_message("Testing!")
@@ -86,7 +86,7 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
                 )
             )
         else:
-            response = httpx_client.get(url)
+            response = httpx_client.get(url, timeout=timeout)
 
         request_span = transaction._span_recorder.spans[-1]
         assert response.request.headers[
@@ -126,7 +126,9 @@ def test_outgoing_trace_headers_append_to_baggage(sentry_init, httpx_client):
                 )
             )
         else:
-            response = httpx_client.get(url, headers={"baGGage": "custom=data"})
+            response = httpx_client.get(
+                url, headers={"baGGage": "custom=data"}, timeout=timeout
+            )
 
         request_span = transaction._span_recorder.spans[-1]
         assert response.request.headers[
@@ -281,7 +283,7 @@ def test_option_trace_propagation_targets(
                 )
             )
         else:
-            httpx_client.get(url)
+            httpx_client.get(url, timeout=timeout)
 
     request_headers = httpx_mock.get_request().headers
 
@@ -301,7 +303,7 @@ def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
     )
 
     httpx_client = httpx.Client()
-    httpx_client.get("http://example.com/")
+    httpx_client.get("http://example.com/", timeout=timeout)
 
     request_headers = httpx_mock.get_request().headers
     assert "sentry-trace" not in request_headers
@@ -320,7 +322,7 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
         "sentry_sdk.integrations.httpx.parse_url",
         side_effect=ValueError,
     ):
-        response = httpx_client.get(url)
+        response = httpx_client.get(url, timeout=timeout)
 
     assert response.status_code == 200
     capture_message("Testing!")
@@ -364,7 +366,7 @@ def test_span_origin(sentry_init, capture_events, httpx_client):
                 )
             )
         else:
-            httpx_client.get(url)
+            httpx_client.get(url, timeout=timeout)
 
     (event,) = events
 
