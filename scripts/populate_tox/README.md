@@ -82,7 +82,7 @@ a specific Werkzeug version to work, you can say:
         "<3.0": ["Werkzeug<2.1.0"],
     }
 }
-````
+```
 
 Sometimes, things depend on the Python version installed. If the integration
 test should only run on specific Python version, e.g. if you want AIOHTTP
