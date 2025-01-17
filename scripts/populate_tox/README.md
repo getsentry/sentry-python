@@ -23,21 +23,6 @@ a number of releases in between:
 - If the package doesn't have multiple majors, we pick two versions in between
   lowest and highest.
 
-
-### How to add a test suite
-
-1. Add the minimum supported version of the framework/library to `_MIN_VERSIONS`
-   in `integrations/__init__.py`. This should be the lowest version of the
-   framework that we can guarantee works with the SDK. If you've just added the
-   integration, it's fine to set this to the latest version of the framework
-   at the time.
-2. Add the integration and any constraints to `TEST_SUITE_CONFIG`. See below
-   for the format (or copy-paste one of the existing entries).
-3. Add the integration to one of the groups in the `GROUPS` dictionary in
-   `scripts/split_tox_gh_actions/split_tox_gh_actions.py`.
-4. Add the `TESTPATH` for the test suite in `tox.jinja`'s `setenv` section.
-5. Run `scripts/generate-test-files.sh` and commit the changes.
-
 #### Caveats
 
 - Make sure the integration name is the same everywhere. If it consists of
@@ -109,3 +94,42 @@ you can say:
     },
 },
 ```
+
+## How-Tos
+
+### Add a new test suite
+
+1. Add the minimum supported version of the framework/library to `_MIN_VERSIONS`
+   in `integrations/__init__.py`. This should be the lowest version of the
+   framework that we can guarantee works with the SDK. If you've just added the
+   integration, it's fine to set this to the latest version of the framework
+   at the time.
+2. Add the integration and any constraints to `TEST_SUITE_CONFIG`. See below
+   for the format (or copy-paste one of the existing entries).
+3. Add the integration to one of the groups in the `GROUPS` dictionary in
+   `scripts/split_tox_gh_actions/split_tox_gh_actions.py`.
+4. Add the `TESTPATH` for the test suite in `tox.jinja`'s `setenv` section.
+5. Run `scripts/generate-test-files.sh` and commit the changes.
+
+### Migrate a test suite to populate_tox.py
+
+A handful of integration test suites are still hardcoded. The goal is to migrate
+them all to `populate_tox.py` over time.
+
+1. Remove the integration from the `IGNORE` list in `populate_tox.py`.
+2. Remove the hardcoded entries for the integration from the `envlist` and `deps` sections of `tox.jinja`.
+2. Run `scripts/generate-test-files.sh`.
+3. Run the test suite, either locally or by creating a PR.
+4. Address any test failures that happen.
+
+You might have to introduce additional version bounds on the dependencies of the
+package. Try to determine the source of the failure and address it.
+
+Common scenarios:
+- An old version of the tested package installs a dependency without defining
+  an upper version bound on it. A new version of the dependency is installed that
+  is incompatible with the package. In this case you need to determine which
+  version of the dependency don't contain the breaking change and restrict this
+  in `TEST_SUITE_CONFIG`.
+- Tests are failing on an old Python version. In this case double-check whether
+  we were even testing them on that version in the original `tox.ini`.
