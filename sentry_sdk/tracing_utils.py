@@ -154,12 +154,6 @@ def record_sql_queries(
         yield span
 
 
-def maybe_create_breadcrumbs_from_span(scope, span):
-    # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
-    # TODO: can be removed when POtelSpan replaces Span
-    pass
-
-
 def _get_frame_module_abs_path(frame):
     # type: (FrameType) -> Optional[str]
     try:

@@ -26,8 +26,6 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
     NoOpSpan,
     Span,
-    POTelSpan,
-    Transaction,
 )
 from sentry_sdk.utils import (
     capture_internal_exception,
@@ -677,7 +675,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture = True  # type: bool
 
-        self._span = None  # type: Optional[POTelSpan]
+        self._span = None  # type: Optional[Span]
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
 
@@ -707,7 +705,7 @@ class Scope:
     @property
     def transaction(self):
         # type: () -> Any
-        # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
+        # would be type: () -> Optional[Span], see https://github.com/python/mypy/issues/3004
         """Return the transaction (root span) in the scope, if any."""
 
         # there is no span/transaction on the scope
@@ -734,7 +732,7 @@ class Scope:
         # anything set in the scope.
         # XXX: note that with the introduction of the Scope.transaction getter,
         # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a Transaction, the setter sets a transaction name.
+        # getter returns a Span, the setter sets a transaction name.
         # Without breaking version compatibility, we could make the setter set a
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
@@ -785,13 +783,13 @@ class Scope:
 
     @property
     def span(self):
-        # type: () -> Optional[POTelSpan]
+        # type: () -> Optional[Span]
         """Get current tracing span."""
         return self._span
 
     @span.setter
     def span(self, span):
-        # type: (Optional[POTelSpan]) -> None
+        # type: (Optional[Span]) -> None
         """Set current tracing span."""
         self._span = span
 
@@ -952,7 +950,7 @@ class Scope:
             self._breadcrumbs.popleft()
 
     def start_transaction(self, transaction=None, **kwargs):
-        # type: (Optional[Transaction], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Span], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Span, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -981,6 +979,7 @@ class Scope:
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
             available arguments.
         """
+        # TODO-neel-potel fix signature and no op
         kwargs.setdefault("scope", self)
 
         client = self.get_client()
@@ -988,7 +987,7 @@ class Scope:
         try_autostart_continuous_profiler()
 
         # if we haven't been given a transaction, make one
-        transaction = Transaction(**kwargs)
+        transaction = Span(**kwargs)
 
         # use traces_sample_rate, traces_sampler, and/or inheritance to make a
         # sampling decision
@@ -1024,6 +1023,7 @@ class Scope:
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
+        # TODO-neel-potel fix signature and no op
         if kwargs.get("description") is not None:
             warnings.warn(
                 "The `description` parameter is deprecated. Please use `name` instead.",
@@ -1054,13 +1054,14 @@ class Scope:
     def continue_trace(
         self, environ_or_headers, op=None, name=None, source=None, origin=None
     ):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], Optional[str]) -> Transaction
+        # TODO-neel-potel fix signature and no op
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], Optional[str]) -> Span
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
         self.generate_propagation_context(environ_or_headers)
 
-        transaction = Transaction.continue_from_headers(
+        transaction = Span.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
             op=op,
             origin=origin,

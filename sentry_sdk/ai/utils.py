@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
 
-from sentry_sdk.tracing import POTelSpan as Span
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import logger
 
 

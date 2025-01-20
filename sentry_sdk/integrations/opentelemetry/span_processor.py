@@ -98,7 +98,7 @@ class SentrySpanProcessor(SpanProcessor):
     def _add_root_span(self, span, parent_span):
         # type: (Span, AbstractSpan) -> None
         """
-        This is required to make POTelSpan.root_span work
+        This is required to make Span.root_span work
         since we can't traverse back to the root purely with otel efficiently.
         """
         if parent_span != INVALID_SPAN and not parent_span.get_span_context().is_remote:

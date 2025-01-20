@@ -12,7 +12,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _request_headers_to_span_attributes,
 )
 from sentry_sdk.sessions import track_session
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import Span, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -157,7 +157,7 @@ class SentryWsgiMiddleware:
 
 def _sentry_start_response(  # type: ignore
     old_start_response,  # type: StartResponse
-    transaction,  # type: Optional[Transaction]
+    transaction,  # type: Optional[Span]
     status,  # type: str
     response_headers,  # type: WsgiResponseHeaders
     exc_info=None,  # type: Optional[WsgiExcInfo]
