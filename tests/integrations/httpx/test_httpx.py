@@ -11,9 +11,6 @@ from sentry_sdk.integrations.httpx import HttpxIntegration
 from tests.conftest import ApproxDict
 
 
-timeout = httpx.Timeout(read=None, write=None, connect=None, pool=None)
-
-
 @pytest.mark.parametrize(
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
@@ -34,13 +31,10 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
 
         if asyncio.iscoroutinefunction(httpx_client.get):
             response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(
-                    url,
-                    timeout=timeout,
-                )
+                httpx_client.get(url)
             )
         else:
-            response = httpx_client.get(url, timeout=timeout)
+            response = httpx_client.get(url)
 
         assert response.status_code == 200
         capture_message("Testing!")
@@ -84,13 +78,10 @@ def test_outgoing_trace_headers(sentry_init, httpx_client, httpx_mock):
     ) as transaction:
         if asyncio.iscoroutinefunction(httpx_client.get):
             response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(
-                    url,
-                    timeout=timeout,
-                )
+                httpx_client.get(url)
             )
         else:
-            response = httpx_client.get(url, timeout=timeout)
+            response = httpx_client.get(url)
 
         request_span = transaction._span_recorder.spans[-1]
         assert response.request.headers[
@@ -131,13 +122,10 @@ def test_outgoing_trace_headers_append_to_baggage(
                 httpx_client.get(
                     url,
                     headers={"baGGage": "custom=data"},
-                    timeout=timeout,
                 )
             )
         else:
-            response = httpx_client.get(
-                url, headers={"baGGage": "custom=data"}, timeout=timeout
-            )
+            response = httpx_client.get(url, headers={"baGGage": "custom=data"})
 
         request_span = transaction._span_recorder.spans[-1]
         assert response.request.headers[
@@ -285,14 +273,9 @@ def test_option_trace_propagation_targets(
 
     with sentry_sdk.start_transaction():  # Must be in a transaction to propagate headers
         if asyncio.iscoroutinefunction(httpx_client.get):
-            asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(
-                    url,
-                    timeout=timeout,
-                )
-            )
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:
-            httpx_client.get(url, timeout=timeout)
+            httpx_client.get(url)
 
     request_headers = httpx_mock.get_request().headers
 
@@ -312,7 +295,7 @@ def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
     )
 
     httpx_client = httpx.Client()
-    httpx_client.get("http://example.com/", timeout=timeout)
+    httpx_client.get("http://example.com/")
 
     request_headers = httpx_mock.get_request().headers
     assert "sentry-trace" not in request_headers
@@ -332,7 +315,7 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock)
         "sentry_sdk.integrations.httpx.parse_url",
         side_effect=ValueError,
     ):
-        response = httpx_client.get(url, timeout=timeout)
+        response = httpx_client.get(url)
 
     assert response.status_code == 200
     capture_message("Testing!")
@@ -370,14 +353,9 @@ def test_span_origin(sentry_init, capture_events, httpx_client, httpx_mock):
 
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx_client.get):
-            asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(
-                    url,
-                    timeout=timeout,
-                )
-            )
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:
-            httpx_client.get(url, timeout=timeout)
+            httpx_client.get(url)
 
     (event,) = events
 
