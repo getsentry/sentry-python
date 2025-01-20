@@ -13,7 +13,7 @@ There is a template in this directory called `tox.jinja` which contains a
 combination of hardcoded and generated entries.
 
 The `populate_tox.py` script fills out the auto-generated part of that template.
-It does this by querying PYPI for each framework's package and its metadata and
+It does this by querying PyPI for each framework's package and its metadata and
 then determining which versions make sense to test to get good coverage.
 
 The lowest supported and latest version of a framework are always tested, with

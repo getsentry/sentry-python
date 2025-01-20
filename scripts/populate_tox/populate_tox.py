@@ -112,7 +112,7 @@ IGNORE = {
 
 @functools.cache
 def fetch_package(package: str) -> dict:
-    """Fetch package metadata from PYPI."""
+    """Fetch package metadata from PyPI."""
     url = PYPI_PROJECT_URL.format(project=package)
     pypi_data = requests.get(url)
 
