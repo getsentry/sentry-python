@@ -252,7 +252,7 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
         indexes = [
             0,  # oldest version supported
             len(releases) // 3,
-            len(releases) // 3 * 2,
+            len(releases) // 3 * 2,  # two releases in between, roughly evenly spaced
             -1,  # latest
         ]
 
