@@ -371,4 +371,6 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     span = transaction["spans"][0]
     assert span["op"] == "http.client"
-    assert span["description"] == f"GET http://localhost:{PORT}/top-chasers"  # noqa: E231
+    assert (
+        span["description"] == f"GET http://localhost:{PORT}/top-chasers"  # noqa: E231
+    )

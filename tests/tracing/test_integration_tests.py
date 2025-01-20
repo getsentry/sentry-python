@@ -51,9 +51,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_continue_trace(
-    sentry_init, capture_envelopes, sample_rate
-):  # noqa:N803
+def test_continue_trace(sentry_init, capture_envelopes, sample_rate):  # noqa:N803
     """
     Ensure data is actually passed along via headers, and that they are read
     correctly.
