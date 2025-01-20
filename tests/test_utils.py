@@ -983,3 +983,23 @@ def test_serialize_span_attribute(value, result):
 )
 def test_datetime_from_isoformat(input_str, expected_output):
     assert datetime_from_isoformat(input_str) == expected_output, input_str
+
+
+def test_qualname_from_function_inner_function():
+    def test_function(): ...
+
+    assert (
+        sentry_sdk.utils.qualname_from_function(test_function)
+        == "tests.test_utils.test_qualname_from_function_inner_function.<locals>.test_function"
+    )
+
+
+def test_qualname_from_function_none_name():
+    def test_function(): ...
+
+    test_function.__module__ = None
+
+    assert (
+        sentry_sdk.utils.qualname_from_function(test_function)
+        == "test_qualname_from_function_none_name.<locals>.test_function"
+    )
