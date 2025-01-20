@@ -6,7 +6,6 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import asyncio
 import inspect
-from contextlib import nullcontext
 from copy import deepcopy
 from functools import partial
 
@@ -169,20 +168,24 @@ class SentryAsgiMiddleware:
         # type: (Any, Any, Any) -> Any
         return await self._run_app(scope, receive, send, asgi_version=3)
 
+    async def _run_original_app(self, scope, receive, send, asgi_version):
+        # type: (Any, Any, Any, Any, int) -> Any
+        try:
+            if asgi_version == 2:
+                return await self.app(scope)(receive, send)
+            else:
+                return await self.app(scope, receive, send)
+
+        except Exception as exc:
+            _capture_exception(exc, mechanism_type=self.mechanism_type)
+            raise exc from None
+
     async def _run_app(self, scope, receive, send, asgi_version):
         # type: (Any, Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         is_lifespan = scope["type"] == "lifespan"
         if is_recursive_asgi_middleware or is_lifespan:
-            try:
-                if asgi_version == 2:
-                    return await self.app(scope)(receive, send)
-                else:
-                    return await self.app(scope, receive, send)
-
-            except Exception as exc:
-                _capture_exception(exc, mechanism_type=self.mechanism_type)
-                raise exc from None
+            return await self._run_original_app(scope, receive, send, asgi_version)
 
         _asgi_middleware_applied.set(True)
         try:
@@ -209,52 +212,42 @@ class SentryAsgiMiddleware:
 
                     method = scope.get("method", "").upper()
                     should_trace = method in self.http_methods_to_capture
+                    if not should_trace:
+                        return await self._run_original_app(
+                            scope, receive, send, asgi_version
+                        )
+
                     with sentry_sdk.continue_trace(_get_headers(scope)):
-                        with (
-                            sentry_sdk.start_span(
-                                op=(
-                                    OP.WEBSOCKET_SERVER
-                                    if ty == "websocket"
-                                    else OP.HTTP_SERVER
-                                ),
-                                name=transaction_name,
-                                source=transaction_source,
-                                origin=self.span_origin,
-                                attributes=_prepopulate_attributes(scope),
-                            )
-                            if should_trace
-                            else nullcontext()
+                        with sentry_sdk.start_span(
+                            op=(
+                                OP.WEBSOCKET_SERVER
+                                if ty == "websocket"
+                                else OP.HTTP_SERVER
+                            ),
+                            name=transaction_name,
+                            source=transaction_source,
+                            origin=self.span_origin,
+                            attributes=_prepopulate_attributes(scope),
                         ) as span:
                             if span is not None:
                                 logger.debug("[ASGI] Started transaction: %s", span)
                                 span.set_tag("asgi.type", ty)
-                            try:
 
-                                async def _sentry_wrapped_send(event):
-                                    # type: (Dict[str, Any]) -> Any
-                                    is_http_response = (
-                                        event.get("type") == "http.response.start"
-                                        and span is not None
-                                        and "status" in event
-                                    )
-                                    if is_http_response:
-                                        span.set_http_status(event["status"])
-
-                                    return await send(event)
-
-                                if asgi_version == 2:
-                                    return await self.app(scope)(
-                                        receive, _sentry_wrapped_send
-                                    )
-                                else:
-                                    return await self.app(
-                                        scope, receive, _sentry_wrapped_send
-                                    )
-                            except Exception as exc:
-                                _capture_exception(
-                                    exc, mechanism_type=self.mechanism_type
+                            async def _sentry_wrapped_send(event):
+                                # type: (Dict[str, Any]) -> Any
+                                is_http_response = (
+                                    event.get("type") == "http.response.start"
+                                    and span is not None
+                                    and "status" in event
                                 )
-                                raise exc from None
+                                if is_http_response:
+                                    span.set_http_status(event["status"])
+
+                                return await send(event)
+
+                            return await self._run_original_app(
+                                scope, receive, _sentry_wrapped_send, asgi_version
+                            )
         finally:
             _asgi_middleware_applied.set(False)
 

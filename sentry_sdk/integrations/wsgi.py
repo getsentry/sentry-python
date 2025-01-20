@@ -1,5 +1,4 @@
 import sys
-from contextlib import nullcontext
 from functools import partial
 
 import sentry_sdk
@@ -123,9 +122,9 @@ class SentryWsgiMiddleware:
                         )
                     method = environ.get("REQUEST_METHOD", "").upper()
                     should_trace = method in self.http_methods_to_capture
-                    with sentry_sdk.continue_trace(environ):
-                        with (
-                            sentry_sdk.start_span(
+                    if should_trace:
+                        with sentry_sdk.continue_trace(environ):
+                            with sentry_sdk.start_span(
                                 op=OP.HTTP_SERVER,
                                 name=DEFAULT_TRANSACTION_NAME,
                                 source=TRANSACTION_SOURCE_ROUTE,
@@ -133,31 +132,36 @@ class SentryWsgiMiddleware:
                                 attributes=_prepopulate_attributes(
                                     environ, self.use_x_forwarded_for
                                 ),
-                            )
-                            if should_trace
-                            else nullcontext()
-                        ) as transaction:
-                            try:
-                                response = self.app(
-                                    environ,
-                                    partial(
-                                        _sentry_start_response,
-                                        start_response,
-                                        transaction,
-                                    ),
+                            ) as span:
+                                response = self._run_original_app(
+                                    environ, start_response, span
                                 )
-                            except BaseException:
-                                reraise(*_capture_exception())
+                    else:
+                        response = self._run_original_app(environ, start_response, None)
 
         finally:
             _wsgi_middleware_applied.set(False)
 
         return _ScopedResponse(scope, response)
 
+    def _run_original_app(self, environ, start_response, span):
+        # type: (dict[str, str], StartResponse, Optional[Span]) -> Any
+        try:
+            return self.app(
+                environ,
+                partial(
+                    _sentry_start_response,
+                    start_response,
+                    span,
+                ),
+            )
+        except BaseException:
+            reraise(*_capture_exception())
+
 
 def _sentry_start_response(  # type: ignore
     old_start_response,  # type: StartResponse
-    transaction,  # type: Optional[Span]
+    span,  # type: Optional[Span]
     status,  # type: str
     response_headers,  # type: WsgiResponseHeaders
     exc_info=None,  # type: Optional[WsgiExcInfo]
@@ -165,8 +169,8 @@ def _sentry_start_response(  # type: ignore
     # type: (...) -> WsgiResponseIter
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
-        if transaction is not None:
-            transaction.set_http_status(status_int)
+        if span is not None:
+            span.set_http_status(status_int)
 
     if exc_info is None:
         # The Django Rest Framework WSGI test client, and likely other
