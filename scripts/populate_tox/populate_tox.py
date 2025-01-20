@@ -84,7 +84,6 @@ IGNORE = {
     "langchain_notiktoken",
     "launchdarkly",
     "litestar",
-    "loguru",
     "openai",
     "openai_notiktoken",
     "openfeature",
@@ -104,8 +103,6 @@ IGNORE = {
     "sqlalchemy",
     "strawberry",
     "tornado",
-    "trytond",
-    "typer",
     "unleash",
 }
 
