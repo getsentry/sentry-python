@@ -80,7 +80,7 @@ tests to only run on Python 3.7+, you can say:
 }
 ```
 
-If, on the other hand, you need to install  a specific version of a secondary
+If, on the other hand, you need to install a specific version of a secondary
 dependency on specific Python versions (so the test suite should still run on
 said Python versions, just with different dependency-of-a-dependency bounds),
 you can say:
@@ -104,8 +104,9 @@ you can say:
    framework that we can guarantee works with the SDK. If you've just added the
    integration, it's fine to set this to the latest version of the framework
    at the time.
-2. Add the integration and any constraints to `TEST_SUITE_CONFIG`. See below
-   for the format (or copy-paste one of the existing entries).
+2. Add the integration and any constraints to `TEST_SUITE_CONFIG`. See the
+   "Defining constraints" section for the format (or copy-paste one
+   of the existing entries).
 3. Add the integration to one of the groups in the `GROUPS` dictionary in
    `scripts/split_tox_gh_actions/split_tox_gh_actions.py`.
 4. Add the `TESTPATH` for the test suite in `tox.jinja`'s `setenv` section.
@@ -129,7 +130,7 @@ Common scenarios:
 - An old version of the tested package installs a dependency without defining
   an upper version bound on it. A new version of the dependency is installed that
   is incompatible with the package. In this case you need to determine which
-  version of the dependency don't contain the breaking change and restrict this
+  versions of the dependency don't contain the breaking change and restrict this
   in `TEST_SUITE_CONFIG`.
-- Tests are failing on an old Python version. In this case double-check whether
-  we were even testing them on that version in the original `tox.ini`.
+- Tests are failing on an old Python version. In this case first double-check
+  whether we were even testing them on that version in the original `tox.ini`.
