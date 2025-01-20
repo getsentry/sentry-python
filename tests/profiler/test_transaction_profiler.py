@@ -1,6 +1,5 @@
 import inspect
 import os
-import sentry_sdk
 import sys
 import threading
 import time
@@ -10,7 +9,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.profiler.transaction_profiler import (
     GeventScheduler,
     Profile,
@@ -149,7 +148,7 @@ def test_profiles_sample_rate(
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
     ):
-        with start_transaction(name="profiling"):
+        with start_span(name="profiling"):
             pass
 
     items = defaultdict(list)
@@ -220,7 +219,7 @@ def test_profiles_sampler(
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
     ):
-        with start_transaction(name="profiling"):
+        with start_span(name="profiling"):
             pass
 
     items = defaultdict(list)
@@ -250,7 +249,7 @@ def test_minimum_unique_samples_required(
     envelopes = capture_envelopes()
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    with start_transaction(name="profiling"):
+    with start_span(name="profiling"):
         pass
 
     items = defaultdict(list)
@@ -278,7 +277,7 @@ def test_profile_captured(
 
     envelopes = capture_envelopes()
 
-    with start_transaction(name="profiling"):
+    with start_span(name="profiling"):
         time.sleep(0.05)
 
     items = defaultdict(list)
@@ -815,24 +814,6 @@ def test_profile_processing(
             assert processed["frames"] == expected["frames"]
             assert processed["stacks"] == expected["stacks"]
             assert processed["samples"] == expected["samples"]
-
-
-def test_hub_backwards_compatibility(suppress_deprecation_warnings):
-    hub = sentry_sdk.Hub()
-
-    with pytest.warns(DeprecationWarning):
-        profile = Profile(True, 0, hub=hub)
-
-    with pytest.warns(DeprecationWarning):
-        assert profile.hub is hub
-
-    new_hub = sentry_sdk.Hub()
-
-    with pytest.warns(DeprecationWarning):
-        profile.hub = new_hub
-
-    with pytest.warns(DeprecationWarning):
-        assert profile.hub is new_hub
 
 
 def test_no_warning_without_hub():

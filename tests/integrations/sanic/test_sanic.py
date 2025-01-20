@@ -346,8 +346,9 @@ class TransactionTestConfig:
         expected_status,
         expected_transaction_name,
         expected_source=None,
+        has_transaction_event=True,
     ):
-        # type: (Iterable[Optional[Container[int]]], str, int, Optional[str], Optional[str]) -> None
+        # type: (Iterable[Optional[Container[int]]], str, int, Optional[str], Optional[str], bool) -> None
         """
         expected_transaction_name of None indicates we expect to not receive a transaction
         """
@@ -356,6 +357,7 @@ class TransactionTestConfig:
         self.expected_status = expected_status
         self.expected_transaction_name = expected_transaction_name
         self.expected_source = expected_source
+        self.has_transaction_event = has_transaction_event
 
 
 @pytest.mark.skipif(
@@ -386,6 +388,7 @@ class TransactionTestConfig:
             url="/404",
             expected_status=404,
             expected_transaction_name=None,
+            has_transaction_event=False,
         ),
         TransactionTestConfig(
             # With no ignored HTTP statuses, we should get transactions for 404 errors
@@ -401,6 +404,7 @@ class TransactionTestConfig:
             url="/message",
             expected_status=200,
             expected_transaction_name=None,
+            has_transaction_event=False,
         ),
     ],
 )
@@ -430,9 +434,7 @@ def test_transactions(test_config, sentry_init, app, capture_events):
     (transaction_event, *_) = [*transaction_events, None]
 
     # We should have no transaction event if and only if we expect no transactions
-    assert (transaction_event is None) == (
-        test_config.expected_transaction_name is None
-    )
+    assert bool(transaction_event) == test_config.has_transaction_event
 
     # If a transaction was expected, ensure it is correct
     assert (

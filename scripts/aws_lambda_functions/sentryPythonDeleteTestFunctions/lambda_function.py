@@ -44,11 +44,6 @@ def delete_lambda_functions(prefix="test_"):
 def lambda_handler(event, context):
     functions_deleted = delete_lambda_functions()
 
-    sentry_sdk.metrics.gauge(
-        key="num_aws_functions_deleted",
-        value=functions_deleted,
-    )
-
     return {
         "statusCode": 200,
         "body": f"{functions_deleted} AWS Lambda functions deleted successfully.",

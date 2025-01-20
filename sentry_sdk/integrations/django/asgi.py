@@ -184,6 +184,7 @@ def wrap_async_view(callback):
             op=OP.VIEW_RENDER,
             name=request.resolver_match.view_name,
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ):
             return await callback(request, *args, **kwargs)
 

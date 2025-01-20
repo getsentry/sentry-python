@@ -6,7 +6,7 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_chat_completion_usage,
@@ -67,7 +67,7 @@ def test_nonstreaming_chat_completion(
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         response = (
             client.chat.completions.create(
                 model="some-model", messages=[{"role": "system", "content": "hello"}]
@@ -83,8 +83,8 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]["content"]
-        assert "the model response" in span["data"]["ai.responses"]["content"]
+        assert '"content": "hello"' in span["data"]["ai.input_messages"]
+        assert '"content": "the model response"' in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
@@ -112,7 +112,7 @@ async def test_nonstreaming_chat_completion_async(
     client = AsyncOpenAI(api_key="z")
     client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         response = await client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -125,8 +125,8 @@ async def test_nonstreaming_chat_completion_async(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]["content"]
-        assert "the model response" in span["data"]["ai.responses"]["content"]
+        assert '"content": "hello"' in span["data"]["ai.input_messages"]
+        assert '"content": "the model response"' in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
@@ -204,7 +204,7 @@ def test_streaming_chat_completion(
     ]
 
     client.chat.completions._post = mock.Mock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         response_stream = client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -218,7 +218,7 @@ def test_streaming_chat_completion(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]["content"]
+        assert '"content": "hello"' in span["data"]["ai.input_messages"]
         assert "hello world" in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
@@ -298,7 +298,7 @@ async def test_streaming_chat_completion_async(
     )
 
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         response_stream = await client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -314,7 +314,7 @@ async def test_streaming_chat_completion_async(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]["content"]
+        assert '"content": "hello"' in span["data"]["ai.input_messages"]
         assert "hello world" in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
@@ -330,6 +330,7 @@ async def test_streaming_chat_completion_async(
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
+@pytest.mark.forked
 def test_bad_chat_completion(sentry_init, capture_events):
     sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -392,7 +393,7 @@ def test_embeddings_create(
     )
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         response = client.embeddings.create(
             input="hello", model="text-embedding-3-large"
         )
@@ -440,7 +441,7 @@ async def test_embeddings_create_async(
     )
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         response = await client.embeddings.create(
             input="hello", model="text-embedding-3-large"
         )
@@ -460,6 +461,7 @@ async def test_embeddings_create_async(
     assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
@@ -487,6 +489,7 @@ def test_embeddings_create_raises_error(
     assert event["level"] == "error"
 
 
+@pytest.mark.forked
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -525,7 +528,7 @@ def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -547,7 +550,7 @@ async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_events):
     client = AsyncOpenAI(api_key="z")
     client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         await client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -604,7 +607,7 @@ def test_span_origin_streaming_chat(sentry_init, capture_events):
     ]
 
     client.chat.completions._post = mock.Mock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         response_stream = client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -668,7 +671,7 @@ async def test_span_origin_streaming_chat_async(sentry_init, capture_events):
     )
 
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         response_stream = await client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -703,7 +706,7 @@ def test_span_origin_embeddings(sentry_init, capture_events):
     )
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         client.embeddings.create(input="hello", model="text-embedding-3-large")
 
     (event,) = events
@@ -733,7 +736,7 @@ async def test_span_origin_embeddings_async(sentry_init, capture_events):
     )
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
+    with start_span(name="openai tx"):
         await client.embeddings.create(input="hello", model="text-embedding-3-large")
 
     (event,) = events

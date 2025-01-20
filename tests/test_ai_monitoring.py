@@ -16,7 +16,7 @@ def test_ai_track(sentry_init, capture_events):
     def pipeline():
         tool()
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="pipeline"):
         pipeline()
 
     transaction = events[0]
@@ -43,7 +43,7 @@ def test_ai_track_with_tags(sentry_init, capture_events):
     def pipeline():
         tool()
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="pipeline"):
         pipeline(sentry_tags={"user": "colin"}, sentry_data={"some_data": "value"})
 
     transaction = events[0]
@@ -74,7 +74,7 @@ async def test_ai_track_async(sentry_init, capture_events):
     async def async_pipeline():
         await async_tool()
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="async_pipeline"):
         await async_pipeline()
 
     transaction = events[0]
@@ -102,7 +102,7 @@ async def test_ai_track_async_with_tags(sentry_init, capture_events):
     async def async_pipeline():
         await async_tool()
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="async_pipeline"):
         await async_pipeline(
             sentry_tags={"user": "czyber"}, sentry_data={"some_data": "value"}
         )

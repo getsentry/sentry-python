@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 
-from sentry_sdk import get_client, start_transaction
+from sentry_sdk import get_client, start_span
 from sentry_sdk.integrations.arq import ArqIntegration
 
 import arq.worker
@@ -292,7 +292,7 @@ async def test_enqueue_job(capture_events, init_arq_settings, source, request):
 
     events = capture_events()
 
-    with start_transaction() as transaction:
+    with start_span(name="test") as transaction:
         await pool.enqueue_job("dummy_job")
 
     (event,) = events
@@ -343,7 +343,7 @@ async def test_span_origin_producer(capture_events, init_arq_settings, source, r
 
     events = capture_events()
 
-    with start_transaction():
+    with start_span(name="job"):
         await pool.enqueue_job("dummy_job")
 
     (event,) = events
