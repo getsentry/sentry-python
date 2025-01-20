@@ -136,7 +136,7 @@ def fetch_release(package: str, version: Version) -> dict:
 def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Version]:
     """Drop versions that are unsupported without making additional API calls."""
     min_supported = _MIN_VERSIONS.get(integration)
-    if min_supported:
+    if min_supported is not None:
         min_supported = Version(".".join(map(str, min_supported)))
     else:
         print(
