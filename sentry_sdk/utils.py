@@ -1501,7 +1501,7 @@ def qualname_from_function(func):
 
     # Python 3: methods, functions, classes
     if func_qualname is not None:
-        if hasattr(func, "__module__"):
+        if hasattr(func, "__module__") and isinstance(func.__module__, str):
             func_qualname = func.__module__ + "." + func_qualname
         func_qualname = prefix + func_qualname + suffix
 
