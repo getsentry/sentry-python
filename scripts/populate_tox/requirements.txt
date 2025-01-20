@@ -1,4 +1,3 @@
 jinja2
 packaging
 requests
-sentry_sdk

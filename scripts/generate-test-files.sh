@@ -1,16 +1,17 @@
-#!/bin/bash
+#!/bin/sh
 
 # This script generates tox.ini and CI YAML files in one go.
 
 set -xe
 
-SCRIPT_DIR="$( cd -- "$( dirname -- "$0" )" && pwd )"
+cd "$(dirname "$0")"
 
 python -m venv .venv
-source .venv/bin/activate
+. .venv/bin/activate
 
-pip install -r "$SCRIPT_DIR/populate_tox/requirements.txt"
-pip install -r "$SCRIPT_DIR/split_tox_gh_actions/requirements.txt"
+pip install -e ..
+pip install -r populate_tox/requirements.txt
+pip install -r split_tox_gh_actions/requirements.txt
 
-python "$SCRIPT_DIR/populate_tox/populate_tox.py"
-python "$SCRIPT_DIR/scripts/split_tox_gh_actions/split_tox_gh_actions.py"
+python populate_tox/populate_tox.py
+python split_tox_gh_actions/split_tox_gh_actions.py
