@@ -58,6 +58,9 @@ GROUPS = {
     "Common": [
         "common",
     ],
+    "Gevent": [
+        "gevent",
+    ],
     "AI": [
         "anthropic",
         "cohere",
@@ -96,7 +99,6 @@ GROUPS = {
         "strawberry",
     ],
     "Network": [
-        "gevent",
         "grpc",
         "httpx",
         "requests",

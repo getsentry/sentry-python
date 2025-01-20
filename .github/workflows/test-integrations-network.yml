@@ -43,10 +43,6 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test gevent latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest"
       - name: Test grpc latest
         run: |
           set -x # print commands that are executed
@@ -101,10 +97,6 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test gevent pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent"
       - name: Test grpc pinned
         run: |
           set -x # print commands that are executed
