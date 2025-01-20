@@ -132,10 +132,15 @@ class SentrySampler(Sampler):
         # parent_span_context.is_valid means this span has a parent, remote or local
         is_root_span = not parent_span_context.is_valid or parent_span_context.is_remote
 
+        sample_rate = None
+
         # Explicit sampled value provided at start_span
-        if attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED) is not None:
+        custom_sampled = cast(
+            "Optional[bool]", attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED)
+        )
+        if custom_sampled is not None:
             if is_root_span:
-                sample_rate = float(attributes[SentrySpanAttribute.CUSTOM_SAMPLED])
+                sample_rate = float(custom_sampled)
                 if sample_rate > 0:
                     return sampled_result(parent_span_context, attributes, sample_rate)
                 else:
@@ -144,8 +149,6 @@ class SentrySampler(Sampler):
                 logger.debug(
                     f"[Tracing] Ignoring sampled param for non-root span {name}"
                 )
-
-        sample_rate = None
 
         # Check if there is a traces_sampler
         # Traces_sampler is responsible to check parent sampled to have full transactions.
@@ -190,16 +193,19 @@ class SentrySampler(Sampler):
 
 
 def create_sampling_context(name, attributes, parent_span_context, trace_id):
-    # type: (str, Attributes, SpanContext, str) -> dict[str, Any]
+    # type: (str, Attributes, Optional[SpanContext], int) -> dict[str, Any]
     sampling_context = {
         "transaction_context": {
             "name": name,
-            "op": attributes.get(SentrySpanAttribute.OP),
-            "source": attributes.get(SentrySpanAttribute.SOURCE),
+            "op": attributes.get(SentrySpanAttribute.OP) if attributes else None,
+            "source": (
+                attributes.get(SentrySpanAttribute.SOURCE) if attributes else None
+            ),
         },
         "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
-    }
+    }  # type: dict[str, Any]
 
-    sampling_context.update(attributes)
+    if attributes is not None:
+        sampling_context.update(attributes)
 
     return sampling_context

@@ -266,7 +266,7 @@ class NoOpSpan:
         scope=None,  # type: Optional[sentry_sdk.Scope]
         end_timestamp=None,  # type: Optional[Union[float, datetime]]
     ):
-        # type: (...) -> Optional[str]
+        # type: (...) -> None
         pass
 
     def set_measurement(self, name, value, unit=""):
@@ -375,7 +375,9 @@ class Span:
                     self.set_status(status)
 
     def __eq__(self, other):
-        # type: (Span) -> bool
+        # type: (object) -> bool
+        if not isinstance(other, Span):
+            return False
         return self._otel_span == other._otel_span
 
     def __repr__(self):
@@ -526,7 +528,6 @@ class Span:
         sample_rate = self._otel_span.get_span_context().trace_state.get(
             TRACESTATE_SAMPLE_RATE_KEY
         )
-        sample_rate = cast("Optional[str]", sample_rate)
         return float(sample_rate) if sample_rate is not None else None
 
     @property
@@ -668,18 +669,24 @@ class Span:
 
     def get_attribute(self, name):
         # type: (str) -> Optional[Any]
-        if not isinstance(self._otel_span, ReadableSpan):
+        if (
+            not isinstance(self._otel_span, ReadableSpan)
+            or not self._otel_span.attributes
+        ):
             return None
         return self._otel_span.attributes.get(name)
 
     def set_attribute(self, key, value):
         # type: (str, Any) -> None
+        # otel doesn't support None as values, preferring to not set the key
+        # at all instead
         if value is None:
-            # otel doesn't support None as values, preferring to not set the key
-            # at all instead
+            return
+        serialized_value = _serialize_span_attribute(value)
+        if serialized_value is None:
             return
 
-        self._otel_span.set_attribute(key, _serialize_span_attribute(value))
+        self._otel_span.set_attribute(key, serialized_value)
 
     @property
     def status(self):
@@ -690,7 +697,7 @@ class Span:
         Sentry `SPANSTATUS` it can not be guaranteed that the status
         set in `set_status()` will be the same as the one returned here.
         """
-        if not hasattr(self._otel_span, "status"):
+        if not isinstance(self._otel_span, ReadableSpan):
             return None
 
         if self._otel_span.status.status_code == StatusCode.UNSET:
@@ -740,10 +747,10 @@ class Span:
 
     def is_success(self):
         # type: () -> bool
-        return self._otel_span.status.code == StatusCode.OK
+        return self.status == SPANSTATUS.OK
 
     def finish(self, end_timestamp=None):
-        # type: (Optional[Union[float, datetime]]) -> Optional[str]
+        # type: (Optional[Union[float, datetime]]) -> None
         if end_timestamp is not None:
             from sentry_sdk.integrations.opentelemetry.utils import (
                 convert_to_otel_timestamp,

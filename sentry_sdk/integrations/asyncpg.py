@@ -189,7 +189,7 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
 
 def _get_db_data(
     conn: Any = None,
-    addr: Optional[tuple[str]] = None,
+    addr: Optional[tuple[str, ...]] = None,
     database: Optional[str] = None,
     user: Optional[str] = None,
 ) -> dict[str, str]:
@@ -218,6 +218,6 @@ def _get_db_data(
     return data
 
 
-def _set_on_span(span: Span, data: dict[str, Any]):
+def _set_on_span(span: Span, data: dict[str, Any]) -> None:
     for key, value in data.items():
         span.set_attribute(key, value)

@@ -449,7 +449,7 @@ class _Client(BaseClient):
                         )
                 return None
 
-            event = event_
+            event = event_  # type: Optional[Event]  # type: ignore[no-redef]
 
             spans_delta = spans_before - len(event.get("spans", []))
             if is_transaction and spans_delta > 0 and self.transport is not None:
@@ -483,7 +483,7 @@ class _Client(BaseClient):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = str(self.options[key]).strip()
+                event[key] = str(self.options[key]).strip()  # type: ignore[literal-required]
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -523,7 +523,7 @@ class _Client(BaseClient):
             and event is not None
             and event.get("type") != "transaction"
         ):
-            new_event = None
+            new_event = None  # type: Optional[Event]
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
             if new_event is None:
@@ -532,7 +532,7 @@ class _Client(BaseClient):
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
                     )
-            event = new_event
+            event = new_event  # type: Optional[Event]  # type: ignore[no-redef]
 
         before_send_transaction = self.options["before_send_transaction"]
         if (
@@ -562,7 +562,7 @@ class _Client(BaseClient):
                         reason="before_send", data_category="span", quantity=spans_delta
                     )
 
-            event = new_event
+            event = new_event  # type: Optional[Event]  # type: ignore[no-redef]
 
         return event
 
