@@ -3,7 +3,6 @@ from unittest import mock
 
 import httpx
 import pytest
-import responses
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_span
@@ -62,7 +61,9 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_outgoing_trace_headers(sentry_init, httpx_client, capture_envelopes, httpx_mock):
+def test_outgoing_trace_headers(
+    sentry_init, httpx_client, capture_envelopes, httpx_mock
+):
     httpx_mock.add_response()
 
     sentry_init(

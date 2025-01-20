@@ -37,7 +37,7 @@ from typing import Any, Callable, Dict, Optional
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import POTelSpan as SentrySpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
@@ -169,7 +169,7 @@ class RustTracingLayer:
             else self.include_tracing_fields
         )
 
-    def on_event(self, event: str, _span_state: Optional[SentrySpan]) -> None:
+    def on_event(self, event: str, _span_state: Optional[Span]) -> None:
         deserialized_event = json.loads(event)
         metadata = deserialized_event.get("metadata", {})
 
@@ -183,7 +183,7 @@ class RustTracingLayer:
         elif event_type == EventTypeMapping.Event:
             process_event(deserialized_event)
 
-    def on_new_span(self, attrs: str, span_id: str) -> Optional[SentrySpan]:
+    def on_new_span(self, attrs: str, span_id: str) -> Optional[Span]:
         attrs = json.loads(attrs)
         metadata = attrs.get("metadata", {})
 
@@ -220,11 +220,11 @@ class RustTracingLayer:
 
         return span
 
-    def on_close(self, span_id: str, span: Optional[SentrySpan]) -> None:
+    def on_close(self, span_id: str, span: Optional[Span]) -> None:
         if span is not None:
             span.__exit__(None, None, None)
 
-    def on_record(self, span_id: str, values: str, span: Optional[SentrySpan]) -> None:
+    def on_record(self, span_id: str, values: str, span: Optional[Span]) -> None:
         if span is not None:
             deserialized_values = json.loads(values)
             for key, value in deserialized_values.items():

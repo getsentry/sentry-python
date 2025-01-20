@@ -676,7 +676,7 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
                     yield span
 
         with mock.patch(
-            "sentry_sdk.tracing.POTelSpan.start_timestamp",
+            "sentry_sdk.tracing.Span.start_timestamp",
             datetime.datetime(2024, 1, 1, microsecond=0, tzinfo=datetime.timezone.utc),
         ):
             with mock.patch(
@@ -723,7 +723,7 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
                     yield span
 
         with mock.patch(
-            "sentry_sdk.tracing.POTelSpan.start_timestamp",
+            "sentry_sdk.tracing.Span.start_timestamp",
             datetime.datetime(2024, 1, 1, microsecond=0, tzinfo=datetime.timezone.utc),
         ):
             with mock.patch(

@@ -28,7 +28,7 @@ from sentry_sdk.integrations.opentelemetry.contextvars_context import (
 )
 from sentry_sdk.integrations.opentelemetry.utils import trace_state_from_baggage
 from sentry_sdk.scope import Scope, ScopeType
-from sentry_sdk.tracing import POTelSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -128,7 +128,7 @@ class PotelScope(Scope):
         return span_context
 
     def start_transaction(self, **kwargs):
-        # type: (Unpack[TransactionKwargs]) -> POTelSpan
+        # type: (Unpack[TransactionKwargs]) -> Span
         """
         .. deprecated:: 3.0.0
             This function is deprecated and will be removed in a future release.
@@ -137,8 +137,8 @@ class PotelScope(Scope):
         return self.start_span(**kwargs)
 
     def start_span(self, **kwargs):
-        # type: (Any) -> POTelSpan
-        return POTelSpan(**kwargs, scope=self)
+        # type: (Any) -> Span
+        return Span(**kwargs, scope=self)
 
 
 _INITIAL_CURRENT_SCOPE = None
