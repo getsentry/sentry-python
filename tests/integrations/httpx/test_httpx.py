@@ -16,7 +16,9 @@ from tests.conftest import ApproxDict, SortedBaggage
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
+def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx_mock):
+    httpx_mock.add_response()
+
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
         return crumb
@@ -24,7 +26,6 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
     sentry_init(integrations=[HttpxIntegration()], before_breadcrumb=before_breadcrumb)
 
     url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
 
     with start_span():
         events = capture_events()
@@ -61,7 +62,9 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_outgoing_trace_headers(sentry_init, httpx_client, capture_envelopes):
+def test_outgoing_trace_headers(sentry_init, httpx_client, capture_envelopes, httpx_mock):
+    httpx_mock.add_response()
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
@@ -70,7 +73,6 @@ def test_outgoing_trace_headers(sentry_init, httpx_client, capture_envelopes):
     envelopes = capture_envelopes()
 
     url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
 
     with start_span(
         name="/interactions/other-dogs/new-dog",
@@ -104,7 +106,10 @@ def test_outgoing_trace_headers_append_to_baggage(
     sentry_init,
     httpx_client,
     capture_envelopes,
+    httpx_mock,
 ):
+    httpx_mock.add_response()
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
@@ -114,7 +119,6 @@ def test_outgoing_trace_headers_append_to_baggage(
     envelopes = capture_envelopes()
 
     url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
 
     with start_span(
         name="/interactions/other-dogs/new-dog",
@@ -306,12 +310,13 @@ def test_propagates_twp_outside_root_span(sentry_init, httpx_mock):
 
 
 @pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
+def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock):
+    httpx_mock.add_response()
+
     sentry_init(integrations=[HttpxIntegration()])
 
     httpx_client = httpx.Client()
     url = "http://example.com"
-    responses.add(responses.GET, url, status=200)
 
     events = capture_events()
     with mock.patch(
@@ -342,7 +347,9 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_span_origin(sentry_init, capture_events, httpx_client):
+def test_span_origin(sentry_init, capture_events, httpx_client, httpx_mock):
+    httpx_mock.add_response()
+
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
@@ -351,7 +358,6 @@ def test_span_origin(sentry_init, capture_events, httpx_client):
     events = capture_events()
 
     url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
 
     with start_span(name="test_root_span"):
         if asyncio.iscoroutinefunction(httpx_client.get):
