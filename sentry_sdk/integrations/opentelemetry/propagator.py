@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional, Set
-    from sentry_sdk.integrations.opentelemetry.scope import PotelScope
+    import sentry_sdk.integrations.opentelemetry.scope as scope
 
 
 class SentryPropagator(TextMapPropagator):
@@ -94,7 +94,7 @@ class SentryPropagator(TextMapPropagator):
 
         scopes = get_value(SENTRY_SCOPES_KEY, context)
         if scopes:
-            scopes = cast("tuple[PotelScope, PotelScope]", scopes)
+            scopes = cast("tuple[scope.PotelScope, scope.PotelScope]", scopes)
             (current_scope, _) = scopes
 
             # TODO-neel-potel check trace_propagation_targets
