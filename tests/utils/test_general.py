@@ -131,7 +131,6 @@ def test_parse_invalid_dsn(dsn):
             None,
             {
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
-                "in_app": False,
             },
         ],
         [
@@ -144,7 +143,6 @@ def test_parse_invalid_dsn(dsn):
             {
                 "module": "fastapi.routing",
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
-                "in_app": False,
             },
         ],
         [
@@ -169,7 +167,6 @@ def test_parse_invalid_dsn(dsn):
             None,
             {
                 "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
-                "in_app": False,
             },
         ],
         [
@@ -182,7 +179,6 @@ def test_parse_invalid_dsn(dsn):
             {
                 "module": "fastapi.routing",
                 "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
-                "in_app": False,
             },
         ],
         [
@@ -216,7 +212,6 @@ def test_parse_invalid_dsn(dsn):
             None,
             {
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
-                "in_app": False,  # because there is no module set
             },
         ],
         [
@@ -254,7 +249,6 @@ def test_parse_invalid_dsn(dsn):
             None,
             {
                 "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
-                "in_app": False,  # because there is no module set
             },
         ],
         [
@@ -301,7 +295,6 @@ def test_parse_invalid_dsn(dsn):
             ["main"],
             {
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
-                "in_app": False,
             },
         ],
         [
@@ -314,7 +307,6 @@ def test_parse_invalid_dsn(dsn):
             {
                 "module": "fastapi.routing",
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
-                "in_app": False,
             },
         ],
         [
@@ -339,7 +331,6 @@ def test_parse_invalid_dsn(dsn):
             ["main"],
             {
                 "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
-                "in_app": False,
             },
         ],
         [
@@ -352,7 +343,6 @@ def test_parse_invalid_dsn(dsn):
             {
                 "module": "fastapi.routing",
                 "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
-                "in_app": False,
             },
         ],
         [
