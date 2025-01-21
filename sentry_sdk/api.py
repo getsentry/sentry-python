@@ -7,6 +7,7 @@ from sentry_sdk.tracing import trace
 from sentry_sdk.crons import monitor
 
 # TODO-neel-potel make 2 scope strategies/impls and switch
+from sentry_sdk.scope import Scope as BaseScope
 from sentry_sdk.integrations.opentelemetry.scope import (
     PotelScope as Scope,
     new_scope,
@@ -123,7 +124,7 @@ def is_initialized():
 
 @scopemethod
 def get_global_scope():
-    # type: () -> Scope
+    # type: () -> BaseScope
     return Scope.get_global_scope()
 
 
@@ -239,7 +240,7 @@ def flush(
 
 
 def start_span(**kwargs):
-    # type: (type.Any) -> Span
+    # type: (Any) -> Span
     """
     Start and return a span.
 

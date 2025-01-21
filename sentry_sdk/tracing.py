@@ -200,6 +200,10 @@ def get_span_status_from_http_code(http_status_code):
 
 
 class NoOpSpan:
+    def __init__(self, **kwargs):
+        # type: (Any) -> None
+        pass
+
     def __repr__(self):
         # type: () -> str
         return "<%s>" % self.__class__.__name__
@@ -263,7 +267,6 @@ class NoOpSpan:
 
     def finish(
         self,
-        scope=None,  # type: Optional[sentry_sdk.Scope]
         end_timestamp=None,  # type: Optional[Union[float, datetime]]
     ):
         # type: (...) -> None
