@@ -59,10 +59,10 @@ def _patch_readable_span():
     def sentry_patched_readable_span(self):
         # type: (Span) -> ReadableSpan
         readable_span = old_readable_span(self)
-        readable_span._sentry_meta = getattr(self, "_sentry_meta", {})
+        readable_span._sentry_meta = getattr(self, "_sentry_meta", {})  # type: ignore[attr-defined]
         return readable_span
 
-    Span._readable_span = sentry_patched_readable_span
+    Span._readable_span = sentry_patched_readable_span  # type: ignore[method-assign]
 
 
 def _setup_sentry_tracing():

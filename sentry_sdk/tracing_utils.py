@@ -525,52 +525,6 @@ class Baggage:
 
         return Baggage(sentry_items, third_party_items, mutable)
 
-    @classmethod
-    def populate_from_transaction(cls, transaction):
-        # type: (sentry_sdk.tracing.Transaction) -> Baggage
-        """
-        Populate fresh baggage entry with sentry_items and make it immutable
-        if this is the head SDK which originates traces.
-        """
-        client = sentry_sdk.get_client()
-        sentry_items = {}  # type: Dict[str, str]
-
-        if not client.is_active():
-            return Baggage(sentry_items)
-
-        options = client.options or {}
-
-        sentry_items["trace_id"] = transaction.trace_id
-
-        if options.get("environment"):
-            sentry_items["environment"] = options["environment"]
-
-        if options.get("release"):
-            sentry_items["release"] = options["release"]
-
-        if options.get("dsn"):
-            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
-
-        if (
-            transaction.name
-            and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
-        ):
-            sentry_items["transaction"] = transaction.name
-
-        if transaction.sample_rate is not None:
-            sentry_items["sample_rate"] = str(transaction.sample_rate)
-
-        if transaction.sampled is not None:
-            sentry_items["sampled"] = "true" if transaction.sampled else "false"
-
-        # there's an existing baggage but it was mutable,
-        # which is why we are creating this new baggage.
-        # However, if by chance the user put some sentry items in there, give them precedence.
-        if transaction._baggage and transaction._baggage.sentry_items:
-            sentry_items.update(transaction._baggage.sentry_items)
-
-        return Baggage(sentry_items, mutable=False)
-
     def freeze(self):
         # type: () -> None
         self.mutable = False
@@ -722,6 +676,5 @@ def get_current_span(scope=None):
 # Circular imports
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
-    LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
