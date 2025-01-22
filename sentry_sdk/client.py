@@ -483,7 +483,7 @@ class _Client(BaseClient):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = str(self.options[key]).strip()  # type: ignore[literal-required]
+                event[key] = str(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
