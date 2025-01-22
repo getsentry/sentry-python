@@ -5,7 +5,6 @@ import os
 import pytest
 import requests
 import subprocess
-import shutil
 import time
 import threading
 import yaml
