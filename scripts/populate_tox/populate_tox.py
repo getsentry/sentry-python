@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -393,6 +393,50 @@ def write_tox_file(packages: dict) -> None:
         file.write("\n")
 
 
+def _get_package_name(integration: str) -> Tuple[str, Optional[str]]:
+    package = TEST_SUITE_CONFIG[integration]["package"]
+    extra = None
+    if "[" in package:
+        extra = package[package.find("[") + 1 : package.find("]")]
+        package = package[: package.find("[")]
+
+    return package, extra
+
+
+def _compare_min_version_with_defined(
+    integration: str, releases: list[Version]
+) -> None:
+    defined_min_version = _MIN_VERSIONS.get(integration)
+    if defined_min_version:
+        defined_min_version = Version(".".join([str(v) for v in defined_min_version]))
+        if (
+            defined_min_version.major != releases[0].major
+            or defined_min_version.minor != releases[0].minor
+        ):
+            print(
+                f"  Integration defines {defined_min_version} as minimum "
+                f"version, but the effective minimum version is {releases[0]}."
+            )
+
+
+def _add_python_versions_to_release(integration: str, package: str, release: Version):
+    release_pypi_data = fetch_release(package, release)
+    time.sleep(0.1)  # give PYPI some breathing room
+
+    target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
+    if target_python_versions:
+        target_python_versions = SpecifierSet(target_python_versions)
+
+    release.python_versions = pick_python_versions_to_test(
+        supported_python_versions(
+            determine_python_versions(release_pypi_data),
+            target_python_versions,
+        )
+    )
+
+    release.rendered_python_versions = _render_python_versions(release.python_versions)
+
+
 def main() -> None:
     print("Finding out the lowest and highest Python version supported by the SDK...")
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
@@ -413,11 +457,7 @@ def main() -> None:
             print(f"Processing {integration}...")
 
             # Figure out the actual main package
-            package = TEST_SUITE_CONFIG[integration]["package"]
-            extra = None
-            if "[" in package:
-                extra = package[package.find("[") + 1 : package.find("]")]
-                package = package[: package.find("[")]
+            package, extra = _get_package_name(integration)
 
             # Fetch data for the main package
             pypi_data = fetch_package(package)
@@ -428,18 +468,7 @@ def main() -> None:
                 print("  Found no supported releases.")
                 continue
 
-            defined_min_version = _MIN_VERSIONS.get(integration)
-            if defined_min_version:
-                defined_min_version = Version(
-                    ".".join([str(v) for v in defined_min_version])
-                )
-                if (
-                    defined_min_version.major != releases[0].major
-                    or defined_min_version.minor != releases[0].minor
-                ):
-                    print(
-                        f"  Integration defines {defined_min_version} as minimum version, but the effective minimum version is {releases[0]}."
-                    )
+            _compare_min_version_with_defined(integration, releases)
 
             # Pick a handful of the supported releases to actually test against
             # and fetch the PYPI data for each to determine which Python versions
@@ -447,23 +476,11 @@ def main() -> None:
             test_releases = pick_releases_to_test(releases)
 
             for release in test_releases:
-                target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-                if target_python_versions:
-                    target_python_versions = SpecifierSet(target_python_versions)
-                release_pypi_data = fetch_release(package, release)
-                release.python_versions = pick_python_versions_to_test(
-                    supported_python_versions(
-                        determine_python_versions(release_pypi_data),
-                        target_python_versions,
-                    )
+                py_versions = _add_python_versions_to_release(
+                    integration, package, release
                 )
-                if not release.python_versions:
+                if not py_versions:
                     print(f"  Release {release} has no Python versions, skipping.")
-                release.rendered_python_versions = _render_python_versions(
-                    release.python_versions
-                )
-
-                time.sleep(0.1)  # give PYPI some breathing room
 
             test_releases = [
                 release for release in test_releases if release.python_versions
