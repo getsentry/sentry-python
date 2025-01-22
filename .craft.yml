@@ -25,6 +25,8 @@ targets:
           - python3.9
           - python3.10
           - python3.11
+          - python3.12
+          - python3.13
     license: MIT
   - name: sentry-pypi
     internalPypiRepo: getsentry/pypi
