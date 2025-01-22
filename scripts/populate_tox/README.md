@@ -102,11 +102,10 @@ you can say:
 1. Add the minimum supported version of the framework/library to `_MIN_VERSIONS`
    in `integrations/__init__.py`. This should be the lowest version of the
    framework that we can guarantee works with the SDK. If you've just added the
-   integration, it's fine to set this to the latest version of the framework
+   integration, you should generally set this to the latest version of the framework
    at the time.
 2. Add the integration and any constraints to `TEST_SUITE_CONFIG`. See the
-   "Defining constraints" section for the format (or copy-paste one
-   of the existing entries).
+   "Defining constraints" section for the format.
 3. Add the integration to one of the groups in the `GROUPS` dictionary in
    `scripts/split_tox_gh_actions/split_tox_gh_actions.py`.
 4. Add the `TESTPATH` for the test suite in `tox.jinja`'s `setenv` section.
