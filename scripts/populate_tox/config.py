@@ -5,4 +5,20 @@
 #
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
-TEST_SUITE_CONFIG = {}
+TEST_SUITE_CONFIG = {
+    "clickhouse_driver": {
+        "package": "clickhouse-driver",
+    },
+    "pymongo": {
+        "package": "pymongo",
+        "deps": {
+            "*": ["mockupdb"],
+        },
+    },
+    "redis_py_cluster_legacy": {
+        "package": "redis-py-cluster",
+    },
+    "sqlalchemy": {
+        "package": "sqlalchemy",
+    },
+}
