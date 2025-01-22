@@ -5,4 +5,28 @@
 #
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
-TEST_SUITE_CONFIG = {}
+TEST_SUITE_CONFIG = {
+    "flask": {
+        "package": "flask",
+        "deps": {
+            "*": ["flask-login", "werkzeug"],
+            "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
+        },
+    },
+    "starlette": {
+        "package": "starlette",
+        "deps": {
+            "*": [
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "anyio<4.0.0",
+                "jinja2",
+                "httpx",
+            ],
+            "<=0.36": ["httpx<0.28.0"],
+            "<0.15": ["jinja2<3.1"],
+            "py3.6": ["aiocontextvars"],
+        },
+    },
+}
