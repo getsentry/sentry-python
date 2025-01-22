@@ -347,6 +347,10 @@ def _render_python_versions(python_versions: list[Version]) -> str:
 
 def _render_dependencies(integration: str, releases: list[Version]) -> list[str]:
     rendered = []
+
+    if TEST_SUITE_CONFIG[integration].get("deps") is None:
+        return rendered
+
     for constraint, deps in TEST_SUITE_CONFIG[integration]["deps"].items():
         if constraint == "*":
             for dep in deps:
