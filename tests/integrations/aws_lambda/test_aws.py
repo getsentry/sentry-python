@@ -219,7 +219,7 @@ def test_basic(run_lambda_function):
     assert frame1["abs_path"] == "/var/task/test_lambda.py"
     assert frame1["function"] == "test_handler"
 
-    assert frame1["in_app"] is True
+    assert "in_app" not in frame1
 
     assert exception["mechanism"]["type"] == "aws_lambda"
     assert not exception["mechanism"]["handled"]
