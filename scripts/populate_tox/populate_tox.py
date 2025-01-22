@@ -109,7 +109,7 @@ IGNORE = {
 
 @functools.cache
 def fetch_package(package: str) -> dict:
-    """Fetch package metadata from PYPI."""
+    """Fetch package metadata from PyPI."""
     url = PYPI_PROJECT_URL.format(project=package)
     pypi_data = requests.get(url)
 
@@ -133,7 +133,7 @@ def fetch_release(package: str, version: Version) -> dict:
 def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Version]:
     """Drop versions that are unsupported without making additional API calls."""
     min_supported = _MIN_VERSIONS.get(integration)
-    if min_supported:
+    if min_supported is not None:
         min_supported = Version(".".join(map(str, min_supported)))
     else:
         print(
@@ -249,7 +249,7 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
         indexes = [
             0,  # oldest version supported
             len(releases) // 3,
-            len(releases) // 3 * 2,
+            len(releases) // 3 * 2,  # two releases in between, roughly evenly spaced
             -1,  # latest
         ]
 
@@ -344,6 +344,10 @@ def _render_python_versions(python_versions: list[Version]) -> str:
 
 def _render_dependencies(integration: str, releases: list[Version]) -> list[str]:
     rendered = []
+
+    if TEST_SUITE_CONFIG[integration].get("deps") is None:
+        return rendered
+
     for constraint, deps in TEST_SUITE_CONFIG[integration]["deps"].items():
         if constraint == "*":
             for dep in deps:
