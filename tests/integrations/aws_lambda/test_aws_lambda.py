@@ -113,7 +113,7 @@ class SentryTestServer:
         self.envelopes = []
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def sentry_test_server():
     server = SentryTestServer()
     server.start()
@@ -123,7 +123,7 @@ def sentry_test_server():
     yield server
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def sam_stack():
     """
     Create and deploy the SAM stack once for all tests
@@ -181,7 +181,7 @@ def lambda_client():
     )
 
 
-def test_basic(lambda_client, sam_stack, sentry_test_server):
+def test_basic(lambda_client, sentry_test_server):
     sentry_test_server.clear_envelopes()
 
     response = lambda_client.invoke(
@@ -193,7 +193,7 @@ def test_basic(lambda_client, sam_stack, sentry_test_server):
     assert result == {"message": "Hello, Anton!"}
 
 
-def test_basic_2(lambda_client, sam_stack, sentry_test_server):
+def test_basic_2(lambda_client, sentry_test_server):
     sentry_test_server.clear_envelopes()
 
     response = lambda_client.invoke(
