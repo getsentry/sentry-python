@@ -89,6 +89,9 @@ GROUPS = {
         "openfeature",
         "unleash",
     ],
+    "Gevent": [
+        "gevent",
+    ],
     "GraphQL": [
         "ariadne",
         "gql",
@@ -96,7 +99,6 @@ GROUPS = {
         "strawberry",
     ],
     "Network": [
-        "gevent",
         "grpc",
         "httpx",
         "requests",
