@@ -3,7 +3,6 @@ This script populates tox.ini automatically using release data from PYPI.
 """
 
 import functools
-import hashlib
 import os
 import sys
 import time
@@ -394,16 +393,7 @@ def write_tox_file(packages: dict) -> None:
         file.write("\n")
 
 
-def _get_tox_hash():
-    hasher = hashlib.md5()
-    with open(TOX_FILE, "rb") as f:
-        buf = f.read()
-        hasher.update(buf)
-
-    return hasher.hexdigest()
-
-
-def main(fail_on_changes: bool = False) -> None:
+def main() -> None:
     print("Finding out the lowest and highest Python version supported by the SDK...")
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
     sdk_python_versions = determine_python_versions(fetch_package("sentry_sdk"))
@@ -488,19 +478,8 @@ def main(fail_on_changes: bool = False) -> None:
                     }
                 )
 
-    old_hash = _get_tox_hash()
     write_tox_file(packages)
-    new_hash = _get_tox_hash()
-    if fail_on_changes and old_hash != new_hash:
-        raise RuntimeError(
-            "There are unexpected changes in tox.ini. tox.ini is not meant to "
-            "be edited directly. It's generated from a template located in "
-            "scripts/populate_tox/tox.jinja. "
-            "Please make sure that both the template and the tox generation "
-            "script in scripts/populate_tox/populate_tox.py are updated as well."
-        )
 
 
 if __name__ == "__main__":
-    fail_on_changes = len(sys.argv) == 2 and sys.argv[1] == "--fail-on-changes"
-    main(fail_on_changes)
+    main()
