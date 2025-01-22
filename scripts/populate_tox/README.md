@@ -48,7 +48,20 @@ integration_name: {
 }
 ```
 
-The following can be set as a rule:
+### `package`
+
+The name of the third party package as it's listed on PyPI. The script will
+be picking different versions of this package to test.
+
+This key is mandatory.
+
+### `deps`
+
+The test dependencies of the test suite. They're defined as a dictionary of
+`rule: [package1, package2, ...]` key-value pairs. All packages
+in the package list of a rule will be installed as long as the rule applies.
+
+`rule`s are predefined. Each `rule` must be one of the following:
   - `*`: packages will be always installed
   - a version specifier on the main package (e.g. `<=0.32`): packages will only
     be installed if the main package falls into the version bounds specified
@@ -60,40 +73,49 @@ package's dependencies, for example. If e.g. Flask tests generally need
 Werkzeug and don't care about its version, but Flask older than 3.0 needs
 a specific Werkzeug version to work, you can say:
 
-```
+```python
 "flask": {
     "deps": {
         "*": ["Werkzeug"],
         "<3.0": ["Werkzeug<2.1.0"],
-    }
-}
-```
-
-Sometimes, things depend on the Python version installed. If the integration
-test should only run on specific Python version, e.g. if you want AIOHTTP
-tests to only run on Python 3.7+, you can say:
-
-```
-"aiohttp": {
+    },
     ...
-    "python": ">=3.7",
 }
 ```
 
-If, on the other hand, you need to install a specific version of a secondary
-dependency on specific Python versions (so the test suite should still run on
-said Python versions, just with different dependency-of-a-dependency bounds),
-you can say:
+If you need to install a specific version of a secondary dependency on specific
+Python versions, you can say:
 
-```
+```python
 "celery": {
-    ...
     "deps": {
         "*": ["newrelic", "redis"],
         "py3.7": ["importlib-metadata<5.0"],
     },
-},
+    ...
+}
 ```
+
+### `python`
+
+Sometimes, the whole test suite should only run on specific Python versions.
+This can be achieved via the `python` key, which expects a version specifier.
+
+For example, if you want AIOHTTP tests to only run on Python 3.7+, you can say:
+
+```python
+"aiohttp": {
+    "python": ">=3.7",
+    ...
+}
+```
+
+Specifying `python` is discouraged as the script itself finds out which
+Python versions are supported by the package. However, if a package has broken
+metadata or the SDK is explicitly not supporting some packages on specific
+Python versions (because of, for example, broken context vars), the `python`
+key can be used.
+
 
 ## How-Tos
 
