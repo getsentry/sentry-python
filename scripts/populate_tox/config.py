@@ -5,4 +5,18 @@
 #
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
-TEST_SUITE_CONFIG = {}
+TEST_SUITE_CONFIG = {
+    "loguru": {
+        "package": "loguru",
+    },
+    "trytond": {
+        "package": "trytond",
+        "deps": {
+            "*": ["werkzeug"],
+            "<=5.0": ["werkzeug<1.0"],
+        },
+    },
+    "typer": {
+        "package": "typer",
+    },
+}
