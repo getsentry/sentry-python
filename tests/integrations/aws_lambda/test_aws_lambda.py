@@ -1,17 +1,25 @@
 import boto3
+import gzip
 import json
+import os
 import pytest
 import requests
 import subprocess
+import shutil
 import time
 import threading
 import yaml
+
 from aws_cdk import (
     App,
     CfnResource,
     Stack,
 )
 from constructs import Construct
+from fastapi import FastAPI, Request
+import uvicorn
+
+from scripts.build_aws_lambda_layer import build_packaged_zip, DIST_PATH
 
 
 SAM_PORT = 3001
@@ -28,12 +36,18 @@ class DummyLambdaStack(Stack):
         self.template_options.transforms = ["AWS::Serverless-2016-10-31"]
 
         # Create Sentry Lambda Layer
+        filename = "sentry-sdk-lambda-layer.zip"
+        build_packaged_zip(
+            make_dist=True,
+            out_zip_filename=filename,
+        )
+
         layer = CfnResource(
             self,
             "SentryPythonServerlessSDK",
             type="AWS::Serverless::LayerVersion",
             properties={
-                "ContentUri": "./tests/integrations/aws_lambda/lambda_layer",
+                "ContentUri": os.path.join(DIST_PATH, filename),
                 "CompatibleRuntimes": [
                     "python3.7",
                     "python3.8",
@@ -53,9 +67,16 @@ class DummyLambdaStack(Stack):
             type="AWS::Serverless::Function",
             properties={
                 "CodeUri": "./tests/integrations/aws_lambda/lambda_functions/hello_world",
-                "Handler": "index.handler",
+                "Handler": "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
                 "Runtime": "python3.12",
-                "Layers": [{"Ref": layer.logical_id}],
+                "Layers": [{"Ref": layer.logical_id}],  # The layer adds the sentry-sdk
+                "Environment": {  # The environment variables are set up the Sentry SDK to instrument the lambda function
+                    "Variables": {
+                        "SENTRY_DSN": "http://123@host.docker.internal:9999/0",
+                        "SENTRY_INITIAL_HANDLER": "index.handler",
+                        "SENTRY_TRACES_SAMPLE_RATE": "1.0",
+                    }
+                },
             },
         )
 
@@ -84,32 +105,51 @@ class SentryTestServer:
     def __init__(self, port=9999):
         self.envelopes = []
         self.port = port
-
-        from fastapi import FastAPI, Request
-
         self.app = FastAPI()
-
-        @self.app.get("/")
-        async def root():
-            return {
-                "message": "Sentry Test Server. Use DSN http://123@localhost:9999/0 in your SDK."
-            }
 
         @self.app.post("/api/0/envelope/")
         async def envelope(request: Request):
-            self.envelopes.append(await request.json())
+            print("[SENTRY SERVER] Received envelope")
+            try:
+                raw_body = await request.body()
+            except:
+                return {"status": "no body"}
+
+            try:
+                body = gzip.decompress(raw_body).decode("utf-8")
+            except:
+                # If decompression fails, assume it's plain text
+                body = raw_body.decode("utf-8")
+
+            lines = body.split("\n")
+
+            current_line = 1  # line 0 is envelope header
+            while current_line < len(lines):
+                # skip empty lines
+                if not lines[current_line].strip():
+                    current_line += 1
+                    continue
+
+                # skip envelope item header
+                current_line += 1
+
+                # add envelope item to store
+                envelope_item = lines[current_line]
+                if envelope_item.strip():
+                    self.envelopes.append(json.loads(envelope_item))
+
             return {"status": "ok"}
 
     def run_server(self):
-        import uvicorn
-
         uvicorn.run(self.app, host="0.0.0.0", port=self.port)
 
     def start(self):
+        print("[SENTRY SERVER] Starting server")
         server_thread = threading.Thread(target=self.run_server, daemon=True)
         server_thread.start()
 
     def clear_envelopes(self):
+        print("[SENTRY SERVER] Clear envelopes")
         self.envelopes = []
 
 
@@ -185,21 +225,27 @@ def test_basic(lambda_client, sentry_test_server):
     sentry_test_server.clear_envelopes()
 
     response = lambda_client.invoke(
-        FunctionName="BasicTestFunction", Payload=json.dumps({"name": "Anton"})
+        FunctionName="BasicTestFunction", Payload=json.dumps({"name": "Ivana"})
     )
     result = json.loads(response["Payload"].read().decode())
+    assert result == {"message": "Hello, Ivana!"}
 
+    print("envelopes:")
     print(sentry_test_server.envelopes)
-    assert result == {"message": "Hello, Anton!"}
+
+    # assert sentry_test_server.envelopes == [{"message": "[SENTRY MESSAGE] Hello, Ivana!"}]
 
 
 def test_basic_2(lambda_client, sentry_test_server):
     sentry_test_server.clear_envelopes()
 
     response = lambda_client.invoke(
-        FunctionName="BasicTestFunction", Payload=json.dumps({"name": "Anton"})
+        FunctionName="BasicTestFunction", Payload=json.dumps({"name": "Neel"})
     )
     result = json.loads(response["Payload"].read().decode())
+    assert result == {"message": "Hello, Neel!"}
 
+    print("envelopes2:")
     print(sentry_test_server.envelopes)
-    assert result == {"message": "Hello, Anton!"}
+
+    # assert sentry_test_server.envelopes == [{"message": "[SENTRY MESSAGE] Hello, Neel!"}]
