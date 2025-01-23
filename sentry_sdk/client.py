@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import cast, overload
+import warnings
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
@@ -139,6 +140,13 @@ def _get_options(*args, **kwargs):
             "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
         )
         rv["socket_options"] = None
+
+    if rv["enable_tracing"] is not None:
+        warnings.warn(
+            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     return rv
 
