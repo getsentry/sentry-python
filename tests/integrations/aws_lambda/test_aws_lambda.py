@@ -7,7 +7,7 @@ import yaml
 
 from aws_cdk import App
 
-from .utils import DummyLambdaStack, SentryTestServer, SAM_PORT, SAM_REGION
+from .utils import DummyLambdaStack, SentryTestServer, SAM_PORT
 
 SAM_TEMPLATE_FILE = "sam.template.yaml"
 
@@ -23,7 +23,7 @@ def test_environment():
 
     # Create the SAM stack
     app = App()
-    stack = DummyLambdaStack(app, "DummyLambdaStack", env={"region": SAM_REGION})
+    stack = DummyLambdaStack(app, "DummyLambdaStack")
 
     # Write template to file
     template = app.synth().get_stack_by_name("DummyLambdaStack").template
@@ -36,8 +36,6 @@ def test_environment():
             "sam",
             "local",
             "start-lambda",
-            "--region",
-            SAM_REGION,
             "--template",
             SAM_TEMPLATE_FILE,
         ],
@@ -84,7 +82,6 @@ def lambda_client():
     return boto3.client(
         "lambda",
         endpoint_url=f"http://127.0.0.1:{SAM_PORT}",
-        region_name=SAM_REGION,
         aws_access_key_id="dummy",
         aws_secret_access_key="dummy",
     )

@@ -17,7 +17,6 @@ from scripts.build_aws_lambda_layer import build_packaged_zip, DIST_PATH
 
 
 SAM_PORT = 3001
-SAM_REGION = "us-east-1"
 
 
 class DummyLambdaStack(Stack):
