@@ -79,25 +79,27 @@ class DummyLambdaStack(Stack):
             },
         )
 
+    @classmethod
+    def wait_for_stack(cls, timeout=30, port=SAM_PORT):
+        """
+        Wait for SAM to be ready, with timeout.
+        """
+        start_time = time.time()
+        while True:
+            if time.time() - start_time > timeout:
+                raise TimeoutError(
+                    "SAM failed to start within {} seconds".format(timeout)
+                )
 
-def wait_for_sam(timeout=30, port=SAM_PORT):
-    """
-    Wait for SAM to be ready, with timeout.
-    """
-    start_time = time.time()
-    while True:
-        if time.time() - start_time > timeout:
-            raise TimeoutError("SAM failed to start within {} seconds".format(timeout))
+            try:
+                # Try to connect to SAM
+                response = requests.get(f"http://127.0.0.1:{port}/")
+                if response.status_code == 200 or response.status_code == 404:
+                    return
 
-        try:
-            # Try to connect to SAM
-            response = requests.get(f"http://127.0.0.1:{port}/")
-            if response.status_code == 200 or response.status_code == 404:
-                return
-
-        except requests.exceptions.ConnectionError:
-            time.sleep(1)
-            continue
+            except requests.exceptions.ConnectionError:
+                time.sleep(1)
+                continue
 
 
 class SentryTestServer:
@@ -153,20 +155,14 @@ class SentryTestServer:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def sentry_test_server():
+def test_environment():
+    print("Setting up AWS Lambda test infrastructure")
+
+    # Setup dummy relay to capture envelopes
     server = SentryTestServer()
     server.start()
-
     time.sleep(1)  # Give it a moment to start up
 
-    yield server
-
-
-@pytest.fixture(scope="session", autouse=True)
-def sam_stack():
-    """
-    Create and deploy the SAM stack once for all tests
-    """
     # Create the SAM stack
     app = App()
     stack = DummyLambdaStack(app, "DummyLambdaStack", env={"region": SAM_REGION})
@@ -194,16 +190,32 @@ def sam_stack():
 
     try:
         # Wait for SAM to be ready
-        wait_for_sam()
-        yield stack
+        DummyLambdaStack.wait_for_stack()
+
+        def before_test():
+            server.clear_envelopes()
+            print("[TEST] Clearing envelopes before test")
+
+        yield {
+            "stack": stack,
+            "server": server,
+            "before_test": before_test,  # Add this function to the yielded dict
+        }
 
     finally:
+        print("Tearing down AWS Lambda test infrastructure")
+
         process.terminate()
         process.wait(timeout=5)  # Give it time to shut down gracefully
 
         # Force kill if still running
         if process.poll() is None:
             process.kill()
+
+
+@pytest.fixture(autouse=True)
+def clear_before_test(test_environment):
+    test_environment["before_test"]()
 
 
 @pytest.fixture
@@ -220,23 +232,20 @@ def lambda_client():
     )
 
 
-def test_basic(lambda_client, sentry_test_server):
-    sentry_test_server.clear_envelopes()
-
+def test_basic(lambda_client, test_environment):
     response = lambda_client.invoke(
         FunctionName="BasicTestFunction", Payload=json.dumps({"name": "Ivana"})
     )
     result = json.loads(response["Payload"].read().decode())
     assert result == {"message": "Hello, Ivana!"}
 
-    print("envelopes:")
-    print(sentry_test_server.envelopes)
+    message, transaction = test_environment["server"].envelopes
+    assert message["message"] == "[SENTRY MESSAGE] Hello, Ivana!"
+    assert transaction["type"] == "transaction"
 
-    # assert sentry_test_server.envelopes == [{"message": "[SENTRY MESSAGE] Hello, Ivana!"}]
 
-
-def test_basic_2(lambda_client, sentry_test_server):
-    sentry_test_server.clear_envelopes()
+def test_basic_2(lambda_client, test_environment):
+    test_environment["server"].clear_envelopes()
 
     response = lambda_client.invoke(
         FunctionName="BasicTestFunction", Payload=json.dumps({"name": "Neel"})
@@ -244,7 +253,10 @@ def test_basic_2(lambda_client, sentry_test_server):
     result = json.loads(response["Payload"].read().decode())
     assert result == {"message": "Hello, Neel!"}
 
-    print("envelopes2:")
-    print(sentry_test_server.envelopes)
+    message, transaction = test_environment["server"].envelopes
+    assert message["message"] == "[SENTRY MESSAGE] Hello, Neel!"
+    assert transaction["type"] == "transaction"
 
-    # assert sentry_test_server.envelopes == [{"message": "[SENTRY MESSAGE] Hello, Neel!"}]
+
+# what is not working:
+# i should improve how the server are started and stopped at the beginning and end of the test session.
