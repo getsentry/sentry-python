@@ -103,7 +103,6 @@ class SentryTestServer:
 
         @self.app.post("/api/0/envelope/")
         async def envelope(request: Request):
-            print("[SENTRY SERVER] Received envelope")
             try:
                 raw_body = await request.body()
             except:
@@ -135,7 +134,7 @@ class SentryTestServer:
             return {"status": "ok"}
 
     def run_server(self):
-        uvicorn.run(self.app, host="0.0.0.0", port=self.port)
+        uvicorn.run(self.app, host="0.0.0.0", port=self.port, log_level="warning")
 
     def start(self):
         print("[SENTRY SERVER] Starting server")
