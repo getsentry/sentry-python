@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
     is_valid_sample_rate,
     logger,
     nanosecond_time,
+    AnnotatedValue
 )
 
 from typing import TYPE_CHECKING
@@ -193,7 +194,7 @@ def get_span_status_from_http_code(http_status_code):
 class _SpanRecorder:
     """Limits the number of spans recorded in a transaction."""
 
-    __slots__ = ("maxlen", "spans")
+    __slots__ = ("maxlen", "spans", "dropped_spans")
 
     def __init__(self, maxlen):
         # type: (int) -> None
@@ -203,14 +204,52 @@ class _SpanRecorder:
         # should be changed to match a consistent interpretation of what maxlen
         # limits: either transaction+spans or only child spans.
         self.maxlen = maxlen - 1
-        self.spans = []  # type: List[Span]
+        self.spans = []  # type: Union[List[Span], AnnotatedValue]
+        self.dropped_spans = 0 # type: int
 
     def add(self, span):
         # type: (Span) -> None
         if len(self.spans) > self.maxlen:
             span._span_recorder = None
+            self.dropped_spans += 1
         else:
             self.spans.append(span)
+
+    
+
+
+
+
+
+    # __slots__ = ("maxlen", "_spans")
+
+    # def __init__(self, maxlen):
+    #     # type: (int) -> None
+    #     # FIXME: this is `maxlen - 1` only to preserve historical behavior
+    #     # enforced by tests.
+    #     # Either this should be changed to `maxlen` or the JS SDK implementation
+    #     # should be changed to match a consistent interpretation of what maxlen
+    #     # limits: either transaction+spans or only child spans.
+    #     self.maxlen = maxlen - 1
+    #     self._spans = []  # type: Union[List[Span], AnnotatedValue]
+
+    # def add(self, span):
+    #     # type: (Span) -> None
+    #     if isinstance(self._spans, AnnotatedValue):
+    #         self._spans.metadata["len"] += 1
+    #     else:
+    #         if len(self._spans) > self.maxlen:
+    #             span._span_recorder = None
+    #             self._spans = AnnotatedValue(self._spans, {"len": self.maxlen}) # TODO!
+    #         else:
+    #             self._spans.append(span)
+
+    # @property
+    # def spans(self):
+    #     # type: () -> List[Span]
+    #     if isinstance(self._spans, AnnotatedValue):
+    #         return self._spans.value
+    #     return self._spans
 
 
 class Span:
@@ -971,6 +1010,10 @@ class Transaction(Span):
             for span in self._span_recorder.spans
             if span.timestamp is not None
         ]
+
+        len_diff = len(self._span_recorder.spans) - len(finished_spans)
+        if len_diff or self._span_recorder.dropped_spans:
+            finished_spans = AnnotatedValue(finished_spans, {"len": len_diff + self._span_recorder.dropped_spans})
 
         # we do this to break the circular reference of transaction -> span
         # recorder -> span -> containing transaction (which is where we started)
