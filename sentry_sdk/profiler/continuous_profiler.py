@@ -129,7 +129,7 @@ def try_continuous_profiling_auto_start():
     if not _scheduler.is_auto_start_enabled():
         return
 
-    _scheduler.ensure_running()
+    _scheduler.manual_start()
 
 
 def start_profiler():
@@ -137,7 +137,7 @@ def start_profiler():
     if _scheduler is None:
         return
 
-    _scheduler.ensure_running()
+    _scheduler.manual_start()
 
 
 def stop_profiler():
@@ -198,15 +198,15 @@ class ContinuousScheduler:
         experiments = self.options.get("_experiments")
         if not experiments:
             return False
-        if not experiments.get("continuous_profiling_auto_start"):
-            return False
 
-        # Ensure that the scheduler only autostarts once per process.
-        # This is necessary because many web servers use forks to spawn
-        # additional processes. And the profiler is only spawned on the
-        # master process, then it often only profiles the main process
-        # and not the ones where the requests are being handled.
-        return self.pid != os.getpid()
+        return experiments.get("continuous_profiling_auto_start")
+
+    def manual_start(self):
+        # type: () -> None
+        if not self.sampled:
+            return
+
+        self.ensure_running()
 
     def ensure_running(self):
         # type: () -> None
@@ -305,10 +305,6 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     def ensure_running(self):
         # type: () -> None
 
-        # if the current profile session is not sampled, ensure_running is noop
-        if not self.sampled:
-            return
-
         pid = os.getpid()
 
         # is running on the right process
@@ -385,10 +381,6 @@ class GeventContinuousScheduler(ContinuousScheduler):
         # type: () -> None
         pid = os.getpid()
 
-        # if the current profile session is not sampled, ensure_running is noop
-        if not self.sampled:
-            return
-
         # is running on the right process
         if self.running and self.pid == pid:
             return
@@ -415,7 +407,6 @@ class GeventContinuousScheduler(ContinuousScheduler):
                 # longer allows us to spawn a thread and we have to bail.
                 self.running = False
                 self.thread = None
-                return
 
     def teardown(self):
         # type: () -> None
