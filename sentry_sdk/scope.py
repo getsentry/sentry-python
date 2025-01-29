@@ -187,7 +187,7 @@ class Scope:
         "_contexts",
         "_extras",
         "_breadcrumbs",
-        "_breadcrumb_info",
+        "_n_breadcrumbs_truncated",
         "_event_processors",
         "_error_processors",
         "_should_capture",
@@ -212,7 +212,7 @@ class Scope:
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[PropagationContext]
-        self._breadcrumb_info = 0  # type: int
+        self._n_breadcrumbs_truncated = 0  # type: int
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -246,7 +246,7 @@ class Scope:
         rv._extras = dict(self._extras)
 
         rv._breadcrumbs = copy(self._breadcrumbs)
-        rv._breadcrumb_info = copy(self._breadcrumb_info)
+        rv._n_breadcrumbs_truncated = copy(self._n_breadcrumbs_truncated)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
         rv._propagation_context = self._propagation_context
@@ -920,7 +920,7 @@ class Scope:
         # type: () -> None
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
-        self._breadcrumb_info = 0
+        self._n_breadcrumbs_truncated = 0
 
     def add_attachment(
         self,
@@ -988,7 +988,7 @@ class Scope:
 
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
-            self._breadcrumb_info += 1
+            self._n_breadcrumbs_truncated += 1
 
     def start_transaction(
         self,
@@ -1388,7 +1388,9 @@ class Scope:
             pass
 
         # Add annotation that breadcrumbs were truncated
-        original_length = len(event["breadcrumbs"]["values"]) + self._breadcrumb_info
+        original_length = (
+            len(event["breadcrumbs"]["values"]) + self._n_breadcrumbs_truncated
+        )
         event["breadcrumbs"]["values"] = AnnotatedValue.truncated_breadcrumbs(
             event["breadcrumbs"]["values"], original_length
         )
