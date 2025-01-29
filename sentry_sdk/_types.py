@@ -81,10 +81,17 @@ class AnnotatedValue:
             },
         )
 
+    @classmethod
+    def truncated_breadcrumbs(cls, breadcrumbs, n_truncated):
+        # type: (list[Breadcrumb], int) -> AnnotatedValue
+        """Breadcrumbs were removed because the number of breadcrumbs exceeded their maximum limit."""
+        return AnnotatedValue(
+            value=breadcrumbs,
+            metadata={"len": [n_truncated]},  # Remark
+        )
 
 T = TypeVar("T")
 Annotated = Union[AnnotatedValue, T]
-
 
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence

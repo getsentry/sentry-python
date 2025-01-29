@@ -145,9 +145,14 @@ class EventScrubber:
         with capture_internal_exceptions():
             if "breadcrumbs" in event:
                 if "values" in event["breadcrumbs"]:
-                    for value in event["breadcrumbs"]["values"]:
-                        if "data" in value:
-                            self.scrub_dict(value["data"])
+                    if isinstance(event["breadcrumbs"]["values"], AnnotatedValue):
+                        for value in event["breadcrumbs"]["values"].value:
+                            if "data" in value:
+                                self.scrub_dict(value["data"])
+                    else:
+                        for value in event["breadcrumbs"]["values"]:
+                            if "data" in value:
+                                self.scrub_dict(value["data"])
 
     def scrub_frames(self, event):
         # type: (Event) -> None

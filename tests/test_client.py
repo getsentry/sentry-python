@@ -22,7 +22,7 @@ from sentry_sdk import (
     set_tag,
 )
 from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
-from sentry_sdk.utils import capture_internal_exception
+from sentry_sdk.utils import AnnotatedValue, capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -1058,8 +1058,10 @@ def test_max_breadcrumbs_option(
         add_breadcrumb({"type": "sourdough"})
 
     capture_message("dogs are great")
-
-    assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs
+    if isinstance(events[0]["breadcrumbs"]["values"], AnnotatedValue):
+        assert len(events[0]["breadcrumbs"]["values"].value) == expected_breadcrumbs
+    else:
+        assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs
 
 
 def test_multiple_positional_args(sentry_init):
