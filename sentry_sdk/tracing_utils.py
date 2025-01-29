@@ -161,8 +161,20 @@ def maybe_create_breadcrumbs_from_span(scope, span):
         scope.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
+
     elif span.op == OP.HTTP_CLIENT:
-        scope.add_breadcrumb(type="http", category="httplib", data=span._data)
+        level = "info"  # XXX is this correct?
+        status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)
+        if status_code:
+            if 500 <= status_code <= 599:
+                level = "error"
+            elif 400 <= status_code <= 499:
+                level = "warning"
+
+        scope.add_breadcrumb(
+            type="http", category="httplib", data=span._data, level=level
+        )
+
     elif span.op == "subprocess":
         scope.add_breadcrumb(
             type="subprocess",
