@@ -42,6 +42,48 @@ def test_crumb_capture(sentry_init, capture_events):
     )
 
 
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
+    sentry_init(integrations=[StdlibIntegration()])
+    events = capture_events()
+
+    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
+    urlopen(url)
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if level is None:
+        assert "level" not in crumb
+    else:
+        assert crumb["level"] == level
+
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: status_code,
+            "reason": "OK",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
+
+
 def test_crumb_capture_hint(sentry_init, capture_events):
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"

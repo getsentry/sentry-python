@@ -45,7 +45,7 @@ def test_crumb_capture(sentry_init, capture_events):
         (500, "error"),
     ],
 )
-def test_crumb_capture_warning(sentry_init, capture_events, status_code, level):
+def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
     sentry_init(integrations=[StdlibIntegration()])
 
     events = capture_events()
