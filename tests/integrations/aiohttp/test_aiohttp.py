@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 from contextlib import suppress
 from unittest import mock
 
@@ -473,9 +474,22 @@ async def test_trace_from_headers_if_performance_disabled(
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
+if sys.version_info >= (3, 12):
+
+    @pytest.fixture
+    def asyncio_loop(event_loop):
+        yield event_loop
+
+else:
+
+    @pytest.fixture
+    def asyncio_loop(loop):
+        yield loop
+
+
 @pytest.mark.asyncio
 async def test_crumb_capture(
-    sentry_init, aiohttp_raw_server, aiohttp_client, event_loop, capture_events
+    sentry_init, aiohttp_raw_server, aiohttp_client, asyncio_loop, capture_events
 ):
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
