@@ -111,8 +111,6 @@ def test_crumb_capture_client_error(
                 SPANDATA.HTTP_FRAGMENT: "",
                 SPANDATA.HTTP_QUERY: "",
                 SPANDATA.HTTP_STATUS_CODE: status_code,
-                "reason": "OK",
-                "extra": "foo",
             }
         )
 

@@ -1,6 +1,7 @@
 import random
 from http.client import HTTPConnection, HTTPSConnection
 from socket import SocketIO
+from urllib.error import HTTPError
 from urllib.request import urlopen
 from unittest import mock
 
@@ -57,7 +58,10 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
     events = capture_events()
 
     url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
-    urlopen(url)
+    try:
+        urlopen(url)
+    except HTTPError:
+        pass
 
     capture_message("Testing!")
 
@@ -77,7 +81,6 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
             "url": url,
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: status_code,
-            "reason": "OK",
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
         }
