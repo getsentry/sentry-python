@@ -475,7 +475,7 @@ async def test_trace_from_headers_if_performance_disabled(
 
 @pytest.mark.asyncio
 async def test_crumb_capture(
-    sentry_init, aiohttp_raw_server, aiohttp_client, loop, capture_events
+    sentry_init, aiohttp_raw_server, aiohttp_client, event_loop, capture_events
 ):
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
