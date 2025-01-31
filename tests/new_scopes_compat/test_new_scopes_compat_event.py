@@ -66,7 +66,6 @@ def expected_error(integrations):
                                     "vars": {
                                         "ex": mock.ANY,
                                     },
-                                    "in_app": True,
                                 }
                             ]
                         },
