@@ -33,7 +33,7 @@ from sentry_sdk.tracing import (
     Transaction,
 )
 from sentry_sdk.utils import (
-    AnnotatedValue,
+    AnnotatedDeque,
     capture_internal_exception,
     capture_internal_exceptions,
     ContextVar,
@@ -1388,12 +1388,13 @@ class Scope:
             pass
 
         # Add annotation that breadcrumbs were truncated
-        original_length = (
-            len(event["breadcrumbs"]["values"]) + self._n_breadcrumbs_truncated
-        )
-        event["breadcrumbs"]["values"] = AnnotatedValue.truncated_breadcrumbs(
-            event["breadcrumbs"]["values"], original_length
-        )
+        if self._n_breadcrumbs_truncated:
+            original_length = (
+                len(event["breadcrumbs"]["values"]) + self._n_breadcrumbs_truncated
+            )
+            event["breadcrumbs"]["values"] = AnnotatedDeque.truncated_breadcrumbs(
+                event["breadcrumbs"]["values"], original_length
+            )
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None

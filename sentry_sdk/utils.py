@@ -43,6 +43,7 @@ if TYPE_CHECKING:
         Callable,
         cast,
         ContextManager,
+        Deque,
         Dict,
         Iterator,
         List,
@@ -59,7 +60,7 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    from sentry_sdk._types import Breadcrumb, Event, ExcInfo
+    from sentry_sdk._types import Event, ExcInfo
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -410,7 +411,6 @@ class Auth:
         if self.secret_key is not None:
             rv.append(("sentry_secret", self.secret_key))
         return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
-
 
 def get_type_name(cls):
     # type: (Optional[type]) -> Optional[str]
