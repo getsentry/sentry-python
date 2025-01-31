@@ -123,9 +123,6 @@ def try_continuous_profiling_auto_start():
     if _scheduler is None:
         return
 
-    # Additionally, we only want this autostart behaviour once per
-    # process. If the user explicitly calls `stop_profiler`, it should
-    # be respected and not start the profiler again.
     if not _scheduler.is_auto_start_enabled():
         return
 
@@ -145,7 +142,7 @@ def stop_profiler():
     if _scheduler is None:
         return
 
-    _scheduler.teardown()
+    _scheduler.manual_stop()
 
 
 def teardown_continuous_profiler():
@@ -195,6 +192,15 @@ class ContinuousScheduler:
 
     def is_auto_start_enabled(self):
         # type: () -> bool
+
+        # Ensure that the scheduler only autostarts once per process.
+        # This is necessary because many web servers use forks to spawn
+        # additional processes. And the profiler is only spawned on the
+        # master process, then it often only profiles the main process
+        # and not the ones where the requests are being handled.
+        if self.pid == os.getpid():
+            return False
+
         experiments = self.options.get("_experiments")
         if not experiments:
             return False
@@ -207,6 +213,10 @@ class ContinuousScheduler:
             return
 
         self.ensure_running()
+
+    def manual_stop(self):
+        # type: () -> None
+        self.teardown()
 
     def ensure_running(self):
         # type: () -> None
