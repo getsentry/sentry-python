@@ -14,3 +14,7 @@ socksio
 httpcore[http2]
 setuptools
 Brotli
+
+aws-sam-cli
+aws-cdk-lib
+requests
