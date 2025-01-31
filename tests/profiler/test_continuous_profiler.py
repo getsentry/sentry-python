@@ -200,7 +200,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
     with sentry_sdk.start_transaction(name="profiling"):
         with sentry_sdk.start_span(op="op"):
-            time.sleep(0.05)
+            time.sleep(0.1)
 
     assert_single_transaction_with_profile_chunks(envelopes, thread)
 
@@ -211,7 +211,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         with sentry_sdk.start_transaction(name="profiling"):
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.05)
+                time.sleep(0.1)
 
         assert_single_transaction_without_profile_chunks(envelopes)
 
@@ -221,7 +221,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         with sentry_sdk.start_transaction(name="profiling"):
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.05)
+                time.sleep(0.1)
 
         assert_single_transaction_with_profile_chunks(envelopes, thread)
 
