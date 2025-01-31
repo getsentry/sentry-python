@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from sentry_sdk.consts import VERSION
 from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk.profiler.utils import extract_stack
+from sentry_sdk.profiler.utils import (
+    DEFAULT_SAMPLING_FREQUENCY,
+    extract_stack,
+)
 from sentry_sdk.utils import (
     capture_internal_exception,
     is_gevent,
@@ -47,11 +50,6 @@ if TYPE_CHECKING:
             "stack_id": int,
         },
     )
-
-
-# The default sampling frequency to use. This is set at 21 in order to
-# mitigate the effects of lockstep sampling.
-DEFAULT_SAMPLING_FREQUENCY = 21
 
 
 try:
