@@ -101,6 +101,8 @@ def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
             elif event.type == "content_block_delta":
                 if hasattr(event.delta, "text"):
                     content_blocks.append(event.delta.text)
+                elif hasattr(event.delta, "partial_json"):
+                    content_blocks.append(event.delta.partial_json)
             elif event.type == "content_block_stop":
                 pass
             elif event.type == "message_delta":
