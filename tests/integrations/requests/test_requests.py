@@ -1,3 +1,4 @@
+import sys
 from unittest import mock
 
 import pytest
@@ -35,6 +36,10 @@ def test_crumb_capture(sentry_init, capture_events):
     )
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 7),
+    reason="The response status is not set on the span early enough in 3.6",
+)
 @pytest.mark.parametrize(
     "status_code,level",
     [
@@ -52,6 +57,8 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
 
     url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
     response = requests.get(url)
+
+    assert response.status_code == status_code
 
     capture_message("Testing!")
 
