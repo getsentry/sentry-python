@@ -2263,7 +2263,7 @@ By: @mgaligniana (#1773)
 
   import sentry_sdk
   from sentry_sdk.integrations.arq import ArqIntegration
-  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+  from sentry_sdk.tracing import TransactionSource
 
   sentry_sdk.init(
       dsn="...",
@@ -2283,7 +2283,7 @@ By: @mgaligniana (#1773)
       await ctx['session'].aclose()
 
   async def main():
-      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TransactionSource.COMPONENT.value):
           redis = await create_pool(RedisSettings())
           for url in ('https://facebook.com', 'https://microsoft.com', 'https://github.com', "asdf"
                       ):
@@ -2357,7 +2357,7 @@ By: @mgaligniana (#1773)
 
   import sentry_sdk
   from sentry_sdk.integrations.huey import HueyIntegration
-  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
+  from sentry_sdk.tracing import TransactionSource, Transaction
 
 
   def main():
@@ -2369,7 +2369,7 @@ By: @mgaligniana (#1773)
           traces_sample_rate=1.0,
       )
 
-      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TransactionSource.COMPONENT.value):
           r = add_numbers(1, 2)
 
   if __name__ == "__main__":

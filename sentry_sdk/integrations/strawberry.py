@@ -7,7 +7,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -204,7 +204,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         transaction = self.graphql_span.containing_transaction
         if transaction and self.execution_context.operation_name:
             transaction.name = self.execution_context.operation_name
-            transaction.source = TRANSACTION_SOURCE_COMPONENT
+            transaction.source = TransactionSource.COMPONENT.value
             transaction.op = op
 
         self.graphql_span.finish()
