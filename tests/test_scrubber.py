@@ -137,7 +137,10 @@ def test_breadcrumb_extra_scrubbing(sentry_init, capture_events):
 
     assert event["_meta"]["extra"]["auth"] == {"": {"rem": [["!config", "s"]]}}
     assert event["_meta"]["breadcrumbs"] == {
-        "values": {"0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}}
+        "values": {
+            "": {"len": [1]},
+            "0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}},
+        }
     }
 
 

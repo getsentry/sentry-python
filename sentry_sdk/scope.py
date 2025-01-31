@@ -29,6 +29,7 @@ from sentry_sdk.tracing import (
     Transaction,
 )
 from sentry_sdk.utils import (
+    AnnotatedDeque,
     capture_internal_exception,
     capture_internal_exceptions,
     ContextVar,
@@ -181,6 +182,7 @@ class Scope:
         "_contexts",
         "_extras",
         "_breadcrumbs",
+        "_n_breadcrumbs_truncated",
         "_event_processors",
         "_error_processors",
         "_should_capture",
@@ -205,6 +207,7 @@ class Scope:
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[PropagationContext]
+        self._n_breadcrumbs_truncated = 0  # type: int
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -238,6 +241,7 @@ class Scope:
         rv._extras = dict(self._extras)
 
         rv._breadcrumbs = copy(self._breadcrumbs)
+        rv._n_breadcrumbs_truncated = copy(self._n_breadcrumbs_truncated)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
         rv._propagation_context = self._propagation_context
@@ -906,6 +910,7 @@ class Scope:
         # type: () -> None
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
+        self._n_breadcrumbs_truncated = 0
 
     def add_attachment(
         self,
@@ -973,6 +978,7 @@ class Scope:
 
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
+            self._n_breadcrumbs_truncated += 1
 
     def start_transaction(
         self,
@@ -1338,6 +1344,15 @@ class Scope:
         except Exception as err:
             logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
+
+        # Add annotation that breadcrumbs were truncated
+        if self._n_breadcrumbs_truncated:
+            original_length = (
+                len(event["breadcrumbs"]["values"]) + self._n_breadcrumbs_truncated
+            )
+            event["breadcrumbs"]["values"] = AnnotatedDeque.truncated_breadcrumbs(
+                event["breadcrumbs"]["values"], original_length
+            )
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
