@@ -49,7 +49,6 @@ from sentry_sdk.spotlight import setup_spotlight
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import Optional
     from typing import Sequence
     from typing import Type
