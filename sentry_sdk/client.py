@@ -491,7 +491,7 @@ class _Client(BaseClient):
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            spans_before = len(event.get("spans", []))
+            spans_before = len(cast(list[dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -510,7 +510,7 @@ class _Client(BaseClient):
                 return None
 
             event = event_
-            spans_delta = spans_before - len(event.get("spans", []))
+            spans_delta = spans_before - len(cast(list[dict[str, object]], event.get("spans", [])))
             if is_transaction and spans_delta > 0 and self.transport is not None:
                 self.transport.record_lost_event(
                     "event_processor", data_category="span", quantity=spans_delta
@@ -609,7 +609,7 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
-            spans_before = len(event.get("spans", []))
+            spans_before = len(cast(list[dict[str, object]], event.get("spans", [])))
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:

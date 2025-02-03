@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import Literal, TypedDict
 
+    from sentry_sdk.utils import Annotated
+
     class SDKInfo(TypedDict):
         name: str
         version: str
@@ -101,7 +103,7 @@ if TYPE_CHECKING:
             "request": dict[str, object],
             "sdk": Mapping[str, object],
             "server_name": str,
-            "spans": list[dict[str, object]],
+            "spans": Annotated[list[dict[str, object]]],
             "stacktrace": dict[
                 str, object
             ],  # We access this key in the code, but I am unsure whether we ever set it
