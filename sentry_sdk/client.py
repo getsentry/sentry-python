@@ -484,7 +484,7 @@ class _Client(BaseClient):
     ):
         # type: (...) -> Optional[Event]
 
-        spans_delta = 0  # type: int
+        previous_total_spans = None  # type: Optional[int]
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
@@ -515,6 +515,10 @@ class _Client(BaseClient):
                 self.transport.record_lost_event(
                     "event_processor", data_category="span", quantity=spans_delta
                 )
+
+            dropped_spans = event.pop("dropped_spans", 0) + spans_delta # type: int
+            if dropped_spans > 0 or spans_delta > 0:
+                previous_total_spans = spans_before + dropped_spans
 
         if (
             self.options["attach_stacktrace"]
@@ -563,10 +567,8 @@ class _Client(BaseClient):
             if event_scrubber:
                 event_scrubber.scrub_event(event)
 
-
-        dropped_spans = event.pop("dropped_spans", 0) + spans_delta # type: int
-        if dropped_spans > 0 or spans_delta > 0:
-            event["spans"] = AnnotatedValue(event.get("spans", []), {"len": spans_before + dropped_spans})
+        if previous_total_spans is not None:
+            event["spans"] = AnnotatedValue(event.get("spans", []), {"len": previous_total_spans})
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
