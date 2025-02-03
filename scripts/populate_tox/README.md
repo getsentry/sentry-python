@@ -35,7 +35,7 @@ the main package (framework, library) to test with; any additional test
 dependencies, optionally gated behind specific conditions; and optionally
 the Python versions to test on.
 
-The format is:
+Constraints are defined using the format specified below. The following sections describe each key.
 
 ```
 integration_name: {
