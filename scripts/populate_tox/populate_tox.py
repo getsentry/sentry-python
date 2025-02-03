@@ -9,6 +9,7 @@ import time
 from bisect import bisect_left
 from collections import defaultdict
 from datetime import datetime, timedelta
+from importlib.metadata import metadata
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pathlib import Path
@@ -144,11 +145,11 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
 
     filtered_releases = []
 
-    for release, metadata in releases.items():
-        if not metadata:
+    for release, data in releases.items():
+        if not data:
             continue
 
-        meta = metadata[0]
+        meta = data[0]
         if datetime.fromisoformat(meta["upload_time"]) < CUTOFF:
             continue
 
@@ -298,15 +299,7 @@ def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version
     return sorted(filtered_python_versions)
 
 
-def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Version]]:
-    try:
-        classifiers = pypi_data["info"]["classifiers"]
-    except (AttributeError, KeyError):
-        # This function assumes `pypi_data` contains classifiers. This is the case
-        # for the most recent release in the /{project} endpoint or for any release
-        # fetched via the /{project}/{version} endpoint.
-        return []
-
+def _parse_python_versions_from_classifiers(classifiers: list[str]) -> list[Version]:
     python_versions = []
     for classifier in classifiers:
         if classifier.startswith(CLASSIFIER_PREFIX):
@@ -320,6 +313,21 @@ def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Versi
 
     if python_versions:
         python_versions.sort()
+        return python_versions
+
+
+def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Version]]:
+    try:
+        classifiers = pypi_data["info"]["classifiers"]
+    except (AttributeError, KeyError):
+        # This function assumes `pypi_data` contains classifiers. This is the case
+        # for the most recent release in the /{project} endpoint or for any release
+        # fetched via the /{project}/{version} endpoint.
+        return []
+
+    # Try parsing classifiers
+    python_versions = _parse_python_versions_from_classifiers(classifiers)
+    if python_versions:
         return python_versions
 
     # We only use `requires_python` if there are no classifiers. This is because
@@ -438,9 +446,10 @@ def _add_python_versions_to_release(integration: str, package: str, release: Ver
 
 
 def main() -> None:
-    print("Finding out the lowest and highest Python version supported by the SDK...")
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
-    sdk_python_versions = determine_python_versions(fetch_package("sentry_sdk"))
+    sdk_python_versions = _parse_python_versions_from_classifiers(
+        metadata("sentry-sdk").get_all("Classifier")
+    )
     MIN_PYTHON_VERSION = sdk_python_versions[0]
     MAX_PYTHON_VERSION = sdk_python_versions[-1]
     print(
