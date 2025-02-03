@@ -13,6 +13,7 @@ from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import Dsn
 from tests.conftest import ApproxDict
 
+
 def test_span_trimming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, _experiments={"max_spans": 3})
     events = capture_events()
