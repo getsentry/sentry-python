@@ -510,7 +510,9 @@ class _Client(BaseClient):
                 return None
 
             event = event_
-            spans_delta = spans_before - len(cast(list[dict[str, object]], event.get("spans", [])))
+            spans_delta = spans_before - len(
+                cast(list[dict[str, object]], event.get("spans", []))
+            )
             if is_transaction and spans_delta > 0 and self.transport is not None:
                 self.transport.record_lost_event(
                     "event_processor", data_category="span", quantity=spans_delta

@@ -280,7 +280,9 @@ class BaseHttpTransport(Transport):
                 event = item.get_transaction_event() or {}
 
                 # +1 for the transaction itself
-                span_count = len(cast(list[dict[str, object]], event.get("spans") or [])) + 1
+                span_count = (
+                    len(cast(list[dict[str, object]], event.get("spans") or [])) + 1
+                )
                 self.record_lost_event(reason, "span", quantity=span_count)
 
             elif data_category == "attachment":
