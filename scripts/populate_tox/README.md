@@ -140,9 +140,9 @@ them all to `populate_tox.py` over time.
 
 1. Remove the integration from the `IGNORE` list in `populate_tox.py`.
 2. Remove the hardcoded entries for the integration from the `envlist` and `deps` sections of `tox.jinja`.
-2. Run `scripts/generate-test-files.sh`.
-3. Run the test suite, either locally or by creating a PR.
-4. Address any test failures that happen.
+3. Run `scripts/generate-test-files.sh`.
+4. Run the test suite, either locally or by creating a PR.
+5. Address any test failures that happen.
 
 You might have to introduce additional version bounds on the dependencies of the
 package. Try to determine the source of the failure and address it.
