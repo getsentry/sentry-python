@@ -136,6 +136,7 @@ def expected_error(integrations):
                 "integrations": integrations,
             },
             "platform": "python",
+            "debug_meta": {"project_root": mock.ANY},
             "_meta": {
                 "user": {"ip_address": {"": {"rem": [["!config", "s"]]}}},
                 "extra": {
