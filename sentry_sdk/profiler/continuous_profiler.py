@@ -430,7 +430,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
         self.buffer = None
 
 
-PROFILE_BUFFER_SECONDS = 10
+PROFILE_BUFFER_SECONDS = 60
 
 
 class ProfileBuffer:
