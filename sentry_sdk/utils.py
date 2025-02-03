@@ -42,6 +42,7 @@ if TYPE_CHECKING:
         Callable,
         cast,
         ContextManager,
+        Deque,
         Dict,
         Iterator,
         List,
@@ -472,6 +473,52 @@ class AnnotatedValue:
                     ]
                 ]
             },
+        )
+
+
+class AnnotatedDeque(AnnotatedValue):
+    """
+    Meta information for a data field in the event payload.
+    This is to tell Relay that we have tampered with the fields value.
+    See:
+    https://github.com/getsentry/relay/blob/be12cd49a0f06ea932ed9b9f93a655de5d6ad6d1/relay-general/src/types/meta.rs#L407-L423
+    """
+
+    __slots__ = ("value", "metadata")
+
+    def __init__(self, value, metadata):
+        # type: (Deque[Any], Dict[str, Any]) -> None
+        self.value = value
+        self.metadata = metadata
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
+
+    def append(self, other):
+        # type: (Any) -> None
+        self.value.append(other)
+
+    def extend(self, other):
+        # type: (Any) -> None
+        self.value.extend(other)
+
+    def popleft(self):
+        self.value.popleft()
+
+    def __len__(self):
+        return len(self.value)
+
+    @classmethod
+    def truncated(cls, value, n_truncated):
+        # type: (Deque[Any], int) -> AnnotatedValue
+        """Data was removed because the number of elements exceeded the maximum limit."""
+        return AnnotatedDeque(
+            value=value,
+            metadata={"len": [n_truncated]},  # Remark
         )
 
 
