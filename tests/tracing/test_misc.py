@@ -31,6 +31,8 @@ def test_span_trimming(sentry_init, capture_events):
     assert span2["op"] == "foo1"
     assert span3["op"] == "foo2"
 
+    assert event["_meta"]["spans"][""]["len"] == 10
+
 
 def test_transaction_naming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)

@@ -10,6 +10,7 @@ import warnings
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
+    AnnotatedValue,
     ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
@@ -483,16 +484,14 @@ class _Client(BaseClient):
     ):
         # type: (...) -> Optional[Event]
 
+        spans_delta = 0  # type: int
+
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            spans = event.get("spans", [])
-            from sentry_sdk.utils import AnnotatedValue
-            if isinstance(spans, AnnotatedValue):
-                spans = spans.value
-            spans_before = len(spans)
+            spans_before = len(event.get("spans", []))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -511,11 +510,7 @@ class _Client(BaseClient):
                 return None
 
             event = event_
-
-            spans = event.get("spans", [])
-            if isinstance(spans, AnnotatedValue):
-                spans = spans.value
-            spans_delta = spans_before - len(spans)
+            spans_delta = spans_before - len(event.get("spans", []))
             if is_transaction and spans_delta > 0 and self.transport is not None:
                 self.transport.record_lost_event(
                     "event_processor", data_category="span", quantity=spans_delta
@@ -567,6 +562,11 @@ class _Client(BaseClient):
             event_scrubber = self.options["event_scrubber"]
             if event_scrubber:
                 event_scrubber.scrub_event(event)
+
+
+        dropped_spans = event.pop("dropped_spans", 0) + spans_delta # type: int
+        if dropped_spans > 0 or spans_delta > 0:
+            event["spans"] = AnnotatedValue(event.get("spans", []), {"len": spans_before + dropped_spans})
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
