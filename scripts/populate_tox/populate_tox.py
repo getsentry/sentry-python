@@ -13,8 +13,10 @@ from importlib.metadata import metadata
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
+# Adding the scripts directory to PATH. This is necessary in order to be able
+# to import stuff from the split_tox_gh_actions script
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import requests
