@@ -269,7 +269,7 @@ def supported_python_versions(
     package_python_versions: Union[SpecifierSet, list[Version]],
     custom_supported_versions: Optional[SpecifierSet] = None,
 ) -> list[Version]:
-    """Get an intersection of python_versions and Python versions supported in the SDK."""
+    """Get an intersection of package_python_versions and Python versions supported in the SDK."""
     supported = []
 
     curr = MIN_PYTHON_VERSION
