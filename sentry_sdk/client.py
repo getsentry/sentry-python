@@ -516,8 +516,8 @@ class _Client(BaseClient):
                     "event_processor", data_category="span", quantity=spans_delta
                 )
 
-            dropped_spans = event.pop("dropped_spans", 0) + spans_delta # type: int
-            if dropped_spans > 0 or spans_delta > 0:
+            dropped_spans = event.pop("_dropped_spans", 0) + spans_delta  # type: int
+            if dropped_spans > 0:
                 previous_total_spans = spans_before + dropped_spans
 
         if (
@@ -568,7 +568,9 @@ class _Client(BaseClient):
                 event_scrubber.scrub_event(event)
 
         if previous_total_spans is not None:
-            event["spans"] = AnnotatedValue(event.get("spans", []), {"len": previous_total_spans})
+            event["spans"] = AnnotatedValue(
+                event.get("spans", []), {"len": previous_total_spans}
+            )
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send

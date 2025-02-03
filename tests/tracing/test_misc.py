@@ -32,6 +32,8 @@ def test_span_trimming(sentry_init, capture_events):
     assert span3["op"] == "foo2"
 
     assert event["_meta"]["spans"][""]["len"] == 10
+    assert "_dropped_spans" not in event
+    assert "dropped_spans" not in event
 
 
 def test_span_data_scrubbing_and_trimming(sentry_init, capture_events):

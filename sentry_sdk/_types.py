@@ -78,7 +78,6 @@ if TYPE_CHECKING:
             "check_in_id": str,
             "contexts": dict[str, dict[str, object]],
             "dist": str,
-            "dropped_spans": int,
             "duration": Optional[float],
             "environment": str,
             "errors": list[dict[str, Any]],  # TODO: We can expand on this type
@@ -119,6 +118,7 @@ if TYPE_CHECKING:
             "transaction_info": Mapping[str, Any],  # TODO: We can expand on this type
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
+            "_dropped_spans": int,
             "_metrics_summary": dict[str, object],
         },
         total=False,

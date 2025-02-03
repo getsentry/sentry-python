@@ -204,7 +204,7 @@ class _SpanRecorder:
         # limits: either transaction+spans or only child spans.
         self.maxlen = maxlen - 1
         self.spans = []  # type: List[Span]
-        self.dropped_spans = 0 # type: int
+        self.dropped_spans = 0  # type: int
 
     def add(self, span):
         # type: (Span) -> None
@@ -974,7 +974,7 @@ class Transaction(Span):
             if span.timestamp is not None
         ]
 
-        len_diff = len(self._span_recorder.spans) - len(finished_spans)        
+        len_diff = len(self._span_recorder.spans) - len(finished_spans)
         dropped_spans = len_diff + self._span_recorder.dropped_spans
 
         # we do this to break the circular reference of transaction -> span
@@ -1002,7 +1002,7 @@ class Transaction(Span):
         }  # type: Event
 
         if dropped_spans > 0:
-            event["dropped_spans"] = dropped_spans
+            event["_dropped_spans"] = dropped_spans
 
         if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
