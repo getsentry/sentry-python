@@ -401,7 +401,7 @@ def write_tox_file(packages: dict) -> None:
         file.write("\n")
 
 
-def _get_package_name(integration: str) -> Tuple[str, Optional[str]]:
+def _get_package_name(integration: str) -> tuple[str, Optional[str]]:
     package = TEST_SUITE_CONFIG[integration]["package"]
     extra = None
     if "[" in package:

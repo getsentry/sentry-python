@@ -95,7 +95,7 @@ Python versions, you can say:
     ...
 }
 ```
-
+This key is optional.
 ### `python`
 
 Sometimes, the whole test suite should only run on specific Python versions.
@@ -110,8 +110,9 @@ For example, if you want AIOHTTP tests to only run on Python 3.7+, you can say:
 }
 ```
 
-Specifying `python` is discouraged as the script itself finds out which
-Python versions are supported by the package. However, if a package has broken
+The `python` key is optional, and when possible, it should be omitted. The script
+should automatically detect which Python versions the package supports.
+However, if a package has broken
 metadata or the SDK is explicitly not supporting some packages on specific
 Python versions (because of, for example, broken context vars), the `python`
 key can be used.
