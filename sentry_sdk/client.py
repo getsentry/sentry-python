@@ -5,7 +5,7 @@ import socket
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
-from typing import cast, overload
+from typing import TYPE_CHECKING, List, Dict, cast, overload
 import warnings
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
@@ -45,8 +45,6 @@ from sentry_sdk.profiler.transaction_profiler import (
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -491,7 +489,7 @@ class _Client(BaseClient):
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            spans_before = len(cast(list[dict[str, object]], event.get("spans", [])))
+            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -511,7 +509,7 @@ class _Client(BaseClient):
 
             event = event_
             spans_delta = spans_before - len(
-                cast(list[dict[str, object]], event.get("spans", []))
+                cast(List[Dict[str, object]], event.get("spans", []))
             )
             if is_transaction and spans_delta > 0 and self.transport is not None:
                 self.transport.record_lost_event(
@@ -611,7 +609,7 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
-            spans_before = len(cast(list[dict[str, object]], event.get("spans", [])))
+            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
