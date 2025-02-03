@@ -118,7 +118,7 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
     return True
 
 
-def try_continuous_profiling_auto_start():
+def try_autostart_continuous_profiler():
     # type: () -> None
     if _scheduler is None:
         return
