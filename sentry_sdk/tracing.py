@@ -1,7 +1,7 @@
 import uuid
-import random
 import warnings
 from datetime import datetime, timedelta, timezone
+from random import Random
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
@@ -761,6 +761,7 @@ class Transaction(Span):
         "parent_sampled",
         # used to create baggage value for head SDKs in dynamic sampling
         "sample_rate",
+        "_sample_rand",
         "_measurements",
         "_contexts",
         "_profile",
@@ -1152,10 +1153,9 @@ class Transaction(Span):
             self.sampled = False
             return
 
-        # Now we roll the dice. random.random is inclusive of 0, but not of 1,
-        # so strict < is safe here. In case sample_rate is a boolean, cast it
-        # to a float (True becomes 1.0 and False becomes 0.0)
-        self.sampled = random.random() < self.sample_rate
+        # Now we "roll the dice" by using the pre-computed sample_rand value.
+        # The sample_rand is in the range [0.0, 1.0).
+        self.sampled = self.sample_rand() < self.sample_rate
 
         if self.sampled:
             logger.debug(
@@ -1170,6 +1170,45 @@ class Transaction(Span):
                     sample_rate=self.sample_rate,
                 )
             )
+
+    def sample_rand(self):
+        # type: () -> float
+        """Generate a sample_rand value, or obtain it from the baggage.
+
+        The sample_rand value is used to determine if a trace is sampled. We use the sample_rand
+        value from the incoming baggage header, if available. Otherwise, we generate a new one
+        according to the [specs](https://develop.sentry.dev/sdk/telemetry/traces/#propagated-random-value).
+
+        The first time this function is called, we generate the sample_rand value. Future calls
+        will return the same value, since we cache the sample_rand on the transaction.
+        """
+        cached_sample_rand = getattr(self, "_sample_rand", None)
+
+        if cached_sample_rand is not None:
+            return cached_sample_rand
+
+        incoming_sample_rand = self._incoming_sample_rand()
+        if incoming_sample_rand is not None:
+            return incoming_sample_rand
+
+        return self._generate_sample_rand()
+
+    def _generate_sample_rand(self):
+        # type: () -> float
+        """Generate a sample_rand value for this transaction.
+
+        Per the [specs](https://develop.sentry.dev/sdk/telemetry/traces/#propagated-random-value),
+        the `sample_rand` value is a pseudo-random number in the range [0.0, 1.0), which we generate
+        deterministically based on the transaction's trace ID.
+        """
+        return Random(self.trace_id).random()
+
+    def _incoming_sample_rand(self):
+        # type: () -> Optional[float]
+        """Returns the sample_rand value from the incoming baggage header, if available."""
+        if self._baggage is not None:
+            return self._baggage.sample_rand()
+        return None
 
 
 class NoOpSpan(Span):
