@@ -193,7 +193,7 @@ def get_span_status_from_http_code(http_status_code):
 class _SpanRecorder:
     """Limits the number of spans recorded in a transaction."""
 
-    __slots__ = ("maxlen", "spans")
+    __slots__ = ("maxlen", "spans", "dropped_spans")
 
     def __init__(self, maxlen):
         # type: (int) -> None
@@ -204,11 +204,13 @@ class _SpanRecorder:
         # limits: either transaction+spans or only child spans.
         self.maxlen = maxlen - 1
         self.spans = []  # type: List[Span]
+        self.dropped_spans = 0  # type: int
 
     def add(self, span):
         # type: (Span) -> None
         if len(self.spans) > self.maxlen:
             span._span_recorder = None
+            self.dropped_spans += 1
         else:
             self.spans.append(span)
 
@@ -972,6 +974,9 @@ class Transaction(Span):
             if span.timestamp is not None
         ]
 
+        len_diff = len(self._span_recorder.spans) - len(finished_spans)
+        dropped_spans = len_diff + self._span_recorder.dropped_spans
+
         # we do this to break the circular reference of transaction -> span
         # recorder -> span -> containing transaction (which is where we started)
         # before either the spans or the transaction goes out of scope and has
@@ -995,6 +1000,9 @@ class Transaction(Span):
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
         }  # type: Event
+
+        if dropped_spans > 0:
+            event["_dropped_spans"] = dropped_spans
 
         if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
