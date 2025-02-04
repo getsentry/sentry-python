@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 import uuid
+from collections import deque
 from datetime import datetime, timezone
 
 from sentry_sdk.consts import VERSION
@@ -27,6 +28,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
+    from typing import Deque
     from typing import Dict
     from typing import List
     from typing import Optional
@@ -120,6 +122,9 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
 
 def try_autostart_continuous_profiler():
     # type: () -> None
+
+    # TODO: deprecate this as it'll be replaced by the auto lifecycle option
+
     if _scheduler is None:
         return
 
@@ -127,6 +132,22 @@ def try_autostart_continuous_profiler():
         return
 
     _scheduler.manual_start()
+
+
+def try_profile_lifecycle_auto_start():
+    # type: () -> bool
+    if _scheduler is None:
+        return False
+
+    return _scheduler.auto_start()
+
+
+def try_profile_lifecycle_auto_stop():
+    # type: () -> None
+    if _scheduler is None:
+        return
+
+    _scheduler.auto_stop()
 
 
 def start_profiler():
@@ -179,16 +200,22 @@ class ContinuousScheduler:
         self.options = options
         self.sdk_info = sdk_info
         self.capture_func = capture_func
+
+        self.lifecycle = self.options.get("profile_lifecycle")
+        profile_session_sample_rate = self.options.get("profile_session_sample_rate")
+        self.sampled = determine_profile_session_sampling_decision(
+            profile_session_sample_rate
+        )
+
         self.sampler = self.make_sampler()
         self.buffer = None  # type: Optional[ProfileBuffer]
         self.pid = None  # type: Optional[int]
 
         self.running = False
 
-        profile_session_sample_rate = self.options.get("profile_session_sample_rate")
-        self.sampled = determine_profile_session_sampling_decision(
-            profile_session_sample_rate
-        )
+        self.active_spans = 0
+        self.started_spans = deque(maxlen=128)  # type: Deque[None]
+        self.finished_spans = deque(maxlen=128)  # type: Deque[None]
 
     def is_auto_start_enabled(self):
         # type: () -> bool
@@ -207,15 +234,45 @@ class ContinuousScheduler:
 
         return experiments.get("continuous_profiling_auto_start")
 
+    def auto_start(self):
+        # type: () -> bool
+        if not self.sampled:
+            return False
+
+        if self.lifecycle != "auto":
+            return False
+
+        logger.debug("[Profiling] Auto starting profiler")
+
+        self.started_spans.append(None)
+        self.ensure_running()
+
+        return True
+
+    def auto_stop(self):
+        # type: () -> None
+        if self.lifecycle != "auto":
+            return
+
+        logger.debug("[Profiling] Auto stopping profiler")
+
+        self.finished_spans.append(None)
+
     def manual_start(self):
         # type: () -> None
         if not self.sampled:
+            return
+
+        if self.lifecycle != "manual":
             return
 
         self.ensure_running()
 
     def manual_stop(self):
         # type: () -> None
+        if self.lifecycle != "manual":
+            return
+
         self.teardown()
 
     def ensure_running(self):
@@ -249,28 +306,77 @@ class ContinuousScheduler:
 
         cache = LRUCache(max_size=256)
 
-        def _sample_stack(*args, **kwargs):
-            # type: (*Any, **Any) -> None
-            """
-            Take a sample of the stack on all the threads in the process.
-            This should be called at a regular interval to collect samples.
-            """
+        if self.lifecycle == "auto":
 
-            ts = now()
+            def _sample_stack(*args, **kwargs):
+                # type: (*Any, **Any) -> None
+                """
+                Take a sample of the stack on all the threads in the process.
+                This should be called at a regular interval to collect samples.
+                """
 
-            try:
-                sample = [
-                    (str(tid), extract_stack(frame, cache, cwd))
-                    for tid, frame in sys._current_frames().items()
-                ]
-            except AttributeError:
-                # For some reason, the frame we get doesn't have certain attributes.
-                # When this happens, we abandon the current sample as it's bad.
-                capture_internal_exception(sys.exc_info())
-                return
+                if (
+                    not self.active_spans
+                    and not self.started_spans
+                    and not self.finished_spans
+                ):
+                    self.running = False
+                    return
 
-            if self.buffer is not None:
-                self.buffer.write(ts, sample)
+                started_spans = len(self.started_spans)
+                finished_spans = len(self.finished_spans)
+
+                ts = now()
+
+                try:
+                    sample = [
+                        (str(tid), extract_stack(frame, cache, cwd))
+                        for tid, frame in sys._current_frames().items()
+                    ]
+                except AttributeError:
+                    # For some reason, the frame we get doesn't have certain attributes.
+                    # When this happens, we abandon the current sample as it's bad.
+                    capture_internal_exception(sys.exc_info())
+                    return
+
+                for _ in range(started_spans):
+                    self.started_spans.popleft()
+
+                for _ in range(finished_spans):
+                    self.finished_spans.popleft()
+
+                self.active_spans = self.active_spans + started_spans - finished_spans
+
+                if self.buffer is None:
+                    self.reset_buffer()
+
+                if self.buffer is not None:
+                    self.buffer.write(ts, sample)
+
+        else:
+
+            def _sample_stack(*args, **kwargs):
+                # type: (*Any, **Any) -> None
+                """
+                Take a sample of the stack on all the threads in the process.
+                This should be called at a regular interval to collect samples.
+                """
+
+                ts = now()
+
+                try:
+                    sample = [
+                        (str(tid), extract_stack(frame, cache, cwd))
+                        for tid, frame in sys._current_frames().items()
+                    ]
+                except AttributeError:
+                    # For some reason, the frame we get doesn't have certain attributes.
+                    # When this happens, we abandon the current sample as it's bad.
+                    capture_internal_exception(sys.exc_info())
+                    return
+
+                if self.buffer is not None:
+                    self.buffer.write(ts, sample)
 
         return _sample_stack
 
@@ -294,6 +400,7 @@ class ContinuousScheduler:
 
         if self.buffer is not None:
             self.buffer.flush()
+            self.buffer = None
 
 
 class ThreadContinuousScheduler(ContinuousScheduler):

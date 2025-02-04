@@ -5,7 +5,10 @@ from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
-from sentry_sdk.profiler.continuous_profiler import get_profiler_id
+from sentry_sdk.profiler.continuous_profiler import (
+    get_profiler_id,
+    try_profile_lifecycle_auto_stop,
+)
 from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
@@ -268,6 +271,7 @@ class Span:
         "scope",
         "origin",
         "name",
+        "_started_profile_lifecycle",
     )
 
     def __init__(
@@ -790,6 +794,7 @@ class Transaction(Span):
         self._profile = (
             None
         )  # type: Optional[sentry_sdk.profiler.transaction_profiler.Profile]
+        self._started_profile_lifecycle = False  # type: bool
         self._baggage = baggage
 
     def __repr__(self):
@@ -841,6 +846,9 @@ class Transaction(Span):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if self._profile is not None:
             self._profile.__exit__(ty, value, tb)
+
+        if self._started_profile_lifecycle:
+            try_profile_lifecycle_auto_stop()
 
         super().__exit__(ty, value, tb)
 
