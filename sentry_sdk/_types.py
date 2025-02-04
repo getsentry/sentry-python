@@ -78,6 +78,7 @@ class AnnotatedValue:
             },
         )
 
+
 T = TypeVar("T")
 Annotated = Union[AnnotatedValue, T]
 
@@ -97,7 +98,6 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Type
     from typing_extensions import Literal, TypedDict
-
 
     class SDKInfo(TypedDict):
         name: str
