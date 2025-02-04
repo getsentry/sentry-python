@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar, Union
 
 
 # Re-exported for compat, since code out there in the wild might use this variable.
@@ -78,6 +78,9 @@ class AnnotatedValue:
             },
         )
 
+T = TypeVar("T")
+Annotated = Union[AnnotatedValue, T]
+
 
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence
@@ -93,12 +96,8 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Tuple
     from typing import Type
-    from typing import TypeVar
-    from typing import Union
     from typing_extensions import Literal, TypedDict
 
-    T = TypeVar("T")
-    Annotated = Union[AnnotatedValue, T]
 
     class SDKInfo(TypedDict):
         name: str
