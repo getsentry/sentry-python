@@ -136,7 +136,15 @@ def fetch_release(package: str, version: Version) -> dict:
 
 
 def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Version]:
-    """Drop versions that are unsupported without making additional API calls."""
+    """
+    Filter `releases`, removing releases that are for sure unsupported.
+
+    This function doesn't guarantee that all releases it returns are supported --
+    there are further criteria that will be checked later in the pipeline because
+    they require additional API calls to be made. The purpose of this function is
+    to slim down the list so that we don't have to make more API calls than
+    necessary for releases that are for sure not supported.
+    """
     min_supported = _MIN_VERSIONS.get(integration)
     if min_supported is not None:
         min_supported = Version(".".join(map(str, min_supported)))
@@ -222,7 +230,7 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
 
 
 def pick_releases_to_test(releases: list[Version]) -> list[Version]:
-    """Pick a handful of releases from a list of supported releases."""
+    """Pick a handful of releases to test from a list of supported releases."""
     # If the package has majors (or major-like releases, even if they don't do
     # semver), we want to make sure we're testing them all. If not, we just pick
     # the oldest, the newest, and a couple in between.
@@ -271,15 +279,35 @@ def supported_python_versions(
     package_python_versions: Union[SpecifierSet, list[Version]],
     custom_supported_versions: Optional[SpecifierSet] = None,
 ) -> list[Version]:
-    """Get an intersection of package_python_versions and Python versions supported in the SDK."""
+    """
+    Get the intersection of Python versions supported by the package and the SDK.
+
+    Optionally, if `custom_supported_versions` is provided, the function will
+    return the intersection of Python versions supported by the package, the SDK,
+    and `custom_supported_versions`. This is used when a test suite definition
+    in `TEST_SUITE_CONFIG` contains a range of Python versions to run the tests
+    on.
+
+    Examples:
+    - The Python SDK supports Python 3.6-3.13. The package supports 3.5-3.8. This
+      function will return [3.6, 3.7, 3.8] as the Python versions supported
+      by both.
+    - The Python SDK supports Python 3.6-3.13. The package supports 3.5-3.8. We
+      have an additional test limitation in place to only test this framework
+      on Python 3.7, so we can provide this as `custom_supported_versions`. The
+      result of this function will then by the intersection of all three, i.e.,
+      [3.7].
+    """
     supported = []
 
+    # Iterate through Python versions from MIN_PYTHON_VERSION to MAX_PYTHON_VERSION
     curr = MIN_PYTHON_VERSION
     while curr <= MAX_PYTHON_VERSION:
         if curr in package_python_versions:
             if not custom_supported_versions or curr in custom_supported_versions:
                 supported.append(curr)
 
+        # Construct the next Python version (i.e., bump the minor)
         next = [int(v) for v in str(curr).split(".")]
         next[1] += 1
         curr = Version(".".join(map(str, next)))
@@ -288,6 +316,12 @@ def supported_python_versions(
 
 
 def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version]:
+    """
+    Given a list of Python versions, pick those that make sense to test on.
+
+    Currently, this is the oldest, the newest, and the second newest Python
+    version.
+    """
     filtered_python_versions = {
         python_versions[0],
     }
