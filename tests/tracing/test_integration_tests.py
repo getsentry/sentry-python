@@ -51,9 +51,11 @@ def test_basic(sentry_init, capture_events, sample_rate):
         assert not events
 
 
-@pytest.mark.parametrize("sampled", [True, False, None])
+@pytest.mark.parametrize("parent_sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_rate):
+def test_continue_from_headers(
+    sentry_init, capture_envelopes, parent_sampled, sample_rate
+):
     """
     Ensure data is actually passed along via headers, and that they are read
     correctly.
@@ -64,7 +66,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     # make a parent transaction (normally this would be in a different service)
     with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
         with start_span() as old_span:
-            old_span.sampled = sampled
+            old_span.sampled = parent_sampled
             headers = dict(
                 sentry_sdk.get_current_scope().iter_trace_propagation_headers(old_span)
             )
@@ -79,7 +81,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     # child transaction, to prove that we can read 'sentry-trace' header data correctly
     child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
     assert child_transaction is not None
-    assert child_transaction.parent_sampled == sampled
+    assert child_transaction.parent_sampled == parent_sampled
     assert child_transaction.trace_id == old_span.trace_id
     assert child_transaction.same_process_as_parent is False
     assert child_transaction.parent_span_id == old_span.span_id
@@ -104,8 +106,8 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
         sentry_sdk.get_current_scope().transaction = "ho"
         capture_message("hello")
 
-    # in this case the child transaction won't be captured
-    if sampled is False or (sample_rate == 0 and sampled is None):
+    if parent_sampled is False or (sample_rate == 0 and parent_sampled is None):
+        # in this case the child transaction won't be captured
         trace1, message = envelopes
         message_payload = message.get_event()
         trace1_payload = trace1.get_transaction_event()
@@ -127,12 +129,17 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
             == message_payload["contexts"]["trace"]["trace_id"]
         )
 
+        if parent_sampled is not None:
+            expected_sample_rate = str(float(parent_sampled))
+        else:
+            expected_sample_rate = str(sample_rate)
+
         assert trace2.headers["trace"] == baggage.dynamic_sampling_context()
         assert trace2.headers["trace"] == {
             "public_key": "49d0f7386ad645858ae85020e393bef3",
             "trace_id": "771a43a4192642f0b136d5159a501700",
             "user_id": "Amelie",
-            "sample_rate": str(sample_rate),
+            "sample_rate": expected_sample_rate,
         }
 
     assert message_payload["message"] == "hello"
