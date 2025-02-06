@@ -399,6 +399,8 @@ def test_litestar_scope_user_on_exception_event(
         }
     else:
         assert "user" not in event
+
+
 @parametrize_test_configurable_status_codes
 def test_configurable_status_codes(
     sentry_init,
@@ -407,13 +409,17 @@ def test_configurable_status_codes(
     status_code,
     expected_error,
 ):
-    integration_kwargs = {"failed_request_status_codes": failed_request_status_codes} if failed_request_status_codes is not None else {}
+    integration_kwargs = (
+        {"failed_request_status_codes": failed_request_status_codes}
+        if failed_request_status_codes is not None
+        else {}
+    )
     sentry_init(integrations=[LitestarIntegration(**integration_kwargs)])
 
     events = capture_events()
 
     @get("/error")
-    async def error()-> None:
+    async def error() -> None:
         raise HTTPException(status_code=status_code)
 
     app = Litestar([error])

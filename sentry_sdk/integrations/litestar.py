@@ -1,7 +1,11 @@
 from collections.abc import Set
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import _DEFAULT_FAILED_REQUEST_STATUS_CODES, DidNotEnable, Integration
+from sentry_sdk.integrations import (
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    DidNotEnable,
+    Integration,
+)
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
@@ -47,9 +51,10 @@ class LitestarIntegration(Integration):
     identifier = "litestar"
     origin = f"auto.http.{identifier}"
 
-    def __init__(self,
-    failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
-                 ) -> None:
+    def __init__(
+        self,
+        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
+    ) -> None:
         self.failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
@@ -285,11 +290,12 @@ def exception_handler(exc, scope):
         sentry_scope.set_user(user_info)
 
     if isinstance(exc, HTTPException):
-        integration = sentry_sdk.get_client().get_integration(
-            LitestarIntegration
-        )
-        if integration is not None and exc.status_code not in integration.failed_request_status_codes:
-                return
+        integration = sentry_sdk.get_client().get_integration(LitestarIntegration)
+        if (
+            integration is not None
+            and exc.status_code not in integration.failed_request_status_codes
+        ):
+            return
 
     event, hint = event_from_exception(
         exc,
