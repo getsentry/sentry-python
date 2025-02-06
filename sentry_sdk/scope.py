@@ -1047,7 +1047,7 @@ class Scope:
         # at this point, but in order to not have broken traces we make
         # an exception here
         propagation_context = self.get_active_propagation_context()
-        if propagation_context:
+        if propagation_context and transaction.sample_rate is not None:
             dsc = propagation_context.dynamic_sampling_context
             if dsc is not None:
                 dsc["sample_rate"] = str(transaction.sample_rate)
