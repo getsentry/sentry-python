@@ -24,15 +24,13 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, List, Dict
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import DefaultDict
     from typing import Iterable
-    from typing import List
     from typing import Mapping
     from typing import Optional
     from typing import Self
@@ -280,7 +278,9 @@ class BaseHttpTransport(Transport):
                 event = item.get_transaction_event() or {}
 
                 # +1 for the transaction itself
-                span_count = len(event.get("spans") or []) + 1
+                span_count = (
+                    len(cast(List[Dict[str, object]], event.get("spans") or [])) + 1
+                )
                 self.record_lost_event(reason, "span", quantity=span_count)
 
             elif data_category == "attachment":
@@ -720,7 +720,7 @@ class HttpTransport(BaseHttpTransport):
 
 try:
     import httpcore
-    import h2  # type: ignore # noqa: F401
+    import h2  # noqa: F401
 except ImportError:
     # Sorry, no Http2Transport for you
     class Http2Transport(HttpTransport):
