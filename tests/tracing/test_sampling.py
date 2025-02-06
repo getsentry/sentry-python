@@ -211,7 +211,7 @@ def test_passes_parent_sampling_decision_in_sampling_context(
     assert sampling_context["parent_sampled"]._mock_wraps is parent_sampling_decision
 
 
-def test_passes_custom_samling_context_from_start_transaction_to_traces_sampler(
+def test_passes_custom_sampling_context_from_start_transaction_to_traces_sampler(
     sentry_init, DictionaryContaining  # noqa: N803
 ):
     traces_sampler = mock.Mock()
