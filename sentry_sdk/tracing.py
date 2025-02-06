@@ -1061,7 +1061,6 @@ class Transaction(Span):
 
         The first time a new baggage with Sentry items is made,
         it will be frozen."""
-
         if not self._baggage or self._baggage.mutable:
             self._baggage = Baggage.populate_from_transaction(self)
 
