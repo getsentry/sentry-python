@@ -1044,16 +1044,16 @@ class Scope:
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
         # update the sample rate in the dsc
-        propagation_context = self.get_active_propagation_context()
-        if propagation_context and transaction.sample_rate is not None:
-            dsc = propagation_context.dynamic_sampling_context
-            if dsc is not None:
-                dsc["sample_rate"] = str(transaction.sample_rate)
-
-        if transaction._baggage:
-            dsc = transaction._baggage.sentry_items["sample_rate"] = str(
-                transaction.sample_rate
-            )
+        if transaction.sample_rate is not None:
+            propagation_context = self.get_active_propagation_context()
+            if propagation_context:
+                dsc = propagation_context.dynamic_sampling_context
+                if dsc is not None:
+                    dsc["sample_rate"] = str(transaction.sample_rate)
+            if transaction._baggage:
+                transaction._baggage.sentry_items["sample_rate"] = str(
+                    transaction.sample_rate
+                )
 
         if transaction.sampled:
             profile = Profile(
