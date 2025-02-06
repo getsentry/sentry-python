@@ -118,7 +118,7 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
 
     assert "sample_rate" in envelope_trace_header
     assert type(envelope_trace_header["sample_rate"]) == str
-    assert envelope_trace_header["sample_rate"] == "0.01337"
+    assert envelope_trace_header["sample_rate"] == "1.0"
 
     assert "sampled" in envelope_trace_header
     assert type(envelope_trace_header["sampled"]) == str
@@ -137,7 +137,9 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
     assert envelope_trace_header["transaction"] == "bar"
 
 
-def test_dsc_continuation_of_trace_sample_rate_changed(sentry_init, capture_envelopes):
+def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
+    sentry_init, capture_envelopes
+):
     """
     Another service calls our service and passes tracing information to us.
     Our service is continuing the trace, but modifies the sample rate.
