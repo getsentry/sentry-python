@@ -17,7 +17,7 @@ from litestar.middleware.rate_limit import RateLimitConfig
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 from litestar.testing import TestClient
 
-from tests.integrations.starlette import test_starlette
+from tests.integrations.conftest import parametrize_test_configurable_status_codes
 
 
 def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -399,7 +399,7 @@ def test_litestar_scope_user_on_exception_event(
         }
     else:
         assert "user" not in event
-@test_starlette.parametrize_test_configurable_status_codes
+@parametrize_test_configurable_status_codes
 def test_configurable_status_codes(
     sentry_init,
     capture_events,
