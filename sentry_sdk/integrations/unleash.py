@@ -16,7 +16,7 @@ class UnleashIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        # Wrap and patch evaluation methods (instance methods)
+        # Wrap and patch evaluation methods (class methods)
         old_is_enabled = UnleashClient.is_enabled
 
         @wraps(old_is_enabled)
