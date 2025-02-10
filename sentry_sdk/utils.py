@@ -1879,3 +1879,11 @@ def get_current_thread_meta(thread=None):
 
     # we've tried everything, time to give up
     return None, None
+
+
+def should_be_treated_as_error(ty, value):
+    # (Any, Any) -> bool
+    if ty == SystemExit and value == 0:
+        return False
+
+    return True
