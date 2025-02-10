@@ -3,7 +3,7 @@ import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
 from threading import Lock
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from typing import TypedDict
@@ -30,6 +30,7 @@ class FlagBuffer:
         self.__buffer = LRUCache(self.capacity)
 
     def __deepcopy__(self, memo):
+        # type: (dict[int, Any]) -> FlagBuffer
         with self.lock:
             buffer = FlagBuffer(self.capacity)
             buffer.__buffer = copy.deepcopy(self.__buffer, memo)
