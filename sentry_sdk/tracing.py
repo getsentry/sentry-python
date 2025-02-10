@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     is_valid_sample_rate,
     logger,
     nanosecond_time,
+    should_be_treated_as_error,
 )
 
 from typing import TYPE_CHECKING
@@ -378,7 +379,7 @@ class Span:
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        if value is not None:
+        if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         scope, old_span = self._context_manager_state
