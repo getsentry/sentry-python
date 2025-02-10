@@ -87,6 +87,7 @@ GROUPS = {
     "Flags": [
         "launchdarkly",
         "openfeature",
+        "statsig",
         "unleash",
     ],
     "Gevent": [
