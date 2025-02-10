@@ -259,18 +259,14 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
                 filtered_releases.add(min_version)
 
     else:
-        indexes = [
-            0,  # oldest version supported
-            len(releases) // 3,
-            len(releases) // 3 * 2,  # two releases in between, roughly evenly spaced
-            -1,  # latest
-        ]
-
-        for i in indexes:
-            try:
-                filtered_releases.add(releases[i])
-            except IndexError:
-                pass
+        filtered_releases = {
+            releases[0],  # oldest version supported
+            releases[len(releases) // 3],
+            releases[
+                len(releases) // 3 * 2
+            ],  # two releases in between, roughly evenly spaced
+            releases[-1],  # latest
+        }
 
     return sorted(filtered_releases)
 
