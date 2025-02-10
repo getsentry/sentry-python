@@ -45,8 +45,8 @@ class FlagBuffer:
     def set(self, flag, result):
         # type: (str, bool) -> None
         if isinstance(result, FlagBuffer):
-            # If someone were to `self` in `self` this would create a circular dependency on
-            # the lock. This is of course a deadlock. However, this is far outside the expected
+            # If someone were to insert `self` into `self` this would create a circular dependency
+            # on the lock. This is of course a deadlock. However, this is far outside the expected
             # usage of this class. We guard against it here for completeness and to document this
             # expected failure mode.
             raise ValueError(
