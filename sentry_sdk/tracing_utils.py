@@ -552,6 +552,7 @@ class Baggage:
         options = client.options or {}
 
         sentry_items["trace_id"] = transaction.trace_id
+        sentry_items["sample_rand"] = str(transaction.sample_rand())
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -623,6 +624,24 @@ class Baggage:
                 if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
             )
         )
+
+    def sample_rand(self):
+        # type: () -> Optional[float]
+        """Gets the sample_rand value from the baggage, if available.
+
+        This function validates the `sample_rand` before returning it. A valid `sample_rand` is
+        a float in the range [0.0, 1.0). If the `sample_rand` is missing or invalid, we return
+        `None` instead of the invalid/missing value.
+        """
+        try:
+            sample_rand = float(self.sentry_items["sample_rand"])
+        except (KeyError, ValueError):
+            return None
+
+        if sample_rand < 0.0 or sample_rand >= 1.0:
+            return None
+
+        return sample_rand
 
 
 def should_propagate_trace(client, url):
