@@ -322,6 +322,20 @@ def _patch_execute():
     strawberry_schema.execute_sync = _sentry_patched_execute_sync
 
 
+def _patch_execute_new():
+    old_execute_sync = strawberry_schema.Schema.execute_sync
+    old_execute_async = strawberry_schema.Schema.execute
+
+    def _sentry_patched_execute_sync(self, query, variable_values, context_value, root_value, operation_name, *args, **kwargs):
+        # type: (strawberry_schema.Schema, Optional[str], Optional[dict[str, Any]], Optional[Any], Optional[Any], Optional[str]) -> ExecutionResult
+        pass
+
+    def _sentry_patched_execute_async(...):
+        pass
+
+    strawberry_schema.Schema.execute_sync = _sentry_patched_execute_sync
+    strawberry_schema.Schema.execute = _sentry_patched_execute_async
+
 def _patch_views():
     # type: () -> None
     old_async_view_handle_errors = async_base_view.AsyncBaseHTTPView._handle_errors
