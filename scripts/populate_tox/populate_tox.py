@@ -353,6 +353,10 @@ def _parse_python_versions_from_classifiers(classifiers: list[str]) -> list[Vers
 
 
 def determine_python_versions(pypi_data: dict) -> Union[SpecifierSet, list[Version]]:
+    """
+    Given data from PyPI's release endpoint, determine the Python versions supported by the package
+    from the Python version classifiers, when present, or from `requires_python` if there are no classifiers.
+    """
     try:
         classifiers = pypi_data["info"]["classifiers"]
     except (AttributeError, KeyError):

@@ -96,6 +96,7 @@ Python versions, you can say:
 }
 ```
 This key is optional.
+
 ### `python`
 
 Sometimes, the whole test suite should only run on specific Python versions.
