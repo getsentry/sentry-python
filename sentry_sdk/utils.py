@@ -1883,7 +1883,8 @@ def get_current_thread_meta(thread=None):
 
 def should_be_treated_as_error(ty, value):
     # (Any, Any) -> bool
-    if ty == SystemExit and value == 0:
+    if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
+        # https://docs.python.org/3/library/exceptions.html#SystemExit
         return False
 
     return True
