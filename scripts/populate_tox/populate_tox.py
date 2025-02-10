@@ -173,6 +173,7 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
 
         if version.is_prerelease or version.is_postrelease:
             # TODO: consider the newest prerelease unless obsolete
+            # https://github.com/getsentry/sentry-python/issues/4030
             continue
 
         for i, saved_version in enumerate(filtered_releases):
