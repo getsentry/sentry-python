@@ -1665,7 +1665,7 @@ def _generate_installed_modules():
 
         yielded = set()
         for dist in metadata.distributions():
-            name = dist.metadata["Name"]
+            name = dist.metadata.get("Name", None)  # type: ignore[attr-defined]
             # `metadata` values may be `None`, see:
             # https://github.com/python/cpython/issues/91216
             # and
