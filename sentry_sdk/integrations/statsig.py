@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Any, TYPE_CHECKING
 
-import sentry_sdk
+from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations import Integration, DidNotEnable
 
 import importlib
@@ -30,10 +30,7 @@ class StatsigIntegration(Integration):
         def sentry_check_gate(user, gate, *args, **kwargs):
             # type: (StatsigUser, str, *Any, **Any) -> Any
             enabled = old_check_gate(user, gate, *args, **kwargs)
-
-            flags = sentry_sdk.get_current_scope().flags
-            flags.set(gate, enabled)
-
+            add_feature_flag(gate, enabled)
             return enabled
 
         statsig.check_gate = sentry_check_gate
