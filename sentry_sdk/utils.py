@@ -1665,7 +1665,7 @@ def _generate_installed_modules():
 
         yielded = set()
         for dist in metadata.distributions():
-            name = dist.metadata["Name"]
+            name = dist.metadata.get("Name", None)  # type: ignore[attr-defined]
             # `metadata` values may be `None`, see:
             # https://github.com/python/cpython/issues/91216
             # and
@@ -1879,3 +1879,12 @@ def get_current_thread_meta(thread=None):
 
     # we've tried everything, time to give up
     return None, None
+
+
+def should_be_treated_as_error(ty, value):
+    # type: (Any, Any) -> bool
+    if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
+        # https://docs.python.org/3/library/exceptions.html#SystemExit
+        return False
+
+    return True

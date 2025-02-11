@@ -20,3 +20,4 @@ openfeature-sdk
 statsig
 UnleashClient
 typer
+strawberry-graphql
