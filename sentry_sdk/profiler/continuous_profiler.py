@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import List
     from typing import Optional
+    from typing import Set
     from typing import Type
     from typing import Union
     from typing_extensions import TypedDict
@@ -134,15 +135,15 @@ def try_autostart_continuous_profiler():
     _scheduler.manual_start()
 
 
-def try_profile_lifecycle_auto_start():
-    # type: () -> bool
+def try_profile_lifecycle_trace_start():
+    # type: () -> Union[ContinuousProfile, None]
     if _scheduler is None:
-        return False
+        return None
 
     return _scheduler.auto_start()
 
 
-def try_profile_lifecycle_auto_stop():
+def try_profile_lifecycle_trace_stop():
     # type: () -> None
     if _scheduler is None:
         return
@@ -191,6 +192,14 @@ def determine_profile_session_sampling_decision(sample_rate):
     return random.random() < float(sample_rate)
 
 
+class ContinuousProfile:
+    active: bool = True
+
+    def stop(self):
+        # type: () -> None
+        self.active = False
+
+
 class ContinuousScheduler:
     mode = "unknown"  # type: ContinuousProfilerMode
 
@@ -213,9 +222,8 @@ class ContinuousScheduler:
 
         self.running = False
 
-        self.active_spans = 0
-        self.started_spans = deque(maxlen=128)  # type: Deque[None]
-        self.finished_spans = deque(maxlen=128)  # type: Deque[None]
+        self.new_profiles = deque(maxlen=128)  # type: Deque[ContinuousProfile]
+        self.active_profiles = set()  # type: Set[ContinuousProfile]
 
     def is_auto_start_enabled(self):
         # type: () -> bool
@@ -235,28 +243,21 @@ class ContinuousScheduler:
         return experiments.get("continuous_profiling_auto_start")
 
     def auto_start(self):
-        # type: () -> bool
+        # type: () -> Union[ContinuousProfile, None]
         if not self.sampled:
-            return False
+            return None
 
-        if self.lifecycle != "auto":
-            return False
+        if self.lifecycle != "trace":
+            return None
 
         logger.debug("[Profiling] Auto starting profiler")
 
-        self.started_spans.append(None)
+        profile = ContinuousProfile()
+
+        self.new_profiles.append(profile)
         self.ensure_running()
 
-        return True
-
-    def auto_stop(self):
-        # type: () -> None
-        if self.lifecycle != "auto":
-            return
-
-        logger.debug("[Profiling] Auto stopping profiler")
-
-        self.finished_spans.append(None)
+        return profile
 
     def manual_start(self):
         # type: () -> None
@@ -306,7 +307,7 @@ class ContinuousScheduler:
 
         cache = LRUCache(max_size=256)
 
-        if self.lifecycle == "auto":
+        if self.lifecycle == "trace":
 
             def _sample_stack(*args, **kwargs):
                 # type: (*Any, **Any) -> None
@@ -315,16 +316,20 @@ class ContinuousScheduler:
                 This should be called at a regular interval to collect samples.
                 """
 
-                if (
-                    not self.active_spans
-                    and not self.started_spans
-                    and not self.finished_spans
-                ):
+                # no profiles taking place, so we can stop early
+                if not self.new_profiles and not self.active_profiles:
                     self.running = False
                     return
 
-                started_spans = len(self.started_spans)
-                finished_spans = len(self.finished_spans)
+                # This is the number of profiles we want to pop off.
+                # It's possible another thread adds a new profile to
+                # the list and we spend longer than we want inside
+                # the loop below.
+                #
+                # Also make sure to set this value before extracting
+                # frames so we do not write to any new profiles that
+                # were started after this point.
+                new_profiles = len(self.new_profiles)
 
                 ts = now()
 
@@ -339,13 +344,32 @@ class ContinuousScheduler:
                     capture_internal_exception(sys.exc_info())
                     return
 
-                for _ in range(started_spans):
-                    self.started_spans.popleft()
+                # Move the new profiles into the active_profiles set.
+                #
+                # We cannot directly add the to active_profiles set
+                # in `start_profiling` because it is called from other
+                # threads which can cause a RuntimeError when it the
+                # set sizes changes during iteration without a lock.
+                #
+                # We also want to avoid using a lock here so threads
+                # that are starting profiles are not blocked until it
+                # can acquire the lock.
+                for _ in range(new_profiles):
+                    self.active_profiles.add(self.new_profiles.popleft())
+                inactive_profiles = []
 
-                for _ in range(finished_spans):
-                    self.finished_spans.popleft()
+                for profile in self.active_profiles:
+                    if profile.active:
+                        pass
+                    else:
+                        # If a profile is marked inactive, we buffer it
+                        # to `inactive_profiles` so it can be removed.
+                        # We cannot remove it here as it would result
+                        # in a RuntimeError.
+                        inactive_profiles.append(profile)
 
-                self.active_spans = self.active_spans + started_spans - finished_spans
+                for profile in inactive_profiles:
+                    self.active_profiles.remove(profile)
 
                 if self.buffer is None:
                     self.reset_buffer()

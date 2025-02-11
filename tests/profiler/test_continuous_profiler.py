@@ -126,14 +126,17 @@ def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling)
     )
 
 
-def assert_single_transaction_with_profile_chunks(envelopes, thread):
+def assert_single_transaction_with_profile_chunks(
+    envelopes, thread, max_chunks, transactions=1
+):
     items = defaultdict(list)
     for envelope in envelopes:
         for item in envelope.items:
             items[item.type].append(item)
 
-    assert len(items["transaction"]) == 1
+    assert len(items["transaction"]) == transactions
     assert len(items["profile_chunk"]) > 0
+    assert len(items["profile_chunk"]) <= max_chunks
 
     transaction = items["transaction"][0].payload.json
 
@@ -231,7 +234,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
         with sentry_sdk.start_span(op="op"):
             time.sleep(0.05)
 
-    assert_single_transaction_with_profile_chunks(envelopes, thread)
+    assert_single_transaction_with_profile_chunks(envelopes, thread, max_chunks=10)
 
     for _ in range(3):
         stop_profiler()
@@ -252,7 +255,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 
-        assert_single_transaction_with_profile_chunks(envelopes, thread)
+        assert_single_transaction_with_profile_chunks(envelopes, thread, max_chunks=10)
 
 
 @pytest.mark.parametrize(
@@ -298,7 +301,7 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 
-        assert_single_transaction_with_profile_chunks(envelopes, thread)
+        assert_single_transaction_with_profile_chunks(envelopes, thread, max_chunks=10)
 
         stop_profiler()
 
@@ -367,7 +370,7 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
+@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.1)
 def test_continuous_profiler_auto_start_and_stop_sampled(
     sentry_init,
     capture_envelopes,
@@ -375,7 +378,9 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
     make_options,
     teardown_profiling,
 ):
-    options = make_options(mode=mode, profile_session_sample_rate=1.0, lifecycle="auto")
+    options = make_options(
+        mode=mode, profile_session_sample_rate=1.0, lifecycle="trace"
+    )
     sentry_init(
         traces_sample_rate=1.0,
         **options,
@@ -391,13 +396,26 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
         with sentry_sdk.start_transaction(name="profiling"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.05)
+                time.sleep(0.03)
+            assert get_profiler_id() is not None, "profiler should be running"
+
+        # the profiler takes a while to stop so if we start a transaction
+        # immediately, it'll be part of the same chunk
+        assert get_profiler_id() is not None, "profiler should be running"
+
+        with sentry_sdk.start_transaction(name="profiling"):
+            assert get_profiler_id() is not None, "profiler should be running"
+            with sentry_sdk.start_span(op="op"):
+                time.sleep(0.03)
             assert get_profiler_id() is not None, "profiler should be running"
 
         # wait at least 1 cycle for the profiler to stop
         time.sleep(0.05)
         assert get_profiler_id() is None, "profiler should not be running"
-        assert_single_transaction_with_profile_chunks(envelopes, thread)
+
+        assert_single_transaction_with_profile_chunks(
+            envelopes, thread, max_chunks=1, transactions=2
+        )
 
 
 @pytest.mark.parametrize(
@@ -422,7 +440,9 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
     make_options,
     teardown_profiling,
 ):
-    options = make_options(mode=mode, profile_session_sample_rate=0.0, lifecycle="auto")
+    options = make_options(
+        mode=mode, profile_session_sample_rate=0.0, lifecycle="trace"
+    )
     sentry_init(
         traces_sample_rate=1.0,
         **options,

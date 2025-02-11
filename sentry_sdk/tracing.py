@@ -5,10 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
-from sentry_sdk.profiler.continuous_profiler import (
-    get_profiler_id,
-    try_profile_lifecycle_auto_stop,
-)
+from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
@@ -37,7 +34,8 @@ if TYPE_CHECKING:
     P = ParamSpec("P")
     R = TypeVar("R")
 
-    import sentry_sdk.profiler
+    from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
+    from sentry_sdk.profiler.transaction_profiler import Profile
     from sentry_sdk._types import (
         Event,
         MeasurementUnit,
@@ -272,7 +270,6 @@ class Span:
         "scope",
         "origin",
         "name",
-        "_started_profile_lifecycle",
     )
 
     def __init__(
@@ -771,6 +768,7 @@ class Transaction(Span):
         "_measurements",
         "_contexts",
         "_profile",
+        "_continuous_profile",
         "_baggage",
     )
 
@@ -792,10 +790,8 @@ class Transaction(Span):
         self.parent_sampled = parent_sampled
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._contexts = {}  # type: Dict[str, Any]
-        self._profile = (
-            None
-        )  # type: Optional[sentry_sdk.profiler.transaction_profiler.Profile]
-        self._started_profile_lifecycle = False  # type: bool
+        self._profile = None  # type: Optional[Profile]
+        self._continuous_profile = None  # type: Optional[ContinuousProfile]
         self._baggage = baggage
 
     def __repr__(self):
@@ -848,8 +844,8 @@ class Transaction(Span):
         if self._profile is not None:
             self._profile.__exit__(ty, value, tb)
 
-        if self._started_profile_lifecycle:
-            try_profile_lifecycle_auto_stop()
+        if self._continuous_profile is not None:
+            self._continuous_profile.stop()
 
         super().__exit__(ty, value, tb)
 

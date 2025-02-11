@@ -15,7 +15,7 @@ from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
     try_autostart_continuous_profiler,
-    try_profile_lifecycle_auto_start,
+    try_profile_lifecycle_trace_start,
 )
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
@@ -1055,12 +1055,12 @@ class Scope:
 
             transaction._profile = profile
 
-            transaction._started_profile_lifecycle = try_profile_lifecycle_auto_start()
+            transaction._continuous_profile = try_profile_lifecycle_trace_start()
 
             # Typically, the profiler is set when the transaction is created. But when
             # using the auto lifecycle, the profiler isn't running when the first
             # transaction is started. So make sure we update the profiler id on it.
-            if transaction._started_profile_lifecycle:
+            if transaction._continuous_profile is not None:
                 transaction.set_profiler_id(get_profiler_id())
 
             # we don't bother to keep spans if we already know we're not going to
