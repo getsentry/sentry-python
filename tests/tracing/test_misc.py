@@ -11,6 +11,7 @@ from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import Dsn
+from tests.conftest import ApproxDict
 
 
 def test_span_trimming(sentry_init, capture_events):
@@ -30,6 +31,33 @@ def test_span_trimming(sentry_init, capture_events):
     assert span1["op"] == "foo0"
     assert span2["op"] == "foo1"
     assert span3["op"] == "foo2"
+
+    assert event["_meta"]["spans"][""]["len"] == 10
+    assert "_dropped_spans" not in event
+    assert "dropped_spans" not in event
+
+
+def test_span_data_scrubbing_and_trimming(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, _experiments={"max_spans": 3})
+    events = capture_events()
+
+    with start_transaction(name="hi"):
+        with start_span(op="foo", name="bar") as span:
+            span.set_data("password", "secret")
+            span.set_data("datafoo", "databar")
+
+        for i in range(10):
+            with start_span(op="foo{}".format(i)):
+                pass
+
+    (event,) = events
+    assert event["spans"][0]["data"] == ApproxDict(
+        {"password": "[Filtered]", "datafoo": "databar"}
+    )
+    assert event["_meta"]["spans"] == {
+        "0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}},
+        "": {"len": 11},
+    }
 
 
 def test_transaction_naming(sentry_init, capture_events):

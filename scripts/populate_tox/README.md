@@ -35,7 +35,7 @@ the main package (framework, library) to test with; any additional test
 dependencies, optionally gated behind specific conditions; and optionally
 the Python versions to test on.
 
-The format is:
+Constraints are defined using the format specified below. The following sections describe each key.
 
 ```
 integration_name: {
@@ -95,6 +95,7 @@ Python versions, you can say:
     ...
 }
 ```
+This key is optional.
 
 ### `python`
 
@@ -110,8 +111,9 @@ For example, if you want AIOHTTP tests to only run on Python 3.7+, you can say:
 }
 ```
 
-Specifying `python` is discouraged as the script itself finds out which
-Python versions are supported by the package. However, if a package has broken
+The `python` key is optional, and when possible, it should be omitted. The script
+should automatically detect which Python versions the package supports.
+However, if a package has broken
 metadata or the SDK is explicitly not supporting some packages on specific
 Python versions (because of, for example, broken context vars), the `python`
 key can be used.
@@ -140,9 +142,9 @@ them all to `populate_tox.py` over time.
 
 1. Remove the integration from the `IGNORE` list in `populate_tox.py`.
 2. Remove the hardcoded entries for the integration from the `envlist` and `deps` sections of `tox.jinja`.
-2. Run `scripts/generate-test-files.sh`.
-3. Run the test suite, either locally or by creating a PR.
-4. Address any test failures that happen.
+3. Run `scripts/generate-test-files.sh`.
+4. Run the test suite, either locally or by creating a PR.
+5. Address any test failures that happen.
 
 You might have to introduce additional version bounds on the dependencies of the
 package. Try to determine the source of the failure and address it.
