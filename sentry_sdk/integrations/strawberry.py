@@ -28,14 +28,16 @@ except ImportError:
 
 try:
     from strawberry import Schema
-    from strawberry.extensions import SchemaExtension  # type: ignore
-    from strawberry.extensions.tracing.utils import should_skip_tracing as strawberry_should_skip_tracing  # type: ignore
-    from strawberry.http import async_base_view, sync_base_view  # type: ignore
+    from strawberry.extensions import SchemaExtension
+    from strawberry.extensions.tracing.utils import (
+        should_skip_tracing as strawberry_should_skip_tracing,
+    )
+    from strawberry.http import async_base_view, sync_base_view
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 try:
-    from strawberry.extensions.tracing import (  # type: ignore
+    from strawberry.extensions.tracing import (
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
@@ -47,9 +49,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Generator, List, Optional
-    from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
+    from graphql import GraphQLError, GraphQLResolveInfo
     from strawberry.http import GraphQLHTTPResponse
-    from strawberry.types import ExecutionContext  # type: ignore
+    from strawberry.types import ExecutionContext
     from sentry_sdk._types import Event, EventProcessor
 
 
@@ -122,10 +124,10 @@ def _patch_schema_init():
 
         return old_schema_init(self, *args, **kwargs)
 
-    Schema.__init__ = _sentry_patched_schema_init
+    Schema.__init__ = _sentry_patched_schema_init  # type: ignore[method-assign]
 
 
-class SentryAsyncExtension(SchemaExtension):  # type: ignore
+class SentryAsyncExtension(SchemaExtension):
     def __init__(
         self,
         *,
@@ -326,10 +328,10 @@ def _patch_views():
                 )
                 sentry_sdk.capture_event(event, hint=hint)
 
-    async_base_view.AsyncBaseHTTPView._handle_errors = (
+    async_base_view.AsyncBaseHTTPView._handle_errors = (  # type: ignore[method-assign]
         _sentry_patched_async_view_handle_errors
     )
-    sync_base_view.SyncBaseHTTPView._handle_errors = (
+    sync_base_view.SyncBaseHTTPView._handle_errors = (  # type: ignore[method-assign]
         _sentry_patched_sync_view_handle_errors
     )
 
