@@ -305,6 +305,16 @@ envlist =
     # These come from the populate_tox.py script. Eventually we should move all
     # integration tests there.
 
+    {% for group, integrations in groups.items() %}
+    # ~~~ {{ group }} ~~~
+    {% for integration in integrations %}
+    {% for release in integration.releases %}
+    {{ release.rendered_python_versions }}-{{ integration.name }}-v{{ release }}
+    {% endfor %}
+
+    {% endfor %}
+
+    {% endfor %}
 
 [testenv]
 deps =
@@ -754,6 +764,23 @@ deps =
     # These come from the populate_tox.py script. Eventually we should move all
     # integration tests there.
 
+    {% for group, integrations in groups.items() %}
+    # ~~~ {{ group }} ~~~
+    {% for integration in integrations %}
+    {% for release in integration.releases %}
+    {% if integration.extra %}
+    {{ integration.name }}-v{{ release }}: {{ integration.package }}[{{ integration.extra }}]=={{ release }}
+    {% else %}
+    {{ integration.name }}-v{{ release }}: {{ integration.package }}=={{ release }}
+    {% endif %}
+    {% endfor %}
+    {% for dep in integration.dependencies %}
+    {{ dep }}
+    {% endfor %}
+
+    {% endfor %}
+
+    {% endfor %}
 
 setenv =
     PYTHONDONTWRITEBYTECODE=1
