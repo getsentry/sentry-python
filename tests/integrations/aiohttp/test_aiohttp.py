@@ -525,6 +525,61 @@ async def test_crumb_capture(
         )
 
 
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_crumb_capture_client_error(
+    sentry_init,
+    aiohttp_raw_server,
+    aiohttp_client,
+    event_loop,
+    capture_events,
+    status_code,
+    level,
+):
+    sentry_init(integrations=[AioHttpIntegration()])
+
+    async def handler(request):
+        return web.Response(status=status_code)
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    with start_transaction():
+        events = capture_events()
+
+        client = await aiohttp_client(raw_server)
+        resp = await client.get("/")
+        assert resp.status == status_code
+        capture_message("Testing!")
+
+        (event,) = events
+
+        crumb = event["breadcrumbs"]["values"][0]
+        assert crumb["type"] == "http"
+        if level is None:
+            assert "level" not in crumb
+        else:
+            assert crumb["level"] == level
+        assert crumb["category"] == "httplib"
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": "http://127.0.0.1:{}/".format(raw_server.port),
+                "http.fragment": "",
+                "http.method": "GET",
+                "http.query": "",
+                "http.response.status_code": status_code,
+            }
+        )
+
+
 @pytest.mark.asyncio
 async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_client):
     sentry_init(
