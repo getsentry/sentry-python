@@ -171,6 +171,7 @@ def assert_single_transaction_with_profile_chunks(
 
     for profile_chunk_item in items["profile_chunk"]:
         profile_chunk = profile_chunk_item.payload.json
+        del profile_chunk["profile"]  # make the diff easier to read
         assert profile_chunk == ApproxDict(
             {
                 "client_sdk": {
@@ -370,7 +371,7 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.1)
+@mock.patch("sentry_sdk.profiler.continuous_profiler.DEFAULT_SAMPLING_FREQUENCY", 21)
 def test_continuous_profiler_auto_start_and_stop_sampled(
     sentry_init,
     capture_envelopes,
@@ -393,7 +394,7 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
     for _ in range(3):
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_transaction(name="profiling 1"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.03)
@@ -403,14 +404,14 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
         # immediately, it'll be part of the same chunk
         assert get_profiler_id() is not None, "profiler should be running"
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_transaction(name="profiling 2"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.03)
             assert get_profiler_id() is not None, "profiler should be running"
 
         # wait at least 1 cycle for the profiler to stop
-        time.sleep(0.05)
+        time.sleep(0.2)
         assert get_profiler_id() is None, "profiler should not be running"
 
         assert_single_transaction_with_profile_chunks(
