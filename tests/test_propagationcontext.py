@@ -35,7 +35,7 @@ def test_context_with_values():
     }
 
 
-def test_lacy_uuids():
+def test_lazy_uuids():
     ctx = PropagationContext()
     assert ctx._trace_id is None
     assert ctx._span_id is None
