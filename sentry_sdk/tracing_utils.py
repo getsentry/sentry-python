@@ -531,6 +531,14 @@ class PropagationContext:
             f"{sample_rand:.6f}"  # noqa: E231
         )
 
+    def _sample_rand(self):
+        # type: () -> Optional[str]
+        """Convenience method to get the sample_rand value from the dynamic_sampling_context."""
+        if self.dynamic_sampling_context is None:
+            return None
+
+        return self.dynamic_sampling_context.get("sample_rand")
+
 
 class Baggage:
     """
@@ -553,8 +561,13 @@ class Baggage:
         self.mutable = mutable
 
     @classmethod
-    def from_incoming_header(cls, header):
-        # type: (Optional[str]) -> Baggage
+    def from_incoming_header(
+        cls,
+        header,  # type: Optional[str]
+        *,
+        _sample_rand=None,  # type: Optional[str]
+    ):
+        # type: (...) -> Baggage
         """
         freeze if incoming header already has sentry baggage
         """
@@ -576,6 +589,10 @@ class Baggage:
                         mutable = False
                     else:
                         third_party_items += ("," if third_party_items else "") + item
+
+        if _sample_rand is not None:
+            sentry_items["sample_rand"] = str(_sample_rand)
+            mutable = False
 
         return Baggage(sentry_items, third_party_items, mutable)
 

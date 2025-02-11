@@ -477,6 +477,8 @@ class Span:
     def continue_from_headers(
         cls,
         headers,  # type: Mapping[str, str]
+        *,
+        _sample_rand=None,  # type: Optional[str]
         **kwargs,  # type: Any
     ):
         # type: (...) -> Transaction
@@ -485,6 +487,8 @@ class Span:
         the ``sentry-trace`` and ``baggage`` headers).
 
         :param headers: The dictionary with the HTTP headers to pull information from.
+        :param _sample_rand: If provided, we override the sample_rand value from the
+            incoming headers with this value. (internal use only)
         """
         # TODO move this to the Transaction class
         if cls is Span:
@@ -495,7 +499,9 @@ class Span:
 
         # TODO-neel move away from this kwargs stuff, it's confusing and opaque
         # make more explicit
-        baggage = Baggage.from_incoming_header(headers.get(BAGGAGE_HEADER_NAME))
+        baggage = Baggage.from_incoming_header(
+            headers.get(BAGGAGE_HEADER_NAME), _sample_rand=_sample_rand
+        )
         kwargs.update({BAGGAGE_HEADER_NAME: baggage})
 
         sentrytrace_kwargs = extract_sentrytrace_data(
