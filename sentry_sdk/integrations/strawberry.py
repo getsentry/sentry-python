@@ -140,7 +140,7 @@ class SentryAsyncExtension(SchemaExtension):
     @cached_property
     def _resource_name(self):
         # type: () -> str
-        query_hash = self.hash_query(self.execution_context.query)
+        query_hash = self.hash_query(self.execution_context.query)  # type: ignore
 
         if self.execution_context.operation_name:
             return "{}:{}".format(self.execution_context.operation_name, query_hash)
@@ -347,7 +347,7 @@ def _make_request_event_processor(execution_context):
                 request_data["api_target"] = "graphql"
 
                 if not request_data.get("data"):
-                    data = {"query": execution_context.query}
+                    data = {"query": execution_context.query}  # type: dict[str, Any]
                     if execution_context.variables:
                         data["variables"] = execution_context.variables
                     if execution_context.operation_name:
