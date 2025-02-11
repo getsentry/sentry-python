@@ -6,6 +6,7 @@ import sys
 from collections.abc import Mapping
 from datetime import timedelta
 from functools import wraps
+from random import Random
 from urllib.parse import quote, unquote
 import uuid
 
@@ -19,6 +20,7 @@ from sentry_sdk.utils import (
     match_regex_list,
     qualname_from_function,
     to_string,
+    try_float,
     is_sentry_url,
     _is_external_source,
     _is_in_project_root,
@@ -418,6 +420,9 @@ class PropagationContext:
                     propagation_context = PropagationContext()
                 propagation_context.update(sentrytrace_data)
 
+        if propagation_context is not None:
+            propagation_context._fill_sample_rand()
+
         return propagation_context
 
     @property
@@ -425,6 +430,7 @@ class PropagationContext:
         # type: () -> str
         """The trace id of the Sentry trace."""
         if not self._trace_id:
+            # New trace, don't fill in sample_rand
             self._trace_id = uuid.uuid4().hex
 
         return self._trace_id
@@ -468,6 +474,55 @@ class PropagationContext:
             self.parent_sampled,
             self.dynamic_sampling_context,
         )
+
+    def _fill_sample_rand(self):
+        # type: () -> None
+        """
+        Ensure that there is a valid sample_rand value in the dynamic_sampling_context.
+
+        If there is a valid sample_rand value in the dynamic_sampling_context, we keep it.
+        Otherwise, we generate a sample_rand value according to the following:
+
+          - If we have a parent_sampled value and a sample_rate in the DSC, we compute
+            a sample_rand value randomly in the range:
+                - [0, sample_rate) if parent_sampled is True,
+                - or, in the range [sample_rate, 1) if parent_sampled is False.
+
+          - If either parent_sampled or sample_rate is missing, we generate a random
+            value in the range [0, 1).
+
+        The sample_rand is deterministically generated from the trace_id, if present.
+
+        This function does nothing if there is no dynamic_sampling_context.
+        """
+        if self.dynamic_sampling_context is None:
+            return
+
+        sample_rand = try_float(self.dynamic_sampling_context.get("sample_rand"))
+        if sample_rand is not None and 0 <= sample_rand < 1:
+            # sample_rand is present and valid, so don't overwrite it
+            return
+
+        # Get the sample rate and compute the transformation that will map the random value
+        # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
+        sample_rate = try_float(self.dynamic_sampling_context.get("sample_rate"))
+        lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
+
+        if lower >= upper:
+            # lower >= upper might happen if the incoming trace's sampled flag
+            # and sample_rate are inconsistent, e.g. sample_rate=0.0 but sampled=True.
+            # We cannot generate a sensible sample_rand value in this case.
+            return
+
+        random = Random(self.trace_id)
+        sample_rand = upper
+        while sample_rand == upper:
+            # The built-in uniform() method can, in some cases, return the
+            # upper bound. We request a new value until we get a different
+            # value.
+            sample_rand = random.uniform(lower, upper)
+
+        self.dynamic_sampling_context["sample_rand"] = str(sample_rand)
 
 
 class Baggage:
@@ -746,6 +801,21 @@ def get_current_span(scope=None):
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
+
+
+def _sample_rand_range(parent_sampled, sample_rate):
+    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
+    """
+    Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
+    that a generated sample_rand value must fall into, given the parent_sampled and
+    sample_rate values.
+    """
+    if parent_sampled is None or sample_rate is None:
+        return 0.0, 1.0
+    elif parent_sampled is True:
+        return 0.0, sample_rate
+    else:  # parent_sampled is False
+        return sample_rate, 1.0
 
 
 # Circular imports
