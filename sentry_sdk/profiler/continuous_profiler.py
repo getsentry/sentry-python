@@ -143,14 +143,6 @@ def try_profile_lifecycle_trace_start():
     return _scheduler.auto_start()
 
 
-def try_profile_lifecycle_trace_stop():
-    # type: () -> None
-    if _scheduler is None:
-        return
-
-    _scheduler.auto_stop()
-
-
 def start_profiler():
     # type: () -> None
     if _scheduler is None:
@@ -370,9 +362,6 @@ class ContinuousScheduler:
 
                 for profile in inactive_profiles:
                     self.active_profiles.remove(profile)
-
-                if self.buffer is None:
-                    self.reset_buffer()
 
                 if self.buffer is not None:
                     self.buffer.write(ts, sample)

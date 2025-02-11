@@ -461,3 +461,49 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
 
         assert get_profiler_id() is None, "profiler should not be running"
         assert_single_transaction_without_profile_chunks(envelopes)
+
+
+@pytest.mark.parametrize(
+    ["mode", "class_name"],
+    [
+        pytest.param("thread", "ThreadContinuousScheduler"),
+        pytest.param(
+            "gevent",
+            "GeventContinuousScheduler",
+            marks=requires_gevent,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
+)
+def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle(
+    sentry_init,
+    mode,
+    class_name,
+    make_options,
+    teardown_profiling,
+):
+    options = make_options(
+        mode=mode, profile_session_sample_rate=0.0, lifecycle="trace"
+    )
+    sentry_init(
+        traces_sample_rate=1.0,
+        **options,
+    )
+
+    with mock.patch(
+        f"sentry_sdk.profiler.continuous_profiler.{class_name}.ensure_running"
+    ) as mock_ensure_running:
+        start_profiler()
+        mock_ensure_running.assert_not_called()
+
+    with mock.patch(
+        f"sentry_sdk.profiler.continuous_profiler.{class_name}.teardown"
+    ) as mock_teardown:
+        stop_profiler()
+        mock_teardown.assert_not_called()
