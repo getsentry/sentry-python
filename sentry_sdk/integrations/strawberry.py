@@ -47,10 +47,10 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Generator, List, Optional, Union
+    from typing import Any, Callable, Generator, List, Optional
     from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
     from strawberry.http import GraphQLHTTPResponse
-    from strawberry.types import ExecutionContext, ExecutionResult, SubscriptionExecutionResult  # type: ignore
+    from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
     from sentry_sdk._types import Event, EventProcessor
 
 
@@ -78,7 +78,7 @@ class StrawberryIntegration(Integration):
         _check_minimum_version(StrawberryIntegration, version, "strawberry-graphql")
 
         _patch_schema_init()
-        _patch_execute()
+        _patch_schema_execute()
         _patch_views()
 
 
@@ -287,54 +287,79 @@ class SentrySyncExtension(SentryAsyncExtension):
             return _next(root, info, *args, **kwargs)
 
 
-def _patch_execute():
-    # type: () -> None
-    old_execute_async = strawberry_schema.execute
-    old_execute_sync = strawberry_schema.execute_sync
+def _patch_schema_execute():
+    old_execute_sync = strawberry_schema.Schema.execute_sync
+    old_execute_async = strawberry_schema.Schema.execute
 
-    async def _sentry_patched_execute_async(*args, **kwargs):
-        # type: (Any, Any) -> Union[ExecutionResult, SubscriptionExecutionResult]
-        result = await old_execute_async(*args, **kwargs)
+    def _sentry_patched_execute_sync(
+        self,
+        query,
+        variable_values,
+        context_value,
+        root_value,
+        operation_name,
+        *args,
+        **kwargs,
+    ):
+        # type: (strawberry_schema.Schema, Optional[str], Optional[dict[str, Any]], Optional[Any], Optional[Any], Optional[str], Any, Any) -> ExecutionResult
+        result = old_execute_sync(
+            self,
+            query,
+            variable_values,
+            context_value,
+            root_value,
+            operation_name,
+            *args,
+            **kwargs,
+        )
 
         if sentry_sdk.get_client().get_integration(StrawberryIntegration) is None:
             return result
 
-        if "execution_context" in kwargs:
-            scope = sentry_sdk.get_isolation_scope()
-            event_processor = _make_request_event_processor(kwargs["execution_context"])
-            scope.add_event_processor(event_processor)
+        scope = sentry_sdk.get_isolation_scope()
+        event_processor = _make_request_event_processor(
+            query, variable_values, operation_name
+        )
+        scope.add_event_processor(event_processor)
 
         return result
 
-    @ensure_integration_enabled(StrawberryIntegration, old_execute_sync)
-    def _sentry_patched_execute_sync(*args, **kwargs):
-        # type: (Any, Any) -> ExecutionResult
-        result = old_execute_sync(*args, **kwargs)
+    async def _sentry_patched_execute_async(
+        self,
+        query,
+        variable_values,
+        context_value,
+        root_value,
+        operation_name,
+        *args,
+        **kwargs,
+    ):
+        # type: (strawberry_schema.Schema, Optional[str], Optional[dict[str, Any]], Optional[Any], Optional[Any], Optional[str], Any, Any) -> ExecutionResult
+        result = await old_execute_async(
+            self,
+            query,
+            variable_values,
+            context_value,
+            root_value,
+            operation_name,
+            *args,
+            **kwargs,
+        )
 
-        if "execution_context" in kwargs:
-            scope = sentry_sdk.get_isolation_scope()
-            event_processor = _make_request_event_processor(kwargs["execution_context"])
-            scope.add_event_processor(event_processor)
+        if sentry_sdk.get_client().get_integration(StrawberryIntegration) is None:
+            return result
+
+        scope = sentry_sdk.get_isolation_scope()
+        event_processor = _make_request_event_processor(
+            query, variable_values, operation_name
+        )
+        scope.add_event_processor(event_processor)
 
         return result
-
-    strawberry_schema.execute = _sentry_patched_execute_async
-    strawberry_schema.execute_sync = _sentry_patched_execute_sync
-
-
-def _patch_execute_new():
-    old_execute_sync = strawberry_schema.Schema.execute_sync
-    old_execute_async = strawberry_schema.Schema.execute
-
-    def _sentry_patched_execute_sync(self, query, variable_values, context_value, root_value, operation_name, *args, **kwargs):
-        # type: (strawberry_schema.Schema, Optional[str], Optional[dict[str, Any]], Optional[Any], Optional[Any], Optional[str]) -> ExecutionResult
-        pass
-
-    def _sentry_patched_execute_async(...):
-        pass
 
     strawberry_schema.Schema.execute_sync = _sentry_patched_execute_sync
     strawberry_schema.Schema.execute = _sentry_patched_execute_async
+
 
 def _patch_views():
     # type: () -> None
@@ -381,8 +406,8 @@ def _patch_views():
     )
 
 
-def _make_request_event_processor(execution_context):
-    # type: (ExecutionContext) -> EventProcessor
+def _make_request_event_processor(query, variables=None, operation_name=None):
+    # type: (Optional[str], Optional[dict[str, Any]], Optional[str]) -> EventProcessor
 
     def inner(event, hint):
         # type: (Event, dict[str, Any]) -> Event
@@ -392,12 +417,12 @@ def _make_request_event_processor(execution_context):
                 request_data["api_target"] = "graphql"
 
                 if not request_data.get("data"):
-                    data = {"query": execution_context.query}
+                    data = {"query": query}
 
-                    if execution_context.variables:
-                        data["variables"] = execution_context.variables
-                    if execution_context.operation_name:
-                        data["operationName"] = execution_context.operation_name
+                    if variables:
+                        data["variables"] = variables
+                    if operation_name:
+                        data["operationName"] = operation_name
 
                     request_data["data"] = data
 
