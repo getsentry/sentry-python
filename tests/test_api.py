@@ -111,7 +111,7 @@ def test_continue_trace(sentry_init):
     transaction = continue_trace(
         {
             "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
-            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19",
+            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19,sentry-sample_rand=0.123456",
         },
         name="some name",
     )
@@ -123,7 +123,8 @@ def test_continue_trace(sentry_init):
         assert propagation_context.parent_span_id == parent_span_id
         assert propagation_context.parent_sampled == parent_sampled
         assert propagation_context.dynamic_sampling_context == {
-            "trace_id": "566e3688a61d4bc888951642d6f14a19"
+            "trace_id": "566e3688a61d4bc888951642d6f14a19",
+            "sample_rand": "0.123456",
         }
 
 
