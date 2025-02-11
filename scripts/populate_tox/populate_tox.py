@@ -231,7 +231,7 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
 
 
 def pick_releases_to_test(releases: list[Version]) -> list[Version]:
-    """Pick a handful of releases to test from a list of supported releases."""
+    """Pick a handful of releases to test from a sorted list of supported releases."""
     # If the package has majors (or major-like releases, even if they don't do
     # semver), we want to make sure we're testing them all. If not, we just pick
     # the oldest, the newest, and a couple in between.
