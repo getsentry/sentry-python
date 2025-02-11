@@ -23,13 +23,25 @@ except ImportError:
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
-def experimental_options(mode=None, auto_start=None):
-    return {
-        "_experiments": {
-            "continuous_profiling_auto_start": auto_start,
-            "continuous_profiling_mode": mode,
+def get_client_options(use_top_level_profiler_mode):
+    def client_options(mode=None, auto_start=None, profile_session_sample_rate=1.0):
+        if use_top_level_profiler_mode:
+            return {
+                "profiler_mode": mode,
+                "profile_session_sample_rate": profile_session_sample_rate,
+                "_experiments": {
+                    "continuous_profiling_auto_start": auto_start,
+                },
+            }
+        return {
+            "profile_session_sample_rate": profile_session_sample_rate,
+            "_experiments": {
+                "continuous_profiling_auto_start": auto_start,
+                "continuous_profiling_mode": mode,
+            },
         }
-    }
+
+    return client_options
 
 
 mock_sdk_info = {
@@ -42,7 +54,10 @@ mock_sdk_info = {
 @pytest.mark.parametrize("mode", [pytest.param("foo")])
 @pytest.mark.parametrize(
     "make_options",
-    [pytest.param(experimental_options, id="experiment")],
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
 )
 def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling):
     with pytest.raises(ValueError):
@@ -62,7 +77,10 @@ def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling
 )
 @pytest.mark.parametrize(
     "make_options",
-    [pytest.param(experimental_options, id="experiment")],
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
 )
 def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
     options = make_options(mode=mode)
@@ -82,7 +100,10 @@ def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
 )
 @pytest.mark.parametrize(
     "make_options",
-    [pytest.param(experimental_options, id="experiment")],
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
 )
 def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling):
     options = make_options(mode=mode)
@@ -178,7 +199,10 @@ def assert_single_transaction_without_profile_chunks(envelopes):
 )
 @pytest.mark.parametrize(
     "make_options",
-    [pytest.param(experimental_options, id="experiment")],
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
 )
 @mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_auto_start_and_manual_stop(
@@ -191,7 +215,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
     options = make_options(mode=mode, auto_start=True)
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments=options.get("_experiments", {}),
+        **options,
     )
 
     envelopes = capture_envelopes()
@@ -200,7 +224,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
     with sentry_sdk.start_transaction(name="profiling"):
         with sentry_sdk.start_span(op="op"):
-            time.sleep(0.05)
+            time.sleep(0.1)
 
     assert_single_transaction_with_profile_chunks(envelopes, thread)
 
@@ -211,7 +235,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         with sentry_sdk.start_transaction(name="profiling"):
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.05)
+                time.sleep(0.1)
 
         assert_single_transaction_without_profile_chunks(envelopes)
 
@@ -221,7 +245,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         with sentry_sdk.start_transaction(name="profiling"):
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.05)
+                time.sleep(0.1)
 
         assert_single_transaction_with_profile_chunks(envelopes, thread)
 
@@ -235,10 +259,13 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 )
 @pytest.mark.parametrize(
     "make_options",
-    [pytest.param(experimental_options, id="experiment")],
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
 )
 @mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
-def test_continuous_profiler_manual_start_and_stop(
+def test_continuous_profiler_manual_start_and_stop_sampled(
     sentry_init,
     capture_envelopes,
     mode,
@@ -248,7 +275,7 @@ def test_continuous_profiler_manual_start_and_stop(
     options = make_options(mode=mode)
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments=options.get("_experiments", {}),
+        **options,
     )
 
     envelopes = capture_envelopes()
@@ -275,3 +302,43 @@ def test_continuous_profiler_manual_start_and_stop(
                 time.sleep(0.05)
 
         assert_single_transaction_without_profile_chunks(envelopes)
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
+)
+def test_continuous_profiler_manual_start_and_stop_unsampled(
+    sentry_init,
+    capture_envelopes,
+    mode,
+    make_options,
+    teardown_profiling,
+):
+    options = make_options(mode=mode, profile_session_sample_rate=0.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        **options,
+    )
+
+    envelopes = capture_envelopes()
+
+    start_profiler()
+
+    with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(op="op"):
+            time.sleep(0.05)
+
+    assert_single_transaction_without_profile_chunks(envelopes)
+
+    stop_profiler()

@@ -12,6 +12,13 @@ from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
 from unittest import mock  # python 3.3 and above
 
 
+def mock_client_post(client, post_mock):
+    # huggingface-hub==0.28.0 deprecates the `post` method
+    # so patch `_inner_post` instead
+    client.post = post_mock
+    client._inner_post = post_mock
+
+
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts, details_arg",
     itertools.product([True, False], repeat=3),
@@ -28,7 +35,7 @@ def test_nonstreaming_chat_completion(
 
     client = InferenceClient("some-model")
     if details_arg:
-        client.post = mock.Mock(
+        post_mock = mock.Mock(
             return_value=b"""[{
                 "generated_text": "the model response",
                 "details": {
@@ -40,9 +47,11 @@ def test_nonstreaming_chat_completion(
             }]"""
         )
     else:
-        client.post = mock.Mock(
+        post_mock = mock.Mock(
             return_value=b'[{"generated_text": "the model response"}]'
         )
+    mock_client_post(client, post_mock)
+
     with start_transaction(name="huggingface_hub tx"):
         response = client.text_generation(
             prompt="hello",
@@ -84,7 +93,8 @@ def test_streaming_chat_completion(
     events = capture_events()
 
     client = InferenceClient("some-model")
-    client.post = mock.Mock(
+
+    post_mock = mock.Mock(
         return_value=[
             b"""data:{
                 "token":{"id":1, "special": false, "text": "the model "}
@@ -95,6 +105,8 @@ def test_streaming_chat_completion(
             }""",
         ]
     )
+    mock_client_post(client, post_mock)
+
     with start_transaction(name="huggingface_hub tx"):
         response = list(
             client.text_generation(
@@ -131,7 +143,9 @@ def test_bad_chat_completion(sentry_init, capture_events):
     events = capture_events()
 
     client = InferenceClient("some-model")
-    client.post = mock.Mock(side_effect=OverloadedError("The server is overloaded"))
+    post_mock = mock.Mock(side_effect=OverloadedError("The server is overloaded"))
+    mock_client_post(client, post_mock)
+
     with pytest.raises(OverloadedError):
         client.text_generation(prompt="hello")
 
@@ -147,13 +161,15 @@ def test_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     client = InferenceClient("some-model")
-    client.post = mock.Mock(
+    post_mock = mock.Mock(
         return_value=[
             b"""data:{
                 "token":{"id":1, "special": false, "text": "the model "}
             }""",
         ]
     )
+    mock_client_post(client, post_mock)
+
     with start_transaction(name="huggingface_hub tx"):
         list(
             client.text_generation(
