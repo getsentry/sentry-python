@@ -6,11 +6,28 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
+    "ariadne": {
+        "package": "ariadne",
+        "deps": {
+            "*": ["fastapi", "flask", "httpx"],
+        },
+        "python": ">=3.8",
+    },
     "flask": {
         "package": "flask",
         "deps": {
             "*": ["flask-login", "werkzeug"],
             "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
+        },
+    },
+    "gql": {
+        "package": "gql[all]",
+    },
+    "graphene": {
+        "package": "graphene",
+        "deps": {
+            "*": ["blinker", "fastapi", "flask", "httpx"],
+            "py3.6": ["aiocontextvars"],
         },
     },
     "starlette": {
@@ -27,6 +44,12 @@ TEST_SUITE_CONFIG = {
             "<=0.36": ["httpx<0.28.0"],
             "<0.15": ["jinja2<3.1"],
             "py3.6": ["aiocontextvars"],
+        },
+    },
+    "strawberry": {
+        "package": "strawberry-graphql[fastapi,flask]",
+        "deps": {
+            "*": ["httpx"],
         },
     },
 }
