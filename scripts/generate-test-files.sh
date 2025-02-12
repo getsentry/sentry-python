@@ -6,8 +6,8 @@ set -xe
 
 cd "$(dirname "$0")"
 
-python -m venv .venv
-. .venv/bin/activate
+python -m venv toxgen.venv
+. toxgen.venv/bin/activate
 
 pip install -e ..
 pip install -r populate_tox/requirements.txt
