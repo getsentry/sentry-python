@@ -638,6 +638,10 @@ class Baggage:
             )
         )
 
+    def __repr__(self):
+        # type: () -> str
+        return f'<Baggage "{self.serialize(include_third_party=True)}", mutable={self.mutable}>'
+
 
 def should_propagate_trace(client, url):
     # type: (sentry_sdk.client.BaseClient, str) -> bool
