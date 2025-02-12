@@ -6,11 +6,34 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
-    "openfeature": {
-        "package": "openfeature-sdk",
+    "ariadne": {
+        "package": "ariadne",
+        "deps": {
+            "*": ["fastapi", "flask", "httpx"],
+        },
+        "python": ">=3.8",
+    },
+    "gql": {
+        "package": "gql[all]",
+    },
+    "graphene": {
+        "package": "graphene",
+        "deps": {
+            "*": ["blinker", "fastapi", "flask", "httpx"],
+            "py3.6": ["aiocontextvars"],
+        },
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
+    },
+    "openfeature": {
+        "package": "openfeature-sdk",
+    },
+    "strawberry": {
+        "package": "strawberry-graphql[fastapi,flask]",
+        "deps": {
+            "*": ["httpx"],
+        },
     },
     "unleash": {
         "package": "UnleashClient",
