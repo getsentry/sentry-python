@@ -103,6 +103,7 @@ IGNORE = {
     "spark",
     "starlette",
     "starlite",
+    "statsig",
     "sqlalchemy",
     "strawberry",
     "tornado",
