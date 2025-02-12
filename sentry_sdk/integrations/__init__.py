@@ -151,6 +151,7 @@ _MIN_VERSIONS = {
     "sanic": (0, 8),
     "sqlalchemy": (1, 2),
     "starlite": (1, 48),
+    "statsig": (0, 55, 3),
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
     "typer": (0, 15),
