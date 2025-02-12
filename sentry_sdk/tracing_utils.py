@@ -645,6 +645,7 @@ class Baggage:
         options = client.options or {}
 
         sentry_items["trace_id"] = transaction.trace_id
+        sentry_items["sample_rand"] = str(transaction._sample_rand)
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -716,6 +717,20 @@ class Baggage:
                 if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
             )
         )
+
+    def _sample_rand(self):
+        # type: () -> Optional[Decimal]
+        """Convenience method to get the sample_rand value from the sentry_items.
+
+        We validate the value and parse it as a Decimal before returning it. The value is considered
+        valid if it is a Decimal in the range [0, 1).
+        """
+        sample_rand = try_convert(Decimal, self.sentry_items.get("sample_rand"))
+
+        if sample_rand is not None and Decimal(0) <= sample_rand < Decimal(1):
+            return sample_rand
+
+        return None
 
     def __repr__(self):
         # type: () -> str
