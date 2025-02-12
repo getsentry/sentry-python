@@ -1,5 +1,42 @@
 # Changelog
 
+## 2.21.0
+
+### Various fixes & improvements
+
+- Fix incompatibility with new Strawberry version (#4026) by @sentrivana
+- Add `failed_request_status_codes` to Litestar (#4021) by @vrslev
+
+  See https://docs.sentry.io/platforms/python/integrations/litestar/ for details.
+- Deprecate `enable_tracing` option (#3935) by @antonpirker
+
+  The `enable_tracing` option is now deprecated. Please use `traces_sample_rate` instead. See https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate for more information.
+- Explicitly use `None` default when checking metadata (#4039) by @mpurnell1
+- Fix bug where concurrent accesses to the flags property could raise a `RuntimeError` (#4034) by @cmanallen
+- Add more min versions of frameworks (#3973) by @sentrivana
+- Set level based on status code for HTTP client breadcrumbs (#4004) by @sentrivana
+- Don't set transaction status to error on `sys.exit(0)` (#4025) by @sentrivana
+- Continuous profiling sample rate (#4002) by @Zylphrex
+- Track and report spans that were dropped (#4005) by @constantinius
+- Change continuous profile buffer size (#3987) by @Zylphrex
+- Handle `MultiPartParserError` to avoid internal sentry crash (#4001) by @orhanhenrik
+- Handle `None` lineno in `get_source_context` (#3925) by @sentrivana
+- Add support for Python 3.12 and 3.13 to AWS Lambda integration (#3965) by @antonpirker
+- Add `propagate_traces` deprecation warning (#3899) by @mgaligniana
+- Check that `__module__` is `str` (#3942) by @szokeasaurusrex
+- Add `__repr__` to `Baggage` (#4043) by @szokeasaurusrex
+- Fix a typo (#3923) by @antonpirker
+- Fix various CI errors on master (#4009) by @Zylphrex
+- Split gevent tests off (#3964) by @sentrivana
+- Add tox generation script, but don't use it yet (#3971) by @sentrivana
+- Use `httpx_mock` in `test_httpx` (#3967) by @sl0thentr0py
+- Fix typo in test name (#4036) by @szokeasaurusrex
+- Fix mypy (#4019) by @sentrivana
+- Test Celery's latest RC (#3938) by @sentrivana
+- Bump `actions/create-github-app-token` from `1.11.2` to `1.11.3` (#4023) by @dependabot
+- Bump `actions/create-github-app-token` from `1.11.1` to `1.11.2` (#4015) by @dependabot
+- Bump `codecov/codecov-action` from `5.1.2` to `5.3.1` (#3995) by @dependabot
+
 ## 2.20.0
 
 - **New integration:** Add [Typer](https://typer.tiangolo.com/) integration (#3869) by @patrick91
