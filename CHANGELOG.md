@@ -17,6 +17,8 @@
 - Set level based on status code for HTTP client breadcrumbs (#4004) by @sentrivana
 - Don't set transaction status to error on `sys.exit(0)` (#4025) by @sentrivana
 - Continuous profiling sample rate (#4002) by @Zylphrex
+
+  Set `profile_session_sample_rate=1.0` in your `init()` to collect continuous profiles for 100% of profile sessions. See https://docs.sentry.io/platforms/python/profiling/#enable-continuous-profiling for more information.
 - Track and report spans that were dropped (#4005) by @constantinius
 - Change continuous profile buffer size (#3987) by @Zylphrex
 - Handle `MultiPartParserError` to avoid internal sentry crash (#4001) by @orhanhenrik
@@ -40,7 +42,7 @@
 ## 2.20.0
 
 - **New integration:** Add [Typer](https://typer.tiangolo.com/) integration (#3869) by @patrick91
-  
+
   For more information, see the documentation for the [TyperIntegration](https://docs.sentry.io/platforms/python/integrations/typer/).
 
 - **New integration:** Add [Unleash](https://www.getunleash.io/) feature flagging integration (#3888) by @aliu39
@@ -122,7 +124,7 @@
 ### Various fixes & improvements
 
 - **New integration:** Add [LaunchDarkly](https://launchdarkly.com/) integration (#3648) by @cmanallen
-  
+
   For more information, see the documentation for the [LaunchDarklyIntegration](https://docs.sentry.io/platforms/python/integrations/launchdarkly/).
 
 - **New integration:** Add [OpenFeature](https://openfeature.dev/) feature flagging integration (#3648) by @cmanallen
