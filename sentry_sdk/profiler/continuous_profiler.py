@@ -1,5 +1,6 @@
 import atexit
 import os
+import random
 import sys
 import threading
 import time
@@ -83,11 +84,15 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
     else:
         default_profiler_mode = ThreadContinuousScheduler.mode
 
-    experiments = options.get("_experiments", {})
+    if options.get("profiler_mode") is not None:
+        profiler_mode = options["profiler_mode"]
+    else:
+        # TODO: deprecate this and just use the existing `profiler_mode`
+        experiments = options.get("_experiments", {})
 
-    profiler_mode = (
-        experiments.get("continuous_profiling_mode") or default_profiler_mode
-    )
+        profiler_mode = (
+            experiments.get("continuous_profiling_mode") or default_profiler_mode
+        )
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
@@ -118,19 +123,10 @@ def try_autostart_continuous_profiler():
     if _scheduler is None:
         return
 
-    # Ensure that the scheduler only autostarts once per process.
-    # This is necessary because many web servers use forks to spawn
-    # additional processes. And the profiler is only spawned on the
-    # master process, then it often only profiles the main process
-    # and not the ones where the requests are being handled.
-    #
-    # Additionally, we only want this autostart behaviour once per
-    # process. If the user explicitly calls `stop_profiler`, it should
-    # be respected and not start the profiler again.
-    if not _scheduler.should_autostart():
+    if not _scheduler.is_auto_start_enabled():
         return
 
-    _scheduler.ensure_running()
+    _scheduler.manual_start()
 
 
 def start_profiler():
@@ -138,7 +134,7 @@ def start_profiler():
     if _scheduler is None:
         return
 
-    _scheduler.ensure_running()
+    _scheduler.manual_start()
 
 
 def stop_profiler():
@@ -146,7 +142,7 @@ def stop_profiler():
     if _scheduler is None:
         return
 
-    _scheduler.teardown()
+    _scheduler.manual_stop()
 
 
 def teardown_continuous_profiler():
@@ -164,6 +160,16 @@ def get_profiler_id():
     return _scheduler.profiler_id
 
 
+def determine_profile_session_sampling_decision(sample_rate):
+    # type: (Union[float, None]) -> bool
+
+    # `None` is treated as `0.0`
+    if not sample_rate:
+        return False
+
+    return random.random() < float(sample_rate)
+
+
 class ContinuousScheduler:
     mode = "unknown"  # type: ContinuousProfilerMode
 
@@ -175,15 +181,42 @@ class ContinuousScheduler:
         self.capture_func = capture_func
         self.sampler = self.make_sampler()
         self.buffer = None  # type: Optional[ProfileBuffer]
+        self.pid = None  # type: Optional[int]
 
         self.running = False
 
-    def should_autostart(self):
+        profile_session_sample_rate = self.options.get("profile_session_sample_rate")
+        self.sampled = determine_profile_session_sampling_decision(
+            profile_session_sample_rate
+        )
+
+    def is_auto_start_enabled(self):
         # type: () -> bool
+
+        # Ensure that the scheduler only autostarts once per process.
+        # This is necessary because many web servers use forks to spawn
+        # additional processes. And the profiler is only spawned on the
+        # master process, then it often only profiles the main process
+        # and not the ones where the requests are being handled.
+        if self.pid == os.getpid():
+            return False
+
         experiments = self.options.get("_experiments")
         if not experiments:
             return False
+
         return experiments.get("continuous_profiling_auto_start")
+
+    def manual_start(self):
+        # type: () -> None
+        if not self.sampled:
+            return
+
+        self.ensure_running()
+
+    def manual_stop(self):
+        # type: () -> None
+        self.teardown()
 
     def ensure_running(self):
         # type: () -> None
@@ -277,15 +310,11 @@ class ThreadContinuousScheduler(ContinuousScheduler):
         super().__init__(frequency, options, sdk_info, capture_func)
 
         self.thread = None  # type: Optional[threading.Thread]
-        self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
-
-    def should_autostart(self):
-        # type: () -> bool
-        return super().should_autostart() and self.pid != os.getpid()
 
     def ensure_running(self):
         # type: () -> None
+
         pid = os.getpid()
 
         # is running on the right process
@@ -356,12 +385,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
         super().__init__(frequency, options, sdk_info, capture_func)
 
         self.thread = None  # type: Optional[_ThreadPool]
-        self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
-
-    def should_autostart(self):
-        # type: () -> bool
-        return super().should_autostart() and self.pid != os.getpid()
 
     def ensure_running(self):
         # type: () -> None
@@ -393,7 +417,6 @@ class GeventContinuousScheduler(ContinuousScheduler):
                 # longer allows us to spawn a thread and we have to bail.
                 self.running = False
                 self.thread = None
-                return
 
     def teardown(self):
         # type: () -> None
@@ -407,7 +430,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
         self.buffer = None
 
 
-PROFILE_BUFFER_SECONDS = 10
+PROFILE_BUFFER_SECONDS = 60
 
 
 class ProfileBuffer:

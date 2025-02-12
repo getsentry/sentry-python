@@ -32,6 +32,7 @@ from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     EndpointType,
 )
+from sentry_sdk._types import Annotated, AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
 
 from typing import TYPE_CHECKING
 
@@ -72,8 +73,6 @@ logger = logging.getLogger("sentry_sdk.errors")
 _installed_modules = None
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
-
-SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
 FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
 TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
@@ -402,84 +401,6 @@ class Auth:
         if self.secret_key is not None:
             rv.append(("sentry_secret", self.secret_key))
         return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
-
-
-class AnnotatedValue:
-    """
-    Meta information for a data field in the event payload.
-    This is to tell Relay that we have tampered with the fields value.
-    See:
-    https://github.com/getsentry/relay/blob/be12cd49a0f06ea932ed9b9f93a655de5d6ad6d1/relay-general/src/types/meta.rs#L407-L423
-    """
-
-    __slots__ = ("value", "metadata")
-
-    def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
-        self.value = value
-        self.metadata = metadata
-
-    def __eq__(self, other):
-        # type: (Any) -> bool
-        if not isinstance(other, AnnotatedValue):
-            return False
-
-        return self.value == other.value and self.metadata == other.metadata
-
-    @classmethod
-    def removed_because_raw_data(cls):
-        # type: () -> AnnotatedValue
-        """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
-        return AnnotatedValue(
-            value="",
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!raw",  # Unparsable raw data
-                        "x",  # The fields original value was removed
-                    ]
-                ]
-            },
-        )
-
-    @classmethod
-    def removed_because_over_size_limit(cls):
-        # type: () -> AnnotatedValue
-        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
-        return AnnotatedValue(
-            value="",
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!config",  # Because of configured maximum size
-                        "x",  # The fields original value was removed
-                    ]
-                ]
-            },
-        )
-
-    @classmethod
-    def substituted_because_contains_sensitive_data(cls):
-        # type: () -> AnnotatedValue
-        """The actual value was removed because it contained sensitive information."""
-        return AnnotatedValue(
-            value=SENSITIVE_DATA_SUBSTITUTE,
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
-                        "s",  # The fields original value was substituted
-                    ]
-                ]
-            },
-        )
-
-
-if TYPE_CHECKING:
-    from typing import TypeVar
-
-    T = TypeVar("T")
-    Annotated = Union[AnnotatedValue, T]
 
 
 def get_type_name(cls):
@@ -1744,7 +1665,7 @@ def _generate_installed_modules():
 
         yielded = set()
         for dist in metadata.distributions():
-            name = dist.metadata["Name"]
+            name = dist.metadata.get("Name", None)  # type: ignore[attr-defined]
             # `metadata` values may be `None`, see:
             # https://github.com/python/cpython/issues/91216
             # and
@@ -1958,3 +1879,12 @@ def get_current_thread_meta(thread=None):
 
     # we've tried everything, time to give up
     return None, None
+
+
+def should_be_treated_as_error(ty, value):
+    # type: (Any, Any) -> bool
+    if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
+        # https://docs.python.org/3/library/exceptions.html#SystemExit
+        return False
+
+    return True

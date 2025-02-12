@@ -27,15 +27,19 @@ class SocketIntegration(Integration):
 
 
 def _get_span_description(host, port):
-    # type: (Union[bytes, str, None], Union[str, int, None]) -> str
+    # type: (Union[bytes, str, None], Union[bytes, str, int, None]) -> str
 
     try:
         host = host.decode()  # type: ignore
     except (UnicodeDecodeError, AttributeError):
         pass
 
-    description = "%s:%s" % (host, port)  # type: ignore
+    try:
+        port = port.decode()  # type: ignore
+    except (UnicodeDecodeError, AttributeError):
+        pass
 
+    description = "%s:%s" % (host, port)  # type: ignore
     return description
 
 
@@ -74,7 +78,7 @@ def _patch_getaddrinfo():
     real_getaddrinfo = socket.getaddrinfo
 
     def getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-        # type: (Union[bytes, str, None], Union[str, int, None], int, int, int, int) -> List[Tuple[AddressFamily, SocketKind, int, str, Union[Tuple[str, int], Tuple[str, int, int, int]]]]
+        # type: (Union[bytes, str, None], Union[bytes, str, int, None], int, int, int, int) -> List[Tuple[AddressFamily, SocketKind, int, str, Union[Tuple[str, int], Tuple[str, int, int, int], Tuple[int, bytes]]]]
         integration = sentry_sdk.get_client().get_integration(SocketIntegration)
         if integration is None:
             return real_getaddrinfo(host, port, family, type, proto, flags)
@@ -89,4 +93,4 @@ def _patch_getaddrinfo():
 
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
-    socket.getaddrinfo = getaddrinfo  # type: ignore
+    socket.getaddrinfo = getaddrinfo

@@ -115,3 +115,34 @@ def test_should_be_included(test_case, expected):
 )
 def test_strip_sentry_baggage(header, expected):
     assert Baggage.strip_sentry_baggage(header) == expected
+
+
+@pytest.mark.parametrize(
+    ("baggage", "expected_repr"),
+    (
+        (Baggage(sentry_items={}), '<Baggage "", mutable=True>'),
+        (Baggage(sentry_items={}, mutable=False), '<Baggage "", mutable=False>'),
+        (
+            Baggage(sentry_items={"foo": "bar"}),
+            '<Baggage "sentry-foo=bar,", mutable=True>',
+        ),
+        (
+            Baggage(sentry_items={"foo": "bar"}, mutable=False),
+            '<Baggage "sentry-foo=bar,", mutable=False>',
+        ),
+        (
+            Baggage(sentry_items={"foo": "bar"}, third_party_items="asdf=1234,"),
+            '<Baggage "sentry-foo=bar,asdf=1234,", mutable=True>',
+        ),
+        (
+            Baggage(
+                sentry_items={"foo": "bar"},
+                third_party_items="asdf=1234,",
+                mutable=False,
+            ),
+            '<Baggage "sentry-foo=bar,asdf=1234,", mutable=False>',
+        ),
+    ),
+)
+def test_baggage_repr(baggage, expected_repr):
+    assert repr(baggage) == expected_repr

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 from contextlib import suppress
 from unittest import mock
 
@@ -473,9 +474,17 @@ async def test_trace_from_headers_if_performance_disabled(
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
+if sys.version_info < (3, 12):
+    # `loop` was deprecated in `pytest-aiohttp`
+    # in favor of `event_loop` from `pytest-asyncio`
+    @pytest.fixture
+    def event_loop(loop):
+        yield loop
+
+
 @pytest.mark.asyncio
 async def test_crumb_capture(
-    sentry_init, aiohttp_raw_server, aiohttp_client, loop, capture_events
+    sentry_init, aiohttp_raw_server, aiohttp_client, event_loop, capture_events
 ):
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
@@ -512,6 +521,61 @@ async def test_crumb_capture(
                 "http.response.status_code": 200,
                 "reason": "OK",
                 "extra": "foo",
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_crumb_capture_client_error(
+    sentry_init,
+    aiohttp_raw_server,
+    aiohttp_client,
+    event_loop,
+    capture_events,
+    status_code,
+    level,
+):
+    sentry_init(integrations=[AioHttpIntegration()])
+
+    async def handler(request):
+        return web.Response(status=status_code)
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    with start_transaction():
+        events = capture_events()
+
+        client = await aiohttp_client(raw_server)
+        resp = await client.get("/")
+        assert resp.status == status_code
+        capture_message("Testing!")
+
+        (event,) = events
+
+        crumb = event["breadcrumbs"]["values"][0]
+        assert crumb["type"] == "http"
+        if level is None:
+            assert "level" not in crumb
+        else:
+            assert crumb["level"] == level
+        assert crumb["category"] == "httplib"
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": "http://127.0.0.1:{}/".format(raw_server.port),
+                "http.fragment": "",
+                "http.method": "GET",
+                "http.query": "",
+                "http.response.status_code": status_code,
             }
         )
 

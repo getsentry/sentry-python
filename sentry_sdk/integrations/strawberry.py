@@ -27,16 +27,17 @@ except ImportError:
     raise DidNotEnable("strawberry-graphql integration requires Python 3.8 or newer")
 
 try:
-    import strawberry.schema.schema as strawberry_schema  # type: ignore
     from strawberry import Schema
-    from strawberry.extensions import SchemaExtension  # type: ignore
-    from strawberry.extensions.tracing.utils import should_skip_tracing as strawberry_should_skip_tracing  # type: ignore
-    from strawberry.http import async_base_view, sync_base_view  # type: ignore
+    from strawberry.extensions import SchemaExtension
+    from strawberry.extensions.tracing.utils import (
+        should_skip_tracing as strawberry_should_skip_tracing,
+    )
+    from strawberry.http import async_base_view, sync_base_view
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 try:
-    from strawberry.extensions.tracing import (  # type: ignore
+    from strawberry.extensions.tracing import (
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
@@ -47,10 +48,10 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Generator, List, Optional, Union
-    from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
+    from typing import Any, Callable, Generator, List, Optional
+    from graphql import GraphQLError, GraphQLResolveInfo
     from strawberry.http import GraphQLHTTPResponse
-    from strawberry.types import ExecutionContext, ExecutionResult, SubscriptionExecutionResult  # type: ignore
+    from strawberry.types import ExecutionContext
     from sentry_sdk._types import Event, EventProcessor
 
 
@@ -78,7 +79,6 @@ class StrawberryIntegration(Integration):
         _check_minimum_version(StrawberryIntegration, version, "strawberry-graphql")
 
         _patch_schema_init()
-        _patch_execute()
         _patch_views()
 
 
@@ -124,10 +124,10 @@ def _patch_schema_init():
 
         return old_schema_init(self, *args, **kwargs)
 
-    Schema.__init__ = _sentry_patched_schema_init
+    Schema.__init__ = _sentry_patched_schema_init  # type: ignore[method-assign]
 
 
-class SentryAsyncExtension(SchemaExtension):  # type: ignore
+class SentryAsyncExtension(SchemaExtension):
     def __init__(
         self,
         *,
@@ -140,7 +140,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
     @cached_property
     def _resource_name(self):
         # type: () -> str
-        query_hash = self.hash_query(self.execution_context.query)
+        query_hash = self.hash_query(self.execution_context.query)  # type: ignore
 
         if self.execution_context.operation_name:
             return "{}:{}".format(self.execution_context.operation_name, query_hash)
@@ -179,6 +179,10 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
                 "operation_type": operation_type,
             },
         )
+
+        scope = sentry_sdk.get_isolation_scope()
+        event_processor = _make_request_event_processor(self.execution_context)
+        scope.add_event_processor(event_processor)
 
         span = sentry_sdk.get_current_span()
         if span:
@@ -287,41 +291,6 @@ class SentrySyncExtension(SentryAsyncExtension):
             return _next(root, info, *args, **kwargs)
 
 
-def _patch_execute():
-    # type: () -> None
-    old_execute_async = strawberry_schema.execute
-    old_execute_sync = strawberry_schema.execute_sync
-
-    async def _sentry_patched_execute_async(*args, **kwargs):
-        # type: (Any, Any) -> Union[ExecutionResult, SubscriptionExecutionResult]
-        result = await old_execute_async(*args, **kwargs)
-
-        if sentry_sdk.get_client().get_integration(StrawberryIntegration) is None:
-            return result
-
-        if "execution_context" in kwargs:
-            scope = sentry_sdk.get_isolation_scope()
-            event_processor = _make_request_event_processor(kwargs["execution_context"])
-            scope.add_event_processor(event_processor)
-
-        return result
-
-    @ensure_integration_enabled(StrawberryIntegration, old_execute_sync)
-    def _sentry_patched_execute_sync(*args, **kwargs):
-        # type: (Any, Any) -> ExecutionResult
-        result = old_execute_sync(*args, **kwargs)
-
-        if "execution_context" in kwargs:
-            scope = sentry_sdk.get_isolation_scope()
-            event_processor = _make_request_event_processor(kwargs["execution_context"])
-            scope.add_event_processor(event_processor)
-
-        return result
-
-    strawberry_schema.execute = _sentry_patched_execute_async
-    strawberry_schema.execute_sync = _sentry_patched_execute_sync
-
-
 def _patch_views():
     # type: () -> None
     old_async_view_handle_errors = async_base_view.AsyncBaseHTTPView._handle_errors
@@ -359,10 +328,10 @@ def _patch_views():
                 )
                 sentry_sdk.capture_event(event, hint=hint)
 
-    async_base_view.AsyncBaseHTTPView._handle_errors = (
+    async_base_view.AsyncBaseHTTPView._handle_errors = (  # type: ignore[method-assign]
         _sentry_patched_async_view_handle_errors
     )
-    sync_base_view.SyncBaseHTTPView._handle_errors = (
+    sync_base_view.SyncBaseHTTPView._handle_errors = (  # type: ignore[method-assign]
         _sentry_patched_sync_view_handle_errors
     )
 
@@ -378,8 +347,7 @@ def _make_request_event_processor(execution_context):
                 request_data["api_target"] = "graphql"
 
                 if not request_data.get("data"):
-                    data = {"query": execution_context.query}
-
+                    data = {"query": execution_context.query}  # type: dict[str, Any]
                     if execution_context.variables:
                         data["variables"] = execution_context.variables
                     if execution_context.operation_name:

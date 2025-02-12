@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
     from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema, QueryParser  # type: ignore
-    from graphql.language.ast import DocumentNode  # type: ignore
+    from graphql.language.ast import DocumentNode
     from sentry_sdk._types import Event, EventProcessor
 
 

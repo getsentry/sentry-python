@@ -19,3 +19,4 @@ openfeature-sdk
 launchdarkly-server-sdk
 UnleashClient
 typer
+strawberry-graphql

@@ -1,8 +1,86 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar, Union
 
 
 # Re-exported for compat, since code out there in the wild might use this variable.
 MYPY = TYPE_CHECKING
+
+
+SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
+
+
+class AnnotatedValue:
+    """
+    Meta information for a data field in the event payload.
+    This is to tell Relay that we have tampered with the fields value.
+    See:
+    https://github.com/getsentry/relay/blob/be12cd49a0f06ea932ed9b9f93a655de5d6ad6d1/relay-general/src/types/meta.rs#L407-L423
+    """
+
+    __slots__ = ("value", "metadata")
+
+    def __init__(self, value, metadata):
+        # type: (Optional[Any], Dict[str, Any]) -> None
+        self.value = value
+        self.metadata = metadata
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
+
+    @classmethod
+    def removed_because_raw_data(cls):
+        # type: () -> AnnotatedValue
+        """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
+        return AnnotatedValue(
+            value="",
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!raw",  # Unparsable raw data
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
+    def removed_because_over_size_limit(cls):
+        # type: () -> AnnotatedValue
+        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
+        return AnnotatedValue(
+            value="",
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of configured maximum size
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
+    def substituted_because_contains_sensitive_data(cls):
+        # type: () -> AnnotatedValue
+        """The actual value was removed because it contained sensitive information."""
+        return AnnotatedValue(
+            value=SENSITIVE_DATA_SUBSTITUTE,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
+                        "s",  # The fields original value was substituted
+                    ]
+                ]
+            },
+        )
+
+
+T = TypeVar("T")
+Annotated = Union[AnnotatedValue, T]
 
 
 if TYPE_CHECKING:
@@ -19,7 +97,6 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Tuple
     from typing import Type
-    from typing import Union
     from typing_extensions import Literal, TypedDict
 
     class SDKInfo(TypedDict):
@@ -101,7 +178,7 @@ if TYPE_CHECKING:
             "request": dict[str, object],
             "sdk": Mapping[str, object],
             "server_name": str,
-            "spans": list[dict[str, object]],
+            "spans": Annotated[list[dict[str, object]]],
             "stacktrace": dict[
                 str, object
             ],  # We access this key in the code, but I am unsure whether we ever set it
@@ -118,6 +195,7 @@ if TYPE_CHECKING:
             "transaction_info": Mapping[str, Any],  # TODO: We can expand on this type
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
+            "_dropped_spans": int,
             "_metrics_summary": dict[str, object],
         },
         total=False,
