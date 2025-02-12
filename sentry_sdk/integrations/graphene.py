@@ -22,8 +22,8 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from typing import Any, Dict, Union
     from graphene.language.source import Source  # type: ignore
-    from graphql.execution import ExecutionResult  # type: ignore
-    from graphql.type import GraphQLSchema  # type: ignore
+    from graphql.execution import ExecutionResult
+    from graphql.type import GraphQLSchema
     from sentry_sdk._types import Event
 
 

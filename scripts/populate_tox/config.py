@@ -6,8 +6,25 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
+    "ariadne": {
+        "package": "ariadne",
+        "deps": {
+            "*": ["fastapi", "flask", "httpx"],
+        },
+        "python": ">=3.8",
+    },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
+    },
+    "gql": {
+        "package": "gql[all]",
+    },
+    "graphene": {
+        "package": "graphene",
+        "deps": {
+            "*": ["blinker", "fastapi", "flask", "httpx"],
+            "py3.6": ["aiocontextvars"],
+        },
     },
     "pymongo": {
         "package": "pymongo",
@@ -20,5 +37,11 @@ TEST_SUITE_CONFIG = {
     },
     "sqlalchemy": {
         "package": "sqlalchemy",
+    },
+    "strawberry": {
+        "package": "strawberry-graphql[fastapi,flask]",
+        "deps": {
+            "*": ["httpx"],
+        },
     },
 }
