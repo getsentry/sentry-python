@@ -185,12 +185,13 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
 
     sentry_init(traces_sample_rate=1.0)
 
-    headers = {}
-    headers["baggage"] = (
-        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
-        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
-    )
+    headers = {
+        "baggage": (
+            "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+            "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+        ),
+    }
 
     transaction = Transaction.continue_from_headers(headers)
 
@@ -220,7 +221,7 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
         expected_outgoing_baggage = (
             "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-            "sentry-sample_rate=0.01337,"
+            "sentry-sample_rate=1.0,"
             "sentry-user_id=Am%C3%A9lie"
         )
 

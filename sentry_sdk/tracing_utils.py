@@ -392,7 +392,7 @@ class PropagationContext:
         self.parent_sampled = parent_sampled
         """Boolean indicator if the parent span was sampled.
         Important when the parent span originated in an upstream service,
-        because we watn to sample the whole trace, or nothing from the trace."""
+        because we want to sample the whole trace, or nothing from the trace."""
 
         self.dynamic_sampling_context = dynamic_sampling_context
         """Data that is used for dynamic sampling decisions."""
