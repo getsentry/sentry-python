@@ -26,7 +26,7 @@ TEST_SUITE_CONFIG = {
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
-            "*": ["fastapi", "flask", "httpx"],
+            "*": ["httpx"],
         },
     },
 }
