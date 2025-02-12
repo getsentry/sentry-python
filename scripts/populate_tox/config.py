@@ -6,7 +6,30 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
+    "ariadne": {
+        "package": "ariadne",
+        "deps": {
+            "*": ["fastapi", "flask", "httpx"],
+        },
+        "python": ">=3.8",
+    },
+    "gql": {
+        "package": "gql[all]",
+    },
+    "graphene": {
+        "package": "graphene",
+        "deps": {
+            "*": ["blinker", "fastapi", "flask", "httpx"],
+            "py3.6": ["aiocontextvars"],
+        },
+    },
     "huggingface_hub": {
         "package": "huggingface_hub",
+    },
+    "strawberry": {
+        "package": "strawberry-graphql[fastapi,flask]",
+        "deps": {
+            "*": ["httpx"],
+        },
     },
 }

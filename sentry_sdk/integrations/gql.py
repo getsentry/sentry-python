@@ -10,7 +10,12 @@ from sentry_sdk.scope import should_send_default_pii
 
 try:
     import gql  # type: ignore[import-not-found]
-    from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode  # type: ignore[import-not-found]
+    from graphql import (
+        print_ast,
+        get_operation_ast,
+        DocumentNode,
+        VariableDefinitionNode,
+    )
     from gql.transport import Transport, AsyncTransport  # type: ignore[import-not-found]
     from gql.transport.exceptions import TransportQueryError  # type: ignore[import-not-found]
 except ImportError:
