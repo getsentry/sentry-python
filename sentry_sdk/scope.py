@@ -230,7 +230,7 @@ class Scope:
         rv._name = self._name
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
-        rv._transaction_info = dict(self._transaction_info)
+        rv._transaction_info = copy(self._transaction_info)
         rv._user = self._user
 
         rv._tags = dict(self._tags)
@@ -674,7 +674,7 @@ class Scope:
         self._level = None  # type: Optional[LogLevelStr]
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
-        self._transaction_info = {}  # type: MutableMapping[str, str]
+        self._transaction_info = None  # type: Optional[MutableMapping[str, str]]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
@@ -783,7 +783,10 @@ class Scope:
                 self._span.containing_transaction.source = source
 
         if source:
-            self._transaction_info["source"] = source
+            if self._transaction_info is None:
+                self._transaction_info = {"source": source}
+            else:
+                self._transaction_info["source"] = source
 
     @_attr_setter
     def user(self, value):
@@ -816,7 +819,10 @@ class Scope:
             if transaction.name:
                 self._transaction = transaction.name
                 if transaction.source:
-                    self._transaction_info["source"] = transaction.source
+                    if self._transaction_info is None:
+                        self._transaction_info = {"source": transaction.source}
+                    else:
+                        self._transaction_info["source"] = transaction.source
 
     @property
     def profile(self):
@@ -1511,7 +1517,10 @@ class Scope:
         if scope._transaction is not None:
             self._transaction = scope._transaction
         if scope._transaction_info is not None:
-            self._transaction_info.update(scope._transaction_info)
+            if self._transaction_info is None:
+                self._transaction_info = scope._transaction_info
+            else:
+                self._transaction_info.update(scope._transaction_info)
         if scope._user is not None:
             self._user = scope._user
         if scope._tags:
