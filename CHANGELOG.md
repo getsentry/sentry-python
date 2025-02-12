@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.21.0
+
+### Various fixes & improvements
+
+- feat(tracing): Add `__repr__` to `Baggage` (#4043) by @szokeasaurusrex
+- ref(utils): Explicitly use None default when checking metadata (#4039) by @mpurnell1
+- fix(flags): Fix bug where concurrent accesses to the flags property could raise a RunTime error (#4034) by @cmanallen
+- fix(integrations): Do not patch `execute` (#4026) by @sentrivana
+- test: Fix typo in test name (#4036) by @szokeasaurusrex
+- ref(integrations): Add more min versions of frameworks (#3973) by @sentrivana
+- [1] Add tox generation script, but don't use it yet (#3971) by @sentrivana
+- Set level based on status code for HTTP client breadcrumbs (#4004) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 1.11.2 to 1.11.3 (#4023) by @dependabot
+- Don't set transaction status to error on sys.exit(0) (#4025) by @sentrivana
+- feat(litestar): Add `failed_request_status_codes` (#4021) by @vrslev
+- build(deps): bump actions/create-github-app-token from 1.11.1 to 1.11.2 (#4015) by @dependabot
+- Fix mypy (#4019) by @sentrivana
+- feat(profiling): Continuous profiling sample rate (#4002) by @Zylphrex
+- feat(spans): track and report spans that were dropped (#4005) by @constantinius
+- chore(profiling): Change continuous profile buffer size (#3987) by @Zylphrex
+- Handle MultiPartParserError to avoid internal sentry crash (#4001) by @orhanhenrik
+- fix(ci): Various errors on master (#4009) by @Zylphrex
+- build(deps): bump codecov/codecov-action from 5.1.2 to 5.3.1 (#3995) by @dependabot
+- Deprecate `enable_tracing` option (#3935) by @antonpirker
+- Split gevent tests off (#3964) by @sentrivana
+- Add support for Python 3.12 and 3.13 to AWS Lambda integration. (#3965) by @antonpirker
+- Use httpx_mock in test_httpx (#3967) by @sentrivana
+- fix(utils): Check that `__module__` is `str` (#3942) by @szokeasaurusrex
+
+_Plus 4 more_
+
 ## 2.20.0
 
 - **New integration:** Add [Typer](https://typer.tiangolo.com/) integration (#3869) by @patrick91
