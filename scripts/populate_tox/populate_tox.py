@@ -56,7 +56,6 @@ IGNORE = {
     "potel",
     "aiohttp",
     "anthropic",
-    "ariadne",
     "arq",
     "asgi",
     "asyncpg",
@@ -76,8 +75,6 @@ IGNORE = {
     "fastapi",
     "flask",
     "gcp",
-    "gql",
-    "graphene",
     "grpc",
     "httpx",
     "huey",
@@ -104,7 +101,6 @@ IGNORE = {
     "starlette",
     "starlite",
     "sqlalchemy",
-    "strawberry",
     "tornado",
     "trytond",
     "typer",
@@ -464,7 +460,9 @@ def _compare_min_version_with_defined(
             )
 
 
-def _add_python_versions_to_release(integration: str, package: str, release: Version):
+def _add_python_versions_to_release(
+    integration: str, package: str, release: Version
+) -> None:
     release_pypi_data = fetch_release(package, release)
     time.sleep(0.1)  # give PYPI some breathing room
 
@@ -522,10 +520,8 @@ def main() -> None:
             test_releases = pick_releases_to_test(releases)
 
             for release in test_releases:
-                py_versions = _add_python_versions_to_release(
-                    integration, package, release
-                )
-                if not py_versions:
+                _add_python_versions_to_release(integration, package, release)
+                if not release.python_versions:
                     print(f"  Release {release} has no Python versions, skipping.")
 
             test_releases = [
