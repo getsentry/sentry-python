@@ -101,6 +101,7 @@ IGNORE = {
     "starlite",
     "sqlalchemy",
     "tornado",
+    "trytond",
     "unleash",
 }
 

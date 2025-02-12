@@ -265,6 +265,13 @@ envlist =
     {py3.8,py3.11,py3.12}-tornado-v{6.2}
     {py3.8,py3.11,py3.12}-tornado-latest
 
+    # Trytond
+    {py3.6}-trytond-v{4}
+    {py3.6,py3.8}-trytond-v{5}
+    {py3.6,py3.11}-trytond-v{6}
+    {py3.8,py3.11,py3.12}-trytond-v{7}
+    {py3.8,py3.12,py3.13}-trytond-latest
+
     # Unleash
     {py3.8,py3.12,py3.13}-unleash-v6.0.1
     {py3.8,py3.12,py3.13}-unleash-latest
@@ -683,6 +690,15 @@ deps =
     tornado-v6.0: tornado~=6.0.0
     tornado-v6.2: tornado~=6.2.0
     tornado-latest: tornado
+
+    # Trytond
+    trytond: werkzeug
+    trytond-v4: werkzeug<1.0
+    trytond-v4: trytond~=4.0
+    trytond-v5: trytond~=5.0
+    trytond-v6: trytond~=6.0
+    trytond-v7: trytond~=7.0
+    trytond-latest: trytond
 
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
