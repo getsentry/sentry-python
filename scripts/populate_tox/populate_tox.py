@@ -100,6 +100,7 @@ IGNORE = {
     "spark",
     "starlette",
     "starlite",
+    "statsig",
     "sqlalchemy",
     "tornado",
     "trytond",

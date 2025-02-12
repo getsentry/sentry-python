@@ -79,6 +79,7 @@ setup(
         "sqlalchemy": ["sqlalchemy>=1.2"],
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
+        "statsig": ["statsig>=0.55.3"],
         "tornado": ["tornado>=6"],
         "unleash": ["UnleashClient>=6.0.1"],
     },
