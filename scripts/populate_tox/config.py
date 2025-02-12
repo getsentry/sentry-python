@@ -6,6 +6,13 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
+    "ariadne": {
+        "package": "ariadne",
+        "deps": {
+            "*": ["fastapi", "flask", "httpx"],
+        },
+        "python": ">=3.8",
+    },
     "bottle": {
         "package": "bottle",
         "deps": {
@@ -15,6 +22,16 @@ TEST_SUITE_CONFIG = {
     "falcon": {
         "package": "falcon",
         "python": "<3.13",
+    },
+    "gql": {
+        "package": "gql[all]",
+    },
+    "graphene": {
+        "package": "graphene",
+        "deps": {
+            "*": ["blinker", "fastapi", "flask", "httpx"],
+            "py3.6": ["aiocontextvars"],
+        },
     },
     "pyramid": {
         "package": "pyramid",
@@ -35,6 +52,12 @@ TEST_SUITE_CONFIG = {
             ],
         },
         "python": "<=3.11",
+    },
+    "strawberry": {
+        "package": "strawberry-graphql[fastapi,flask]",
+        "deps": {
+            "*": ["httpx"],
+        },
     },
     "tornado": {
         "package": "tornado",
