@@ -13,6 +13,16 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "bottle": {
+        "package": "bottle",
+        "deps": {
+            "*": ["werkzeug<2.1.0"],
+        },
+    },
+    "falcon": {
+        "package": "falcon",
+        "python": "<3.13",
+    },
     "gql": {
         "package": "gql[all]",
     },
@@ -23,10 +33,40 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars"],
         },
     },
+    "pyramid": {
+        "package": "pyramid",
+        "deps": {
+            "*": ["werkzeug<2.1.0"],
+        },
+    },
+    "starlite": {
+        "package": "starlite",
+        "deps": {
+            "*": [
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "cryptography",
+                "pydantic<2.0.0",
+                "httpx<0.28",
+            ],
+        },
+        "python": "<=3.11",
+    },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
             "*": ["httpx"],
+        },
+    },
+    "tornado": {
+        "package": "tornado",
+        "deps": {
+            "*": ["pytest"],
+            "<=6.4.1": [
+                "pytest<8.2"
+            ],  # https://github.com/tornadoweb/tornado/pull/3382
+            "py3.6": ["aiocontextvars"],
         },
     },
 }
