@@ -509,7 +509,8 @@ def test_baggage_propagation(init_celery):
     def dummy_task(self, x, y):
         return _get_headers(self)
 
-    with start_transaction() as transaction:
+    # force trace_id for predictable sample_rand
+    with start_transaction(trace_id="00000000000000000000000000000000"):
         result = dummy_task.apply_async(
             args=(1, 0),
             headers={"baggage": "custom=value"},
@@ -518,8 +519,9 @@ def test_baggage_propagation(init_celery):
         assert sorted(result["baggage"].split(",")) == sorted(
             [
                 "sentry-release=abcdef",
-                "sentry-trace_id={}".format(transaction.trace_id),
+                "sentry-trace_id=00000000000000000000000000000000",
                 "sentry-environment=production",
+                "sentry-sample_rand=0.8766381713144122",
                 "sentry-sample_rate=1.0",
                 "sentry-sampled=true",
                 "custom=value",

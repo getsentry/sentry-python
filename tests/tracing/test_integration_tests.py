@@ -1,5 +1,4 @@
 import gc
-import random
 import re
 import sys
 import weakref
@@ -168,10 +167,11 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     sentry_init(traces_sample_rate=sample_rate, release="foo")
     envelopes = capture_envelopes()
 
-    # make sure transaction is sampled for both cases
-    monkeypatch.setattr(random, "random", lambda: 0.1)
-
-    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+    # force trace_id such that sample_rand is 0.27862410307482766, so transaction
+    # is sampled in both cases
+    transaction = Transaction.continue_from_headers(
+        {}, name="Head SDK tx", trace_id="22222222222222222222222222222222"
+    )
 
     # will create empty mutable baggage
     baggage = transaction._baggage
@@ -191,36 +191,47 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     assert baggage
     assert not baggage.mutable
     assert baggage.third_party_items == ""
-    assert baggage.sentry_items == {
-        "environment": "production",
-        "release": "foo",
-        "sample_rate": str(sample_rate),
-        "sampled": "true" if transaction.sampled else "false",
-        "transaction": "Head SDK tx",
-        "trace_id": trace_id,
+    assert baggage.sentry_items.keys() == {
+        "environment",
+        "release",
+        "sample_rate",
+        "sampled",
+        "transaction",
+        "trace_id",
+        "sample_rand",
     }
+    assert (
+        baggage.sentry_items.items()
+        >= {
+            "environment": "production",
+            "release": "foo",
+            "sample_rate": str(sample_rate),
+            "sampled": "true" if transaction.sampled else "false",
+            "transaction": "Head SDK tx",
+            "trace_id": trace_id,
+        }.items()
+    )
+    assert 0.0 <= float(baggage.sentry_items["sample_rand"]) < 1.0
 
     expected_baggage = (
         "sentry-trace_id=%s,"
+        "sentry-sample_rand=%s,"
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-transaction=Head%%20SDK%%20tx,"
         "sentry-sample_rate=%s,"
         "sentry-sampled=%s"
-        % (trace_id, sample_rate, "true" if transaction.sampled else "false")
+        % (
+            trace_id,
+            baggage.sentry_items["sample_rand"],
+            sample_rate,
+            "true" if transaction.sampled else "false",
+        )
     )
     assert baggage.serialize() == expected_baggage
 
     (envelope,) = envelopes
     assert envelope.headers["trace"] == baggage.dynamic_sampling_context()
-    assert envelope.headers["trace"] == {
-        "environment": "production",
-        "release": "foo",
-        "sample_rate": str(sample_rate),
-        "sampled": "true" if transaction.sampled else "false",
-        "transaction": "Head SDK tx",
-        "trace_id": trace_id,
-    }
 
 
 @pytest.mark.parametrize(
