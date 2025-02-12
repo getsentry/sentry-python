@@ -972,6 +972,8 @@ class Scope:
             logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
 
         while len(self._breadcrumbs) > max_breadcrumbs:
+            if client.transport is not None:
+                client.transport.record_lost_event("buffer_overflow", "log_item")
             self._breadcrumbs.popleft()
 
     def start_transaction(
