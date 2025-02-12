@@ -43,10 +43,6 @@ envlist =
     {py3.8,py3.11,py3.12}-anthropic-v{0.16,0.28,0.40}
     {py3.7,py3.11,py3.12}-anthropic-latest
 
-    # Ariadne
-    {py3.8,py3.11}-ariadne-v{0.20}
-    {py3.8,py3.12,py3.13}-ariadne-latest
-
     # Arq
     {py3.7,py3.11}-arq-v{0.23}
     {py3.7,py3.12,py3.13}-arq-latest
@@ -139,14 +135,6 @@ envlist =
 
     # GCP
     {py3.7}-gcp
-
-    # GQL
-    {py3.7,py3.11}-gql-v{3.4}
-    {py3.7,py3.12,py3.13}-gql-latest
-
-    # Graphene
-    {py3.7,py3.11}-graphene-v{3.3}
-    {py3.7,py3.12,py3.13}-graphene-latest
 
     # gRPC
     {py3.7,py3.9}-grpc-v{1.39}
@@ -272,11 +260,6 @@ envlist =
     {py3.7,py3.11}-sqlalchemy-v{2.0}
     {py3.7,py3.12,py3.13}-sqlalchemy-latest
 
-    # Strawberry
-    {py3.8,py3.11}-strawberry-v{0.209}
-    {py3.8,py3.11,py3.12}-strawberry-v{0.222}
-    {py3.8,py3.12,py3.13}-strawberry-latest
-
     # Tornado
     {py3.8,py3.11,py3.12}-tornado-v{6.0}
     {py3.8,py3.11,py3.12}-tornado-v{6.2}
@@ -346,13 +329,6 @@ deps =
     anthropic-v0.28: anthropic~=0.28.0
     anthropic-v0.40: anthropic~=0.40.0
     anthropic-latest: anthropic
-
-    # Ariadne
-    ariadne-v0.20: ariadne~=0.20.0
-    ariadne-latest: ariadne
-    ariadne: fastapi
-    ariadne: flask
-    ariadne: httpx
 
     # Arq
     arq-v0.23: arq~=0.23.0
@@ -479,18 +455,6 @@ deps =
     flask-v2: Flask~=2.0
     flask-v3: Flask~=3.0
     flask-latest: Flask
-
-    # GQL
-    gql-v{3.4}: gql[all]~=3.4.0
-    gql-latest: gql[all]
-
-    # Graphene
-    graphene: blinker
-    graphene: fastapi
-    graphene: flask
-    graphene: httpx
-    graphene-v{3.3}: graphene~=3.3.0
-    graphene-latest: graphene
 
     # gRPC
     grpc: protobuf
@@ -711,14 +675,6 @@ deps =
     sqlalchemy-v1.4: sqlalchemy~=1.4.0
     sqlalchemy-v2.0: sqlalchemy~=2.0.0
     sqlalchemy-latest: sqlalchemy
-
-    # Strawberry
-    strawberry: fastapi
-    strawberry: flask
-    strawberry: httpx
-    strawberry-v0.209: strawberry-graphql[fastapi,flask]~=0.209.0
-    strawberry-v0.222: strawberry-graphql[fastapi,flask]~=0.222.0
-    strawberry-latest: strawberry-graphql[fastapi,flask]
 
     # Tornado
     # Tornado <6.4.1 is incompatible with Pytest ≥8.2
