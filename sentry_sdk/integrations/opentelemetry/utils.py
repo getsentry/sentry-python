@@ -388,7 +388,7 @@ def dsc_from_trace_state(trace_state):
 def has_incoming_trace(trace_state):
     # type: (TraceState) -> bool
     """
-    The existence a sentry-trace_id in the baggage implies we continued an upstream trace.
+    The existence of a sentry-trace_id in the baggage implies we continued an upstream trace.
     """
     return (Baggage.SENTRY_PREFIX + "trace_id") in trace_state
 
