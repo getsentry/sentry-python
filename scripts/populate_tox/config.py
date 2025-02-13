@@ -26,6 +26,15 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars"],
         },
     },
+    "launchdarkly": {
+        "package": "launchdarkly-server-sdk",
+    },
+    "loguru": {
+        "package": "loguru",
+    },
+    "openfeature": {
+        "package": "openfeature-sdk",
+    },
     "pymongo": {
         "package": "pymongo",
         "deps": {
@@ -38,10 +47,29 @@ TEST_SUITE_CONFIG = {
     "sqlalchemy": {
         "package": "sqlalchemy",
     },
+    "statsig": {
+        "package": "statsig",
+        "deps": {
+            "*": ["typing_extensions"],
+        },
+    },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
             "*": ["httpx"],
         },
+    },
+    "trytond": {
+        "package": "trytond",
+        "deps": {
+            "*": ["werkzeug"],
+            "<=5.0": ["werkzeug<1.0"],
+        },
+    },
+    "typer": {
+        "package": "typer",
+    },
+    "unleash": {
+        "package": "UnleashClient",
     },
 }
