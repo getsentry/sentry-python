@@ -29,6 +29,9 @@ TEST_SUITE_CONFIG = {
     "openfeature": {
         "package": "openfeature-sdk",
     },
+    "statsig": {
+        "package": "statsig",
+    },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
