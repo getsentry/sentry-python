@@ -1,4 +1,3 @@
-import random
 from collections import Counter
 from unittest import mock
 
@@ -68,15 +67,15 @@ def test_transaction_uses_downsampled_rate(
     monitor = sentry_sdk.get_client().monitor
     monitor.interval = 0.1
 
-    # make sure rng doesn't sample
-    monkeypatch.setattr(random, "random", lambda: 0.9)
-
     assert monitor.is_healthy() is True
     monitor.run()
     assert monitor.is_healthy() is False
     assert monitor.downsample_factor == 1
 
-    with sentry_sdk.start_transaction(name="foobar") as transaction:
+    # trace_id forces sample_rand == 0.8766381713144122 >= 0.5, so sampled is False
+    with sentry_sdk.start_transaction(
+        name="foobar", trace_id="00000000000000000000000000000000"
+    ) as transaction:
         assert transaction.sampled is False
         assert transaction.sample_rate == 0.5
 
