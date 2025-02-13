@@ -147,20 +147,6 @@ def test_continue_from_headers(
     assert message_payload["message"] == "hello"
 
 
-@pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_propagate_traces_deprecation_warning(sentry_init, sample_rate):
-    sentry_init(traces_sample_rate=sample_rate, propagate_traces=False)
-
-    with start_transaction(name="hi"):
-        with start_span() as old_span:
-            with pytest.warns(DeprecationWarning):
-                dict(
-                    sentry_sdk.get_current_scope().iter_trace_propagation_headers(
-                        old_span
-                    )
-                )
-
-
 @pytest.mark.parametrize("sample_rate", [0.5, 1.0])
 def test_dynamic_sampling_head_sdk_creates_dsc(
     sentry_init, capture_envelopes, sample_rate, monkeypatch
