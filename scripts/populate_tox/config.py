@@ -13,6 +13,16 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "celery": {
+        "package": "celery",
+        "deps": {
+            "*": ["newrelic", "redis"],
+            "py3.7": ["importlib-metadata<5.0"],
+        },
+    },
+    "dramatiq": {
+        "package": "dramatiq",
+    },
     "gql": {
         "package": "gql[all]",
     },
@@ -22,6 +32,13 @@ TEST_SUITE_CONFIG = {
             "*": ["blinker", "fastapi", "flask", "httpx"],
             "py3.6": ["aiocontextvars"],
         },
+    },
+    "huey": {
+        "package": "huey",
+    },
+    "spark": {
+        "package": "pyspark",
+        "python": ">=3.8",
     },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
