@@ -135,7 +135,7 @@ _MIN_VERSIONS = {
     "dramatiq": (1, 9),
     "falcon": (1, 4),
     "fastapi": (0, 79, 0),
-    "flask": (0, 10),
+    "flask": (1, 1, 4),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
     "grpc": (1, 32, 0),  # grpcio
