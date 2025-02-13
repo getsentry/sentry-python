@@ -13,6 +13,9 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "clickhouse_driver": {
+        "package": "clickhouse-driver",
+    },
     "flask": {
         "package": "flask",
         "deps": {
@@ -30,6 +33,27 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars"],
         },
     },
+    "launchdarkly": {
+        "package": "launchdarkly-server-sdk",
+    },
+    "loguru": {
+        "package": "loguru",
+    },
+    "openfeature": {
+        "package": "openfeature-sdk",
+    },
+    "pymongo": {
+        "package": "pymongo",
+        "deps": {
+            "*": ["mockupdb"],
+        },
+    },
+    "redis_py_cluster_legacy": {
+        "package": "redis-py-cluster",
+    },
+    "sqlalchemy": {
+        "package": "sqlalchemy",
+    },
     "starlette": {
         "package": "starlette",
         "deps": {
@@ -46,10 +70,29 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars"],
         },
     },
+    "statsig": {
+        "package": "statsig",
+        "deps": {
+            "*": ["typing_extensions"],
+        },
+    },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
             "*": ["httpx"],
         },
+    },
+    "trytond": {
+        "package": "trytond",
+        "deps": {
+            "*": ["werkzeug"],
+            "<=5.0": ["werkzeug<1.0"],
+        },
+    },
+    "typer": {
+        "package": "typer",
+    },
+    "unleash": {
+        "package": "UnleashClient",
     },
 }

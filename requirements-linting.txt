@@ -15,8 +15,9 @@ flake8-bugbear
 pep8-naming
 pre-commit # local linting
 httpcore
-openfeature-sdk
 launchdarkly-server-sdk
+openfeature-sdk
+statsig
 UnleashClient
 typer
 strawberry-graphql
