@@ -259,6 +259,10 @@ envlist =
     {py3.8,py3.11}-starlite-v{1.48,1.51}
     # 1.51.14 is the last starlite version; the project continues as litestar
 
+    # Statsig
+    {py3.8,py3.12,py3.13}-statsig-v0.55.3
+    {py3.8,py3.12,py3.13}-statsig-latest
+
     # SQL Alchemy
     {py3.6,py3.9}-sqlalchemy-v{1.2,1.4}
     {py3.7,py3.11}-sqlalchemy-v{2.0}
@@ -689,6 +693,11 @@ deps =
     starlite-v{1.48}: starlite~=1.48.0
     starlite-v{1.51}: starlite~=1.51.0
 
+    # Statsig
+    statsig: typing_extensions
+    statsig-v0.55.3: statsig~=0.55.3
+    statsig-latest: statsig
+
     # SQLAlchemy
     sqlalchemy-v1.2: sqlalchemy~=1.2.0
     sqlalchemy-v1.4: sqlalchemy~=1.4.0
@@ -794,9 +803,10 @@ setenv =
     rq: TESTPATH=tests/integrations/rq
     sanic: TESTPATH=tests/integrations/sanic
     spark: TESTPATH=tests/integrations/spark
+    sqlalchemy: TESTPATH=tests/integrations/sqlalchemy
     starlette: TESTPATH=tests/integrations/starlette
     starlite: TESTPATH=tests/integrations/starlite
-    sqlalchemy: TESTPATH=tests/integrations/sqlalchemy
+    statsig: TESTPATH=tests/integrations/statsig
     strawberry: TESTPATH=tests/integrations/strawberry
     tornado: TESTPATH=tests/integrations/tornado
     trytond: TESTPATH=tests/integrations/trytond
