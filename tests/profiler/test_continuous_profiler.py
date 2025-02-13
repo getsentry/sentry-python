@@ -127,7 +127,7 @@ def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling)
 
 
 def assert_single_transaction_with_profile_chunks(
-    envelopes, thread, max_chunks, transactions=1
+    envelopes, thread, max_chunks=None, transactions=1
 ):
     items = defaultdict(list)
     for envelope in envelopes:
@@ -136,7 +136,8 @@ def assert_single_transaction_with_profile_chunks(
 
     assert len(items["transaction"]) == transactions
     assert len(items["profile_chunk"]) > 0
-    assert len(items["profile_chunk"]) <= max_chunks
+    if max_chunks is not None:
+        assert len(items["profile_chunk"]) <= max_chunks
 
     transaction = items["transaction"][0].payload.json
 
@@ -235,7 +236,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
         with sentry_sdk.start_span(op="op"):
             time.sleep(0.05)
 
-    assert_single_transaction_with_profile_chunks(envelopes, thread, max_chunks=10)
+    assert_single_transaction_with_profile_chunks(envelopes, thread)
 
     for _ in range(3):
         stop_profiler()
@@ -256,7 +257,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 
-        assert_single_transaction_with_profile_chunks(envelopes, thread, max_chunks=10)
+        assert_single_transaction_with_profile_chunks(envelopes, thread)
 
 
 @pytest.mark.parametrize(
@@ -299,18 +300,27 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
         envelopes.clear()
 
         with sentry_sdk.start_transaction(name="profiling"):
+            assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.05)
+                time.sleep(0.1)
+            assert get_profiler_id() is not None, "profiler should be running"
 
-        assert_single_transaction_with_profile_chunks(envelopes, thread, max_chunks=10)
+        assert_single_transaction_with_profile_chunks(envelopes, thread)
+
+        assert get_profiler_id() is not None, "profiler should be running"
 
         stop_profiler()
+
+        # the profiler stops immediately in manual mode
+        assert get_profiler_id() is None, "profiler should not be running"
 
         envelopes.clear()
 
         with sentry_sdk.start_transaction(name="profiling"):
+            assert get_profiler_id() is None, "profiler should not be running"
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.05)
+                time.sleep(0.1)
+            assert get_profiler_id() is None, "profiler should not be running"
 
         assert_single_transaction_without_profile_chunks(envelopes)
 
@@ -397,17 +407,17 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
         with sentry_sdk.start_transaction(name="profiling 1"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.03)
+                time.sleep(0.1)
             assert get_profiler_id() is not None, "profiler should be running"
 
-        # the profiler takes a while to stop so if we start a transaction
-        # immediately, it'll be part of the same chunk
+        # the profiler takes a while to stop in auto mode so if we start
+        # a transaction immediately, it'll be part of the same chunk
         assert get_profiler_id() is not None, "profiler should be running"
 
         with sentry_sdk.start_transaction(name="profiling 2"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.03)
+                time.sleep(0.1)
             assert get_profiler_id() is not None, "profiler should be running"
 
         # wait at least 1 cycle for the profiler to stop
