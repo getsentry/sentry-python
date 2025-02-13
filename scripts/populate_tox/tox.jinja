@@ -163,10 +163,6 @@ envlist =
     {py3.9,py3.11,py3.12}-langchain-latest
     {py3.9,py3.11,py3.12}-langchain-notiktoken
 
-    # LaunchDarkly
-    {py3.8,py3.12,py3.13}-launchdarkly-v9.8.0
-    {py3.8,py3.12,py3.13}-launchdarkly-latest
-
     # Litestar
     {py3.8,py3.11}-litestar-v{2.0}
     {py3.8,py3.11,py3.12}-litestar-v{2.6}
@@ -179,10 +175,6 @@ envlist =
     {py3.9,py3.11,py3.12}-openai-v1.55
     {py3.9,py3.11,py3.12}-openai-latest
     {py3.9,py3.11,py3.12}-openai-notiktoken
-
-    # OpenFeature
-    {py3.8,py3.12,py3.13}-openfeature-v0.7
-    {py3.8,py3.12,py3.13}-openfeature-latest
 
     # OpenTelemetry (OTel)
     {py3.7,py3.9,py3.12,py3.13}-opentelemetry
@@ -271,10 +263,6 @@ envlist =
     {py3.6,py3.11}-trytond-v{6}
     {py3.8,py3.11,py3.12}-trytond-v{7}
     {py3.8,py3.12,py3.13}-trytond-latest
-
-    # Unleash
-    {py3.8,py3.12,py3.13}-unleash-v6.0.1
-    {py3.8,py3.12,py3.13}-unleash-latest
 
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
@@ -541,18 +529,6 @@ deps =
     openai-latest: tiktoken~=0.6.0
     openai-notiktoken: openai
 
-    # OpenFeature
-    openfeature-v0.7: openfeature-sdk~=0.7.1
-    openfeature-latest: openfeature-sdk
-
-    # LaunchDarkly
-    launchdarkly-v9.8.0: launchdarkly-server-sdk~=9.8.0
-    launchdarkly-latest: launchdarkly-server-sdk
-
-    # Unleash
-    unleash-v6.0.1: UnleashClient~=6.0.1
-    unleash-latest: UnleashClient
-
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
 
@@ -778,9 +754,10 @@ setenv =
     rq: TESTPATH=tests/integrations/rq
     sanic: TESTPATH=tests/integrations/sanic
     spark: TESTPATH=tests/integrations/spark
+    sqlalchemy: TESTPATH=tests/integrations/sqlalchemy
     starlette: TESTPATH=tests/integrations/starlette
     starlite: TESTPATH=tests/integrations/starlite
-    sqlalchemy: TESTPATH=tests/integrations/sqlalchemy
+    statsig: TESTPATH=tests/integrations/statsig
     strawberry: TESTPATH=tests/integrations/strawberry
     tornado: TESTPATH=tests/integrations/tornado
     trytond: TESTPATH=tests/integrations/trytond
