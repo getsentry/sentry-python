@@ -31,6 +31,9 @@ TEST_SUITE_CONFIG = {
     },
     "statsig": {
         "package": "statsig",
+        "deps": {
+            "*": ["typing_extensions"],
+        },
     },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
