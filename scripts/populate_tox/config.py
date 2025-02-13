@@ -23,6 +23,16 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars"],
         },
     },
+    "grpc": {
+        "package": "grpcio",
+        "deps": {
+            "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"],
+        },
+        "python": ">=3.7",
+    },
+    "requests": {
+        "package": "requests",
+    },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
