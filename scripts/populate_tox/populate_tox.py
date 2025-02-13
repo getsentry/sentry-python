@@ -78,7 +78,6 @@ IGNORE = {
     "langchain",
     "langchain_notiktoken",
     "litestar",
-    "loguru",
     "openai",
     "openai_notiktoken",
     "pure_eval",
@@ -96,8 +95,6 @@ IGNORE = {
     "starlite",
     "sqlalchemy",
     "tornado",
-    "trytond",
-    "typer",
 }
 
 

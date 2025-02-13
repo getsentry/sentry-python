@@ -26,6 +26,9 @@ TEST_SUITE_CONFIG = {
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
+    "loguru": {
+        "package": "loguru",
+    },
     "openfeature": {
         "package": "openfeature-sdk",
     },
@@ -40,6 +43,16 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["httpx"],
         },
+    },
+    "trytond": {
+        "package": "trytond",
+        "deps": {
+            "*": ["werkzeug"],
+            "<=5.0": ["werkzeug<1.0"],
+        },
+    },
+    "typer": {
+        "package": "typer",
     },
     "unleash": {
         "package": "UnleashClient",
