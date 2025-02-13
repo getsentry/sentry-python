@@ -85,10 +85,6 @@ envlist =
     {py3.6,py3.9}-chalice-v{1.16}
     {py3.8,py3.12,py3.13}-chalice-latest
 
-    # Clickhouse Driver
-    {py3.8,py3.11}-clickhouse_driver-v{0.2.0}
-    {py3.8,py3.12,py3.13}-clickhouse_driver-latest
-
     # Cloud Resource Context
     {py3.6,py3.12,py3.13}-cloud_resource_context
 
@@ -185,13 +181,6 @@ envlist =
     # pure_eval
     {py3.6,py3.12,py3.13}-pure_eval
 
-    # PyMongo (Mongo DB)
-    {py3.6}-pymongo-v{3.1}
-    {py3.6,py3.9}-pymongo-v{3.12}
-    {py3.6,py3.11}-pymongo-v{4.0}
-    {py3.7,py3.11,py3.12}-pymongo-v{4.3,4.7}
-    {py3.7,py3.12,py3.13}-pymongo-latest
-
     # Pyramid
     {py3.6,py3.11}-pyramid-v{1.6}
     {py3.6,py3.11,py3.12}-pyramid-v{1.10}
@@ -212,10 +201,6 @@ envlist =
     {py3.7,py3.8,py3.11}-redis-v{4}
     {py3.7,py3.11,py3.12}-redis-v{5}
     {py3.7,py3.12,py3.13}-redis-latest
-
-    # Redis Cluster
-    {py3.6,py3.8}-redis_py_cluster_legacy-v{1,2}
-    # no -latest, not developed anymore
 
     # Requests
     {py3.6,py3.8,py3.12,py3.13}-requests
@@ -246,11 +231,6 @@ envlist =
     # Starlite
     {py3.8,py3.11}-starlite-v{1.48,1.51}
     # 1.51.14 is the last starlite version; the project continues as litestar
-
-    # SQL Alchemy
-    {py3.6,py3.9}-sqlalchemy-v{1.2,1.4}
-    {py3.7,py3.11}-sqlalchemy-v{2.0}
-    {py3.7,py3.12,py3.13}-sqlalchemy-latest
 
     # Tornado
     {py3.8,py3.11,py3.12}-tornado-v{6.0}
@@ -372,10 +352,6 @@ deps =
     chalice: pytest-chalice==0.0.5
     chalice-v1.16: chalice~=1.16.0
     chalice-latest: chalice
-
-    # Clickhouse Driver
-    clickhouse_driver-v0.2.0: clickhouse_driver~=0.2.0
-    clickhouse_driver-latest: clickhouse_driver
 
     # Cohere
     cohere-v5: cohere~=5.3.3
@@ -531,15 +507,6 @@ deps =
     # pure_eval
     pure_eval: pure_eval
 
-    # PyMongo (MongoDB)
-    pymongo: mockupdb
-    pymongo-v3.1: pymongo~=3.1.0
-    pymongo-v3.13: pymongo~=3.13.0
-    pymongo-v4.0: pymongo~=4.0.0
-    pymongo-v4.3: pymongo~=4.3.0
-    pymongo-v4.7: pymongo~=4.7.0
-    pymongo-latest: pymongo
-
     # Pyramid
     pyramid: Werkzeug<2.1.0
     pyramid-v1.6: pyramid~=1.6.0
@@ -573,10 +540,6 @@ deps =
     redis-v4: redis~=4.0
     redis-v5: redis~=5.0
     redis-latest: redis
-
-    # Redis Cluster
-    redis_py_cluster_legacy-v1: redis-py-cluster~=1.0
-    redis_py_cluster_legacy-v2: redis-py-cluster~=2.0
 
     # Requests
     requests: requests>=2.0
@@ -645,12 +608,6 @@ deps =
     starlite: httpx<0.28
     starlite-v{1.48}: starlite~=1.48.0
     starlite-v{1.51}: starlite~=1.51.0
-
-    # SQLAlchemy
-    sqlalchemy-v1.2: sqlalchemy~=1.2.0
-    sqlalchemy-v1.4: sqlalchemy~=1.4.0
-    sqlalchemy-v2.0: sqlalchemy~=2.0.0
-    sqlalchemy-latest: sqlalchemy
 
     # Tornado
     # Tornado <6.4.1 is incompatible with Pytest ≥8.2

@@ -13,6 +13,9 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "clickhouse_driver": {
+        "package": "clickhouse-driver",
+    },
     "gql": {
         "package": "gql[all]",
     },
@@ -31,6 +34,18 @@ TEST_SUITE_CONFIG = {
     },
     "openfeature": {
         "package": "openfeature-sdk",
+    },
+    "pymongo": {
+        "package": "pymongo",
+        "deps": {
+            "*": ["mockupdb"],
+        },
+    },
+    "redis_py_cluster_legacy": {
+        "package": "redis-py-cluster",
+    },
+    "sqlalchemy": {
+        "package": "sqlalchemy",
     },
     "statsig": {
         "package": "statsig",
