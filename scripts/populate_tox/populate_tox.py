@@ -68,7 +68,6 @@ IGNORE = {
     "dramatiq",
     "falcon",
     "fastapi",
-    "flask",
     "gcp",
     "grpc",
     "httpx",
@@ -88,7 +87,6 @@ IGNORE = {
     "rq",
     "sanic",
     "spark",
-    "starlette",
     "starlite",
     "tornado",
 }

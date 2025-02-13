@@ -16,6 +16,13 @@ TEST_SUITE_CONFIG = {
     "clickhouse_driver": {
         "package": "clickhouse-driver",
     },
+    "flask": {
+        "package": "flask",
+        "deps": {
+            "*": ["flask-login", "werkzeug"],
+            "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
+        },
+    },
     "gql": {
         "package": "gql[all]",
     },
@@ -46,6 +53,22 @@ TEST_SUITE_CONFIG = {
     },
     "sqlalchemy": {
         "package": "sqlalchemy",
+    },
+    "starlette": {
+        "package": "starlette",
+        "deps": {
+            "*": [
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "anyio<4.0.0",
+                "jinja2",
+                "httpx",
+            ],
+            "<0.37": ["httpx<0.28.0"],
+            "<0.15": ["jinja2<3.1"],
+            "py3.6": ["aiocontextvars"],
+        },
     },
     "statsig": {
         "package": "statsig",
