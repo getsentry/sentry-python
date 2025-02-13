@@ -142,6 +142,7 @@ _MIN_VERSIONS = {
     "huggingface_hub": (0, 22),
     "langchain": (0, 0, 210),
     "launchdarkly": (9, 8, 0),
+    "loguru": (0, 7, 0),
     "openai": (1, 0, 0),
     "openfeature": (0, 7, 1),
     "quart": (0, 16, 0),
