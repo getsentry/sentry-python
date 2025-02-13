@@ -77,12 +77,10 @@ IGNORE = {
     "huggingface_hub",
     "langchain",
     "langchain_notiktoken",
-    "launchdarkly",
     "litestar",
     "loguru",
     "openai",
     "openai_notiktoken",
-    "openfeature",
     "pure_eval",
     "pymongo",
     "pyramid",
@@ -96,12 +94,10 @@ IGNORE = {
     "spark",
     "starlette",
     "starlite",
-    "statsig",
     "sqlalchemy",
     "tornado",
     "trytond",
     "typer",
-    "unleash",
 }
 
 

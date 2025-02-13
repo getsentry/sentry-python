@@ -23,10 +23,25 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars"],
         },
     },
+    "launchdarkly": {
+        "package": "launchdarkly-server-sdk",
+    },
+    "openfeature": {
+        "package": "openfeature-sdk",
+    },
+    "statsig": {
+        "package": "statsig",
+        "deps": {
+            "*": ["typing_extensions"],
+        },
+    },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
             "*": ["httpx"],
         },
+    },
+    "unleash": {
+        "package": "UnleashClient",
     },
 }

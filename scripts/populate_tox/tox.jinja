@@ -163,10 +163,6 @@ envlist =
     {py3.9,py3.11,py3.12}-langchain-latest
     {py3.9,py3.11,py3.12}-langchain-notiktoken
 
-    # LaunchDarkly
-    {py3.8,py3.12,py3.13}-launchdarkly-v9.8.0
-    {py3.8,py3.12,py3.13}-launchdarkly-latest
-
     # Litestar
     {py3.8,py3.11}-litestar-v{2.0}
     {py3.8,py3.11,py3.12}-litestar-v{2.6}
@@ -183,10 +179,6 @@ envlist =
     {py3.9,py3.11,py3.12}-openai-v1.55
     {py3.9,py3.11,py3.12}-openai-latest
     {py3.9,py3.11,py3.12}-openai-notiktoken
-
-    # OpenFeature
-    {py3.8,py3.12,py3.13}-openfeature-v0.7
-    {py3.8,py3.12,py3.13}-openfeature-latest
 
     # OpenTelemetry (OTel)
     {py3.7,py3.9,py3.12,py3.13}-opentelemetry
@@ -259,10 +251,6 @@ envlist =
     {py3.8,py3.11}-starlite-v{1.48,1.51}
     # 1.51.14 is the last starlite version; the project continues as litestar
 
-    # Statsig
-    {py3.8,py3.12,py3.13}-statsig-v0.55.3
-    {py3.8,py3.12,py3.13}-statsig-latest
-
     # SQL Alchemy
     {py3.6,py3.9}-sqlalchemy-v{1.2,1.4}
     {py3.7,py3.11}-sqlalchemy-v{2.0}
@@ -283,10 +271,6 @@ envlist =
     # Typer
     {py3.7,py3.12,py3.13}-typer-v{0.15}
     {py3.7,py3.12,py3.13}-typer-latest
-
-    # Unleash
-    {py3.8,py3.12,py3.13}-unleash-v6.0.1
-    {py3.8,py3.12,py3.13}-unleash-latest
 
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
@@ -557,18 +541,6 @@ deps =
     openai-latest: tiktoken~=0.6.0
     openai-notiktoken: openai
 
-    # OpenFeature
-    openfeature-v0.7: openfeature-sdk~=0.7.1
-    openfeature-latest: openfeature-sdk
-
-    # LaunchDarkly
-    launchdarkly-v9.8.0: launchdarkly-server-sdk~=9.8.0
-    launchdarkly-latest: launchdarkly-server-sdk
-
-    # Unleash
-    unleash-v6.0.1: UnleashClient~=6.0.1
-    unleash-latest: UnleashClient
-
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
 
@@ -692,11 +664,6 @@ deps =
     starlite: httpx<0.28
     starlite-v{1.48}: starlite~=1.48.0
     starlite-v{1.51}: starlite~=1.51.0
-
-    # Statsig
-    statsig: typing_extensions
-    statsig-v0.55.3: statsig~=0.55.3
-    statsig-latest: statsig
 
     # SQLAlchemy
     sqlalchemy-v1.2: sqlalchemy~=1.2.0
