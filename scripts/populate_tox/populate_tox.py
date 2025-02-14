@@ -77,6 +77,7 @@ IGNORE = {
     "quart",
     "ray",
     "redis",
+    "requests",
     "rq",
     "sanic",
 }
