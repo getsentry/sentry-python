@@ -13,8 +13,18 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "celery": {
+        "package": "celery",
+        "deps": {
+            "*": ["newrelic", "redis"],
+            "py3.7": ["importlib-metadata<5.0"],
+        },
+    },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
+    },
+    "dramatiq": {
+        "package": "dramatiq",
     },
     "flask": {
         "package": "flask",
@@ -32,6 +42,9 @@ TEST_SUITE_CONFIG = {
             "*": ["blinker", "fastapi", "flask", "httpx"],
             "py3.6": ["aiocontextvars"],
         },
+    },
+    "huey": {
+        "package": "huey",
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
@@ -53,6 +66,10 @@ TEST_SUITE_CONFIG = {
     },
     "redis_py_cluster_legacy": {
         "package": "redis-py-cluster",
+    },
+    "spark": {
+        "package": "pyspark",
+        "python": ">=3.8",
     },
     "sqlalchemy": {
         "package": "sqlalchemy",
