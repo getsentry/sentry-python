@@ -1,5 +1,5 @@
 """
-This script populates tox.ini automatically using release data from PYPI.
+This script populates tox.ini automatically using release data from PyPI.
 """
 
 import functools
@@ -8,7 +8,6 @@ import sys
 import time
 from bisect import bisect_left
 from collections import defaultdict
-from datetime import datetime, timedelta
 from importlib.metadata import metadata
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
@@ -26,9 +25,6 @@ from sentry_sdk.integrations import _MIN_VERSIONS
 from config import TEST_SUITE_CONFIG
 from split_tox_gh_actions.split_tox_gh_actions import GROUPS
 
-
-# Only consider package versions going back this far
-CUTOFF = datetime.now() - timedelta(days=365 * 5)
 
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 ENV = Environment(
@@ -64,43 +60,31 @@ IGNORE = {
     "boto3",
     "bottle",
     "chalice",
-    "clickhouse_driver",
     "cohere",
     "cloud_resource_context",
     "cohere",
     "django",
     "falcon",
     "fastapi",
-    "flask",
     "gcp",
     "grpc",
     "httpx",
     "huggingface_hub",
     "langchain",
     "langchain_notiktoken",
-    "launchdarkly",
     "litestar",
-    "loguru",
     "openai",
     "openai_notiktoken",
-    "openfeature",
     "pure_eval",
-    "pymongo",
     "pyramid",
     "quart",
     "ray",
     "redis",
-    "redis_py_cluster_legacy",
     "requests",
     "rq",
     "sanic",
-    "starlette",
     "starlite",
-    "sqlalchemy",
     "tornado",
-    "trytond",
-    "typer",
-    "unleash",
 }
 
 
@@ -152,8 +136,6 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
             continue
 
         meta = data[0]
-        if datetime.fromisoformat(meta["upload_time"]) < CUTOFF:
-            continue
 
         if meta["yanked"]:
             continue
