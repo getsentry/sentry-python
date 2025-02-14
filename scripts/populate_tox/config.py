@@ -13,8 +13,28 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "bottle": {
+        "package": "bottle",
+        "deps": {
+            "*": ["werkzeug<2.1.0"],
+        },
+    },
+    "celery": {
+        "package": "celery",
+        "deps": {
+            "*": ["newrelic", "redis"],
+            "py3.7": ["importlib-metadata<5.0"],
+        },
+    },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
+    },
+    "dramatiq": {
+        "package": "dramatiq",
+    },
+    "falcon": {
+        "package": "falcon",
+        "python": "<3.13",
     },
     "flask": {
         "package": "flask",
@@ -33,6 +53,19 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars"],
         },
     },
+    "grpc": {
+        "package": "grpcio",
+        "deps": {
+            "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"],
+        },
+        "python": ">=3.7",
+    },
+    "huey": {
+        "package": "huey",
+    },
+    "huggingface_hub": {
+        "package": "huggingface_hub",
+    },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
@@ -48,8 +81,21 @@ TEST_SUITE_CONFIG = {
             "*": ["mockupdb"],
         },
     },
+    "pyramid": {
+        "package": "pyramid",
+        "deps": {
+            "*": ["werkzeug<2.1.0"],
+        },
+    },
     "redis_py_cluster_legacy": {
         "package": "redis-py-cluster",
+    },
+    "requests": {
+        "package": "requests",
+    },
+    "spark": {
+        "package": "pyspark",
+        "python": ">=3.8",
     },
     "sqlalchemy": {
         "package": "sqlalchemy",
@@ -70,6 +116,20 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars"],
         },
     },
+    "starlite": {
+        "package": "starlite",
+        "deps": {
+            "*": [
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "cryptography",
+                "pydantic<2.0.0",
+                "httpx<0.28",
+            ],
+        },
+        "python": "<=3.11",
+    },
     "statsig": {
         "package": "statsig",
         "deps": {
@@ -80,6 +140,16 @@ TEST_SUITE_CONFIG = {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
             "*": ["httpx"],
+        },
+    },
+    "tornado": {
+        "package": "tornado",
+        "deps": {
+            "*": ["pytest"],
+            "<=6.4.1": [
+                "pytest<8.2"
+            ],  # https://github.com/tornadoweb/tornado/pull/3382
+            "py3.6": ["aiocontextvars"],
         },
     },
     "trytond": {
