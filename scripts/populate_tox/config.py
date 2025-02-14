@@ -46,6 +46,9 @@ TEST_SUITE_CONFIG = {
     "huey": {
         "package": "huey",
     },
+    "huggingface_hub": {
+        "package": "huggingface_hub",
+    },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },

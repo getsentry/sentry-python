@@ -69,6 +69,7 @@ IGNORE = {
     "gcp",
     "grpc",
     "httpx",
+    "huey",
     "huggingface_hub",
     "langchain",
     "langchain_notiktoken",
