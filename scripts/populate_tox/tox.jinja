@@ -70,10 +70,6 @@ envlist =
     {py3.11,py3.12}-boto3-v{1.34}
     {py3.11,py3.12,py3.13}-boto3-latest
 
-    # Bottle
-    {py3.6,py3.9}-bottle-v{0.12}
-    {py3.6,py3.12,py3.13}-bottle-latest
-
     # Chalice
     {py3.6,py3.9}-chalice-v{1.16}
     {py3.8,py3.12,py3.13}-chalice-latest
@@ -99,12 +95,6 @@ envlist =
     # - Django 5.x
     {py3.10,py3.11,py3.12}-django-v{5.0,5.1}
     {py3.10,py3.12,py3.13}-django-latest
-
-    # Falcon
-    {py3.6,py3.7}-falcon-v{1,1.4,2}
-    {py3.6,py3.11,py3.12}-falcon-v{3}
-    {py3.8,py3.11,py3.12}-falcon-v{4}
-    {py3.7,py3.11,py3.12}-falcon-latest
 
     # FastAPI
     {py3.7,py3.10}-fastapi-v{0.79}
@@ -154,12 +144,6 @@ envlist =
     # pure_eval
     {py3.6,py3.12,py3.13}-pure_eval
 
-    # Pyramid
-    {py3.6,py3.11}-pyramid-v{1.6}
-    {py3.6,py3.11,py3.12}-pyramid-v{1.10}
-    {py3.6,py3.11,py3.12}-pyramid-v{2.0}
-    {py3.6,py3.11,py3.12}-pyramid-latest
-
     # Quart
     {py3.7,py3.11}-quart-v{0.16}
     {py3.8,py3.11,py3.12}-quart-v{0.19}
@@ -190,15 +174,6 @@ envlist =
     {py3.6,py3.8}-sanic-v{20}
     {py3.8,py3.11,py3.12}-sanic-v{24.6}
     {py3.9,py3.12,py3.13}-sanic-latest
-
-    # Starlite
-    {py3.8,py3.11}-starlite-v{1.48,1.51}
-    # 1.51.14 is the last starlite version; the project continues as litestar
-
-    # Tornado
-    {py3.8,py3.11,py3.12}-tornado-v{6.0}
-    {py3.8,py3.11,py3.12}-tornado-v{6.2}
-    {py3.8,py3.11,py3.12}-tornado-latest
 
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
@@ -291,11 +266,6 @@ deps =
     boto3-v1.34: boto3~=1.34.0
     boto3-latest: boto3
 
-    # Bottle
-    bottle: Werkzeug<2.1.0
-    bottle-v0.12: bottle~=0.12.0
-    bottle-latest: bottle
-
     # Chalice
     chalice: pytest-chalice==0.0.5
     chalice-v1.16: chalice~=1.16.0
@@ -333,14 +303,6 @@ deps =
     django-v5.0: Django~=5.0.0
     django-v5.1: Django==5.1rc1
     django-latest: Django
-
-    # Falcon
-    falcon-v1.4: falcon~=1.4.0
-    falcon-v1: falcon~=1.0
-    falcon-v2: falcon~=2.0
-    falcon-v3: falcon~=3.0
-    falcon-v4: falcon~=4.0
-    falcon-latest: falcon
 
     # FastAPI
     fastapi: httpx
@@ -431,13 +393,6 @@ deps =
     # pure_eval
     pure_eval: pure_eval
 
-    # Pyramid
-    pyramid: Werkzeug<2.1.0
-    pyramid-v1.6: pyramid~=1.6.0
-    pyramid-v1.10: pyramid~=1.10.0
-    pyramid-v2.0: pyramid~=2.0.0
-    pyramid-latest: pyramid
-
     # Quart
     quart: quart-auth
     quart: pytest-asyncio
@@ -496,24 +451,6 @@ deps =
     sanic-v20: sanic~=20.0
     sanic-v24.6: sanic~=24.6.0
     sanic-latest: sanic
-
-    # Starlite
-    starlite: pytest-asyncio
-    starlite: python-multipart
-    starlite: requests
-    starlite: cryptography
-    starlite: pydantic<2.0.0
-    starlite: httpx<0.28
-    starlite-v{1.48}: starlite~=1.48.0
-    starlite-v{1.51}: starlite~=1.51.0
-
-    # Tornado
-    # Tornado <6.4.1 is incompatible with Pytest ≥8.2
-    # See https://github.com/tornadoweb/tornado/pull/3382.
-    tornado-{v6.0,v6.2}: pytest<8.2
-    tornado-v6.0: tornado~=6.0.0
-    tornado-v6.2: tornado~=6.2.0
-    tornado-latest: tornado
 
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
