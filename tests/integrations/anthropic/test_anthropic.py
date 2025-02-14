@@ -1,5 +1,7 @@
 from unittest import mock
 
+from sentry_sdk.integrations import DidNotEnable
+
 try:
     from unittest.mock import AsyncMock
 except ImportError:
@@ -10,7 +12,7 @@ except ImportError:
 
 
 import pytest
-from anthropic import AsyncAnthropic, Anthropic, AnthropicError, AsyncStream, Stream
+from anthropic import Anthropic, AnthropicError, AsyncAnthropic, AsyncStream, Stream
 from anthropic.types import MessageDeltaUsage, TextDelta, Usage
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
@@ -19,6 +21,7 @@ from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
+from sentry_sdk.integrations.anthropic import _add_ai_data_to_span, _collect_ai_data
 from sentry_sdk.utils import package_version
 
 try:
@@ -517,9 +520,8 @@ def test_streaming_create_message_with_input_json_delta(
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
         assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"text": "", "type": "text"}
-        ]  # we do not record InputJSONDelta because it could contain PII
-
+            {"text": "{'location': 'San Francisco, CA'}", "type": "text"}
+        ]
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
@@ -757,3 +759,78 @@ async def test_span_origin_async(sentry_init, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.ai.anthropic"
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Versions <0.27.0 do not include InputJSONDelta.",
+)
+def test_collect_ai_data_with_input_json_delta():
+    event = ContentBlockDeltaEvent(
+        delta=InputJSONDelta(partial_json="test", type="input_json_delta"),
+        index=0,
+        type="content_block_delta",
+    )
+
+    input_tokens = 10
+    output_tokens = 20
+    content_blocks = []
+
+    new_input_tokens, new_output_tokens, new_content_blocks = _collect_ai_data(
+        event, input_tokens, output_tokens, content_blocks
+    )
+
+    assert new_input_tokens == input_tokens
+    assert new_output_tokens == output_tokens
+    assert new_content_blocks == ["test"]
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Versions <0.27.0 do not include InputJSONDelta.",
+)
+def test_add_ai_data_to_span_with_input_json_delta(sentry_init):
+    sentry_init(
+        integrations=[AnthropicIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with start_transaction(name="test") as transaction:
+        span = transaction.start_span()
+        integration = AnthropicIntegration()
+
+        _add_ai_data_to_span(
+            span,
+            integration,
+            input_tokens=10,
+            output_tokens=20,
+            content_blocks=["{'test': 'data'}", "'more': 'json'"],
+        )
+
+        assert span.get_data(SPANDATA.AI_RESPONSES) == [
+            {"type": "text", "text": "{'test': 'data''more': 'json'}"}
+        ]
+        assert span.get_data("ai.streaming") is True
+        assert span.get_measurement("ai_prompt_tokens_used")["value"] == 10
+        assert span.get_measurement("ai_completion_tokens_used")["value"] == 20
+        assert span.get_measurement("ai_total_tokens_used")["value"] == 30
+
+
+def test_unsupported_anthropic_version(sentry_init):
+    with mock.patch(
+        "sentry_sdk.integrations.anthropic.package_version", return_value=(0, 15, 0)
+    ):
+        with pytest.raises(DidNotEnable):
+            sentry_init(
+                integrations=[AnthropicIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+
+def test_no_version_info(sentry_init):
+    with mock.patch(
+        "sentry_sdk.integrations.anthropic.package_version", return_value=None
+    ):
+        with pytest.raises(DidNotEnable):
+            sentry_init(integrations=[AnthropicIntegration()])
