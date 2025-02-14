@@ -34,7 +34,8 @@ if TYPE_CHECKING:
     P = ParamSpec("P")
     R = TypeVar("R")
 
-    import sentry_sdk.profiler
+    from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
+    from sentry_sdk.profiler.transaction_profiler import Profile
     from sentry_sdk._types import (
         Event,
         MeasurementUnit,
@@ -767,6 +768,7 @@ class Transaction(Span):
         "_measurements",
         "_contexts",
         "_profile",
+        "_continuous_profile",
         "_baggage",
     )
 
@@ -788,9 +790,8 @@ class Transaction(Span):
         self.parent_sampled = parent_sampled
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._contexts = {}  # type: Dict[str, Any]
-        self._profile = (
-            None
-        )  # type: Optional[sentry_sdk.profiler.transaction_profiler.Profile]
+        self._profile = None  # type: Optional[Profile]
+        self._continuous_profile = None  # type: Optional[ContinuousProfile]
         self._baggage = baggage
 
     def __repr__(self):
@@ -842,6 +843,9 @@ class Transaction(Span):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if self._profile is not None:
             self._profile.__exit__(ty, value, tb)
+
+        if self._continuous_profile is not None:
+            self._continuous_profile.stop()
 
         super().__exit__(ty, value, tb)
 
