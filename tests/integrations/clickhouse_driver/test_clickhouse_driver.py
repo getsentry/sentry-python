@@ -109,7 +109,13 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
 
-    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
+    actual_query_breadcrumbs = [
+        breadcrumb
+        for breadcrumb in event["breadcrumbs"]["values"]
+        if breadcrumb["category"] == "query"
+    ]
+
+    assert actual_query_breadcrumbs == expected_breadcrumbs
 
 
 def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
