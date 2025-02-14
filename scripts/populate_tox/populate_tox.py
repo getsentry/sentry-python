@@ -65,7 +65,6 @@ IGNORE = {
     "django",
     "fastapi",
     "gcp",
-    "grpc",
     "httpx",
     "huey",
     "huggingface_hub",

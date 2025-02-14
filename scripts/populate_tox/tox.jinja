@@ -103,12 +103,6 @@ envlist =
     # GCP
     {py3.7}-gcp
 
-    # gRPC
-    {py3.7,py3.9}-grpc-v{1.39}
-    {py3.7,py3.10}-grpc-v{1.49}
-    {py3.7,py3.11}-grpc-v{1.59}
-    {py3.8,py3.11,py3.12}-grpc-latest
-
     # HTTPX
     {py3.6,py3.9}-httpx-v{0.16,0.18}
     {py3.6,py3.10}-httpx-v{0.20,0.22}
@@ -313,16 +307,6 @@ deps =
     fastapi: requests
     fastapi-v{0.79}: fastapi~=0.79.0
     fastapi-latest: fastapi
-
-    # gRPC
-    grpc: protobuf
-    grpc: mypy-protobuf
-    grpc: types-protobuf
-    grpc: pytest-asyncio
-    grpc-v1.39: grpcio~=1.39.0
-    grpc-v1.49: grpcio~=1.49.1
-    grpc-v1.59: grpcio~=1.59.0
-    grpc-latest: grpcio
 
     # HTTPX
     httpx-v0.16: pytest-httpx==0.10.0
