@@ -1,6 +1,6 @@
 mypy
 black
-flake8==5.0.4  # flake8 depends on pyflakes>=3.0.0 and this dropped support for Python 2 "# type:" comments
+flake8==7.1.2  # flake8 depends on pyflakes>=3.0.0 and this dropped support for Python 2 "# type:" comments
 types-certifi
 types-protobuf
 types-gevent
