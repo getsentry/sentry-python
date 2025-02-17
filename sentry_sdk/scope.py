@@ -12,7 +12,11 @@ from itertools import chain
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
-from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
+from sentry_sdk.profiler.continuous_profiler import (
+    get_profiler_id,
+    try_autostart_continuous_profiler,
+    try_profile_lifecycle_trace_start,
+)
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
@@ -1043,6 +1047,18 @@ class Scope:
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
+        # update the sample rate in the dsc
+        if transaction.sample_rate is not None:
+            propagation_context = self.get_active_propagation_context()
+            if propagation_context:
+                dsc = propagation_context.dynamic_sampling_context
+                if dsc is not None:
+                    dsc["sample_rate"] = str(transaction.sample_rate)
+            if transaction._baggage:
+                transaction._baggage.sentry_items["sample_rate"] = str(
+                    transaction.sample_rate
+                )
+
         if transaction.sampled:
             profile = Profile(
                 transaction.sampled, transaction._start_timestamp_monotonic_ns
@@ -1050,6 +1066,14 @@ class Scope:
             profile._set_initial_sampling_decision(sampling_context=sampling_context)
 
             transaction._profile = profile
+
+            transaction._continuous_profile = try_profile_lifecycle_trace_start()
+
+            # Typically, the profiler is set when the transaction is created. But when
+            # using the auto lifecycle, the profiler isn't running when the first
+            # transaction is started. So make sure we update the profiler id on it.
+            if transaction._continuous_profile is not None:
+                transaction.set_profiler_id(get_profiler_id())
 
             # we don't bother to keep spans if we already know we're not going to
             # send the transaction

@@ -156,13 +156,27 @@ def record_sql_queries(
 
 def maybe_create_breadcrumbs_from_span(scope, span):
     # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
-
     if span.op == OP.DB_REDIS:
         scope.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
+
     elif span.op == OP.HTTP_CLIENT:
-        scope.add_breadcrumb(type="http", category="httplib", data=span._data)
+        level = None
+        status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)
+        if status_code:
+            if 500 <= status_code <= 599:
+                level = "error"
+            elif 400 <= status_code <= 499:
+                level = "warning"
+
+        if level:
+            scope.add_breadcrumb(
+                type="http", category="httplib", data=span._data, level=level
+            )
+        else:
+            scope.add_breadcrumb(type="http", category="httplib", data=span._data)
+
     elif span.op == "subprocess":
         scope.add_breadcrumb(
             type="subprocess",
@@ -378,7 +392,7 @@ class PropagationContext:
         self.parent_sampled = parent_sampled
         """Boolean indicator if the parent span was sampled.
         Important when the parent span originated in an upstream service,
-        because we watn to sample the whole trace, or nothing from the trace."""
+        because we want to sample the whole trace, or nothing from the trace."""
 
         self.dynamic_sampling_context = dynamic_sampling_context
         """Data that is used for dynamic sampling decisions."""
@@ -623,6 +637,10 @@ class Baggage:
                 if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
             )
         )
+
+    def __repr__(self):
+        # type: () -> str
+        return f'<Baggage "{self.serialize(include_third_party=True)}", mutable={self.mutable}>'
 
 
 def should_propagate_trace(client, url):

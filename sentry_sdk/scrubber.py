@@ -4,11 +4,10 @@ from sentry_sdk.utils import (
     iter_event_frames,
 )
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, List, Dict
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Event
-    from typing import List
     from typing import Optional
 
 
@@ -161,7 +160,7 @@ class EventScrubber:
         # type: (Event) -> None
         with capture_internal_exceptions():
             if "spans" in event:
-                for span in event["spans"]:
+                for span in cast(List[Dict[str, object]], event["spans"]):
                     if "data" in span:
                         self.scrub_dict(span["data"])
 
