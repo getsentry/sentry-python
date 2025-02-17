@@ -60,13 +60,21 @@ def dropped_result(parent_span_context, attributes, sample_rate=None):
     elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
         trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "false")
 
-    if sample_rate and TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
-        trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
-
     is_root_span = not (
         parent_span_context.is_valid and not parent_span_context.is_remote
     )
     if is_root_span:
+        # Update the sample rate in the trace state
+        if sample_rate is not None:
+            if TRACESTATE_SAMPLE_RATE_KEY in trace_state:
+                trace_state = trace_state.update(
+                    TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate)
+                )
+            else:
+                trace_state = trace_state.add(
+                    TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate)
+                )
+
         # Tell Sentry why we dropped the transaction/root-span
         client = sentry_sdk.get_client()
         if client.monitor and client.monitor.downsample_factor > 0:
@@ -97,7 +105,9 @@ def sampled_result(span_context, attributes, sample_rate):
     elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
         trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "true")
 
-    if TRACESTATE_SAMPLE_RATE_KEY not in trace_state:
+    if TRACESTATE_SAMPLE_RATE_KEY in trace_state:
+        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+    else:
         trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     return SamplingResult(
@@ -144,7 +154,7 @@ class SentrySampler(Sampler):
                 if sample_rate > 0:
                     return sampled_result(parent_span_context, attributes, sample_rate)
                 else:
-                    return dropped_result(parent_span_context, attributes)
+                    return dropped_result(parent_span_context, attributes, sample_rate)
             else:
                 logger.debug(
                     f"[Tracing] Ignoring sampled param for non-root span {name}"
