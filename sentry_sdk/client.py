@@ -574,7 +574,9 @@ class _Client(BaseClient):
                         quantity=spans_before + 1,  # +1 for the transaction itself
                     )
             else:
-                spans_delta = spans_before - len(new_event.get("spans", []))
+                spans_delta = spans_before - len(
+                    cast(List[Dict[str, object]], new_event.get("spans", []))
+                )
                 if spans_delta > 0 and self.transport is not None:
                     self.transport.record_lost_event(
                         reason="before_send", data_category="span", quantity=spans_delta
