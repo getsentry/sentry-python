@@ -118,7 +118,7 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
 
     assert "sample_rate" in envelope_trace_header
     assert type(envelope_trace_header["sample_rate"]) == str
-    assert envelope_trace_header["sample_rate"] == "1.0"
+    assert envelope_trace_header["sample_rate"] == "0.01337"
 
     assert "sampled" in envelope_trace_header
     assert type(envelope_trace_header["sampled"]) == str
