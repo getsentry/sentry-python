@@ -380,7 +380,7 @@ def test_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     with start_transaction(name="foo"):
-        conn = HTTPSConnection("example.com")
+        conn = HTTPConnection("example.com")
         conn.request("GET", "/foo")
         conn.getresponse()
 
