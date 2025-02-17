@@ -40,7 +40,6 @@ if TYPE_CHECKING:
     P = ParamSpec("P")
     R = TypeVar("R")
 
-    import sentry_sdk.profiler
     from sentry_sdk._types import (
         MeasurementUnit,
         SamplingContext,

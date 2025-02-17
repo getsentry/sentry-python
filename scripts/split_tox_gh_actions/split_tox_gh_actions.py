@@ -90,7 +90,11 @@ GROUPS = {
     "Flags": [
         "launchdarkly",
         "openfeature",
+        "statsig",
         "unleash",
+    ],
+    "Gevent": [
+        "gevent",
     ],
     "GraphQL": [
         "ariadne",

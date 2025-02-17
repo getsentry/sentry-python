@@ -611,7 +611,7 @@ class Scheduler(ABC):
                 if profile.active:
                     profile.write(now, sample)
                 else:
-                    # If a thread is marked inactive, we buffer it
+                    # If a profile is marked inactive, we buffer it
                     # to `inactive_profiles` so it can be removed.
                     # We cannot remove it here as it would result
                     # in a RuntimeError.

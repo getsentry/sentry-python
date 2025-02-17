@@ -88,7 +88,7 @@ class TornadoIntegration(Integration):
         else:
 
             @coroutine  # type: ignore
-            def sentry_execute_request_handler(self, *args, **kwargs):
+            def sentry_execute_request_handler(self, *args, **kwargs):  # type: ignore
                 # type: (RequestHandler, *Any, **Any) -> Any
                 with _handle_request_impl(self):
                     result = yield from old_execute(self, *args, **kwargs)

@@ -81,7 +81,7 @@ def _wrap_channel_async(func: Callable[P, AsyncChannel]) -> Callable[P, AsyncCha
     "Wrapper for asynchronous secure and insecure channel."
 
     @wraps(func)
-    def patched_channel(
+    def patched_channel(  # type: ignore
         *args: P.args,
         interceptors: Optional[Sequence[grpc.aio.ClientInterceptor]] = None,
         **kwargs: P.kwargs,
@@ -100,7 +100,7 @@ def _wrap_sync_server(func: Callable[P, Server]) -> Callable[P, Server]:
     """Wrapper for synchronous server."""
 
     @wraps(func)
-    def patched_server(
+    def patched_server(  # type: ignore
         *args: P.args,
         interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None,
         **kwargs: P.kwargs,
@@ -121,7 +121,7 @@ def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServe
     """Wrapper for asynchronous server."""
 
     @wraps(func)
-    def patched_aio_server(
+    def patched_aio_server(  # type: ignore
         *args: P.args,
         interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None,
         **kwargs: P.kwargs,

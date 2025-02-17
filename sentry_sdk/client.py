@@ -5,10 +5,12 @@ import socket
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
-from typing import cast, overload
+from typing import TYPE_CHECKING, List, Dict, cast, overload
+import warnings
 
 from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk.utils import (
+    AnnotatedValue,
     ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
@@ -42,12 +44,9 @@ from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import Optional
     from typing import Sequence
     from typing import Type
@@ -133,6 +132,13 @@ def _get_options(*args, **kwargs):
             "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
         )
         rv["socket_options"] = None
+
+    if rv["enable_tracing"] is not None:
+        warnings.warn(
+            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     return rv
 
@@ -426,12 +432,14 @@ class _Client(BaseClient):
     ):
         # type: (...) -> Optional[Event]
 
+        previous_total_spans = None  # type: Optional[int]
+
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            spans_before = len(event.get("spans", []))
+            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -450,12 +458,17 @@ class _Client(BaseClient):
                 return None
 
             event = event_  # type: Optional[Event]  # type: ignore[no-redef]
-
-            spans_delta = spans_before - len(event.get("spans", []))
+            spans_delta = spans_before - len(
+                cast(List[Dict[str, object]], event.get("spans", []))
+            )
             if is_transaction and spans_delta > 0 and self.transport is not None:
                 self.transport.record_lost_event(
                     "event_processor", data_category="span", quantity=spans_delta
                 )
+
+            dropped_spans = event.pop("_dropped_spans", 0) + spans_delta  # type: int
+            if dropped_spans > 0:
+                previous_total_spans = spans_before + dropped_spans
 
         if (
             self.options["attach_stacktrace"]
@@ -504,6 +517,11 @@ class _Client(BaseClient):
             if event_scrubber:
                 event_scrubber.scrub_event(event)
 
+        if previous_total_spans is not None:
+            event["spans"] = AnnotatedValue(
+                event.get("spans", []), {"len": previous_total_spans}
+            )
+
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
@@ -541,7 +559,7 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
-            spans_before = len(event.get("spans", []))
+            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:

@@ -363,7 +363,7 @@ class PropagationContext:
         self.parent_sampled = parent_sampled
         """Boolean indicator if the parent span was sampled.
         Important when the parent span originated in an upstream service,
-        because we watn to sample the whole trace, or nothing from the trace."""
+        because we want to sample the whole trace, or nothing from the trace."""
 
         self.baggage = baggage
         """Baggage object used for dynamic sampling decisions."""
@@ -566,6 +566,10 @@ class Baggage:
                 if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
             )
         )
+
+    def __repr__(self):
+        # type: () -> str
+        return f'<Baggage "{self.serialize(include_third_party=True)}", mutable={self.mutable}>'
 
 
 def should_propagate_trace(client, url):

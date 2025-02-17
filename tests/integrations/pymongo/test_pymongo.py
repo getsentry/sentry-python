@@ -12,7 +12,7 @@ import pytest
 @pytest.fixture(scope="session")
 def mongo_server():
     server = MockupDB(verbose=True)
-    server.autoresponds("ismaster", maxWireVersion=6)
+    server.autoresponds("ismaster", maxWireVersion=7)
     server.run()
     server.autoresponds(
         {"find": "test_collection"}, cursor={"id": 123, "firstBatch": []}

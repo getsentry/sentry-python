@@ -1,6 +1,7 @@
 import random
 from http.client import HTTPConnection, HTTPSConnection
 from socket import SocketIO
+from urllib.error import HTTPError
 from urllib.request import urlopen
 from unittest import mock
 
@@ -60,6 +61,50 @@ def test_crumb_capture(sentry_init, capture_events):
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
+    sentry_init(integrations=[StdlibIntegration()])
+    events = capture_events()
+
+    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
+    try:
+        urlopen(url)
+    except HTTPError:
+        pass
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if level is None:
+        assert "level" not in crumb
+    else:
+        assert crumb["level"] == level
+
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: status_code,
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
         }
@@ -162,14 +207,14 @@ def test_outgoing_trace_headers(
     envelopes = capture_envelopes()
     request_headers = capture_request_headers()
 
-    headers = {}
-    headers["sentry-trace"] = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
-    headers["baggage"] = (
-        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
-        "sentry-sampled=true, sentry-sample_rate=0.01337, "
-        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
-    )
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+        "baggage": (
+            "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+            "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+        ),
+    }
 
     with isolation_scope():
         with continue_trace(headers):
@@ -192,8 +237,7 @@ def test_outgoing_trace_headers(
     expected_outgoing_baggage = (
         "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
         "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-        "sentry-sampled=true,"
-        "sentry-sample_rate=0.01337,"
+        "sentry-sample_rate=1.0,"
         "sentry-user_id=Am%C3%A9lie"
     )
 

@@ -19,6 +19,7 @@ from sentry_sdk.utils import parse_version
 
 FASTAPI_VERSION = parse_version(fastapi.__version__)
 
+from tests.integrations.conftest import parametrize_test_configurable_status_codes
 from tests.integrations.starlette import test_starlette
 
 
@@ -647,7 +648,7 @@ def test_transaction_http_method_custom(sentry_init, capture_events):
     assert event2["request"]["method"] == "HEAD"
 
 
-@test_starlette.parametrize_test_configurable_status_codes
+@parametrize_test_configurable_status_codes
 def test_configurable_status_codes(
     sentry_init,
     capture_events,

@@ -1,6 +1,7 @@
 import re
 import pytest
 import random
+import sys
 
 import sentry_sdk
 from sentry_sdk import (
@@ -238,3 +239,55 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
     assert 'meta name="baggage"' in baggage
     baggage_content = re.findall('content="([^"]*)"', baggage)[0]
     assert baggage_content == root_span.get_baggage().serialize()
+
+
+@pytest.mark.parametrize(
+    "exception_cls,exception_value",
+    [
+        (SystemExit, 0),
+    ],
+)
+def test_non_error_exceptions(
+    sentry_init, capture_events, exception_cls, exception_value
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_span(name="hi") as span:
+        span.set_status(SPANSTATUS.OK)
+        with pytest.raises(exception_cls):
+            with start_span(op="foo", name="foodesc"):
+                raise exception_cls(exception_value)
+
+    assert len(events) == 1
+    event = events[0]
+
+    span = event["spans"][0]
+    assert "status" not in span.get("tags", {})
+    assert "status" not in event["tags"]
+    assert event["contexts"]["trace"]["status"] == "ok"
+
+
+@pytest.mark.parametrize("exception_value", [None, 0, False])
+def test_good_sysexit_doesnt_fail_transaction(
+    sentry_init, capture_events, exception_value
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_span(name="hi") as span:
+        span.set_status(SPANSTATUS.OK)
+        with pytest.raises(SystemExit):
+            with start_span(op="foo", name="foodesc"):
+                if exception_value is not False:
+                    sys.exit(exception_value)
+                else:
+                    sys.exit()
+
+    assert len(events) == 1
+    event = events[0]
+
+    span = event["spans"][0]
+    assert "status" not in span.get("tags", {})
+    assert "status" not in event["tags"]
+    assert event["contexts"]["trace"]["status"] == "ok"
