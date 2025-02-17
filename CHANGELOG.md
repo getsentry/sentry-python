@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.22.0
+
+### Various fixes & improvements
+
+- tests(httplib): Fix flakey https test (#4057) by @Zylphrex
+- Revert "feat(tracing): Add `propagate_traces` deprecation warning (#3899)" (#4055) by @cmanallen
+- tests: Generate tox entries for grpc via script (#3979) by @sentrivana
+- tests: Generate some of the Web 2 tox entries by toxgen (#3981) by @sentrivana
+- tests: Generate part of the Tasks tox entries by a script (#3976) by @sentrivana
+- tests: Generate some of the AI tox entries by toxgen (#3977) by @sentrivana
+- tests: Generate some of the Web 1 tox entries with toxgen (#3980) by @sentrivana
+- tests: Generate DB group by toxgen script  (#3978) by @sentrivana
+- Generate Misc tox entries via toxgen script (#3982) by @sentrivana
+- tests: Generate Flags tox entries with toxgen script (#3974) by @sentrivana
+- tests: Remove toxgen cutoff, add statsig (#4048) by @sentrivana
+- Fix clickhouse test (#4053) by @sentrivana
+- tests(profiling): Reduce continuous profiling test flakiness (#4052) by @Zylphrex
+- feat(profiling): Continuous profiling lifecycle (#4017) by @Zylphrex
+- feat(flags): add Statsig integration (#4022) by @aliu39
+- Update changelog with `profile_session_sample_rate` (#4046) by @sentrivana
+- Move the GraphQL group over to the tox gen script (#3975) by @sentrivana
+- Update sample rate in DSC (#4018) by @sentrivana
+
 ## 2.21.0
 
 ### Various fixes & improvements
