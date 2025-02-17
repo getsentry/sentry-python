@@ -6,7 +6,7 @@
 
 - **New integration:** Add [Statsig](https://statsig.com/) integration (#4022) by @aliu39
 
-  For more information, see the documentation for the [TyperIntegration](https://docs.sentry.io/platforms/python/integrations/statsig/).
+  For more information, see the documentation for the [StatsigIntegration](https://docs.sentry.io/platforms/python/integrations/statsig/).
 
 - Profiling: Continuous profiling lifecycle (#4017) by @Zylphrex
 - Fix: Revert "feat(tracing): Add `propagate_traces` deprecation warning (#3899)" (#4055) by @cmanallen
