@@ -50,7 +50,6 @@ def test_environment():
 
         def before_test():
             server.clear_envelopes()
-            print("[TEST] Clearing envelopes before test")
 
         yield {
             "stack": stack,
@@ -87,27 +86,81 @@ def lambda_client():
     )
 
 
-def test_basic(lambda_client, test_environment):
-    response = lambda_client.invoke(
-        FunctionName="BasicTestFunction", Payload=json.dumps({"name": "Ivana"})
-    )
-    result = json.loads(response["Payload"].read().decode())
-    assert result == {"message": "Hello, Ivana!"}
+# def test_basic_ok(lambda_client, test_environment):
+#     response = lambda_client.invoke(
+#         FunctionName="BasicOk", 
+#         Payload=json.dumps({"name": "Ivana"}),
+#     )
+#     result = json.loads(response["Payload"].read().decode())
+#     assert result == {"event": {"name": "Ivana"}}
 
-    message, transaction = test_environment["server"].envelopes
-    assert message["message"] == "[SENTRY MESSAGE] Hello, Ivana!"
-    assert transaction["type"] == "transaction"
+#     envelopes = test_environment["server"].envelopes
+#     assert len(envelopes) == 1
+
+#     transaction = envelopes[0]
+#     assert transaction["type"] == "transaction"
 
 
-def test_basic_2(lambda_client, test_environment):
-    test_environment["server"].clear_envelopes()
+def test_xxx(lambda_client, test_environment):
+    for x in range(20):   
+        test_environment["server"].clear_envelopes()
+        print(f"*** BasicException {x} ***")
+        response = lambda_client.invoke(
+            FunctionName="BasicException", 
+            Payload=json.dumps({}),
+        )
+        print("- RESPONSE")
+        print(response)
+        print("- PAYLOAD")
+        print(response["Payload"].read().decode())
+        print(f'- ENVELOPES {len(test_environment["server"].envelopes)}')
 
-    response = lambda_client.invoke(
-        FunctionName="BasicTestFunction", Payload=json.dumps({"name": "Neel"})
-    )
-    result = json.loads(response["Payload"].read().decode())
-    assert result == {"message": "Hello, Neel!"}
 
-    message, transaction = test_environment["server"].envelopes
-    assert message["message"] == "[SENTRY MESSAGE] Hello, Neel!"
-    assert transaction["type"] == "transaction"
+
+    assert False
+
+
+# def test_basic(lambda_client, test_environment):
+#     response = lambda_client.invoke(
+#         FunctionName="BasicException", 
+#         Payload=json.dumps({"name": "Neel"}),
+#     )
+#     print("RESPONSE")
+#     print(response)
+#     print("PAYLOAD")
+#     print(response["Payload"].read().decode())
+#     result = json.loads(response["Payload"].read().decode())
+#     print("RESULT")
+#     print(result)
+
+#     envelopes = test_environment["server"].envelopes
+#     (error,) = envelopes
+
+#     assert error["level"] == "error"
+#     (exception,) = error["exception"]["values"]
+#     assert exception["type"] == "Exception"
+#     assert exception["value"] == "Oh!"
+
+#     (frame1,) = exception["stacktrace"]["frames"]
+#     assert frame1["filename"] == "test_lambda.py"
+#     assert frame1["abs_path"] == "/var/task/test_lambda.py"
+#     assert frame1["function"] == "test_handler"
+
+#     assert frame1["in_app"] is True
+
+#     assert exception["mechanism"]["type"] == "aws_lambda"
+#     assert not exception["mechanism"]["handled"]
+
+#     assert error["extra"]["lambda"]["function_name"].startswith("test_")
+
+#     logs_url = error["extra"]["cloudwatch logs"]["url"]
+#     assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region")
+#     assert not re.search("(=;|=$)", logs_url)
+#     assert error["extra"]["cloudwatch logs"]["log_group"].startswith(
+#         "/aws/lambda/test_"
+#     )
+
+#     log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
+#     log_stream = error["extra"]["cloudwatch logs"]["log_stream"]
+
+#     assert re.match(log_stream_re, log_stream)

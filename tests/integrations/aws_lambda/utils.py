@@ -23,18 +23,20 @@ class DummyLambdaStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        print(f"CREATING STACK: {self}")
+
         # Override the template synthesis
         self.template_options.template_format_version = "2010-09-09"
         self.template_options.transforms = ["AWS::Serverless-2016-10-31"]
 
-        # Create Sentry Lambda Layer
+        # Create Sentry Lambda layer to the SAM stack
         filename = "sentry-sdk-lambda-layer.zip"
         build_packaged_zip(
             make_dist=True,
             out_zip_filename=filename,
         )
 
-        layer = CfnResource(
+        self.sentry_layer = CfnResource(
             self,
             "SentryPythonServerlessSDK",
             type="AWS::Serverless::LayerVersion",
@@ -52,25 +54,35 @@ class DummyLambdaStack(Stack):
             },
         )
 
-        # Add the function using SAM format
-        CfnResource(
-            self,
-            "BasicTestFunction",
-            type="AWS::Serverless::Function",
-            properties={
-                "CodeUri": "./tests/integrations/aws_lambda/lambda_functions/hello_world",
-                "Handler": "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
-                "Runtime": "python3.12",
-                "Layers": [{"Ref": layer.logical_id}],  # The layer adds the sentry-sdk
-                "Environment": {  # The environment variables are set up the Sentry SDK to instrument the lambda function
-                    "Variables": {
-                        "SENTRY_DSN": "http://123@host.docker.internal:9999/0",
-                        "SENTRY_INITIAL_HANDLER": "index.handler",
-                        "SENTRY_TRACES_SAMPLE_RATE": "1.0",
-                    }
+        # Add all lambda functions from /tests/integrations/aws_lambda/lambda_functions/ to the SAM stack
+        FUNCTIONS_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
+        lambda_dirs = [
+            d for d in os.listdir(FUNCTIONS_DIR) 
+            if os.path.isdir(os.path.join(FUNCTIONS_DIR, d))
+        ]
+        for lambda_dir in lambda_dirs:
+            lambda_name = "".join(word.capitalize() for word in lambda_dir.replace("_", " ").replace("-", " ").split())
+
+            CfnResource(
+                self,
+                lambda_name,
+                type="AWS::Serverless::Function",
+                properties={
+                    "CodeUri": os.path.join(FUNCTIONS_DIR, lambda_dir),
+                    "Handler": "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
+                    "Runtime": "python3.12",
+                    "Layers": [{"Ref": self.sentry_layer.logical_id}],  # Add layer containing the Sentry SDK to function.
+                    "Environment": {
+                        "Variables": {
+                            "SENTRY_DSN": "http://123@host.docker.internal:9999/0",
+                            "SENTRY_INITIAL_HANDLER": "index.handler",
+                            "SENTRY_TRACES_SAMPLE_RATE": "1.0",
+                        }
+                    },
                 },
-            },
-        )
+            )
+            print(f"- created function: {lambda_name} / {os.path.join(FUNCTIONS_DIR, lambda_dir)}")
+
 
     @classmethod
     def wait_for_stack(cls, timeout=30, port=SAM_PORT):
@@ -142,5 +154,5 @@ class SentryTestServer:
         server_thread.start()
 
     def clear_envelopes(self):
-        print("[SENTRY SERVER] Clear envelopes")
+        print("[SENTRY SERVER] Clearing envelopes")
         self.envelopes = []
