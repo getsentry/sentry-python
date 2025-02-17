@@ -4,24 +4,27 @@
 
 ### Various fixes & improvements
 
-- tests(httplib): Fix flakey https test (#4057) by @Zylphrex
-- Revert "feat(tracing): Add `propagate_traces` deprecation warning (#3899)" (#4055) by @cmanallen
-- tests: Generate tox entries for grpc via script (#3979) by @sentrivana
-- tests: Generate some of the Web 2 tox entries by toxgen (#3981) by @sentrivana
-- tests: Generate part of the Tasks tox entries by a script (#3976) by @sentrivana
-- tests: Generate some of the AI tox entries by toxgen (#3977) by @sentrivana
-- tests: Generate some of the Web 1 tox entries with toxgen (#3980) by @sentrivana
-- tests: Generate DB group by toxgen script  (#3978) by @sentrivana
-- Generate Misc tox entries via toxgen script (#3982) by @sentrivana
-- tests: Generate Flags tox entries with toxgen script (#3974) by @sentrivana
-- tests: Remove toxgen cutoff, add statsig (#4048) by @sentrivana
-- Fix clickhouse test (#4053) by @sentrivana
-- tests(profiling): Reduce continuous profiling test flakiness (#4052) by @Zylphrex
-- feat(profiling): Continuous profiling lifecycle (#4017) by @Zylphrex
-- feat(flags): add Statsig integration (#4022) by @aliu39
-- Update changelog with `profile_session_sample_rate` (#4046) by @sentrivana
-- Move the GraphQL group over to the tox gen script (#3975) by @sentrivana
+- **New integration:** Add [Statsig](https://statsig.com/) integration (#4022) by @aliu39
+
+  For more information, see the documentation for the [TyperIntegration](https://docs.sentry.io/platforms/python/integrations/statsig/).
+
+- Profiling: Continuous profiling lifecycle (#4017) by @Zylphrex
+- Fix: Revert "feat(tracing): Add `propagate_traces` deprecation warning (#3899)" (#4055) by @cmanallen
+- Tests: Generate Web 1 group tox entries by toxgen script (#3980) by @sentrivana
+- Tests: Generate Web 2 group tox entries by toxgen script (#3981) by @sentrivana
+- Tests: Generate Tasks group tox entries by toxgen script (#3976) by @sentrivana
+- Tests: Generate AI group tox entries by toxgen script (#3977) by @sentrivana
+- Tests: Generate DB group tox entries by toxgen script (#3978) by @sentrivana
+- Tests: Generate Misc group tox entries by toxgen script (#3982) by @sentrivana
+- Tests: Generate Flags group tox entries by toxgen script (#3974) by @sentrivana
+- Tests: Generate gRPC tox entries by toxgen script (#3979) by @sentrivana
+- Tests: Remove toxgen cutoff, add statsig (#4048) by @sentrivana
+- Tests: Reduce continuous profiling test flakiness (#4052) by @Zylphrex
+- Tests: Fix Clickhouse test (#4053) by @sentrivana
+- Tests: Fix flaky HTTPS test (#4057) by @Zylphrex
 - Update sample rate in DSC (#4018) by @sentrivana
+- Move the GraphQL group over to the tox gen script (#3975) by @sentrivana
+- Update changelog with `profile_session_sample_rate` (#4046) by @sentrivana
 
 ## 2.21.0
 
