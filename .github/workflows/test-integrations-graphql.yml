@@ -22,64 +22,6 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-graphql-latest:
-    name: GraphQL (latest)
-    timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.8","3.12","3.13"]
-        os: [ubuntu-22.04]
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-      - name: Setup Test Env
-        run: |
-          pip install "coverage[toml]" tox
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test ariadne latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-ariadne-latest"
-      - name: Test gql latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gql-latest"
-      - name: Test graphene latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-graphene-latest"
-      - name: Test strawberry latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-strawberry-latest"
-      - name: Generate coverage XML
-        if: ${{ !cancelled() }}
-        run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugin: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
-          verbose: true
   test-graphql-pinned:
     name: GraphQL (pinned)
     timeout-minutes: 30
@@ -87,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7","3.8","3.11","3.12"]
+        python-version: ["3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
         os: [ubuntu-22.04]
     steps:
       - uses: actions/checkout@v4.2.2
@@ -124,7 +66,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.3.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.9","3.11","3.12","3.13"]
+        python-version: ["3.9","3.12","3.13"]
         os: [ubuntu-22.04]
     steps:
       - uses: actions/checkout@v4.2.2
@@ -62,7 +62,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.3.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -116,7 +116,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.3.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

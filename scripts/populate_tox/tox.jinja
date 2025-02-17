@@ -16,10 +16,10 @@ requires =
     virtualenv<20.26.3
 envlist =
     # === Common ===
-    {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common
+    {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common
 
     # === Gevent ===
-    {py3.6,py3.8,py3.10,py3.11,py3.12}-gevent
+    {py3.8,py3.10,py3.11,py3.12}-gevent
 
     # === Integrations ===
     # General format is {pythonversion}-{integrationname}-v{frameworkversion}
@@ -65,17 +65,17 @@ envlist =
     {py3.8,py3.11}-beam-latest
 
     # Boto3
-    {py3.6,py3.7}-boto3-v{1.12}
+    {py3.7}-boto3-v{1.12}
     {py3.7,py3.11,py3.12}-boto3-v{1.23}
     {py3.11,py3.12}-boto3-v{1.34}
     {py3.11,py3.12,py3.13}-boto3-latest
 
     # Chalice
-    {py3.6,py3.9}-chalice-v{1.16}
+    {py3.7,py3.9}-chalice-v{1.16}
     {py3.8,py3.12,py3.13}-chalice-latest
 
     # Cloud Resource Context
-    {py3.6,py3.12,py3.13}-cloud_resource_context
+    {py3.7,py3.12,py3.13}-cloud_resource_context
 
     # Cohere
     {py3.9,py3.11,py3.12}-cohere-v5
@@ -83,13 +83,13 @@ envlist =
 
     # Django
     # - Django 1.x
-    {py3.6,py3.7}-django-v{1.11}
+    {py3.7}-django-v{1.11}
     # - Django 2.x
-    {py3.6,py3.7}-django-v{2.0}
-    {py3.6,py3.9}-django-v{2.2}
+    {py3.7}-django-v{2.0}
+    {py3.7,py3.9}-django-v{2.2}
     # - Django 3.x
-    {py3.6,py3.9}-django-v{3.0}
-    {py3.6,py3.9,py3.11}-django-v{3.2}
+    {py3.7,py3.9}-django-v{3.0}
+    {py3.7,py3.9,py3.11}-django-v{3.2}
     # - Django 4.x
     {py3.8,py3.11,py3.12}-django-v{4.0,4.1,4.2}
     # - Django 5.x
@@ -104,8 +104,8 @@ envlist =
     {py3.7}-gcp
 
     # HTTPX
-    {py3.6,py3.9}-httpx-v{0.16,0.18}
-    {py3.6,py3.10}-httpx-v{0.20,0.22}
+    {py3.7,py3.9}-httpx-v{0.16,0.18}
+    {py3.7,py3.10}-httpx-v{0.20,0.22}
     {py3.7,py3.11,py3.12}-httpx-v{0.23,0.24}
     {py3.9,py3.11,py3.12}-httpx-v{0.25,0.27}
     {py3.9,py3.12,py3.13}-httpx-latest
@@ -136,7 +136,7 @@ envlist =
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
 
     # pure_eval
-    {py3.6,py3.12,py3.13}-pure_eval
+    {py3.7,py3.12,py3.13}-pure_eval
 
     # Quart
     {py3.7,py3.11}-quart-v{0.16}
@@ -148,24 +148,23 @@ envlist =
     {py3.10,py3.11}-ray-latest
 
     # Redis
-    {py3.6,py3.8}-redis-v{3}
+    {py3.7,py3.8}-redis-v{3}
     {py3.7,py3.8,py3.11}-redis-v{4}
     {py3.7,py3.11,py3.12}-redis-v{5}
     {py3.7,py3.12,py3.13}-redis-latest
 
     # Requests
-    {py3.6,py3.8,py3.12,py3.13}-requests
+    {py3.7,py3.8,py3.12,py3.13}-requests
 
     # RQ (Redis Queue)
-    {py3.6}-rq-v{0.6}
-    {py3.6,py3.9}-rq-v{0.13,1.0}
-    {py3.6,py3.11}-rq-v{1.5,1.10}
+    {py3.7,py3.9}-rq-v{0.13,1.0}
+    {py3.7,py3.11}-rq-v{1.5,1.10}
     {py3.7,py3.11,py3.12}-rq-v{1.15,1.16}
     {py3.7,py3.12,py3.13}-rq-latest
 
     # Sanic
-    {py3.6,py3.7}-sanic-v{0.8}
-    {py3.6,py3.8}-sanic-v{20}
+    {py3.7}-sanic-v{0.8}
+    {py3.8}-sanic-v{20}
     {py3.8,py3.11,py3.12}-sanic-v{24.6}
     {py3.9,py3.12,py3.13}-sanic-latest
 
@@ -200,16 +199,16 @@ deps =
     # See https://github.com/pytest-dev/pytest/issues/9621
     # and https://github.com/pytest-dev/pytest-forked/issues/67
     # for justification of the upper bound on pytest
-    {py3.6,py3.7}-common: pytest<7.0.0
+    py3.7-common: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common: pytest
 
     # === Gevent ===
-    {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11}-gevent: gevent>=22.10.0, <22.11.0
+    {py3.7,py3.8,py3.9,py3.10,py3.11}-gevent: gevent>=22.10.0, <22.11.0
     {py3.12}-gevent: gevent
     # See https://github.com/pytest-dev/pytest/issues/9621
     # and https://github.com/pytest-dev/pytest-forked/issues/67
     # for justification of the upper bound on pytest
-    {py3.6,py3.7}-gevent: pytest<7.0.0
+    py3.7-gevent: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
 
     # === Integrations ===
@@ -397,7 +396,7 @@ deps =
     # Redis
     redis: fakeredis!=1.7.4
     redis: pytest<8.0.0
-    {py3.6,py3.7}-redis: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    py3.7-redis: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
     {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-redis: pytest-asyncio
     redis-v3: redis~=3.0
     redis-v4: redis~=4.0
@@ -409,13 +408,11 @@ deps =
 
     # RQ (Redis Queue)
     # https://github.com/jamesls/fakeredis/issues/245
-    rq-v{0.6}: fakeredis<1.0
-    rq-v{0.6}: redis<3.2.2
     rq-v{0.13,1.0,1.5,1.10}: fakeredis>=1.0,<1.7.4
     rq-v{1.15,1.16}: fakeredis
-    {py3.6,py3.7}-rq-v{1.15,1.16}: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    py3.7-rq-v{1.15,1.16}: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
     rq-latest: fakeredis
-    {py3.6,py3.7}-rq-latest: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    py3.7-rq-latest: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
     rq-v0.6: rq~=0.6.0
     rq-v0.13: rq~=0.13.0
     rq-v1.0: rq~=1.0.0
@@ -430,7 +427,6 @@ deps =
     sanic: aiohttp
     sanic-v{24.6}: sanic_testing
     sanic-latest: sanic_testing
-    {py3.6}-sanic: aiocontextvars==0.2.1
     sanic-v0.8: sanic~=0.8.0
     sanic-v20: sanic~=20.0
     sanic-v24.6: sanic~=24.6.0
@@ -462,9 +458,9 @@ setenv =
     PYTHONDONTWRITEBYTECODE=1
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     COVERAGE_FILE=.coverage-sentry-{envname}
-    py3.6: COVERAGE_RCFILE=.coveragerc36
 
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
+    py3.12-django: PIP_CONSTRAINT=constraints.txt
 
     common: TESTPATH=tests
     gevent: TESTPATH=tests
@@ -542,7 +538,6 @@ extras =
     pymongo: pymongo
 
 basepython =
-    py3.6: python3.6
     py3.7: python3.7
     py3.8: python3.8
     py3.9: python3.9
