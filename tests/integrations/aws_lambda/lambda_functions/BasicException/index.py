@@ -1,4 +1,3 @@
-
 def handler(event, context):
     raise RuntimeError("Oh!")
 

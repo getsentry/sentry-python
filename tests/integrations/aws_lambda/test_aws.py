@@ -31,7 +31,6 @@ the temporary folders is printed when running a test.
 
 import base64
 import json
-import re
 from textwrap import dedent
 
 import pytest
@@ -215,7 +214,6 @@ def test_initialization_order(run_lambda_function):
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "Oh!"
-
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(

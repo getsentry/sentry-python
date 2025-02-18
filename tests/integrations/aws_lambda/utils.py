@@ -28,6 +28,7 @@ class LocalLambdaStack(Stack):
     """
     Uses the AWS CDK to create a local SAM stack containing Lambda functions.
     """
+
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         print("[LocalLambdaStack] Creating local SAM Lambda Stack: %s" % self)
@@ -112,7 +113,7 @@ class LocalLambdaStack(Stack):
 
             try:
                 # Try to connect to SAM
-                response = requests.get(f"http://127.0.0.1:{port}/")
+                response = requests.get(f"http://127.0.0.1:{port}/")  # noqa: E231
                 if response.status_code == 200 or response.status_code == 404:
                     return
 
@@ -137,12 +138,12 @@ class SentryServerForTesting:
             print("[SentryServerForTesting] Received envelope")
             try:
                 raw_body = await request.body()
-            except:
+            except Exception:
                 return {"status": "no body received"}
 
             try:
                 body = gzip.decompress(raw_body).decode("utf-8")
-            except:
+            except Exception:
                 # If decompression fails, assume it's plain text
                 body = raw_body.decode("utf-8")
 
