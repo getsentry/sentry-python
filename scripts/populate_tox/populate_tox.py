@@ -14,6 +14,7 @@ from importlib.metadata import metadata
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pathlib import Path
+from textwrap import dedent
 from typing import Optional, Union
 
 # Adding the scripts directory to PATH. This is necessary in order to be able
@@ -594,16 +595,27 @@ def main(fail_on_changes: bool = False) -> None:
         new_file_hash = get_file_hash()
         if old_file_hash != new_file_hash:
             raise RuntimeError(
-                "The yaml configuration files have changed. This means that either `tox.ini` "
-                "or one of the constants in `split_tox_gh_actions.py` has changed "
-                "but the changes have not been propagated to the GitHub actions config files. "
-                "Please run `python scripts/split_tox_gh_actions/split_tox_gh_actions.py` "
-                "locally and commit the changes of the yaml configuration files to continue. "
-            )
+                dedent(
+                    """
+                Detected an unexpected change in `tox.ini` that is not reflected
+                in `tox.jinja` and/or `populate_tox.py`.
 
-    print(
-        "Done generating tox.ini. Make sure to also update the CI YAML files to reflect the new test targets."
-    )
+                Please make sure to not make manual changes to `tox.ini`. The file
+                is generated from a template in `scripts/populate_tox/tox.jinja`
+                by the `scripts/populate_tox/populate_tox.py` script. Any changes
+                should be made to the template or the script directly and the
+                resulting `tox.ini` file should be generated with:
+
+                pip install -r scripts/populate_tox/requirements.txt
+                python scripts/populate_tox/populate_tox.py
+                """
+                )
+            )
+        print("Done checking tox.ini. Looking good!")
+    else:
+        print(
+            "Done generating tox.ini. Make sure to also update the CI YAML files to reflect the new test targets."
+        )
 
 
 if __name__ == "__main__":
