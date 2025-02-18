@@ -106,7 +106,9 @@ def fetch_release(package: str, version: Version) -> dict:
     return pypi_data.json()
 
 
-def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Version]:
+def _prefilter_releases(
+    integration: str, releases: dict[str, dict]
+) -> tuple[list[Version], Optional[Version]]:
     """
     Filter `releases`, removing releases that are for sure unsupported.
 
@@ -115,6 +117,10 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
     they require additional API calls to be made. The purpose of this function is
     to slim down the list so that we don't have to make more API calls than
     necessary for releases that are for sure not supported.
+
+    The function returns a tuple with:
+    - the list of prefiltered releases
+    - an optional prerelease if there is one that should be tested
     """
     min_supported = _MIN_VERSIONS.get(integration)
     if min_supported is not None:
@@ -125,6 +131,7 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
         )
 
     filtered_releases = []
+    last_prerelease = None
 
     for release, data in releases.items():
         if not data:
@@ -140,9 +147,14 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
         if min_supported and version < min_supported:
             continue
 
-        if version.is_prerelease or version.is_postrelease:
-            # TODO: consider the newest prerelease unless obsolete
-            # https://github.com/getsentry/sentry-python/issues/4030
+        if version.is_postrelease:
+            continue
+
+        # If we made it here, we want to consider this release.
+
+        if version.is_prerelease:
+            if last_prerelease is None or version > last_prerelease:
+                last_prerelease = version
             continue
 
         for i, saved_version in enumerate(filtered_releases):
@@ -157,22 +169,37 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
         else:
             filtered_releases.append(version)
 
-    return sorted(filtered_releases)
+    filtered_releases.sort()
+
+    # Check if the latest prerelease is relevant (i.e., it's for a version higher
+    # than the last released version); if not, don't consider it
+    if last_prerelease is not None and last_prerelease > filtered_releases[-1]:
+        return filtered_releases, last_prerelease
+
+    return filtered_releases, None
 
 
-def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
+def get_supported_releases(
+    integration: str, pypi_data: dict
+) -> tuple[list[Version], Optional[Version]]:
     """
     Get a list of releases that are currently supported by the SDK.
 
     This takes into account a handful of parameters (Python support, the lowest
     version we've defined for the framework, the date of the release).
+
+    We return the list of supported releases and optionally also the newest
+    prerelease, if it should be tested (meaning it's for a version higher than
+    the current stable version).
     """
     package = pypi_data["info"]["name"]
 
     # Get a consolidated list without taking into account Python support yet
     # (because that might require an additional API call for some
     # of the releases)
-    releases = _prefilter_releases(integration, pypi_data["releases"])
+    releases, latest_prerelease = _prefilter_releases(
+        integration, pypi_data["releases"]
+    )
 
     # Determine Python support
     expected_python_versions = TEST_SUITE_CONFIG[integration].get("python")
@@ -196,7 +223,7 @@ def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
             # version(s) that we do, cut off the rest
             releases = releases[i:]
 
-    return releases
+    return releases, latest_prerelease
 
 
 def pick_releases_to_test(releases: list[Version]) -> list[Version]:
@@ -480,7 +507,7 @@ def main() -> None:
             pypi_data = fetch_package(package)
 
             # Get the list of all supported releases
-            releases = get_supported_releases(integration, pypi_data)
+            releases, latest_prerelease = get_supported_releases(integration, pypi_data)
             if not releases:
                 print("  Found no supported releases.")
                 continue
