@@ -3,11 +3,13 @@ This script populates tox.ini automatically using release data from PyPI.
 """
 
 import functools
+import hashlib
 import os
 import sys
 import time
 from bisect import bisect_left
 from collections import defaultdict
+from datetime import datetime, timezone
 from importlib.metadata import metadata
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
@@ -106,7 +108,9 @@ def fetch_release(package: str, version: Version) -> dict:
     return pypi_data.json()
 
 
-def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Version]:
+def _prefilter_releases(
+    integration: str, releases: dict[str, dict], older_than: Optional[datetime] = None
+) -> list[Version]:
     """
     Filter `releases`, removing releases that are for sure unsupported.
 
@@ -135,6 +139,10 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
         if meta["yanked"]:
             continue
 
+        if older_than is not None:
+            if datetime.fromisoformat(meta["upload_time_iso_8601"]) > older_than:
+                continue
+
         version = Version(release)
 
         if min_supported and version < min_supported:
@@ -160,19 +168,24 @@ def _prefilter_releases(integration: str, releases: dict[str, dict]) -> list[Ver
     return sorted(filtered_releases)
 
 
-def get_supported_releases(integration: str, pypi_data: dict) -> list[Version]:
+def get_supported_releases(
+    integration: str, pypi_data: dict, older_than: Optional[datetime] = None
+) -> list[Version]:
     """
     Get a list of releases that are currently supported by the SDK.
 
     This takes into account a handful of parameters (Python support, the lowest
     version we've defined for the framework, the date of the release).
+
+    If an `older_than` timestamp is provided, no release newer than that will be
+    considered.
     """
     package = pypi_data["info"]["name"]
 
     # Get a consolidated list without taking into account Python support yet
     # (because that might require an additional API call for some
     # of the releases)
-    releases = _prefilter_releases(integration, pypi_data["releases"])
+    releases = _prefilter_releases(integration, pypi_data["releases"], older_than)
 
     # Determine Python support
     expected_python_versions = TEST_SUITE_CONFIG[integration].get("python")
@@ -381,7 +394,9 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
     return rendered
 
 
-def write_tox_file(packages: dict) -> None:
+def write_tox_file(
+    packages: dict, update_timestamp: bool, last_updated: datetime
+) -> None:
     template = ENV.get_template("tox.jinja")
 
     context = {"groups": {}}
@@ -399,6 +414,11 @@ def write_tox_file(packages: dict) -> None:
                     ),
                 }
             )
+
+    if update_timestamp:
+        context["updated"] = datetime.now(tz=timezone.utc).isoformat()
+    else:
+        context["updated"] = last_updated.isoformat()
 
     rendered = template.render(context)
 
@@ -453,7 +473,52 @@ def _add_python_versions_to_release(
     release.rendered_python_versions = _render_python_versions(release.python_versions)
 
 
-def main() -> None:
+def get_file_hash() -> str:
+    """Calculate a hash of the tox.ini file."""
+    hasher = hashlib.md5()
+
+    with open(TOX_FILE, "rb") as f:
+        buf = f.read()
+        hasher.update(buf)
+
+    return hasher.hexdigest()
+
+
+def get_last_updated() -> Optional[datetime]:
+    timestamp = None
+
+    with open(TOX_FILE, "r") as f:
+        for line in f:
+            if line.startswith("# Last generated:"):
+                timestamp = datetime.fromisoformat(line.strip().split[-1])
+                break
+
+    if timestamp is None:
+        print(
+            "Failed to find out when tox.ini was last generated; the timestamp seems to be missing from the file."
+        )
+
+    return timestamp
+
+
+def main(fail_on_changes: bool = False) -> None:
+    """
+    Generate tox.ini from the tox.jinja template.
+
+    The script has two modes of operation:
+    - check mode (if `fail_on_changes` is True)
+    - normal mode (if `fail_on_changes` is False)
+
+    Check mode is run on every PR to make sure that `tox.ini`, `tox.jinja` and
+    this script don't go out of sync because of manual changes in one place but
+    not the other.
+
+    Normal mode is meant to be run as a cron job, regenerating tox.ini and
+    proposing the changes via a PR.
+    """
+    mode = "check" if fail_on_changes else "normal"
+    print(f"Running in {mode} mode.")
+
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
     sdk_python_versions = _parse_python_versions_from_classifiers(
         metadata("sentry-sdk").get_all("Classifier")
@@ -463,6 +528,12 @@ def main() -> None:
     print(
         f"The SDK supports Python versions {MIN_PYTHON_VERSION} - {MAX_PYTHON_VERSION}."
     )
+
+    # If this script is run in check mode (fail_on_changes is True), we need to
+    # make the script ignore any new releases after the `last_updated` timestamp
+    # so that we don't fail CI on a PR just because a new package version was
+    # released, leading to unrelated changes in tox.ini.
+    last_updated = get_last_updated()
 
     packages = defaultdict(list)
 
@@ -480,7 +551,9 @@ def main() -> None:
             pypi_data = fetch_package(package)
 
             # Get the list of all supported releases
-            releases = get_supported_releases(integration, pypi_data)
+            # If in check mode, ignore releases newer than `last_updated`
+            older_than = last_updated if fail_on_changes else None
+            releases = get_supported_releases(integration, pypi_data, older_than)
             if not releases:
                 print("  Found no supported releases.")
                 continue
@@ -510,8 +583,29 @@ def main() -> None:
                     }
                 )
 
-    write_tox_file(packages)
+    if fail_on_changes:
+        old_file_hash = get_file_hash()
+
+    write_tox_file(
+        packages, update_timestamp=not fail_on_changes, last_updated=last_updated
+    )
+
+    if fail_on_changes:
+        new_file_hash = get_file_hash()
+        if old_file_hash != new_file_hash:
+            raise RuntimeError(
+                "The yaml configuration files have changed. This means that either `tox.ini` "
+                "or one of the constants in `split_tox_gh_actions.py` has changed "
+                "but the changes have not been propagated to the GitHub actions config files. "
+                "Please run `python scripts/split_tox_gh_actions/split_tox_gh_actions.py` "
+                "locally and commit the changes of the yaml configuration files to continue. "
+            )
+
+    print(
+        "Done generating tox.ini. Make sure to also update the CI YAML files to reflect the new test targets."
+    )
 
 
 if __name__ == "__main__":
-    main()
+    fail_on_changes = len(sys.argv) == 2 and sys.argv[1] == "--fail-on-changes"
+    main(fail_on_changes)
