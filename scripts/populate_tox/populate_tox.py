@@ -226,11 +226,15 @@ def get_supported_releases(
     return releases, latest_prerelease
 
 
-def pick_releases_to_test(releases: list[Version]) -> list[Version]:
+def pick_releases_to_test(
+    releases: list[Version], last_prerelease: Optional[Version]
+) -> list[Version]:
     """Pick a handful of releases to test from a sorted list of supported releases."""
     # If the package has majors (or major-like releases, even if they don't do
     # semver), we want to make sure we're testing them all. If not, we just pick
     # the oldest, the newest, and a couple in between.
+    #
+    # If there is a relevant prerelease, also test that in addition to the above.
     has_majors = len(set([v.major for v in releases])) > 1
     filtered_releases = set()
 
@@ -265,7 +269,11 @@ def pick_releases_to_test(releases: list[Version]) -> list[Version]:
             releases[-1],  # latest
         }
 
-    return sorted(filtered_releases)
+    filtered_releases = sorted(filtered_releases)
+    if last_prerelease is not None:
+        filtered_releases.append(last_prerelease)
+
+    return filtered_releases
 
 
 def supported_python_versions(
@@ -517,9 +525,7 @@ def main() -> None:
             # Pick a handful of the supported releases to actually test against
             # and fetch the PyPI data for each to determine which Python versions
             # to test it on
-            test_releases = pick_releases_to_test(releases)
-            if latest_prerelease is not None:
-                test_releases.append(latest_prerelease)
+            test_releases = pick_releases_to_test(releases, latest_prerelease)
 
             for release in test_releases:
                 _add_python_versions_to_release(integration, package, release)
