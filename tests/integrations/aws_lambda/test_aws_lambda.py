@@ -174,3 +174,16 @@ def test_basic_exception(lambda_client, test_environment):
         "origin": "auto.function.aws_lambda",
         "data": mock.ANY,
     }
+
+
+def test_init_error(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="InitError",
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (error_event, transaction_event) = envelopes
+
+    assert error_event["exception"]["values"][0]["value"] == "name 'func' is not defined"
+    assert transaction_event["transaction"] == "InitError"
