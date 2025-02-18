@@ -318,3 +318,129 @@ def test_non_dict_event(
         assert error_event["tags"]["batch_request"] is True
         assert transaction_event["tags"]["batch_size"] == batch_size
         assert transaction_event["tags"]["batch_request"] is True
+
+
+def test_request_data(lambda_client, test_environment):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "User-Agent": "custom",
+            "X-Forwarded-Proto": "https"
+          },
+          "queryStringParameters": {
+            "bonkers": "true"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOk",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"] == {
+        "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "User-Agent": "custom",
+            "X-Forwarded-Proto": "https",
+        },
+        "method": "GET",
+        "query_string": {"bonkers": "true"},
+        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+    }
+
+
+def test_trace_continuation(lambda_client, test_environment):
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    # We simulate here AWS Api Gateway's behavior of passing HTTP headers
+    # as the `headers` dict in the event passed to the Lambda function.
+    payload = {
+        "headers": {
+            "sentry-trace": sentry_trace_header,
+        }
+    }
+
+    lambda_client.invoke(
+        FunctionName="BasicException",
+        Payload=json.dumps(payload),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (error_event, transaction_event) = envelopes
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"headers": None},
+        {"headers": ""},
+        {"headers": {}},
+        {"headers": []},  # EventBridge sends an empty list
+    ],
+    ids=[
+        "no headers",
+        "none headers",
+        "empty string headers",
+        "empty dict headers",
+        "empty list headers",
+    ],
+)
+def test_headers(lambda_client, test_environment, payload):
+    lambda_client.invoke(
+        FunctionName="BasicException",
+        Payload=json.dumps(payload),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (error_event, _) = envelopes
+
+    assert error_event["level"] == "error"
+    assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
+    assert error_event["exception"]["values"][0]["value"] == "Oh!"
+
+
+def test_span_origin(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOk",
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert (
+        transaction_event["contexts"]["trace"]["origin"] == "auto.function.aws_lambda"
+    )
+
+
+def test_init_sentry_manually():
+    # todo
+    pass
