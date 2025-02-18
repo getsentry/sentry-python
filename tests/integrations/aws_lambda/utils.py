@@ -25,6 +25,9 @@ PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 
 
 class LocalLambdaStack(Stack):
+    """
+    Uses the AWS CDK to create a local SAM stack containing Lambda functions.
+    """
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         print("[LocalLambdaStack] Creating local SAM Lambda Stack: %s" % self)
@@ -56,7 +59,8 @@ class LocalLambdaStack(Stack):
         )
 
         print(
-            "[LocalLambdaStack] Add all Lambda functions defined in /tests/integrations/aws_lambda/lambda_functions/ to the SAM stack"
+            "[LocalLambdaStack] Add all Lambda functions defined in "
+            "/tests/integrations/aws_lambda/lambda_functions/ to the SAM stack"
         )
         lambda_dirs = [
             d
