@@ -515,9 +515,11 @@ def main() -> None:
             _compare_min_version_with_defined(integration, releases)
 
             # Pick a handful of the supported releases to actually test against
-            # and fetch the PYPI data for each to determine which Python versions
+            # and fetch the PyPI data for each to determine which Python versions
             # to test it on
             test_releases = pick_releases_to_test(releases)
+            if latest_prerelease is not None:
+                test_releases.append(latest_prerelease)
 
             for release in test_releases:
                 _add_python_versions_to_release(integration, package, release)
