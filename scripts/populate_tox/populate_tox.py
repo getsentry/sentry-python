@@ -490,7 +490,7 @@ def get_last_updated() -> Optional[datetime]:
     with open(TOX_FILE, "r") as f:
         for line in f:
             if line.startswith("# Last generated:"):
-                timestamp = datetime.fromisoformat(line.strip().split[-1])
+                timestamp = datetime.fromisoformat(line.strip().split()[-1])
                 break
 
     if timestamp is None:
