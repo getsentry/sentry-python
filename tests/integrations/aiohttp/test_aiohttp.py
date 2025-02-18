@@ -636,7 +636,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
 
         assert (
             resp.request_info.headers["baggage"]
-            == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
+            == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-sample_rand=0.3015579701611357,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
         )
 
 
