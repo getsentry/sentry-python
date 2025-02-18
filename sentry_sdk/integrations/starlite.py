@@ -140,6 +140,7 @@ def enable_span_for_middleware(middleware):
             op=OP.MIDDLEWARE_STARLITE,
             name=middleware_name,
             origin=StarliteIntegration.origin,
+            only_if_parent=True,
         ) as middleware_span:
             middleware_span.set_tag("starlite.middleware_name", middleware_name)
 
@@ -152,6 +153,7 @@ def enable_span_for_middleware(middleware):
                     op=OP.MIDDLEWARE_STARLITE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
                     origin=StarliteIntegration.origin,
+                    only_if_parent=True,
                 ) as span:
                     span.set_tag("starlite.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -169,6 +171,7 @@ def enable_span_for_middleware(middleware):
                     op=OP.MIDDLEWARE_STARLITE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
                     origin=StarliteIntegration.origin,
+                    only_if_parent=True,
                 ) as span:
                     span.set_tag("starlite.middleware_name", middleware_name)
                     return await send(message)

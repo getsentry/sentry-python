@@ -650,8 +650,8 @@ def install_sql_hook():
             _set_db_data(span, self)
             result = real_execute(self, sql, params)
 
-        with capture_internal_exceptions():
-            add_query_source(span)
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return result
 
@@ -670,8 +670,8 @@ def install_sql_hook():
 
             result = real_executemany(self, sql, param_list)
 
-        with capture_internal_exceptions():
-            add_query_source(span)
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return result
 
@@ -685,6 +685,7 @@ def install_sql_hook():
             op=OP.DB,
             name="connect",
             origin=DjangoIntegration.origin_db,
+            only_if_parent=True,
         ) as span:
             _set_db_data(span, self)
             return real_connect(self)

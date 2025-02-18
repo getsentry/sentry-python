@@ -30,8 +30,8 @@ def test_dsc_head_of_trace(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    # We start a new transaction
-    with sentry_sdk.start_transaction(name="foo"):
+    # We start a new root_span
+    with sentry_sdk.start_span(name="foo"):
         pass
 
     assert len(envelopes) == 1
@@ -98,10 +98,10 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
         "HTTP_BAGGAGE": baggage,
     }
 
-    # We continue the incoming trace and start a new transaction
-    transaction = sentry_sdk.continue_trace(incoming_http_headers)
-    with sentry_sdk.start_transaction(transaction, name="foo"):
-        pass
+    # We continue the incoming trace and start a new root span
+    with sentry_sdk.continue_trace(incoming_http_headers):
+        with sentry_sdk.start_span(name="foo"):
+            pass
 
     assert len(envelopes) == 1
 
@@ -177,9 +177,9 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
 
     # We continue the incoming trace and start a new transaction
     with mock.patch.object(random, "random", return_value=0.2):
-        transaction = sentry_sdk.continue_trace(incoming_http_headers)
-        with sentry_sdk.start_transaction(transaction, name="foo"):
-            pass
+        with sentry_sdk.continue_trace(incoming_http_headers):
+            with sentry_sdk.start_span(name="foo"):
+                pass
 
     assert len(envelopes) == 1
 
@@ -226,7 +226,7 @@ def test_dsc_issue(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    # No transaction is started, just an error is captured
+    # No root span is started, just an error is captured
     try:
         1 / 0
     except ZeroDivisionError as exp:
@@ -262,8 +262,8 @@ def test_dsc_issue(sentry_init, capture_envelopes):
 
 def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     """
-    Our service has tracing enabled and an error occurs in an transaction.
-    Envelopes containing errors also have the same DSC than the transaction envelopes.
+    Our service has tracing enabled and an error occurs in an root span.
+    Envelopes containing errors also have the same DSC than the root span envelopes.
     """
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
@@ -273,8 +273,8 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    # We start a new transaction and an error occurs
-    with sentry_sdk.start_transaction(name="foo"):
+    # We start a new root span and an error occurs
+    with sentry_sdk.start_span(name="foo"):
         try:
             1 / 0
         except ZeroDivisionError as exp:
@@ -320,7 +320,7 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     "traces_sample_rate",
     [
         0,  # no traces will be started, but if incoming traces will be continued (by our instrumentations, not happening in this test)
-        None,  # no tracing at all. This service will never create transactions.
+        None,  # no tracing at all. This service will never create root spans.
     ],
 )
 def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
@@ -359,14 +359,14 @@ def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
     }
 
     # We continue the trace (meaning: saving the incoming trace information on the scope)
-    # but in this test, we do not start a transaction.
-    sentry_sdk.continue_trace(incoming_http_headers)
+    # but in this test, we do not start a root span.
+    with sentry_sdk.continue_trace(incoming_http_headers):
 
-    # No transaction is started, just an error is captured
-    try:
-        1 / 0
-    except ZeroDivisionError as exp:
-        sentry_sdk.capture_exception(exp)
+        # No root span is started, just an error is captured
+        try:
+            1 / 0
+        except ZeroDivisionError as exp:
+            sentry_sdk.capture_exception(exp)
 
     assert len(envelopes) == 1
 
