@@ -44,7 +44,8 @@ jobs:
         with:
           python-version: 3.12
 
-      - run: |
+      - name: Detect unexpected changes to tox.ini or CI
+        run: |
           pip install -e .
           pip install -r scripts/populate_tox/requirements.txt
           python scripts/populate_tox/populate_tox.py --fail-on-changes
