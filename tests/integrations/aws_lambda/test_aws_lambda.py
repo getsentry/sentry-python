@@ -2,6 +2,7 @@ import boto3
 import json
 import pytest
 import subprocess
+import tempfile
 import time
 import yaml
 
@@ -30,17 +31,23 @@ def test_environment():
     with open(SAM_TEMPLATE_FILE, "w") as f:
         yaml.dump(template, f)
 
+    debug_log_file = tempfile.gettempdir() + "/sentry_aws_lambda_tests_sam_debug.log"
+    debug_log = open(debug_log_file, "w")
+    print(f"Writing SAM debug log to: {debug_log_file}")
+
     # Start SAM local
     process = subprocess.Popen(
         [
             "sam",
             "local",
             "start-lambda",
+            "--debug",
             "--template",
             SAM_TEMPLATE_FILE,
+            "--warm-containers", "EAGER",
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=debug_log,
+        stderr=debug_log,
         text=True,  # This makes stdout/stderr return strings instead of bytes
     )
 
@@ -88,7 +95,7 @@ def lambda_client():
 
 # def test_basic_ok(lambda_client, test_environment):
 #     response = lambda_client.invoke(
-#         FunctionName="BasicOk", 
+#         FunctionName="BasicOk",
 #         Payload=json.dumps({"name": "Ivana"}),
 #     )
 #     result = json.loads(response["Payload"].read().decode())
@@ -102,27 +109,25 @@ def lambda_client():
 
 
 def test_xxx(lambda_client, test_environment):
-    for x in range(20):   
+    for x in range(20):
         test_environment["server"].clear_envelopes()
         print(f"*** BasicException {x} ***")
         response = lambda_client.invoke(
-            FunctionName="BasicException", 
+            FunctionName="BasicException",
             Payload=json.dumps({}),
         )
         print("- RESPONSE")
         print(response)
         print("- PAYLOAD")
         print(response["Payload"].read().decode())
-        print(f'- ENVELOPES {len(test_environment["server"].envelopes)}')
-
-
-
-    assert False
+        num_envelopes = len(test_environment["server"].envelopes)
+        print(f'- ENVELOPES {num_envelopes}')
+        assert num_envelopes == 2
 
 
 # def test_basic(lambda_client, test_environment):
 #     response = lambda_client.invoke(
-#         FunctionName="BasicException", 
+#         FunctionName="BasicException",
 #         Payload=json.dumps({"name": "Neel"}),
 #     )
 #     print("RESPONSE")

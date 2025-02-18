@@ -17,6 +17,7 @@ from scripts.build_aws_lambda_layer import build_packaged_zip, DIST_PATH
 
 
 SAM_PORT = 3001
+FUNCTIONS_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
 
 
 class DummyLambdaStack(Stack):
@@ -29,13 +30,14 @@ class DummyLambdaStack(Stack):
         self.template_options.template_format_version = "2010-09-09"
         self.template_options.transforms = ["AWS::Serverless-2016-10-31"]
 
-        # Create Sentry Lambda layer to the SAM stack
+        print("- Create Sentry Lambda layer package")
         filename = "sentry-sdk-lambda-layer.zip"
         build_packaged_zip(
             make_dist=True,
             out_zip_filename=filename,
         )
 
+        print("- Add Sentry Lambda layer containing the Sentry SDK to the SAM stack")
         self.sentry_layer = CfnResource(
             self,
             "SentryPythonServerlessSDK",
@@ -54,10 +56,9 @@ class DummyLambdaStack(Stack):
             },
         )
 
-        # Add all lambda functions from /tests/integrations/aws_lambda/lambda_functions/ to the SAM stack
-        FUNCTIONS_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
+        print("- Add all Lambda functions defined in /tests/integrations/aws_lambda/lambda_functions/ to the SAM stack")
         lambda_dirs = [
-            d for d in os.listdir(FUNCTIONS_DIR) 
+            d for d in os.listdir(FUNCTIONS_DIR)
             if os.path.isdir(os.path.join(FUNCTIONS_DIR, d))
         ]
         for lambda_dir in lambda_dirs:
@@ -71,6 +72,7 @@ class DummyLambdaStack(Stack):
                     "CodeUri": os.path.join(FUNCTIONS_DIR, lambda_dir),
                     "Handler": "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
                     "Runtime": "python3.12",
+                    "Timeout": 15,
                     "Layers": [{"Ref": self.sentry_layer.logical_id}],  # Add layer containing the Sentry SDK to function.
                     "Environment": {
                         "Variables": {
@@ -81,7 +83,7 @@ class DummyLambdaStack(Stack):
                     },
                 },
             )
-            print(f"- created function: {lambda_name} / {os.path.join(FUNCTIONS_DIR, lambda_dir)}")
+            print(f"  - Created Lambda function: {lambda_name} / {os.path.join(FUNCTIONS_DIR, lambda_dir)}")
 
 
     @classmethod
@@ -93,7 +95,7 @@ class DummyLambdaStack(Stack):
         while True:
             if time.time() - start_time > timeout:
                 raise TimeoutError(
-                    "SAM failed to start within {} seconds".format(timeout)
+                    "SAM failed to start within {} seconds. (Maybe Docker is not running?)".format(timeout)
                 )
 
             try:
