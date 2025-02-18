@@ -10,7 +10,7 @@ from unittest import mock
 
 from aws_cdk import App
 
-from .utils import DummyLambdaStack, SentryTestServer, SAM_PORT
+from .utils import LocalLambdaStack, SentryServerForTesting, SAM_PORT
 
 
 SAM_TEMPLATE_FILE = "sam.template.yaml"
@@ -18,25 +18,26 @@ SAM_TEMPLATE_FILE = "sam.template.yaml"
 
 @pytest.fixture(scope="session", autouse=True)
 def test_environment():
-    print("Setting up AWS Lambda test infrastructure")
+    print("[test_environment fixture] Setting up AWS Lambda test infrastructure")
 
-    # Setup dummy relay to capture envelopes
-    server = SentryTestServer()
+    # Start Sentry server
+    server = SentryServerForTesting()
     server.start()
     time.sleep(1)  # Give it a moment to start up
 
-    # Create the SAM stack
+    # Create local AWS SAM stack
     app = App()
-    stack = DummyLambdaStack(app, "DummyLambdaStack")
+    stack = LocalLambdaStack(app, "LocalLambdaStack")
 
-    # Write template to file
-    template = app.synth().get_stack_by_name("DummyLambdaStack").template
+    # Write SAM template to file
+    template = app.synth().get_stack_by_name("LocalLambdaStack").template
     with open(SAM_TEMPLATE_FILE, "w") as f:
         yaml.dump(template, f)
 
+    # Write SAM debug log to file
     debug_log_file = tempfile.gettempdir() + "/sentry_aws_lambda_tests_sam_debug.log"
     debug_log = open(debug_log_file, "w")
-    print(f"Writing SAM debug log to: {debug_log_file}")
+    print("[test_environment fixture] Writing SAM debug log to: %s" % debug_log_file)
 
     # Start SAM local
     process = subprocess.Popen(
@@ -57,7 +58,7 @@ def test_environment():
 
     try:
         # Wait for SAM to be ready
-        DummyLambdaStack.wait_for_stack()
+        LocalLambdaStack.wait_for_stack()
 
         def before_test():
             server.clear_envelopes()
@@ -65,11 +66,11 @@ def test_environment():
         yield {
             "stack": stack,
             "server": server,
-            "before_test": before_test,  # Add this function to the yielded dict
+            "before_test": before_test,
         }
 
     finally:
-        print("Tearing down AWS Lambda test infrastructure")
+        print("[test_environment fixture] Tearing down AWS Lambda test infrastructure")
 
         process.terminate()
         process.wait(timeout=5)  # Give it time to shut down gracefully
@@ -439,8 +440,3 @@ def test_span_origin(lambda_client, test_environment):
     assert (
         transaction_event["contexts"]["trace"]["origin"] == "auto.function.aws_lambda"
     )
-
-
-def test_init_sentry_manually():
-    # todo
-    pass
