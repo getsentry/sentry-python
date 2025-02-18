@@ -135,7 +135,7 @@ def test_basic_no_exception(lambda_client, test_environment):
     }
 
 
-def test_BasicException(lambda_client, test_environment):
+def test_basic_exception(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="BasicException",
         Payload=json.dumps({}),
@@ -185,7 +185,9 @@ def test_init_error(lambda_client, test_environment):
 
     (error_event, transaction_event) = envelopes
 
-    assert error_event["exception"]["values"][0]["value"] == "name 'func' is not defined"
+    assert (
+        error_event["exception"]["values"][0]["value"] == "name 'func' is not defined"
+    )
     assert transaction_event["transaction"] == "InitError"
 
 
@@ -196,7 +198,7 @@ def test_timeout_error(lambda_client, test_environment):
     )
     envelopes = test_environment["server"].envelopes
 
-    (error_event, ) = envelopes
+    (error_event,) = envelopes
 
     assert error_event["level"] == "error"
     assert error_event["extra"]["lambda"]["function_name"] == "TimeoutError"
@@ -204,5 +206,115 @@ def test_timeout_error(lambda_client, test_environment):
     (exception,) = error_event["exception"]["values"]
     assert not exception["mechanism"]["handled"]
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert exception["value"].startswith("WARNING : Function is expected to get timed out. Configured timeout duration =")
+    assert exception["value"].startswith(
+        "WARNING : Function is expected to get timed out. Configured timeout duration ="
+    )
     assert exception["mechanism"]["type"] == "threading"
+
+
+@pytest.mark.parametrize(
+    "aws_event, has_request_data, batch_size",
+    [
+        (b"1231", False, 1),
+        (b"11.21", False, 1),
+        (b'"Good dog!"', False, 1),
+        (b"true", False, 1),
+        (
+            b"""
+            [
+                {"good dog": "Maisey"},
+                {"good dog": "Charlie"},
+                {"good dog": "Cory"},
+                {"good dog": "Bodhi"}
+            ]
+            """,
+            False,
+            4,
+        ),
+        (
+            b"""
+            [
+                {
+                    "headers": {
+                        "Host": "x1.io",
+                        "X-Forwarded-Proto": "https"
+                    },
+                    "httpMethod": "GET",
+                    "path": "/1",
+                    "queryStringParameters": {
+                        "done": "f"
+                    },
+                    "d": "D1"
+                },
+                {
+                    "headers": {
+                        "Host": "x2.io",
+                        "X-Forwarded-Proto": "http"
+                    },
+                    "httpMethod": "POST",
+                    "path": "/2",
+                    "queryStringParameters": {
+                        "done": "t"
+                    },
+                    "d": "D2"
+                }
+            ]
+            """,
+            True,
+            2,
+        ),
+        (b"[]", False, 1),
+    ],
+    ids=[
+        "event as integer",
+        "event as float",
+        "event as string",
+        "event as bool",
+        "event as list of dicts",
+        "event as dict",
+        "event as empty list",
+    ],
+)
+def test_non_dict_event(
+    lambda_client, test_environment, aws_event, has_request_data, batch_size
+):
+    lambda_client.invoke(
+        FunctionName="BasicException",
+        Payload=aws_event,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (error_event, transaction_event) = envelopes
+
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "BasicException"
+    assert transaction_event["sdk"]["name"] == "sentry.python.aws_lambda"
+    assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
+
+    assert error_event["level"] == "error"
+    assert error_event["transaction"] == "BasicException"
+    assert error_event["sdk"]["name"] == "sentry.python.aws_lambda"
+    assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
+    assert error_event["exception"]["values"][0]["value"] == "Oh!"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "aws_lambda"
+
+    if has_request_data:
+        request_data = {
+            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
+            "method": "GET",
+            "url": "https://x1.io/1",
+            "query_string": {
+                "done": "f",
+            },
+        }
+    else:
+        request_data = {"url": "awslambda:///BasicException"}
+
+    assert error_event["request"] == request_data
+    assert transaction_event["request"] == request_data
+
+    if batch_size > 1:
+        assert error_event["tags"]["batch_size"] == batch_size
+        assert error_event["tags"]["batch_request"] is True
+        assert transaction_event["tags"]["batch_size"] == batch_size
+        assert transaction_event["tags"]["batch_request"] is True
