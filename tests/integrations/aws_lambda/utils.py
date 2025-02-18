@@ -2,6 +2,7 @@ import gzip
 import json
 import os
 import requests
+import sys
 import time
 import threading
 
@@ -16,6 +17,7 @@ import uvicorn
 from scripts.build_aws_lambda_layer import build_packaged_zip, DIST_PATH
 
 
+PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 SAM_PORT = 3001
 FUNCTIONS_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
 
@@ -45,13 +47,7 @@ class DummyLambdaStack(Stack):
             properties={
                 "ContentUri": os.path.join(DIST_PATH, filename),
                 "CompatibleRuntimes": [
-                    "python3.7",
-                    "python3.8",
-                    "python3.9",
-                    "python3.10",
-                    "python3.11",
-                    "python3.12",
-                    "python3.13",
+                    PYTHON_VERSION,
                 ],
             },
         )
@@ -69,7 +65,7 @@ class DummyLambdaStack(Stack):
                 properties={
                     "CodeUri": os.path.join(FUNCTIONS_DIR, lambda_dir),
                     "Handler": "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
-                    "Runtime": "python3.12",
+                    "Runtime": PYTHON_VERSION,
                     "Timeout": 15,
                     "Layers": [{"Ref": self.sentry_layer.logical_id}],  # Add layer containing the Sentry SDK to function.
                     "Environment": {
