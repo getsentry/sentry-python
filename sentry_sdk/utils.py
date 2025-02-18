@@ -1888,3 +1888,12 @@ def should_be_treated_as_error(ty, value):
         return False
 
     return True
+
+
+def try_float(value):
+    # type: (Any) -> Optional[float]
+    """Small utility to convert a value to a float, if possible."""
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
