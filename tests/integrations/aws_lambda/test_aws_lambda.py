@@ -135,7 +135,7 @@ def test_basic_no_exception(lambda_client, test_environment):
     }
 
 
-def test_basic_exception(lambda_client, test_environment):
+def test_BasicException(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="BasicException",
         Payload=json.dumps({}),

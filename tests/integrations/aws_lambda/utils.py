@@ -62,11 +62,9 @@ class DummyLambdaStack(Stack):
             if os.path.isdir(os.path.join(FUNCTIONS_DIR, d))
         ]
         for lambda_dir in lambda_dirs:
-            lambda_name = "".join(word.capitalize() for word in lambda_dir.replace("_", " ").replace("-", " ").split())
-
             CfnResource(
                 self,
-                lambda_name,
+                lambda_dir,
                 type="AWS::Serverless::Function",
                 properties={
                     "CodeUri": os.path.join(FUNCTIONS_DIR, lambda_dir),
@@ -83,7 +81,7 @@ class DummyLambdaStack(Stack):
                     },
                 },
             )
-            print(f"  - Created Lambda function: {lambda_name} / {os.path.join(FUNCTIONS_DIR, lambda_dir)}")
+            print(f"  - Created Lambda function: {lambda_dir} ({os.path.join(FUNCTIONS_DIR, lambda_dir)})")
 
 
     @classmethod
