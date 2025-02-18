@@ -507,18 +507,25 @@ def main(fail_on_changes: bool = False) -> None:
     Generate tox.ini from the tox.jinja template.
 
     The script has two modes of operation:
-    - check mode (if `fail_on_changes` is True)
+    - fail on changes mode (if `fail_on_changes` is True)
     - normal mode (if `fail_on_changes` is False)
 
-    Check mode is run on every PR to make sure that `tox.ini`, `tox.jinja` and
-    this script don't go out of sync because of manual changes in one place but
-    not the other.
+    Fail on changes mode is run on every PR to make sure that `tox.ini`,
+    `tox.jinja` and this script don't go out of sync because of manual changes
+    in one place but not the other.
 
     Normal mode is meant to be run as a cron job, regenerating tox.ini and
     proposing the changes via a PR.
     """
-    mode = "check" if fail_on_changes else "normal"
-    print(f"Running in {mode} mode.")
+    print(f"Running in {'fail_on_changes' if fail_on_changes else 'normal'} mode.")
+    last_updated = get_last_updated()
+    if fail_on_changes:
+        # We need to make the script ignore any new releases after the `last_updated`
+        # timestamp so that we don't fail CI on a PR just because a new package
+        # version was released, leading to unrelated changes in tox.ini.
+        print(
+            f"Since we're in fail_on_changes mode, we're only considering releases before the last tox.ini update at {last_updated.isoformat()}."
+        )
 
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
     sdk_python_versions = _parse_python_versions_from_classifiers(
@@ -529,12 +536,6 @@ def main(fail_on_changes: bool = False) -> None:
     print(
         f"The SDK supports Python versions {MIN_PYTHON_VERSION} - {MAX_PYTHON_VERSION}."
     )
-
-    # If this script is run in check mode (fail_on_changes is True), we need to
-    # make the script ignore any new releases after the `last_updated` timestamp
-    # so that we don't fail CI on a PR just because a new package version was
-    # released, leading to unrelated changes in tox.ini.
-    last_updated = get_last_updated()
 
     packages = defaultdict(list)
 
