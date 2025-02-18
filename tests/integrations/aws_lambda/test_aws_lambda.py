@@ -6,9 +6,12 @@ import tempfile
 import time
 import yaml
 
+from unittest import mock
+
 from aws_cdk import App
 
 from .utils import DummyLambdaStack, SentryTestServer, SAM_PORT
+
 
 SAM_TEMPLATE_FILE = "sam.template.yaml"
 
@@ -44,7 +47,8 @@ def test_environment():
             "--debug",
             "--template",
             SAM_TEMPLATE_FILE,
-            "--warm-containers", "EAGER",
+            "--warm-containers",
+            "EAGER",
         ],
         stdout=debug_log,
         stderr=debug_log,
@@ -93,79 +97,80 @@ def lambda_client():
     )
 
 
-# def test_basic_ok(lambda_client, test_environment):
-#     response = lambda_client.invoke(
-#         FunctionName="BasicOk",
-#         Payload=json.dumps({"name": "Ivana"}),
-#     )
-#     result = json.loads(response["Payload"].read().decode())
-#     assert result == {"event": {"name": "Ivana"}}
+def test_basic_no_exception(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOk",
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
 
-#     envelopes = test_environment["server"].envelopes
-#     assert len(envelopes) == 1
+    (transaction_event,) = envelopes
 
-#     transaction = envelopes[0]
-#     assert transaction["type"] == "transaction"
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "BasicOk"
+    assert transaction_event["sdk"]["name"] == "sentry.python.aws_lambda"
+    assert transaction_event["tags"] == {"aws_region": "us-east-1"}
+
+    assert transaction_event["extra"]["cloudwatch logs"] == {
+        "log_group": mock.ANY,
+        "log_stream": mock.ANY,
+        "url": mock.ANY,
+    }
+    assert transaction_event["extra"]["lambda"] == {
+        "aws_request_id": mock.ANY,
+        "execution_duration_in_millis": mock.ANY,
+        "function_name": "BasicOk",
+        "function_version": "$LATEST",
+        "invoked_function_arn": "arn:aws:lambda:us-east-1:012345678912:function:BasicOk",
+        "remaining_time_in_millis": mock.ANY,
+    }
+    assert transaction_event["contexts"]["trace"] == {
+        "op": "function.aws",
+        "description": mock.ANY,
+        "span_id": mock.ANY,
+        "parent_span_id": mock.ANY,
+        "trace_id": mock.ANY,
+        "origin": "auto.function.aws_lambda",
+        "data": mock.ANY,
+    }
 
 
-def test_xxx(lambda_client, test_environment):
-    for x in range(20):
-        test_environment["server"].clear_envelopes()
-        print(f"*** BasicException {x} ***")
-        response = lambda_client.invoke(
-            FunctionName="BasicException",
-            Payload=json.dumps({}),
-        )
-        print("- RESPONSE")
-        print(response)
-        print("- PAYLOAD")
-        print(response["Payload"].read().decode())
-        num_envelopes = len(test_environment["server"].envelopes)
-        print(f'- ENVELOPES {num_envelopes}')
-        assert num_envelopes == 2
+def test_basic_exception(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicException",
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
 
+    # The second envelope we ignore.
+    # It is the transaction that we test in test_basic_no_exception.
+    (error_event, _) = envelopes
 
-# def test_basic(lambda_client, test_environment):
-#     response = lambda_client.invoke(
-#         FunctionName="BasicException",
-#         Payload=json.dumps({"name": "Neel"}),
-#     )
-#     print("RESPONSE")
-#     print(response)
-#     print("PAYLOAD")
-#     print(response["Payload"].read().decode())
-#     result = json.loads(response["Payload"].read().decode())
-#     print("RESULT")
-#     print(result)
+    assert error_event["level"] == "error"
+    assert error_event["exception"]["values"][0]["type"] == "RuntimeError"
+    assert error_event["exception"]["values"][0]["value"] == "Oh!"
+    assert error_event["sdk"]["name"] == "sentry.python.aws_lambda"
 
-#     envelopes = test_environment["server"].envelopes
-#     (error,) = envelopes
-
-#     assert error["level"] == "error"
-#     (exception,) = error["exception"]["values"]
-#     assert exception["type"] == "Exception"
-#     assert exception["value"] == "Oh!"
-
-#     (frame1,) = exception["stacktrace"]["frames"]
-#     assert frame1["filename"] == "test_lambda.py"
-#     assert frame1["abs_path"] == "/var/task/test_lambda.py"
-#     assert frame1["function"] == "test_handler"
-
-#     assert frame1["in_app"] is True
-
-#     assert exception["mechanism"]["type"] == "aws_lambda"
-#     assert not exception["mechanism"]["handled"]
-
-#     assert error["extra"]["lambda"]["function_name"].startswith("test_")
-
-#     logs_url = error["extra"]["cloudwatch logs"]["url"]
-#     assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region")
-#     assert not re.search("(=;|=$)", logs_url)
-#     assert error["extra"]["cloudwatch logs"]["log_group"].startswith(
-#         "/aws/lambda/test_"
-#     )
-
-#     log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
-#     log_stream = error["extra"]["cloudwatch logs"]["log_stream"]
-
-#     assert re.match(log_stream_re, log_stream)
+    assert error_event["tags"] == {"aws_region": "us-east-1"}
+    assert error_event["extra"]["cloudwatch logs"] == {
+        "log_group": mock.ANY,
+        "log_stream": mock.ANY,
+        "url": mock.ANY,
+    }
+    assert error_event["extra"]["lambda"] == {
+        "aws_request_id": mock.ANY,
+        "execution_duration_in_millis": mock.ANY,
+        "function_name": "BasicException",
+        "function_version": "$LATEST",
+        "invoked_function_arn": "arn:aws:lambda:us-east-1:012345678912:function:BasicException",
+        "remaining_time_in_millis": mock.ANY,
+    }
+    assert error_event["contexts"]["trace"] == {
+        "op": "function.aws",
+        "description": mock.ANY,
+        "span_id": mock.ANY,
+        "parent_span_id": mock.ANY,
+        "trace_id": mock.ANY,
+        "origin": "auto.function.aws_lambda",
+        "data": mock.ANY,
+    }
