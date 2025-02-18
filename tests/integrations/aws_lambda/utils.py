@@ -19,7 +19,8 @@ from scripts.build_aws_lambda_layer import build_packaged_zip, DIST_PATH
 
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 SAM_PORT = 3001
-FUNCTIONS_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
+LAMBDA_FUNCTION_TIMEOUT = 10
+LAMBDA_FUNCTION_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
 
 
 class DummyLambdaStack(Stack):
@@ -54,8 +55,8 @@ class DummyLambdaStack(Stack):
 
         print("- Add all Lambda functions defined in /tests/integrations/aws_lambda/lambda_functions/ to the SAM stack")
         lambda_dirs = [
-            d for d in os.listdir(FUNCTIONS_DIR)
-            if os.path.isdir(os.path.join(FUNCTIONS_DIR, d))
+            d for d in os.listdir(LAMBDA_FUNCTION_DIR)
+            if os.path.isdir(os.path.join(LAMBDA_FUNCTION_DIR, d))
         ]
         for lambda_dir in lambda_dirs:
             CfnResource(
@@ -63,10 +64,10 @@ class DummyLambdaStack(Stack):
                 lambda_dir,
                 type="AWS::Serverless::Function",
                 properties={
-                    "CodeUri": os.path.join(FUNCTIONS_DIR, lambda_dir),
+                    "CodeUri": os.path.join(LAMBDA_FUNCTION_DIR, lambda_dir),
                     "Handler": "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
                     "Runtime": PYTHON_VERSION,
-                    "Timeout": 15,
+                    "Timeout": LAMBDA_FUNCTION_TIMEOUT,
                     "Layers": [{"Ref": self.sentry_layer.logical_id}],  # Add layer containing the Sentry SDK to function.
                     "Environment": {
                         "Variables": {
@@ -77,7 +78,7 @@ class DummyLambdaStack(Stack):
                     },
                 },
             )
-            print(f"  - Created Lambda function: {lambda_dir} ({os.path.join(FUNCTIONS_DIR, lambda_dir)})")
+            print(f"  - Created Lambda function: {lambda_dir} ({os.path.join(LAMBDA_FUNCTION_DIR, lambda_dir)})")
 
 
     @classmethod

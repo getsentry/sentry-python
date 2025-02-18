@@ -187,3 +187,22 @@ def test_init_error(lambda_client, test_environment):
 
     assert error_event["exception"]["values"][0]["value"] == "name 'func' is not defined"
     assert transaction_event["transaction"] == "InitError"
+
+
+def test_timeout_error(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="TimeoutError",
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (error_event, ) = envelopes
+
+    assert error_event["level"] == "error"
+    assert error_event["extra"]["lambda"]["function_name"] == "TimeoutError"
+
+    (exception,) = error_event["exception"]["values"]
+    assert not exception["mechanism"]["handled"]
+    assert exception["type"] == "ServerlessTimeoutWarning"
+    assert exception["value"].startswith("WARNING : Function is expected to get timed out. Configured timeout duration =")
+    assert exception["mechanism"]["type"] == "threading"
