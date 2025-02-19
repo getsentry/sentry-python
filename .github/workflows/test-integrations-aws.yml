@@ -13,8 +13,6 @@ on:
   # this to run on forks with access to the secrets necessary to run the test suite.
   # Prefer to use `pull_request` when possible.
   pull_request:
-  # pull_request_target:
-  #   types: [labeled, opened, reopened, synchronize]
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
 concurrency:
