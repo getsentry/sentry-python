@@ -129,7 +129,7 @@ TEST_SUITE_CONFIG = {
             ],
         },
         "python": "<=3.11",
-        "ignore": "==2.*",  # the project ultimately renamed itself to litestar and these are not relevant as there will never be a stable 2.0 release
+        "ignore": "==2.*",  # these are not relevant as there will never be a stable 2.0 release (starlite continues as litestar)
     },
     "statsig": {
         "package": "statsig",
