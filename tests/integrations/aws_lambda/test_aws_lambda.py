@@ -1,6 +1,8 @@
 import boto3
 import docker
 import json
+import os
+import platform
 import pytest
 import socket
 import subprocess
@@ -15,7 +17,26 @@ from aws_cdk import App
 from .utils import LocalLambdaStack, SentryServerForTesting, SAM_PORT
 
 
+DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
+
+
+def _get_host_ip():
+    if os.environ.get("GITHUB_ACTIONS"):
+        # Running in GitHub Actions
+        hostname = socket.gethostname()
+        host = socket.gethostbyname(hostname)
+    else:
+        # Running locally
+        if platform.system() in ["Darwin", "Windows"]:
+            # Windows or MacOS
+            host = "host.docker.internal"
+        else:
+            # Linux
+            hostname = socket.gethostname()
+            host = socket.gethostbyname(hostname)
+
+    return host
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -24,20 +45,17 @@ def test_environment():
 
     # Create a Docker network
     docker_client = docker.from_env()
-    network = docker_client.networks.create("lambda-test-network", driver="bridge")
+    docker_client.networks.prune()
+    docker_client.networks.create(DOCKER_NETWORK_NAME, driver="bridge")
 
     # Start Sentry server
     server = SentryServerForTesting()
     server.start()
     time.sleep(1)  # Give it a moment to start up
 
-    # Get the host IP address
-    hostname = socket.gethostname()
-    host_ip = socket.gethostbyname(hostname)
-
     # Create local AWS SAM stack
     app = App()
-    stack = LocalLambdaStack(app, "LocalLambdaStack", host=host_ip)
+    stack = LocalLambdaStack(app, "LocalLambdaStack", host=_get_host_ip())
 
     # Write SAM template to file
     template = app.synth().get_stack_by_name("LocalLambdaStack").template
@@ -61,7 +79,7 @@ def test_environment():
             "--warm-containers",
             "EAGER",
             "--docker-network",
-            "lambda-test-network",
+            DOCKER_NETWORK_NAME,
         ],
         stdout=debug_log,
         stderr=debug_log,

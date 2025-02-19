@@ -31,9 +31,12 @@ class LocalLambdaStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         host = kwargs.pop("host", "host-not-specified")
+        dsn = f"http://123@{host}:9999/0"  # noqa: E231
 
         super().__init__(scope, construct_id, **kwargs)
-        print("[LocalLambdaStack] Creating local SAM Lambda Stack: %s" % self)
+        print(
+            "[LocalLambdaStack] Creating local SAM Lambda Stack (Sentry DSN: %s)" % dsn
+        )
 
         # Override the template synthesis
         self.template_options.template_format_version = "2010-09-09"
@@ -85,7 +88,7 @@ class LocalLambdaStack(Stack):
                     ],  # Add layer containing the Sentry SDK to function.
                     "Environment": {
                         "Variables": {
-                            "SENTRY_DSN": f"http://123@{host}:9999/0",
+                            "SENTRY_DSN": dsn,
                             "SENTRY_INITIAL_HANDLER": "index.handler",
                             "SENTRY_TRACES_SAMPLE_RATE": "1.0",
                         }
@@ -109,7 +112,7 @@ class LocalLambdaStack(Stack):
         while True:
             if time.time() - start_time > timeout:
                 raise TimeoutError(
-                    "SAM failed to start within %s seconds. (Maybe Docker is not running?)"
+                    "AWS SAM failed to start within %s seconds. (Maybe Docker is not running?)"
                     % timeout
                 )
 
@@ -173,7 +176,9 @@ class SentryServerForTesting:
         uvicorn.run(self.app, host=self.host, port=self.port, log_level=self.log_level)
 
     def start(self):
-        print("[SentryServerForTesting] Starting server on %s:%s" % (self.host, self.port))
+        print(
+            "[SentryServerForTesting] Starting server on %s:%s" % (self.host, self.port)
+        )
         server_thread = threading.Thread(target=self.run_server, daemon=True)
         server_thread.start()
 
