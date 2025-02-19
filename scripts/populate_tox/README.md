@@ -52,7 +52,7 @@ integration_name: {
 When talking about version specifiers, we mean
 [version specifiers as defined](https://packaging.python.org/en/latest/specifications/version-specifiers/#id5)
 by the Python Packaging Authority. See also the actual implementation
-in `[packaging.specifiers](https://packaging.pypa.io/en/stable/specifiers.html)`.
+in [packaging.specifiers](https://packaging.pypa.io/en/stable/specifiers.html).
 
 ### `package`
 
