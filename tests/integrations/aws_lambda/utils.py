@@ -5,6 +5,8 @@ import requests
 import sys
 import time
 import threading
+import socket
+import platform
 
 from aws_cdk import (
     CfnResource,
@@ -24,19 +26,35 @@ SAM_PORT = 3001
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 
 
+def get_host_ip():
+    """
+    Returns the IP address of the host we are running on.
+    """
+    if os.environ.get("GITHUB_ACTIONS"):
+        # Running in GitHub Actions
+        hostname = socket.gethostname()
+        host = socket.gethostbyname(hostname)
+    else:
+        # Running locally
+        if platform.system() in ["Darwin", "Windows"]:
+            # Windows or MacOS
+            host = "host.docker.internal"
+        else:
+            # Linux
+            hostname = socket.gethostname()
+            host = socket.gethostbyname(hostname)
+
+    return host
+
+
 class LocalLambdaStack(Stack):
     """
     Uses the AWS CDK to create a local SAM stack containing Lambda functions.
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
-        host = kwargs.pop("host", "host-not-specified")
-        dsn = f"http://123@{host}:9999/0"  # noqa: E231
-
+        print("[LocalLambdaStack] Creating local SAM Lambda Stack")
         super().__init__(scope, construct_id, **kwargs)
-        print(
-            "[LocalLambdaStack] Creating local SAM Lambda Stack (Sentry DSN: %s)" % dsn
-        )
 
         # Override the template synthesis
         self.template_options.template_format_version = "2010-09-09"
@@ -63,6 +81,9 @@ class LocalLambdaStack(Stack):
                 ],
             },
         )
+
+        dsn = f"http://123@{get_host_ip()}:9999/0"  # noqa: E231
+        print("[LocalLambdaStack] Using Sentry DSN: %s" % dsn)
 
         print(
             "[LocalLambdaStack] Add all Lambda functions defined in "
