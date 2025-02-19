@@ -598,15 +598,19 @@ def main(fail_on_changes: bool = False) -> None:
             raise RuntimeError(
                 dedent(
                     """
-                Detected an unexpected change in `tox.ini` that is not reflected
-                in `tox.jinja` and/or `populate_tox.py`.
+                Detected that `tox.ini` is out of sync with
+                `scripts/populate_tox/tox.jinja` and/or
+                `scripts/populate_tox/populate_tox.py`. This might either mean
+                that `tox.ini` was changed manually, or the `tox.jinja`
+                template and/or the `populate_tox.py` script were changed without
+                regenerating `tox.ini`.
 
-                Please make sure to not make manual changes to `tox.ini`. The file
-                is generated from a template in `scripts/populate_tox/tox.jinja`
-                by the `scripts/populate_tox/populate_tox.py` script. Any changes
-                should be made to the template or the script directly and the
-                resulting `tox.ini` file should be generated with:
+                Please don't make manual changes to `tox.ini`. Instead, make the
+                changes to the `tox.jinja` template and/or the `populate_tox.py`
+                script (as applicable) and regenerate the `tox.ini` file with:
 
+                python -m venv toxgen.env
+                . toxgen.env/bin/activate
                 pip install -r scripts/populate_tox/requirements.txt
                 python scripts/populate_tox/populate_tox.py
                 """
