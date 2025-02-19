@@ -1,11 +1,3 @@
-import os
-
-AWS_CREDENTIALS = {
-    "aws_access_key_id": os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
-    "aws_secret_access_key": os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
-}
-
-
 # This is for inspecting new Python runtime environments in AWS Lambda
 # If you need to debug a new runtime, use this REPL to run arbitrary Python or bash commands
 # in that runtime in a Lambda function:

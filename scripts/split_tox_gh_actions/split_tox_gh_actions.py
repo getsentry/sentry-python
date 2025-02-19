@@ -43,14 +43,6 @@ FRAMEWORKS_NEEDING_CLICKHOUSE = {
     "clickhouse_driver",
 }
 
-FRAMEWORKS_NEEDING_AWS = {
-    "aws_lambda",
-}
-
-FRAMEWORKS_NEEDING_GITHUB_SECRETS = {
-    "aws_lambda",
-}
-
 # Frameworks grouped here will be tested together to not hog all GitHub runners.
 # If you add or remove a group, make sure to git rm the generated YAML file as
 # well.
@@ -292,13 +284,9 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "group": group,
         "frameworks": frameworks,
         "categories": sorted(categories),
-        "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
         "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
-        "needs_github_secrets": bool(
-            set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
-        ),
         "py_versions": {
             category: [f'"{version}"' for version in _normalize_py_versions(versions)]
             for category, versions in py_versions.items()
