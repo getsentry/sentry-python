@@ -95,6 +95,7 @@ def lambda_client():
         endpoint_url=f"http://127.0.0.1:{SAM_PORT}",  # noqa: E231
         aws_access_key_id="dummy",
         aws_secret_access_key="dummy",
+        region_name="us-east-1",
     )
 
 
