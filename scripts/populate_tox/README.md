@@ -44,9 +44,15 @@ integration_name: {
          rule1: [package1, package2, ...],
          rule2: [package3, package4, ...],
      },
-     "python": python_version_specifier,
+     "python": version_specifier,
+     "ignore": version_specifier,
 }
 ```
+
+When talking about version specifiers, we mean
+[version specifiers as defined](https://packaging.python.org/en/latest/specifications/version-specifiers/#id5)
+by the Python Packaging Authority. See also the actual implementation
+in `[packaging.specifiers](https://packaging.pypa.io/en/stable/specifiers.html)`.
 
 ### `package`
 
@@ -118,6 +124,22 @@ metadata or the SDK is explicitly not supporting some packages on specific
 Python versions (because of, for example, broken context vars), the `python`
 key can be used.
 
+### `ignore`
+
+Sometimes there are versions of packages that we explicitly don't want to test.
+One example is Starlite, which has two alpha prereleases of version 2.0.0, but
+there will never will be a stable 2.0 release, since development on Starlite
+has stopped and Starlite 2.0 eventually became Litestar.
+
+The value of the `ignore` key expects a version specifier defining which
+versions should not be considered for testing.
+
+```python
+"starlite": {
+    "ignore": ">=2.0",
+    ...
+}
+```
 
 ## How-Tos
 

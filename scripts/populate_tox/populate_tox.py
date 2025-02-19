@@ -130,6 +130,12 @@ def _prefilter_releases(
             f"  {integration} doesn't have a minimum version defined in sentry_sdk/integrations/__init__.py. Consider defining one"
         )
 
+    ignored_versions = set()
+    if TEST_SUITE_CONFIG[integration].get("ignore") is not None:
+        ignored_versions = SpecifierSet(
+            TEST_SUITE_CONFIG[integration]["ignore"], prereleases=True
+        )
+
     filtered_releases = []
     last_prerelease = None
 
@@ -147,10 +153,11 @@ def _prefilter_releases(
         if min_supported and version < min_supported:
             continue
 
-        if version.is_postrelease:
+        if version.is_postrelease or version.is_devrelease:
             continue
 
-        # If we made it here, we want to consider this release.
+        if version in ignored_versions:
+            continue
 
         if version.is_prerelease:
             if last_prerelease is None or version > last_prerelease:
@@ -173,8 +180,9 @@ def _prefilter_releases(
 
     # Check if the latest prerelease is relevant (i.e., it's for a version higher
     # than the last released version); if not, don't consider it
-    if last_prerelease is not None and last_prerelease > filtered_releases[-1]:
-        return filtered_releases, last_prerelease
+    if last_prerelease is not None:
+        if not filtered_releases or last_prerelease > filtered_releases[-1]:
+            return filtered_releases, last_prerelease
 
     return filtered_releases, None
 
