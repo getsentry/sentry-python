@@ -45,7 +45,7 @@ integration_name: {
          rule2: [package3, package4, ...],
      },
      "python": python_version_specifier,
-     "ignore": package_version_specifier,
+     "include": package_version_specifier,
 }
 ```
 
@@ -124,19 +124,19 @@ metadata or the SDK is explicitly not supporting some packages on specific
 Python versions (because of, for example, broken context vars), the `python`
 key can be used.
 
-### `ignore`
+### `include`
 
 Sometimes there are versions of packages that we explicitly don't want to test.
 One example is Starlite, which has two alpha prereleases of version 2.0.0, but
 there will never will be a stable 2.0 release, since development on Starlite
 has stopped and Starlite 2.0 eventually became Litestar.
 
-The value of the `ignore` key expects a version specifier defining which
-versions should not be considered for testing.
+The value of the `include` key expects a version specifier defining which
+versions should be considered for testing.
 
 ```python
 "starlite": {
-    "ignore": "==2.*",
+    "include": "!=2.0.0a1,!=2.0.0a2",
     ...
 }
 ```
