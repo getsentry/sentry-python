@@ -44,8 +44,8 @@ integration_name: {
          rule1: [package1, package2, ...],
          rule2: [package3, package4, ...],
      },
-     "python": version_specifier,
-     "ignore": version_specifier,
+     "python": python_version_specifier,
+     "ignore": package_version_specifier,
 }
 ```
 
