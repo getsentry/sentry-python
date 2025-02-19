@@ -427,12 +427,7 @@ def test_configurable_status_codes_handler(
 
     assert len(events) == int(expected_error)
 
-# @pytest.mark.parametrize(
-#     ("failed_request_status_codes", "status_code", "expected_error"),
-#     (
-#         (set(), 500, False),
-#     ),
-# )
+
 @parametrize_test_configurable_status_codes
 def test_configurable_status_codes_middleware(
     sentry_init,
@@ -453,11 +448,11 @@ def test_configurable_status_codes_middleware(
     def create_raising_middleware(app):
         async def raising_middleware(scope, receive, send):
             raise HTTPException(status_code=status_code)
+
         return raising_middleware
 
     @get("/error")
-    async def error() -> None:
-        ...
+    async def error() -> None: ...
 
     app = Litestar([error], middleware=[create_raising_middleware])
     client = TestClient(app)
