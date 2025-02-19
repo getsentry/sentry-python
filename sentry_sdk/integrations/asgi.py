@@ -60,17 +60,6 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
-def _capture_exception(exc, mechanism_type="asgi"):
-    # type: (Any, str) -> None
-
-    event, hint = event_from_exception(
-        exc,
-        client_options=sentry_sdk.get_client().options,
-        mechanism={"type": mechanism_type, "handled": False},
-    )
-    sentry_sdk.capture_event(event, hint=hint)
-
-
 def _looks_like_asgi3(app):
     # type: (Any) -> bool
     """
@@ -148,6 +137,23 @@ class SentryAsgiMiddleware:
         else:
             self.__call__ = self._run_asgi2
 
+    def _capture_exception(self, exc):
+        # type: (Exception) -> None
+        event, hint = event_from_exception(
+            exc,
+            client_options=sentry_sdk.get_client().options,
+            mechanism={"type": self.mechanism_type, "handled": False},
+        )
+        sentry_sdk.capture_event(event, hint=hint)
+
+    def _capture_lifespan_exception(self, exc):
+        # type: (Exception) -> None
+        return self._capture_exception(exc)
+
+    def _capture_request_exception(self, exc):
+        # type: (Exception) -> None
+        return self._capture_exception(exc)
+
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
         async def inner(receive, send):
@@ -161,7 +167,7 @@ class SentryAsgiMiddleware:
         return await self._run_app(scope, receive, send, asgi_version=3)
 
     async def _run_app(self, scope, receive, send, asgi_version):
-        # type: (Any, Any, Any, Any, int) -> Any
+        # type: (Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         is_lifespan = scope["type"] == "lifespan"
         if is_recursive_asgi_middleware or is_lifespan:
@@ -172,7 +178,7 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                _capture_exception(exc, mechanism_type=self.mechanism_type)
+                self._capture_lifespan_exception(exc)
                 raise exc from None
 
         _asgi_middleware_applied.set(True)
@@ -258,7 +264,7 @@ class SentryAsgiMiddleware:
                                     scope, receive, _sentry_wrapped_send
                                 )
                         except Exception as exc:
-                            _capture_exception(exc, mechanism_type=self.mechanism_type)
+                            self._capture_request_exception(exc)
                             raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
