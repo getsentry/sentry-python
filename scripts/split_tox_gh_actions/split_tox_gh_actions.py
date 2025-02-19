@@ -43,6 +43,10 @@ FRAMEWORKS_NEEDING_CLICKHOUSE = {
     "clickhouse_driver",
 }
 
+FRAMEWORKS_NEEDING_DOCKER = {
+    "aws_lambda",
+}
+
 # Frameworks grouped here will be tested together to not hog all GitHub runners.
 # If you add or remove a group, make sure to git rm the generated YAML file as
 # well.
@@ -281,6 +285,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "frameworks": frameworks,
         "categories": sorted(categories),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
+        "needs_docker": bool(set(frameworks) & FRAMEWORKS_NEEDING_DOCKER),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
         "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
         "py_versions": {

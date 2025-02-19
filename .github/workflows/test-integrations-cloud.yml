@@ -35,6 +35,10 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+    services:
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
@@ -107,6 +111,10 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+    services:
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5

@@ -12,6 +12,12 @@
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
 
+    {% if needs_docker %}
+    services:
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
+    {% endif %}
     {% if needs_postgres %}
     services:
       postgres:
