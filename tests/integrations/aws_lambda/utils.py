@@ -30,6 +30,8 @@ class LocalLambdaStack(Stack):
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        host = kwargs.pop("host", "host-not-specified")
+
         super().__init__(scope, construct_id, **kwargs)
         print("[LocalLambdaStack] Creating local SAM Lambda Stack: %s" % self)
 
@@ -83,7 +85,7 @@ class LocalLambdaStack(Stack):
                     ],  # Add layer containing the Sentry SDK to function.
                     "Environment": {
                         "Variables": {
-                            "SENTRY_DSN": "http://123@host.docker.internal:9999/0",
+                            "SENTRY_DSN": f"http://123@{host}:9999/0",
                             "SENTRY_INITIAL_HANDLER": "index.handler",
                             "SENTRY_TRACES_SAMPLE_RATE": "1.0",
                         }
@@ -127,8 +129,9 @@ class SentryServerForTesting:
     A simple Sentry.io style server that accepts envelopes and stores them in a list.
     """
 
-    def __init__(self, port=9999, log_level="warning"):
+    def __init__(self, host="0.0.0.0", port=9999, log_level="warning"):
         self.envelopes = []
+        self.host = host
         self.port = port
         self.log_level = log_level
         self.app = FastAPI()
@@ -167,10 +170,10 @@ class SentryServerForTesting:
             return {"status": "ok"}
 
     def run_server(self):
-        uvicorn.run(self.app, host="0.0.0.0", port=self.port, log_level=self.log_level)
+        uvicorn.run(self.app, host=self.host, port=self.port, log_level=self.log_level)
 
     def start(self):
-        print("[SentryServerForTesting] Starting server")
+        print("[SentryServerForTesting] Starting server on %s:%s" % (self.host, self.port))
         server_thread = threading.Thread(target=self.run_server, daemon=True)
         server_thread.start()
 

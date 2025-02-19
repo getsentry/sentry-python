@@ -69,6 +69,10 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     needs: check-permissions
+    services:
+      docker:
+        image: docker:dind  # Docker-in-Docker
+        options: --privileged
     steps:
       - uses: actions/checkout@v4.2.2
         with:

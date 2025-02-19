@@ -1,6 +1,8 @@
 import boto3
+import docker
 import json
 import pytest
+import socket
 import subprocess
 import tempfile
 import time
@@ -20,14 +22,22 @@ SAM_TEMPLATE_FILE = "sam.template.yaml"
 def test_environment():
     print("[test_environment fixture] Setting up AWS Lambda test infrastructure")
 
+    # Create a Docker network
+    docker_client = docker.from_env()
+    network = docker_client.networks.create("lambda-test-network", driver="bridge")
+
     # Start Sentry server
     server = SentryServerForTesting()
     server.start()
     time.sleep(1)  # Give it a moment to start up
 
+    # Get the host IP address
+    hostname = socket.gethostname()
+    host_ip = socket.gethostbyname(hostname)
+
     # Create local AWS SAM stack
     app = App()
-    stack = LocalLambdaStack(app, "LocalLambdaStack")
+    stack = LocalLambdaStack(app, "LocalLambdaStack", host=host_ip)
 
     # Write SAM template to file
     template = app.synth().get_stack_by_name("LocalLambdaStack").template
@@ -50,6 +60,8 @@ def test_environment():
             SAM_TEMPLATE_FILE,
             "--warm-containers",
             "EAGER",
+            "--docker-network",
+            "lambda-test-network",
         ],
         stdout=debug_log,
         stderr=debug_log,
