@@ -9,9 +9,6 @@ on:
       - master
       - release/**
       - potel-base
-  # XXX: We are using `pull_request_target` instead of `pull_request` because we want
-  # this to run on forks with access to the secrets necessary to run the test suite.
-  # Prefer to use `pull_request` when possible.
   pull_request:
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
@@ -20,39 +17,11 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
-  # `write` is needed to remove the `Trigger: tests using secrets` label
-  pull-requests: write
 env:
-  SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
-  SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY }}
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  check-permissions:
-    name: permissions check
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          persist-credentials: false
-      - name: Check permissions on PR
-        if: github.event_name == 'pull_request_target'
-        run: |
-          python3 -uS .github/workflows/scripts/trigger_tests_on_label.py \
-              --repo-id ${{ github.event.repository.id }} \
-              --pr ${{ github.event.number }} \
-              --event ${{ github.event.action }} \
-              --username "$ARG_USERNAME" \
-              --label-names "$ARG_LABEL_NAMES"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # these can contain special characters
-          ARG_USERNAME: ${{ github.event.pull_request.user.login }}
-          ARG_LABEL_NAMES: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-      - name: Check permissions on repo branch
-        if: github.event_name == 'push'
-        run: true
   test-aws-pinned:
     name: AWS (pinned)
     timeout-minutes: 30
@@ -66,15 +35,8 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
-    needs: check-permissions
-    services:
-      docker:
-        image: docker:dind  # Docker-in-Docker
-        options: --privileged
     steps:
       - uses: actions/checkout@v4.2.2
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
