@@ -136,7 +136,7 @@ versions should not be considered for testing.
 
 ```python
 "starlite": {
-    "ignore": ">=2.0",
+    "ignore": "==2.*",
     ...
 }
 ```
