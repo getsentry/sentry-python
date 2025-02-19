@@ -301,7 +301,6 @@ def exception_handler(exc, scope):
         ):
             return
 
-    print("HANDLING EXC", exc)
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
