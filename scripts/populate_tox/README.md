@@ -126,13 +126,25 @@ key can be used.
 
 ### `include`
 
-Sometimes there are versions of packages that we explicitly don't want to test.
-One example is Starlite, which has two alpha prereleases of version 2.0.0, but
-there will never will be a stable 2.0 release, since development on Starlite
-has stopped and Starlite 2.0 eventually became Litestar.
+Sometimes we only want to consider testing some specific versions of packages.
+For example, the Starlite package has two alpha prereleases of version 2.0.0, but
+we do not want to test these, since Starlite 2.0 was renamed to Litestar.
 
 The value of the `include` key expects a version specifier defining which
-versions should be considered for testing.
+versions should be considered for testing. For example, since we only want to test
+versions below 2.x in Starlite, we can use
+
+```python
+"starlite": {
+    "include": "<2",
+    ...
+}
+```
+
+The `include` key can also be used to exclude a set of specific versions by using
+`!=` version specifiers. For example, the Starlite restriction above could equivalently
+be expressed like so:
+
 
 ```python
 "starlite": {
@@ -140,6 +152,7 @@ versions should be considered for testing.
     ...
 }
 ```
+
 
 ## How-Tos
 
