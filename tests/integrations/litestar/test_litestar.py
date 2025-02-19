@@ -16,7 +16,6 @@ from litestar.middleware.logging import LoggingMiddlewareConfig
 from litestar.middleware.rate_limit import RateLimitConfig
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 from litestar.testing import TestClient
-
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
 
 
@@ -402,7 +401,7 @@ def test_litestar_scope_user_on_exception_event(
 
 
 @parametrize_test_configurable_status_codes
-def test_configurable_status_codes(
+def test_configurable_status_codes_handler(
     sentry_init,
     capture_events,
     failed_request_status_codes,
@@ -423,6 +422,44 @@ def test_configurable_status_codes(
         raise HTTPException(status_code=status_code)
 
     app = Litestar([error])
+    client = TestClient(app)
+    client.get("/error")
+
+    assert len(events) == int(expected_error)
+
+# @pytest.mark.parametrize(
+#     ("failed_request_status_codes", "status_code", "expected_error"),
+#     (
+#         (set(), 500, False),
+#     ),
+# )
+@parametrize_test_configurable_status_codes
+def test_configurable_status_codes_middleware(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    integration_kwargs = (
+        {"failed_request_status_codes": failed_request_status_codes}
+        if failed_request_status_codes is not None
+        else {}
+    )
+    sentry_init(integrations=[LitestarIntegration(**integration_kwargs)])
+
+    events = capture_events()
+
+    def create_raising_middleware(app):
+        async def raising_middleware(scope, receive, send):
+            raise HTTPException(status_code=status_code)
+        return raising_middleware
+
+    @get("/error")
+    async def error() -> None:
+        ...
+
+    app = Litestar([error], middleware=[create_raising_middleware])
     client = TestClient(app)
     client.get("/error")
 
