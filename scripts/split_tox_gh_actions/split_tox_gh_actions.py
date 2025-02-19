@@ -57,12 +57,8 @@ GROUPS = {
         "openai",
         "huggingface_hub",
     ],
-    "AWS": [
-        # this is separate from Cloud Computing because only this one test suite
-        # needs to run with access to GitHub secrets
-        "aws_lambda",
-    ],
     "Cloud": [
+        "aws_lambda",
         "boto3",
         "chalice",
         "cloud_resource_context",
