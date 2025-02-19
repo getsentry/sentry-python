@@ -45,8 +45,14 @@ integration_name: {
          rule2: [package3, package4, ...],
      },
      "python": python_version_specifier,
+     "include": package_version_specifier,
 }
 ```
+
+When talking about version specifiers, we mean
+[version specifiers as defined](https://packaging.python.org/en/latest/specifications/version-specifiers/#id5)
+by the Python Packaging Authority. See also the actual implementation
+in [packaging.specifiers](https://packaging.pypa.io/en/stable/specifiers.html).
 
 ### `package`
 
@@ -117,6 +123,35 @@ However, if a package has broken
 metadata or the SDK is explicitly not supporting some packages on specific
 Python versions (because of, for example, broken context vars), the `python`
 key can be used.
+
+### `include`
+
+Sometimes we only want to consider testing some specific versions of packages.
+For example, the Starlite package has two alpha prereleases of version 2.0.0, but
+we do not want to test these, since Starlite 2.0 was renamed to Litestar.
+
+The value of the `include` key expects a version specifier defining which
+versions should be considered for testing. For example, since we only want to test
+versions below 2.x in Starlite, we can use
+
+```python
+"starlite": {
+    "include": "<2",
+    ...
+}
+```
+
+The `include` key can also be used to exclude a set of specific versions by using
+`!=` version specifiers. For example, the Starlite restriction above could equivalently
+be expressed like so:
+
+
+```python
+"starlite": {
+    "include": "!=2.0.0a1,!=2.0.0a2",
+    ...
+}
+```
 
 
 ## How-Tos
