@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Sequence
     from typing import Tuple
+    from typing_extensions import Literal
     from typing_extensions import TypedDict
 
     from sentry_sdk._types import (
@@ -528,6 +529,8 @@ class ClientConstructor:
         profiles_sample_rate=None,  # type: Optional[float]
         profiles_sampler=None,  # type: Optional[TracesSampler]
         profiler_mode=None,  # type: Optional[ProfilerMode]
+        profile_lifecycle="manual",  # type: Literal["manual", "trace"]
+        profile_session_sample_rate=None,  # type: Optional[float]
         auto_enabling_integrations=True,  # type: bool
         disabled_integrations=None,  # type: Optional[Sequence[sentry_sdk.integrations.Integration]]
         auto_session_tracking=True,  # type: bool
@@ -581,4 +584,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.20.0"
+VERSION = "2.22.0"
