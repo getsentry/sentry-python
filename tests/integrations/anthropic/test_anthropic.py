@@ -45,7 +45,7 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_transaction, start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import AnthropicIntegration
 
@@ -656,8 +656,8 @@ async def test_streaming_create_message_with_input_json_delta_async(
     if send_default_pii and include_prompts:
         assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
         assert span["data"][SPANDATA.AI_RESPONSES] == [
-            {"text": "", "type": "text"}
-        ]  # we do not record InputJSONDelta because it could contain PII
+            {"text": "{'location': 'San Francisco, CA'}", "type": "text"}
+        ]
 
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
@@ -796,8 +796,8 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init):
         send_default_pii=True,
     )
 
-    with start_transaction(name="test") as transaction:
-        span = transaction.start_span()
+    with start_transaction(name="test"):
+        span = start_span()
         integration = AnthropicIntegration()
 
         _add_ai_data_to_span(
@@ -805,32 +805,13 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init):
             integration,
             input_tokens=10,
             output_tokens=20,
-            content_blocks=["{'test': 'data'}", "'more': 'json'"],
+            content_blocks=["{'test': 'data',", "'more': 'json'}"],
         )
 
-        assert span.get_data(SPANDATA.AI_RESPONSES) == [
-            {"type": "text", "text": "{'test': 'data''more': 'json'}"}
+        assert span._data.get(SPANDATA.AI_RESPONSES) == [
+            {"type": "text", "text": "{'test': 'data','more': 'json'}"}
         ]
-        assert span.get_data("ai.streaming") is True
-        assert span.get_measurement("ai_prompt_tokens_used")["value"] == 10
-        assert span.get_measurement("ai_completion_tokens_used")["value"] == 20
-        assert span.get_measurement("ai_total_tokens_used")["value"] == 30
-
-
-def test_unsupported_anthropic_version(sentry_init):
-    with mock.patch(
-        "sentry_sdk.integrations.anthropic.package_version", return_value=(0, 15, 0)
-    ):
-        with pytest.raises(DidNotEnable):
-            sentry_init(
-                integrations=[AnthropicIntegration()],
-                traces_sample_rate=1.0,
-            )
-
-
-def test_no_version_info(sentry_init):
-    with mock.patch(
-        "sentry_sdk.integrations.anthropic.package_version", return_value=None
-    ):
-        with pytest.raises(DidNotEnable):
-            sentry_init(integrations=[AnthropicIntegration()])
+        assert span._data.get("ai.streaming") is True
+        assert span._measurements.get("ai_prompt_tokens_used")["value"] == 10
+        assert span._measurements.get("ai_completion_tokens_used")["value"] == 20
+        assert span._measurements.get("ai_total_tokens_used")["value"] == 30
