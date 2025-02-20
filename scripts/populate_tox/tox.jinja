@@ -1,0 +1,578 @@
+# Tox (http://codespeak.net/~hpk/tox/) is a tool for running tests
+# in multiple virtualenvs. This configuration file will run the
+# test suite on all supported python versions. To use it, "pip install tox"
+# and then run "tox" from this directory.
+#
+# This file has been generated from a template
+# by "scripts/populate_tox/populate_tox.py". Any changes to the file should
+# be made in the template (if you want to change a hardcoded part of the file)
+# or in the script (if you want to change the auto-generated part).
+# The file (and all resulting CI YAMLs) then need to be regenerated via
+# "scripts/generate-test-files.sh".
+#
+# Last generated: {{ updated }}
+
+[tox]
+requires =
+    # This version introduced using pip 24.1 which does not work with older Celery and HTTPX versions.
+    virtualenv<20.26.3
+envlist =
+    # === Common ===
+    {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common
+
+    # === Gevent ===
+    {py3.6,py3.8,py3.10,py3.11,py3.12}-gevent
+
+    # === Integrations ===
+    # General format is {pythonversion}-{integrationname}-v{frameworkversion}
+    # 1 blank line between different integrations
+    # Each framework version should only be mentioned once. I.e:
+    #   {py3.7,py3.10}-django-v{3.2}
+    #   {py3.10}-django-v{4.0}
+    # instead of:
+    #   {py3.7}-django-v{3.2}
+    #   {py3.7,py3.10}-django-v{3.2,4.0}
+    #
+    # At a minimum, we should test against at least the lowest
+    # and the latest supported version of a framework.
+
+    # AIOHTTP
+    {py3.7}-aiohttp-v{3.4}
+    {py3.7,py3.9,py3.11}-aiohttp-v{3.8}
+    {py3.8,py3.12,py3.13}-aiohttp-latest
+
+    # Anthropic
+    {py3.8,py3.11,py3.12}-anthropic-v{0.16,0.28,0.40}
+    {py3.7,py3.11,py3.12}-anthropic-latest
+
+    # Arq
+    {py3.7,py3.11}-arq-v{0.23}
+    {py3.7,py3.12,py3.13}-arq-latest
+
+    # Asgi
+    {py3.7,py3.12,py3.13}-asgi
+
+    # asyncpg
+    {py3.7,py3.10}-asyncpg-v{0.23}
+    {py3.8,py3.11,py3.12}-asyncpg-latest
+
+    # AWS Lambda
+    # The aws_lambda tests deploy to the real AWS and have their own
+    # matrix of Python versions to run the test lambda function in.
+    # see `lambda_runtime` fixture in tests/integrations/aws_lambda.py
+    {py3.9}-aws_lambda
+
+    # Beam
+    {py3.7}-beam-v{2.12}
+    {py3.8,py3.11}-beam-latest
+
+    # Boto3
+    {py3.6,py3.7}-boto3-v{1.12}
+    {py3.7,py3.11,py3.12}-boto3-v{1.23}
+    {py3.11,py3.12}-boto3-v{1.34}
+    {py3.11,py3.12,py3.13}-boto3-latest
+
+    # Chalice
+    {py3.6,py3.9}-chalice-v{1.16}
+    {py3.8,py3.12,py3.13}-chalice-latest
+
+    # Cloud Resource Context
+    {py3.6,py3.12,py3.13}-cloud_resource_context
+
+    # Cohere
+    {py3.9,py3.11,py3.12}-cohere-v5
+    {py3.9,py3.11,py3.12}-cohere-latest
+
+    # Django
+    # - Django 1.x
+    {py3.6,py3.7}-django-v{1.11}
+    # - Django 2.x
+    {py3.6,py3.7}-django-v{2.0}
+    {py3.6,py3.9}-django-v{2.2}
+    # - Django 3.x
+    {py3.6,py3.9}-django-v{3.0}
+    {py3.6,py3.9,py3.11}-django-v{3.2}
+    # - Django 4.x
+    {py3.8,py3.11,py3.12}-django-v{4.0,4.1,4.2}
+    # - Django 5.x
+    {py3.10,py3.11,py3.12}-django-v{5.0,5.1}
+    {py3.10,py3.12,py3.13}-django-latest
+
+    # FastAPI
+    {py3.7,py3.10}-fastapi-v{0.79}
+    {py3.8,py3.12,py3.13}-fastapi-latest
+
+    # GCP
+    {py3.7}-gcp
+
+    # HTTPX
+    {py3.6,py3.9}-httpx-v{0.16,0.18}
+    {py3.6,py3.10}-httpx-v{0.20,0.22}
+    {py3.7,py3.11,py3.12}-httpx-v{0.23,0.24}
+    {py3.9,py3.11,py3.12}-httpx-v{0.25,0.27}
+    {py3.9,py3.12,py3.13}-httpx-latest
+
+    # Langchain
+    {py3.9,py3.11,py3.12}-langchain-v0.1
+    {py3.9,py3.11,py3.12}-langchain-v0.3
+    {py3.9,py3.11,py3.12}-langchain-latest
+    {py3.9,py3.11,py3.12}-langchain-notiktoken
+
+    # Litestar
+    {py3.8,py3.11}-litestar-v{2.0}
+    {py3.8,py3.11,py3.12}-litestar-v{2.6}
+    {py3.8,py3.11,py3.12}-litestar-v{2.12}
+    {py3.8,py3.11,py3.12}-litestar-latest
+
+    # OpenAI
+    {py3.9,py3.11,py3.12}-openai-v1.0
+    {py3.9,py3.11,py3.12}-openai-v1.22
+    {py3.9,py3.11,py3.12}-openai-v1.55
+    {py3.9,py3.11,py3.12}-openai-latest
+    {py3.9,py3.11,py3.12}-openai-notiktoken
+
+    # OpenTelemetry (OTel)
+    {py3.7,py3.9,py3.12,py3.13}-opentelemetry
+
+    # OpenTelemetry Experimental (POTel)
+    {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
+
+    # pure_eval
+    {py3.6,py3.12,py3.13}-pure_eval
+
+    # Quart
+    {py3.7,py3.11}-quart-v{0.16}
+    {py3.8,py3.11,py3.12}-quart-v{0.19}
+    {py3.8,py3.12,py3.13}-quart-latest
+
+    # Ray
+    {py3.10,py3.11}-ray-v{2.34}
+    {py3.10,py3.11}-ray-latest
+
+    # Redis
+    {py3.6,py3.8}-redis-v{3}
+    {py3.7,py3.8,py3.11}-redis-v{4}
+    {py3.7,py3.11,py3.12}-redis-v{5}
+    {py3.7,py3.12,py3.13}-redis-latest
+
+    # Requests
+    {py3.6,py3.8,py3.12,py3.13}-requests
+
+    # RQ (Redis Queue)
+    {py3.6}-rq-v{0.6}
+    {py3.6,py3.9}-rq-v{0.13,1.0}
+    {py3.6,py3.11}-rq-v{1.5,1.10}
+    {py3.7,py3.11,py3.12}-rq-v{1.15,1.16}
+    {py3.7,py3.12,py3.13}-rq-latest
+
+    # Sanic
+    {py3.6,py3.7}-sanic-v{0.8}
+    {py3.6,py3.8}-sanic-v{20}
+    {py3.8,py3.11,py3.12}-sanic-v{24.6}
+    {py3.9,py3.12,py3.13}-sanic-latest
+
+    # === Integrations - Auto-generated ===
+    # These come from the populate_tox.py script. Eventually we should move all
+    # integration tests there.
+
+    {% for group, integrations in groups.items() %}
+    # ~~~ {{ group }} ~~~
+    {% for integration in integrations %}
+    {% for release in integration.releases %}
+    {{ release.rendered_python_versions }}-{{ integration.name }}-v{{ release }}
+    {% endfor %}
+
+    {% endfor %}
+
+    {% endfor %}
+
+[testenv]
+deps =
+    # if you change requirements-testing.txt and your change is not being reflected
+    # in what's installed by tox (when running tox locally), try running tox
+    # with the -r flag
+    -r requirements-testing.txt
+
+    linters: -r requirements-linting.txt
+    linters: werkzeug<2.3.0
+
+    # === Common ===
+    py3.8-common: hypothesis
+    common: pytest-asyncio
+    # See https://github.com/pytest-dev/pytest/issues/9621
+    # and https://github.com/pytest-dev/pytest-forked/issues/67
+    # for justification of the upper bound on pytest
+    {py3.6,py3.7}-common: pytest<7.0.0
+    {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common: pytest
+
+    # === Gevent ===
+    {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11}-gevent: gevent>=22.10.0, <22.11.0
+    {py3.12}-gevent: gevent
+    # See https://github.com/pytest-dev/pytest/issues/9621
+    # and https://github.com/pytest-dev/pytest-forked/issues/67
+    # for justification of the upper bound on pytest
+    {py3.6,py3.7}-gevent: pytest<7.0.0
+    {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
+
+    # === Integrations ===
+
+    # AIOHTTP
+    aiohttp-v3.4: aiohttp~=3.4.0
+    aiohttp-v3.8: aiohttp~=3.8.0
+    aiohttp-latest: aiohttp
+    aiohttp: pytest-aiohttp
+    aiohttp-v3.8: pytest-asyncio
+    aiohttp-latest: pytest-asyncio
+
+    # Anthropic
+    anthropic: pytest-asyncio
+    anthropic-v{0.16,0.28}: httpx<0.28.0
+    anthropic-v0.16: anthropic~=0.16.0
+    anthropic-v0.28: anthropic~=0.28.0
+    anthropic-v0.40: anthropic~=0.40.0
+    anthropic-latest: anthropic
+
+    # Arq
+    arq-v0.23: arq~=0.23.0
+    arq-v0.23: pydantic<2
+    arq-latest: arq
+    arq: fakeredis>=2.2.0,<2.8
+    arq: pytest-asyncio
+    arq: async-timeout
+
+    # Asgi
+    asgi: pytest-asyncio
+    asgi: async-asgi-testclient
+
+    # Asyncpg
+    asyncpg-v0.23: asyncpg~=0.23.0
+    asyncpg-latest: asyncpg
+    asyncpg: pytest-asyncio
+
+    # AWS Lambda
+    aws_lambda: boto3
+
+    # Beam
+    beam-v2.12: apache-beam~=2.12.0
+    beam-latest: apache-beam
+
+    # Boto3
+    boto3-v1.12: boto3~=1.12.0
+    boto3-v1.23: boto3~=1.23.0
+    boto3-v1.34: boto3~=1.34.0
+    boto3-latest: boto3
+
+    # Chalice
+    chalice: pytest-chalice==0.0.5
+    chalice-v1.16: chalice~=1.16.0
+    chalice-latest: chalice
+
+    # Cohere
+    cohere-v5: cohere~=5.3.3
+    cohere-latest: cohere
+
+    # Django
+    django: psycopg2-binary
+    django-v{1.11,2.0,2.1,2.2,3.0,3.1,3.2}: djangorestframework>=3.0.0,<4.0.0
+    django-v{2.0,2.2,3.0,3.2,4.0,4.1,4.2,5.0,5.1}: channels[daphne]
+    django-v{2.2,3.0}: six
+    django-v{1.11,2.0,2.2,3.0,3.2}: Werkzeug<2.1.0
+    django-v{1.11,2.0,2.2,3.0}: pytest-django<4.0
+    django-v{3.2,4.0,4.1,4.2,5.0,5.1}: pytest-django
+    django-v{4.0,4.1,4.2,5.0,5.1}: djangorestframework
+    django-v{4.0,4.1,4.2,5.0,5.1}: pytest-asyncio
+    django-v{4.0,4.1,4.2,5.0,5.1}: Werkzeug
+    django-latest: djangorestframework
+    django-latest: pytest-asyncio
+    django-latest: pytest-django
+    django-latest: Werkzeug
+    django-latest: channels[daphne]
+
+    django-v1.11: Django~=1.11.0
+    django-v2.0: Django~=2.0.0
+    django-v2.2: Django~=2.2.0
+    django-v3.0: Django~=3.0.0
+    django-v3.2: Django~=3.2.0
+    django-v4.0: Django~=4.0.0
+    django-v4.1: Django~=4.1.0
+    django-v4.2: Django~=4.2.0
+    django-v5.0: Django~=5.0.0
+    django-v5.1: Django==5.1rc1
+    django-latest: Django
+
+    # FastAPI
+    fastapi: httpx
+    # (this is a dependency of httpx)
+    fastapi: anyio<4.0.0
+    fastapi: pytest-asyncio
+    fastapi: python-multipart
+    fastapi: requests
+    fastapi-v{0.79}: fastapi~=0.79.0
+    fastapi-latest: fastapi
+
+    # HTTPX
+    httpx-v0.16: pytest-httpx==0.10.0
+    httpx-v0.18: pytest-httpx==0.12.0
+    httpx-v0.20: pytest-httpx==0.14.0
+    httpx-v0.22: pytest-httpx==0.19.0
+    httpx-v0.23: pytest-httpx==0.21.0
+    httpx-v0.24: pytest-httpx==0.22.0
+    httpx-v0.25: pytest-httpx==0.25.0
+    httpx: pytest-httpx
+    # anyio is a dep of httpx
+    httpx: anyio<4.0.0
+    httpx-v0.16: httpx~=0.16.0
+    httpx-v0.18: httpx~=0.18.0
+    httpx-v0.20: httpx~=0.20.0
+    httpx-v0.22: httpx~=0.22.0
+    httpx-v0.23: httpx~=0.23.0
+    httpx-v0.24: httpx~=0.24.0
+    httpx-v0.25: httpx~=0.25.0
+    httpx-v0.27: httpx~=0.27.0
+    httpx-latest: httpx
+
+    # Langchain
+    langchain-v0.1: openai~=1.0.0
+    langchain-v0.1: langchain~=0.1.11
+    langchain-v0.1: tiktoken~=0.6.0
+    langchain-v0.1: httpx<0.28.0
+    langchain-v0.3: langchain~=0.3.0
+    langchain-v0.3: langchain-community
+    langchain-v0.3: tiktoken
+    langchain-v0.3: openai
+    langchain-{latest,notiktoken}: langchain
+    langchain-{latest,notiktoken}: langchain-openai
+    langchain-{latest,notiktoken}: openai>=1.6.1
+    langchain-latest: tiktoken~=0.6.0
+
+    # Litestar
+    litestar: pytest-asyncio
+    litestar: python-multipart
+    litestar: requests
+    litestar: cryptography
+    litestar-v{2.0,2.6}: httpx<0.28
+    litestar-v2.0: litestar~=2.0.0
+    litestar-v2.6: litestar~=2.6.0
+    litestar-v2.12: litestar~=2.12.0
+    litestar-latest: litestar
+
+    # OpenAI
+    openai: pytest-asyncio
+    openai-v1.0: openai~=1.0.0
+    openai-v1.0: tiktoken
+    openai-v1.0: httpx<0.28.0
+    openai-v1.22: openai~=1.22.0
+    openai-v1.22: tiktoken
+    openai-v1.22: httpx<0.28.0
+    openai-v1.55: openai~=1.55.0
+    openai-v1.55: tiktoken
+    openai-latest: openai
+    openai-latest: tiktoken~=0.6.0
+    openai-notiktoken: openai
+
+    # OpenTelemetry (OTel)
+    opentelemetry: opentelemetry-distro
+
+    # OpenTelemetry Experimental (POTel)
+    potel: -e .[opentelemetry-experimental]
+
+    # pure_eval
+    pure_eval: pure_eval
+
+    # Quart
+    quart: quart-auth
+    quart: pytest-asyncio
+    quart-v0.16: blinker<1.6
+    quart-v0.16: jinja2<3.1.0
+    quart-v0.16: Werkzeug<2.1.0
+    quart-v0.16: hypercorn<0.15.0
+    quart-v0.16: quart~=0.16.0
+    quart-v0.19: Werkzeug>=3.0.0
+    quart-v0.19: quart~=0.19.0
+    {py3.8}-quart: taskgroup==0.0.0a4
+    quart-latest: quart
+
+    # Ray
+    ray-v2.34: ray~=2.34.0
+    ray-latest: ray
+
+    # Redis
+    redis: fakeredis!=1.7.4
+    redis: pytest<8.0.0
+    {py3.6,py3.7}-redis: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-redis: pytest-asyncio
+    redis-v3: redis~=3.0
+    redis-v4: redis~=4.0
+    redis-v5: redis~=5.0
+    redis-latest: redis
+
+    # Requests
+    requests: requests>=2.0
+
+    # RQ (Redis Queue)
+    # https://github.com/jamesls/fakeredis/issues/245
+    rq-v{0.6}: fakeredis<1.0
+    rq-v{0.6}: redis<3.2.2
+    rq-v{0.13,1.0,1.5,1.10}: fakeredis>=1.0,<1.7.4
+    rq-v{1.15,1.16}: fakeredis
+    {py3.6,py3.7}-rq-v{1.15,1.16}: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    rq-latest: fakeredis
+    {py3.6,py3.7}-rq-latest: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    rq-v0.6: rq~=0.6.0
+    rq-v0.13: rq~=0.13.0
+    rq-v1.0: rq~=1.0.0
+    rq-v1.5: rq~=1.5.0
+    rq-v1.10: rq~=1.10.0
+    rq-v1.15: rq~=1.15.0
+    rq-v1.16: rq~=1.16.0
+    rq-latest: rq
+
+    # Sanic
+    sanic: websockets<11.0
+    sanic: aiohttp
+    sanic-v{24.6}: sanic_testing
+    sanic-latest: sanic_testing
+    {py3.6}-sanic: aiocontextvars==0.2.1
+    sanic-v0.8: sanic~=0.8.0
+    sanic-v20: sanic~=20.0
+    sanic-v24.6: sanic~=24.6.0
+    sanic-latest: sanic
+
+    # === Integrations - Auto-generated ===
+    # These come from the populate_tox.py script. Eventually we should move all
+    # integration tests there.
+
+    {% for group, integrations in groups.items() %}
+    # ~~~ {{ group }} ~~~
+    {% for integration in integrations %}
+    {% for release in integration.releases %}
+    {% if integration.extra %}
+    {{ integration.name }}-v{{ release }}: {{ integration.package }}[{{ integration.extra }}]=={{ release }}
+    {% else %}
+    {{ integration.name }}-v{{ release }}: {{ integration.package }}=={{ release }}
+    {% endif %}
+    {% endfor %}
+    {% for dep in integration.dependencies %}
+    {{ dep }}
+    {% endfor %}
+
+    {% endfor %}
+
+    {% endfor %}
+
+setenv =
+    PYTHONDONTWRITEBYTECODE=1
+    OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+    COVERAGE_FILE=.coverage-sentry-{envname}
+    py3.6: COVERAGE_RCFILE=.coveragerc36
+
+    django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
+
+    common: TESTPATH=tests
+    gevent: TESTPATH=tests
+    aiohttp: TESTPATH=tests/integrations/aiohttp
+    anthropic: TESTPATH=tests/integrations/anthropic
+    ariadne: TESTPATH=tests/integrations/ariadne
+    arq: TESTPATH=tests/integrations/arq
+    asgi: TESTPATH=tests/integrations/asgi
+    asyncpg: TESTPATH=tests/integrations/asyncpg
+    aws_lambda: TESTPATH=tests/integrations/aws_lambda
+    beam: TESTPATH=tests/integrations/beam
+    boto3: TESTPATH=tests/integrations/boto3
+    bottle: TESTPATH=tests/integrations/bottle
+    celery: TESTPATH=tests/integrations/celery
+    chalice: TESTPATH=tests/integrations/chalice
+    clickhouse_driver: TESTPATH=tests/integrations/clickhouse_driver
+    cohere: TESTPATH=tests/integrations/cohere
+    cloud_resource_context: TESTPATH=tests/integrations/cloud_resource_context
+    django: TESTPATH=tests/integrations/django
+    dramatiq: TESTPATH=tests/integrations/dramatiq
+    falcon: TESTPATH=tests/integrations/falcon
+    fastapi:  TESTPATH=tests/integrations/fastapi
+    flask: TESTPATH=tests/integrations/flask
+    gcp: TESTPATH=tests/integrations/gcp
+    gql: TESTPATH=tests/integrations/gql
+    graphene: TESTPATH=tests/integrations/graphene
+    grpc: TESTPATH=tests/integrations/grpc
+    httpx: TESTPATH=tests/integrations/httpx
+    huey: TESTPATH=tests/integrations/huey
+    huggingface_hub: TESTPATH=tests/integrations/huggingface_hub
+    langchain: TESTPATH=tests/integrations/langchain
+    launchdarkly: TESTPATH=tests/integrations/launchdarkly
+    litestar: TESTPATH=tests/integrations/litestar
+    loguru: TESTPATH=tests/integrations/loguru
+    openai: TESTPATH=tests/integrations/openai
+    openfeature: TESTPATH=tests/integrations/openfeature
+    opentelemetry: TESTPATH=tests/integrations/opentelemetry
+    potel: TESTPATH=tests/integrations/opentelemetry
+    pure_eval: TESTPATH=tests/integrations/pure_eval
+    pymongo: TESTPATH=tests/integrations/pymongo
+    pyramid: TESTPATH=tests/integrations/pyramid
+    quart: TESTPATH=tests/integrations/quart
+    ray: TESTPATH=tests/integrations/ray
+    redis: TESTPATH=tests/integrations/redis
+    redis_py_cluster_legacy: TESTPATH=tests/integrations/redis_py_cluster_legacy
+    requests: TESTPATH=tests/integrations/requests
+    rq: TESTPATH=tests/integrations/rq
+    sanic: TESTPATH=tests/integrations/sanic
+    spark: TESTPATH=tests/integrations/spark
+    sqlalchemy: TESTPATH=tests/integrations/sqlalchemy
+    starlette: TESTPATH=tests/integrations/starlette
+    starlite: TESTPATH=tests/integrations/starlite
+    statsig: TESTPATH=tests/integrations/statsig
+    strawberry: TESTPATH=tests/integrations/strawberry
+    tornado: TESTPATH=tests/integrations/tornado
+    trytond: TESTPATH=tests/integrations/trytond
+    typer: TESTPATH=tests/integrations/typer
+    unleash: TESTPATH=tests/integrations/unleash
+    socket: TESTPATH=tests/integrations/socket
+
+passenv =
+    SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID
+    SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY
+    SENTRY_PYTHON_TEST_POSTGRES_HOST
+    SENTRY_PYTHON_TEST_POSTGRES_USER
+    SENTRY_PYTHON_TEST_POSTGRES_PASSWORD
+    SENTRY_PYTHON_TEST_POSTGRES_NAME
+
+usedevelop = True
+
+extras =
+    bottle: bottle
+    falcon: falcon
+    flask: flask
+    pymongo: pymongo
+
+basepython =
+    py3.6: python3.6
+    py3.7: python3.7
+    py3.8: python3.8
+    py3.9: python3.9
+    py3.10: python3.10
+    py3.11: python3.11
+    py3.12: python3.12
+    py3.13: python3.13
+
+    # Python version is pinned here because flake8 actually behaves differently
+    # depending on which version is used. You can patch this out to point to
+    # some random Python 3 binary, but then you get guaranteed mismatches with
+    # CI. Other tools such as mypy and black have options that pin the Python
+    # version.
+    linters: python3.12
+
+commands =
+    {py3.7,py3.8}-boto3: pip install urllib3<2.0.0
+
+    ; https://github.com/pallets/flask/issues/4455
+    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: pip install "itsdangerous>=0.24,<2.0" "markupsafe<2.0.0" "jinja2<3.1.1"
+
+    ; Running `pytest` as an executable suffers from an import error
+    ; when loading tests in scenarios. In particular, django fails to
+    ; load the settings from the test module.
+    python -m pytest {env:TESTPATH} -o junit_suite_name={envname} {posargs}
+
+[testenv:linters]
+commands =
+    flake8 tests sentry_sdk
+    black --check tests sentry_sdk
+    mypy sentry_sdk

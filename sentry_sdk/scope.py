@@ -11,8 +11,12 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.flag_utils import FlagBuffer, DEFAULT_FLAG_CAPACITY
-from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
+from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
+from sentry_sdk.profiler.continuous_profiler import (
+    get_profiler_id,
+    try_autostart_continuous_profiler,
+    try_profile_lifecycle_trace_start,
+)
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
@@ -621,6 +625,11 @@ class Scope:
         """
         client = self.get_client()
         if not client.options.get("propagate_traces"):
+            warnings.warn(
+                "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             return
 
         span = kwargs.pop("span", None)
@@ -1038,6 +1047,18 @@ class Scope:
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
+        # update the sample rate in the dsc
+        if transaction.sample_rate is not None:
+            propagation_context = self.get_active_propagation_context()
+            if propagation_context:
+                dsc = propagation_context.dynamic_sampling_context
+                if dsc is not None:
+                    dsc["sample_rate"] = str(transaction.sample_rate)
+            if transaction._baggage:
+                transaction._baggage.sentry_items["sample_rate"] = str(
+                    transaction.sample_rate
+                )
+
         if transaction.sampled:
             profile = Profile(
                 transaction.sampled, transaction._start_timestamp_monotonic_ns
@@ -1045,6 +1066,14 @@ class Scope:
             profile._set_initial_sampling_decision(sampling_context=sampling_context)
 
             transaction._profile = profile
+
+            transaction._continuous_profile = try_profile_lifecycle_trace_start()
+
+            # Typically, the profiler is set when the transaction is created. But when
+            # using the auto lifecycle, the profiler isn't running when the first
+            # transaction is started. So make sure we update the profiler id on it.
+            if transaction._continuous_profile is not None:
+                transaction.set_profiler_id(get_profiler_id())
 
             # we don't bother to keep spans if we already know we're not going to
             # send the transaction
@@ -1378,6 +1407,14 @@ class Scope:
             else:
                 contexts["trace"] = self.get_trace_context()
 
+    def _apply_flags_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+        flags = self.flags.get()
+        if len(flags) > 0:
+            event.setdefault("contexts", {}).setdefault("flags", {}).update(
+                {"values": flags}
+            )
+
     def _drop(self, cause, ty):
         # type: (Any, str) -> Optional[Any]
         logger.info("%s (%s) dropped event", ty, cause)
@@ -1476,6 +1513,7 @@ class Scope:
 
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
+            self._apply_flags_to_event(event, hint, options)
 
         event = self.run_error_processors(event, hint)
         if event is None:
@@ -1518,13 +1556,19 @@ class Scope:
             self._propagation_context = scope._propagation_context
         if scope._session:
             self._session = scope._session
+        if scope._flags:
+            if not self._flags:
+                self._flags = deepcopy(scope._flags)
+            else:
+                for flag in scope._flags.get():
+                    self._flags.set(flag["flag"], flag["result"])
 
     def update_from_kwargs(
         self,
         user=None,  # type: Optional[Any]
         level=None,  # type: Optional[LogLevelStr]
         extras=None,  # type: Optional[Dict[str, Any]]
-        contexts=None,  # type: Optional[Dict[str, Any]]
+        contexts=None,  # type: Optional[Dict[str, Dict[str, Any]]]
         tags=None,  # type: Optional[Dict[str, str]]
         fingerprint=None,  # type: Optional[List[str]]
     ):

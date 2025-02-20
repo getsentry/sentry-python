@@ -1,18 +1,16 @@
 import concurrent.futures as cf
 import sys
+import copy
+import threading
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk.integrations.feature_flags import (
-    FeatureFlagsIntegration,
-    add_feature_flag,
-)
+from sentry_sdk.feature_flags import add_feature_flag, FlagBuffer
 
 
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
-    uninstall_integration(FeatureFlagsIntegration.identifier)
-    sentry_init(integrations=[FeatureFlagsIntegration()])
+    sentry_init()
 
     add_feature_flag("hello", False)
     add_feature_flag("world", True)
@@ -34,8 +32,7 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
 def test_featureflags_integration_threaded(
     sentry_init, capture_events, uninstall_integration
 ):
-    uninstall_integration(FeatureFlagsIntegration.identifier)
-    sentry_init(integrations=[FeatureFlagsIntegration()])
+    sentry_init()
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
@@ -86,8 +83,7 @@ def test_featureflags_integration_asyncio(
 ):
     asyncio = pytest.importorskip("asyncio")
 
-    uninstall_integration(FeatureFlagsIntegration.identifier)
-    sentry_init(integrations=[FeatureFlagsIntegration()])
+    sentry_init()
     events = capture_events()
 
     # Capture an eval before we split isolation scopes.
@@ -131,3 +127,77 @@ def test_featureflags_integration_asyncio(
             {"flag": "world", "result": False},
         ]
     }
+
+
+def test_flag_tracking():
+    """Assert the ring buffer works."""
+    buffer = FlagBuffer(capacity=3)
+    buffer.set("a", True)
+    flags = buffer.get()
+    assert len(flags) == 1
+    assert flags == [{"flag": "a", "result": True}]
+
+    buffer.set("b", True)
+    flags = buffer.get()
+    assert len(flags) == 2
+    assert flags == [{"flag": "a", "result": True}, {"flag": "b", "result": True}]
+
+    buffer.set("c", True)
+    flags = buffer.get()
+    assert len(flags) == 3
+    assert flags == [
+        {"flag": "a", "result": True},
+        {"flag": "b", "result": True},
+        {"flag": "c", "result": True},
+    ]
+
+    buffer.set("d", False)
+    flags = buffer.get()
+    assert len(flags) == 3
+    assert flags == [
+        {"flag": "b", "result": True},
+        {"flag": "c", "result": True},
+        {"flag": "d", "result": False},
+    ]
+
+    buffer.set("e", False)
+    buffer.set("f", False)
+    flags = buffer.get()
+    assert len(flags) == 3
+    assert flags == [
+        {"flag": "d", "result": False},
+        {"flag": "e", "result": False},
+        {"flag": "f", "result": False},
+    ]
+
+
+def test_flag_buffer_concurrent_access():
+    buffer = FlagBuffer(capacity=100)
+    error_occurred = False
+
+    def writer():
+        for i in range(1_000_000):
+            buffer.set(f"key_{i}", True)
+
+    def reader():
+        nonlocal error_occurred
+
+        try:
+            for _ in range(1000):
+                copy.deepcopy(buffer)
+        except RuntimeError:
+            error_occurred = True
+
+    writer_thread = threading.Thread(target=writer)
+    reader_thread = threading.Thread(target=reader)
+
+    writer_thread.start()
+    reader_thread.start()
+
+    writer_thread.join(timeout=5)
+    reader_thread.join(timeout=5)
+
+    # This should always be false. If this ever fails we know we have concurrent access to a
+    # shared resource. When deepcopying we should have exclusive access to the underlying
+    # memory.
+    assert error_occurred is False

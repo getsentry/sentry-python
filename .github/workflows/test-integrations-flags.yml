@@ -1,0 +1,103 @@
+# Do not edit this YAML file. This file is generated automatically by executing
+# python scripts/split_tox_gh_actions/split_tox_gh_actions.py
+# The template responsible for it is in
+# scripts/split_tox_gh_actions/templates/base.jinja
+name: Test Flags
+on:
+  push:
+    branches:
+      - master
+      - release/**
+      - potel-base
+  pull_request:
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  BUILD_CACHE_KEY: ${{ github.sha }}
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dist-serverless
+jobs:
+  test-flags-pinned:
+    name: Flags (pinned)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.7","3.8","3.9","3.12","3.13"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+      - name: Setup Test Env
+        run: |
+          pip install "coverage[toml]" tox
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test launchdarkly pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-launchdarkly"
+      - name: Test openfeature pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openfeature"
+      - name: Test statsig pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-statsig"
+      - name: Test unleash pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-unleash"
+      - name: Generate coverage XML (Python 3.6)
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
+        run: |
+          export COVERAGE_RCFILE=.coveragerc36
+          coverage combine .coverage-sentry-*
+          coverage xml --ignore-errors
+      - name: Generate coverage XML
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
+        run: |
+          coverage combine .coverage-sentry-*
+          coverage xml
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5.3.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugin: noop
+          verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
+          verbose: true
+  check_required_tests:
+    name: All pinned Flags tests passed
+    needs: test-flags-pinned
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check for failures
+        if: contains(needs.test-flags-pinned.result, 'failure') || contains(needs.test-flags-pinned.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

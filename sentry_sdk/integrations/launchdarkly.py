@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.flag_utils import flag_error_processor
 
 try:
     import ldclient
@@ -41,8 +40,7 @@ class LaunchDarklyIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        scope = sentry_sdk.get_current_scope()
-        scope.add_error_processor(flag_error_processor)
+        pass
 
 
 class LaunchDarklyHook(Hook):

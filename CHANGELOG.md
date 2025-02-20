@@ -1,5 +1,99 @@
 # Changelog
 
+## 2.22.0
+
+### Various fixes & improvements
+
+- **New integration:** Add [Statsig](https://statsig.com/) integration (#4022) by @aliu39
+
+  For more information, see the documentation for the [StatsigIntegration](https://docs.sentry.io/platforms/python/integrations/statsig/).
+
+- Profiling: Continuous profiling lifecycle (#4017) by @Zylphrex
+- Fix: Revert "feat(tracing): Add `propagate_traces` deprecation warning (#3899)" (#4055) by @cmanallen
+- Tests: Generate Web 1 group tox entries by toxgen script (#3980) by @sentrivana
+- Tests: Generate Web 2 group tox entries by toxgen script (#3981) by @sentrivana
+- Tests: Generate Tasks group tox entries by toxgen script (#3976) by @sentrivana
+- Tests: Generate AI group tox entries by toxgen script (#3977) by @sentrivana
+- Tests: Generate DB group tox entries by toxgen script (#3978) by @sentrivana
+- Tests: Generate Misc group tox entries by toxgen script (#3982) by @sentrivana
+- Tests: Generate Flags group tox entries by toxgen script (#3974) by @sentrivana
+- Tests: Generate gRPC tox entries by toxgen script (#3979) by @sentrivana
+- Tests: Remove toxgen cutoff, add statsig (#4048) by @sentrivana
+- Tests: Reduce continuous profiling test flakiness (#4052) by @Zylphrex
+- Tests: Fix Clickhouse test (#4053) by @sentrivana
+- Tests: Fix flaky HTTPS test (#4057) by @Zylphrex
+- Update sample rate in DSC (#4018) by @sentrivana
+- Move the GraphQL group over to the tox gen script (#3975) by @sentrivana
+- Update changelog with `profile_session_sample_rate` (#4046) by @sentrivana
+
+## 2.21.0
+
+### Various fixes & improvements
+
+- Fix incompatibility with new Strawberry version (#4026) by @sentrivana
+- Add `failed_request_status_codes` to Litestar (#4021) by @vrslev
+
+  See https://docs.sentry.io/platforms/python/integrations/litestar/ for details.
+- Deprecate `enable_tracing` option (#3935) by @antonpirker
+
+  The `enable_tracing` option is now deprecated. Please use `traces_sample_rate` instead. See https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate for more information.
+- Explicitly use `None` default when checking metadata (#4039) by @mpurnell1
+- Fix bug where concurrent accesses to the flags property could raise a `RuntimeError` (#4034) by @cmanallen
+- Add more min versions of frameworks (#3973) by @sentrivana
+- Set level based on status code for HTTP client breadcrumbs (#4004) by @sentrivana
+- Don't set transaction status to error on `sys.exit(0)` (#4025) by @sentrivana
+- Continuous profiling sample rate (#4002) by @Zylphrex
+
+  Set `profile_session_sample_rate=1.0` in your `init()` to collect continuous profiles for 100% of profile sessions. See https://docs.sentry.io/platforms/python/profiling/#enable-continuous-profiling for more information.
+- Track and report spans that were dropped (#4005) by @constantinius
+- Change continuous profile buffer size (#3987) by @Zylphrex
+- Handle `MultiPartParserError` to avoid internal sentry crash (#4001) by @orhanhenrik
+- Handle `None` lineno in `get_source_context` (#3925) by @sentrivana
+- Add support for Python 3.12 and 3.13 to AWS Lambda integration (#3965) by @antonpirker
+- Add `propagate_traces` deprecation warning (#3899) by @mgaligniana
+- Check that `__module__` is `str` (#3942) by @szokeasaurusrex
+- Add `__repr__` to `Baggage` (#4043) by @szokeasaurusrex
+- Fix a typo (#3923) by @antonpirker
+- Fix various CI errors on master (#4009) by @Zylphrex
+- Split gevent tests off (#3964) by @sentrivana
+- Add tox generation script, but don't use it yet (#3971) by @sentrivana
+- Use `httpx_mock` in `test_httpx` (#3967) by @sl0thentr0py
+- Fix typo in test name (#4036) by @szokeasaurusrex
+- Fix mypy (#4019) by @sentrivana
+- Test Celery's latest RC (#3938) by @sentrivana
+- Bump `actions/create-github-app-token` from `1.11.2` to `1.11.3` (#4023) by @dependabot
+- Bump `actions/create-github-app-token` from `1.11.1` to `1.11.2` (#4015) by @dependabot
+- Bump `codecov/codecov-action` from `5.1.2` to `5.3.1` (#3995) by @dependabot
+
+## 2.20.0
+
+- **New integration:** Add [Typer](https://typer.tiangolo.com/) integration (#3869) by @patrick91
+
+  For more information, see the documentation for the [TyperIntegration](https://docs.sentry.io/platforms/python/integrations/typer/).
+
+- **New integration:** Add [Unleash](https://www.getunleash.io/) feature flagging integration (#3888) by @aliu39
+
+  For more information, see the documentation for the [UnleashIntegration](https://docs.sentry.io/platforms/python/integrations/unleash/).
+
+- Add custom tracking of feature flag evaluations (#3860) by @aliu39
+- Feature Flags: Register LD hook in setup instead of init, and don't check for initialization (#3890) by @aliu39
+- Feature Flags: Moved adding of `flags` context into Scope (#3917) by @antonpirker
+- Create a separate group for feature flag test suites (#3911) by @sentrivana
+- Fix flaky LaunchDarkly tests (#3896) by @aliu39
+- Fix LRU cache copying (#3883) by @ffelixg
+- Fix cache pollution from mutable reference (#3887) by @cmanallen
+- Centralize minimum version checking (#3910) by @sentrivana
+- Support SparkIntegration activation after SparkContext created (#3411) by @seyoon-lim
+- Preserve ARQ enqueue_job __kwdefaults__ after patching (#3903) by @danmr
+- Add Github workflow to comment on issues when a fix was released (#3866) by @antonpirker
+- Update test matrix for Sanic (#3904) by @antonpirker
+- Rename scripts (#3885) by @sentrivana
+- Fix CI (#3878) by @sentrivana
+- Treat `potel-base` as release branch in CI (#3912) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 1.11.0 to 1.11.1 (#3893) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.0.7 to 5.1.1 (#3867) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.1.1 to 5.1.2 (#3892) by @dependabot
+
 ## 2.19.2
 
 ### Various fixes & improvements
@@ -54,6 +148,14 @@
 ## 2.18.0
 
 ### Various fixes & improvements
+
+- **New integration:** Add [LaunchDarkly](https://launchdarkly.com/) integration (#3648) by @cmanallen
+
+  For more information, see the documentation for the [LaunchDarklyIntegration](https://docs.sentry.io/platforms/python/integrations/launchdarkly/).
+
+- **New integration:** Add [OpenFeature](https://openfeature.dev/) feature flagging integration (#3648) by @cmanallen
+
+  For more information, see the documentation for the [OpenFeatureIntegration](https://docs.sentry.io/platforms/python/integrations/openfeature/).
 
 - Add LaunchDarkly and OpenFeature integration (#3648) by @cmanallen
 - Correct typo in a comment (#3726) by @szokeasaurusrex

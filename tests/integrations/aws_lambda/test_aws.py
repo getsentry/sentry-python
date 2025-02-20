@@ -38,10 +38,9 @@ import pytest
 
 RUNTIMES_TO_TEST = [
     "python3.8",
-    "python3.9",
     "python3.10",
-    "python3.11",
     "python3.12",
+    "python3.13",
 ]
 
 LAMBDA_PRELUDE = """
@@ -317,9 +316,6 @@ def test_request_data(run_lambda_function):
     }
 
 
-@pytest.mark.xfail(
-    reason="Amazon changed something (2024-10-01) and on Python 3.9+ our SDK can not capture events in the init phase of the Lambda function anymore. We need to fix this somehow."
-)
 def test_init_error(run_lambda_function, lambda_runtime):
     envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE

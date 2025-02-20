@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.flag_utils import flag_error_processor
 
 try:
     from openfeature import api
@@ -21,9 +20,6 @@ class OpenFeatureIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        scope = sentry_sdk.get_current_scope()
-        scope.add_error_processor(flag_error_processor)
-
         # Register the hook within the global openfeature hooks list.
         api.add_hooks(hooks=[OpenFeatureHook()])
 

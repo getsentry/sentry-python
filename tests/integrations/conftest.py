@@ -32,3 +32,24 @@ def capture_exceptions(monkeypatch):
         return errors
 
     return inner
+
+
+parametrize_test_configurable_status_codes = pytest.mark.parametrize(
+    ("failed_request_status_codes", "status_code", "expected_error"),
+    (
+        (None, 500, True),
+        (None, 400, False),
+        ({500, 501}, 500, True),
+        ({500, 501}, 401, False),
+        ({*range(400, 500)}, 401, True),
+        ({*range(400, 500)}, 500, False),
+        ({*range(400, 600)}, 300, False),
+        ({*range(400, 600)}, 403, True),
+        ({*range(400, 600)}, 503, True),
+        ({*range(400, 403), 500, 501}, 401, True),
+        ({*range(400, 403), 500, 501}, 405, False),
+        ({*range(400, 403), 500, 501}, 501, True),
+        ({*range(400, 403), 500, 501}, 503, False),
+        (set(), 500, False),
+    ),
+)

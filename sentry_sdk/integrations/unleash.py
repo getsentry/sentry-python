@@ -2,7 +2,6 @@ from functools import wraps
 from typing import Any
 
 import sentry_sdk
-from sentry_sdk.flag_utils import flag_error_processor
 from sentry_sdk.integrations import Integration, DidNotEnable
 
 try:
@@ -17,9 +16,8 @@ class UnleashIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        # Wrap and patch evaluation methods (instance methods)
+        # Wrap and patch evaluation methods (class methods)
         old_is_enabled = UnleashClient.is_enabled
-        old_get_variant = UnleashClient.get_variant
 
         @wraps(old_is_enabled)
         def sentry_is_enabled(self, feature, *args, **kwargs):
@@ -33,23 +31,4 @@ class UnleashIntegration(Integration):
 
             return enabled
 
-        @wraps(old_get_variant)
-        def sentry_get_variant(self, feature, *args, **kwargs):
-            # type: (UnleashClient, str, *Any, **Any) -> Any
-            variant = old_get_variant(self, feature, *args, **kwargs)
-            enabled = variant.get("enabled", False)
-
-            # Payloads are not always used as the feature's value for application logic. They
-            # may be used for metrics or debugging context instead. Therefore, we treat every
-            # variant as a boolean toggle, using the `enabled` field.
-            flags = sentry_sdk.get_current_scope().flags
-            flags.set(feature, enabled)
-
-            return variant
-
         UnleashClient.is_enabled = sentry_is_enabled  # type: ignore
-        UnleashClient.get_variant = sentry_get_variant  # type: ignore
-
-        # Error processor
-        scope = sentry_sdk.get_current_scope()
-        scope.add_error_processor(flag_error_processor)
