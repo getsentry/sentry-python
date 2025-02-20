@@ -87,7 +87,11 @@ GROUPS = {
     "Flags": [
         "launchdarkly",
         "openfeature",
+        "statsig",
         "unleash",
+    ],
+    "Gevent": [
+        "gevent",
     ],
     "GraphQL": [
         "ariadne",
@@ -96,7 +100,6 @@ GROUPS = {
         "strawberry",
     ],
     "Network": [
-        "gevent",
         "grpc",
         "httpx",
         "requests",

@@ -1,4 +1,9 @@
-from sentry_sdk.profiler.continuous_profiler import start_profiler, stop_profiler
+from sentry_sdk.profiler.continuous_profiler import (
+    start_profile_session,
+    start_profiler,
+    stop_profile_session,
+    stop_profiler,
+)
 from sentry_sdk.profiler.transaction_profiler import (
     MAX_PROFILE_DURATION_NS,
     PROFILE_MINIMUM_SAMPLES,
@@ -20,8 +25,10 @@ from sentry_sdk.profiler.utils import (
 )
 
 __all__ = [
-    "start_profiler",
-    "stop_profiler",
+    "start_profile_session",
+    "start_profiler",  # TODO: Deprecate this in favor of `start_profile_session`
+    "stop_profile_session",
+    "stop_profiler",  # TODO: Deprecate this in favor of `stop_profile_session`
     # DEPRECATED: The following was re-exported for backwards compatibility. It
     # will be removed from sentry_sdk.profiler in a future release.
     "MAX_PROFILE_DURATION_NS",
