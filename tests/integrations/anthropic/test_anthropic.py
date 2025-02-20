@@ -1,6 +1,5 @@
 from unittest import mock
 
-from sentry_sdk.integrations import DidNotEnable
 
 try:
     from unittest.mock import AsyncMock
