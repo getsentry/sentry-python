@@ -64,7 +64,6 @@ jobs:
       - name: Check Clickhouse Setup
         run: |
           set -x
-          lsof -i :8123
           docker logs clickhouse-test
           curl 'http://localhost:8123/' --data-binary 'SELECT 1'  
       - name: Setup Test Env
