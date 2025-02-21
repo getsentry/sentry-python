@@ -52,14 +52,7 @@
           allow-prereleases: true
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.2
-      - name: Ensure ClickHouse Ready
-        run: |
-          set -x
-          sleep 3
-          docker ps
-          docker logs clickhouse-test
-          curl -i 'http://localhost:8123/' --data-binary 'SELECT * FROM system.build_options'
+        uses: getsentry/action-clickhouse-in-ci@v1.3
       {% endif %}
 
       {% if needs_redis %}
