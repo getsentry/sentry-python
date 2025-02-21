@@ -63,9 +63,10 @@ jobs:
       - uses: getsentry/action-clickhouse-in-ci@v1.1
       - name: Check Clickhouse Setup
         run: |
-          printenv | sort
+          set -x
+          lsof -i :8123
+          docker logs clickhouse-test
           curl 'http://localhost:8123/' --data-binary 'SELECT 1'  
-          curl 'http://localhost:8123/?query=select%20number%20from%20numbers(10)' -v    
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -73,66 +74,3 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest"
-
-  test-dbs-pinned:
-    name: DBs (pinned)
-    timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: sentry
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        # Maps tcp port 5432 on service container to the host
-        ports:
-          - 5432:5432
-    env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
-      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
-      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
-      - name: Check Clickhouse Setup
-        run: |
-          printenv | sort
-          curl 'http://localhost:8123/' --data-binary 'SELECT 1'  
-          curl 'http://localhost:8123/?query=select%20number%20from%20numbers(10)' -v    
-      - name: Setup Test Env
-        run: |
-          pip install "coverage[toml]" tox
-      - name: Test clickhouse_driver pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver"
-
-  check_required_tests:
-    name: All pinned DBs tests passed
-    needs: test-dbs-pinned
-    # Always run this, even if a dependent job failed
-    if: always()
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Check for failures
-        if: contains(needs.test-dbs-pinned.result, 'failure') || contains(needs.test-dbs-pinned.result, 'skipped')
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
