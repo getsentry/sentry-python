@@ -53,14 +53,18 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      CLICKHOUSE_SKIP_USER_SETUP: 1
+      CLICKHOUSE_DATABASE: demo
+      CLICKHOUSE_USER: demo
+      CLICKHOUSE_PASSWORD: demo
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-      - uses: getsentry/action-clickhouse-in-ci@v1.2
+      - name: "Setup ClickHouse Server"
+        id: clickhouse-server          
+        uses: praneeth527/clickhouse-server-action@v1.0.0
       - name: Check Clickhouse Setup
         run: |
           set -x
