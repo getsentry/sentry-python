@@ -69,6 +69,7 @@ jobs:
         run: |
           set -x
           docker ps
+          docker logs clickhouse-test
           curl -i 'http://localhost:8123/' --data-binary 'SELECT 1'  
       - name: Setup Test Env
         run: |
