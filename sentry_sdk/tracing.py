@@ -140,6 +140,7 @@ class TransactionSource(str, Enum):
     VIEW = "view"
 
     def __str__(self):
+        # type: () -> str
         return self.value
 
 
