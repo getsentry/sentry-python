@@ -63,7 +63,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: "Setup ClickHouse Server"
-        id: clickhouse-server          
+        id: clickhouse-server
         uses: getsentry/action-clickhouse-in-ci@v1.2
       - name: Check Clickhouse Setup
         run: |
@@ -71,8 +71,7 @@ jobs:
           sleep 5
           docker ps
           docker logs clickhouse-test
-          curl -i 'http://localhost:8123/'
-          docker logs clickhouse-test
+          curl -sI 'http://localhost:8123/'
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
