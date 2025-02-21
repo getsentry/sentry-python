@@ -65,7 +65,7 @@ jobs:
       - name: "Setup ClickHouse Server"
         id: clickhouse-server
         uses: getsentry/action-clickhouse-in-ci@v1.2
-      - name: Check Clickhouse Setup
+      - name: Ensure ClickHouse Ready
         run: |
           set -x
           sleep 5
