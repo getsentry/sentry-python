@@ -71,7 +71,7 @@ jobs:
           sleep 5
           docker ps
           docker logs clickhouse-test
-          curl -sI 'http://localhost:8123/'
+          curl -sI 'http://localhost:8123/' --binary-data 'SELECT * FROM system.build_options'
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
