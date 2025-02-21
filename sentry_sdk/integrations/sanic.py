@@ -229,9 +229,7 @@ async def _set_transaction(request, route, **_):
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
             route_name = route.name.replace(request.app.name, "").strip(".")
-            scope.set_transaction_name(
-                route_name, source=TransactionSource.COMPONENT
-            )
+            scope.set_transaction_name(route_name, source=TransactionSource.COMPONENT)
 
 
 def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
