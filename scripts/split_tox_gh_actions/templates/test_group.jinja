@@ -52,7 +52,7 @@
           allow-prereleases: true
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.4
+        uses: getsentry/action-clickhouse-in-ci@v1.5
       {% endif %}
 
       {% if needs_redis %}

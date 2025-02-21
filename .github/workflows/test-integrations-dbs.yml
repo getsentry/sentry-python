@@ -60,7 +60,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.4
+        uses: getsentry/action-clickhouse-in-ci@v1.5
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -156,7 +156,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.4
+        uses: getsentry/action-clickhouse-in-ci@v1.5
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
