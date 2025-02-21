@@ -62,7 +62,7 @@ jobs:
       - uses: getsentry/action-clickhouse-in-ci@v1.1
         with:
           docker-run-options: >-
-            -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=0
+            -e CLICKHOUSE_SKIP_USER_SETUP=1
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -160,7 +160,7 @@ jobs:
       - uses: getsentry/action-clickhouse-in-ci@v1.1
         with:
           docker-run-options: >-
-            -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=0
+            -e CLICKHOUSE_SKIP_USER_SETUP=1
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
