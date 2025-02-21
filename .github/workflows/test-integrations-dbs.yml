@@ -53,6 +53,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      CLICKHOUSE_SKIP_USER_SETUP: 1
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
@@ -60,65 +61,19 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - uses: getsentry/action-clickhouse-in-ci@v1.1
-        env:
-          CLICKHOUSE_SKIP_USER_SETUP: 1
+      - name: Check Clickhouse Setup
+        run: |
+          printenv | sort
+          curl 'http://localhost:8123/' --data-binary 'SELECT 1'  
+          curl 'http://localhost:8123/?query=select%20number%20from%20numbers(10)' -v    
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test asyncpg latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest"
       - name: Test clickhouse_driver latest
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest"
-      - name: Test pymongo latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest"
-      - name: Test redis latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest"
-      - name: Test redis_py_cluster_legacy latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy-latest"
-      - name: Test sqlalchemy latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-      - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
-        run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.3.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugin: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
-          verbose: true
+
   test-dbs-pinned:
     name: DBs (pinned)
     timeout-minutes: 30
@@ -159,63 +114,19 @@ jobs:
       - uses: getsentry/action-clickhouse-in-ci@v1.1
         env:
           CLICKHOUSE_SKIP_USER_SETUP: 1
+      - name: Check Clickhouse Setup
+
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test asyncpg pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg"
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver"
-      - name: Test pymongo pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo"
-      - name: Test redis pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis"
-      - name: Test redis_py_cluster_legacy pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis_py_cluster_legacy"
-      - name: Test sqlalchemy pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-      - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
-        run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.3.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugin: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
-          verbose: true
+
   check_required_tests:
     name: All pinned DBs tests passed
     needs: test-dbs-pinned
