@@ -52,6 +52,9 @@
           allow-prereleases: true
       {% if needs_clickhouse %}
       - uses: getsentry/action-clickhouse-in-ci@v1.1
+        with:
+        docker-run-options: >-
+          -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=0
       {% endif %}
 
       {% if needs_redis %}
