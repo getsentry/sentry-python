@@ -51,7 +51,15 @@
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
       {% if needs_clickhouse %}
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.2
+      - name: Ensure ClickHouse Ready
+        run: |
+          set -x
+          sleep 3
+          docker ps
+          docker logs clickhouse-test
+          curl -i 'http://localhost:8123/' --data-binary 'SELECT * FROM system.build_options'
       {% endif %}
 
       {% if needs_redis %}
