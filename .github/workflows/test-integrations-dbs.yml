@@ -53,9 +53,9 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      CLICKHOUSE_DATABASE: demo
-      CLICKHOUSE_USER: demo
-      CLICKHOUSE_PASSWORD: demo
+      # CLICKHOUSE_DATABASE: demo
+      # CLICKHOUSE_USER: demo
+      # CLICKHOUSE_PASSWORD: demo
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
@@ -68,9 +68,11 @@ jobs:
       - name: Check Clickhouse Setup
         run: |
           set -x
+          sleep 5
           docker ps
           docker logs clickhouse-test
-          curl -i 'http://localhost:8123/' --data-binary 'SELECT 1'  
+          curl -i 'http://localhost:8123/'
+          docker logs clickhouse-test
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
