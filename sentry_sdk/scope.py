@@ -1397,7 +1397,7 @@ class Scope:
         user=None,  # type: Optional[Any]
         level=None,  # type: Optional[LogLevelStr]
         extras=None,  # type: Optional[Dict[str, Any]]
-        contexts=None,  # type: Optional[Dict[str, Any]]
+        contexts=None,  # type: Optional[Dict[str, Dict[str, Any]]]
         tags=None,  # type: Optional[Dict[str, str]]
         fingerprint=None,  # type: Optional[List[str]]
     ):
