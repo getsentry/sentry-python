@@ -88,7 +88,7 @@ def _wrap_func(func):
                 headers,
                 op=OP.FUNCTION_GCP,
                 name=environ.get("FUNCTION_NAME", ""),
-                source=TransactionSource.COMPONENT.value,
+                source=TransactionSource.COMPONENT,
                 origin=GcpIntegration.origin,
             )
             sampling_context = {

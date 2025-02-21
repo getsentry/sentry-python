@@ -713,7 +713,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
-        source = TransactionSource.ROUTE.value
+        source = TransactionSource.ROUTE
 
     scope.set_transaction_name(name, source=source)
     logger.debug(
@@ -728,9 +728,9 @@ def _get_transaction_from_middleware(app, asgi_scope, integration):
 
     if integration.transaction_style == "endpoint":
         name = transaction_from_function(app.__class__)
-        source = TransactionSource.COMPONENT.value
+        source = TransactionSource.COMPONENT
     elif integration.transaction_style == "url":
         name = _transaction_name_from_router(asgi_scope)
-        source = TransactionSource.ROUTE.value
+        source = TransactionSource.ROUTE
 
     return name, source

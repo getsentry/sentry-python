@@ -42,7 +42,7 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                         metadata,
                         op=OP.GRPC_SERVER,
                         name=name,
-                        source=TransactionSource.CUSTOM.value,
+                        source=TransactionSource.CUSTOM,
                         origin=SPAN_ORIGIN,
                     )
 

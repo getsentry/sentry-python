@@ -370,7 +370,7 @@ class TransactionTestConfig:
             url="/message",
             expected_status=200,
             expected_transaction_name="hi",
-            expected_source=TransactionSource.COMPONENT.value,
+            expected_source=TransactionSource.COMPONENT,
         ),
         TransactionTestConfig(
             # Transaction still recorded when we have an internal server error
@@ -378,7 +378,7 @@ class TransactionTestConfig:
             url="/500",
             expected_status=500,
             expected_transaction_name="fivehundred",
-            expected_source=TransactionSource.COMPONENT.value,
+            expected_source=TransactionSource.COMPONENT,
         ),
         TransactionTestConfig(
             # By default, no transaction when we have a 404 error
@@ -393,7 +393,7 @@ class TransactionTestConfig:
             url="/404",
             expected_status=404,
             expected_transaction_name="/404",
-            expected_source=TransactionSource.URL.value,
+            expected_source=TransactionSource.URL,
         ),
         TransactionTestConfig(
             # Transaction can be suppressed for other HTTP statuses, too, by passing config to the integration

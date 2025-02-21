@@ -61,7 +61,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME
-        source = TransactionSource.ROUTE.value
+        source = TransactionSource.ROUTE
     else:
         source = SOURCE_FOR_STYLE[transaction_style]
 

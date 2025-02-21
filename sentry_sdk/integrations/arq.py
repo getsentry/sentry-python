@@ -102,7 +102,7 @@ def patch_run_job():
                 name="unknown arq task",
                 status="ok",
                 op=OP.QUEUE_TASK_ARQ,
-                source=TransactionSource.TASK.value,
+                source=TransactionSource.TASK,
                 origin=ArqIntegration.origin,
             )
 

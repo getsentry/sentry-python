@@ -131,30 +131,33 @@ SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
-class TransactionSource(Enum):
-    CUSTOM = "custom"
-    URL = "url"
-    ROUTE = "route"
-    VIEW = "view"
+class TransactionSource(str, Enum):
     COMPONENT = "component"
+    CUSTOM = "custom"
+    ROUTE = "route"
     TASK = "task"
+    URL = "url"
+    VIEW = "view"
+
+    def __str__(self):
+        return self.value
 
 
 # These are typically high cardinality and the server hates them
 LOW_QUALITY_TRANSACTION_SOURCES = [
-    TransactionSource.URL.value,
+    TransactionSource.URL,
 ]
 
 SOURCE_FOR_STYLE = {
-    "endpoint": TransactionSource.COMPONENT.value,
-    "function_name": TransactionSource.COMPONENT.value,
-    "handler_name": TransactionSource.COMPONENT.value,
-    "method_and_path_pattern": TransactionSource.ROUTE.value,
-    "path": TransactionSource.URL.value,
-    "route_name": TransactionSource.COMPONENT.value,
-    "route_pattern": TransactionSource.ROUTE.value,
-    "uri_template": TransactionSource.ROUTE.value,
-    "url": TransactionSource.ROUTE.value,
+    "endpoint": TransactionSource.COMPONENT,
+    "function_name": TransactionSource.COMPONENT,
+    "handler_name": TransactionSource.COMPONENT,
+    "method_and_path_pattern": TransactionSource.ROUTE,
+    "path": TransactionSource.URL,
+    "route_name": TransactionSource.COMPONENT,
+    "route_pattern": TransactionSource.ROUTE,
+    "uri_template": TransactionSource.ROUTE,
+    "url": TransactionSource.ROUTE,
 }
 
 
@@ -782,7 +785,7 @@ class Transaction(Span):
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
-        source=TransactionSource.CUSTOM.value,  # type: str
+        source=TransactionSource.CUSTOM,  # type: str
         **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None

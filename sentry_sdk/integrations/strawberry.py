@@ -208,7 +208,7 @@ class SentryAsyncExtension(SchemaExtension):
         transaction = self.graphql_span.containing_transaction
         if transaction and self.execution_context.operation_name:
             transaction.name = self.execution_context.operation_name
-            transaction.source = TransactionSource.COMPONENT.value
+            transaction.source = TransactionSource.COMPONENT
             transaction.op = op
 
         self.graphql_span.finish()

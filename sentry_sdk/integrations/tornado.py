@@ -119,7 +119,7 @@ def _handle_request_impl(self):
             # sentry_urldispatcher_resolve is responsible for
             # setting a transaction name later.
             name="generic Tornado request",
-            source=TransactionSource.ROUTE.value,
+            source=TransactionSource.ROUTE,
             origin=TornadoIntegration.origin,
         )
 
@@ -157,7 +157,7 @@ def _make_event_processor(weak_handler):
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
             event["transaction"] = transaction_from_function(method) or ""
-            event["transaction_info"] = {"source": TransactionSource.COMPONENT.value}
+            event["transaction_info"] = {"source": TransactionSource.COMPONENT}
 
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)

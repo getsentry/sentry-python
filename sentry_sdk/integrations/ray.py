@@ -63,7 +63,7 @@ def _patch_ray_remote():
                 op=OP.QUEUE_TASK_RAY,
                 name=qualname_from_function(f),
                 origin=RayIntegration.origin,
-                source=TransactionSource.TASK.value,
+                source=TransactionSource.TASK,
             )
 
             with sentry_sdk.start_transaction(transaction) as transaction:

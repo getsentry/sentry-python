@@ -539,7 +539,7 @@ def test_transaction_name(
     envelopes = capture_envelopes()
 
     sentry_sdk.get_current_scope().set_transaction_name(
-        "/user/{user_id}", source=TransactionSource.ROUTE.value
+        "/user/{user_id}", source=TransactionSource.ROUTE
     )
     metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
     metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
@@ -581,7 +581,7 @@ def test_metric_summaries(
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(
-        op="stuff", name="/foo", source=TransactionSource.ROUTE.value
+        op="stuff", name="/foo", source=TransactionSource.ROUTE
     ) as transaction:
         metrics.increment("root-counter", timestamp=ts)
         with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):

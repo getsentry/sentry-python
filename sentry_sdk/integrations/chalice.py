@@ -67,7 +67,7 @@ def _get_view_function_response(app, view_function, function_args):
                 configured_time = app.lambda_context.get_remaining_time_in_millis()
                 scope.set_transaction_name(
                     app.lambda_context.function_name,
-                    source=TransactionSource.COMPONENT.value,
+                    source=TransactionSource.COMPONENT,
                 )
 
                 scope.add_event_processor(

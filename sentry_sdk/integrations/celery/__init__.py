@@ -319,7 +319,7 @@ def _wrap_tracer(task, f):
                     headers,
                     op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
-                    source=TransactionSource.TASK.value,
+                    source=TransactionSource.TASK,
                     origin=CeleryIntegration.origin,
                 )
                 transaction.name = task.name

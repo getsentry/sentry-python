@@ -270,9 +270,9 @@ class SentryAsgiMiddleware:
         already_set = event["transaction"] != _DEFAULT_TRANSACTION_NAME and event[
             "transaction_info"
         ].get("source") in [
-            TransactionSource.COMPONENT.value,
-            TransactionSource.ROUTE.value,
-            TransactionSource.CUSTOM.value,
+            TransactionSource.COMPONENT,
+            TransactionSource.ROUTE,
+            TransactionSource.CUSTOM,
         ]
         if not already_set:
             name, source = self._get_transaction_name_and_source(
@@ -310,7 +310,7 @@ class SentryAsgiMiddleware:
                 name = transaction_from_function(endpoint) or ""
             else:
                 name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
-                source = TransactionSource.URL.value
+                source = TransactionSource.URL
 
         elif transaction_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
@@ -322,11 +322,11 @@ class SentryAsgiMiddleware:
                     name = path
             else:
                 name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
-                source = TransactionSource.URL.value
+                source = TransactionSource.URL
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
-            source = TransactionSource.ROUTE.value
+            source = TransactionSource.ROUTE
             return name, source
 
         return name, source

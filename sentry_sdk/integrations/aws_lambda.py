@@ -153,7 +153,7 @@ def _wrap_handler(handler):
                 headers,
                 op=OP.FUNCTION_AWS,
                 name=aws_context.function_name,
-                source=TransactionSource.COMPONENT.value,
+                source=TransactionSource.COMPONENT,
                 origin=AwsLambdaIntegration.origin,
             )
             with sentry_sdk.start_transaction(

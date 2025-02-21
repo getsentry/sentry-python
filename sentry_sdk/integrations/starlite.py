@@ -235,7 +235,7 @@ def patch_http_route_handle():
 
             if not tx_name:
                 tx_name = _DEFAULT_TRANSACTION_NAME
-                tx_info = {"source": TransactionSource.ROUTE.value}
+                tx_info = {"source": TransactionSource.ROUTE}
 
             event.update(
                 {

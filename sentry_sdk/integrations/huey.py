@@ -159,7 +159,7 @@ def patch_execute():
                 sentry_headers or {},
                 name=task.name,
                 op=OP.QUEUE_TASK_HUEY,
-                source=TransactionSource.TASK.value,
+                source=TransactionSource.TASK,
                 origin=HueyIntegration.origin,
             )
             transaction.set_status(SPANSTATUS.OK)

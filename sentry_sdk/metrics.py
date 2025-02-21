@@ -63,10 +63,10 @@ _set = set  # set is shadowed below
 
 GOOD_TRANSACTION_SOURCES = frozenset(
     [
-        TransactionSource.ROUTE.value,
-        TransactionSource.VIEW.value,
-        TransactionSource.COMPONENT.value,
-        TransactionSource.TASK.value,
+        TransactionSource.ROUTE,
+        TransactionSource.VIEW,
+        TransactionSource.COMPONENT,
+        TransactionSource.TASK,
     ]
 )
 

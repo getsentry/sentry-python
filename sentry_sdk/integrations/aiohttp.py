@@ -129,7 +129,7 @@ class AioHttpIntegration(Integration):
                         # If this transaction name makes it to the UI, AIOHTTP's
                         # URL resolver did not find a route or died trying.
                         name="generic AIOHTTP request",
-                        source=TransactionSource.ROUTE.value,
+                        source=TransactionSource.ROUTE,
                         origin=AioHttpIntegration.origin,
                     )
                     with sentry_sdk.start_transaction(

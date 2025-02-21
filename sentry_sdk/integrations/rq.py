@@ -57,7 +57,7 @@ class RqIntegration(Integration):
                     job.meta.get("_sentry_trace_headers") or {},
                     op=OP.QUEUE_TASK_RQ,
                     name="unknown RQ task",
-                    source=TransactionSource.TASK.value,
+                    source=TransactionSource.TASK,
                     origin=RqIntegration.origin,
                 )
 

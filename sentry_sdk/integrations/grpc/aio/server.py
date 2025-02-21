@@ -48,7 +48,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                     dict(context.invocation_metadata()),
                     op=OP.GRPC_SERVER,
                     name=name,
-                    source=TransactionSource.CUSTOM.value,
+                    source=TransactionSource.CUSTOM,
                     origin=SPAN_ORIGIN,
                 )
 

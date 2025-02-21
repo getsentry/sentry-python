@@ -192,7 +192,7 @@ async def _context_enter(request):
         op=OP.HTTP_SERVER,
         # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
         name=request.path,
-        source=TransactionSource.URL.value,
+        source=TransactionSource.URL,
         origin=SanicIntegration.origin,
     )
     request.ctx._sentry_transaction = sentry_sdk.start_transaction(
@@ -230,7 +230,7 @@ async def _set_transaction(request, route, **_):
             scope = sentry_sdk.get_current_scope()
             route_name = route.name.replace(request.app.name, "").strip(".")
             scope.set_transaction_name(
-                route_name, source=TransactionSource.COMPONENT.value
+                route_name, source=TransactionSource.COMPONENT
             )
 
 
@@ -306,11 +306,11 @@ def _legacy_router_get(self, *args):
                     sanic_route = sanic_route[len(sanic_app_name) + 1 :]
 
                 scope.set_transaction_name(
-                    sanic_route, source=TransactionSource.COMPONENT.value
+                    sanic_route, source=TransactionSource.COMPONENT
                 )
             else:
                 scope.set_transaction_name(
-                    rv[0].__name__, source=TransactionSource.COMPONENT.value
+                    rv[0].__name__, source=TransactionSource.COMPONENT
                 )
 
     return rv

@@ -115,7 +115,7 @@ class SentryWsgiMiddleware:
                             environ,
                             op=OP.HTTP_SERVER,
                             name="generic WSGI request",
-                            source=TransactionSource.ROUTE.value,
+                            source=TransactionSource.ROUTE,
                             origin=self.span_origin,
                         )
 

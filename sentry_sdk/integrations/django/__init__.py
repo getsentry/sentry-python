@@ -398,7 +398,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
         if transaction_name is None:
             transaction_name = request.path_info
-            source = TransactionSource.URL.value
+            source = TransactionSource.URL
         else:
             source = SOURCE_FOR_STYLE[transaction_style]
 
