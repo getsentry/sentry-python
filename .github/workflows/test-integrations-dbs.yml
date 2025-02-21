@@ -112,16 +112,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - uses: getsentry/action-clickhouse-in-ci@v1.1
-        env:
-          CLICKHOUSE_SKIP_USER_SETUP: 1
       - name: Check Clickhouse Setup
-
+        run: |
+          printenv | sort
+          curl 'http://localhost:8123/' --data-binary 'SELECT 1'  
+          curl 'http://localhost:8123/?query=select%20number%20from%20numbers(10)' -v    
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
-      - name: Erase coverage
-        run: |
-          coverage erase
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
