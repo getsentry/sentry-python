@@ -60,11 +60,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - uses: getsentry/action-clickhouse-in-ci@v1.2
       - name: Check Clickhouse Setup
         run: |
           set -x
-          docker logs clickhouse-test
           curl 'http://localhost:8123/' --data-binary 'SELECT 1'  
       - name: Setup Test Env
         run: |
