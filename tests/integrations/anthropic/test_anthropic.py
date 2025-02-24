@@ -528,9 +528,9 @@ def test_streaming_create_message_with_input_json_delta(
         assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
             messages
         )
-        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute([
-            {"type": "text", "text": "{'location': 'San Francisco, CA'}"}
-        ])  # we do not record InputJSONDelta because it could contain PII
+        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+            [{"type": "text", "text": "{'location': 'San Francisco, CA'}"}]
+        )  # we do not record InputJSONDelta because it could contain PII
 
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
@@ -667,9 +667,9 @@ async def test_streaming_create_message_with_input_json_delta_async(
         assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
             messages
         )
-        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute([
-            {"type": "text", "text": "{'location': 'San Francisco, CA'}"}
-        ])  # we do not record InputJSONDelta because it could contain PII
+        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+            [{"type": "text", "text": "{'location': 'San Francisco, CA'}"}]
+        )  # we do not record InputJSONDelta because it could contain PII
 
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
@@ -832,10 +832,10 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init, capture_events):
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute([
-        {"type": "text", "text": "{'test': 'data','more': 'json'}"}
-    ])
-    assert span["data"]["ai.streaming"] == True
+    assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
+        [{"type": "text", "text": "{'test': 'data','more': 'json'}"}]
+    )
+    assert span["data"]["ai.streaming"] is True
     assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
     assert span["measurements"]["ai_completion_tokens_used"]["value"] == 20
     assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
