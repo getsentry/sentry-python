@@ -12,6 +12,7 @@ from opentelemetry.context import Context
 from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
 import sentry_sdk
+from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
 from sentry_sdk.utils import get_current_thread_meta
@@ -63,6 +64,7 @@ class SentrySpanProcessor(SpanProcessor):
         self._children_spans = defaultdict(
             list
         )  # type: DefaultDict[int, List[ReadableSpan]]
+        self._dropped_spans = defaultdict(lambda: 0)
 
     def on_start(self, span, parent_context=None):
         # type: (Span, Optional[Context]) -> None
@@ -148,7 +150,17 @@ class SentrySpanProcessor(SpanProcessor):
             span_json = self._span_to_json(child)
             if span_json:
                 spans.append(span_json)
-        transaction_event["spans"] = spans
+
+        dropped_spans = 0
+        if span in self._dropped_spans:
+            dropped_spans = self._dropped_spans.pop(span)
+
+        if dropped_spans == 0:
+            transaction_event["spans"] = spans
+        else:
+            transaction_event["spans"] = AnnotatedValue(
+                spans, {"len": len(spans) + dropped_spans}
+            )
         # TODO-neel-potel sort and cutoff max spans
 
         sentry_sdk.capture_event(transaction_event)
@@ -166,6 +178,8 @@ class SentrySpanProcessor(SpanProcessor):
         children_spans = self._children_spans[span.parent.span_id]
         if len(children_spans) < max_spans:
             children_spans.append(span)
+        else:
+            self._dropped_spans[span.parent.span_id] += 1
 
     def _collect_children(self, span):
         # type: (ReadableSpan) -> List[ReadableSpan]
