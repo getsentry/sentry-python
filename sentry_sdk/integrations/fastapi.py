@@ -5,7 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.utils import (
     transaction_from_function,
     logger,
@@ -61,7 +61,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME
-        source = TRANSACTION_SOURCE_ROUTE
+        source = TransactionSource.ROUTE
     else:
         source = SOURCE_FOR_STYLE[transaction_style]
 

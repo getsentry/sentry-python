@@ -4,7 +4,7 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     event_from_exception,
     logger,
@@ -63,7 +63,7 @@ def _patch_ray_remote():
                 op=OP.QUEUE_TASK_RAY,
                 name=qualname_from_function(f),
                 origin=RayIntegration.origin,
-                source=TRANSACTION_SOURCE_TASK,
+                source=TransactionSource.TASK,
             )
 
             with sentry_sdk.start_transaction(transaction) as transaction:

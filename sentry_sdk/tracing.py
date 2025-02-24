@@ -2,6 +2,7 @@ import uuid
 import random
 import warnings
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
@@ -15,6 +16,7 @@ from sentry_sdk.utils import (
 )
 
 from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
@@ -126,30 +128,37 @@ if TYPE_CHECKING:
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
+
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
-TRANSACTION_SOURCE_CUSTOM = "custom"
-TRANSACTION_SOURCE_URL = "url"
-TRANSACTION_SOURCE_ROUTE = "route"
-TRANSACTION_SOURCE_VIEW = "view"
-TRANSACTION_SOURCE_COMPONENT = "component"
-TRANSACTION_SOURCE_TASK = "task"
+class TransactionSource(str, Enum):
+    COMPONENT = "component"
+    CUSTOM = "custom"
+    ROUTE = "route"
+    TASK = "task"
+    URL = "url"
+    VIEW = "view"
+
+    def __str__(self):
+        # type: () -> str
+        return self.value
+
 
 # These are typically high cardinality and the server hates them
 LOW_QUALITY_TRANSACTION_SOURCES = [
-    TRANSACTION_SOURCE_URL,
+    TransactionSource.URL,
 ]
 
 SOURCE_FOR_STYLE = {
-    "endpoint": TRANSACTION_SOURCE_COMPONENT,
-    "function_name": TRANSACTION_SOURCE_COMPONENT,
-    "handler_name": TRANSACTION_SOURCE_COMPONENT,
-    "method_and_path_pattern": TRANSACTION_SOURCE_ROUTE,
-    "path": TRANSACTION_SOURCE_URL,
-    "route_name": TRANSACTION_SOURCE_COMPONENT,
-    "route_pattern": TRANSACTION_SOURCE_ROUTE,
-    "uri_template": TRANSACTION_SOURCE_ROUTE,
-    "url": TRANSACTION_SOURCE_ROUTE,
+    "endpoint": TransactionSource.COMPONENT,
+    "function_name": TransactionSource.COMPONENT,
+    "handler_name": TransactionSource.COMPONENT,
+    "method_and_path_pattern": TransactionSource.ROUTE,
+    "path": TransactionSource.URL,
+    "route_name": TransactionSource.COMPONENT,
+    "route_pattern": TransactionSource.ROUTE,
+    "uri_template": TransactionSource.ROUTE,
+    "url": TransactionSource.ROUTE,
 }
 
 
@@ -777,7 +786,7 @@ class Transaction(Span):
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
-        source=TRANSACTION_SOURCE_CUSTOM,  # type: str
+        source=TransactionSource.CUSTOM,  # type: str
         **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None

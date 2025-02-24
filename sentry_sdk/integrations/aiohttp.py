@@ -20,7 +20,7 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SOURCE_FOR_STYLE,
-    TRANSACTION_SOURCE_ROUTE,
+    TransactionSource,
 )
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
@@ -129,7 +129,7 @@ class AioHttpIntegration(Integration):
                         # If this transaction name makes it to the UI, AIOHTTP's
                         # URL resolver did not find a route or died trying.
                         name="generic AIOHTTP request",
-                        source=TRANSACTION_SOURCE_ROUTE,
+                        source=TransactionSource.ROUTE,
                         origin=AioHttpIntegration.origin,
                     )
                     with sentry_sdk.start_transaction(
