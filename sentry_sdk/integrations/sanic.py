@@ -185,7 +185,7 @@ async def _context_enter(request):
     scope = request.ctx._sentry_scope_manager.__enter__()
     request.ctx._sentry_scope = scope
 
-    scope.set_transaction_name(request.path, TRANSACTION_SOURCE_URL)
+    scope.set_transaction_name(request.path, TransactionSource.URL)
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
