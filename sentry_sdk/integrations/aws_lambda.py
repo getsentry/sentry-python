@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -125,7 +125,7 @@ def _wrap_handler(handler):
 
         with sentry_sdk.isolation_scope() as scope:
             scope.set_transaction_name(
-                aws_context.function_name, source=TRANSACTION_SOURCE_COMPONENT
+                aws_context.function_name, source=TransactionSource.COMPONENT
             )
             timeout_thread = None
             with capture_internal_exceptions():
@@ -170,7 +170,7 @@ def _wrap_handler(handler):
                 with sentry_sdk.start_span(
                     op=OP.FUNCTION_AWS,
                     name=aws_context.function_name,
-                    source=TRANSACTION_SOURCE_COMPONENT,
+                    source=TransactionSource.COMPONENT,
                     origin=AwsLambdaIntegration.origin,
                     attributes=_prepopulate_attributes(request_data, aws_context),
                 ):

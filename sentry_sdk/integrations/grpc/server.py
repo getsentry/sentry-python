@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.tracing import TRANSACTION_SOURCE_CUSTOM
+from sentry_sdk.tracing import TransactionSource
 
 from typing import TYPE_CHECKING
 
@@ -42,7 +42,7 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                         with sentry_sdk.start_span(
                             op=OP.GRPC_SERVER,
                             name=name,
-                            source=TRANSACTION_SOURCE_CUSTOM,
+                            source=TransactionSource.CUSTOM,
                             origin=SPAN_ORIGIN,
                         ):
                             try:

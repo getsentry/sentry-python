@@ -8,7 +8,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -198,7 +198,7 @@ async def _context_enter(request):
         op=OP.HTTP_SERVER,
         # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
         name=request.path,
-        source=TRANSACTION_SOURCE_URL,
+        source=TransactionSource.URL,
         origin=SanicIntegration.origin,
     ).__enter__()
 
@@ -239,7 +239,7 @@ async def _set_transaction(request, route, **_):
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
             route_name = route.name.replace(request.app.name, "").strip(".")
-            scope.set_transaction_name(route_name, source=TRANSACTION_SOURCE_COMPONENT)
+            scope.set_transaction_name(route_name, source=TransactionSource.COMPONENT)
 
 
 def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
@@ -314,11 +314,11 @@ def _legacy_router_get(self, *args):
                     sanic_route = sanic_route[len(sanic_app_name) + 1 :]
 
                 scope.set_transaction_name(
-                    sanic_route, source=TRANSACTION_SOURCE_COMPONENT
+                    sanic_route, source=TransactionSource.COMPONENT
                 )
             else:
                 scope.set_transaction_name(
-                    rv[0].__name__, source=TRANSACTION_SOURCE_COMPONENT
+                    rv[0].__name__, source=TransactionSource.COMPONENT
                 )
 
     return rv
