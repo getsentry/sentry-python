@@ -13,15 +13,7 @@ on:
       - release/**
       - potel-base
 
-  {% if needs_github_secrets %}
-  # XXX: We are using `pull_request_target` instead of `pull_request` because we want
-  # this to run on forks with access to the secrets necessary to run the test suite.
-  # Prefer to use `pull_request` when possible.
-  pull_request_target:
-    types: [labeled, opened, reopened, synchronize]
-  {% else %}
   pull_request:
-  {% endif %}
 
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
@@ -31,27 +23,13 @@ concurrency:
 
 permissions:
   contents: read
-  {% if needs_github_secrets %}
-  # `write` is needed to remove the `Trigger: tests using secrets` label
-  pull-requests: write
-  {% endif %}
 
 env:
-{% if needs_aws_credentials %}
-{% raw %}
-  SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
-  SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY }}
-{% endraw %}
-{% endif %}
   BUILD_CACHE_KEY: {% raw %}${{ github.sha }}{% endraw %}
   CACHED_BUILD_PATHS: |
     {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}
 
 jobs:
-{% if needs_github_secrets %}
-{% include "check_permissions.jinja" %}
-{% endif %}
-
 {% for category in categories %}
 {% include "test_group.jinja" %}
 {% endfor %}
