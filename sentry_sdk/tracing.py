@@ -1,3 +1,4 @@
+from enum import Enum
 import json
 from datetime import datetime
 
