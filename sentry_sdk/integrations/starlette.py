@@ -21,8 +21,7 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_ROUTE,
+    TransactionSource,
 )
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -717,7 +716,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
-        source = TRANSACTION_SOURCE_ROUTE
+        source = TransactionSource.ROUTE
 
     scope.set_transaction_name(name, source=source)
     logger.debug(
@@ -732,9 +731,9 @@ def _get_transaction_from_middleware(app, asgi_scope, integration):
 
     if integration.transaction_style == "endpoint":
         name = transaction_from_function(app.__class__)
-        source = TRANSACTION_SOURCE_COMPONENT
+        source = TransactionSource.COMPONENT
     elif integration.transaction_style == "url":
         name = _transaction_name_from_router(asgi_scope)
-        source = TRANSACTION_SOURCE_ROUTE
+        source = TransactionSource.ROUTE
 
     return name, source

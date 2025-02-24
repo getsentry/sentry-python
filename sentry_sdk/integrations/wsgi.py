@@ -11,7 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _request_headers_to_span_attributes,
 )
 from sentry_sdk.sessions import track_session
-from sentry_sdk.tracing import Span, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -108,7 +108,7 @@ class SentryWsgiMiddleware:
         try:
             with sentry_sdk.isolation_scope() as scope:
                 scope.set_transaction_name(
-                    DEFAULT_TRANSACTION_NAME, source=TRANSACTION_SOURCE_ROUTE
+                    DEFAULT_TRANSACTION_NAME, source=TransactionSource.ROUTE
                 )
 
                 with track_session(scope, session_mode="request"):
@@ -127,7 +127,7 @@ class SentryWsgiMiddleware:
                             with sentry_sdk.start_span(
                                 op=OP.HTTP_SERVER,
                                 name=DEFAULT_TRANSACTION_NAME,
-                                source=TRANSACTION_SOURCE_ROUTE,
+                                source=TransactionSource.ROUTE,
                                 origin=self.span_origin,
                                 attributes=_prepopulate_attributes(
                                     environ, self.use_x_forwarded_for

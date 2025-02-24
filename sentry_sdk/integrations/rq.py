@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -66,7 +66,7 @@ class RqIntegration(Integration):
                     transaction_name = DEFAULT_TRANSACTION_NAME
 
                 scope.set_transaction_name(
-                    transaction_name, source=TRANSACTION_SOURCE_TASK
+                    transaction_name, source=TransactionSource.TASK
                 )
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
@@ -77,7 +77,7 @@ class RqIntegration(Integration):
                     with sentry_sdk.start_span(
                         op=OP.QUEUE_TASK_RQ,
                         name=transaction_name,
-                        source=TRANSACTION_SOURCE_TASK,
+                        source=TransactionSource.TASK,
                         origin=RqIntegration.origin,
                         attributes=_prepopulate_attributes(job, queue),
                     ):
