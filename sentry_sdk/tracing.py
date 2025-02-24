@@ -131,7 +131,7 @@ SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
-class TransactionSource(str, Enum):
+class TransactionSource(Enum):
     COMPONENT = "component"
     CUSTOM = "custom"
     ROUTE = "route"
@@ -142,6 +142,12 @@ class TransactionSource(str, Enum):
     def __str__(self):
         # type: () -> str
         return self.value
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        if isinstance(other, str):
+            return self.value == other
+        return super().__eq__(other)
 
 
 # These are typically high cardinality and the server hates them
