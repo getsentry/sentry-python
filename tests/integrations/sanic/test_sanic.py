@@ -10,7 +10,7 @@ import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import TransactionSource
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
 from sanic.response import HTTPResponse
@@ -372,7 +372,7 @@ class TransactionTestConfig:
             url="/message",
             expected_status=200,
             expected_transaction_name="hi",
-            expected_source=TRANSACTION_SOURCE_COMPONENT,
+            expected_source=TransactionSource.COMPONENT,
         ),
         TransactionTestConfig(
             # Transaction still recorded when we have an internal server error
@@ -380,7 +380,7 @@ class TransactionTestConfig:
             url="/500",
             expected_status=500,
             expected_transaction_name="fivehundred",
-            expected_source=TRANSACTION_SOURCE_COMPONENT,
+            expected_source=TransactionSource.COMPONENT,
         ),
         TransactionTestConfig(
             # By default, no transaction when we have a 404 error
@@ -396,7 +396,7 @@ class TransactionTestConfig:
             url="/404",
             expected_status=404,
             expected_transaction_name="/404",
-            expected_source=TRANSACTION_SOURCE_URL,
+            expected_source=TransactionSource.URL,
         ),
         TransactionTestConfig(
             # Transaction can be suppressed for other HTTP statuses, too, by passing config to the integration

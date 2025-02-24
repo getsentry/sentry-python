@@ -5,10 +5,7 @@ from inspect import iscoroutinefunction
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import (
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_ROUTE,
-)
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -131,7 +128,7 @@ def _handle_request_impl(self):
                 # sentry_urldispatcher_resolve is responsible for
                 # setting a transaction name later.
                 name="generic Tornado request",
-                source=TRANSACTION_SOURCE_ROUTE,
+                source=TransactionSource.ROUTE,
                 origin=TornadoIntegration.origin,
                 attributes=_prepopulate_attributes(self.request),
             ):
@@ -166,7 +163,7 @@ def _make_event_processor(weak_handler):
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
             event["transaction"] = transaction_from_function(method) or ""
-            event["transaction_info"] = {"source": TRANSACTION_SOURCE_COMPONENT}
+            event["transaction_info"] = {"source": TransactionSource.COMPONENT}
 
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)

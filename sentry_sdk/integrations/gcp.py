@@ -12,7 +12,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _request_headers_to_span_attributes,
 )
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -90,7 +90,7 @@ def _wrap_func(func):
                 with sentry_sdk.start_span(
                     op=OP.FUNCTION_GCP,
                     name=environ.get("FUNCTION_NAME", ""),
-                    source=TRANSACTION_SOURCE_COMPONENT,
+                    source=TransactionSource.COMPONENT,
                     origin=GcpIntegration.origin,
                     attributes=_prepopulate_attributes(gcp_event),
                 ):
