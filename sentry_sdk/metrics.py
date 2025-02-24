@@ -22,12 +22,7 @@ from sentry_sdk.utils import (
     json_dumps,
 )
 from sentry_sdk.envelope import Envelope, Item
-from sentry_sdk.tracing import (
-    TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_VIEW,
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_TASK,
-)
+from sentry_sdk.tracing import TransactionSource
 
 from typing import TYPE_CHECKING
 
@@ -68,10 +63,10 @@ _set = set  # set is shadowed below
 
 GOOD_TRANSACTION_SOURCES = frozenset(
     [
-        TRANSACTION_SOURCE_ROUTE,
-        TRANSACTION_SOURCE_VIEW,
-        TRANSACTION_SOURCE_COMPONENT,
-        TRANSACTION_SOURCE_TASK,
+        TransactionSource.ROUTE,
+        TransactionSource.VIEW,
+        TransactionSource.COMPONENT,
+        TransactionSource.TASK,
     ]
 )
 

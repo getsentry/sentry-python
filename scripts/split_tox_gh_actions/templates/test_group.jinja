@@ -51,7 +51,8 @@
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
       {% if needs_clickhouse %}
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.5
       {% endif %}
 
       {% if needs_redis %}

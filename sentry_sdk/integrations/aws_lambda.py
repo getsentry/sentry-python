@@ -10,7 +10,7 @@ import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -153,7 +153,7 @@ def _wrap_handler(handler):
                 headers,
                 op=OP.FUNCTION_AWS,
                 name=aws_context.function_name,
-                source=TRANSACTION_SOURCE_COMPONENT,
+                source=TransactionSource.COMPONENT,
                 origin=AwsLambdaIntegration.origin,
             )
             with sentry_sdk.start_transaction(

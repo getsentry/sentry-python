@@ -10,7 +10,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -88,7 +88,7 @@ def _wrap_func(func):
                 headers,
                 op=OP.FUNCTION_GCP,
                 name=environ.get("FUNCTION_NAME", ""),
-                source=TRANSACTION_SOURCE_COMPONENT,
+                source=TransactionSource.COMPONENT,
                 origin=GcpIntegration.origin,
             )
             sampling_context = {
