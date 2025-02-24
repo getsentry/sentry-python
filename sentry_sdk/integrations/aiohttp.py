@@ -27,6 +27,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    http_client_status_to_breadcrumb_level,
     logger,
     parse_url,
     parse_version,
@@ -277,13 +278,15 @@ def create_trace_config():
             return
 
         span_data = trace_config_ctx.span_data or {}
-        span_data[SPANDATA.HTTP_STATUS_CODE] = int(params.response.status)
+        status_code = int(params.response.status)
+        span_data[SPANDATA.HTTP_STATUS_CODE] = status_code
         span_data["reason"] = params.response.reason
 
         sentry_sdk.add_breadcrumb(
             type="http",
             category="httplib",
             data=span_data,
+            level=http_client_status_to_breadcrumb_level(status_code),
         )
 
         span = trace_config_ctx.span
