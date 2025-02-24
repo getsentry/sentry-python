@@ -5,7 +5,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.api import continue_trace
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -57,7 +57,7 @@ class RqIntegration(Integration):
                     job.meta.get("_sentry_trace_headers") or {},
                     op=OP.QUEUE_TASK_RQ,
                     name="unknown RQ task",
-                    source=TRANSACTION_SOURCE_TASK,
+                    source=TransactionSource.TASK,
                     origin=RqIntegration.origin,
                 )
 
