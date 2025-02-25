@@ -37,11 +37,10 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
         span1, span2 = event["spans"]
         parent_span = event
-        assert span1["tags"]["status"] == "internal_error"
         assert span1["status"] == "internal_error"
         assert span1["op"] == "foo"
         assert span1["description"] == "foodesc"
-        assert span2["tags"]["status"] == "ok"
+        assert span2["status"] == "ok"
         assert span2["op"] == "bar"
         assert span2["description"] == "bardesc"
         assert parent_span["transaction"] == "hi"
@@ -253,8 +252,8 @@ def test_non_error_exceptions(
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_span(name="hi") as span:
-        span.set_status(SPANSTATUS.OK)
+    with start_span(name="hi") as root_span:
+        root_span.set_status(SPANSTATUS.OK)
         with pytest.raises(exception_cls):
             with start_span(op="foo", name="foodesc"):
                 raise exception_cls(exception_value)
@@ -264,7 +263,7 @@ def test_non_error_exceptions(
 
     span = event["spans"][0]
     assert "status" not in span.get("tags", {})
-    assert "status" not in event["tags"]
+    assert "status" not in event.get("tags", {})
     assert event["contexts"]["trace"]["status"] == "ok"
 
 
@@ -289,5 +288,5 @@ def test_good_sysexit_doesnt_fail_transaction(
 
     span = event["spans"][0]
     assert "status" not in span.get("tags", {})
-    assert "status" not in event["tags"]
+    assert "status" not in event.get("tags", {})
     assert event["contexts"]["trace"]["status"] == "ok"

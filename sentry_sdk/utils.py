@@ -1879,7 +1879,6 @@ def datetime_from_isoformat(value):
     return result.astimezone(timezone.utc)
 
 
-# TODO-neel-potel use in span status
 def should_be_treated_as_error(ty, value):
     # type: (Any, Any) -> bool
     if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
