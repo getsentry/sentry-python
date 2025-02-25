@@ -170,6 +170,25 @@ def test_flag_tracking():
         {"flag": "f", "result": False},
     ]
 
+    # Test updates
+    buffer.set("e", True)
+    buffer.set("e", False)
+    buffer.set("e", True)
+    flags = buffer.get()
+    assert flags == [
+        {"flag": "d", "result": False},
+        {"flag": "f", "result": False},
+        {"flag": "e", "result": True},
+    ]
+
+    buffer.set("d", True)
+    flags = buffer.get()
+    assert flags == [
+        {"flag": "f", "result": False},
+        {"flag": "e", "result": True},
+        {"flag": "d", "result": True},
+    ]
+
 
 def test_flag_buffer_concurrent_access():
     buffer = FlagBuffer(capacity=100)
