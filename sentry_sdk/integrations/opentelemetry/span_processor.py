@@ -18,6 +18,7 @@ from sentry_sdk.utils import get_current_thread_meta
 from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     get_profiler_id,
+    try_profile_lifecycle_trace_start,
 )
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.integrations.opentelemetry.sampler import create_sampling_context
@@ -79,7 +80,8 @@ class SentrySpanProcessor(SpanProcessor):
 
         is_root_span = not span.parent or span.parent.is_remote
         if is_root_span:
-            # if have a root span ending, we build a transaction and send it
+            # if have a root span ending, stop the profiler, build a transaction and send it
+            self._stop_profile(span)
             self._flush_root_span(span)
         else:
             self._append_child_span(span)
@@ -112,6 +114,7 @@ class SentrySpanProcessor(SpanProcessor):
     def _start_profile(self, span):
         # type: (Span) -> None
         try_autostart_continuous_profiler()
+
         profiler_id = get_profiler_id()
         thread_id, thread_name = get_current_thread_meta()
 
@@ -130,12 +133,25 @@ class SentrySpanProcessor(SpanProcessor):
             # unix timestamp that is on span.start_time
             # setting it to 0 means the profiler will internally measure time on start
             profile = Profile(sampled, 0)
+
             sampling_context = create_sampling_context(
                 span.name, span.attributes, span.parent, span.context.trace_id
             )
             profile._set_initial_sampling_decision(sampling_context)
             profile.__enter__()
             set_sentry_meta(span, "profile", profile)
+
+            continuous_profile = try_profile_lifecycle_trace_start()
+            profiler_id = get_profiler_id()
+            if profiler_id:
+                span.set_attribute(SPANDATA.PROFILER_ID, profiler_id)
+            set_sentry_meta(span, "continuous_profile", continuous_profile)
+
+    def _stop_profile(self, span):
+        # type: (ReadableSpan) -> None
+        continuous_profiler = get_sentry_meta(span, "continuous_profile")
+        if continuous_profiler:
+            continuous_profiler.stop()
 
     def _flush_root_span(self, span):
         # type: (ReadableSpan) -> None
