@@ -267,13 +267,18 @@ class SentryAsgiMiddleware:
         event["request"] = deepcopy(request_data)
 
         # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
-        already_set = event["transaction"] != _DEFAULT_TRANSACTION_NAME and event[
-            "transaction_info"
-        ].get("source") in [
-            TransactionSource.COMPONENT,
-            TransactionSource.ROUTE,
-            TransactionSource.CUSTOM,
-        ]
+        transaction = event.get("transaction")
+        transaction_source = (event.get("transaction_info") or {}).get("source")
+        already_set = (
+            transaction is not None
+            and transaction != _DEFAULT_TRANSACTION_NAME
+            and transaction_source
+            in [
+                TransactionSource.COMPONENT,
+                TransactionSource.ROUTE,
+                TransactionSource.CUSTOM,
+            ]
+        )
         if not already_set:
             name, source = self._get_transaction_name_and_source(
                 self.transaction_style, asgi_scope
