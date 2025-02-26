@@ -1,4 +1,3 @@
-import random
 from http.client import HTTPConnection, HTTPSConnection
 from socket import SocketIO
 from urllib.error import HTTPError
@@ -189,7 +188,7 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
         "baggage": (
             "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
-            "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+            "sentry-user_id=Am%C3%A9lie, sentry-sample_rand=0.132521102938283, other-vendor-value-2=foo;bar;"
         ),
     }
 
@@ -222,7 +221,8 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
             "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
             "sentry-sample_rate=1.0,"
-            "sentry-user_id=Am%C3%A9lie"
+            "sentry-user_id=Am%C3%A9lie,"
+            "sentry-sample_rand=0.132521102938283"
         )
 
         assert request_headers["baggage"] == expected_outgoing_baggage
@@ -235,11 +235,9 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
     mock_send = mock.Mock()
     monkeypatch.setattr(HTTPSConnection, "send", mock_send)
 
-    # make sure transaction is always sampled
-    monkeypatch.setattr(random, "random", lambda: 0.1)
-
     sentry_init(traces_sample_rate=0.5, release="foo")
-    transaction = Transaction.continue_from_headers({})
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
+        transaction = Transaction.continue_from_headers({})
 
     with start_transaction(transaction=transaction, name="Head SDK tx") as transaction:
         HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
@@ -261,6 +259,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
 
         expected_outgoing_baggage = (
             "sentry-trace_id=%s,"
+            "sentry-sample_rand=0.250000,"
             "sentry-environment=production,"
             "sentry-release=foo,"
             "sentry-sample_rate=0.5,"
