@@ -70,8 +70,8 @@ def test_crumb_capture(sentry_init, capture_events):
 @pytest.mark.parametrize(
     "status_code,level",
     [
-        (200, None),
-        (301, None),
+        (200, "info"),
+        (301, "info"),
         (403, "warning"),
         (405, "warning"),
         (500, "error"),
@@ -94,12 +94,7 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
 
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-
-    if level is None:
-        assert "level" not in crumb
-    else:
-        assert crumb["level"] == level
-
+    assert crumb["level"] == level
     assert crumb["data"] == ApproxDict(
         {
             "url": url,

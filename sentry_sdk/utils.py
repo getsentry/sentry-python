@@ -1886,3 +1886,14 @@ def should_be_treated_as_error(ty, value):
         return False
 
     return True
+
+
+def http_client_status_to_breadcrumb_level(status_code):
+    # type: (Optional[int]) -> str
+    if status_code is not None:
+        if 500 <= status_code <= 599:
+            return "error"
+        elif 400 <= status_code <= 499:
+            return "warning"
+
+    return "info"
