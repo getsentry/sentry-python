@@ -8,7 +8,6 @@ The DSC is propagated between service using a header called "baggage".
 This is not tested in this file.
 """
 
-import random
 from unittest import mock
 
 import pytest
@@ -176,7 +175,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
     }
 
     # We continue the incoming trace and start a new transaction
-    with mock.patch.object(random, "random", return_value=0.2):
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.125):
         transaction = sentry_sdk.continue_trace(incoming_http_headers)
         with sentry_sdk.start_transaction(transaction, name="foo"):
             pass
