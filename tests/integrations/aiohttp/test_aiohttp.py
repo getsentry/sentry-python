@@ -634,24 +634,26 @@ async def test_outgoing_trace_headers_append_to_baggage(
 
     raw_server = await aiohttp_raw_server(handler)
 
-    with start_span(
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-    ) as transaction:
-        client = await aiohttp_client(raw_server)
-        resp = await client.get("/", headers={"bagGage": "custom=value"})
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+        with start_span(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+        ) as transaction:
+            client = await aiohttp_client(raw_server)
+            resp = await client.get("/", headers={"bagGage": "custom=value"})
 
-        assert sorted(resp.request_info.headers["baggage"].split(",")) == sorted(
-            [
-                "custom=value",
-                f"sentry-trace_id={transaction.trace_id}",
-                "sentry-environment=production",
-                "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42",
-                "sentry-transaction=/interactions/other-dogs/new-dog",
-                "sentry-sample_rate=1.0",
-                "sentry-sampled=true",
-            ]
-        )
+            assert sorted(resp.request_info.headers["baggage"].split(",")) == sorted(
+                [
+                    "custom=value",
+                    f"sentry-trace_id={transaction.trace_id}",
+                    "sentry-environment=production",
+                    "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42",
+                    "sentry-transaction=/interactions/other-dogs/new-dog",
+                    "sentry-sample_rate=1.0",
+                    "sentry-sampled=true",
+                    "sentry-sample_rand=0.500000",
+                ]
+            )
 
 
 @pytest.mark.asyncio

@@ -6,6 +6,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import start_span, capture_exception
+from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import logger
 
 
@@ -58,9 +59,9 @@ def test_uses_traces_sample_rate_correctly(
 ):
     sentry_init(traces_sample_rate=traces_sample_rate)
 
-    with mock.patch.object(random, "random", return_value=0.5):
-        transaction = start_span(name="dogpark")
-        assert transaction.sampled is expected_decision
+    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
+    root_span = start_span(name="dogpark", baggage=baggage)
+    assert root_span.sampled is expected_decision
 
 
 @pytest.mark.parametrize(
@@ -74,9 +75,9 @@ def test_uses_traces_sampler_return_value_correctly(
 ):
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
-    with mock.patch.object(random, "random", return_value=0.5):
-        with start_span(name="dogpark") as span:
-            assert span.sampled is expected_decision
+    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
+    root_span = start_span(name="dogpark", baggage=baggage)
+    assert root_span.sampled is expected_decision
 
 
 @pytest.mark.parametrize("traces_sampler_return_value", [True, False])

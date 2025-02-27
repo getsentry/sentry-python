@@ -1,6 +1,6 @@
+from datetime import datetime
 from enum import Enum
 import json
-from datetime import datetime
 
 from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace import (

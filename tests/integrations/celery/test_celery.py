@@ -509,23 +509,25 @@ def test_baggage_propagation(init_celery):
     def dummy_task(self, x, y):
         return _get_headers(self)
 
-    with sentry_sdk.start_span(name="task") as root_span:
-        result = dummy_task.apply_async(
-            args=(1, 0),
-            headers={"baggage": "custom=value"},
-        ).get()
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+        with sentry_sdk.start_span(name="task") as root_span:
+            result = dummy_task.apply_async(
+                args=(1, 0),
+                headers={"baggage": "custom=value"},
+            ).get()
 
-        assert sorted(result["baggage"].split(",")) == sorted(
-            [
-                "sentry-release=abcdef",
-                "sentry-trace_id={}".format(root_span.trace_id),
-                "sentry-transaction=task",
-                "sentry-environment=production",
-                "sentry-sample_rate=1.0",
-                "sentry-sampled=true",
-                "custom=value",
-            ]
-        )
+            assert sorted(result["baggage"].split(",")) == sorted(
+                [
+                    "sentry-release=abcdef",
+                    "sentry-trace_id={}".format(root_span.trace_id),
+                    "sentry-transaction=task",
+                    "sentry-environment=production",
+                    "sentry-sample_rand=0.500000",
+                    "sentry-sample_rate=1.0",
+                    "sentry-sampled=true",
+                    "custom=value",
+                ]
+            )
 
 
 def test_sentry_propagate_traces_override(init_celery):

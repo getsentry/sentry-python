@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from random import Random
 from urllib.parse import quote, unquote
 
 import sentry_sdk
@@ -43,6 +44,7 @@ SENTRY_TRACE_REGEX = re.compile(
     "-?([01])?"  # sampled
     "[ \t]*$"  # whitespace
 )
+
 
 # This is a normal base64 regex, modified to reflect that fact that we strip the
 # trailing = or == off
@@ -466,8 +468,11 @@ class Baggage:
         self.mutable = mutable
 
     @classmethod
-    def from_incoming_header(cls, header):
-        # type: (Optional[str]) -> Baggage
+    def from_incoming_header(
+        cls,
+        header,  # type: Optional[str]
+    ):
+        # type: (...) -> Baggage
         """
         freeze if incoming header already has sentry baggage
         """
@@ -675,6 +680,55 @@ def get_current_span(scope=None):
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
+
+
+# XXX-potel-ivana: use this
+def _generate_sample_rand(
+    trace_id,  # type: Optional[str]
+    *,
+    interval=(0.0, 1.0),  # type: tuple[float, float]
+):
+    # type: (...) -> Any
+    """Generate a sample_rand value from a trace ID.
+
+    The generated value will be pseudorandomly chosen from the provided
+    interval. Specifically, given (lower, upper) = interval, the generated
+    value will be in the range [lower, upper). The value has 6-digit precision,
+    so when printing with .6f, the value will never be rounded up.
+
+    The pseudorandom number generator is seeded with the trace ID.
+    """
+    import decimal
+
+    lower, upper = interval
+    if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
+        raise ValueError("Invalid interval: lower must be less than upper")
+
+    rng = Random(trace_id)
+    sample_rand = upper
+    while sample_rand >= upper:
+        sample_rand = rng.uniform(lower, upper)
+
+    # Round down to exactly six decimal-digit precision.
+    return decimal.Decimal(sample_rand).quantize(
+        decimal.Decimal("0.000001"), rounding=decimal.ROUND_DOWN
+    )
+
+
+# XXX-potel-ivana: use this
+def _sample_rand_range(parent_sampled, sample_rate):
+    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
+    """
+    Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
+    that a generated sample_rand value must fall into, given the parent_sampled and
+    sample_rate values.
+    """
+    if parent_sampled is None or sample_rate is None:
+        return 0.0, 1.0
+    elif parent_sampled is True:
+        return 0.0, sample_rate
+    else:  # parent_sampled is False
+        return sample_rate, 1.0
 
 
 # Circular imports
