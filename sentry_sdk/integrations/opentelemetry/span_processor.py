@@ -261,9 +261,6 @@ class SentrySpanProcessor(SpanProcessor):
             }
         )
 
-        if status:
-            span_json.setdefault("tags", {})["status"] = status
-
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id
 
