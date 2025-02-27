@@ -1,4 +1,3 @@
-import random
 from collections import Counter
 from unittest import mock
 
@@ -70,22 +69,21 @@ def test_root_span_uses_downsample_rate(
     monitor = sentry_sdk.get_client().monitor
     monitor.interval = 0.1
 
-    # make sure rng doesn't sample
-    monkeypatch.setattr(random, "random", lambda: 0.9)
-
     assert monitor.is_healthy() is True
     monitor.run()
     assert monitor.is_healthy() is False
     assert monitor.downsample_factor == 1
 
-    with sentry_sdk.start_span(name="foobar") as root_span:
-        with sentry_sdk.start_span(name="foospan"):
-            with sentry_sdk.start_span(name="foospan2"):
-                with sentry_sdk.start_span(name="foospan3"):
-                    ...
+    # make sure we don't sample the root span
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.75):
+        with sentry_sdk.start_span(name="foobar") as root_span:
+            with sentry_sdk.start_span(name="foospan"):
+                with sentry_sdk.start_span(name="foospan2"):
+                    with sentry_sdk.start_span(name="foospan3"):
+                        ...
 
-        assert root_span.sampled is False
-        assert root_span.sample_rate == 0.5
+            assert root_span.sampled is False
+            assert root_span.sample_rate == 0.5
 
     assert len(envelopes) == 0
 
