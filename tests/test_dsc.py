@@ -246,7 +246,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
-                "sentry_trace_header_parent_sampled": 1,
+                "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": False,
                 "local_traces_sampler_result": None,
                 "local_traces_sample_rate": 0.7,
@@ -294,7 +294,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
-                "sentry_trace_header_parent_sampled": 1,
+                "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": False,
                 "local_traces_sampler_result": None,
                 "local_traces_sample_rate": None,
