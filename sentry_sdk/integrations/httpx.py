@@ -7,6 +7,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
+    http_client_status_to_breadcrumb_level,
     logger,
     parse_url,
 )
@@ -101,6 +102,7 @@ def _install_httpx_client():
                 type="http",
                 category="httplib",
                 data=data,
+                level=http_client_status_to_breadcrumb_level(rv.status_code),
             )
 
             return rv
