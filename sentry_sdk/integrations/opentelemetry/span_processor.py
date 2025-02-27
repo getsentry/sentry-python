@@ -12,7 +12,6 @@ from opentelemetry.context import Context
 from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
 import sentry_sdk
-from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
 from sentry_sdk.utils import get_current_thread_meta
@@ -152,12 +151,10 @@ class SentrySpanProcessor(SpanProcessor):
             if span_json:
                 spans.append(span_json)
 
-        if dropped_spans == 0:
-            transaction_event["spans"] = spans
-        else:
-            transaction_event["spans"] = AnnotatedValue(
-                spans, {"len": len(spans) + dropped_spans}
-            )
+        transaction_event["spans"] = spans
+        if dropped_spans > 0:
+            transaction_event["_dropped_spans"] = dropped_spans
+
         # TODO-neel-potel sort and cutoff max spans
 
         sentry_sdk.capture_event(transaction_event)
