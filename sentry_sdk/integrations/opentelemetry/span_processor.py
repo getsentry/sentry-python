@@ -178,7 +178,7 @@ class SentrySpanProcessor(SpanProcessor):
     def _collect_children(self, span):
         # type: (ReadableSpan) -> tuple[List[ReadableSpan], int]
         if not span.context:
-            return []
+            return [], 0
 
         children = []
         dropped_spans = 0
