@@ -64,8 +64,8 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
 @pytest.mark.parametrize(
     "status_code,level",
     [
-        (200, None),
-        (301, None),
+        (200, "info"),
+        (301, "info"),
         (403, "warning"),
         (405, "warning"),
         (500, "error"),
@@ -98,12 +98,7 @@ def test_crumb_capture_client_error(
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-
-        if level is None:
-            assert "level" not in crumb
-        else:
-            assert crumb["level"] == level
-
+        assert crumb["level"] == level
         assert crumb["data"] == ApproxDict(
             {
                 "url": url,
