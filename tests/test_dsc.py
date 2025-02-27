@@ -222,6 +222,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": 1,
                 "use_local_traces_sampler": False,
                 "local_traces_sampler_result": 0.5,
                 "local_traces_sample_rate": 0.7,
@@ -233,6 +234,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": 1,
                 "use_local_traces_sampler": True,
                 "local_traces_sampler_result": 0.5,
                 "local_traces_sample_rate": 0.7,
@@ -244,17 +246,19 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
+                "sentry_trace_header_parent_sampled": 1,
                 "use_local_traces_sampler": False,
                 "local_traces_sampler_result": 0.5,
                 "local_traces_sample_rate": 0.7,
             },
             1.0,  # expected_sample_rate
-            "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled
+            "false",  # expected_sampled
         ),
         (
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
+                "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
                 "local_traces_sampler_result": 0.5,
                 "local_traces_sample_rate": 0.7,
@@ -266,6 +270,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": 1,
                 "use_local_traces_sampler": False,
                 "local_traces_sampler_result": 0.5,
                 "local_traces_sample_rate": None,
@@ -277,6 +282,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": 1,
                 "use_local_traces_sampler": True,
                 "local_traces_sampler_result": 0.5,
                 "local_traces_sample_rate": None,
@@ -288,6 +294,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
+                "sentry_trace_header_parent_sampled": 1,
                 "use_local_traces_sampler": False,
                 "local_traces_sampler_result": 0.5,
                 "local_traces_sample_rate": None,
@@ -299,12 +306,25 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
+                "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
                 "local_traces_sampler_result": 0.5,
                 "local_traces_sample_rate": None,
             },
             0.5,  # expected_sample_rate
             "false",  # expected_sampled
+        ),
+        (
+            {
+                "incoming_sample_rate": 1.0,
+                "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": None,
+                "use_local_traces_sampler": False,
+                "local_traces_sampler_result": 0.5,
+                "local_traces_sample_rate": 0.7,
+            },
+            0.7,  # expected_sample_rate
+            "true",  # expected_sampled
         ),
     ],
     ids=(
@@ -316,6 +336,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         "6 traces_sampler overrides incoming  (traces_sample_rate not set)",
         "7 forwarding incoming (traces_sample_rate not set) (incoming not sampled)",
         "8 traces_sampler overrides incoming  (traces_sample_rate not set) (incoming not sampled)",
+        "9 traces_sample_rate overrides incoming",
     ),
 )
 def test_dsc_sample_rate_change(
@@ -351,7 +372,11 @@ def test_dsc_sample_rate_change(
 
     # This is what the upstream service sends us
     incoming_trace_id = "771a43a4192642f0b136d5159a501700"
-    sentry_trace = f"{incoming_trace_id}-1234567890abcdef-{1 if test_data['incoming_sampled'] == 'true' else 0}"
+    if test_data["sentry_trace_header_parent_sampled"] is None:
+        sentry_trace = f"{incoming_trace_id}-1234567890abcdef"
+    else:
+        sentry_trace = f"{incoming_trace_id}-1234567890abcdef-{test_data["sentry_trace_header_parent_sampled"]}"
+
     baggage = (
         f"sentry-trace_id={incoming_trace_id}, "
         f"sentry-sample_rate={str(test_data['incoming_sample_rate'])}, "
