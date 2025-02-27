@@ -223,7 +223,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
                 "use_local_traces_sampler": False,
-                "local_traces_sampler_result": 0.5,
+                "local_traces_sampler_result": None,
                 "local_traces_sample_rate": 0.7,
             },
             1.0,  # expected_sample_rate
@@ -245,10 +245,10 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
                 "use_local_traces_sampler": False,
-                "local_traces_sampler_result": 0.5,
+                "local_traces_sampler_result": None,
                 "local_traces_sample_rate": 0.7,
             },
-            1.0,  # expected_sample_rate
+            None,  # expected_sample_rate
             "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled
         ),
         (
@@ -267,10 +267,10 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
                 "use_local_traces_sampler": False,
-                "local_traces_sampler_result": 0.5,
+                "local_traces_sampler_result": None,
                 "local_traces_sample_rate": None,
             },
-            1.0,  # expected_sample_rate
+            None,  # expected_sample_rate
             "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled
         ),
         (
@@ -289,10 +289,10 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
                 "use_local_traces_sampler": False,
-                "local_traces_sampler_result": 0.5,
+                "local_traces_sampler_result": None,
                 "local_traces_sample_rate": None,
             },
-            0.7,  # expected_sample_rate
+            None,  # expected_sample_rate
             "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled
         ),
         (
