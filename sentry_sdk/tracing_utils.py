@@ -1,4 +1,5 @@
 import contextlib
+import decimal
 import inspect
 import os
 import re
@@ -682,13 +683,12 @@ def get_current_span(scope=None):
     return current_span
 
 
-# XXX-potel-ivana: use this
 def _generate_sample_rand(
     trace_id,  # type: Optional[str]
     *,
     interval=(0.0, 1.0),  # type: tuple[float, float]
 ):
-    # type: (...) -> Any
+    # type: (...) -> decimal.Decimal
     """Generate a sample_rand value from a trace ID.
 
     The generated value will be pseudorandomly chosen from the provided
@@ -698,8 +698,6 @@ def _generate_sample_rand(
 
     The pseudorandom number generator is seeded with the trace ID.
     """
-    import decimal
-
     lower, upper = interval
     if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
         raise ValueError("Invalid interval: lower must be less than upper")
@@ -715,7 +713,6 @@ def _generate_sample_rand(
     )
 
 
-# XXX-potel-ivana: use this
 def _sample_rand_range(parent_sampled, sample_rate):
     # type: (Optional[bool], Optional[float]) -> tuple[float, float]
     """

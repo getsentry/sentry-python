@@ -12,9 +12,12 @@ SENTRY_FORK_ISOLATION_SCOPE_KEY = create_key("sentry_fork_isolation_scope")
 SENTRY_USE_CURRENT_SCOPE_KEY = create_key("sentry_use_current_scope")
 SENTRY_USE_ISOLATION_SCOPE_KEY = create_key("sentry_use_isolation_scope")
 
+# trace state keys
 TRACESTATE_SAMPLED_KEY = Baggage.SENTRY_PREFIX + "sampled"
 TRACESTATE_SAMPLE_RATE_KEY = Baggage.SENTRY_PREFIX + "sample_rate"
+TRACESTATE_SAMPLE_RAND_KEY = Baggage.SENTRY_PREFIX + "sample_rand"
 
+# misc
 OTEL_SENTRY_CONTEXT = "otel"
 SPAN_ORIGIN = "auto.otel"
 
