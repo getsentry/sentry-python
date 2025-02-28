@@ -99,7 +99,7 @@ def get_parent_sample_rand(parent_context, trace_id):
 def dropped_result(parent_span_context, attributes, sample_rate=None, sample_rand=None):
     # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
     # these will only be added the first time in a root span sampling decision
-    # if sample_rate is provided, it'll be updated in trace state
+    # if sample_rate or sample_rand is provided, they'll be updated in trace state
     trace_state = parent_span_context.trace_state
 
     if TRACESTATE_SAMPLED_KEY not in trace_state:
@@ -140,7 +140,7 @@ def dropped_result(parent_span_context, attributes, sample_rate=None, sample_ran
 def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None):
     # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
     # these will only be added the first time in a root span sampling decision
-    # if sample_rate is provided, it'll be updated in trace state
+    # if sample_rate or sample_rand is provided, they'll be updated in trace state
     trace_state = span_context.trace_state
 
     if TRACESTATE_SAMPLED_KEY not in trace_state:
