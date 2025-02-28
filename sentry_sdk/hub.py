@@ -17,10 +17,7 @@ from sentry_sdk.tracing import (
     Transaction,
 )
 
-from sentry_sdk.utils import (
-    logger,
-    ContextVar,
-)
+from sentry_sdk.utils import ContextVar
 
 from typing import TYPE_CHECKING
 
@@ -271,9 +268,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         .. deprecated:: 1.40.5
             This function is deprecated and will be removed in a future release. The functions `capture_event`, `capture_message`, and `capture_exception` return the event ID directly.
         """
-        logger.warning(
-            "Deprecated: last_event_id is deprecated. This will be removed in the future. The functions `capture_event`, `capture_message`, and `capture_exception` return the event ID directly."
+        warnings.warn(
+            "Deprecated: last_event_id is deprecated. This will be removed in the future. The functions `capture_event`, `capture_message`, and `capture_exception` return the event ID directly.",
+            stacklevel=2,
+            category=DeprecationWarning,
         )
+
         return self._last_event_id
 
     def bind_client(
@@ -719,8 +719,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         to allow propagation of trace information.
         """
         if span is not None:
-            logger.warning(
-                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
+            warnings.warn(
+                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.",
+                stacklevel=2,
+                category=DeprecationWarning,
             )
 
         return get_current_scope().trace_propagation_meta(
