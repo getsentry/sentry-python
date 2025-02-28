@@ -195,7 +195,7 @@ class SentrySampler(Sampler):
             sample_rand = parent_sample_rand
         else:
             lower, upper = _sample_rand_range(parent_sampled, parent_sample_rate)
-            sample_rand = _generate_sample_rand(lower, upper)
+            sample_rand = _generate_sample_rand(trace_id, (lower, upper))
 
         # Explicit sampled value provided at start_span
         custom_sampled = cast(
