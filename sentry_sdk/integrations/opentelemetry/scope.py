@@ -123,7 +123,7 @@ class PotelScope(Scope):
         # for twp to work, we also need to consider deferred sampling when the sampling
         # flag is not present, so the above TraceFlags are not sufficient
         if self._propagation_context.parent_sampled is None:
-            trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "deferred")
+            trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "deferred")
 
         span_context = SpanContext(
             trace_id=int(self._propagation_context.trace_id, 16),
