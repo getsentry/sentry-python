@@ -1,4 +1,5 @@
 import random
+from decimal import Decimal
 from typing import cast
 
 from opentelemetry import trace
@@ -6,10 +7,15 @@ from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace.span import TraceState
 
 import sentry_sdk
-from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.tracing_utils import (
+    _generate_sample_rand,
+    _sample_rand_range,
+    has_tracing_enabled,
+)
 from sentry_sdk.utils import is_valid_sample_rate, logger
 from sentry_sdk.integrations.opentelemetry.consts import (
     TRACESTATE_SAMPLED_KEY,
+    TRACESTATE_SAMPLE_RAND_KEY,
     TRACESTATE_SAMPLE_RATE_KEY,
     SentrySpanAttribute,
 )
@@ -70,8 +76,28 @@ def get_parent_sample_rate(parent_context, trace_id):
     return None
 
 
-def dropped_result(parent_span_context, attributes, sample_rate=None):
-    # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
+def get_parent_sample_rand(parent_context, trace_id):
+    # type: (Optional[SpanContext], int) -> Optional[Decimal]
+    if parent_context is None:
+        return None
+
+    is_span_context_valid = parent_context is not None and parent_context.is_valid
+
+    if is_span_context_valid and parent_context.trace_id == trace_id:
+        parent_sample_rand = parent_context.trace_state.get(TRACESTATE_SAMPLE_RAND_KEY)
+        if parent_sample_rand is None:
+            return None
+
+        try:
+            return Decimal(parent_sample_rand)
+        except Exception:
+            return None
+
+    return None
+
+
+def dropped_result(parent_span_context, attributes, sample_rate=None, sample_rand=None):
+    # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
     # these will only be added the first time in a root span sampling decision
     # if sample_rate is provided, it'll be updated in trace state
     trace_state = parent_span_context.trace_state
@@ -83,6 +109,9 @@ def dropped_result(parent_span_context, attributes, sample_rate=None):
 
     if sample_rate is not None:
         trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+
+    if sample_rand is not None:
+        trace_state = trace_state.update(TRACESTATE_SAMPLE_RAND_KEY, str(sample_rand))
 
     is_root_span = not (
         parent_span_context.is_valid and not parent_span_context.is_remote
@@ -108,8 +137,8 @@ def dropped_result(parent_span_context, attributes, sample_rate=None):
     )
 
 
-def sampled_result(span_context, attributes, sample_rate):
-    # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
+def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None):
+    # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
     # these will only be added the first time in a root span sampling decision
     # if sample_rate is provided, it'll be updated in trace state
     trace_state = span_context.trace_state
@@ -121,6 +150,9 @@ def sampled_result(span_context, attributes, sample_rate):
 
     if sample_rate is not None:
         trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+
+    if sample_rand is not None:
+        trace_state = trace_state.update(TRACESTATE_SAMPLE_RAND_KEY, str(sample_rand))
 
     return SamplingResult(
         Decision.RECORD_AND_SAMPLE,
@@ -156,6 +188,15 @@ class SentrySampler(Sampler):
 
         sample_rate = None
 
+        parent_sampled = get_parent_sampled(parent_span_context, trace_id)
+        parent_sample_rate = get_parent_sample_rate(parent_span_context, trace_id)
+        parent_sample_rand = get_parent_sample_rand(parent_span_context, trace_id)
+        if parent_sample_rand is not None:
+            sample_rand = parent_sample_rand
+        else:
+            lower, upper = _sample_rand_range(parent_sampled, parent_sample_rate)
+            sample_rand = _generate_sample_rand(lower, upper)
+
         # Explicit sampled value provided at start_span
         custom_sampled = cast(
             "Optional[bool]", attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED)
@@ -165,11 +206,17 @@ class SentrySampler(Sampler):
                 sample_rate = float(custom_sampled)
                 if sample_rate > 0:
                     return sampled_result(
-                        parent_span_context, attributes, sample_rate=sample_rate
+                        parent_span_context,
+                        attributes,
+                        sample_rate=sample_rate,
+                        sample_rand=sample_rand,
                     )
                 else:
                     return dropped_result(
-                        parent_span_context, attributes, sample_rate=sample_rate
+                        parent_span_context,
+                        attributes,
+                        sample_rate=sample_rate,
+                        sample_rand=sample_rand,
                     )
             else:
                 logger.debug(
@@ -190,8 +237,6 @@ class SentrySampler(Sampler):
             sample_rate_to_propagate = sample_rate
         else:
             # Check if there is a parent with a sampling decision
-            parent_sampled = get_parent_sampled(parent_span_context, trace_id)
-            parent_sample_rate = get_parent_sample_rate(parent_span_context, trace_id)
             if parent_sampled is not None:
                 sample_rate = bool(parent_sampled)
                 sample_rate_to_propagate = (
@@ -207,7 +252,9 @@ class SentrySampler(Sampler):
             logger.warning(
                 f"[Tracing] Discarding {name} because of invalid sample rate."
             )
-            return dropped_result(parent_span_context, attributes)
+            return dropped_result(
+                parent_span_context, attributes, sample_rand=sample_rand
+            )
 
         # Down-sample in case of back pressure monitor says so
         if is_root_span and client.monitor:
@@ -221,11 +268,17 @@ class SentrySampler(Sampler):
 
         if sampled:
             return sampled_result(
-                parent_span_context, attributes, sample_rate=sample_rate_to_propagate
+                parent_span_context,
+                attributes,
+                sample_rate=sample_rate_to_propagate,
+                sample_rand=sample_rand,
             )
         else:
             return dropped_result(
-                parent_span_context, attributes, sample_rate=sample_rate_to_propagate
+                parent_span_context,
+                attributes,
+                sample_rate=sample_rate_to_propagate,
+                sample_rand=sample_rand,
             )
 
     def get_description(self) -> str:
