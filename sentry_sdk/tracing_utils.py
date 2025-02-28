@@ -686,7 +686,7 @@ def get_current_span(scope=None):
 
 
 def _generate_sample_rand(
-    trace_id,  # type: Optional[str]
+    trace_id,  # type: Optional[int]
     interval=(0.0, 1.0),  # type: tuple[float, float]
 ):
     # type: (...) -> decimal.Decimal
