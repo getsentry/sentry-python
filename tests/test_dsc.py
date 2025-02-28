@@ -137,6 +137,84 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
     assert envelope_trace_header["transaction"] == "bar"
 
 
+def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
+    sentry_init, capture_envelopes, monkeypatch
+):
+    """
+    Another service calls our service and passes tracing information to us.
+    Our service is continuing the trace, but modifies the sample rate.
+    The DSC propagated further should contain the updated sample rate.
+    """
+
+    def my_traces_sampler(sampling_context):
+        return 0.25
+
+    sentry_init(
+        dsn="https://mysecret@bla.ingest.sentry.io/12312012",
+        release="myapp@0.0.1",
+        environment="canary",
+        traces_sampler=my_traces_sampler,
+    )
+    envelopes = capture_envelopes()
+
+    # This is what the upstream service sends us
+    sentry_trace = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
+    baggage = (
+        "other-vendor-value-1=foo;bar;baz, "
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+        "sentry-public_key=frontendpublickey, "
+        "sentry-sample_rate=1.0, "
+        "sentry-sampled=true, "
+        "sentry-release=myfrontend@1.2.3, "
+        "sentry-environment=bird, "
+        "sentry-transaction=bar, "
+        "other-vendor-value-2=foo;bar;"
+    )
+    incoming_http_headers = {
+        "HTTP_SENTRY_TRACE": sentry_trace,
+        "HTTP_BAGGAGE": baggage,
+    }
+
+    # We continue the incoming trace and start a new transaction
+    monkeypatch.setattr(random, "random", lambda: 0.2)
+    with sentry_sdk.continue_trace(incoming_http_headers):
+        with sentry_sdk.start_span(name="foo"):
+            pass
+
+    assert len(envelopes) == 1
+
+    transaction_envelope = envelopes[0]
+    envelope_trace_header = transaction_envelope.headers["trace"]
+
+    assert "trace_id" in envelope_trace_header
+    assert type(envelope_trace_header["trace_id"]) == str
+    assert envelope_trace_header["trace_id"] == "771a43a4192642f0b136d5159a501700"
+
+    assert "public_key" in envelope_trace_header
+    assert type(envelope_trace_header["public_key"]) == str
+    assert envelope_trace_header["public_key"] == "frontendpublickey"
+
+    assert "sample_rate" in envelope_trace_header
+    assert type(envelope_trace_header["sample_rate"]) == str
+    assert envelope_trace_header["sample_rate"] == "0.25"
+
+    assert "sampled" in envelope_trace_header
+    assert type(envelope_trace_header["sampled"]) == str
+    assert envelope_trace_header["sampled"] == "true"
+
+    assert "release" in envelope_trace_header
+    assert type(envelope_trace_header["release"]) == str
+    assert envelope_trace_header["release"] == "myfrontend@1.2.3"
+
+    assert "environment" in envelope_trace_header
+    assert type(envelope_trace_header["environment"]) == str
+    assert envelope_trace_header["environment"] == "bird"
+
+    assert "transaction" in envelope_trace_header
+    assert type(envelope_trace_header["transaction"]) == str
+    assert envelope_trace_header["transaction"] == "bar"
+
+
 @pytest.mark.parametrize(
     "test_data, expected_sample_rate, expected_sampled",
     [
