@@ -70,16 +70,6 @@ def get_parent_sample_rate(parent_context, trace_id):
     return None
 
 
-def _update_sample_rate(sample_rate, trace_state):
-    # type: (float, TraceState) -> TraceState
-    if TRACESTATE_SAMPLE_RATE_KEY in trace_state:
-        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
-    else:
-        trace_state = trace_state.add(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
-
-    return trace_state
-
-
 def dropped_result(parent_span_context, attributes, sample_rate=None):
     # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
     # these will only be added the first time in a root span sampling decision
@@ -92,7 +82,7 @@ def dropped_result(parent_span_context, attributes, sample_rate=None):
         trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "false")
 
     if sample_rate is not None:
-        trace_state = _update_sample_rate(sample_rate, trace_state)
+        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     is_root_span = not (
         parent_span_context.is_valid and not parent_span_context.is_remote
@@ -130,7 +120,7 @@ def sampled_result(span_context, attributes, sample_rate):
         trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "true")
 
     if sample_rate is not None:
-        trace_state = _update_sample_rate(sample_rate, trace_state)
+        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     return SamplingResult(
         Decision.RECORD_AND_SAMPLE,
