@@ -191,6 +191,7 @@ class SentrySampler(Sampler):
         parent_sampled = get_parent_sampled(parent_span_context, trace_id)
         parent_sample_rate = get_parent_sample_rate(parent_span_context, trace_id)
         parent_sample_rand = get_parent_sample_rand(parent_span_context, trace_id)
+
         if parent_sample_rand is not None:
             sample_rand = parent_sample_rand
         else:
