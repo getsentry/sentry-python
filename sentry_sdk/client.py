@@ -47,7 +47,6 @@ from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
 
-
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
