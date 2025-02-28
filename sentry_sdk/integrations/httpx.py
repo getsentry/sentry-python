@@ -174,6 +174,7 @@ def _install_httpx_async_client():
                 type="http",
                 category="httplib",
                 data=data,
+                level=http_client_status_to_breadcrumb_level(rv.status_code),
             )
 
             return rv

@@ -1,7 +1,8 @@
 import re
-import pytest
-import random
 import sys
+from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk import (
@@ -141,12 +142,12 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     envelopes = capture_envelopes()
 
     # make sure transaction is sampled for both cases
-    monkeypatch.setattr(random, "random", lambda: 0.1)
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
 
-    with continue_trace({}):
-        with start_span(name="Head SDK tx"):
-            with start_span(op="foo", name="foodesc") as span:
-                baggage = span.get_baggage()
+        with continue_trace({}):
+            with start_span(name="Head SDK tx"):
+                with start_span(op="foo", name="foodesc") as span:
+                    baggage = span.get_baggage()
 
     trace_id = span.trace_id
 
@@ -157,12 +158,14 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "release": "foo",
         "sample_rate": str(sample_rate),
         "sampled": "true" if span.sampled else "false",
+        "sample_rand": "0.250000",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
 
     expected_baggage = (
         "sentry-trace_id=%s,"
+        "sentry-sample_rand=0.250000,"
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-transaction=Head%%20SDK%%20tx,"
@@ -179,6 +182,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "release": "foo",
         "sample_rate": str(sample_rate),
         "sampled": "true" if span.sampled else "false",
+        "sample_rand": "0.250000",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
