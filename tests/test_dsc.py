@@ -421,9 +421,6 @@ def test_dsc_sample_rate_change(
         assert dsc_in_envelope_header["trace_id"] == incoming_trace_id
 
 
-# TODO: test for dcs sample_rate upate in case of backpressure down sampling.
-
-
 def test_dsc_issue(sentry_init, capture_envelopes):
     """
     Our service is a standalone service that does not have tracing enabled. Just uses Sentry for error reporting.
