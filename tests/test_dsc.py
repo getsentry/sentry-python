@@ -388,7 +388,7 @@ def test_dsc_sample_rate_change(
     if test_data["sentry_trace_header_parent_sampled"] is None:
         sentry_trace = f"{incoming_trace_id}-1234567890abcdef"
     else:
-        sentry_trace = f"{incoming_trace_id}-1234567890abcdef-{test_data["sentry_trace_header_parent_sampled"]}"
+        sentry_trace = f"{incoming_trace_id}-1234567890abcdef-{test_data['sentry_trace_header_parent_sampled']}"
 
     baggage = (
         f"sentry-trace_id={incoming_trace_id}, "
