@@ -204,7 +204,7 @@ def patch_create_worker():
             if "cron_jobs" in settings_cls:
                 settings_cls["cron_jobs"] = [
                     _get_arq_cron_job(cron_job)
-                    for cron_job in settings_cls["cron_jobs"]
+                    for cron_job in settings_cls.get("cron_jobs", [])
                 ]
 
         if hasattr(settings_cls, "functions"):
