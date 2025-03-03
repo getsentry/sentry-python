@@ -1888,3 +1888,20 @@ def should_be_treated_as_error(ty, value):
         return False
 
     return True
+
+
+if TYPE_CHECKING:
+    T = TypeVar("T")
+
+
+def try_convert(convert_func, value):
+    # type: (Callable[[Any], T], Any) -> Optional[T]
+    """
+    Attempt to convert from an unknown type to a specific type, using the
+    given function. Return None if the conversion fails, i.e. if the function
+    raises an exception.
+    """
+    try:
+        return convert_func(value)
+    except Exception:
+        return None
