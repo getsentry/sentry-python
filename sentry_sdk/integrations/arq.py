@@ -199,7 +199,8 @@ def patch_create_worker():
         if isinstance(settings_cls, dict):
             if "functions" in settings_cls:
                 settings_cls["functions"] = [
-                    _get_arq_function(func) for func in settings_cls.get("functions", [])
+                    _get_arq_function(func)
+                    for func in settings_cls.get("functions", [])
                 ]
             if "cron_jobs" in settings_cls:
                 settings_cls["cron_jobs"] = [
