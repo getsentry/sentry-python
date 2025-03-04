@@ -258,6 +258,7 @@ def test_exception_chain_context():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 1,
             },
             "module": None,
             "type": "TypeError",
@@ -267,6 +268,7 @@ def test_exception_chain_context():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
@@ -297,6 +299,7 @@ def test_simple_exception():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
