@@ -872,35 +872,16 @@ def exceptions_from_error_tuple(
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
 
-    is_exception_group = BaseExceptionGroup is not None and isinstance(
-        exc_value, BaseExceptionGroup
+    _, exceptions = exceptions_from_error(
+        exc_type=exc_type,
+        exc_value=exc_value,
+        tb=tb,
+        client_options=client_options,
+        mechanism=mechanism,
+        exception_id=0,
+        parent_id=0,
+        full_stack=full_stack,
     )
-
-    if is_exception_group:
-        (_, exceptions) = exceptions_from_error(
-            exc_type=exc_type,
-            exc_value=exc_value,
-            tb=tb,
-            client_options=client_options,
-            mechanism=mechanism,
-            exception_id=0,
-            parent_id=0,
-            full_stack=full_stack,
-        )
-
-    else:
-        exceptions = []
-        for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-            exceptions.append(
-                single_exception_from_error_tuple(
-                    exc_type=exc_type,
-                    exc_value=exc_value,
-                    tb=tb,
-                    client_options=client_options,
-                    mechanism=mechanism,
-                    full_stack=full_stack,
-                )
-            )
 
     exceptions.reverse()
 
