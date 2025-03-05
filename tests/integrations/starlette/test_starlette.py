@@ -237,10 +237,12 @@ class SampleMiddleware:
 
         await self.app(scope, receive, do_stuff)
 
+
 class SampleMiddlewareWithArgs(Middleware):
     def __init__(self, app, bla):
         self.app = app
         self.bla = bla
+
 
 class SampleReceiveSendMiddleware:
     def __init__(self, app):

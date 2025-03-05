@@ -361,6 +361,7 @@ def patch_middlewares():
     not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
 
     if not_yet_patched:
+
         def _sentry_middleware_init(self, cls, *args, **kwargs):
             # type: (Any, Any, Any, Any) -> None
             if cls == SentryAsgiMiddleware:
