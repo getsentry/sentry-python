@@ -672,7 +672,7 @@ def single_exception_from_error_tuple(
     is_root_exception = exception_id == 0
     if not is_root_exception and parent_id is not None:
         exception_value["mechanism"]["parent_id"] = parent_id
-        if "type" not in exception_value["mechanism"]:
+        if exception_id is not None and exception_id > 0:
             exception_value["mechanism"]["type"] = "chained"
 
     if is_root_exception and "type" not in exception_value["mechanism"]:
