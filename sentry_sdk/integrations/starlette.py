@@ -84,6 +84,7 @@ class StarletteIntegration(Integration):
     origin = f"auto.http.{identifier}"
 
     transaction_style = ""
+    starlette_version = None
 
     def __init__(
         self,
@@ -124,9 +125,9 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        version = parse_version(STARLETTE_VERSION)
+        StarletteIntegration.starlette_version = parse_version(STARLETTE_VERSION)
 
-        if version is None:
+        if StarletteIntegration.starlette_version is None:
             raise DidNotEnable(
                 "Unparsable Starlette version: {}".format(STARLETTE_VERSION)
             )
@@ -135,7 +136,7 @@ class StarletteIntegration(Integration):
         patch_asgi_app()
         patch_request_response()
 
-        if version >= (0, 24):
+        if StarletteIntegration.starlette_version >= (0, 24):
             patch_templates()
 
 
@@ -365,10 +366,16 @@ def patch_middlewares():
         def _sentry_middleware_init(self, cls, *args, **kwargs):
             # type: (Any, Any, Any, Any) -> None
             if cls == SentryAsgiMiddleware:
-                return old_middleware_init(self, cls, *args, **kwargs)
+                if StarletteIntegration.starlette_version < (0, 35):
+                    return old_middleware_init(self, cls, **kwargs)
+                else:
+                    return old_middleware_init(self, cls, *args, **kwargs)
 
             span_enabled_cls = _enable_span_for_middleware(cls)
-            old_middleware_init(self, span_enabled_cls, *args, **kwargs)
+            if StarletteIntegration.starlette_version < (0, 35):
+                old_middleware_init(self, span_enabled_cls, **kwargs)
+            else:
+                old_middleware_init(self, span_enabled_cls, *args, **kwargs)
 
             if cls == AuthenticationMiddleware:
                 patch_authentication_middleware(cls)
