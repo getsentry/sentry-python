@@ -362,7 +362,7 @@ def patch_middlewares():
 
     if not_yet_patched:
         def _sentry_middleware_init(self, cls, *args, **kwargs):
-            # type: (Any, Any, Any) -> None
+            # type: (Any, Any, Any, Any) -> None
             if cls == SentryAsgiMiddleware:
                 return old_middleware_init(self, cls, *args, **kwargs)
 

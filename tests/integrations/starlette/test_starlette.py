@@ -237,6 +237,10 @@ class SampleMiddleware:
 
         await self.app(scope, receive, do_stuff)
 
+class SampleMiddlewareWithArgs(Middleware):
+    def __init__(self, app, bla):
+        self.app = app
+        self.bla = bla
 
 class SampleReceiveSendMiddleware:
     def __init__(self, app):
@@ -860,6 +864,20 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         assert span["description"].startswith(expected[idx]["description"])
         assert span["tags"] == expected[idx]["tags"]
         idx += 1
+
+
+def test_middleware_args(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    _ = starlette_app_factory(
+        middleware=[Middleware(SampleMiddlewareWithArgs, "bla", "ba")]
+    )
+
+    # Only creating the App with an Middleware with args
+    # should not raise an error
+    # So as long as test passes, we are good
 
 
 def test_legacy_setup(
