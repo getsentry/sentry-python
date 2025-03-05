@@ -873,9 +873,7 @@ def test_middleware_args(sentry_init):
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
     )
-    _ = starlette_app_factory(
-        middleware=[Middleware(SampleMiddlewareWithArgs, "bla")]
-    )
+    _ = starlette_app_factory(middleware=[Middleware(SampleMiddlewareWithArgs, "bla")])
 
     # Only creating the App with an Middleware with args
     # should not raise an error
