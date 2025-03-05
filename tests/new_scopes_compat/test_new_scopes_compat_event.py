@@ -36,7 +36,11 @@ def expected_error(integrations):
             "exception": {
                 "values": [
                     {
-                        "mechanism": {"type": "generic", "handled": True},
+                        "mechanism": {
+                            "exception_id": 0,
+                            "type": "generic",
+                            "handled": True,
+                        },
                         "module": None,
                         "type": "ValueError",
                         "value": "This is a test exception",
