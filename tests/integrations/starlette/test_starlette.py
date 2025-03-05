@@ -239,7 +239,7 @@ class SampleMiddleware:
 
 
 class SampleMiddlewareWithArgs(Middleware):
-    def __init__(self, app, bla):
+    def __init__(self, app, bla=None):
         self.app = app
         self.bla = bla
 
@@ -874,7 +874,7 @@ def test_middleware_args(sentry_init):
         integrations=[StarletteIntegration()],
     )
     _ = starlette_app_factory(
-        middleware=[Middleware(SampleMiddlewareWithArgs, "bla", "ba")]
+        middleware=[Middleware(SampleMiddlewareWithArgs, "bla")]
     )
 
     # Only creating the App with an Middleware with args
