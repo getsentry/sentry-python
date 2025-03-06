@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 CONTEXT_TYPE = "cloud_resource"
 
+HTTP_TIMEOUT = 2.0
+
 AWS_METADATA_HOST = "169.254.169.254"
 AWS_TOKEN_URL = "http://{}/latest/api/token".format(AWS_METADATA_HOST)
 AWS_METADATA_URL = "http://{}/latest/dynamic/instance-identity/document".format(
@@ -59,7 +61,7 @@ class CloudResourceContextIntegration(Integration):
     cloud_provider = ""
 
     aws_token = ""
-    http = urllib3.PoolManager()
+    http = urllib3.PoolManager(timeout=HTTP_TIMEOUT)
 
     gcp_metadata = None
 
@@ -83,7 +85,13 @@ class CloudResourceContextIntegration(Integration):
             cls.aws_token = r.data.decode()
             return True
 
-        except Exception:
+        except urllib3.exceptions.TimeoutError:
+            logger.debug(
+                "AWS metadata service timed out after %s seconds", HTTP_TIMEOUT
+            )
+            return False
+        except Exception as e:
+            logger.debug("Error checking AWS metadata service: %s", str(e))
             return False
 
     @classmethod
@@ -131,8 +139,12 @@ class CloudResourceContextIntegration(Integration):
             except Exception:
                 pass
 
-        except Exception:
-            pass
+        except urllib3.exceptions.TimeoutError:
+            logger.debug(
+                "AWS metadata service timed out after %s seconds", HTTP_TIMEOUT
+            )
+        except Exception as e:
+            logger.debug("Error fetching AWS metadata: %s", str(e))
 
         return ctx
 
@@ -152,7 +164,13 @@ class CloudResourceContextIntegration(Integration):
             cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
             return True
 
-        except Exception:
+        except urllib3.exceptions.TimeoutError:
+            logger.debug(
+                "GCP metadata service timed out after %s seconds", HTTP_TIMEOUT
+            )
+            return False
+        except Exception as e:
+            logger.debug("Error checking GCP metadata service: %s", str(e))
             return False
 
     @classmethod
@@ -201,8 +219,12 @@ class CloudResourceContextIntegration(Integration):
             except Exception:
                 pass
 
-        except Exception:
-            pass
+        except urllib3.exceptions.TimeoutError:
+            logger.debug(
+                "GCP metadata service timed out after %s seconds", HTTP_TIMEOUT
+            )
+        except Exception as e:
+            logger.debug("Error fetching GCP metadata: %s", str(e))
 
         return ctx
 
