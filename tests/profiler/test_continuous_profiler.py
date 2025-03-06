@@ -251,7 +251,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
     thread = threading.current_thread()
 
-    with sentry_sdk.start_transaction(name="profiling"):
+    with sentry_sdk.start_span(name="profiling"):
         with sentry_sdk.start_span(op="op"):
             time.sleep(0.05)
 
@@ -262,7 +262,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 
@@ -272,7 +272,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)
 
@@ -335,7 +335,7 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
 
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.1)
@@ -352,7 +352,7 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
 
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             assert get_profiler_id() is None, "profiler should not be running"
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.1)
@@ -411,7 +411,7 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
 
     start_profiler_func()
 
-    with sentry_sdk.start_transaction(name="profiling"):
+    with sentry_sdk.start_span(name="profiling"):
         with sentry_sdk.start_span(op="op"):
             time.sleep(0.05)
 
@@ -457,7 +457,7 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
     for _ in range(3):
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling 1"):
+        with sentry_sdk.start_span(name="profiling 1"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.1)
@@ -467,7 +467,7 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
         # a transaction immediately, it'll be part of the same chunk
         assert get_profiler_id() is not None, "profiler should be running"
 
-        with sentry_sdk.start_transaction(name="profiling 2"):
+        with sentry_sdk.start_span(name="profiling 2"):
             assert get_profiler_id() is not None, "profiler should be running"
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.1)
@@ -517,7 +517,7 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
     for _ in range(3):
         envelopes.clear()
 
-        with sentry_sdk.start_transaction(name="profiling"):
+        with sentry_sdk.start_span(name="profiling"):
             assert get_profiler_id() is None, "profiler should not be running"
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.05)

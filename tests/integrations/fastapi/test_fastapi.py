@@ -247,7 +247,6 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
 
 
-@pytest.mark.asyncio
 def test_response_status_code_ok_in_transaction_context(sentry_init, capture_envelopes):
     """
     Tests that the response status code is added to the transaction "response" context.
@@ -276,7 +275,6 @@ def test_response_status_code_ok_in_transaction_context(sentry_init, capture_env
     assert transaction["contexts"]["response"]["status_code"] == 200
 
 
-@pytest.mark.asyncio
 def test_response_status_code_error_in_transaction_context(
     sentry_init,
     capture_envelopes,
@@ -313,7 +311,6 @@ def test_response_status_code_error_in_transaction_context(
     assert transaction["contexts"]["response"]["status_code"] == 500
 
 
-@pytest.mark.asyncio
 def test_response_status_code_not_found_in_transaction_context(
     sentry_init,
     capture_envelopes,

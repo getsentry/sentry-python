@@ -54,6 +54,7 @@ def _patch_cache_method(cache, method_name, address, port):
             op=op,
             name=description,
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
             value = original_method(*args, **kwargs)
 

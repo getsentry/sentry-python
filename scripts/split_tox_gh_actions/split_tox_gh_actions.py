@@ -58,6 +58,9 @@ GROUPS = {
     "Common": [
         "common",
     ],
+    "Gevent": [
+        "gevent",
+    ],
     "AI": [
         "anthropic",
         "cohere",

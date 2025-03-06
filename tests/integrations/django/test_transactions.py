@@ -21,6 +21,7 @@ else:
     included_url_conf = ((re_path(r"^foo/bar/(?P<param>[\w]+)", lambda x: ""),), "")
 
 from sentry_sdk.integrations.django.transactions import RavenResolver
+from tests.integrations.django.myapp.wsgi import application  # noqa: F401
 
 
 example_url_conf = (

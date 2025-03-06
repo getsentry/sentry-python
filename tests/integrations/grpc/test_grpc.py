@@ -7,7 +7,7 @@ from concurrent import futures
 from typing import List, Optional
 from unittest.mock import Mock
 
-from sentry_sdk import start_span, start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
 from tests.conftest import ApproxDict
@@ -41,7 +41,7 @@ def _tear_down(server: grpc.Server):
 
 
 @pytest.mark.forked
-def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
+def test_grpc_server_starts_root_span(sentry_init, capture_events_forksafe):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
 
@@ -99,7 +99,7 @@ def test_grpc_server_other_interceptors(sentry_init, capture_events_forksafe):
 
 
 @pytest.mark.forked
-def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe):
+def test_grpc_server_continues_trace(sentry_init, capture_events_forksafe):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
 
@@ -108,20 +108,20 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
     with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
-        with start_transaction() as transaction:
+        with start_span() as root_span:
             metadata = (
                 (
                     "baggage",
                     "sentry-trace_id={trace_id},sentry-environment=test,"
                     "sentry-transaction=test-transaction,sentry-sample_rate=1.0".format(
-                        trace_id=transaction.trace_id
+                        trace_id=root_span.trace_id
                     ),
                 ),
                 (
                     "sentry-trace",
                     "{trace_id}-{parent_span_id}-{sampled}".format(
-                        trace_id=transaction.trace_id,
-                        parent_span_id=transaction.span_id,
+                        trace_id=root_span.trace_id,
+                        parent_span_id=root_span.span_id,
                         sampled=1,
                     ),
                 ),
@@ -139,7 +139,7 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
         "source": "custom",
     }
     assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
-    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert event["contexts"]["trace"]["trace_id"] == root_span.trace_id
     assert span["op"] == "test"
 
 
@@ -153,17 +153,17 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
     with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
-        with start_transaction():
+        with start_span():
             stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
 
     events.write_file.close()
     events.read_event()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+    local_root_span = events.read_event()
+    span = local_root_span["spans"][0]
 
-    assert len(local_transaction["spans"]) == 1
+    assert len(local_root_span["spans"]) == 1
     assert span["op"] == OP.GRPC_CLIENT
     assert (
         span["description"]
@@ -188,16 +188,16 @@ def test_grpc_client_unary_stream_starts_span(sentry_init, capture_events_forksa
     with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
-        with start_transaction():
+        with start_span():
             [el for el in stub.TestUnaryStream(gRPCTestMessage(text="test"))]
 
     _tear_down(server=server)
 
     events.write_file.close()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+    local_root_span = events.read_event()
+    span = local_root_span["spans"][0]
 
-    assert len(local_transaction["spans"]) == 1
+    assert len(local_root_span["spans"]) == 1
     assert span["op"] == OP.GRPC_CLIENT
     assert (
         span["description"]
@@ -233,7 +233,7 @@ def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
         channel = grpc.intercept_channel(channel, MockClientInterceptor())
         stub = gRPCTestServiceStub(channel)
 
-        with start_transaction():
+        with start_span():
             stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
@@ -242,10 +242,10 @@ def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
 
     events.write_file.close()
     events.read_event()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+    local_root_span = events.read_event()
+    span = local_root_span["spans"][0]
 
-    assert len(local_transaction["spans"]) == 1
+    assert len(local_root_span["spans"]) == 1
     assert span["op"] == OP.GRPC_CLIENT
     assert (
         span["description"]
@@ -272,18 +272,18 @@ def test_grpc_client_and_servers_interceptors_integration(
     with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
-        with start_transaction():
+        with start_span():
             stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
 
     events.write_file.close()
-    server_transaction = events.read_event()
-    local_transaction = events.read_event()
+    server_root_span = events.read_event()
+    local_root_span = events.read_event()
 
     assert (
-        server_transaction["contexts"]["trace"]["trace_id"]
-        == local_transaction["contexts"]["trace"]["trace_id"]
+        server_root_span["contexts"]["trace"]["trace_id"]
+        == local_root_span["contexts"]["trace"]["trace_id"]
     )
 
 
@@ -328,26 +328,23 @@ def test_span_origin(sentry_init, capture_events_forksafe):
     with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
-        with start_transaction(name="custom_transaction"):
+        with start_span(name="custom_root"):
             stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
 
     events.write_file.close()
 
-    transaction_from_integration = events.read_event()
-    custom_transaction = events.read_event()
+    root_span_from_integration = events.read_event()
+    custom_root_span = events.read_event()
 
+    assert root_span_from_integration["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
     assert (
-        transaction_from_integration["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
-    )
-    assert (
-        transaction_from_integration["spans"][0]["origin"]
-        == "auto.grpc.grpc.TestService"
+        root_span_from_integration["spans"][0]["origin"] == "auto.grpc.grpc.TestService"
     )  # manually created in TestService, not the instrumentation
 
-    assert custom_transaction["contexts"]["trace"]["origin"] == "manual"
-    assert custom_transaction["spans"][0]["origin"] == "auto.grpc.grpc"
+    assert custom_root_span["contexts"]["trace"]["origin"] == "manual"
+    assert custom_root_span["spans"][0]["origin"] == "auto.grpc.grpc"
 
 
 class TestService(gRPCTestServiceServicer):
