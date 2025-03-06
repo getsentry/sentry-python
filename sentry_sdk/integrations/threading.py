@@ -1,6 +1,7 @@
 import sys
 from functools import wraps
 from threading import Thread, current_thread
+import warnings
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
@@ -8,7 +9,6 @@ from sentry_sdk.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (
     event_from_exception,
     capture_internal_exceptions,
-    logger,
     reraise,
 )
 
@@ -31,8 +31,10 @@ class ThreadingIntegration(Integration):
     def __init__(self, propagate_hub=None, propagate_scope=True):
         # type: (Optional[bool], bool) -> None
         if propagate_hub is not None:
-            logger.warning(
-                "Deprecated: propagate_hub is deprecated. This will be removed in the future."
+            warnings.warn(
+                "Deprecated: propagate_hub is deprecated. This will be removed in the future.",
+                stacklevel=2,
+                category=DeprecationWarning,
             )
 
         # Note: propagate_hub did not have any effect on propagation of scope data
