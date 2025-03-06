@@ -84,7 +84,6 @@ class StarletteIntegration(Integration):
     origin = f"auto.http.{identifier}"
 
     transaction_style = ""
-    starlette_version = None
 
     def __init__(
         self,
@@ -125,9 +124,9 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        StarletteIntegration.starlette_version = parse_version(STARLETTE_VERSION)
+        version = parse_version(STARLETTE_VERSION)
 
-        if StarletteIntegration.starlette_version is None:
+        if version is None:
             raise DidNotEnable(
                 "Unparsable Starlette version: {}".format(STARLETTE_VERSION)
             )
@@ -136,7 +135,7 @@ class StarletteIntegration(Integration):
         patch_asgi_app()
         patch_request_response()
 
-        if StarletteIntegration.starlette_version >= (0, 24):
+        if version >= (0, 24):
             patch_templates()
 
 
