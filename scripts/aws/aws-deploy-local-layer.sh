@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
-# Builds and deploys the Sentry AWS Lambda layer (including the Sentry SDK and the Sentry Lambda Extension)
+# Builds and deploys the `SentryPythonServerlessSDK-local-dev` AWS Lambda layer (containing the Sentry SDK)
 #
 # The currently checked out version of the SDK in your local directory is used.
-# The latest version of the Lambda Extension is fetched from the Sentry Release Registry.
 #
 
 set -euo pipefail

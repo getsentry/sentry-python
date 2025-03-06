@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
 # Deletes all versions of the layer specified in LAYER_NAME in one region.
+# Use with caution!
 #
 
 set -euo pipefail

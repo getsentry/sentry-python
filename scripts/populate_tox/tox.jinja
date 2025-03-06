@@ -57,10 +57,7 @@ envlist =
     {py3.8,py3.11,py3.12}-asyncpg-latest
 
     # AWS Lambda
-    # The aws_lambda tests deploy to the real AWS and have their own
-    # matrix of Python versions to run the test lambda function in.
-    # see `lambda_runtime` fixture in tests/integrations/aws_lambda.py
-    {py3.9}-aws_lambda
+    {py3.8,py3.9,py3.11,py3.13}-aws_lambda
 
     # Beam
     {py3.7}-beam-v{2.12}
@@ -250,7 +247,12 @@ deps =
     asyncpg: pytest-asyncio
 
     # AWS Lambda
+    aws_lambda: aws-cdk-lib
+    aws_lambda: aws-sam-cli
     aws_lambda: boto3
+    aws_lambda: fastapi
+    aws_lambda: requests
+    aws_lambda: uvicorn
 
     # Beam
     beam-v2.12: apache-beam~=2.12.0
@@ -528,8 +530,6 @@ setenv =
     socket: TESTPATH=tests/integrations/socket
 
 passenv =
-    SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID
-    SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY
     SENTRY_PYTHON_TEST_POSTGRES_HOST
     SENTRY_PYTHON_TEST_POSTGRES_USER
     SENTRY_PYTHON_TEST_POSTGRES_PASSWORD
