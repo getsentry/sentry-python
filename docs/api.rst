@@ -5,6 +5,14 @@ Top Level API
 This is the user facing API of the SDK. It's exposed as ``sentry_sdk``.
 With this API you can implement a custom performance monitoring or error reporting solution.
 
+Initializing the SDK
+====================
+
+.. autoclass:: sentry_sdk.client.ClientConstructor
+   :members:
+   :undoc-members:
+   :special-members: __init__
+   :noindex:
 
 Capturing Data
 ==============
