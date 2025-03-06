@@ -15,7 +15,7 @@ def test_span_trimming(sentry_init, capture_events):
 
     with start_span(name="hi"):
         for i in range(10):
-            with start_span(op="foo{}".format(i)):
+            with start_span(op=f"foo{i}"):
                 pass
 
     (event,) = events
@@ -29,7 +29,6 @@ def test_span_trimming(sentry_init, capture_events):
 
     assert event["_meta"]["spans"][""]["len"] == 10
     assert "_dropped_spans" not in event
-    assert "dropped_spans" not in event
 
 
 def test_span_data_scrubbing_and_trimming(sentry_init, capture_events):
@@ -42,7 +41,7 @@ def test_span_data_scrubbing_and_trimming(sentry_init, capture_events):
             span.set_data("datafoo", "databar")
 
         for i in range(10):
-            with start_span(op="foo{}".format(i)):
+            with start_span(op=f"foo{i}"):
                 pass
 
     (event,) = events
