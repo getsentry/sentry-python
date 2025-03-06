@@ -86,7 +86,9 @@ class CloudResourceContextIntegration(Integration):
             return True
 
         except urllib3.exceptions.TimeoutError:
-            logger.debug("AWS metadata service timed out after %s seconds", HTTP_TIMEOUT)
+            logger.debug(
+                "AWS metadata service timed out after %s seconds", HTTP_TIMEOUT
+            )
             return False
         except Exception as e:
             logger.debug("Error checking AWS metadata service: %s", str(e))
@@ -138,7 +140,9 @@ class CloudResourceContextIntegration(Integration):
                 pass
 
         except urllib3.exceptions.TimeoutError:
-            logger.debug("AWS metadata service timed out after %s seconds", HTTP_TIMEOUT)
+            logger.debug(
+                "AWS metadata service timed out after %s seconds", HTTP_TIMEOUT
+            )
         except Exception as e:
             logger.debug("Error fetching AWS metadata: %s", str(e))
 
@@ -161,7 +165,9 @@ class CloudResourceContextIntegration(Integration):
             return True
 
         except urllib3.exceptions.TimeoutError:
-            logger.debug("GCP metadata service timed out after %s seconds", HTTP_TIMEOUT)
+            logger.debug(
+                "GCP metadata service timed out after %s seconds", HTTP_TIMEOUT
+            )
             return False
         except Exception as e:
             logger.debug("Error checking GCP metadata service: %s", str(e))
@@ -214,7 +220,9 @@ class CloudResourceContextIntegration(Integration):
                 pass
 
         except urllib3.exceptions.TimeoutError:
-            logger.debug("GCP metadata service timed out after %s seconds", HTTP_TIMEOUT)
+            logger.debug(
+                "GCP metadata service timed out after %s seconds", HTTP_TIMEOUT
+            )
         except Exception as e:
             logger.debug("Error fetching GCP metadata: %s", str(e))
 
