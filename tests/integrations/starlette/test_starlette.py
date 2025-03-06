@@ -31,7 +31,6 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.testclient import TestClient
-
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
 
 
@@ -868,7 +867,11 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         idx += 1
 
 
-def test_middleware_args(sentry_init):
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 35),
+    reason="Positional args for middleware have been introduced in Starlette >= 0.35",
+)
+def test_middleware_positional_args(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],

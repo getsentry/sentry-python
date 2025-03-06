@@ -366,16 +366,10 @@ def patch_middlewares():
         def _sentry_middleware_init(self, cls, *args, **kwargs):
             # type: (Any, Any, Any, Any) -> None
             if cls == SentryAsgiMiddleware:
-                if StarletteIntegration.starlette_version < (0, 35):
-                    return old_middleware_init(self, cls, **kwargs)
-                else:
-                    return old_middleware_init(self, cls, *args, **kwargs)
+                return old_middleware_init(self, cls, *args, **kwargs)
 
             span_enabled_cls = _enable_span_for_middleware(cls)
-            if StarletteIntegration.starlette_version < (0, 35):
-                old_middleware_init(self, span_enabled_cls, **kwargs)
-            else:
-                old_middleware_init(self, span_enabled_cls, *args, **kwargs)
+            old_middleware_init(self, span_enabled_cls, *args, **kwargs)
 
             if cls == AuthenticationMiddleware:
                 patch_authentication_middleware(cls)
