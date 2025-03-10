@@ -2,13 +2,14 @@
 import functools
 from typing import Any, Optional
 
-from sentry_sdk import get_client
+from sentry_sdk import get_client, get_current_scope
 
 
 def capture_log(severity_text, severity_number, template, **kwargs):
     # type: (str, int, str, **Any) -> Optional[str]
     client = get_client()
-    return client.capture_log(severity_text, severity_number, template, **kwargs)
+    scope = get_current_scope()
+    return client.capture_log(scope, severity_text, severity_number, template, **kwargs)
 
 
 trace = functools.partial(capture_log, "trace", 1)

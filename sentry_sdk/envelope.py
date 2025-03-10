@@ -274,6 +274,8 @@ class Item:
             return "transaction"
         elif ty == "event":
             return "error"
+        elif ty == "otel_log":
+            return "log"
         elif ty == "client_report":
             return "internal"
         elif ty == "profile":

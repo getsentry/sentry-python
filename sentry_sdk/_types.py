@@ -239,6 +239,7 @@ if TYPE_CHECKING:
         "metric_bucket",
         "monitor",
         "span",
+        "log",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 

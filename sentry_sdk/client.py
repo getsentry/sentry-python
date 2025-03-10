@@ -10,7 +10,6 @@ from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
 import warnings
 
-from sentry_sdk import get_current_scope
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -209,8 +208,8 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def capture_log(self, severity_text, severity_number, template, **kwargs):
-        # type: (str, int, str, **Any) -> None
+    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
+        # type: (Scope, str, int, str, **Any) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -854,8 +853,8 @@ class _Client(BaseClient):
 
         return return_value
 
-    def capture_log(self, severity_text, severity_number, template, **kwargs):
-        # type: (str, int, str, **Any) -> None
+    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
+        # type: (Scope, str, int, str, **Any) -> None
         if not self.options.get("enable_sentry_logs", False):
             return
 
@@ -894,7 +893,7 @@ class _Client(BaseClient):
             "time_unix_nano": time.time_ns(),
         }
 
-        if (ctx := get_current_scope().get_active_propagation_context()) is not None:
+        if (ctx := scope.get_active_propagation_context()) is not None:
             headers["trace_id"] = ctx.trace_id
             log["trace_id"] = ctx.trace_id
         envelope = Envelope(headers=headers)
