@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
@@ -862,17 +862,6 @@ class _Client(BaseClient):
             "sent_at": format_timestamp(datetime.now(timezone.utc)),
         }  # type: dict[str, object]
 
-        def format_attribute(key: str, val: int | float | str | bool):
-            if isinstance(val, int):
-                return {"key": key, "value": {"int_value": val}}
-            if isinstance(val, str):
-                return {"key": key, "value": {"string_value": val}}
-            if isinstance(val, float):
-                return {"key": key, "value": {"double_value": val}}
-            if isinstance(val, bool):
-                return {"key": key, "value": {"bool_value": val}}
-            return {"key": key, "value": {"string_value": json.dumps(val)}}
-
         attrs = {
             "sentry.message.template": template,
         }
@@ -885,6 +874,7 @@ class _Client(BaseClient):
         for k, v in kwargs.items():
             attrs[f"sentry.message.parameters.{k}"] = v
 
+        # type: Log
         log = {
             "severity_text": severity_text,
             "severity_number": severity_number,
@@ -901,20 +891,40 @@ class _Client(BaseClient):
         before_send_log = self.options.get("before_send_log")
         if before_send_log is not None:
             log = before_send_log(log)
+        if log is None:
+            return
 
-        # convert to otel form - otel_log has a different schema than just 'log'
-        log["body"] = {"string_value": log["body"]}
-        log["attributes"] = [
-            format_attribute(k, v) for (k, v) in log["attributes"].items()
-        ]
+        def format_attribute(key, val):
+            # type: (str, int | float | str | bool) -> Any
+            if isinstance(val, int):
+                return {"key": key, "value": {"intValue": val}}
+            if isinstance(val, str):
+                return {"key": key, "value": {"stringValue": val}}
+            if isinstance(val, float):
+                return {"key": key, "value": {"doubleValue": val}}
+            if isinstance(val, bool):
+                return {"key": key, "value": {"boolValue": val}}
+            return {"key": key, "value": {"stringValue": json.dumps(val)}}
 
-        envelope.add_log(log)  # TODO: batch these
+        otel_log = {
+            "severityText": log["severity_text"],
+            "severityNumber": log["severity_number"],
+            "body": {"stringValue": log["body"]},
+            "timeUnixNano": str(log["time_unix_nano"]),
+        }
+        if isinstance((attrs := log["attributes"]), dict):
+            otel_log["attributes"] = [
+                format_attribute(k, v) for (k, v) in attrs.items()
+            ]
+        if "trace_id" in log:
+            otel_log["traceId"] = log["trace_id"]
+
+        envelope.add_log(otel_log)  # TODO: batch these
         if self.spotlight:
             self.spotlight.capture_envelope(envelope)
 
         if self.transport is not None:
             self.transport.capture_envelope(envelope)
-        return None
 
     def capture_session(
         self, session  # type: Session

@@ -207,7 +207,17 @@ if TYPE_CHECKING:
     ]
 
     Hint = Dict[str, Any]
-    Log = Dict[str, Any]
+    Log = TypedDict(
+        "Log",
+        {
+            "severity_text": str,
+            "severity_number": int,
+            "body": str,
+            "attributes": dict[str, str | bool | float | int],
+            "time_unix_nano": int,
+            "trace_id": Optional[str],
+        },
+    )
 
     Breadcrumb = Dict[str, Any]
     BreadcrumbHint = Dict[str, Any]

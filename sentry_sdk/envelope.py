@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Iterator
 
-    from sentry_sdk._types import Event, EventDataCategory, Log
+    from sentry_sdk._types import Event, EventDataCategory
 
 
 def parse_json(data):
@@ -103,7 +103,7 @@ class Envelope:
         self.add_item(Item(payload=PayloadRef(json=sessions), type="sessions"))
 
     def add_log(
-        self, log  # type: Log
+        self, log  # type: Any
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=log), type="otel_log"))
