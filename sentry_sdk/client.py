@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo, Log
+    from sentry_sdk._types import Event, Hint, SDKInfo
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
@@ -874,7 +874,6 @@ class _Client(BaseClient):
         for k, v in kwargs.items():
             attrs[f"sentry.message.parameters.{k}"] = v
 
-        # type: Log
         log = {
             "severity_text": severity_text,
             "severity_number": severity_number,
@@ -890,14 +889,15 @@ class _Client(BaseClient):
 
         before_send_log = self.options.get("before_send_log")
         if before_send_log is not None:
-            log = before_send_log(log)
+            hint = {}
+            log = before_send_log(log, hint)
         if log is None:
             return
 
         def format_attribute(key, val):
             # type: (str, int | float | str | bool) -> Any
             if isinstance(val, int):
-                return {"key": key, "value": {"intValue": val}}
+                return {"key": key, "value": {"intValue": str(val)}}
             if isinstance(val, str):
                 return {"key": key, "value": {"stringValue": val}}
             if isinstance(val, float):
