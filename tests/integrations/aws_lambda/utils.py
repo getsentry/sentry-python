@@ -1,6 +1,8 @@
 import gzip
 import json
 import os
+import shutil
+import subprocess
 import requests
 import sys
 import time
@@ -20,6 +22,9 @@ from scripts.build_aws_lambda_layer import build_packaged_zip, DIST_PATH
 
 
 LAMBDA_FUNCTION_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
+LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR = (
+    "./tests/integrations/aws_lambda/lambda_functions_with_embedded_sdk/"
+)
 LAMBDA_FUNCTION_TIMEOUT = 10
 SAM_PORT = 3001
 
@@ -45,6 +50,20 @@ def get_host_ip():
             host = socket.gethostbyname(hostname)
 
     return host
+
+
+def get_project_root():
+    """
+    Returns the absolute path to the project root directory.
+    """
+    # Start from the current file's directory
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Navigate up to the project root (4 levels up from tests/integrations/aws_lambda/)
+    # This is equivalent to the multiple dirname() calls
+    project_root = os.path.abspath(os.path.join(current_dir, "../../../"))
+
+    return project_root
 
 
 class LocalLambdaStack(Stack):
@@ -112,6 +131,73 @@ class LocalLambdaStack(Stack):
                             "SENTRY_DSN": dsn,
                             "SENTRY_INITIAL_HANDLER": "index.handler",
                             "SENTRY_TRACES_SAMPLE_RATE": "1.0",
+                        }
+                    },
+                },
+            )
+            print(
+                "[LocalLambdaStack] - Created Lambda function: %s (%s)"
+                % (
+                    lambda_dir,
+                    os.path.join(LAMBDA_FUNCTION_DIR, lambda_dir),
+                )
+            )
+
+        print(
+            "[LocalLambdaStack] Add all Lambda functions defined in "
+            "/tests/integrations/aws_lambda/lambda_functions_with_embedded_sdk/ to the SAM stack"
+        )
+        lambda_dirs = [
+            d
+            for d in os.listdir(LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR)
+            if os.path.isdir(os.path.join(LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR, d))
+        ]
+        for lambda_dir in lambda_dirs:
+            # Copy the Sentry SDK into the function directory
+            sdk_path = os.path.join(
+                LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR, lambda_dir, "sentry_sdk"
+            )
+            if not os.path.exists(sdk_path):
+                # Find the Sentry SDK in the current environment
+                import sentry_sdk as sdk_module
+
+                sdk_source = os.path.dirname(sdk_module.__file__)
+                shutil.copytree(sdk_source, sdk_path)
+
+            # Install the requirements of Sentry SDK into the function directory
+            requirements_file = os.path.join(
+                get_project_root(), "requirements-aws-lambda-layer.txt"
+            )
+
+            # Install the package using pip
+            subprocess.check_call(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "--target",
+                    os.path.join(LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR, lambda_dir),
+                    "-r",
+                    requirements_file,
+                ]
+            )
+
+            CfnResource(
+                self,
+                lambda_dir,
+                type="AWS::Serverless::Function",
+                properties={
+                    "CodeUri": os.path.join(
+                        LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR, lambda_dir
+                    ),
+                    "Handler": "index.handler",
+                    "Runtime": PYTHON_VERSION,
+                    "Timeout": LAMBDA_FUNCTION_TIMEOUT,
+                    "Environment": {
+                        "Variables": {
+                            "SENTRY_DSN": dsn,
                         }
                     },
                 },

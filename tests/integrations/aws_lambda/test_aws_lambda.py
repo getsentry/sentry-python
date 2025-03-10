@@ -450,3 +450,22 @@ def test_span_origin(lambda_client, test_environment):
     assert (
         transaction_event["contexts"]["trace"]["origin"] == "auto.function.aws_lambda"
     )
+
+
+def test_traces_sampler_has_correct_sampling_context(lambda_client, test_environment):
+    """
+    Test that aws_event and aws_context are passed in the custom_sampling_context
+    when using the AWS Lambda integration.
+    """
+    test_payload = {"test_key": "test_value"}
+    response = lambda_client.invoke(
+        FunctionName="TracesSampler",
+        Payload=json.dumps(test_payload),
+    )
+    response_payload = json.loads(response["Payload"].read().decode())
+    sampling_context_data = json.loads(response_payload["body"])[
+        "sampling_context_data"
+    ]
+    assert sampling_context_data.get("aws_event_present") is True
+    assert sampling_context_data.get("aws_context_present") is True
+    assert sampling_context_data.get("event_data", {}).get("test_key") == "test_value"
