@@ -883,6 +883,7 @@ class _Client(BaseClient):
             "body": template.format(**kwargs),
             "attributes": attrs,
             "time_unix_nano": time.time_ns(),
+            "trace_id": None,
         }  # type: Log
 
         propagation_context = scope.get_active_propagation_context()
