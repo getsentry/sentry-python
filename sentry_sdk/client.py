@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
@@ -865,12 +865,15 @@ class _Client(BaseClient):
         attrs = {
             "sentry.message.template": template,
         }
-        if kwargs.get("attributes") is not None:
-            attrs.update(kwargs.get("attributes"))
-        if self.options.get("environment") is not None:
-            attrs["sentry.environment"] = self.options.get("environment")
-        if self.options.get("release") is not None:
-            attrs["sentry.release"] = self.options.get("release")
+        kwargs_attributes = kwargs.get("attributes")
+        if kwargs_attributes is not None:
+            attrs.update(kwargs_attributes)
+        environment = self.options.get("environment")
+        if environment is not None:
+            attrs["sentry.environment"] = environment
+        release = self.options.get("release")
+        if release is not None:
+            attrs["sentry.release"] = release
         for k, v in kwargs.items():
             attrs[f"sentry.message.parameters.{k}"] = v
 
@@ -880,7 +883,7 @@ class _Client(BaseClient):
             "body": template.format(**kwargs),
             "attributes": attrs,
             "time_unix_nano": time.time_ns(),
-        }
+        }  # type: Log
 
         propagation_context = scope.get_active_propagation_context()
         if propagation_context is not None:
@@ -890,8 +893,7 @@ class _Client(BaseClient):
 
         before_send_log = self.options.get("before_send_log")
         if before_send_log is not None:
-            hint = {}
-            log = before_send_log(log, hint)
+            log = before_send_log(log, {})
         if log is None:
             return
 
