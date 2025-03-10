@@ -1,4 +1,6 @@
+import json
 import os
+import time
 import uuid
 import random
 import socket
@@ -8,6 +10,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
 import warnings
 
+from sentry_sdk import get_current_scope
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -205,6 +208,10 @@ class BaseClient:
     def capture_event(self, *args, **kwargs):
         # type: (*Any, **Any) -> Optional[str]
         return None
+
+    def capture_log(self, severity_text, severity_number, template, **kwargs):
+        # type: (str, int, str, **Any) -> None
+        pass
 
     def capture_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -846,6 +853,69 @@ class _Client(BaseClient):
             return_value = event_id
 
         return return_value
+
+    def capture_log(self, severity_text, severity_number, template, **kwargs):
+        # type: (str, int, str, **Any) -> None
+        if not self.options.get("enable_sentry_logs", False):
+            return
+
+        headers = {
+            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+        }  # type: dict[str, object]
+
+        def format_attribute(key: str, val: int | float | str | bool):
+            if isinstance(val, int):
+                return {"key": key, "value": {"int_value": val}}
+            if isinstance(val, str):
+                return {"key": key, "value": {"string_value": val}}
+            if isinstance(val, float):
+                return {"key": key, "value": {"double_value": val}}
+            if isinstance(val, bool):
+                return {"key": key, "value": {"bool_value": val}}
+            return {"key": key, "value": {"string_value": json.dumps(val)}}
+
+        attrs = {
+            "sentry.message.template": template,
+        }
+        if (extra_attrs := kwargs.get("attributes")) is not None:
+            attrs.update(extra_attrs)
+        if (env := self.options.get("environment")) is not None:
+            attrs["sentry.environment"] = env
+        if (release := self.options.get("release")) is not None:
+            attrs["sentry.release"] = release
+        for k, v in kwargs.items():
+            attrs[f"sentry.message.parameters.{k}"] = v
+
+        log = {
+            "severity_text": severity_text,
+            "severity_number": severity_number,
+            "body": template.format(**kwargs),
+            "attributes": attrs,
+            "time_unix_nano": time.time_ns(),
+        }
+
+        if (ctx := get_current_scope().get_active_propagation_context()) is not None:
+            headers["trace_id"] = ctx.trace_id
+            log["trace_id"] = ctx.trace_id
+        envelope = Envelope(headers=headers)
+
+        before_send_log = self.options.get("before_send_log")
+        if before_send_log is not None:
+            log = before_send_log(log)
+
+        # convert to otel form - otel_log has a different schema than just 'log'
+        log["body"] = {"string_value": log["body"]}
+        log["attributes"] = [
+            format_attribute(k, v) for (k, v) in log["attributes"].items()
+        ]
+
+        envelope.add_log(log)  # TODO: batch these
+        if self.spotlight:
+            self.spotlight.capture_envelope(envelope)
+
+        if self.transport is not None:
+            self.transport.capture_envelope(envelope)
+        return None
 
     def capture_session(
         self, session  # type: Session
