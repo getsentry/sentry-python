@@ -421,7 +421,5 @@ async def test_job_concurrency(capture_events, init_arq):
 
     exception_event = events[1]
     assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-    assert exception_event["transaction"] == "division"  # fails, transaction is sleepy
-    assert (
-        exception_event["extra"]["arq-job"]["task"] == "division"
-    )  # fails, task is sleepy
+    assert exception_event["transaction"] == "division"
+    assert exception_event["extra"]["arq-job"]["task"] == "division"
