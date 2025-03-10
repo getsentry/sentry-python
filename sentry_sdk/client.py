@@ -865,12 +865,12 @@ class _Client(BaseClient):
         attrs = {
             "sentry.message.template": template,
         }
-        if (extra_attrs := kwargs.get("attributes")) is not None:
-            attrs.update(extra_attrs)
-        if (env := self.options.get("environment")) is not None:
-            attrs["sentry.environment"] = env
-        if (release := self.options.get("release")) is not None:
-            attrs["sentry.release"] = release
+        if kwargs.get("attributes") is not None:
+            attrs.update(kwargs.get("attributes"))
+        if self.options.get("environment") is not None:
+            attrs["sentry.environment"] = self.options.get("environment")
+        if self.options.get("release") is not None:
+            attrs["sentry.release"] = self.options.get("release")
         for k, v in kwargs.items():
             attrs[f"sentry.message.parameters.{k}"] = v
 
@@ -882,9 +882,10 @@ class _Client(BaseClient):
             "time_unix_nano": time.time_ns(),
         }
 
-        if (ctx := scope.get_active_propagation_context()) is not None:
-            headers["trace_id"] = ctx.trace_id
-            log["trace_id"] = ctx.trace_id
+        propagation_context = scope.get_active_propagation_context()
+        if propagation_context is not None:
+            headers["trace_id"] = propagation_context.trace_id
+            log["trace_id"] = propagation_context.trace_id
         envelope = Envelope(headers=headers)
 
         before_send_log = self.options.get("before_send_log")
@@ -911,11 +912,10 @@ class _Client(BaseClient):
             "severityNumber": log["severity_number"],
             "body": {"stringValue": log["body"]},
             "timeUnixNano": str(log["time_unix_nano"]),
+            "attributes": [
+                format_attribute(k, v) for (k, v) in log["attributes"].items()
+            ],
         }
-        if isinstance((attrs := log["attributes"]), dict):
-            otel_log["attributes"] = [
-                format_attribute(k, v) for (k, v) in attrs.items()
-            ]
         if "trace_id" in log:
             otel_log["traceId"] = log["trace_id"]
 
