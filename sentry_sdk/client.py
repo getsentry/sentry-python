@@ -864,7 +864,7 @@ class _Client(BaseClient):
 
         attrs = {
             "sentry.message.template": template,
-        }
+        }  # type: dict[str, str | bool | float | int]
         kwargs_attributes = kwargs.get("attributes")
         if kwargs_attributes is not None:
             attrs.update(kwargs_attributes)
