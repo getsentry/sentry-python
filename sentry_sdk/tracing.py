@@ -466,10 +466,12 @@ class Span:
         :param environ: The ASGI/WSGI environ to pull information from.
         """
         if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.continue_from_environ "
-                "instead of Span.continue_from_environ."
+            warnings.warn(
+                "Deprecated: use Transaction.continue_from_environ instead of Span.continue_from_environ.",
+                stacklevel=2,
+                category=DeprecationWarning,
             )
+
         return Transaction.continue_from_headers(EnvironHeaders(environ), **kwargs)
 
     @classmethod
@@ -491,9 +493,10 @@ class Span:
         """
         # TODO move this to the Transaction class
         if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.continue_from_headers "
-                "instead of Span.continue_from_headers."
+            warnings.warn(
+                "Deprecated: use Transaction.continue_from_headers instead of Span.continue_from_headers.",
+                stacklevel=2,
+                category=DeprecationWarning,
             )
 
         # TODO-neel move away from this kwargs stuff, it's confusing and opaque
@@ -553,9 +556,10 @@ class Span:
         Create a ``Transaction`` with the given params, then add in data pulled from
         the given ``sentry-trace`` header value before returning the ``Transaction``.
         """
-        logger.warning(
-            "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
-            "instead of from_traceparent(traceparent, **kwargs)"
+        warnings.warn(
+            "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) instead of from_traceparent(traceparent, **kwargs)",
+            stacklevel=2,
+            category=DeprecationWarning,
         )
 
         if not traceparent:
