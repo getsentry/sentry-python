@@ -874,6 +874,9 @@ class _Client(BaseClient):
         release = self.options.get("release")
         if release is not None:
             attrs["sentry.release"] = release
+        span = scope.span
+        if span is not None:
+            attrs["sentry.trace.parent_span_id"] = span.span_id
         for k, v in kwargs.items():
             attrs[f"sentry.message.parameters.{k}"] = v
 
@@ -892,9 +895,9 @@ class _Client(BaseClient):
             log["trace_id"] = propagation_context.trace_id
         envelope = Envelope(headers=headers)
 
-        before_send_log = self.options.get("before_send_log")
-        if before_send_log is not None:
-            log = before_send_log(log, {})
+        before_emit_log = self.options.get("before_emit_log")
+        if before_emit_log is not None:
+            log = before_emit_log(log, {})
         if log is None:
             return
 
