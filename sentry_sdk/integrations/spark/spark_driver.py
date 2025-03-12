@@ -260,7 +260,12 @@ class SentryListener(SparkListener):
         # type: (Any) -> None
         stage_info = stageSubmitted.stageInfo()
         message = "Stage {} Submitted".format(stage_info.stageId())
-        data = {"attemptId": stage_info.attemptId(), "name": stage_info.name()}
+
+        data = {"name": stage_info.name()}
+        attempt_id = _get_attempt_id(stage_info)
+        if attempt_id is not None:
+            data["attemptId"] = attempt_id
+
         self._add_breadcrumb(level="info", message=message, data=data)
         _set_app_properties()
 
@@ -271,7 +276,11 @@ class SentryListener(SparkListener):
         stage_info = stageCompleted.stageInfo()
         message = ""
         level = ""
-        data = {"attemptId": stage_info.attemptId(), "name": stage_info.name()}
+
+        data = {"name": stage_info.name()}
+        attempt_id = _get_attempt_id(stage_info)
+        if attempt_id is not None:
+            data["attemptId"] = attempt_id
 
         # Have to Try Except because stageInfo.failureReason() is typed with Scala Option
         try:
@@ -283,3 +292,24 @@ class SentryListener(SparkListener):
             level = "info"
 
         self._add_breadcrumb(level=level, message=message, data=data)
+
+
+def _get_attempt_id(stage_info):
+    from py4j.protocol import Py4JJavaError  # type: ignore
+
+    try:
+        return stage_info.attemptId()
+    except Py4JJavaError:
+        pass
+
+    try:
+        return stage_info.attemptNumber()
+    except Py4JJavaError:
+        pass
+
+    try:
+        return stage_info.currentAttemptId()
+    except Py4JJavaError:
+        pass
+
+    return None
