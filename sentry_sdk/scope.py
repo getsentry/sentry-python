@@ -43,6 +43,7 @@ from sentry_sdk.utils import (
     logger,
 )
 
+import typing
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -1146,8 +1147,20 @@ class Scope:
         """
         self.generate_propagation_context(environ_or_headers)
 
+        # When we generate the propagation context, the sample_rand value is set
+        # if missing or invalid (we use the original value if it's valid).
+        # We want the transaction to use the same sample_rand value. Due to duplicated
+        # propagation logic in the transaction, we pass it in to avoid recomputing it
+        # in the transaction.
+        # TYPE SAFETY: self.generate_propagation_context() ensures that self._propagation_context
+        # is not None.
+        sample_rand = typing.cast(
+            PropagationContext, self._propagation_context
+        )._sample_rand()
+
         transaction = Transaction.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
+            _sample_rand=sample_rand,
             op=op,
             origin=origin,
             name=name,
