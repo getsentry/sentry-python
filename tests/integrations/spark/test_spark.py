@@ -295,6 +295,9 @@ def test_sentry_listener_on_stage_submitted_no_attempt_id(sentry_listener):
             def name(self):
                 return "run-job"
 
+            def attemptId(self):
+                raise Py4JJavaError
+
             def attemptNumber(self):  # noqa: N802
                 return 14
 
@@ -325,6 +328,12 @@ def test_sentry_listener_on_stage_submitted_no_attempt_id_or_number(sentry_liste
 
             def name(self):
                 return "run-job"
+
+            def attemptId(self):
+                raise Py4JJavaError
+
+            def attemptNumber(self):
+                raise Py4JJavaError
 
         class MockStageSubmitted:
             def stageInfo(self):  # noqa: N802
