@@ -12,10 +12,9 @@ try:
 except ImportError:
     raise DidNotEnable("asyncio not available")
 
-from typing import TYPE_CHECKING, cast
+from typing import Any, cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
     from collections.abc import Coroutine
 
     from sentry_sdk._types import ExcInfo
