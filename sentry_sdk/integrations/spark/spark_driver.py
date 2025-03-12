@@ -296,16 +296,14 @@ class SentryListener(SparkListener):
 
 def _get_attempt_id(stage_info):
     # type: (Any) -> Optional[int]
-    from py4j.protocol import Py4JJavaError
-
     try:
         return stage_info.attemptId()
-    except Py4JJavaError:
+    except Exception:
         pass
 
     try:
         return stage_info.attemptNumber()
-    except Py4JJavaError:
+    except Exception:
         pass
 
     return None
