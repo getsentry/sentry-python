@@ -3,7 +3,7 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.utils import event_from_exception, reraise
+from sentry_sdk.utils import event_from_exception, logger, reraise
 
 try:
     import asyncio
@@ -74,9 +74,15 @@ def patch_asyncio():
             return task
 
         loop.set_task_factory(_sentry_task_factory)  # type: ignore
+
     except RuntimeError:
         # When there is no running loop, we have nothing to patch.
-        pass
+        logger.warning(
+            "There is no running asyncio loop so there is nothing Sentry can patch. "
+            "Please make sure you call sentry_sdk.init() within a running "
+            "asyncio loop for the AsyncioIntegration to work. "
+            "See https://docs.sentry.io/platforms/python/integrations/asyncio/"
+        )
 
 
 def _capture_exception():
