@@ -12,7 +12,7 @@ try:
 except ImportError:
     raise DidNotEnable("asyncio not available")
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from typing import Any
@@ -39,6 +39,7 @@ def patch_asyncio():
 
         # Add a shutdown handler to log a helpful message
         def shutdown_handler():
+            # type: () -> None
             logger.info(
                 "AsyncIO is shutting down. If you see 'Task was destroyed but it is pending!' "
                 "errors with '_task_with_sentry_span_creation', these are normal during shutdown "
@@ -94,7 +95,9 @@ def patch_asyncio():
 
             # Set the task name to include the original coroutine's name
             try:
-                task.set_name(f"{get_name(coro)} (Sentry-wrapped)")
+                cast(asyncio.Task[Any], task).set_name(
+                    f"{get_name(coro)} (Sentry-wrapped)"
+                )
             except AttributeError:
                 # set_name might not be available in all Python versions
                 pass
