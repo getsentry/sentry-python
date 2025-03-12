@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # exit on first error
-set -xe
+set -xeuo pipefail
 
 # Setup local AWS Lambda environment
 
@@ -14,7 +14,7 @@ uv sync
 
 # Create a deployment package of the lambda function in `lambda_function.py`.
 rm -rf package && mkdir -p package              
-pip install -e ../../../sentry-python -t package/ --upgrade
+pip install ../../../sentry-python -t package/ --upgrade
 cp lambda_function.py package/ 
 cd package && zip -r ../lambda_deployment_package.zip . && cd ..
 
