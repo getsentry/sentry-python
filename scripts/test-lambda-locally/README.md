@@ -17,7 +17,7 @@ is supported. Adding the SDK as Lambda Layer is not possible at the moment.
 
 - Update `lambda_function.py` to include your test code. 
 - Run `./deploy-lambda-locally.sh`. This will:
-    - Install [AWS SAM](https://aws.amazon.com/serverless/sam/) in an virtual Python environment
+    - Install [AWS SAM](https://aws.amazon.com/serverless/sam/) in a virtual Python environment
     - Create a lambda function package in `package/` that includes
         - The currently checked out Sentry SDK
         - All dependencies of the Sentry SDK (certifi and urllib3)
