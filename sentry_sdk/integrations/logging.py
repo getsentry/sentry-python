@@ -249,7 +249,9 @@ class EventHandler(_BaseHandler):
             event["logentry"] = {
                 "message": to_string(record.msg),
                 "params": (
-                    tuple(to_string(arg) if arg is None else arg for arg in record.args) if record.args else ()
+                    tuple(to_string(arg) if arg is None else arg for arg in record.args)
+                    if record.args
+                    else ()
                 ),
             }
 
