@@ -12,9 +12,10 @@ try:
 except ImportError:
     raise DidNotEnable("asyncio not available")
 
-from typing import Any, cast, TYPE_CHECKING
+from typing import cast, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Any
     from collections.abc import Coroutine
 
     from sentry_sdk._types import ExcInfo
@@ -94,7 +95,7 @@ def patch_asyncio():
 
             # Set the task name to include the original coroutine's name
             try:
-                cast(asyncio.Task[Any], task).set_name(
+                cast("asyncio.Task[Any]", task).set_name(
                     f"{get_name(coro)} (Sentry-wrapped)"
                 )
             except AttributeError:
