@@ -469,3 +469,82 @@ def test_traces_sampler_has_correct_sampling_context(lambda_client, test_environ
     assert sampling_context_data.get("aws_event_present") is True
     assert sampling_context_data.get("aws_context_present") is True
     assert sampling_context_data.get("event_data", {}).get("test_key") == "test_value"
+
+
+@pytest.mark.parametrize(
+    "lambda_function_name",
+    ["RaiseErrorPerformanceEnabled", "RaiseErrorPerformanceDisabled"],
+)
+def test_error_has_new_trace_context(
+    lambda_client, test_environment, lambda_function_name
+):
+    lambda_client.invoke(
+        FunctionName=lambda_function_name,
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    if lambda_function_name == "RaiseErrorPerformanceEnabled":
+        (error_event, transaction_event) = envelopes
+    else:
+        (error_event,) = envelopes
+        transaction_event = None
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    if transaction_event:
+        assert "trace" in transaction_event["contexts"]
+        assert "trace_id" in transaction_event["contexts"]["trace"]
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == transaction_event["contexts"]["trace"]["trace_id"]
+        )
+
+
+@pytest.mark.parametrize(
+    "lambda_function_name",
+    ["RaiseErrorPerformanceEnabled", "RaiseErrorPerformanceDisabled"],
+)
+def test_error_has_existing_trace_context(
+    lambda_client, test_environment, lambda_function_name
+):
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    # We simulate here AWS Api Gateway's behavior of passing HTTP headers
+    # as the `headers` dict in the event passed to the Lambda function.
+    payload = {
+        "headers": {
+            "sentry-trace": sentry_trace_header,
+        }
+    }
+
+    lambda_client.invoke(
+        FunctionName=lambda_function_name,
+        Payload=json.dumps(payload),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    if lambda_function_name == "RaiseErrorPerformanceEnabled":
+        (error_event, transaction_event) = envelopes
+    else:
+        (error_event,) = envelopes
+        transaction_event = None
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )
+
+    if transaction_event:
+        assert "trace" in transaction_event["contexts"]
+        assert "trace_id" in transaction_event["contexts"]["trace"]
+        assert (
+            transaction_event["contexts"]["trace"]["trace_id"]
+            == "471a43a4192642f0b136d5159a501701"
+        )

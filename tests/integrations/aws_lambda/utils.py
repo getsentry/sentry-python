@@ -211,7 +211,7 @@ class LocalLambdaStack(Stack):
             )
 
     @classmethod
-    def wait_for_stack(cls, timeout=30, port=SAM_PORT):
+    def wait_for_stack(cls, timeout=60, port=SAM_PORT):
         """
         Wait for SAM to be ready, with timeout.
         """
