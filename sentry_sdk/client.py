@@ -865,18 +865,23 @@ class _Client(BaseClient):
         attrs = {
             "sentry.message.template": template,
         }  # type: dict[str, str | bool | float | int]
+
         kwargs_attributes = kwargs.get("attributes")
         if kwargs_attributes is not None:
             attrs.update(kwargs_attributes)
+
         environment = self.options.get("environment")
         if environment is not None:
             attrs["sentry.environment"] = environment
+
         release = self.options.get("release")
         if release is not None:
             attrs["sentry.release"] = release
+
         span = scope.span
         if span is not None:
             attrs["sentry.trace.parent_span_id"] = span.span_id
+
         for k, v in kwargs.items():
             attrs[f"sentry.message.parameters.{k}"] = v
 
@@ -893,6 +898,7 @@ class _Client(BaseClient):
         if propagation_context is not None:
             headers["trace_id"] = propagation_context.trace_id
             log["trace_id"] = propagation_context.trace_id
+
         envelope = Envelope(headers=headers)
 
         before_emit_log = self.options.get("before_emit_log")
@@ -922,10 +928,12 @@ class _Client(BaseClient):
                 format_attribute(k, v) for (k, v) in log["attributes"].items()
             ],
         }
+
         if "trace_id" in log:
             otel_log["traceId"] = log["trace_id"]
 
         envelope.add_log(otel_log)  # TODO: batch these
+
         if self.spotlight:
             self.spotlight.capture_envelope(envelope)
 
