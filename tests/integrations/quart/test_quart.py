@@ -1,3 +1,4 @@
+import importlib
 import json
 import threading
 from unittest import mock
@@ -73,6 +74,10 @@ def integration_enabled_params(request):
 
 @pytest.mark.asyncio
 @pytest.mark.forked
+@pytest.mark.skipif(
+    not importlib.util.find_spec("quart_flask_patch"),
+    reason="requires quart_flask_patch",
+)
 async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations):
     # This testcase is forked because `import quart_flask_patch` needs to run
     # before anything else Quart-related is imported (since it monkeypatches
