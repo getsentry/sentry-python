@@ -89,14 +89,18 @@ async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations
 
     @app.route("/")
     async def index():
-        return "ok"
+        1 / 0
 
     events = capture_events()
 
     client = app.test_client()
-    await client.get("/")
+    try:
+        await client.get("/")
+    except ZeroDivisionError:
+        pass
 
-    assert not events
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "quart"
 
 
 @pytest.mark.asyncio
