@@ -187,3 +187,5 @@ def test_logs_message_python_logging(sentry_init, capture_envelopes):
         # This is when users just replace the existing call to Python logging method, with the new Sentry logging method.
         # This is a very confusing error message to explain what is wrong here.
         assert str(ex) == "capture_log() takes 3 positional arguments but 4 were given"
+
+    assert len(envelopes) == 0
