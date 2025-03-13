@@ -150,7 +150,7 @@ def test_logs_message_old_style(sentry_init, capture_envelopes):
 
 def test_logs_message_format(sentry_init, capture_envelopes):
     """
-    This is another popular war how vars are passed to strings in old Python projects. 
+    This is another popular way how vars are passed to strings in old Python projects. 
     TODO: Should we support this?
     """
     sentry_init(enable_sentry_logs=True)
