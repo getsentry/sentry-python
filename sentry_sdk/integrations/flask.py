@@ -72,6 +72,16 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        try:
+            from quart import Quart
+
+            if Flask == Quart:
+                # This is Quart masquerading as Flask, don't enable the Flask
+                # integration. See https://github.com/getsentry/sentry-python/issues/2709
+                raise DidNotEnable("Quart is impersonating Flask")
+        except ImportError:
+            pass
+
         version = package_version("flask")
         _check_minimum_version(FlaskIntegration, version)
 

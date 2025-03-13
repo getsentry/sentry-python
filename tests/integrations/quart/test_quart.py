@@ -13,22 +13,22 @@ from sentry_sdk import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.quart as quart_sentry
 
-from quart import Quart, Response, abort, stream_with_context
-from quart.views import View
-
-from quart_auth import AuthUser, login_user
-
-try:
-    from quart_auth import QuartAuth
-
-    auth_manager = QuartAuth()
-except ImportError:
-    from quart_auth import AuthManager
-
-    auth_manager = AuthManager()
-
 
 def quart_app_factory():
+    # These imports are inlined because the test_quart_flask_patch testcase tests
+    # behavior that is triggered by importing a package before any Quart imports
+    # happen
+    from quart import Quart
+
+    try:
+        from quart_auth import QuartAuth
+
+        auth_manager = QuartAuth()
+    except ImportError:
+        from quart_auth import AuthManager
+
+        auth_manager = AuthManager()
+
     app = Quart(__name__)
     app.debug = False
     app.config["TESTING"] = False
@@ -69,6 +69,34 @@ def integration_enabled_params(request):
         return {"integrations": [quart_sentry.QuartIntegration()]}
     else:
         raise ValueError(request.param)
+
+
+@pytest.mark.asyncio
+@pytest.mark.forked
+async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations):
+    # This testcase is forked because import quart_flask_patch needs to run
+    # before anything else Quart-related is imported (since it monkeypatches
+    # some things) and we don't want this to affect other testcases.
+    #
+    # It's also important that this testcase is run before any other testcase
+    # that uses quart_app_factory.
+    import quart_flask_patch  # noqa: F401
+
+    app = quart_app_factory()
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+    )
+
+    @app.route("/")
+    async def index():
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    await client.get("/")
+
+    assert not events
 
 
 @pytest.mark.asyncio
@@ -213,6 +241,8 @@ async def test_quart_auth_configured(
     monkeypatch,
     integration_enabled_params,
 ):
+    from quart_auth import AuthUser, login_user
+
     sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
     app = quart_app_factory()
 
@@ -368,6 +398,8 @@ async def test_error_in_errorhandler(sentry_init, capture_events):
 
 @pytest.mark.asyncio
 async def test_bad_request_not_captured(sentry_init, capture_events):
+    from quart import abort
+
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
     events = capture_events()
@@ -385,6 +417,8 @@ async def test_bad_request_not_captured(sentry_init, capture_events):
 
 @pytest.mark.asyncio
 async def test_does_not_leak_scope(sentry_init, capture_events):
+    from quart import Response, stream_with_context
+
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
     events = capture_events()
@@ -514,6 +548,8 @@ async def test_tracing_error(sentry_init, capture_events):
 
 @pytest.mark.asyncio
 async def test_class_based_views(sentry_init, capture_events):
+    from quart.views import View
+
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
     app = quart_app_factory()
     events = capture_events()
