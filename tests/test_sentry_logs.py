@@ -1,4 +1,3 @@
-import random
 from unittest import mock 
 
 import sentry_sdk
@@ -102,7 +101,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
 
     assert log_item["attributes"][1] == {"key": "attr_int", "value": {"intValue": "1"}}  # TODO: this is strange. 
     assert log_item["attributes"][2] == {"key": "attr_float", "value": {"doubleValue": 2.0}}
-    assert log_item["attributes"][3] == {"key": "attr_bool", "value": {"intValue": "True"}}  # TODO: this is strange. 
+    assert log_item["attributes"][3] == {"key": "attr_bool", "value": {"boolValue": True}}
     assert log_item["attributes"][4] == {"key": "attr_string", "value": {"stringValue": "string attribute"}}
     assert log_item["attributes"][5] == {"key": "sentry.environment", "value": {"stringValue": "production"}}
     assert log_item["attributes"][6] == {"key": "sentry.release", "value": {"stringValue": mock.ANY}}
@@ -128,7 +127,7 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     assert envelopes[1].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.float_var", "value": {'doubleValue': 2.0}}
 
     assert envelopes[2].items[0].payload.json["body"]["stringValue"] == "The recorded value was 'False'"
-    assert envelopes[2].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.bool_var", "value": {'intValue': "False"}}  # TODO: this is strange. 
+    assert envelopes[2].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.bool_var", "value": {'boolValue': False}}
 
     assert envelopes[3].items[0].payload.json["body"]["stringValue"] == "The recorded value was 'some string value'"
     assert envelopes[3].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.string_var", "value": {'stringValue': "some string value"}}

@@ -909,14 +909,14 @@ class _Client(BaseClient):
 
         def format_attribute(key, val):
             # type: (str, int | float | str | bool) -> Any
-            if isinstance(val, int):
-                return {"key": key, "value": {"intValue": str(val)}}
-            if isinstance(val, str):
-                return {"key": key, "value": {"stringValue": val}}
-            if isinstance(val, float):
-                return {"key": key, "value": {"doubleValue": val}}
             if isinstance(val, bool):
                 return {"key": key, "value": {"boolValue": val}}
+            if isinstance(val, int):
+                return {"key": key, "value": {"intValue": str(val)}}
+            if isinstance(val, float):
+                return {"key": key, "value": {"doubleValue": val}}
+            if isinstance(val, str):
+                return {"key": key, "value": {"stringValue": val}}
             return {"key": key, "value": {"stringValue": json.dumps(val)}}
 
         otel_log = {
