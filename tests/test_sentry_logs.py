@@ -100,9 +100,9 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     log_item = envelopes[0].items[0].payload.json
     assert log_item["body"]["stringValue"] == "The recorded value was 'some value'"
 
-    assert log_item["attributes"][1] == {"key": "attr_int", "value": {"intValue": "1"}}  # ???
+    assert log_item["attributes"][1] == {"key": "attr_int", "value": {"intValue": "1"}}  # TODO: this is strange. 
     assert log_item["attributes"][2] == {"key": "attr_float", "value": {"doubleValue": 2.0}}
-    assert log_item["attributes"][3] == {"key": "attr_bool", "value": {"intValue": "True"}}  # ???
+    assert log_item["attributes"][3] == {"key": "attr_bool", "value": {"intValue": "True"}}  # TODO: this is strange. 
     assert log_item["attributes"][4] == {"key": "attr_string", "value": {"stringValue": "string attribute"}}
     assert log_item["attributes"][5] == {"key": "sentry.environment", "value": {"stringValue": "production"}}
     assert log_item["attributes"][6] == {"key": "sentry.release", "value": {"stringValue": mock.ANY}}
@@ -122,13 +122,13 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     sentry_logger.warn("The recorded value was '{string_var}'", string_var="some string value") 
 
     assert envelopes[0].items[0].payload.json["body"]["stringValue"] == "The recorded value was '1'"
-    assert envelopes[0].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.int_var", "value": {'intValue': "1"}}  # ???
+    assert envelopes[0].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.int_var", "value": {'intValue': "1"}}  # TODO: this is strange. 
 
     assert envelopes[1].items[0].payload.json["body"]["stringValue"] == "The recorded value was '2.0'"
     assert envelopes[1].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.float_var", "value": {'doubleValue': 2.0}}
 
     assert envelopes[2].items[0].payload.json["body"]["stringValue"] == "The recorded value was 'False'"
-    assert envelopes[2].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.bool_var", "value": {'intValue': "False"}}  # ???
+    assert envelopes[2].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.bool_var", "value": {'intValue': "False"}}  # TODO: this is strange. 
 
     assert envelopes[3].items[0].payload.json["body"]["stringValue"] == "The recorded value was 'some string value'"
     assert envelopes[3].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.string_var", "value": {'stringValue': "some string value"}}
@@ -137,6 +137,7 @@ def test_logs_message_params(sentry_init, capture_envelopes):
 def test_logs_message_old_style(sentry_init, capture_envelopes):
     """
     This is how vars are passed to strings in old Python projects. 
+    TODO: Should we support this?
     """
     sentry_init(enable_sentry_logs=True)
 
@@ -151,6 +152,7 @@ def test_logs_message_old_style(sentry_init, capture_envelopes):
 def test_logs_message_format(sentry_init, capture_envelopes):
     """
     This is another popular war how vars are passed to strings in old Python projects. 
+    TODO: Should we support this?
     """
     sentry_init(enable_sentry_logs=True)
     envelopes = capture_envelopes()
@@ -164,6 +166,7 @@ def test_logs_message_format(sentry_init, capture_envelopes):
 def test_logs_message_f_string(sentry_init, capture_envelopes):
     """
     This is the preferred way how vars are passed to strings in old Python projects. 
+    TODO: This we should definitely support.
     """
     sentry_init(enable_sentry_logs=True)
     envelopes = capture_envelopes()
@@ -178,6 +181,7 @@ def test_logs_message_f_string(sentry_init, capture_envelopes):
 def test_logs_message_python_logging(sentry_init, capture_envelopes):
     """
     This is how vars are passed to log messages when using Python logging module.
+    TODO: We probably should also support this, to make it easier to migrate from the old logging module to the Sentry one.
     """
     sentry_init(enable_sentry_logs=True)
     envelopes = capture_envelopes()
