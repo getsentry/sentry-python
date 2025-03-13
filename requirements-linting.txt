@@ -21,3 +21,4 @@ statsig
 UnleashClient
 typer
 strawberry-graphql
+quart
