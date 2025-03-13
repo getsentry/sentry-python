@@ -73,7 +73,7 @@ class FlaskIntegration(Integration):
     def setup_once():
         # type: () -> None
         try:
-            from quart import Quart
+            from quart import Quart  # type: ignore
 
             if Flask == Quart:
                 # This is Quart masquerading as Flask, don't enable the Flask
