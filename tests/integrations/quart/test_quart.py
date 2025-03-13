@@ -78,7 +78,7 @@ async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations
     # before anything else Quart-related is imported (since it monkeypatches
     # some things) and we don't want this to affect other testcases.
     #
-    # It's also important this testcase be run before any other testcases
+    # It's also important this testcase be run before any other testcase
     # that uses `quart_app_factory`.
     import quart_flask_patch  # noqa: F401
 
