@@ -1,6 +1,7 @@
 import random
 from unittest import mock 
 
+import sentry_sdk
 from sentry_sdk import _experimental_logger as sentry_logger
 
 
@@ -189,3 +190,32 @@ def test_logs_message_python_logging(sentry_init, capture_envelopes):
         assert str(ex) == "capture_log() takes 3 positional arguments but 4 were given"
 
     assert len(envelopes) == 0
+
+
+def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
+    """
+    Log messages are also tied to transactions.
+    """
+    sentry_init(enable_sentry_logs=True)
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.start_transaction(name="test-transaction") as trx:
+        sentry_logger.warn("This is a log tied to a transaction")
+
+    log_entry = envelopes[0].items[0].payload.json
+    assert log_entry["attributes"][-1] =={'key': 'sentry.trace.parent_span_id', 'value': {'stringValue': trx.span_id}}
+
+
+def test_logs_tied_to_spans(sentry_init, capture_envelopes):
+    """
+    Log messages are also tied to spans.
+    """
+    sentry_init(enable_sentry_logs=True)
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.start_transaction(name="test-transaction") as trx:
+        with sentry_sdk.start_span(description="test-span") as span:
+            sentry_logger.warn("This is a log tied to a span")
+
+    log_entry = envelopes[0].items[0].payload.json
+    assert log_entry["attributes"][-1] =={'key': 'sentry.trace.parent_span_id', 'value': {'stringValue': span.span_id}}
