@@ -15,9 +15,9 @@ import sentry_sdk.integrations.quart as quart_sentry
 
 
 def quart_app_factory():
-    # These imports are inlined because the test_quart_flask_patch testcase tests
-    # behavior that is triggered by importing a package before any Quart imports
-    # happen
+    # These imports are inlined because the `test_quart_flask_patch` testcase
+    # tests behavior that is triggered by importing a package before any Quart
+    # imports happen
     from quart import Quart
 
     try:
@@ -74,12 +74,12 @@ def integration_enabled_params(request):
 @pytest.mark.asyncio
 @pytest.mark.forked
 async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations):
-    # This testcase is forked because import quart_flask_patch needs to run
+    # This testcase is forked because `import quart_flask_patch` needs to run
     # before anything else Quart-related is imported (since it monkeypatches
     # some things) and we don't want this to affect other testcases.
     #
-    # It's also important that this testcase is run before any other testcase
-    # that uses quart_app_factory.
+    # It's also important this testcase be run before any other testcases
+    # that uses `quart_app_factory`.
     import quart_flask_patch  # noqa: F401
 
     app = quart_app_factory()
