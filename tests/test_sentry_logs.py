@@ -8,12 +8,12 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     sentry_init()
     envelopes = capture_envelopes()
 
-    sentry_logger.trace("This is a 'trace' log...{rand}", rand=random.randint(0, 100)) 
-    sentry_logger.debug("This is a 'debug' log... ({rand})", rand=random.randint(0, 100)) 
-    sentry_logger.info("This is a 'info' log... ({rand})", rand=random.randint(0, 100)) 
-    sentry_logger.warn("This is a 'warn' log... ({rand})", rand=random.randint(0, 100)) 
-    sentry_logger.error("This is a 'error' log... ({rand})", rand=random.randint(0, 100)) 
-    sentry_logger.fatal("This is a 'fatal' log... ({rand})", rand=random.randint(0, 100)) 
+    sentry_logger.trace("This is a 'trace' log.") 
+    sentry_logger.debug("This is a 'debug' log...") 
+    sentry_logger.info("This is a 'info' log...") 
+    sentry_logger.warn("This is a 'warn' log...") 
+    sentry_logger.error("This is a 'error' log...") 
+    sentry_logger.fatal("This is a 'fatal' log...") 
 
     assert len(envelopes) == 0
 
@@ -22,14 +22,15 @@ def test_logs_basics(sentry_init, capture_envelopes):
     sentry_init(enable_sentry_logs=True)
     envelopes = capture_envelopes()
 
-    sentry_logger.trace("This is a 'trace' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.debug("This is a 'debug' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.info("This is a 'info' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.warn("This is a 'warn' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.error("This is a 'error' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.fatal("This is a 'fatal' log... {rand}", rand=random.randint(0, 100)) 
+    sentry_logger.trace("This is a 'trace' log...")
+    sentry_logger.debug("This is a 'debug' log...")
+    sentry_logger.info("This is a 'info' log...")
+    sentry_logger.warn("This is a 'warn' log...")
+    sentry_logger.error("This is a 'error' log...")
+    sentry_logger.fatal("This is a 'fatal' log...")
 
     assert len(envelopes) == 6  # We will batch those log items into a single envelope at some point
+    
     assert envelopes[0].items[0].payload.json["severityText"] == "trace"
     assert envelopes[0].items[0].payload.json["severityNumber"] == 1
     
@@ -62,15 +63,14 @@ def test_logs_before_emit_log(sentry_init, capture_envelopes):
         enable_sentry_logs=True, 
         before_emit_log=_before_log,
     )
-
     envelopes = capture_envelopes()
 
-    sentry_logger.trace("This is a 'trace' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.debug("This is a 'debug' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.info("This is a 'info' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.warn("This is a 'warn' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.error("This is a 'error' log... {rand}", rand=random.randint(0, 100)) 
-    sentry_logger.fatal("This is a 'fatal' log... {rand}", rand=random.randint(0, 100)) 
+    sentry_logger.trace("This is a 'trace' log...")
+    sentry_logger.debug("This is a 'debug' log...")
+    sentry_logger.info("This is a 'info' log...")
+    sentry_logger.warn("This is a 'warn' log...")
+    sentry_logger.error("This is a 'error' log...")
+    sentry_logger.fatal("This is a 'fatal' log...")
 
     assert len(envelopes) == 4
 
@@ -81,8 +81,10 @@ def test_logs_before_emit_log(sentry_init, capture_envelopes):
 
 
 def test_logs_attributes(sentry_init, capture_envelopes):
+    """
+    Passing arbitrary attributes to log messages. 
+    """
     sentry_init(enable_sentry_logs=True)
-
     envelopes = capture_envelopes()
 
     attrs = {
@@ -107,8 +109,10 @@ def test_logs_attributes(sentry_init, capture_envelopes):
 
 
 def test_logs_message_params(sentry_init, capture_envelopes):
+    """
+    This is the official way of how to pass vars to log messages. 
+    """
     sentry_init(enable_sentry_logs=True)
-
     envelopes = capture_envelopes()
 
     sentry_logger.warn("The recorded value was '{int_var}'", int_var=1) 
@@ -130,6 +134,9 @@ def test_logs_message_params(sentry_init, capture_envelopes):
 
 
 def test_logs_message_old_style(sentry_init, capture_envelopes):
+    """
+    This is how vars are passed to strings in old Python projects. 
+    """
     sentry_init(enable_sentry_logs=True)
 
     envelopes = capture_envelopes()
@@ -141,8 +148,10 @@ def test_logs_message_old_style(sentry_init, capture_envelopes):
 
 
 def test_logs_message_format(sentry_init, capture_envelopes):
+    """
+    This is another popular war how vars are passed to strings in old Python projects. 
+    """
     sentry_init(enable_sentry_logs=True)
-
     envelopes = capture_envelopes()
 
     sentry_logger.warn("The recorded value was '{int_var}'".format(int_var=1)) 
@@ -152,8 +161,10 @@ def test_logs_message_format(sentry_init, capture_envelopes):
 
 
 def test_logs_message_f_string(sentry_init, capture_envelopes):
+    """
+    This is the preferred way how vars are passed to strings in old Python projects. 
+    """
     sentry_init(enable_sentry_logs=True)
-
     envelopes = capture_envelopes()
 
     int_var = 1
@@ -164,8 +175,10 @@ def test_logs_message_f_string(sentry_init, capture_envelopes):
 
 
 def test_logs_message_python_logging(sentry_init, capture_envelopes):
+    """
+    This is how vars are passed to log messages when using Python logging module.
+    """
     sentry_init(enable_sentry_logs=True)
-
     envelopes = capture_envelopes()
 
     try:
