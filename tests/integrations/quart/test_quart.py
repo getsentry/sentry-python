@@ -18,7 +18,7 @@ import sentry_sdk.integrations.quart as quart_sentry
 def quart_app_factory():
     # These imports are inlined because the `test_quart_flask_patch` testcase
     # tests behavior that is triggered by importing a package before any Quart
-    # imports happen
+    # imports happen, so we can't have these on the module level
     from quart import Quart
 
     try:

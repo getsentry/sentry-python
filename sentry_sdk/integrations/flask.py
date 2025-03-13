@@ -78,7 +78,9 @@ class FlaskIntegration(Integration):
             if Flask == Quart:
                 # This is Quart masquerading as Flask, don't enable the Flask
                 # integration. See https://github.com/getsentry/sentry-python/issues/2709
-                raise DidNotEnable("Quart is impersonating Flask")
+                raise DidNotEnable(
+                    "This is not a Flask app but rather Quart pretending to be Flask"
+                )
         except ImportError:
             pass
 
