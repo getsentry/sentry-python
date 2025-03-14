@@ -4,6 +4,7 @@ import time
 import uuid
 import random
 import socket
+import logging
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -894,6 +895,21 @@ class _Client(BaseClient):
             "time_unix_nano": time.time_ns(),
             "trace_id": None,
         }  # type: Log
+
+        debug = self.options.get("debug", False)
+        if debug:
+            severity_text_to_logging_level = {
+                "trace": logging.DEBUG,
+                "debug": logging.DEBUG,
+                "info": logging.INFO,
+                "warn": logging.WARNING,
+                "error": logging.ERROR,
+                "fatal": logging.CRITICAL,
+            }
+            logger.log(
+                severity_text_to_logging_level.get(severity_text, logging.DEBUG),
+                f'[Sentry Logs] {log["body"]}',
+            )
 
         propagation_context = scope.get_active_propagation_context()
         if propagation_context is not None:
