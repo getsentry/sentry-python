@@ -1,17 +1,16 @@
 <a href="https://sentry.io/?utm_source=github&utm_medium=logo" target="_blank">
   <img src="https://sentry-brand.storage.googleapis.com/github-banners/github-sdk-python.png" alt="Sentry for Python">
 </a>
-
 <div align="center">
+
+_Bad software is everywhere, and we're tired of it. Sentry is on a mission to help developers write better software faster, so we can get back to enjoying technology. If you want to join us
+[<kbd>**Check out our open positions**</kbd>](https://sentry.io/careers/)_.
 
 [![Discord](https://img.shields.io/discord/621778831602221064?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb)](https://discord.gg/wdNEHETs87)
 [![Twitter Follow](https://img.shields.io/twitter/follow/getsentry?label=@getsentry&style=social)](https://twitter.com/intent/follow?screen_name=getsentry)
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 <img src="https://img.shields.io/badge/python-3.7 | 3.8 | 3.9 | 3.10 | 3.11 | 3.12 | 3.13-blue.svg" alt="python">
 [![Build Status](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml/badge.svg)](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml)
-
-_Bad software is everywhere, and we're tired of it. Sentry is on a mission to help developers write better software faster, so we can get back to enjoying technology. If you want to join us
-[<kbd>**Check out our open positions**</kbd>](https://sentry.io/careers/)_.
 
 <br/>
 
