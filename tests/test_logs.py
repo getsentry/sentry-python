@@ -217,7 +217,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_transaction(name="test-transaction") as trx:
+    with sentry_sdk.start_transaction(name="test-transaction"):
         with sentry_sdk.start_span(description="test-span") as span:
             sentry_logger.warn("This is a log tied to a span")
 

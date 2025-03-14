@@ -53,7 +53,6 @@ if TYPE_CHECKING:
         TransactionProcessor,
         MetricTags,
         MetricValue,
-        LogProcessor,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
