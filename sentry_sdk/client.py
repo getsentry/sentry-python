@@ -1,7 +1,10 @@
+import json
 import os
+import time
 import uuid
 import random
 import socket
+import logging
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -55,7 +58,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
@@ -205,6 +208,10 @@ class BaseClient:
     def capture_event(self, *args, **kwargs):
         # type: (*Any, **Any) -> Optional[str]
         return None
+
+    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
+        # type: (Scope, str, int, str, **Any) -> None
+        pass
 
     def capture_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -846,6 +853,110 @@ class _Client(BaseClient):
             return_value = event_id
 
         return return_value
+
+    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
+        # type: (Scope, str, int, str, **Any) -> None
+        logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
+        if not logs_enabled:
+            return
+
+        headers = {
+            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+        }  # type: dict[str, object]
+
+        attrs = {
+            "sentry.message.template": template,
+        }  # type: dict[str, str | bool | float | int]
+
+        kwargs_attributes = kwargs.get("attributes")
+        if kwargs_attributes is not None:
+            attrs.update(kwargs_attributes)
+
+        environment = self.options.get("environment")
+        if environment is not None:
+            attrs["sentry.environment"] = environment
+
+        release = self.options.get("release")
+        if release is not None:
+            attrs["sentry.release"] = release
+
+        span = scope.span
+        if span is not None:
+            attrs["sentry.trace.parent_span_id"] = span.span_id
+
+        for k, v in kwargs.items():
+            attrs[f"sentry.message.parameters.{k}"] = v
+
+        log = {
+            "severity_text": severity_text,
+            "severity_number": severity_number,
+            "body": template.format(**kwargs),
+            "attributes": attrs,
+            "time_unix_nano": time.time_ns(),
+            "trace_id": None,
+        }  # type: Log
+
+        # If debug is enabled, log the log to the console
+        debug = self.options.get("debug", False)
+        if debug:
+            severity_text_to_logging_level = {
+                "trace": logging.DEBUG,
+                "debug": logging.DEBUG,
+                "info": logging.INFO,
+                "warn": logging.WARNING,
+                "error": logging.ERROR,
+                "fatal": logging.CRITICAL,
+            }
+            logger.log(
+                severity_text_to_logging_level.get(severity_text, logging.DEBUG),
+                f'[Sentry Logs] {log["body"]}',
+            )
+
+        propagation_context = scope.get_active_propagation_context()
+        if propagation_context is not None:
+            headers["trace_id"] = propagation_context.trace_id
+            log["trace_id"] = propagation_context.trace_id
+
+        envelope = Envelope(headers=headers)
+
+        before_emit_log = self.options["_experiments"].get("before_emit_log")
+        if before_emit_log is not None:
+            log = before_emit_log(log, {})
+        if log is None:
+            return
+
+        def format_attribute(key, val):
+            # type: (str, int | float | str | bool) -> Any
+            if isinstance(val, bool):
+                return {"key": key, "value": {"boolValue": val}}
+            if isinstance(val, int):
+                return {"key": key, "value": {"intValue": str(val)}}
+            if isinstance(val, float):
+                return {"key": key, "value": {"doubleValue": val}}
+            if isinstance(val, str):
+                return {"key": key, "value": {"stringValue": val}}
+            return {"key": key, "value": {"stringValue": json.dumps(val)}}
+
+        otel_log = {
+            "severityText": log["severity_text"],
+            "severityNumber": log["severity_number"],
+            "body": {"stringValue": log["body"]},
+            "timeUnixNano": str(log["time_unix_nano"]),
+            "attributes": [
+                format_attribute(k, v) for (k, v) in log["attributes"].items()
+            ],
+        }
+
+        if "trace_id" in log:
+            otel_log["traceId"] = log["trace_id"]
+
+        envelope.add_log(otel_log)  # TODO: batch these
+
+        if self.spotlight:
+            self.spotlight.capture_envelope(envelope)
+
+        if self.transport is not None:
+            self.transport.capture_envelope(envelope)
 
     def capture_session(
         self, session  # type: Session

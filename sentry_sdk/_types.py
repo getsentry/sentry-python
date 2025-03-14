@@ -207,6 +207,17 @@ if TYPE_CHECKING:
     ]
 
     Hint = Dict[str, Any]
+    Log = TypedDict(
+        "Log",
+        {
+            "severity_text": str,
+            "severity_number": int,
+            "body": str,
+            "attributes": dict[str, str | bool | float | int],
+            "time_unix_nano": int,
+            "trace_id": Optional[str],
+        },
+    )
 
     Breadcrumb = Dict[str, Any]
     BreadcrumbHint = Dict[str, Any]
@@ -217,6 +228,7 @@ if TYPE_CHECKING:
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
     TransactionProcessor = Callable[[Event, Hint], Optional[Event]]
+    LogProcessor = Callable[[Log, Hint], Optional[Log]]
 
     TracesSampler = Callable[[SamplingContext], Union[float, int, bool]]
 
@@ -237,6 +249,7 @@ if TYPE_CHECKING:
         "metric_bucket",
         "monitor",
         "span",
+        "log",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
