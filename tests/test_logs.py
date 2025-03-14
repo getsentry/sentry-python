@@ -19,7 +19,7 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
 
 
 def test_logs_basics(sentry_init, capture_envelopes):
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
     sentry_logger.trace("This is a 'trace' log...")
@@ -84,7 +84,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     """
     Passing arbitrary attributes to log messages. 
     """
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
     attrs = {
@@ -112,7 +112,7 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     """
     This is the official way of how to pass vars to log messages. 
     """
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
     sentry_logger.warn("The recorded value was '{int_var}'", int_var=1) 
@@ -138,7 +138,7 @@ def test_logs_message_old_style(sentry_init, capture_envelopes):
     This is how vars are passed to strings in old Python projects. 
     TODO: Should we support this?
     """
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
 
     envelopes = capture_envelopes()
 
@@ -153,7 +153,7 @@ def test_logs_message_format(sentry_init, capture_envelopes):
     This is another popular way how vars are passed to strings in old Python projects. 
     TODO: Should we support this?
     """
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
     sentry_logger.warn("The recorded value was '{int_var}'".format(int_var=1)) 
@@ -167,7 +167,7 @@ def test_logs_message_f_string(sentry_init, capture_envelopes):
     This is the preferred way how vars are passed to strings in newer Python projects. 
     TODO: This we should definitely support.
     """
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
     int_var = 1
@@ -182,7 +182,7 @@ def test_logs_message_python_logging(sentry_init, capture_envelopes):
     This is how vars are passed to log messages when using Python logging module.
     TODO: We probably should also support this, to make it easier to migrate from the old logging module to the Sentry one.
     """
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
     try:
@@ -199,7 +199,7 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
     """
     Log messages are also tied to transactions.
     """
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(name="test-transaction") as trx:
@@ -213,7 +213,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
     """
     Log messages are also tied to spans.
     """
-    sentry_init(enable_sentry_logs=True)
+    sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(name="test-transaction") as trx:

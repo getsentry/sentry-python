@@ -855,7 +855,8 @@ class _Client(BaseClient):
 
     def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
         # type: (Scope, str, int, str, **Any) -> None
-        if not self.options.get("enable_sentry_logs", False):
+        logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
+        if not logs_enabled:
             return
 
         headers = {
@@ -901,7 +902,7 @@ class _Client(BaseClient):
 
         envelope = Envelope(headers=headers)
 
-        before_emit_log = self.options.get("before_emit_log")
+        before_emit_log = self.options["_experiments"].get("before_emit_log")
         if before_emit_log is not None:
             log = before_emit_log(log, {})
         if log is None:

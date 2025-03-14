@@ -540,8 +540,6 @@ class ClientConstructor:
         proxy_headers=None,  # type: Optional[Dict[str, str]]
         instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
-        enable_sentry_logs=False,  # type: bool
-        before_emit_log=None,  # type: Optional[LogProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
         include_local_variables=True,  # type: Optional[bool]
