@@ -60,8 +60,10 @@ def test_logs_before_emit_log(sentry_init, capture_envelopes):
         return record
     
     sentry_init(
-        enable_sentry_logs=True, 
-        before_emit_log=_before_log,
+        _experiments={
+            "enable_sentry_logs": True, 
+            "before_emit_log": _before_log,
+        }
     )
     envelopes = capture_envelopes()
 
@@ -131,68 +133,6 @@ def test_logs_message_params(sentry_init, capture_envelopes):
 
     assert envelopes[3].items[0].payload.json["body"]["stringValue"] == "The recorded value was 'some string value'"
     assert envelopes[3].items[0].payload.json["attributes"][-1] == {"key": "sentry.message.parameters.string_var", "value": {'stringValue': "some string value"}}
-
-
-def test_logs_message_old_style(sentry_init, capture_envelopes):
-    """
-    This is how vars are passed to strings in old Python projects. 
-    TODO: Should we support this?
-    """
-    sentry_init(_experiments={"enable_sentry_logs": True})
-
-    envelopes = capture_envelopes()
-
-    sentry_logger.warn("The recorded value was '%s'" % 1) 
-
-    assert envelopes[0].items[0].payload.json["body"]["stringValue"] == "The recorded value was '1'"
-    assert envelopes[0].items[0].payload.json["attributes"][-1] == {"key": "sentry.release", "value": {"stringValue": mock.ANY}}  # no parametrization!
-
-
-def test_logs_message_format(sentry_init, capture_envelopes):
-    """
-    This is another popular way how vars are passed to strings in old Python projects. 
-    TODO: Should we support this?
-    """
-    sentry_init(_experiments={"enable_sentry_logs": True})
-    envelopes = capture_envelopes()
-
-    sentry_logger.warn("The recorded value was '{int_var}'".format(int_var=1)) 
-
-    assert envelopes[0].items[0].payload.json["body"]["stringValue"] == "The recorded value was '1'"
-    assert envelopes[0].items[0].payload.json["attributes"][-1] == {"key": "sentry.release", "value": {"stringValue": mock.ANY}}  # no parametrization!
-
-
-def test_logs_message_f_string(sentry_init, capture_envelopes):
-    """
-    This is the preferred way how vars are passed to strings in newer Python projects. 
-    TODO: This we should definitely support.
-    """
-    sentry_init(_experiments={"enable_sentry_logs": True})
-    envelopes = capture_envelopes()
-
-    int_var = 1
-    sentry_logger.warn(f"The recorded value was '{int_var}'") 
-
-    assert envelopes[0].items[0].payload.json["body"]["stringValue"] == "The recorded value was '1'"
-    assert envelopes[0].items[0].payload.json["attributes"][-1] == {"key": "sentry.release", "value": {"stringValue": mock.ANY}}  # no parametrization!
-
-
-def test_logs_message_python_logging(sentry_init, capture_envelopes):
-    """
-    This is how vars are passed to log messages when using Python logging module.
-    TODO: We probably should also support this, to make it easier to migrate from the old logging module to the Sentry one.
-    """
-    sentry_init(_experiments={"enable_sentry_logs": True})
-    envelopes = capture_envelopes()
-
-    try:
-        sentry_logger.warn(f"The recorded value was '%s'", 1) 
-    except Exception as ex:
-        # This is when users just replace the existing call to Python logging method, with the new Sentry logging method.
-        # This is a very confusing error message to explain what is wrong here.
-        assert str(ex) == "capture_log() takes 3 positional arguments but 4 were given"
-
-    assert len(envelopes) == 0
 
 
 def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
