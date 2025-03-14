@@ -5,10 +5,13 @@ import pytest
 import sentry_sdk
 from sentry_sdk import _experimental_logger as sentry_logger
 
-if sys.version_info < (3, 7):
-    pytest.skip("requires python3.7 or higher")
+
+minimum_python_37 = pytest.mark.skipif(
+    sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
+)
 
 
+@minimum_python_37
 def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     sentry_init()
     envelopes = capture_envelopes()
@@ -23,6 +26,7 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     assert len(envelopes) == 0
 
 
+@minimum_python_37
 def test_logs_basics(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
@@ -57,6 +61,7 @@ def test_logs_basics(sentry_init, capture_envelopes):
     assert envelopes[5].items[0].payload.json["severityNumber"] == 21
 
 
+@minimum_python_37
 def test_logs_before_emit_log(sentry_init, capture_envelopes):
     def _before_log(record, hint):
         assert list(record.keys()) == [
@@ -96,6 +101,7 @@ def test_logs_before_emit_log(sentry_init, capture_envelopes):
     assert envelopes[3].items[0].payload.json["severityText"] == "warn"
 
 
+@minimum_python_37
 def test_logs_attributes(sentry_init, capture_envelopes):
     """
     Passing arbitrary attributes to log messages.
@@ -147,6 +153,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     }
 
 
+@minimum_python_37
 def test_logs_message_params(sentry_init, capture_envelopes):
     """
     This is the official way of how to pass vars to log messages.
@@ -198,6 +205,7 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     }
 
 
+@minimum_python_37
 def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
     """
     Log messages are also tied to transactions.
@@ -215,6 +223,7 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
     }
 
 
+@minimum_python_37
 def test_logs_tied_to_spans(sentry_init, capture_envelopes):
     """
     Log messages are also tied to spans.
