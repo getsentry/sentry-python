@@ -68,7 +68,8 @@ def test_capture_request_and_response_if_send_pii_is_on_async(
     assert len(events) == 1
 
     (event,) = events
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "ariadne"
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert event["exception"]["values"][-1]["mechanism"]["type"] == "ariadne"
     assert event["contexts"]["response"] == {
         "data": {
             "data": {"error": None},
@@ -111,7 +112,9 @@ def test_capture_request_and_response_if_send_pii_is_on_sync(
     assert len(events) == 1
 
     (event,) = events
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "ariadne"
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert event["exception"]["values"][-1]["mechanism"]["type"] == "ariadne"
+
     assert event["contexts"]["response"] == {
         "data": {
             "data": {"error": None},
@@ -152,7 +155,9 @@ def test_do_not_capture_request_and_response_if_send_pii_is_off_async(
     assert len(events) == 1
 
     (event,) = events
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "ariadne"
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert event["exception"]["values"][-1]["mechanism"]["type"] == "ariadne"
+
     assert "data" not in event["request"]
     assert "response" not in event["contexts"]
 
@@ -182,7 +187,8 @@ def test_do_not_capture_request_and_response_if_send_pii_is_off_sync(
     assert len(events) == 1
 
     (event,) = events
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "ariadne"
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert event["exception"]["values"][-1]["mechanism"]["type"] == "ariadne"
     assert "data" not in event["request"]
     assert "response" not in event["contexts"]
 
