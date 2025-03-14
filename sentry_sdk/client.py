@@ -896,6 +896,7 @@ class _Client(BaseClient):
             "trace_id": None,
         }  # type: Log
 
+        # If debug is enabled, log the log to the console
         debug = self.options.get("debug", False)
         if debug:
             severity_text_to_logging_level = {

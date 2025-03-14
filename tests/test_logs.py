@@ -1,7 +1,12 @@
+import sys
 from unittest import mock
+import pytest
 
 import sentry_sdk
 from sentry_sdk import _experimental_logger as sentry_logger
+
+if sys.version_info < (3, 7):
+    pytest.skip("requires python3.7 or higher")
 
 
 def test_logs_disabled_by_default(sentry_init, capture_envelopes):
