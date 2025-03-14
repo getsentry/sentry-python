@@ -4,8 +4,6 @@
 
 <div align="center">
 
-<br/>
-
 [![Discord](https://img.shields.io/discord/621778831602221064?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb)](https://discord.gg/wdNEHETs87)
 [![Twitter Follow](https://img.shields.io/twitter/follow/getsentry?label=@getsentry&style=social)](https://twitter.com/intent/follow?screen_name=getsentry)
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
@@ -24,7 +22,7 @@ _Bad software is everywhere, and we're tired of it. Sentry is on a mission to he
 
 Welcome to the official Python SDK for **[Sentry](http://sentry.io/)**.
 
-<a name="getting-started"></a>
+
 ## 📦 Getting Started
 
 ### Prerequisites
@@ -70,18 +68,17 @@ sentry_sdk.capture_message("Hello Sentry!")  # You'll see this in your Sentry da
 raise ValueError("Oops, something went wrong!")  # This will create an error event in Sentry.
 ```
 
-<a name="documentation"></a>
+
 ## 📚 Documentation
 
 For more details on advanced usage, integrations, and customization, check out the full documentation on [https://docs.sentry.io](https://docs.sentry.io/).
 
-<a name="integrations"></a>
+
 ## 🧩 Integrations
 
 Sentry integrates with a ton of popular Python libraries and frameworks, including [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/), [Django](https://docs.sentry.io/platforms/python/integrations/django/), [Celery](https://docs.sentry.io/platforms/python/integrations/celery/), [OpenAI](https://docs.sentry.io/platforms/python/integrations/openai/) and many, many more.  Check out the [full list of integrations](https://docs.sentry.io/platforms/python/integrations/) to get the full picture.
 
 
-<a name="migrating"></a>
 ## 🚧 Migrating Between Versions?
 
 ### From `1.x` to `2.x`
@@ -92,19 +89,19 @@ If you're using the older `1.x` version of the SDK, now's the time to upgrade to
 
 Using the legacy `raven-python` client? It's now in maintenance mode, and we recommend migrating to the new SDK for an improved experience. Get all the details in our [migration guide](https://docs.sentry.io/platforms/python/migration/raven-to-sentry-sdk/).
 
-<a name="contributing"></a>
+
 ## 🙌 Want to Contribute?
 
 We'd love your help in improving the Sentry SDK! Whether it's fixing bugs, adding features, writing new integrations, or enhancing documentation, every contribution is valuable.
 
 For details on how to contribute, please read our [contribution guide](CONTRIBUTING.md) and explore the [open issues](https://github.com/getsentry/sentry-python/issues).
 
-<a name="help"></a>
+
 ## 🛟 Need Help?
 
 If you encounter issues or need help setting up or configuring the SDK, don't hesitate to reach out to the [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr). There is a ton of great people there ready to help!
 
-<a name="resources"></a>
+
 ## 🔗 Resources
 
 Here are all resources to help you make the most of Sentry:
@@ -119,7 +116,7 @@ Here are all resources to help you make the most of Sentry:
 
 The SDK is open-source and available under the MIT license. Check out the [LICENSE](LICENSE) file for more information.
 
-<a name="contributors"></a>
+
 ## 😘 Contributors
 
 Thanks to everyone who has helped improve the SDK!
