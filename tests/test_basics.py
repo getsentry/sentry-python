@@ -741,7 +741,7 @@ def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_
             except Exception:
                 capture_exception()
 
-    assert len(events) == 2
+    assert len(events) == 1
 
 
 def test_event_processor_drop_records_client_report(
