@@ -186,7 +186,7 @@ def test_logs_message_params(sentry_init, capture_envelopes):
         envelopes[3].items[0].payload.json["body"]["stringValue"]
         == "The recorded value was 'some string value'"
     )
-    assert otel_attributes_to_dict(envelopes[2].items[0].payload.json["attributes"])[
+    assert otel_attributes_to_dict(envelopes[3].items[0].payload.json["attributes"])[
         "sentry.message.parameters.string_var"
     ] == {"stringValue": "some string value"}
 
