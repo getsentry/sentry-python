@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -309,7 +309,7 @@ class BreadcrumbHandler(_BaseHandler):
 
 
 def _python_level_to_otel(record_level):
-    # type: (int) -> (int, str)
+    # type: (int) -> Tuple[int, str]
     for py_level, otel_severity_number, otel_severity_text in [
         (50, 21, "fatal"),
         (40, 17, "error"),
@@ -358,7 +358,7 @@ class SentryLogsHandler(_BaseHandler):
             "sentry.message.template": (
                 record.msg if isinstance(record.msg, str) else json.dumps(record.msg)
             ),
-        }
+        }  # type: dict[str, str | bool | float | int]
         if record.args is not None:
             if isinstance(record.args, tuple):
                 for i, arg in enumerate(record.args):
