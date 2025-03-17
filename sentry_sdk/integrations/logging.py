@@ -345,9 +345,6 @@ class SentryLogsHandler(_BaseHandler):
             if not client.options["_experiments"].get("enable_sentry_logs", False):
                 return
 
-            if record.msg.startswith("[Sentry Logs]"):
-                return  # avoid infinite loop when debug is true
-
             SentryLogsHandler._capture_log_from_record(client, record)
 
     @staticmethod

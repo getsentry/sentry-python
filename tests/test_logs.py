@@ -6,7 +6,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import _experimental_logger as sentry_logger
-
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 minimum_python_37 = pytest.mark.skipif(
     sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
@@ -263,3 +263,21 @@ def test_logger_integration_debug(sentry_init, capture_envelopes):
     python_logger.debug("this is %s a template %s", "1", "2")
 
     assert len(envelopes) == 0
+
+
+@minimum_python_37
+def test_no_log_infinite_loop(sentry_init, capture_envelopes):
+    """
+    If 'debug' mode is true, and you set a low log level in the logging integration, there should be no infinite loops.
+    """
+    sentry_init(
+        _experiments={"enable_sentry_logs": True},
+        integrations=[LoggingIntegration(level=logging.DEBUG)],
+        debug=True,
+    )
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.debug("this is %s a template %s", "1", "2")
+
+    assert len(envelopes) == 1
