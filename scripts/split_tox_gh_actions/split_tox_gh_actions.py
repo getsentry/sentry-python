@@ -43,11 +43,7 @@ FRAMEWORKS_NEEDING_CLICKHOUSE = {
     "clickhouse_driver",
 }
 
-FRAMEWORKS_NEEDING_AWS = {
-    "aws_lambda",
-}
-
-FRAMEWORKS_NEEDING_GITHUB_SECRETS = {
+FRAMEWORKS_NEEDING_DOCKER = {
     "aws_lambda",
 }
 
@@ -65,12 +61,8 @@ GROUPS = {
         "openai",
         "huggingface_hub",
     ],
-    "AWS": [
-        # this is separate from Cloud Computing because only this one test suite
-        # needs to run with access to GitHub secrets
-        "aws_lambda",
-    ],
     "Cloud": [
+        "aws_lambda",
         "boto3",
         "chalice",
         "cloud_resource_context",
@@ -87,6 +79,7 @@ GROUPS = {
     "Flags": [
         "launchdarkly",
         "openfeature",
+        "statsig",
         "unleash",
     ],
     "Gevent": [
@@ -291,13 +284,10 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "group": group,
         "frameworks": frameworks,
         "categories": sorted(categories),
-        "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
+        "needs_docker": bool(set(frameworks) & FRAMEWORKS_NEEDING_DOCKER),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
         "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
-        "needs_github_secrets": bool(
-            set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
-        ),
         "py_versions": {
             category: [f'"{version}"' for version in _normalize_py_versions(versions)]
             for category, versions in py_versions.items()

@@ -1,6 +1,4 @@
 import sys
-import warnings
-
 from collections.abc import Mapping
 from functools import wraps
 
@@ -16,7 +14,7 @@ from sentry_sdk.integrations.celery.beat import (
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TransactionSource
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -70,11 +68,6 @@ class CeleryIntegration(Integration):
         exclude_beat_tasks=None,
     ):
         # type: (bool, bool, Optional[List[str]]) -> None
-        warnings.warn(
-            "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
@@ -326,7 +319,7 @@ def _wrap_tracer(task, f):
                     headers,
                     op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
-                    source=TRANSACTION_SOURCE_TASK,
+                    source=TransactionSource.TASK,
                     origin=CeleryIntegration.origin,
                 )
                 transaction.name = task.name

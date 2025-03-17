@@ -268,9 +268,7 @@ def test_no_stackoverflows(celery):
 
 
 def test_simple_no_propagation(capture_events, init_celery):
-    with pytest.warns(DeprecationWarning):
-        celery = init_celery(propagate_traces=False)
-
+    celery = init_celery(propagate_traces=False)
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -511,22 +509,25 @@ def test_baggage_propagation(init_celery):
     def dummy_task(self, x, y):
         return _get_headers(self)
 
-    with start_transaction() as transaction:
-        result = dummy_task.apply_async(
-            args=(1, 0),
-            headers={"baggage": "custom=value"},
-        ).get()
+    # patch random.uniform to return a predictable sample_rand value
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+        with start_transaction() as transaction:
+            result = dummy_task.apply_async(
+                args=(1, 0),
+                headers={"baggage": "custom=value"},
+            ).get()
 
-        assert sorted(result["baggage"].split(",")) == sorted(
-            [
-                "sentry-release=abcdef",
-                "sentry-trace_id={}".format(transaction.trace_id),
-                "sentry-environment=production",
-                "sentry-sample_rate=1.0",
-                "sentry-sampled=true",
-                "custom=value",
-            ]
-        )
+            assert sorted(result["baggage"].split(",")) == sorted(
+                [
+                    "sentry-release=abcdef",
+                    "sentry-trace_id={}".format(transaction.trace_id),
+                    "sentry-environment=production",
+                    "sentry-sample_rand=0.500000",
+                    "sentry-sample_rate=1.0",
+                    "sentry-sampled=true",
+                    "custom=value",
+                ]
+            )
 
 
 def test_sentry_propagate_traces_override(init_celery):
@@ -534,10 +535,9 @@ def test_sentry_propagate_traces_override(init_celery):
     Test if the `sentry-propagate-traces` header given to `apply_async`
     overrides the `propagate_traces` parameter in the integration constructor.
     """
-    with pytest.warns(DeprecationWarning):
-        celery = init_celery(
-            propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
-        )
+    celery = init_celery(
+        propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
+    )
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
