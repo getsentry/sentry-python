@@ -1,5 +1,6 @@
 # NOTE: this is the logger sentry exposes to users, not some generic logger.
 import functools
+from time import time_ns
 from typing import Any
 
 from sentry_sdk import get_client, get_current_scope
@@ -9,9 +10,24 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     # type: (str, int, str, **Any) -> None
     client = get_client()
     scope = get_current_scope()
-    kwargs["sentry.message.template"] = template
-    client.capture_log(
-        scope, severity_text, severity_number, template.format(**kwargs), **kwargs
+
+    attrs = {
+        "sentry.message.template": template,
+    }
+    for k, v in kwargs.items():
+        attrs[f"sentry.message.parameters.{k}"] = v
+
+    # noinspection PyProtectedMember
+    client._capture_experimental_log(
+        scope,
+        {
+            "severity_text": severity_text,
+            "severity_number": severity_number,
+            "attributes": attrs,
+            "body": template.format(**kwargs),
+            "time_unix_nano": time_ns(),
+            "trace_id": None,
+        },
     )
 
 

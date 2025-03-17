@@ -354,7 +354,7 @@ class SentryLogsHandler(_BaseHandler):
         # type: (BaseClient, LogRecord) -> None
         scope = sentry_sdk.get_current_scope()
         otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
-        kwargs = {
+        attrs = {
             "sentry.message.template": (
                 record.msg if isinstance(record.msg, str) else json.dumps(record.msg)
             ),
@@ -362,35 +362,37 @@ class SentryLogsHandler(_BaseHandler):
         if record.args is not None:
             if isinstance(record.args, tuple):
                 for i, arg in enumerate(record.args):
-                    kwargs[f"sentry.message.parameters.{i}"] = (
+                    attrs[f"sentry.message.parameters.{i}"] = (
                         arg if isinstance(arg, str) else json.dumps(arg)
                     )
         if record.lineno:
-            kwargs["code.line.number"] = record.lineno
+            attrs["code.line.number"] = record.lineno
         if record.pathname:
-            kwargs["code.file.path"] = record.pathname
+            attrs["code.file.path"] = record.pathname
         if record.funcName:
-            kwargs["code.function.name"] = record.funcName
+            attrs["code.function.name"] = record.funcName
 
         if record.thread:
-            kwargs["thread.id"] = record.thread
+            attrs["thread.id"] = record.thread
         if record.threadName:
-            kwargs["thread.name"] = record.threadName
+            attrs["thread.name"] = record.threadName
 
         if record.process:
-            kwargs["process.pid"] = record.process
+            attrs["process.pid"] = record.process
         if record.processName:
-            kwargs["process.executable.name"] = record.processName
+            attrs["process.executable.name"] = record.processName
         if record.name:
-            kwargs["logger.name"] = record.name
-        if record.created:
-            kwargs["time_unix_nano"] = int(record.created * 1e9)
+            attrs["logger.name"] = record.name
 
         # noinspection PyProtectedMember
         client._capture_experimental_log(
             scope,
-            otel_severity_text,
-            otel_severity_number,
-            record.getMessage(),
-            **kwargs,
+            {
+                "severity_text": otel_severity_text,
+                "severity_number": otel_severity_number,
+                "body": record.message,
+                "attributes": attrs,
+                "time_unix_nano": int(record.created * 1e9),
+                "trace_id": None,
+            },
         )
