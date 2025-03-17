@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.23.1
+
+### Various fixes & improvements
+
+- Fix import problem in release 2.23.0 (#4140) by @antonpirker
+
 ## 2.23.0
 
 ### Various fixes & improvements
