@@ -1,3 +1,4 @@
+import logging
 import sys
 from unittest import mock
 import pytest
@@ -240,3 +241,37 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
         "key": "sentry.trace.parent_span_id",
         "value": {"stringValue": span.span_id},
     }
+
+
+@minimum_python_37
+def test_logger_integration_warning(sentry_init, capture_envelopes):
+    """
+    The python logger module should create 'warn' sentry logs if the flag is on.
+    """
+    sentry_init(_experiments={"enable_sentry_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("this is %s a template %s", "1", "2")
+
+    log_entry = envelopes[0].items[0].payload.json
+    assert log_entry["attributes"][0] == {
+        "key": "sentry.message.template",
+        "value": {"stringValue": "this is %s a template %s"},
+    }
+    assert log_entry["severityNumber"] == 13
+    assert log_entry["severityText"] == "warn"
+
+
+@minimum_python_37
+def test_logger_integration_debug(sentry_init, capture_envelopes):
+    """
+    The python logger module should not create 'debug' sentry logs if the flag is on by default
+    """
+    sentry_init(_experiments={"enable_sentry_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.debug("this is %s a template %s", "1", "2")
+
+    assert len(envelopes) == 0
