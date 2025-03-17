@@ -13,7 +13,7 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
 
     attrs = {
         "sentry.message.template": template,
-    }
+    }  # type: dict[str, str | bool | float | int]
     for k, v in kwargs.items():
         attrs[f"sentry.message.parameters.{k}"] = v
 
