@@ -608,8 +608,12 @@ class _Client(BaseClient):
                         "before_send", data_category="error"
                     )
 
-                # XXX: Should only reset if this is an exception
-                DedupeIntegration.reset_last_seen()
+                # If this is an exception, reset the DedupeIntegration. It still
+                # remembers the dropped exception as the last exception, meaning
+                # that if the same exception happens again and is not dropped
+                # in before_send, it'd get dropped by DedupeIntegration.
+                if event.get("exception"):
+                    DedupeIntegration.reset_last_seen()
 
             event = new_event
 
