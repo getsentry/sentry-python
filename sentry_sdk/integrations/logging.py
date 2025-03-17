@@ -321,6 +321,7 @@ def _python_level_to_otel(record_level):
     ]:
         if max(record_level, 0) >= py_level:
             return otel_severity_number, otel_severity_text
+    raise AssertionError("this shouldn't happen")
 
 
 class SentryLogsHandler(_BaseHandler):
