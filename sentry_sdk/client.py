@@ -210,7 +210,9 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
+    def _capture_experimental_log(
+        self, scope, severity_text, severity_number, body, **kwargs
+    ):
         # type: (Scope, str, int, str, **Any) -> None
         pass
 
@@ -863,7 +865,9 @@ class _Client(BaseClient):
 
         return return_value
 
-    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
+    def _capture_experimental_log(
+        self, scope, severity_text, severity_number, body, **kwargs
+    ):
         # type: (Scope, str, int, str, **Any) -> None
         logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
         if not logs_enabled:
@@ -873,9 +877,7 @@ class _Client(BaseClient):
             "sent_at": format_timestamp(datetime.now(timezone.utc)),
         }  # type: dict[str, object]
 
-        attrs = {
-            "sentry.message.template": template,
-        }  # type: dict[str, str | bool | float | int]
+        attrs = {}  # type: dict[str, str | bool | float | int]
 
         kwargs_attributes = kwargs.get("attributes")
         if kwargs_attributes is not None:
@@ -899,9 +901,9 @@ class _Client(BaseClient):
         log = {
             "severity_text": severity_text,
             "severity_number": severity_number,
-            "body": template.format(**kwargs),
+            "body": body,
             "attributes": attrs,
-            "time_unix_nano": time.time_ns(),
+            "time_unix_nano": kwargs.pop("time_unix_nano", time.time_ns()),
             "trace_id": None,
         }  # type: Log
 
@@ -916,6 +918,7 @@ class _Client(BaseClient):
                 "error": logging.ERROR,
                 "fatal": logging.CRITICAL,
             }
+            # Be careful editing this line, you can add infinite logging loops with the logger integration
             logger.log(
                 severity_text_to_logging_level.get(severity_text, logging.DEBUG),
                 f'[Sentry Logs] {log["body"]}',
