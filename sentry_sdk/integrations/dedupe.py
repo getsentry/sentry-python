@@ -40,3 +40,11 @@ class DedupeIntegration(Integration):
                 return None
             integration._last_seen.set(exc)
             return event
+
+    @staticmethod
+    def reset_last_seen():
+        integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
+        if integration is None:
+            return
+
+        integration._last_seen.set(None)

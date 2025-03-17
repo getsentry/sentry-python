@@ -606,6 +606,10 @@ class _Client(BaseClient):
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
                     )
+                from sentry_sdk.integrations.dedupe import DedupeIntegration
+
+                DedupeIntegration.reset_last_seen()
+
             event = new_event
 
         before_send_transaction = self.options["before_send_transaction"]
