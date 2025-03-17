@@ -78,6 +78,7 @@ if TYPE_CHECKING:
                 Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
             ],
             "metric_code_locations": Optional[bool],
+            "enable_sentry_logs": Optional[bool],
         },
         total=False,
     )

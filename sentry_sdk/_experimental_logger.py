@@ -9,7 +9,10 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     # type: (str, int, str, **Any) -> None
     client = get_client()
     scope = get_current_scope()
-    client.capture_log(scope, severity_text, severity_number, template, **kwargs)
+    kwargs["sentry.message.template"] = template
+    client.capture_log(
+        scope, severity_text, severity_number, template.format(**kwargs), **kwargs
+    )
 
 
 trace = functools.partial(_capture_log, "trace", 1)

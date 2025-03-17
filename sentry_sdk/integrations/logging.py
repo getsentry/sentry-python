@@ -1,8 +1,10 @@
+import json
 import logging
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 
 import sentry_sdk
+from sentry_sdk.client import BaseClient
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
@@ -65,9 +67,11 @@ class LoggingIntegration(Integration):
         # type: (Optional[int], Optional[int]) -> None
         self._handler = None
         self._breadcrumb_handler = None
+        self._sentry_logs_handler = None
 
         if level is not None:
             self._breadcrumb_handler = BreadcrumbHandler(level=level)
+            self._sentry_logs_handler = SentryLogsHandler(level=level)
 
         if event_level is not None:
             self._handler = EventHandler(level=event_level)
@@ -82,6 +86,12 @@ class LoggingIntegration(Integration):
             and record.levelno >= self._breadcrumb_handler.level
         ):
             self._breadcrumb_handler.handle(record)
+
+        if (
+            self._sentry_logs_handler is not None
+            and record.levelno >= self._sentry_logs_handler.level
+        ):
+            self._sentry_logs_handler.handle(record)
 
     @staticmethod
     def setup_once():
@@ -296,3 +306,91 @@ class BreadcrumbHandler(_BaseHandler):
             "timestamp": datetime.fromtimestamp(record.created, timezone.utc),
             "data": self._extra_from_record(record),
         }
+
+
+def _python_level_to_otel(record_level):
+    # type: (int) -> (int, str)
+    for py_level, otel_severity_number, otel_severity_text in [
+        (50, 21, "fatal"),
+        (40, 17, "error"),
+        (30, 13, "warn"),
+        (20, 9, "info"),
+        (10, 5, "debug"),
+        (5, 1, "trace"),
+        (0, 0, "default"),
+    ]:
+        if max(record_level, 0) >= py_level:
+            return otel_severity_number, otel_severity_text
+
+
+class SentryLogsHandler(_BaseHandler):
+    """
+    A logging handler that records Sentry logs for each Python log record.
+
+    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    """
+
+    def emit(self, record):
+        # type: (LogRecord) -> Any
+        with capture_internal_exceptions():
+            self.format(record)
+            if not self._can_record(record):
+                return
+
+            client = sentry_sdk.get_client()
+            if not client.is_active():
+                return
+
+            if not client.options["_experiments"].get("enable_sentry_logs", False):
+                return
+
+            if record.msg.startswith("[Sentry Logs]"):
+                return  # avoid infinite loop when debug is true
+
+            SentryLogsHandler._capture_log_from_record(client, record)
+
+    @staticmethod
+    def _capture_log_from_record(client, record):
+        # type: (BaseClient, LogRecord) -> None
+        scope = sentry_sdk.get_current_scope()
+        otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
+        kwargs = {
+            "sentry.message.template": (
+                record.msg if isinstance(record.msg, str) else json.dumps(record.msg)
+            ),
+        }
+        if record.args is not None:
+            if isinstance(record.args, tuple):
+                for i, arg in enumerate(record.args):
+                    kwargs[f"sentry.message.parameters.{i}"] = (
+                        arg if isinstance(arg, str) else json.dumps(arg)
+                    )
+        if record.lineno:
+            kwargs["code.line.number"] = record.lineno
+        if record.pathname:
+            kwargs["code.file.path"] = record.pathname
+        if record.funcName:
+            kwargs["code.function.name"] = record.funcName
+
+        if record.thread:
+            kwargs["thread.id"] = record.thread
+        if record.threadName:
+            kwargs["thread.name"] = record.threadName
+
+        if record.process:
+            kwargs["process.pid"] = record.process
+        if record.processName:
+            kwargs["process.executable.name"] = record.processName
+        if record.name:
+            kwargs["logger.name"] = record.name
+        if record.created:
+            kwargs["time_unix_nano"] = int(record.created * 1e9)
+
+        # noinspection PyProtectedMember
+        client._capture_experimental_log(
+            scope,
+            otel_severity_text,
+            otel_severity_number,
+            record.getMessage(),
+            **kwargs,
+        )
