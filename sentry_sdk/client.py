@@ -901,7 +901,6 @@ class _Client(BaseClient):
                 "error": logging.ERROR,
                 "fatal": logging.CRITICAL,
             }
-            # Be careful editing this line, you can add infinite logging loops with the logger integration
             logger.log(
                 severity_text_to_logging_level.get(log["severity_text"], logging.DEBUG),
                 f'[Sentry Logs] {log["body"]}',
