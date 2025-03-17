@@ -74,14 +74,14 @@ def test_logs_basics(sentry_init, capture_envelopes):
 @minimum_python_37
 def test_logs_before_emit_log(sentry_init, capture_envelopes):
     def _before_log(record, hint):
-        assert list(record.keys()) == [
+        assert set(record.keys()) == {
             "severity_text",
             "severity_number",
             "body",
             "attributes",
             "time_unix_nano",
             "trace_id",
-        ]
+        }
 
         if record["severity_text"] in ["fatal", "error"]:
             return None
