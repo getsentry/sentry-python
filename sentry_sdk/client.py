@@ -37,6 +37,7 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -606,8 +607,8 @@ class _Client(BaseClient):
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
                     )
-                from sentry_sdk.integrations.dedupe import DedupeIntegration
 
+                # XXX: Should only reset if this is an exception
                 DedupeIntegration.reset_last_seen()
 
             event = new_event
