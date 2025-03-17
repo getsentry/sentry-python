@@ -728,18 +728,15 @@ def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_
     sentry_init(before_send=before_send)
     events = capture_events()
 
+    exc = ValueError("aha!")
     for _ in range(2):
         # The first ValueError will be dropped by before_send. The second
         # ValueError will be accepted by before_send, and should be sent to
         # Sentry.
         try:
-            raise ValueError("aha!")
+            raise exc
         except Exception:
-            try:
-                capture_exception()
-                reraise(*sys.exc_info())
-            except Exception:
-                capture_exception()
+            capture_exception()
 
     assert len(events) == 1
 
