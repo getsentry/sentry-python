@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.23.0
+
+### Various fixes & improvements
+
+- build(deps): bump actions/create-github-app-token from 1.11.5 to 1.11.6 (#4113) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.3.1 to 5.4.0 (#4112) by @dependabot
+- docs(baggage): Document that caller must check `mutable` (#4010) by @szokeasaurusrex
+- Add `init()` parameters to ApiDocs. (#4100) by @antonpirker
+- feat(logs): Add alpha version of Sentry logs (#4126) by @colin-sentry
+- Updating Readme (#4134) by @antonpirker
+- fix(debug): Take into account parent handlers for debug logger (#4133) by @sentrivana
+- fix(quart): Support `quart_flask_patch` (#4132) by @sentrivana
+- tests: Add concurrency testcase for arq (#4125) by @sentrivana
+- fix(bottle): Prevent internal error on 404 (#4131) by @sentrivana
+- Coerce None values into strings in logentry params. (#4121) by @antonpirker
+- A way to locally run AWS Lambda functions (#4128) by @antonpirker
+- fix(pyspark): Grab `attemptId` more defensively (#4130) by @sentrivana
+- Improve asyncio integration error handling. (#4129) by @antonpirker
+- Run AWS Lambda tests locally (#3988) by @antonpirker
+- Added timeout to HTTP requests in CloudResourceContextIntegration (#4120) by @antonpirker
+- Fix FastAPI/Starlette middleware with positional arguments.  (#4118) by @antonpirker
+- fix(typing): Set correct type for set_context everywhere (#4123) by @sentrivana
+- chore(tests): Regenerate tox.ini (#4108) by @sentrivana
+- Fixed bug when `cron_jobs` is set to `None` in arq integration (#4115) by @antonpirker
+- feat(tracing): Backfill missing `sample_rand` on `PropagationContext` (#4038) by @szokeasaurusrex
+- fix(asgi): Fix KeyError if transaction does not exist (#4095) by @kevinji
+- security(gha): fix potential for shell injection (#4099) by @mdtro
+- ref(tracing): Move `TRANSACTION_SOURCE_*` constants to `Enum` (#3889) by @mgaligniana
+
+_Plus 12 more_
+
 ## 2.22.0
 
 ### Various fixes & improvements
