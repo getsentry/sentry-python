@@ -1,6 +1,6 @@
 # NOTE: this is the logger sentry exposes to users, not some generic logger.
 import functools
-from time import time_ns
+import time
 from typing import Any
 
 from sentry_sdk import get_client, get_current_scope
@@ -25,7 +25,7 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
             "severity_number": severity_number,
             "attributes": attrs,
             "body": template.format(**kwargs),
-            "time_unix_nano": time_ns(),
+            "time_unix_nano": time.time_ns(),
             "trace_id": None,
         },
     )
