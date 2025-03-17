@@ -211,9 +211,9 @@ class BaseClient:
         return None
 
     def _capture_experimental_log(
-        self, scope, severity_text, severity_number, body, **kwargs
+        self, scope, severity_text, severity_number, body, time_unix_nano=None, **kwargs
     ):
-        # type: (Scope, str, int, str, **Any) -> None
+        # type: (Scope, str, int, str, Optional[int], **Any) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -866,12 +866,15 @@ class _Client(BaseClient):
         return return_value
 
     def _capture_experimental_log(
-        self, scope, severity_text, severity_number, body, **kwargs
+        self, scope, severity_text, severity_number, body, time_unix_nano=None, **kwargs
     ):
-        # type: (Scope, str, int, str, **Any) -> None
+        # type: (Scope, str, int, str, Optional[int], **Any) -> None
         logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
         if not logs_enabled:
             return
+
+        if time_unix_nano is None:
+            time_unix_nano = time.time_ns()
 
         headers = {
             "sent_at": format_timestamp(datetime.now(timezone.utc)),
@@ -903,7 +906,7 @@ class _Client(BaseClient):
             "severity_number": severity_number,
             "body": body,
             "attributes": attrs,
-            "time_unix_nano": kwargs.pop("time_unix_nano", time.time_ns()),
+            "time_unix_nano": time_unix_nano,
             "trace_id": None,
         }  # type: Log
 
