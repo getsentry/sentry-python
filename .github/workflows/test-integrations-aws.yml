@@ -9,11 +9,7 @@ on:
       - master
       - release/**
       - potel-base
-  # XXX: We are using `pull_request_target` instead of `pull_request` because we want
-  # this to run on forks with access to the secrets necessary to run the test suite.
-  # Prefer to use `pull_request` when possible.
-  pull_request_target:
-    types: [labeled, opened, reopened, synchronize]
+  pull_request:
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
 concurrency:
