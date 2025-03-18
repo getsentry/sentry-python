@@ -693,7 +693,7 @@ def _transaction_name_from_router(scope):
     for route in router.routes:
         match = route.matches(scope)
         if match[0] == Match.FULL:
-            return route.path
+            return getattr(route, "path", None)
 
     return None
 
