@@ -693,7 +693,11 @@ def _transaction_name_from_router(scope):
     for route in router.routes:
         match = route.matches(scope)
         if match[0] == Match.FULL:
-            return route.path
+            try:
+                return route.path
+            except AttributeError:
+                # routes added via app.host() won't have a path attribute
+                return scope.get("path")
 
     return None
 
