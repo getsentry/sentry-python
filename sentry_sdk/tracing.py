@@ -7,6 +7,7 @@ import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
+    event_from_exception,
     get_current_thread_meta,
     is_valid_sample_rate,
     logger,
@@ -1143,9 +1144,12 @@ class Transaction(Span):
         # we would have bailed already if neither `traces_sampler` nor
         # `traces_sample_rate` were defined, so one of these should work; prefer
         # the hook if so
+        traces_sampler_rate = _rate_from_traces_sampler(
+            client.options.get("traces_sampler"), sampling_context
+        )
         sample_rate = (
-            client.options["traces_sampler"](sampling_context)
-            if callable(client.options.get("traces_sampler"))
+            traces_sampler_rate
+            if traces_sampler_rate is not None
             else (
                 # default inheritance behavior
                 sampling_context["parent_sampled"]
@@ -1339,6 +1343,23 @@ def trace(func=None):
         return start_child_span_decorator(func)
     else:
         return start_child_span_decorator
+
+
+def _rate_from_traces_sampler(traces_sampler, sampling_context):
+    # type: (Any, SamplingContext) -> Optional[Any]
+    if not callable(traces_sampler):
+        return None
+
+    try:
+        return traces_sampler(sampling_context)
+    except Exception as e:
+        event, hint = event_from_exception(
+            e,
+            mechanism={"type": "traces_sampler", "handled": False},
+        )
+        sentry_sdk.capture_event(event, hint)
+        logger.error("Unhandled exception in traces_sampler", exc_info=True)
+        return None
 
 
 # Circular imports
