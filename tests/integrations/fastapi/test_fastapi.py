@@ -682,3 +682,38 @@ def test_configurable_status_codes(
     client.get("/error")
 
     assert len(events) == int(expected_error)
+
+
+@pytest.mark.parametrize("transaction_style", ["endpoint", "url"])
+def test_app_host(sentry_init, capture_events, transaction_style):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(transaction_style=transaction_style),
+            FastApiIntegration(transaction_style=transaction_style),
+        ],
+    )
+
+    app = FastAPI()
+    subapp = FastAPI()
+
+    @subapp.get("/subapp")
+    async def subapp_route():
+        return {"message": "Hello world!"}
+
+    app.host("subapp", subapp)
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.get("/subapp", headers={"Host": "subapp"})
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert "transaction" in event
+
+    if transaction_style == "url":
+        assert event["transaction"] == "/subapp"
+    else:
+        assert event["transaction"].endswith("subapp_route")
