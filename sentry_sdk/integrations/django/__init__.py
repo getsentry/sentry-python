@@ -1,3 +1,4 @@
+import functools
 import inspect
 import sys
 import threading
@@ -168,6 +169,7 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         @ensure_integration_enabled(DjangoIntegration, old_app)
+        @functools.wraps(old_app)
         def sentry_patched_wsgi_handler(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
             bound_old_app = old_app.__get__(self, WSGIHandler)
@@ -321,6 +323,7 @@ def _patch_drf():
             else:
                 old_drf_initial = APIView.initial
 
+                @functools.wraps(old_drf_initial)
                 def sentry_patched_drf_initial(self, request, *args, **kwargs):
                     # type: (APIView, Any, *Any, **Any) -> Any
                     with capture_internal_exceptions():
@@ -471,6 +474,7 @@ def _patch_get_response():
 
     old_get_response = BaseHandler.get_response
 
+    @functools.wraps(old_get_response)
     def sentry_patched_get_response(self, request):
         # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
         _before_get_response(request)
@@ -637,6 +641,7 @@ def install_sql_hook():
         return
 
     @ensure_integration_enabled(DjangoIntegration, real_execute)
+    @functools.wraps(real_execute)
     def execute(self, sql, params=None):
         # type: (CursorWrapper, Any, Optional[Any]) -> Any
         with record_sql_queries(
@@ -656,6 +661,7 @@ def install_sql_hook():
         return result
 
     @ensure_integration_enabled(DjangoIntegration, real_executemany)
+    @functools.wraps(real_executemany)
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
         with record_sql_queries(
@@ -676,6 +682,7 @@ def install_sql_hook():
         return result
 
     @ensure_integration_enabled(DjangoIntegration, real_connect)
+    @functools.wraps(real_connect)
     def connect(self):
         # type: (BaseDatabaseWrapper) -> None
         with capture_internal_exceptions():
