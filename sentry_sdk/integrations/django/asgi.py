@@ -88,6 +88,7 @@ def patch_django_asgi_handler_impl(cls):
 
     old_app = cls.__call__
 
+    @functools.wraps(old_app)
     async def sentry_patched_asgi_handler(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
@@ -109,6 +110,7 @@ def patch_django_asgi_handler_impl(cls):
     if modern_django_asgi_support:
         old_create_request = cls.create_request
 
+        @functools.wrap(old_create_request)
         @ensure_integration_enabled(DjangoIntegration, old_create_request)
         def sentry_patched_create_request(self, *args, **kwargs):
             # type: (Any, *Any, **Any) -> Any
@@ -125,6 +127,7 @@ def patch_get_response_async(cls, _before_get_response):
     # type: (Any, Any) -> None
     old_get_response_async = cls.get_response_async
 
+    @functools.wraps(old_get_response_async)
     async def sentry_patched_get_response_async(self, request):
         # type: (Any, Any) -> Union[HttpResponse, BaseException]
         _before_get_response(request)
@@ -142,6 +145,7 @@ def patch_channels_asgi_handler_impl(cls):
     if channels.__version__ < "3.0.0":
         old_app = cls.__call__
 
+        @functools.wraps(old_app)
         async def sentry_patched_asgi_handler(self, receive, send):
             # type: (Any, Any, Any) -> Any
             integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
