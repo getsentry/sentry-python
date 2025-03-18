@@ -64,7 +64,6 @@ def patch_templates():
 
     real_rendered_content = SimpleTemplateResponse.rendered_content
 
-    @functools.wraps(real_rendered_content)
     @property  # type: ignore
     @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
     def rendered_content(self):
