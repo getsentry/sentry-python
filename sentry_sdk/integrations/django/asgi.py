@@ -110,7 +110,7 @@ def patch_django_asgi_handler_impl(cls):
     if modern_django_asgi_support:
         old_create_request = cls.create_request
 
-        @functools.wrap(old_create_request)
+        @functools.wraps(old_create_request)
         @ensure_integration_enabled(DjangoIntegration, old_create_request)
         def sentry_patched_create_request(self, *args, **kwargs):
             # type: (Any, *Any, **Any) -> Any
