@@ -168,8 +168,8 @@ class DjangoIntegration(Integration):
 
         old_app = WSGIHandler.__call__
 
-        @ensure_integration_enabled(DjangoIntegration, old_app)
         @functools.wraps(old_app)
+        @ensure_integration_enabled(DjangoIntegration, old_app)
         def sentry_patched_wsgi_handler(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
             bound_old_app = old_app.__get__(self, WSGIHandler)
@@ -640,8 +640,8 @@ def install_sql_hook():
         # This won't work on Django versions < 1.6
         return
 
-    @ensure_integration_enabled(DjangoIntegration, real_execute)
     @functools.wraps(real_execute)
+    @ensure_integration_enabled(DjangoIntegration, real_execute)
     def execute(self, sql, params=None):
         # type: (CursorWrapper, Any, Optional[Any]) -> Any
         with record_sql_queries(
@@ -660,8 +660,8 @@ def install_sql_hook():
 
         return result
 
-    @ensure_integration_enabled(DjangoIntegration, real_executemany)
     @functools.wraps(real_executemany)
+    @ensure_integration_enabled(DjangoIntegration, real_executemany)
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
         with record_sql_queries(
@@ -681,8 +681,8 @@ def install_sql_hook():
 
         return result
 
-    @ensure_integration_enabled(DjangoIntegration, real_connect)
     @functools.wraps(real_connect)
+    @ensure_integration_enabled(DjangoIntegration, real_connect)
     def connect(self):
         # type: (BaseDatabaseWrapper) -> None
         with capture_internal_exceptions():
