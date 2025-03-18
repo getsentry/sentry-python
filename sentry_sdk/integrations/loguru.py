@@ -31,6 +31,16 @@ class LoggingLevels(enum.IntEnum):
     CRITICAL = 50
 
 
+SENTRY_LEVEL_FROM_LOGURU_LEVEL = {
+    "TRACE": "DEBUG",
+    "DEBUG": "DEBUG",
+    "INFO": "INFO",
+    "SUCCESS": "INFO",
+    "WARNING": "WARNING",
+    "ERROR": "ERROR",
+    "CRITICAL": "CRITICAL",
+}
+
 DEFAULT_LEVEL = LoggingLevels.INFO.value
 DEFAULT_EVENT_LEVEL = LoggingLevels.ERROR.value
 # We need to save the handlers to be able to remove them later
@@ -87,14 +97,32 @@ class _LoguruBaseHandler(_BaseHandler):
     def _logging_to_event_level(self, record):
         # type: (LogRecord) -> str
         try:
-            return LoggingLevels(record.levelno).name.lower()
-        except ValueError:
+            return SENTRY_LEVEL_FROM_LOGURU_LEVEL[
+                LoggingLevels(record.levelno).name
+            ].lower()
+        except (ValueError, KeyError):
             return record.levelname.lower() if record.levelname else ""
 
 
 class LoguruEventHandler(_LoguruBaseHandler, EventHandler):
     """Modified version of :class:`sentry_sdk.integrations.logging.EventHandler` to use loguru's level names."""
 
+    def __init__(self, *args, **kwargs):
+        if kwargs.get("level"):
+            kwargs["level"] = SENTRY_LEVEL_FROM_LOGURU_LEVEL.get(
+                kwargs.get("level"), DEFAULT_LEVEL
+            )
+
+        super().__init__(*args, **kwargs)
+
 
 class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
     """Modified version of :class:`sentry_sdk.integrations.logging.BreadcrumbHandler` to use loguru's level names."""
+
+    def __init__(self, *args, **kwargs):
+        if kwargs.get("level"):
+            kwargs["level"] = SENTRY_LEVEL_FROM_LOGURU_LEVEL.get(
+                kwargs.get("level"), DEFAULT_LEVEL
+            )
+
+        super().__init__(*args, **kwargs)
