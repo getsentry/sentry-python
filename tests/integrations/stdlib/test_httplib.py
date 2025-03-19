@@ -398,25 +398,16 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    with start_transaction(op="op", name="name"):
-        try:
-            conn = HTTPSConnection("www.squirrelchasers.com")
-            conn.request("GET", "/top-chasers")
+    with pytest.raises(TimeoutError):
+        with start_transaction(op="op", name="name"):
+            conn = HTTPSConnection("www.example.com")
+            conn.request("GET", "/bla")
             conn.getresponse()
-        except Exception:
-            pass
 
-    items = [
-        item
-        for envelope in envelopes
-        for item in envelope.items
-        if item.type == "transaction"
-    ]
-    assert len(items) == 1
-
-    transaction = items[0].payload.json
+    (transaction_envelope, ) = envelopes
+    transaction = transaction_envelope.get_transaction_event()
     assert len(transaction["spans"]) == 1
 
     span = transaction["spans"][0]
     assert span["op"] == "http.client"
-    assert span["description"] == "GET https://www.squirrelchasers.com/top-chasers"
+    assert span["description"] == "GET https://www.example.com/bla"
