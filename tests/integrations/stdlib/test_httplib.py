@@ -404,7 +404,7 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
             conn.request("GET", "/bla")
             conn.getresponse()
 
-    (transaction_envelope, ) = envelopes
+    (transaction_envelope,) = envelopes
     transaction = transaction_envelope.get_transaction_event()
     assert len(transaction["spans"]) == 1
 
