@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Optional, Tuple
+    from typing import Optional, Tuple, Any
 
 try:
     import loguru
@@ -108,9 +108,10 @@ class LoguruEventHandler(_LoguruBaseHandler, EventHandler):
     """Modified version of :class:`sentry_sdk.integrations.logging.EventHandler` to use loguru's level names."""
 
     def __init__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
         if kwargs.get("level"):
             kwargs["level"] = SENTRY_LEVEL_FROM_LOGURU_LEVEL.get(
-                kwargs.get("level"), DEFAULT_LEVEL
+                kwargs.get("level", ""), DEFAULT_LEVEL
             )
 
         super().__init__(*args, **kwargs)
@@ -120,9 +121,10 @@ class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
     """Modified version of :class:`sentry_sdk.integrations.logging.BreadcrumbHandler` to use loguru's level names."""
 
     def __init__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
         if kwargs.get("level"):
             kwargs["level"] = SENTRY_LEVEL_FROM_LOGURU_LEVEL.get(
-                kwargs.get("level"), DEFAULT_LEVEL
+                kwargs.get("level", ""), DEFAULT_LEVEL
             )
 
         super().__init__(*args, **kwargs)
