@@ -776,7 +776,8 @@ def exceptions_from_error(
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
     Converts the given exception information into the Sentry structured "exception" format.
-    This will return a list of exceptions in the format of the Exception Interface documentation:
+    This will return a list of exceptions (a flattened tree of exceptions) in the
+    format of the Exception Interface documentation:
     https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
 
     This function can handle:
@@ -800,56 +801,49 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    # Note: __suppress_context__ is True if the exception is raised with the `from` keyword.
+    causing_exception = None
+    exception_source = None
+
+    # Add any causing exceptions, if present.
     should_suppress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    # Note: __suppress_context__ is True if the exception is raised with the `from` keyword.
     if should_suppress_context:
         # Explicitly chained exceptions (Like: raise NewException() from OriginalException())
         # The field `__cause__` is set to OriginalException
-        exception_has_explicit_causing_exception = (
+        has_explicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__cause__")
             and exc_value.__cause__ is not None
         )
-        if exception_has_explicit_causing_exception:
+        if has_explicit_causing_exception:
+            exception_source = "__cause__"
             causing_exception = exc_value.__cause__  # type: ignore
-
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(causing_exception),
-                exc_value=causing_exception,
-                tb=getattr(causing_exception, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                parent_id=parent_id,
-                source="__cause__",
-                full_stack=full_stack,
-            )
-            exceptions.extend(child_exceptions)
-
     else:
         # Implicitly chained exceptions (when an exception occurs while handling another exception)
         # The field `__context__` is set in the exception that occurs while handling another exception,
         # to the other exception.
-        exception_has_implicit_causing_exception = (
+        has_implicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__context__")
             and exc_value.__context__ is not None
         )
-        if exception_has_implicit_causing_exception:
+        if has_implicit_causing_exception:
+            exception_source = "__context__"
             causing_exception = exc_value.__context__  # type: ignore
 
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(causing_exception),
-                exc_value=causing_exception,
-                tb=getattr(causing_exception, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                parent_id=parent_id,
-                source="__context__",
-                full_stack=full_stack,
-            )
-            exceptions.extend(child_exceptions)
+    if causing_exception:
+        (exception_id, child_exceptions) = exceptions_from_error(
+            exc_type=type(causing_exception),
+            exc_value=causing_exception,
+            tb=getattr(causing_exception, "__traceback__", None),
+            client_options=client_options,
+            mechanism=mechanism,
+            exception_id=exception_id,
+            parent_id=parent_id,
+            source=exception_source,
+            full_stack=full_stack,
+        )
+        exceptions.extend(child_exceptions)
 
     # Add child exceptions from an ExceptionGroup.
     is_exception_group = exc_value and hasattr(exc_value, "exceptions")
