@@ -800,14 +800,16 @@ def exceptions_from_error(
 ):
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
-    Creates the list of exceptions.
-    This can include chained exceptions and exceptions from an ExceptionGroup.
+    Converts the given exception information into the Sentry structured "exception" format.
+    This will return a list of exceptions in the format of the Exception Interface documentation:
+    https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
 
-    See the Exception Interface documentation for more details:
-    https://develop.sentry.dev/sdk/event-payloads/exception/
+    This function can handle:
+    - simple exceptions
+    - chained exceptions (raise .. from ..)
+    - exception groups
     """
-
-    parent = single_exception_from_error_tuple(
+    base_exception = single_exception_from_error_tuple(
         exc_type=exc_type,
         exc_value=exc_value,
         tb=tb,
@@ -818,64 +820,70 @@ def exceptions_from_error(
         source=source,
         full_stack=full_stack,
     )
-    exceptions = [parent]
+    exceptions = [base_exception]
 
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
-    if should_supress_context:
-        # Add direct cause.
-        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
-        exception_has_cause = (
+    # Note: __suppress_context__ is True if the exception is raised with the `from` keyword.
+    should_suppress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    if should_suppress_context:
+        # Explicitly chained exceptions (Like: raise NewException() from OriginalException())
+        # The field `__cause__` is set to OriginalException
+        exception_has_explicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__cause__")
             and exc_value.__cause__ is not None
         )
-        if exception_has_cause:
-            cause = exc_value.__cause__  # type: ignore
+        if exception_has_explicit_causing_exception:
+            causing_exception = exc_value.__cause__  # type: ignore
+
             (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(cause),
-                exc_value=cause,
-                tb=getattr(cause, "__traceback__", None),
+                exc_type=type(causing_exception),
+                exc_value=causing_exception,
+                tb=getattr(causing_exception, "__traceback__", None),
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
+                # parent_id=parent_id, TODO: why is this not set?
                 source="__cause__",
                 full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
     else:
-        # Add indirect cause.
-        # The field `__context__` is assigned if another exception occurs while handling the exception.
-        exception_has_content = (
+        # Implicitly chained exceptions (when an exception occurs while handling another exception)
+        # The field `__context__` is set in the exception that occurs while handling another exception,
+        # to the other exception.
+        exception_has_implicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__context__")
             and exc_value.__context__ is not None
         )
-        if exception_has_content:
-            context = exc_value.__context__  # type: ignore
+        if exception_has_implicit_causing_exception:
+            causing_exception = exc_value.__context__  # type: ignore
+
             (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(context),
-                exc_value=context,
-                tb=getattr(context, "__traceback__", None),
+                exc_type=type(causing_exception),
+                exc_value=causing_exception,
+                tb=getattr(causing_exception, "__traceback__", None),
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
+                # parent_id=parent_id, TODO: why is this not set?
                 source="__context__",
                 full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
-    # Add exceptions from an ExceptionGroup.
+    # Add child exceptions from an ExceptionGroup.
     is_exception_group = exc_value and hasattr(exc_value, "exceptions")
     if is_exception_group:
-        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
+        for idx, causing_exception in enumerate(exc_value.exceptions):  # type: ignore
             (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(e),
-                exc_value=e,
-                tb=getattr(e, "__traceback__", None),
+                exc_type=type(causing_exception),
+                exc_value=causing_exception,
+                tb=getattr(causing_exception, "__traceback__", None),
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
@@ -895,8 +903,15 @@ def exceptions_from_error_tuple(
     full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> List[Dict[str, Any]]
+    """
+    Convert Python's exception information into Sentry's structured "exception" format in the event.
+    See https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
+    This is the entry point for the exception handling.
+    """
+    # unpack the exception info tuple
     exc_type, exc_value, tb = exc_info
 
+    # let exceptions_from_error do the actual work
     _, exceptions = exceptions_from_error(
         exc_type=exc_type,
         exc_value=exc_value,
@@ -908,6 +923,9 @@ def exceptions_from_error_tuple(
         full_stack=full_stack,
     )
 
+    # make sure the exceptions are sorted
+    # from the innermost (oldest)
+    # to the outermost (newest) exception
     exceptions.reverse()
 
     return exceptions
