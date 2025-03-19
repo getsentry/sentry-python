@@ -362,13 +362,13 @@ def patch_middlewares():
 
     if not_yet_patched:
 
-        def _sentry_middleware_init(self, cls, **options):
-            # type: (Any, Any, Any) -> None
+        def _sentry_middleware_init(self, cls, *args, **kwargs):
+            # type: (Any, Any, Any, Any) -> None
             if cls == SentryAsgiMiddleware:
-                return old_middleware_init(self, cls, **options)
+                return old_middleware_init(self, cls, *args, **kwargs)
 
             span_enabled_cls = _enable_span_for_middleware(cls)
-            old_middleware_init(self, span_enabled_cls, **options)
+            old_middleware_init(self, span_enabled_cls, *args, **kwargs)
 
             if cls == AuthenticationMiddleware:
                 patch_authentication_middleware(cls)
@@ -693,7 +693,11 @@ def _transaction_name_from_router(scope):
     for route in router.routes:
         match = route.matches(scope)
         if match[0] == Match.FULL:
-            return route.path
+            try:
+                return route.path
+            except AttributeError:
+                # routes added via app.host() won't have a path attribute
+                return scope.get("path")
 
     return None
 

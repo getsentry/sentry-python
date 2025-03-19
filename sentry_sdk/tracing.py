@@ -1052,7 +1052,7 @@ class Transaction(Span):
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key, value):
-        # type: (str, Any) -> None
+        # type: (str, dict[str, Any]) -> None
         """Sets a context. Transactions can have multiple contexts
         and they should follow the format described in the "Contexts Interface"
         documentation.
@@ -1287,7 +1287,7 @@ class NoOpSpan(Span):
         pass
 
     def set_context(self, key, value):
-        # type: (str, Any) -> None
+        # type: (str, dict[str, Any]) -> None
         pass
 
     def init_span_recorder(self, maxlen):
