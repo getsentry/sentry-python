@@ -820,7 +820,7 @@ def exceptions_from_error(
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
-                # parent_id=parent_id, TODO: why is this not set?
+                parent_id=parent_id,
                 source="__cause__",
                 full_stack=full_stack,
             )
@@ -845,7 +845,7 @@ def exceptions_from_error(
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
-                # parent_id=parent_id, TODO: why is this not set?
+                parent_id=parent_id,
                 source="__context__",
                 full_stack=full_stack,
             )
