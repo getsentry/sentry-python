@@ -710,6 +710,37 @@ def test_dedupe_event_processor_drop_records_client_report(
     assert lost_event_call == ("event_processor", "error", None, 1)
 
 
+def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_events):
+    # Two exceptions happen one after another. The first one is dropped in the
+    # user's before_send. The second one isn't.
+    # Originally, DedupeIntegration would drop the second exception. This test
+    # is making sure that that is no longer the case -- i.e., DedupeIntegration
+    # doesn't consider exceptions dropped in before_send.
+    count = 0
+
+    def before_send(event, hint):
+        nonlocal count
+        count += 1
+        if count == 1:
+            return None
+        return event
+
+    sentry_init(before_send=before_send)
+    events = capture_events()
+
+    exc = ValueError("aha!")
+    for _ in range(2):
+        # The first ValueError will be dropped by before_send. The second
+        # ValueError will be accepted by before_send, and should be sent to
+        # Sentry.
+        try:
+            raise exc
+        except Exception:
+            capture_exception()
+
+    assert len(events) == 1
+
+
 def test_event_processor_drop_records_client_report(
     sentry_init, capture_events, capture_record_lost_event_calls
 ):
