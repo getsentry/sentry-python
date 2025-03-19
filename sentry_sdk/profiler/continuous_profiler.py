@@ -145,32 +145,34 @@ def try_profile_lifecycle_trace_start():
 
 def start_profiler():
     # type: () -> None
-
-    # TODO: deprecate this as it'll be replaced by `start_profile_session`
-    start_profile_session()
-
-
-def start_profile_session():
-    # type: () -> None
     if _scheduler is None:
         return
 
     _scheduler.manual_start()
 
 
-def stop_profiler():
+
+def start_profile_session():
     # type: () -> None
 
-    # TODO: deprecate this as it'll be replaced by `stop_profile_session`
-    stop_profile_session()
+    # TODO: deprecate this as it'll be replaced by `start_profiler`
+    start_profiler()
 
 
-def stop_profile_session():
+def stop_profiler():
     # type: () -> None
     if _scheduler is None:
         return
 
     _scheduler.manual_stop()
+
+
+def stop_profile_session():
+    # type: () -> None
+
+    # TODO: deprecate this as it'll be replaced by `stop_profiler`
+    stop_profiler()
+
 
 
 def teardown_continuous_profiler():
