@@ -1,5 +1,49 @@
 # Changelog
 
+## 2.23.1
+
+### Various fixes & improvements
+
+- Fix import problem in release 2.23.0 (#4140) by @antonpirker
+
+## 2.23.0
+
+### Various fixes & improvements
+
+- Feat(profiling): Add new functions to start/stop continuous profiler (#4056) by @Zylphrex
+- Feat(profiling): Export start/stop profile session (#4079) by @Zylphrex
+- Feat(tracing): Backfill missing `sample_rand` on `PropagationContext` (#4038) by @szokeasaurusrex
+- Feat(logs): Add alpha version of Sentry logs (#4126) by @colin-sentry
+- Security(gha): fix potential for shell injection (#4099) by @mdtro
+- Docs: Add `init()` parameters to ApiDocs. (#4100) by @antonpirker
+- Docs: Document that caller must check `mutable` (#4010) by @szokeasaurusrex
+- Fix(Anthropic): Add partial json support to streams (#3674)
+- Fix(ASGI): Fix KeyError if transaction does not exist (#4095) by @kevinji
+- Fix(asyncio): Improve asyncio integration error handling. (#4129) by @antonpirker
+- Fix(AWS Lambda): Fix capturing errors during AWS Lambda INIT phase (#3943)
+- Fix(Bottle): Prevent internal error on 404 (#4131) by @sentrivana
+- Fix(CI): Fix API doc failure in CI (#4075) by @sentrivana
+- Fix(ClickHouse) ClickHouse in test suite (#4087) by @antonpirker
+- Fix(cloudresourcecontext): Added timeout to HTTP requests in CloudResourceContextIntegration (#4120) by @antonpirker
+- Fix(crons): Fixed bug when `cron_jobs` is set to `None` in arq integration (#4115) by @antonpirker
+- Fix(debug): Take into account parent handlers for debug logger (#4133) by @sentrivana
+- Fix(FastAPI/Starlette):  Fix middleware with positional arguments.  (#4118) by @antonpirker
+- Fix(featureflags): add LRU update/dedupe test coverage (#4082)
+- Fix(logging): Coerce None values into strings in logentry params. (#4121) by @antonpirker
+- Fix(pyspark): Grab `attemptId` more defensively (#4130) by @sentrivana
+- Fix(Quart): Support `quart_flask_patch` (#4132) by @sentrivana
+- Fix(tests): A way to locally run AWS Lambda functions (#4128) by @antonpirker
+- Fix(tests): Add concurrency testcase for arq (#4125) by @sentrivana
+- Fix(tests): Add fail_on_changes to toxgen by @sentrivana
+- Fix(tests): Run AWS Lambda tests locally (#3988) by @antonpirker
+- Fix(tests): Test relevant prereleases and allow to ignore releases
+- Fix(tracing): Move `TRANSACTION_SOURCE_*` constants to `Enum` (#3889) by @mgaligniana
+- Fix(typing): Add more typing info to Scope.update_from_kwargs's "contexts" (#4080)
+- Fix(typing): Set correct type for `set_context` everywhere (#4123) by @sentrivana
+- Chore(tests): Regenerate tox.ini (#4108) by @sentrivana
+- Build(deps): bump actions/create-github-app-token from 1.11.5 to 1.11.6 (#4113) by @dependabot
+- Build(deps): bump codecov/codecov-action from 5.3.1 to 5.4.0 (#4112) by @dependabot
+
 ## 2.22.0
 
 ### Various fixes & improvements
