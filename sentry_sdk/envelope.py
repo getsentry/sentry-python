@@ -79,7 +79,7 @@ class Envelope:
     ):
         # type: (...) -> None
         self.add_item(
-            Item(payload=PayloadRef(json=profile_chunk), type="profile_chunk")
+            Item(payload=PayloadRef(json=profile_chunk), type="profile_chunk", headers={"platform": profile_chunk.get("platform")})
         )
 
     def add_checkin(

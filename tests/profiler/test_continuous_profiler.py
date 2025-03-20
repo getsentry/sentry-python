@@ -141,6 +141,11 @@ def assert_single_transaction_with_profile_chunks(
     if max_chunks is not None:
         assert len(items["profile_chunk"]) <= max_chunks
 
+    for chunk_item in items["profile_chunk"]:
+        chunk = chunk_item.payload.json
+        headers = chunk_item.headers
+        assert chunk["platform"]==headers["platform"]
+
     transaction = items["transaction"][0].payload.json
 
     trace_context = transaction["contexts"]["trace"]
@@ -215,12 +220,12 @@ def assert_single_transaction_without_profile_chunks(envelopes):
         pytest.param(
             start_profile_session,
             stop_profile_session,
-            id="start_profile_session/stop_profile_session",
+            id="start_profile_session/stop_profile_session (deprecated)",
         ),
         pytest.param(
             start_profiler,
             stop_profiler,
-            id="start_profiler/stop_profiler (deprecated)",
+            id="start_profiler/stop_profiler",
         ),
     ],
 )
@@ -292,12 +297,12 @@ def test_continuous_profiler_auto_start_and_manual_stop(
         pytest.param(
             start_profile_session,
             stop_profile_session,
-            id="start_profile_session/stop_profile_session",
+            id="start_profile_session/stop_profile_session  (deprecated)",
         ),
         pytest.param(
             start_profiler,
             stop_profiler,
-            id="start_profiler/stop_profiler (deprecated)",
+            id="start_profiler/stop_profiler",
         ),
     ],
 )
@@ -374,12 +379,12 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
         pytest.param(
             start_profile_session,
             stop_profile_session,
-            id="start_profile_session/stop_profile_session",
+            id="start_profile_session/stop_profile_session (deprecated)",
         ),
         pytest.param(
             start_profiler,
             stop_profiler,
-            id="start_profiler/stop_profiler (deprecated)",
+            id="start_profiler/stop_profiler",
         ),
     ],
 )
@@ -544,12 +549,12 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
         pytest.param(
             start_profile_session,
             stop_profile_session,
-            id="start_profile_session/stop_profile_session",
+            id="start_profile_session/stop_profile_session (deprecated)",
         ),
         pytest.param(
             start_profiler,
             stop_profiler,
-            id="start_profiler/stop_profiler (deprecated)",
+            id="start_profiler/stop_profiler",
         ),
     ],
 )
