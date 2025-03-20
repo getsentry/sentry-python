@@ -204,6 +204,7 @@ def test_capture_request_if_available_and_send_pii_is_on(
 
     (error_event,) = events
 
+    assert len(error_event["exception"]["values"]) == 2
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
     assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
@@ -259,6 +260,8 @@ def test_do_not_capture_request_if_send_pii_is_off(
     assert len(events) == 1
 
     (error_event,) = events
+
+    assert len(error_event["exception"]["values"]) == 2
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
     assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
