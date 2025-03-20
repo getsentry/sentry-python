@@ -144,7 +144,7 @@ def assert_single_transaction_with_profile_chunks(
     for chunk_item in items["profile_chunk"]:
         chunk = chunk_item.payload.json
         headers = chunk_item.headers
-        assert chunk["platform"]==headers["platform"]
+        assert chunk["platform"] == headers["platform"]
 
     transaction = items["transaction"][0].payload.json
 
