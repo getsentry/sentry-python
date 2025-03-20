@@ -151,26 +151,12 @@ def start_profiler():
     _scheduler.manual_start()
 
 
-def start_profile_session():
-    # type: () -> None
-
-    # TODO: deprecate this as it'll be replaced by `start_profiler`
-    start_profiler()
-
-
 def stop_profiler():
     # type: () -> None
     if _scheduler is None:
         return
 
     _scheduler.manual_stop()
-
-
-def stop_profile_session():
-    # type: () -> None
-
-    # TODO: deprecate this as it'll be replaced by `stop_profiler`
-    stop_profiler()
 
 
 def teardown_continuous_profiler():
