@@ -14,12 +14,13 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 
 if TYPE_CHECKING:
     from typing import Optional
+    from contextvars import Token
     import sentry_sdk.integrations.opentelemetry.scope as scope
 
 
 class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
     def attach(self, context):
-        # type: (Context) -> object
+        # type: (Context) -> Token[Context]
         scopes = get_value(SENTRY_SCOPES_KEY, context)
 
         should_fork_isolation_scope = context.pop(

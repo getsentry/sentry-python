@@ -566,7 +566,7 @@ class _Client(BaseClient):
                 if event.get("exception"):
                     DedupeIntegration.reset_last_seen()
 
-            event = new_event
+            event = new_event  # type: Optional[Event]  # type: ignore[no-redef]
 
         before_send_transaction = self.options["before_send_transaction"]
         if (
