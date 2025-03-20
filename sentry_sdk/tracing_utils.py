@@ -5,7 +5,7 @@ import re
 import sys
 from collections.abc import Mapping
 from datetime import timedelta
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, Context, Decimal
 from functools import wraps
 from random import Random
 from urllib.parse import quote, unquote
@@ -871,7 +871,11 @@ def _generate_sample_rand(
         sample_rand = rng.uniform(lower, upper)
 
     # Round down to exactly six decimal-digit precision.
-    return Decimal(sample_rand).quantize(Decimal("0.000001"), rounding=ROUND_DOWN)
+    # Setting the context is needed to avoid an InvalidOperation exception
+    # in case the user has changed the default precision.
+    return Decimal(sample_rand).quantize(
+        Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
+    )
 
 
 def _sample_rand_range(parent_sampled, sample_rate):
