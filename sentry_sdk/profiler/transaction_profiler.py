@@ -266,6 +266,7 @@ class Profile:
 
         options = client.options
 
+        sample_rate = None
         if callable(options.get("profiles_sampler")):
             sample_rate = options["profiles_sampler"](sampling_context)
         elif options["profiles_sample_rate"] is not None:
