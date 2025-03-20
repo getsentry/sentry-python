@@ -270,8 +270,6 @@ class Profile:
             sample_rate = options["profiles_sampler"](sampling_context)
         elif options["profiles_sample_rate"] is not None:
             sample_rate = options["profiles_sample_rate"]
-        else:
-            sample_rate = options["_experiments"].get("profiles_sample_rate")
 
         # The profiles_sample_rate option was not set, so profiling
         # was never enabled.
