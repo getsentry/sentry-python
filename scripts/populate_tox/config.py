@@ -93,6 +93,15 @@ TEST_SUITE_CONFIG = {
     "requests": {
         "package": "requests",
     },
+    "sanic": {
+        "package": "sanic",
+        "python": ">=3.6",
+        "deps": {
+            "*": ["websockets<11.0", "aiohttp"],
+            ">=24.6": ["sanic_testing"],
+            "py3.6": ["aiocontextvars==0.2.1"],
+        },
+    },
     "spark": {
         "package": "pyspark",
         "python": ">=3.8",

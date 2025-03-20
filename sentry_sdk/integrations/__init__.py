@@ -149,7 +149,7 @@ _MIN_VERSIONS = {
     "ray": (2, 7, 0),
     "requests": (2, 0, 0),
     "rq": (0, 6),
-    "sanic": (0, 8),
+    "sanic": (20, 3, 0),
     "sqlalchemy": (1, 2),
     "starlette": (0, 16),
     "starlite": (1, 48),
