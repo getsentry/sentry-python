@@ -98,7 +98,7 @@ TEST_SUITE_CONFIG = {
         "python": ">=3.6",
         "deps": {
             "*": ["websockets<11.0", "aiohttp"],
-            ">=22.0": ["sanic_testing"],
+            ">=21.3.0": ["sanic_testing"],
             "py3.6": ["aiocontextvars==0.2.1"],
         },
     },
