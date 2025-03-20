@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 import uuid
+import warnings
 from collections import deque
 from datetime import datetime, timezone
 
@@ -154,7 +155,11 @@ def start_profiler():
 def start_profile_session():
     # type: () -> None
 
-    # TODO: deprecate this as it'll be replaced by `start_profiler`
+    warnings.warn(
+        "The `start_profile_session` function is deprecated. Please use `start_profile` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     start_profiler()
 
 
@@ -169,7 +174,11 @@ def stop_profiler():
 def stop_profile_session():
     # type: () -> None
 
-    # TODO: deprecate this as it'll be replaced by `stop_profiler`
+    warnings.warn(
+        "The `stop_profile_session` function is deprecated. Please use `stop_profile` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     stop_profiler()
 
 
