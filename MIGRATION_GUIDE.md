@@ -14,6 +14,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - You can no longer change the sampled status of a span with `span.sampled = False` after starting it.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
+- `Span.finish()` no longer returns the `event_id` if the event is sent to sentry.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
 - A `Profile` object does not have a `.hub` property anymore.
 - `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
@@ -146,6 +147,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.
 - `PropagationContext` constructor no longer takes a `dynamic_sampling_context` but takes a `baggage` object instead.
 - `ThreadingIntegration` no longer takes the `propagate_hub` argument.
+- `Baggage.populate_from_transaction` has been removed.
 
 ### Deprecated
 

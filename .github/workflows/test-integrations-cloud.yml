@@ -31,6 +31,10 @@ jobs:
       matrix:
         python-version: ["3.8","3.11","3.12","3.13"]
         os: [ubuntu-22.04]
+    services:
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
@@ -43,6 +47,11 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test aws_lambda latest
+        if: ${{ !cancelled() }}
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda-latest"
       - name: Test boto3 latest
         if: ${{ !cancelled() }}
         run: |
@@ -70,7 +79,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -91,8 +100,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7","3.9","3.11","3.12","3.13"]
+        python-version: ["3.7","3.8","3.9","3.11","3.12","3.13"]
         os: [ubuntu-22.04]
+    services:
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
@@ -105,6 +118,11 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test aws_lambda pinned
+        if: ${{ !cancelled() }}
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda"
       - name: Test boto3 pinned
         if: ${{ !cancelled() }}
         run: |
@@ -132,7 +150,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

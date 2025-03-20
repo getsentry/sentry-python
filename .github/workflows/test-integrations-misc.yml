@@ -22,87 +22,6 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-misc-latest:
-    name: Misc (latest)
-    timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.8","3.12","3.13"]
-        os: [ubuntu-22.04]
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-      - name: Setup Test Env
-        run: |
-          pip install "coverage[toml]" tox
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test launchdarkly latest
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-launchdarkly-latest"
-      - name: Test loguru latest
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru-latest"
-      - name: Test openfeature latest
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openfeature-latest"
-      - name: Test opentelemetry latest
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry-latest"
-      - name: Test potel latest
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-potel-latest"
-      - name: Test pure_eval latest
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval-latest"
-      - name: Test trytond latest
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest"
-      - name: Test typer latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-typer-latest"
-      - name: Generate coverage XML
-        if: ${{ !cancelled() }}
-        run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugin: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
-          verbose: true
   test-misc-pinned:
     name: Misc (pinned)
     timeout-minutes: 30
@@ -124,21 +43,11 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test launchdarkly pinned
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-launchdarkly"
       - name: Test loguru pinned
         if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru"
-      - name: Test openfeature pinned
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openfeature"
       - name: Test opentelemetry pinned
         if: ${{ !cancelled() }}
         run: |
@@ -160,6 +69,7 @@ jobs:
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond"
       - name: Test typer pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-typer"
@@ -170,7 +80,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

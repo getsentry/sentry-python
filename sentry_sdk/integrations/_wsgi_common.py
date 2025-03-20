@@ -140,8 +140,15 @@ class RequestExtractor:
 
     def parsed_body(self):
         # type: () -> Optional[Dict[str, Any]]
-        form = self.form()
-        files = self.files()
+        try:
+            form = self.form()
+        except Exception:
+            form = None
+        try:
+            files = self.files()
+        except Exception:
+            files = None
+
         if form or files:
             data = {}
             if form:

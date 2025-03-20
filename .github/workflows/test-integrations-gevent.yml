@@ -1,0 +1,82 @@
+# Do not edit this YAML file. This file is generated automatically by executing
+# python scripts/split_tox_gh_actions/split_tox_gh_actions.py
+# The template responsible for it is in
+# scripts/split_tox_gh_actions/templates/base.jinja
+name: Test Gevent
+on:
+  push:
+    branches:
+      - master
+      - release/**
+      - potel-base
+  pull_request:
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  BUILD_CACHE_KEY: ${{ github.sha }}
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dist-serverless
+jobs:
+  test-gevent-pinned:
+    name: Gevent (pinned)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8","3.10","3.11","3.12"]
+        os: [ubuntu-22.04]
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+      - name: Setup Test Env
+        run: |
+          pip install "coverage[toml]" tox
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test gevent pinned
+        if: ${{ !cancelled() }}
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent"
+      - name: Generate coverage XML
+        if: ${{ !cancelled() }}
+        run: |
+          coverage combine .coverage-sentry-*
+          coverage xml
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5.4.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugin: noop
+          verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
+          verbose: true
+  check_required_tests:
+    name: All pinned Gevent tests passed
+    needs: test-gevent-pinned
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check for failures
+        if: contains(needs.test-gevent-pinned.result, 'failure') || contains(needs.test-gevent-pinned.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

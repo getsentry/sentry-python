@@ -12,13 +12,11 @@ from itertools import chain
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
-from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
-    normalize_incoming_data,
     PropagationContext,
 )
 from sentry_sdk.tracing import (
@@ -26,8 +24,6 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
     NoOpSpan,
     Span,
-    POTelSpan,
-    Transaction,
 )
 from sentry_sdk.utils import (
     capture_internal_exception,
@@ -57,6 +53,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import TypeVar
     from typing import Union
+    from typing import Self
 
     from typing_extensions import Unpack
 
@@ -69,7 +66,6 @@ if TYPE_CHECKING:
         ExcInfo,
         Hint,
         LogLevelStr,
-        SamplingContext,
         Type,
     )
 
@@ -196,12 +192,12 @@ class Scope:
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
     def __copy__(self):
-        # type: () -> Scope
+        # type: () -> Self
         """
         Returns a copy of this scope.
         This also creates a copy of all referenced data structures.
         """
-        rv = object.__new__(self.__class__)  # type: Scope
+        rv = object.__new__(self.__class__)  # type: Self
 
         rv._type = self._type
         rv.client = self.client
@@ -335,7 +331,7 @@ class Scope:
         return cls.get_isolation_scope()._last_event_id
 
     def _merge_scopes(self, additional_scope=None, additional_scope_kwargs=None):
-        # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
+        # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Self
         """
         Merges global, isolation and current scope into a new scope and
         adds the given additional scope or additional scope kwargs to it.
@@ -421,7 +417,7 @@ class Scope:
         self.client = client if client is not None else NonRecordingClient()
 
     def fork(self):
-        # type: () -> Scope
+        # type: () -> Self
         """
         .. versionadded:: 2.0.0
 
@@ -677,7 +673,7 @@ class Scope:
         self.clear_breadcrumbs()
         self._should_capture = True  # type: bool
 
-        self._span = None  # type: Optional[POTelSpan]
+        self._span = None  # type: Optional[Span]
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
 
@@ -707,7 +703,7 @@ class Scope:
     @property
     def transaction(self):
         # type: () -> Any
-        # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
+        # would be type: () -> Optional[Span], see https://github.com/python/mypy/issues/3004
         """Return the transaction (root span) in the scope, if any."""
 
         # there is no span/transaction on the scope
@@ -734,7 +730,7 @@ class Scope:
         # anything set in the scope.
         # XXX: note that with the introduction of the Scope.transaction getter,
         # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a Transaction, the setter sets a transaction name.
+        # getter returns a Span, the setter sets a transaction name.
         # Without breaking version compatibility, we could make the setter set a
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
@@ -785,13 +781,13 @@ class Scope:
 
     @property
     def span(self):
-        # type: () -> Optional[POTelSpan]
+        # type: () -> Optional[Span]
         """Get current tracing span."""
         return self._span
 
     @span.setter
     def span(self, span):
-        # type: (Optional[POTelSpan]) -> None
+        # type: (Optional[Span]) -> None
         """Set current tracing span."""
         self._span = span
 
@@ -951,70 +947,20 @@ class Scope:
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
 
-    def start_transaction(self, transaction=None, **kwargs):
-        # type: (Optional[Transaction], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+    def start_transaction(self, **kwargs):
+        # type: (Unpack[TransactionKwargs]) -> Union[NoOpSpan, Span]
         """
-        Start and return a transaction.
-
-        Start an existing transaction if given, otherwise create and start a new
-        transaction with kwargs.
-
-        This is the entry point to manual tracing instrumentation.
-
-        A tree structure can be built by adding child spans to the transaction,
-        and child spans to other spans. To start a new child span within the
-        transaction or any span, call the respective `.start_child()` method.
-
-        Every child span must be finished before the transaction is finished,
-        otherwise the unfinished spans are discarded.
-
-        When used as context managers, spans and transactions are automatically
-        finished at the end of the `with` block. If not using context managers,
-        call the `.finish()` method.
-
-        When the transaction is finished, it will be sent to Sentry with all its
-        finished child spans.
-
-        :param transaction: The transaction to start. If omitted, we create and
-            start a new transaction.
-        :param kwargs: Optional keyword arguments to be passed to the Transaction
-            constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
-            available arguments.
+        .. deprecated:: 3.0.0
+            This function is deprecated and will be removed in a future release.
+            Use :py:meth:`sentry_sdk.start_span` instead.
         """
-        kwargs.setdefault("scope", self)
-
-        client = self.get_client()
-
-        try_autostart_continuous_profiler()
-
-        # if we haven't been given a transaction, make one
-        transaction = Transaction(**kwargs)
-
-        # use traces_sample_rate, traces_sampler, and/or inheritance to make a
-        # sampling decision
-        sampling_context = {
-            "transaction_context": transaction.to_json(),
-            "parent_sampled": transaction.parent_sampled,
-        }
-        transaction._set_initial_sampling_decision(sampling_context=sampling_context)
-
-        if transaction.sampled:
-            profile = Profile(
-                transaction.sampled, transaction._start_timestamp_monotonic_ns
-            )
-            profile._set_initial_sampling_decision(sampling_context=sampling_context)
-
-            transaction._profile = profile
-
-            # we don't bother to keep spans if we already know we're not going to
-            # send the transaction
-            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
-
-        return transaction
+        logger.warning(
+            "The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`"
+        )
+        return NoOpSpan(**kwargs)
 
     def start_span(self, **kwargs):
-        # type: (Optional[Span], Any) -> Span
+        # type: (Any) -> Union[NoOpSpan, Span]
         """
         Start a span whose parent is the currently active span, if any.
 
@@ -1024,51 +970,16 @@ class Scope:
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        if kwargs.get("description") is not None:
-            warnings.warn(
-                "The `description` parameter is deprecated. Please use `name` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        return NoOpSpan(**kwargs)
 
-        with new_scope():
-            kwargs.setdefault("scope", self)
-
-            # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
-
-            if span is None:
-                # New spans get the `trace_id` from the scope
-                if "trace_id" not in kwargs:
-                    propagation_context = self.get_active_propagation_context()
-                    if propagation_context is not None:
-                        kwargs["trace_id"] = propagation_context.trace_id
-
-                span = Span(**kwargs)
-            else:
-                # Children take `trace_id`` from the parent span.
-                span = span.start_child(**kwargs)
-
-            return span
-
-    def continue_trace(
-        self, environ_or_headers, op=None, name=None, source=None, origin=None
-    ):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], Optional[str]) -> Transaction
+    @contextmanager
+    def continue_trace(self, environ_or_headers):
+        # type: (Dict[str, Any]) -> Generator[None, None, None]
         """
-        Sets the propagation context from environment or headers and returns a transaction.
+        Sets the propagation context from environment or headers to continue an incoming trace.
         """
         self.generate_propagation_context(environ_or_headers)
-
-        transaction = Transaction.continue_from_headers(
-            normalize_incoming_data(environ_or_headers),
-            op=op,
-            origin=origin,
-            name=name,
-            source=source,
-        )
-
-        return transaction
+        yield
 
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
@@ -1381,7 +1292,7 @@ class Scope:
             )
 
             for event_processor in event_processors:
-                new_event = event
+                new_event = event  # type: Optional[Event]
                 with capture_internal_exceptions():
                     new_event = event_processor(event, hint)
                 if new_event is None:
@@ -1486,7 +1397,7 @@ class Scope:
         user=None,  # type: Optional[Any]
         level=None,  # type: Optional[LogLevelStr]
         extras=None,  # type: Optional[Dict[str, Any]]
-        contexts=None,  # type: Optional[Dict[str, Any]]
+        contexts=None,  # type: Optional[Dict[str, Dict[str, Any]]]
         tags=None,  # type: Optional[Dict[str, str]]
         fingerprint=None,  # type: Optional[List[str]]
     ):

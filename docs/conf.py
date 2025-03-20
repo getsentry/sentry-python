@@ -13,6 +13,8 @@ import sphinx.domains.cpp  # noqa: F401
 import sphinx.ext.autodoc  # noqa: F401
 import sphinx.ext.intersphinx  # noqa: F401
 import urllib3.exceptions  # noqa: F401
+import importlib_metadata  # noqa: F401
+import opentelemetry.sdk.metrics._internal  # noqa: F401
 
 typing.TYPE_CHECKING = True
 
@@ -31,7 +33,7 @@ project = "sentry-python"
 copyright = "2019-{}, Sentry Team and Contributors".format(datetime.now().year)
 author = "Sentry Team and Contributors"
 
-release = "2.20.0"
+release = "2.23.1"
 version = ".".join(release.split(".")[:2])  # The short X.Y version.
 
 

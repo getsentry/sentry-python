@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.9","3.11","3.12","3.13"]
+        python-version: ["3.9","3.12","3.13"]
         os: [ubuntu-22.04]
     steps:
       - uses: actions/checkout@v4.2.2
@@ -43,11 +43,6 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test gevent latest
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest"
       - name: Test grpc latest
         if: ${{ !cancelled() }}
         run: |
@@ -70,7 +65,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -105,11 +100,6 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test gevent pinned
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent"
       - name: Test grpc pinned
         if: ${{ !cancelled() }}
         run: |
@@ -132,7 +122,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

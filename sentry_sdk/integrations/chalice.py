@@ -4,7 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -67,7 +67,7 @@ def _get_view_function_response(app, view_function, function_args):
                 configured_time = app.lambda_context.get_remaining_time_in_millis()
                 scope.set_transaction_name(
                     app.lambda_context.function_name,
-                    source=TRANSACTION_SOURCE_COMPONENT,
+                    source=TransactionSource.COMPONENT,
                 )
 
                 scope.add_event_processor(

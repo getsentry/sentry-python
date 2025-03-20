@@ -3,10 +3,11 @@ from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
-from sentry_sdk.tracing import POTelSpan, Transaction, trace
+from sentry_sdk.tracing import trace
 from sentry_sdk.crons import monitor
 
 # TODO-neel-potel make 2 scope strategies/impls and switch
+from sentry_sdk.scope import Scope as BaseScope
 from sentry_sdk.integrations.opentelemetry.scope import (
     PotelScope as Scope,
     new_scope,
@@ -123,7 +124,7 @@ def is_initialized():
 
 @scopemethod
 def get_global_scope():
-    # type: () -> Scope
+    # type: () -> BaseScope
     return Scope.get_global_scope()
 
 
@@ -239,7 +240,7 @@ def flush(
 
 
 def start_span(**kwargs):
-    # type: (type.Any) -> POTelSpan
+    # type: (Any) -> Span
     """
     Start and return a span.
 
@@ -256,10 +257,10 @@ def start_span(**kwargs):
 
 
 def start_transaction(
-    transaction=None,  # type: Optional[Transaction]
+    transaction=None,  # type: Optional[Span]
     **kwargs,  # type: Unpack[TransactionKwargs]
 ):
-    # type: (...) -> POTelSpan
+    # type: (...) -> Span
     """
     .. deprecated:: 3.0.0
         This function is deprecated and will be removed in a future release.

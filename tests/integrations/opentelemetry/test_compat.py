@@ -19,7 +19,7 @@ def test_transaction_name_span_description_compat(
         ) as spn:
             ...
 
-    assert trx.__class__.__name__ == "POTelSpan"
+    assert trx.__class__.__name__ == "Span"
     assert trx.op == "trx-op"
     assert trx.name == "trx-name"
     assert trx.description is None
@@ -30,7 +30,7 @@ def test_transaction_name_span_description_compat(
     assert trx._otel_span.attributes["sentry.name"] == "trx-name"
     assert "sentry.description" not in trx._otel_span.attributes
 
-    assert spn.__class__.__name__ == "POTelSpan"
+    assert spn.__class__.__name__ == "Span"
     assert spn.op == "span-op"
     assert spn.description == "span-desc"
     assert spn.name == "span-desc"

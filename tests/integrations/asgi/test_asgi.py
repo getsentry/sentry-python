@@ -3,6 +3,7 @@ from collections import Counter
 import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.integrations._asgi_common import _get_ip, _get_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 
@@ -129,7 +130,9 @@ def asgi3_ws_app():
 @pytest.fixture
 def asgi3_custom_transaction_app():
     async def app(scope, receive, send):
-        sentry_sdk.get_current_scope().set_transaction_name("foobar", source="custom")
+        sentry_sdk.get_current_scope().set_transaction_name(
+            "foobar", source=TransactionSource.CUSTOM
+        )
         await send(
             {
                 "type": "http.response.start",

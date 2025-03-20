@@ -1,6 +1,6 @@
-import random
 from http.client import HTTPConnection, HTTPSConnection
 from socket import SocketIO
+from urllib.error import HTTPError
 from urllib.request import urlopen
 from unittest import mock
 
@@ -60,6 +60,45 @@ def test_crumb_capture(sentry_init, capture_events):
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, "info"),
+        (301, "info"),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
+    sentry_init(integrations=[StdlibIntegration()])
+    events = capture_events()
+
+    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
+    try:
+        urlopen(url)
+    except HTTPError:
+        pass
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["level"] == level
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: status_code,
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
         }
@@ -162,14 +201,14 @@ def test_outgoing_trace_headers(
     envelopes = capture_envelopes()
     request_headers = capture_request_headers()
 
-    headers = {}
-    headers["sentry-trace"] = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
-    headers["baggage"] = (
-        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
-        "sentry-sampled=true, sentry-sample_rate=0.01337, "
-        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
-    )
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+        "baggage": (
+            "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+            "sentry-user_id=Am%C3%A9lie, sentry-sample_rand=0.132521102938283, other-vendor-value-2=foo;bar;"
+        ),
+    }
 
     with isolation_scope():
         with continue_trace(headers):
@@ -192,30 +231,28 @@ def test_outgoing_trace_headers(
     expected_outgoing_baggage = (
         "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
         "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-        "sentry-sampled=true,"
-        "sentry-sample_rate=0.01337,"
-        "sentry-user_id=Am%C3%A9lie"
+        "sentry-sample_rate=1.0,"
+        "sentry-user_id=Am%C3%A9lie,"
+        "sentry-sample_rand=0.132521102938283"
     )
 
     assert request_headers["baggage"] == SortedBaggage(expected_outgoing_baggage)
 
 
 def test_outgoing_trace_headers_head_sdk(
-    sentry_init, monkeypatch, capture_request_headers, capture_envelopes
+    sentry_init, capture_request_headers, capture_envelopes
 ):
-    # make sure transaction is always sampled
-    monkeypatch.setattr(random, "random", lambda: 0.1)
-
     sentry_init(traces_sample_rate=0.5, release="foo")
     envelopes = capture_envelopes()
     request_headers = capture_request_headers()
 
-    with isolation_scope():
-        with continue_trace({}):
-            with start_span(name="Head SDK tx") as root_span:
-                conn = HTTPConnection("localhost", PORT)
-                conn.request("GET", "/top-chasers")
-                conn.getresponse()
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
+        with isolation_scope():
+            with continue_trace({}):
+                with start_span(name="Head SDK tx") as root_span:
+                    conn = HTTPConnection("localhost", PORT)
+                    conn.request("GET", "/top-chasers")
+                    conn.getresponse()
 
     (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
@@ -230,6 +267,7 @@ def test_outgoing_trace_headers_head_sdk(
 
     expected_outgoing_baggage = (
         f"sentry-trace_id={root_span.trace_id},"  # noqa: E231
+        "sentry-sample_rand=0.250000,"
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-sample_rate=0.5,"
@@ -371,4 +409,6 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     span = transaction["spans"][0]
     assert span["op"] == "http.client"
-    assert span["description"] == f"GET http://localhost:{PORT}/top-chasers"  # noqa: E231
+    assert (
+        span["description"] == f"GET http://localhost:{PORT}/top-chasers"  # noqa: E231
+    )

@@ -4,7 +4,7 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     event_from_exception,
     logger,
@@ -63,14 +63,14 @@ def _patch_ray_remote():
             root_span_name = qualname_from_function(f) or DEFAULT_TRANSACTION_NAME
             sentry_sdk.get_current_scope().set_transaction_name(
                 root_span_name,
-                source=TRANSACTION_SOURCE_TASK,
+                source=TransactionSource.TASK,
             )
             with sentry_sdk.continue_trace(_tracing or {}):
                 with sentry_sdk.start_span(
                     op=OP.QUEUE_TASK_RAY,
                     name=root_span_name,
                     origin=RayIntegration.origin,
-                    source=TRANSACTION_SOURCE_TASK,
+                    source=TransactionSource.TASK,
                 ) as root_span:
                     try:
                         result = f(*f_args, **f_kwargs)

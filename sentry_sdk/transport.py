@@ -23,15 +23,13 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, List, Dict
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import DefaultDict
     from typing import Iterable
-    from typing import List
     from typing import Mapping
     from typing import Optional
     from typing import Self
@@ -179,6 +177,7 @@ def _parse_rate_limits(header, now=None):
 
             retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
+                category = cast("Optional[EventDataCategory]", category)
                 yield category, retry_after
         except (LookupError, ValueError):
             continue
@@ -266,7 +265,9 @@ class BaseHttpTransport(Transport):
                 event = item.get_transaction_event() or {}
 
                 # +1 for the transaction itself
-                span_count = len(event.get("spans") or []) + 1
+                span_count = (
+                    len(cast(List[Dict[str, object]], event.get("spans") or [])) + 1
+                )
                 self.record_lost_event(reason, "span", quantity=span_count)
 
             elif data_category == "attachment":
@@ -676,7 +677,7 @@ class HttpTransport(BaseHttpTransport):
 
 try:
     import httpcore
-    import h2  # type: ignore # noqa: F401
+    import h2  # noqa: F401
 except ImportError:
     # Sorry, no Http2Transport for you
     class Http2Transport(HttpTransport):
