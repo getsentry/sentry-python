@@ -22,7 +22,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - `sentry_sdk.init` now returns `None` instead of a context manager.
 - The `sampling_context` argument of `traces_sampler` and `profiles_sampler` now additionally contains all span attributes known at span start.
-- We updated how we handle `ExceptionGroup`s. You will now get more data if ExceptionGroups are appearing in chained exceptions.
+- We updated how we handle `ExceptionGroup`s. You will now get more data if ExceptionGroups are appearing in chained exceptions. It could happen that after updating the SDK the grouping of issues change because of this. So eventually you will see the same exception in two Sentry issues (one from before the update, one from after the update)
 - The integration-specific content of the `sampling_context` argument of `traces_sampler` and `profiles_sampler` now looks different.
   - The Celery integration doesn't add the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
 
