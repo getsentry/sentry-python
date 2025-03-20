@@ -210,12 +210,13 @@ def patch_create_worker():
         if isinstance(settings_cls, dict):
             if "functions" in settings_cls:
                 settings_cls["functions"] = [
-                    _get_arq_function(func) for func in settings_cls["functions"]
+                    _get_arq_function(func)
+                    for func in settings_cls.get("functions", [])
                 ]
             if "cron_jobs" in settings_cls:
                 settings_cls["cron_jobs"] = [
                     _get_arq_cron_job(cron_job)
-                    for cron_job in settings_cls["cron_jobs"]
+                    for cron_job in settings_cls.get("cron_jobs", [])
                 ]
 
         if hasattr(settings_cls, "functions"):
@@ -229,11 +230,11 @@ def patch_create_worker():
 
         if "functions" in kwargs:
             kwargs["functions"] = [
-                _get_arq_function(func) for func in kwargs["functions"]
+                _get_arq_function(func) for func in kwargs.get("functions", [])
             ]
         if "cron_jobs" in kwargs:
             kwargs["cron_jobs"] = [
-                _get_arq_cron_job(cron_job) for cron_job in kwargs["cron_jobs"]
+                _get_arq_cron_job(cron_job) for cron_job in kwargs.get("cron_jobs", [])
             ]
 
         return old_create_worker(*args, **kwargs)
