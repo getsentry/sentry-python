@@ -20,7 +20,6 @@ from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.utils import (
     _serialize_span_attribute,
     get_current_thread_meta,
-    logger,
     should_be_treated_as_error,
 )
 

@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME
 
 
 @pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
@@ -40,16 +40,20 @@ def test_transaction_uses_incoming_sample_rand(
     """
     Test that the transaction uses the sample_rand value from the incoming baggage.
     """
-    baggage = Baggage(sentry_items={"sample_rand": f"{sample_rand:.6f}"})  # noqa: E231
-
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
-    with sentry_sdk.start_span(baggage=baggage) as root_span:
-        assert (
-            root_span.get_baggage().sentry_items["sample_rand"]
-            == f"{sample_rand:.6f}"  # noqa: E231
-        )
+    baggage = f"sentry-sample_rand={sample_rand:.6f},sentry-trace_id=771a43a4192642f0b136d5159a501700"  # noqa: E231
+    sentry_trace = "771a43a4192642f0b136d5159a501700-1234567890abcdef"
+
+    with sentry_sdk.continue_trace(
+        {BAGGAGE_HEADER_NAME: baggage, SENTRY_TRACE_HEADER_NAME: sentry_trace}
+    ):
+        with sentry_sdk.start_span() as root_span:
+            assert (
+                root_span.get_baggage().sentry_items["sample_rand"]
+                == f"{sample_rand:.6f}"  # noqa: E231
+            )
 
     # Transaction event captured if sample_rand < sample_rate, indicating that
     # sample_rand is used to make the sampling decision.
