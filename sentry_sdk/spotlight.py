@@ -86,6 +86,7 @@ try:
         def __init__(self, get_response):
             # type: (Self, Callable[..., HttpResponse]) -> None
             super().__init__(get_response)
+            _spotlight_script = None
 
             import sentry_sdk.api
 
