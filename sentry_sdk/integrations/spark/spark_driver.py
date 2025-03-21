@@ -31,9 +31,13 @@ def _set_app_properties():
 
     spark_context = SparkContext._active_spark_context
     if spark_context:
-        spark_context.setLocalProperty("sentry_app_name", spark_context.appName)
         spark_context.setLocalProperty(
-            "sentry_application_id", spark_context.applicationId
+            "sentry_app_name",
+            spark_context.appName,
+        )
+        spark_context.setLocalProperty(
+            "sentry_application_id",
+            spark_context.applicationId,
         )
 
 
@@ -231,12 +235,14 @@ class SentryListener(SparkListener):
         data=None,  # type: Optional[dict[str, Any]]
     ):
         # type: (...) -> None
-        sentry_sdk.get_global_scope().add_breadcrumb(
+        sentry_sdk.get_isolation_scope().add_breadcrumb(
             level=level, message=message, data=data
         )
 
     def onJobStart(self, jobStart):  # noqa: N802,N803
         # type: (Any) -> None
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+
         message = "Job {} Started".format(jobStart.jobId())
         self._add_breadcrumb(level="info", message=message)
         _set_app_properties()

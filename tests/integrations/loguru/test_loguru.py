@@ -8,18 +8,18 @@ logger.remove(0)  # don't print to console
 
 
 @pytest.mark.parametrize(
-    "level,created_event",
+    "level,created_event,expected_sentry_level",
     [
         # None - no breadcrumb
         # False - no event
         # True - event created
-        (LoggingLevels.TRACE, None),
-        (LoggingLevels.DEBUG, None),
-        (LoggingLevels.INFO, False),
-        (LoggingLevels.SUCCESS, False),
-        (LoggingLevels.WARNING, False),
-        (LoggingLevels.ERROR, True),
-        (LoggingLevels.CRITICAL, True),
+        (LoggingLevels.TRACE, None, "debug"),
+        (LoggingLevels.DEBUG, None, "debug"),
+        (LoggingLevels.INFO, False, "info"),
+        (LoggingLevels.SUCCESS, False, "info"),
+        (LoggingLevels.WARNING, False, "warning"),
+        (LoggingLevels.ERROR, True, "error"),
+        (LoggingLevels.CRITICAL, True, "critical"),
     ],
 )
 @pytest.mark.parametrize("disable_breadcrumbs", [True, False])
@@ -29,6 +29,7 @@ def test_just_log(
     capture_events,
     level,
     created_event,
+    expected_sentry_level,
     disable_breadcrumbs,
     disable_events,
 ):
@@ -48,7 +49,7 @@ def test_just_log(
     formatted_message = (
         " | "
         + "{:9}".format(level.name.upper())
-        + "| tests.integrations.loguru.test_loguru:test_just_log:46 - test"
+        + "| tests.integrations.loguru.test_loguru:test_just_log:47 - test"
     )
 
     if not created_event:
@@ -59,7 +60,7 @@ def test_just_log(
             not disable_breadcrumbs and created_event is not None
         ):  # not None == not TRACE or DEBUG level
             (breadcrumb,) = breadcrumbs
-            assert breadcrumb["level"] == level.name.lower()
+            assert breadcrumb["level"] == expected_sentry_level
             assert breadcrumb["category"] == "tests.integrations.loguru.test_loguru"
             assert breadcrumb["message"][23:] == formatted_message
         else:
@@ -72,7 +73,7 @@ def test_just_log(
         return
 
     (event,) = events
-    assert event["level"] == (level.name.lower())
+    assert event["level"] == expected_sentry_level
     assert event["logger"] == "tests.integrations.loguru.test_loguru"
     assert event["logentry"]["message"][23:] == formatted_message
 
