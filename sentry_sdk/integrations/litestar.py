@@ -1,10 +1,15 @@
+from collections.abc import Set
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import (
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    DidNotEnable,
+    Integration,
+)
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import TransactionSource, SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -17,6 +22,7 @@ try:
     from litestar.middleware import DefineMiddleware  # type: ignore
     from litestar.routes.http import HTTPRoute  # type: ignore
     from litestar.data_extractors import ConnectionDataExtractor  # type: ignore
+    from litestar.exceptions import HTTPException  # type: ignore
 except ImportError:
     raise DidNotEnable("Litestar is not installed")
 
@@ -44,6 +50,12 @@ _DEFAULT_TRANSACTION_NAME = "generic Litestar request"
 class LitestarIntegration(Integration):
     identifier = "litestar"
     origin = f"auto.http.{identifier}"
+
+    def __init__(
+        self,
+        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
+    ) -> None:
+        self.failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
     def setup_once():
@@ -237,7 +249,7 @@ def patch_http_route_handle():
 
             if not tx_name:
                 tx_name = _DEFAULT_TRANSACTION_NAME
-                tx_info = {"source": TRANSACTION_SOURCE_ROUTE}
+                tx_info = {"source": TransactionSource.ROUTE}
 
             event.update(
                 {
@@ -276,6 +288,14 @@ def exception_handler(exc, scope):
     if user_info and isinstance(user_info, dict):
         sentry_scope = sentry_sdk.get_isolation_scope()
         sentry_scope.set_user(user_info)
+
+    if isinstance(exc, HTTPException):
+        integration = sentry_sdk.get_client().get_integration(LitestarIntegration)
+        if (
+            integration is not None
+            and exc.status_code not in integration.failed_request_status_codes
+        ):
+            return
 
     event, hint = event_from_exception(
         exc,

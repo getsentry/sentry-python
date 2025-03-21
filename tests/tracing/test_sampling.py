@@ -7,6 +7,7 @@ import pytest
 import sentry_sdk
 from sentry_sdk import start_span, start_transaction, capture_exception
 from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import logger
 
 
@@ -73,9 +74,9 @@ def test_uses_traces_sample_rate_correctly(
 ):
     sentry_init(traces_sample_rate=traces_sample_rate)
 
-    with mock.patch.object(random, "random", return_value=0.5):
-        transaction = start_transaction(name="dogpark")
-        assert transaction.sampled is expected_decision
+    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
+    transaction = start_transaction(name="dogpark", baggage=baggage)
+    assert transaction.sampled is expected_decision
 
 
 @pytest.mark.parametrize(
@@ -89,9 +90,9 @@ def test_uses_traces_sampler_return_value_correctly(
 ):
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
-    with mock.patch.object(random, "random", return_value=0.5):
-        transaction = start_transaction(name="dogpark")
-        assert transaction.sampled is expected_decision
+    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
+    transaction = start_transaction(name="dogpark", baggage=baggage)
+    assert transaction.sampled is expected_decision
 
 
 @pytest.mark.parametrize("traces_sampler_return_value", [True, False])
@@ -198,20 +199,19 @@ def test_passes_parent_sampling_decision_in_sampling_context(
     transaction = Transaction.continue_from_headers(
         headers={"sentry-trace": sentry_trace_header}, name="dogpark"
     )
-    spy = mock.Mock(wraps=transaction)
-    start_transaction(transaction=spy)
 
-    # there's only one call (so index at 0) and kwargs are always last in a call
-    # tuple (so index at -1)
-    sampling_context = spy._set_initial_sampling_decision.mock_calls[0][-1][
-        "sampling_context"
-    ]
-    assert "parent_sampled" in sampling_context
-    # because we passed in a spy, attribute access requires unwrapping
-    assert sampling_context["parent_sampled"]._mock_wraps is parent_sampling_decision
+    def mock_set_initial_sampling_decision(_, sampling_context):
+        assert "parent_sampled" in sampling_context
+        assert sampling_context["parent_sampled"] is parent_sampling_decision
+
+    with mock.patch(
+        "sentry_sdk.tracing.Transaction._set_initial_sampling_decision",
+        mock_set_initial_sampling_decision,
+    ):
+        start_transaction(transaction=transaction)
 
 
-def test_passes_custom_samling_context_from_start_transaction_to_traces_sampler(
+def test_passes_custom_sampling_context_from_start_transaction_to_traces_sampler(
     sentry_init, DictionaryContaining  # noqa: N803
 ):
     traces_sampler = mock.Mock()

@@ -1,14 +1,19 @@
+import json
 import os
+import time
 import uuid
 import random
 import socket
+import logging
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
-from typing import cast, overload
+from typing import TYPE_CHECKING, List, Dict, cast, overload
+import warnings
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
+    AnnotatedValue,
     ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
@@ -32,6 +37,7 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -44,19 +50,16 @@ from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import Optional
     from typing import Sequence
     from typing import Type
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
@@ -140,6 +143,13 @@ def _get_options(*args, **kwargs):
         )
         rv["socket_options"] = None
 
+    if rv["enable_tracing"] is not None:
+        warnings.warn(
+            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     return rv
 
 
@@ -199,6 +209,10 @@ class BaseClient:
     def capture_event(self, *args, **kwargs):
         # type: (*Any, **Any) -> Optional[str]
         return None
+
+    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
+        # type: (Scope, str, int, str, **Any) -> None
+        pass
 
     def capture_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -475,12 +489,14 @@ class _Client(BaseClient):
     ):
         # type: (...) -> Optional[Event]
 
+        previous_total_spans = None  # type: Optional[int]
+
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            spans_before = len(event.get("spans", []))
+            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -499,12 +515,17 @@ class _Client(BaseClient):
                 return None
 
             event = event_
-
-            spans_delta = spans_before - len(event.get("spans", []))
+            spans_delta = spans_before - len(
+                cast(List[Dict[str, object]], event.get("spans", []))
+            )
             if is_transaction and spans_delta > 0 and self.transport is not None:
                 self.transport.record_lost_event(
                     "event_processor", data_category="span", quantity=spans_delta
                 )
+
+            dropped_spans = event.pop("_dropped_spans", 0) + spans_delta  # type: int
+            if dropped_spans > 0:
+                previous_total_spans = spans_before + dropped_spans
 
         if (
             self.options["attach_stacktrace"]
@@ -553,6 +574,11 @@ class _Client(BaseClient):
             if event_scrubber:
                 event_scrubber.scrub_event(event)
 
+        if previous_total_spans is not None:
+            event["spans"] = AnnotatedValue(
+                event.get("spans", []), {"len": previous_total_spans}
+            )
+
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
@@ -581,6 +607,14 @@ class _Client(BaseClient):
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
                     )
+
+                # If this is an exception, reset the DedupeIntegration. It still
+                # remembers the dropped exception as the last exception, meaning
+                # that if the same exception happens again and is not dropped
+                # in before_send, it'd get dropped by DedupeIntegration.
+                if event.get("exception"):
+                    DedupeIntegration.reset_last_seen()
+
             event = new_event
 
         before_send_transaction = self.options["before_send_transaction"]
@@ -590,7 +624,7 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
-            spans_before = len(event.get("spans", []))
+            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
@@ -828,6 +862,110 @@ class _Client(BaseClient):
             return_value = event_id
 
         return return_value
+
+    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
+        # type: (Scope, str, int, str, **Any) -> None
+        logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
+        if not logs_enabled:
+            return
+
+        headers = {
+            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+        }  # type: dict[str, object]
+
+        attrs = {
+            "sentry.message.template": template,
+        }  # type: dict[str, str | bool | float | int]
+
+        kwargs_attributes = kwargs.get("attributes")
+        if kwargs_attributes is not None:
+            attrs.update(kwargs_attributes)
+
+        environment = self.options.get("environment")
+        if environment is not None:
+            attrs["sentry.environment"] = environment
+
+        release = self.options.get("release")
+        if release is not None:
+            attrs["sentry.release"] = release
+
+        span = scope.span
+        if span is not None:
+            attrs["sentry.trace.parent_span_id"] = span.span_id
+
+        for k, v in kwargs.items():
+            attrs[f"sentry.message.parameters.{k}"] = v
+
+        log = {
+            "severity_text": severity_text,
+            "severity_number": severity_number,
+            "body": template.format(**kwargs),
+            "attributes": attrs,
+            "time_unix_nano": time.time_ns(),
+            "trace_id": None,
+        }  # type: Log
+
+        # If debug is enabled, log the log to the console
+        debug = self.options.get("debug", False)
+        if debug:
+            severity_text_to_logging_level = {
+                "trace": logging.DEBUG,
+                "debug": logging.DEBUG,
+                "info": logging.INFO,
+                "warn": logging.WARNING,
+                "error": logging.ERROR,
+                "fatal": logging.CRITICAL,
+            }
+            logger.log(
+                severity_text_to_logging_level.get(severity_text, logging.DEBUG),
+                f'[Sentry Logs] {log["body"]}',
+            )
+
+        propagation_context = scope.get_active_propagation_context()
+        if propagation_context is not None:
+            headers["trace_id"] = propagation_context.trace_id
+            log["trace_id"] = propagation_context.trace_id
+
+        envelope = Envelope(headers=headers)
+
+        before_emit_log = self.options["_experiments"].get("before_emit_log")
+        if before_emit_log is not None:
+            log = before_emit_log(log, {})
+        if log is None:
+            return
+
+        def format_attribute(key, val):
+            # type: (str, int | float | str | bool) -> Any
+            if isinstance(val, bool):
+                return {"key": key, "value": {"boolValue": val}}
+            if isinstance(val, int):
+                return {"key": key, "value": {"intValue": str(val)}}
+            if isinstance(val, float):
+                return {"key": key, "value": {"doubleValue": val}}
+            if isinstance(val, str):
+                return {"key": key, "value": {"stringValue": val}}
+            return {"key": key, "value": {"stringValue": json.dumps(val)}}
+
+        otel_log = {
+            "severityText": log["severity_text"],
+            "severityNumber": log["severity_number"],
+            "body": {"stringValue": log["body"]},
+            "timeUnixNano": str(log["time_unix_nano"]),
+            "attributes": [
+                format_attribute(k, v) for (k, v) in log["attributes"].items()
+            ],
+        }
+
+        if "trace_id" in log:
+            otel_log["traceId"] = log["trace_id"]
+
+        envelope.add_log(otel_log)  # TODO: batch these
+
+        if self.spotlight:
+            self.spotlight.capture_envelope(envelope)
+
+        if self.transport is not None:
+            self.transport.capture_envelope(envelope)
 
     def capture_session(
         self, session  # type: Session

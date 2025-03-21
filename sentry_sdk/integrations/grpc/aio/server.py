@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
+from sentry_sdk.tracing import Transaction, TransactionSource
 from sentry_sdk.utils import event_from_exception
 
 from typing import TYPE_CHECKING
@@ -48,7 +48,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                     dict(context.invocation_metadata()),
                     op=OP.GRPC_SERVER,
                     name=name,
-                    source=TRANSACTION_SOURCE_CUSTOM,
+                    source=TransactionSource.CUSTOM,
                     origin=SPAN_ORIGIN,
                 )
 

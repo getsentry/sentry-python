@@ -25,10 +25,7 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.sessions import track_session
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
-    TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_URL,
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_CUSTOM,
+    TransactionSource,
 )
 from sentry_sdk.utils import (
     ContextVar,
@@ -270,13 +267,18 @@ class SentryAsgiMiddleware:
         event["request"] = deepcopy(request_data)
 
         # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
-        already_set = event["transaction"] != _DEFAULT_TRANSACTION_NAME and event[
-            "transaction_info"
-        ].get("source") in [
-            TRANSACTION_SOURCE_COMPONENT,
-            TRANSACTION_SOURCE_ROUTE,
-            TRANSACTION_SOURCE_CUSTOM,
-        ]
+        transaction = event.get("transaction")
+        transaction_source = (event.get("transaction_info") or {}).get("source")
+        already_set = (
+            transaction is not None
+            and transaction != _DEFAULT_TRANSACTION_NAME
+            and transaction_source
+            in [
+                TransactionSource.COMPONENT,
+                TransactionSource.ROUTE,
+                TransactionSource.CUSTOM,
+            ]
+        )
         if not already_set:
             name, source = self._get_transaction_name_and_source(
                 self.transaction_style, asgi_scope
@@ -313,7 +315,7 @@ class SentryAsgiMiddleware:
                 name = transaction_from_function(endpoint) or ""
             else:
                 name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
-                source = TRANSACTION_SOURCE_URL
+                source = TransactionSource.URL
 
         elif transaction_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
@@ -325,11 +327,11 @@ class SentryAsgiMiddleware:
                     name = path
             else:
                 name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
-                source = TRANSACTION_SOURCE_URL
+                source = TransactionSource.URL
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
-            source = TRANSACTION_SOURCE_ROUTE
+            source = TransactionSource.ROUTE
             return name, source
 
         return name, source

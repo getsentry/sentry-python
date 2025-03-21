@@ -14,6 +14,7 @@ from pyspark import SparkContext
 
 from py4j.protocol import Py4JJavaError
 
+
 ################
 # DRIVER TESTS #
 ################
@@ -163,6 +164,65 @@ def test_sentry_listener_on_stage_submitted(sentry_listener):
         assert mock_hub.kwargs["level"] == "info"
         assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
         assert mock_hub.kwargs["data"]["attemptId"] == 14
+        assert mock_hub.kwargs["data"]["name"] == "run-job"
+
+
+def test_sentry_listener_on_stage_submitted_no_attempt_id(sentry_listener):
+    listener = sentry_listener
+    with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
+
+        class StageInfo:
+            def stageId(self):  # noqa: N802
+                return "sample-stage-id-submit"
+
+            def name(self):
+                return "run-job"
+
+            def attemptNumber(self):  # noqa: N802
+                return 14
+
+        class MockStageSubmitted:
+            def stageInfo(self):  # noqa: N802
+                stageinf = StageInfo()
+                return stageinf
+
+        mock_stage_submitted = MockStageSubmitted()
+        listener.onStageSubmitted(mock_stage_submitted)
+
+        mock_add_breadcrumb.assert_called_once()
+        mock_hub = mock_add_breadcrumb.call_args
+
+        assert mock_hub.kwargs["level"] == "info"
+        assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
+        assert mock_hub.kwargs["data"]["attemptId"] == 14
+        assert mock_hub.kwargs["data"]["name"] == "run-job"
+
+
+def test_sentry_listener_on_stage_submitted_no_attempt_id_or_number(sentry_listener):
+    listener = sentry_listener
+    with patch.object(listener, "_add_breadcrumb") as mock_add_breadcrumb:
+
+        class StageInfo:
+            def stageId(self):  # noqa: N802
+                return "sample-stage-id-submit"
+
+            def name(self):
+                return "run-job"
+
+        class MockStageSubmitted:
+            def stageInfo(self):  # noqa: N802
+                stageinf = StageInfo()
+                return stageinf
+
+        mock_stage_submitted = MockStageSubmitted()
+        listener.onStageSubmitted(mock_stage_submitted)
+
+        mock_add_breadcrumb.assert_called_once()
+        mock_hub = mock_add_breadcrumb.call_args
+
+        assert mock_hub.kwargs["level"] == "info"
+        assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
+        assert "attemptId" not in mock_hub.kwargs["data"]
         assert mock_hub.kwargs["data"]["name"] == "run-job"
 
 
