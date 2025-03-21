@@ -48,6 +48,7 @@ jobs:
         run: |
           coverage erase
       - name: Test aws_lambda latest
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda-latest"
@@ -118,6 +119,7 @@ jobs:
         run: |
           coverage erase
       - name: Test aws_lambda pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda"

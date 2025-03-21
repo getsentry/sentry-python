@@ -43,21 +43,11 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test launchdarkly pinned
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-launchdarkly"
       - name: Test loguru pinned
         if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru"
-      - name: Test openfeature pinned
-        if: ${{ !cancelled() }}
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openfeature"
       - name: Test opentelemetry pinned
         if: ${{ !cancelled() }}
         run: |
@@ -79,6 +69,7 @@ jobs:
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond"
       - name: Test typer pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-typer"
