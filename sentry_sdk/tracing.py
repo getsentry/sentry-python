@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 import json
+import warnings
 
 from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace import (
@@ -476,8 +477,10 @@ class Span:
         .. deprecated:: 3.0.0
             This will be removed in the future. Use :func:`root_span` instead.
         """
-        logger.warning(
-            "Deprecated: This will be removed in the future. Use root_span instead."
+        warnings.warn(
+            "Deprecated: This will be removed in the future. Use root_span instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
         return self.root_span
 
