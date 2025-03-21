@@ -563,8 +563,10 @@ class Scope:
         """
         span = kwargs.pop("span", None)
         if span is not None:
-            logger.warning(
-                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
+            warnings.warn(
+                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.",
+                DeprecationWarning,
+                stacklevel=2,
             )
 
         meta = ""
@@ -735,8 +737,10 @@ class Scope:
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
 
-        logger.warning(
-            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
+        warnings.warn(
+            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
         self._transaction = value
         if self._span and self._span.containing_transaction:
@@ -954,8 +958,10 @@ class Scope:
             This function is deprecated and will be removed in a future release.
             Use :py:meth:`sentry_sdk.start_span` instead.
         """
-        logger.warning(
-            "The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`"
+        warnings.warn(
+            "The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`",
+            DeprecationWarning,
+            stacklevel=2,
         )
         return NoOpSpan(**kwargs)
 

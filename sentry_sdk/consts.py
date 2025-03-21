@@ -160,7 +160,7 @@ class SPANDATA:
 
     AI_TOOL_CALLS = "ai.tool_calls"
     """
-    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    For an AI model call, the function that was called.
     """
 
     AI_TOOLS = "ai.tools"

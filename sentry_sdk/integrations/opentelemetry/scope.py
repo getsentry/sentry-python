@@ -1,5 +1,6 @@
 from typing import cast
 from contextlib import contextmanager
+import warnings
 
 from opentelemetry.context import (
     get_value,
@@ -142,8 +143,10 @@ class PotelScope(Scope):
             This function is deprecated and will be removed in a future release.
             Use :py:meth:`sentry_sdk.start_span` instead.
         """
-        logger.warning(
-            "The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`"
+        warnings.warn(
+            "The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`",
+            DeprecationWarning,
+            stacklevel=2,
         )
         return self.start_span(**kwargs)
 
