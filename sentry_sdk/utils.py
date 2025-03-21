@@ -25,7 +25,6 @@ except ImportError:
     BaseExceptionGroup = None  # type: ignore
 
 import sentry_sdk
-from sentry_sdk._compat import PY37
 from sentry_sdk.consts import (
     DEFAULT_ADD_FULL_STACK,
     DEFAULT_MAX_STACK_FRAMES,
@@ -57,7 +56,8 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from gevent.hub import Hub
+    from gevent.hub import Hub as GeventHub
+    from opentelemetry.util.types import AttributeValue
 
     from sentry_sdk._types import Event, ExcInfo
 
@@ -239,31 +239,6 @@ def format_timestamp(value):
     # We use this custom formatting rather than isoformat for backwards compatibility (we have used this format for
     # several years now), and isoformat is slightly different.
     return utctime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-ISO_TZ_SEPARATORS = frozenset(("+", "-"))
-
-
-def datetime_from_isoformat(value):
-    # type: (str) -> datetime
-    try:
-        result = datetime.fromisoformat(value)
-    except (AttributeError, ValueError):
-        # py 3.6
-        timestamp_format = (
-            "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
-        )
-        if value.endswith("Z"):
-            value = value[:-1] + "+0000"
-
-        if value[-6] in ISO_TZ_SEPARATORS:
-            timestamp_format += "%z"
-            value = value[:-3] + value[-2:]
-        elif value[-5] in ISO_TZ_SEPARATORS:
-            timestamp_format += "%z"
-
-        result = datetime.strptime(value, timestamp_format)
-    return result.astimezone(timezone.utc)
 
 
 def event_hint_with_exc_info(exc_info=None):
@@ -800,14 +775,17 @@ def exceptions_from_error(
 ):
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
-    Creates the list of exceptions.
-    This can include chained exceptions and exceptions from an ExceptionGroup.
+    Converts the given exception information into the Sentry structured "exception" format.
+    This will return a list of exceptions (a flattened tree of exceptions) in the
+    format of the Exception Interface documentation:
+    https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
 
-    See the Exception Interface documentation for more details:
-    https://develop.sentry.dev/sdk/event-payloads/exception/
+    This function can handle:
+    - simple exceptions
+    - chained exceptions (raise .. from ..)
+    - exception groups
     """
-
-    parent = single_exception_from_error_tuple(
+    base_exception = single_exception_from_error_tuple(
         exc_type=exc_type,
         exc_value=exc_value,
         tb=tb,
@@ -818,64 +796,63 @@ def exceptions_from_error(
         source=source,
         full_stack=full_stack,
     )
-    exceptions = [parent]
+    exceptions = [base_exception]
 
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
-    if should_supress_context:
-        # Add direct cause.
-        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
-        exception_has_cause = (
+    causing_exception = None
+    exception_source = None
+
+    # Add any causing exceptions, if present.
+    should_suppress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    # Note: __suppress_context__ is True if the exception is raised with the `from` keyword.
+    if should_suppress_context:
+        # Explicitly chained exceptions (Like: raise NewException() from OriginalException())
+        # The field `__cause__` is set to OriginalException
+        has_explicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__cause__")
             and exc_value.__cause__ is not None
         )
-        if exception_has_cause:
-            cause = exc_value.__cause__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(cause),
-                exc_value=cause,
-                tb=getattr(cause, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__cause__",
-                full_stack=full_stack,
-            )
-            exceptions.extend(child_exceptions)
-
+        if has_explicit_causing_exception:
+            exception_source = "__cause__"
+            causing_exception = exc_value.__cause__  # type: ignore
     else:
-        # Add indirect cause.
-        # The field `__context__` is assigned if another exception occurs while handling the exception.
-        exception_has_content = (
+        # Implicitly chained exceptions (when an exception occurs while handling another exception)
+        # The field `__context__` is set in the exception that occurs while handling another exception,
+        # to the other exception.
+        has_implicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__context__")
             and exc_value.__context__ is not None
         )
-        if exception_has_content:
-            context = exc_value.__context__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(context),
-                exc_value=context,
-                tb=getattr(context, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__context__",
-                full_stack=full_stack,
-            )
-            exceptions.extend(child_exceptions)
+        if has_implicit_causing_exception:
+            exception_source = "__context__"
+            causing_exception = exc_value.__context__  # type: ignore
 
-    # Add exceptions from an ExceptionGroup.
+    if causing_exception:
+        (exception_id, child_exceptions) = exceptions_from_error(
+            exc_type=type(causing_exception),
+            exc_value=causing_exception,
+            tb=getattr(causing_exception, "__traceback__", None),
+            client_options=client_options,
+            mechanism=mechanism,
+            exception_id=exception_id,
+            parent_id=parent_id,
+            source=exception_source,
+            full_stack=full_stack,
+        )
+        exceptions.extend(child_exceptions)
+
+    # Add child exceptions from an ExceptionGroup.
     is_exception_group = exc_value and hasattr(exc_value, "exceptions")
     if is_exception_group:
-        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
+        for idx, causing_exception in enumerate(exc_value.exceptions):  # type: ignore
             (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(e),
-                exc_value=e,
-                tb=getattr(e, "__traceback__", None),
+                exc_type=type(causing_exception),
+                exc_value=causing_exception,
+                tb=getattr(causing_exception, "__traceback__", None),
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
@@ -895,38 +872,29 @@ def exceptions_from_error_tuple(
     full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> List[Dict[str, Any]]
+    """
+    Convert Python's exception information into Sentry's structured "exception" format in the event.
+    See https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
+    This is the entry point for the exception handling.
+    """
+    # unpack the exception info tuple
     exc_type, exc_value, tb = exc_info
 
-    is_exception_group = BaseExceptionGroup is not None and isinstance(
-        exc_value, BaseExceptionGroup
+    # let exceptions_from_error do the actual work
+    _, exceptions = exceptions_from_error(
+        exc_type=exc_type,
+        exc_value=exc_value,
+        tb=tb,
+        client_options=client_options,
+        mechanism=mechanism,
+        exception_id=0,
+        parent_id=0,
+        full_stack=full_stack,
     )
 
-    if is_exception_group:
-        (_, exceptions) = exceptions_from_error(
-            exc_type=exc_type,
-            exc_value=exc_value,
-            tb=tb,
-            client_options=client_options,
-            mechanism=mechanism,
-            exception_id=0,
-            parent_id=0,
-            full_stack=full_stack,
-        )
-
-    else:
-        exceptions = []
-        for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-            exceptions.append(
-                single_exception_from_error_tuple(
-                    exc_type=exc_type,
-                    exc_value=exc_value,
-                    tb=tb,
-                    client_options=client_options,
-                    mechanism=mechanism,
-                    full_stack=full_stack,
-                )
-            )
-
+    # make sure the exceptions are sorted
+    # from the innermost (oldest)
+    # to the outermost (newest) exception
     exceptions.reverse()
 
     return exceptions
@@ -1344,27 +1312,13 @@ def _get_contextvars():
     See https://docs.sentry.io/platforms/python/contextvars/ for more information.
     """
     if not _is_contextvars_broken():
-        # aiocontextvars is a PyPI package that ensures that the contextvars
-        # backport (also a PyPI package) works with asyncio under Python 3.6
-        #
-        # Import it if available.
-        if sys.version_info < (3, 7):
-            # `aiocontextvars` is absolutely required for functional
-            # contextvars on Python 3.6.
-            try:
-                from aiocontextvars import ContextVar
+        # On Python 3.7+ contextvars are functional.
+        try:
+            from contextvars import ContextVar
 
-                return True, ContextVar
-            except ImportError:
-                pass
-        else:
-            # On Python 3.7 contextvars are functional.
-            try:
-                from contextvars import ContextVar
-
-                return True, ContextVar
-            except ImportError:
-                pass
+            return True, ContextVar
+        except ImportError:
+            pass
 
     # Fall back to basic thread-local usage.
 
@@ -1764,7 +1718,7 @@ def ensure_integration_enabled(
     ```python
     @ensure_integration_enabled(MyIntegration, my_function)
     def patch_my_function():
-        with sentry_sdk.start_transaction(...):
+        with sentry_sdk.start_span(...):
             return my_function()
     ```
     """
@@ -1790,19 +1744,6 @@ def ensure_integration_enabled(
     return patcher
 
 
-if PY37:
-
-    def nanosecond_time():
-        # type: () -> int
-        return time.perf_counter_ns()
-
-else:
-
-    def nanosecond_time():
-        # type: () -> int
-        return int(time.perf_counter() * 1e9)
-
-
 def now():
     # type: () -> float
     return time.perf_counter()
@@ -1814,9 +1755,9 @@ try:
 except ImportError:
 
     # it's not great that the signatures are different, get_hub can't return None
-    # consider adding an if TYPE_CHECKING to change the signature to Optional[Hub]
+    # consider adding an if TYPE_CHECKING to change the signature to Optional[GeventHub]
     def get_gevent_hub():  # type: ignore[misc]
-        # type: () -> Optional[Hub]
+        # type: () -> Optional[GeventHub]
         return None
 
     def is_module_patched(mod_name):
@@ -1881,6 +1822,56 @@ def get_current_thread_meta(thread=None):
     return None, None
 
 
+def _serialize_span_attribute(value):
+    # type: (Any) -> Optional[AttributeValue]
+    """Serialize an object so that it's OTel-compatible and displays nicely in Sentry."""
+    # check for allowed primitives
+    if isinstance(value, (int, str, float, bool)):
+        return value
+
+    # lists are allowed too, as long as they don't mix types
+    if isinstance(value, (list, tuple)):
+        for type_ in (int, str, float, bool):
+            if all(isinstance(item, type_) for item in value):
+                return list(value)
+
+    # if this is anything else, just try to coerce to string
+    # we prefer json.dumps since this makes things like dictionaries display
+    # nicely in the UI
+    try:
+        return json.dumps(value)
+    except TypeError:
+        try:
+            return str(value)
+        except Exception:
+            return None
+
+
+ISO_TZ_SEPARATORS = frozenset(("+", "-"))
+
+
+def datetime_from_isoformat(value):
+    # type: (str) -> datetime
+    try:
+        result = datetime.fromisoformat(value)
+    except (AttributeError, ValueError):
+        # py 3.6
+        timestamp_format = (
+            "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
+        )
+        if value.endswith("Z"):
+            value = value[:-1] + "+0000"
+
+        if value[-6] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+            value = value[:-3] + value[-2:]
+        elif value[-5] in ISO_TZ_SEPARATORS:
+            timestamp_format += "%z"
+
+        result = datetime.strptime(value, timestamp_format)
+    return result.astimezone(timezone.utc)
+
+
 def should_be_treated_as_error(ty, value):
     # type: (Any, Any) -> bool
     if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
@@ -1890,18 +1881,12 @@ def should_be_treated_as_error(ty, value):
     return True
 
 
-if TYPE_CHECKING:
-    T = TypeVar("T")
+def http_client_status_to_breadcrumb_level(status_code):
+    # type: (Optional[int]) -> str
+    if status_code is not None:
+        if 500 <= status_code <= 599:
+            return "error"
+        elif 400 <= status_code <= 499:
+            return "warning"
 
-
-def try_convert(convert_func, value):
-    # type: (Callable[[Any], T], Any) -> Optional[T]
-    """
-    Attempt to convert from an unknown type to a specific type, using the
-    given function. Return None if the conversion fails, i.e. if the function
-    raises an exception.
-    """
-    try:
-        return convert_func(value)
-    except Exception:
-        return None
+    return "info"

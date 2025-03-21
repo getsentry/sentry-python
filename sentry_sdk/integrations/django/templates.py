@@ -72,8 +72,11 @@ def patch_templates():
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(self.template_name),
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data("context", self.context_data)
+            if isinstance(self.context_data, dict):
+                for k, v in self.context_data.items():
+                    span.set_data(f"context.{k}", v)
             return real_rendered_content.fget(self)
 
     SimpleTemplateResponse.rendered_content = rendered_content
@@ -100,8 +103,10 @@ def patch_templates():
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(template_name),
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data("context", context)
+            for k, v in context.items():
+                span.set_data(f"context.{k}", v)
             return real_render(request, template_name, context, *args, **kwargs)
 
     django.shortcuts.render = render

@@ -14,7 +14,7 @@ import sentry_sdk
 FAKEREDIS_VERSION = parse_version(fakeredis.__version__)
 
 
-def test_no_cache_basic(sentry_init, capture_events):
+def test_no_cache_basic(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[
             RedisIntegration(),
@@ -24,16 +24,20 @@ def test_no_cache_basic(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="cache"):
         connection.get("mycachekey")
 
     (event,) = events
-    spans = event["spans"]
-    assert len(spans) == 1
-    assert spans[0]["op"] == "db.redis"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="cache": description=null
+  - op="db.redis": description="GET 'mycachekey'"\
+"""
+    )
 
 
-def test_cache_basic(sentry_init, capture_events):
+def test_cache_basic(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -45,7 +49,7 @@ def test_cache_basic(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="cache"):
         connection.hget("mycachekey", "myfield")
         connection.get("mycachekey")
         connection.set("mycachekey1", "bla")
@@ -53,31 +57,25 @@ def test_cache_basic(sentry_init, capture_events):
         connection.mget("mycachekey1", "mycachekey2")
 
     (event,) = events
-    spans = event["spans"]
-    assert len(spans) == 9
-
-    # no cache support for hget command
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["tags"]["redis.command"] == "HGET"
-
-    assert spans[1]["op"] == "cache.get"
-    assert spans[2]["op"] == "db.redis"
-    assert spans[2]["tags"]["redis.command"] == "GET"
-
-    assert spans[3]["op"] == "cache.put"
-    assert spans[4]["op"] == "db.redis"
-    assert spans[4]["tags"]["redis.command"] == "SET"
-
-    assert spans[5]["op"] == "cache.put"
-    assert spans[6]["op"] == "db.redis"
-    assert spans[6]["tags"]["redis.command"] == "SETEX"
-
-    assert spans[7]["op"] == "cache.get"
-    assert spans[8]["op"] == "db.redis"
-    assert spans[8]["tags"]["redis.command"] == "MGET"
+    # no cache support for HGET command
+    assert (
+        render_span_tree(event)
+        == """\
+- op="cache": description=null
+  - op="db.redis": description="HGET 'mycachekey' [Filtered]"
+  - op="cache.get": description="mycachekey"
+    - op="db.redis": description="GET 'mycachekey'"
+  - op="cache.put": description="mycachekey1"
+    - op="db.redis": description="SET 'mycachekey1' [Filtered]"
+  - op="cache.put": description="mycachekey2"
+    - op="db.redis": description="SETEX 'mycachekey2' [Filtered] [Filtered]"
+  - op="cache.get": description="mycachekey1, mycachekey2"
+    - op="db.redis": description="MGET 'mycachekey1' [Filtered]"\
+"""
+    )
 
 
-def test_cache_keys(sentry_init, capture_events):
+def test_cache_keys(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[
             RedisIntegration(
@@ -89,30 +87,25 @@ def test_cache_keys(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="cache"):
         connection.get("somethingelse")
         connection.get("blub")
         connection.get("blubkeything")
         connection.get("bl")
 
     (event,) = events
-    spans = event["spans"]
-    assert len(spans) == 6
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "GET 'somethingelse'"
-
-    assert spans[1]["op"] == "cache.get"
-    assert spans[1]["description"] == "blub"
-    assert spans[2]["op"] == "db.redis"
-    assert spans[2]["description"] == "GET 'blub'"
-
-    assert spans[3]["op"] == "cache.get"
-    assert spans[3]["description"] == "blubkeything"
-    assert spans[4]["op"] == "db.redis"
-    assert spans[4]["description"] == "GET 'blubkeything'"
-
-    assert spans[5]["op"] == "db.redis"
-    assert spans[5]["description"] == "GET 'bl'"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="cache": description=null
+  - op="db.redis": description="GET 'somethingelse'"
+  - op="cache.get": description="blub"
+    - op="db.redis": description="GET 'blub'"
+  - op="cache.get": description="blubkeything"
+    - op="db.redis": description="GET 'blubkeything'"
+  - op="db.redis": description="GET 'bl'"\
+"""
+    )
 
 
 def test_cache_data(sentry_init, capture_events):
@@ -127,13 +120,13 @@ def test_cache_data(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis(host="mycacheserver.io", port=6378)
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="cache"):
         connection.get("mycachekey")
         connection.set("mycachekey", "事实胜于雄辩")
         connection.get("mycachekey")
 
     (event,) = events
-    spans = event["spans"]
+    spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
 
     assert len(spans) == 6
 
@@ -210,7 +203,7 @@ def test_cache_prefixes(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="cache"):
         connection.mget("yes", "no")
         connection.mget("no", 1, "yes")
         connection.mget("no", "yes.1", "yes.2")
@@ -222,7 +215,7 @@ def test_cache_prefixes(sentry_init, capture_events):
 
     (event,) = events
 
-    spans = event["spans"]
+    spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
     assert len(spans) == 13  # 8 db spans + 5 cache spans
 
     cache_spans = [span for span in spans if span["op"] == "cache.get"]

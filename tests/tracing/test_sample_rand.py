@@ -21,9 +21,9 @@ def test_deterministic_sampled(sentry_init, capture_events, sample_rate, sample_
     with mock.patch(
         "sentry_sdk.tracing_utils.Random.uniform", return_value=sample_rand
     ):
-        with sentry_sdk.start_transaction() as transaction:
+        with sentry_sdk.start_span() as root_span:
             assert (
-                transaction.get_baggage().sentry_items["sample_rand"]
+                root_span.get_baggage().sentry_items["sample_rand"]
                 == f"{sample_rand:.6f}"  # noqa: E231
             )
 
@@ -45,9 +45,9 @@ def test_transaction_uses_incoming_sample_rand(
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
-    with sentry_sdk.start_transaction(baggage=baggage) as transaction:
+    with sentry_sdk.start_span(baggage=baggage) as root_span:
         assert (
-            transaction.get_baggage().sentry_items["sample_rand"]
+            root_span.get_baggage().sentry_items["sample_rand"]
             == f"{sample_rand:.6f}"  # noqa: E231
         )
 
