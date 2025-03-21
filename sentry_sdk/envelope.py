@@ -82,7 +82,7 @@ class Envelope:
             Item(
                 payload=PayloadRef(json=profile_chunk),
                 type="profile_chunk",
-                headers={"platform": profile_chunk.get("platform")},
+                headers={"platform": profile_chunk.get("platform", "python")},
             )
         )
 
