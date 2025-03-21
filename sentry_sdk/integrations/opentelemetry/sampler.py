@@ -1,4 +1,3 @@
-import random
 from decimal import Decimal
 from typing import cast
 
@@ -265,7 +264,7 @@ class SentrySampler(Sampler):
 
         # Roll the dice on sample rate
         sample_rate = float(cast("Union[bool, float, int]", sample_rate))
-        sampled = random.random() < sample_rate
+        sampled = sample_rand < sample_rate
 
         if sampled:
             return sampled_result(
