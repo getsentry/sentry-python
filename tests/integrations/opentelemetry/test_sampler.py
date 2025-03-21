@@ -71,13 +71,17 @@ def test_sampling_traces_sample_rate_50(sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    with mock.patch("random.random", return_value=0.2):  # drop
+    with mock.patch(
+        "sentry_sdk.tracing_utils.Random.uniform", return_value=0.2
+    ):  # drop
         with sentry_sdk.start_span(description="request a"):
             with sentry_sdk.start_span(description="cache a"):
                 with sentry_sdk.start_span(description="db a"):
                     ...
 
-    with mock.patch("random.random", return_value=0.7):  # keep
+    with mock.patch(
+        "sentry_sdk.tracing_utils.Random.uniform", return_value=0.7
+    ):  # keep
         with sentry_sdk.start_span(description="request b"):
             with sentry_sdk.start_span(description="cache b"):
                 with sentry_sdk.start_span(description="db b"):
