@@ -1,4 +1,6 @@
 import asyncio
+from datetime import timedelta
+
 import pytest
 
 from sentry_sdk import get_client, start_span
@@ -376,3 +378,48 @@ async def test_span_origin_consumer(capture_events, init_arq_settings, request):
     assert event["contexts"]["trace"]["origin"] == "auto.queue.arq"
     assert event["spans"][0]["origin"] == "auto.db.redis"
     assert event["spans"][1]["origin"] == "auto.db.redis"
+
+
+@pytest.mark.asyncio
+async def test_job_concurrency(capture_events, init_arq):
+    """
+    10 - division starts
+    70 - sleepy starts
+    110 - division raises error
+    120 - sleepy finishes
+
+    """
+
+    async def sleepy(_):
+        await asyncio.sleep(0.05)
+
+    async def division(_):
+        await asyncio.sleep(0.1)
+        return 1 / 0
+
+    sleepy.__qualname__ = sleepy.__name__
+    division.__qualname__ = division.__name__
+
+    pool, worker = init_arq([sleepy, division])
+
+    events = capture_events()
+
+    await pool.enqueue_job(
+        "division", _job_id="123", _defer_by=timedelta(milliseconds=10)
+    )
+    await pool.enqueue_job(
+        "sleepy", _job_id="456", _defer_by=timedelta(milliseconds=70)
+    )
+
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(worker.async_run())
+    await asyncio.sleep(1)
+
+    task.cancel()
+
+    await worker.close()
+
+    exception_event = events[1]
+    assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert exception_event["transaction"] == "division"
+    assert exception_event["extra"]["arq-job"]["task"] == "division"

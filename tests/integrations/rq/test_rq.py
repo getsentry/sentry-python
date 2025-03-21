@@ -150,7 +150,9 @@ def test_error_has_trace_context_if_tracing_disabled(
     assert error_event["contexts"]["trace"]
 
 
-def test_tracing_enabled(sentry_init, capture_events, DictionaryContaining):
+def test_tracing_enabled(
+    sentry_init, capture_events, DictionaryContaining  # noqa: N803
+):
     sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 

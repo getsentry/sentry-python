@@ -14,12 +14,13 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 
 if TYPE_CHECKING:
     from typing import Optional
-    from sentry_sdk.integrations.opentelemetry.scope import PotelScope
+    from contextvars import Token
+    import sentry_sdk.integrations.opentelemetry.scope as scope
 
 
 class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
     def attach(self, context):
-        # type: (Context) -> object
+        # type: (Context) -> Token[Context]
         scopes = get_value(SENTRY_SCOPES_KEY, context)
 
         should_fork_isolation_scope = context.pop(
@@ -29,16 +30,16 @@ class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
 
         should_use_isolation_scope = context.pop(SENTRY_USE_ISOLATION_SCOPE_KEY, None)
         should_use_isolation_scope = cast(
-            "Optional[PotelScope]", should_use_isolation_scope
+            "Optional[scope.PotelScope]", should_use_isolation_scope
         )
 
         should_use_current_scope = context.pop(SENTRY_USE_CURRENT_SCOPE_KEY, None)
         should_use_current_scope = cast(
-            "Optional[PotelScope]", should_use_current_scope
+            "Optional[scope.PotelScope]", should_use_current_scope
         )
 
         if scopes:
-            scopes = cast("tuple[PotelScope, PotelScope]", scopes)
+            scopes = cast("tuple[scope.PotelScope, scope.PotelScope]", scopes)
             (current_scope, isolation_scope) = scopes
         else:
             current_scope = sentry_sdk.get_current_scope()

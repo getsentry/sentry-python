@@ -11,6 +11,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_TRACE_KEY,
 )
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
+from tests.conftest import SortedBaggage
 
 
 @pytest.mark.forked
@@ -116,7 +117,7 @@ def test_extract_context_sentry_trace_header_baggage():
     assert span_context.trace_id == int("1234567890abcdef1234567890abcdef", 16)
 
 
-def test_inject_continue_trace(sentry_init, SortedBaggage):
+def test_inject_continue_trace(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
     carrier = {}
@@ -145,7 +146,7 @@ def test_inject_continue_trace(sentry_init, SortedBaggage):
             assert (carrier["baggage"]) == SortedBaggage(baggage)
 
 
-def test_inject_head_sdk(sentry_init, SortedBaggage):
+def test_inject_head_sdk(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="release")
 
     carrier = {}
@@ -155,5 +156,5 @@ def test_inject_head_sdk(sentry_init, SortedBaggage):
         SentryPropagator().inject(carrier, setter=setter)
         assert (carrier["sentry-trace"]) == f"{span.trace_id}-{span.span_id}-1"
         assert (carrier["baggage"]) == SortedBaggage(
-            f"sentry-transaction=foo,sentry-release=release,sentry-environment=production,sentry-trace_id={span.trace_id},sentry-sample_rate=1.0,sentry-sampled=true"
+            f"sentry-transaction=foo,sentry-release=release,sentry-environment=production,sentry-trace_id={span.trace_id},sentry-sample_rate=1.0,sentry-sampled=true"  # noqa: E231
         )

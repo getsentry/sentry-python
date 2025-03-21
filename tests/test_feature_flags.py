@@ -1,5 +1,7 @@
 import concurrent.futures as cf
 import sys
+import copy
+import threading
 
 import pytest
 
@@ -167,3 +169,54 @@ def test_flag_tracking():
         {"flag": "e", "result": False},
         {"flag": "f", "result": False},
     ]
+
+    # Test updates
+    buffer.set("e", True)
+    buffer.set("e", False)
+    buffer.set("e", True)
+    flags = buffer.get()
+    assert flags == [
+        {"flag": "d", "result": False},
+        {"flag": "f", "result": False},
+        {"flag": "e", "result": True},
+    ]
+
+    buffer.set("d", True)
+    flags = buffer.get()
+    assert flags == [
+        {"flag": "f", "result": False},
+        {"flag": "e", "result": True},
+        {"flag": "d", "result": True},
+    ]
+
+
+def test_flag_buffer_concurrent_access():
+    buffer = FlagBuffer(capacity=100)
+    error_occurred = False
+
+    def writer():
+        for i in range(1_000_000):
+            buffer.set(f"key_{i}", True)
+
+    def reader():
+        nonlocal error_occurred
+
+        try:
+            for _ in range(1000):
+                copy.deepcopy(buffer)
+        except RuntimeError:
+            error_occurred = True
+
+    writer_thread = threading.Thread(target=writer)
+    reader_thread = threading.Thread(target=reader)
+
+    writer_thread.start()
+    reader_thread.start()
+
+    writer_thread.join(timeout=5)
+    reader_thread.join(timeout=5)
+
+    # This should always be false. If this ever fails we know we have concurrent access to a
+    # shared resource. When deepcopying we should have exclusive access to the underlying
+    # memory.
+    assert error_occurred is False

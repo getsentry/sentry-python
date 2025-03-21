@@ -1,7 +1,9 @@
+import copy
 import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
+from threading import Lock
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from typing import TypedDict
@@ -16,20 +18,44 @@ class FlagBuffer:
 
     def __init__(self, capacity):
         # type: (int) -> None
-        self.buffer = LRUCache(capacity)
         self.capacity = capacity
+        self.lock = Lock()
+
+        # Buffer is private. The name is mangled to discourage use. If you use this attribute
+        # directly you're on your own!
+        self.__buffer = LRUCache(capacity)
 
     def clear(self):
         # type: () -> None
-        self.buffer = LRUCache(self.capacity)
+        self.__buffer = LRUCache(self.capacity)
+
+    def __deepcopy__(self, memo):
+        # type: (dict[int, Any]) -> FlagBuffer
+        with self.lock:
+            buffer = FlagBuffer(self.capacity)
+            buffer.__buffer = copy.deepcopy(self.__buffer, memo)
+            return buffer
 
     def get(self):
         # type: () -> list[FlagData]
-        return [{"flag": key, "result": value} for key, value in self.buffer.get_all()]
+        with self.lock:
+            return [
+                {"flag": key, "result": value} for key, value in self.__buffer.get_all()
+            ]
 
     def set(self, flag, result):
         # type: (str, bool) -> None
-        self.buffer.set(flag, result)
+        if isinstance(result, FlagBuffer):
+            # If someone were to insert `self` into `self` this would create a circular dependency
+            # on the lock. This is of course a deadlock. However, this is far outside the expected
+            # usage of this class. We guard against it here for completeness and to document this
+            # expected failure mode.
+            raise ValueError(
+                "FlagBuffer instances can not be inserted into the dictionary."
+            )
+
+        with self.lock:
+            self.__buffer.set(flag, result)
 
 
 def add_feature_flag(flag, result):

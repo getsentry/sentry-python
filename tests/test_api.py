@@ -1,4 +1,6 @@
 import pytest
+
+import re
 from unittest import mock
 
 from sentry_sdk import (
@@ -17,6 +19,7 @@ from sentry_sdk import (
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
+from tests.conftest import SortedBaggage
 
 
 @pytest.mark.forked
@@ -77,7 +80,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
 
 
 @pytest.mark.forked
-def test_baggage_with_tracing_disabled(sentry_init, SortedBaggage):
+def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
     expected_baggage = (
@@ -89,13 +92,13 @@ def test_baggage_with_tracing_disabled(sentry_init, SortedBaggage):
 
 
 @pytest.mark.forked
-def test_baggage_with_tracing_enabled(sentry_init, SortedBaggage):
+def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_span(name="foo") as span:
-        expected_baggage = "sentry-transaction=foo,sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={}".format(
+        expected_baggage_re = r"^sentry-transaction=foo,sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=1\.0\.0,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
             span.trace_id, "true" if span.sampled else "false"
         )
-        assert get_baggage() == SortedBaggage(expected_baggage)
+        assert re.match(expected_baggage_re, get_baggage())
 
 
 @pytest.mark.forked
@@ -109,18 +112,18 @@ def test_continue_trace(sentry_init):
     with continue_trace(
         {
             "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
-            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19",
+            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19,sentry-sample_rand=0.123456",
         },
     ):
         with start_span(name="some name") as span:
             assert span.name == "some name"
-
             propagation_context = get_isolation_scope()._propagation_context
             assert propagation_context.trace_id == span.trace_id == trace_id
             assert propagation_context.parent_span_id == parent_span_id
             assert propagation_context.parent_sampled == parent_sampled
             assert propagation_context.dynamic_sampling_context == {
-                "trace_id": "566e3688a61d4bc888951642d6f14a19"
+                "trace_id": "566e3688a61d4bc888951642d6f14a19",
+                "sample_rand": "0.123456",
             }
 
 

@@ -6,7 +6,9 @@ import sys
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
+from decimal import ROUND_DOWN, Context, Decimal
 from functools import wraps
+from random import Random
 from urllib.parse import quote, unquote
 
 import sentry_sdk
@@ -43,6 +45,7 @@ SENTRY_TRACE_REGEX = re.compile(
     "-?([01])?"  # sampled
     "[ \t]*$"  # whitespace
 )
+
 
 # This is a normal base64 regex, modified to reflect that fact that we strip the
 # trailing = or == off
@@ -91,17 +94,14 @@ def has_tracing_enabled(options):
     # type: (Optional[Dict[str, Any]]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    defined and enable_tracing is set and not false.
+    defined.
     """
     if options is None:
         return False
 
     return bool(
-        options.get("enable_tracing") is not False
-        and (
-            options.get("traces_sample_rate") is not None
-            or options.get("traces_sampler") is not None
-        )
+        options.get("traces_sample_rate") is not None
+        or options.get("traces_sampler") is not None
     )
 
 
@@ -152,12 +152,6 @@ def record_sql_queries(
         for k, v in data.items():
             span.set_data(k, v)
         yield span
-
-
-def maybe_create_breadcrumbs_from_span(scope, span):
-    # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
-    # TODO: can be removed when POtelSpan replaces Span
-    pass
 
 
 def _get_frame_module_abs_path(frame):
@@ -369,7 +363,7 @@ class PropagationContext:
         self.parent_sampled = parent_sampled
         """Boolean indicator if the parent span was sampled.
         Important when the parent span originated in an upstream service,
-        because we watn to sample the whole trace, or nothing from the trace."""
+        because we want to sample the whole trace, or nothing from the trace."""
 
         self.baggage = baggage
         """Baggage object used for dynamic sampling decisions."""
@@ -454,6 +448,10 @@ class PropagationContext:
 class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
+
+    Before mutating a `Baggage` object, calling code must check that `mutable` is `True`.
+    Mutating a `Baggage` object that has `mutable` set to `False` is not allowed, but
+    it is the caller's responsibility to enforce this restriction.
     """
 
     __slots__ = ("sentry_items", "third_party_items", "mutable")
@@ -472,8 +470,11 @@ class Baggage:
         self.mutable = mutable
 
     @classmethod
-    def from_incoming_header(cls, header):
-        # type: (Optional[str]) -> Baggage
+    def from_incoming_header(
+        cls,
+        header,  # type: Optional[str]
+    ):
+        # type: (...) -> Baggage
         """
         freeze if incoming header already has sentry baggage
         """
@@ -531,52 +532,6 @@ class Baggage:
 
         return Baggage(sentry_items, third_party_items, mutable)
 
-    @classmethod
-    def populate_from_transaction(cls, transaction):
-        # type: (sentry_sdk.tracing.Transaction) -> Baggage
-        """
-        Populate fresh baggage entry with sentry_items and make it immutable
-        if this is the head SDK which originates traces.
-        """
-        client = sentry_sdk.get_client()
-        sentry_items = {}  # type: Dict[str, str]
-
-        if not client.is_active():
-            return Baggage(sentry_items)
-
-        options = client.options or {}
-
-        sentry_items["trace_id"] = transaction.trace_id
-
-        if options.get("environment"):
-            sentry_items["environment"] = options["environment"]
-
-        if options.get("release"):
-            sentry_items["release"] = options["release"]
-
-        if options.get("dsn"):
-            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
-
-        if (
-            transaction.name
-            and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
-        ):
-            sentry_items["transaction"] = transaction.name
-
-        if transaction.sample_rate is not None:
-            sentry_items["sample_rate"] = str(transaction.sample_rate)
-
-        if transaction.sampled is not None:
-            sentry_items["sampled"] = "true" if transaction.sampled else "false"
-
-        # there's an existing baggage but it was mutable,
-        # which is why we are creating this new baggage.
-        # However, if by chance the user put some sentry items in there, give them precedence.
-        if transaction._baggage and transaction._baggage.sentry_items:
-            sentry_items.update(transaction._baggage.sentry_items)
-
-        return Baggage(sentry_items, mutable=False)
-
     def freeze(self):
         # type: () -> None
         self.mutable = False
@@ -618,6 +573,10 @@ class Baggage:
                 if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
             )
         )
+
+    def __repr__(self):
+        # type: () -> str
+        return f'<Baggage "{self.serialize(include_third_party=True)}", mutable={self.mutable}>'
 
 
 def should_propagate_trace(client, url):
@@ -725,9 +684,57 @@ def get_current_span(scope=None):
     return current_span
 
 
+# XXX-potel-ivana: use this
+def _generate_sample_rand(
+    trace_id,  # type: Optional[str]
+    *,
+    interval=(0.0, 1.0),  # type: tuple[float, float]
+):
+    # type: (...) -> Any
+    """Generate a sample_rand value from a trace ID.
+
+    The generated value will be pseudorandomly chosen from the provided
+    interval. Specifically, given (lower, upper) = interval, the generated
+    value will be in the range [lower, upper). The value has 6-digit precision,
+    so when printing with .6f, the value will never be rounded up.
+
+    The pseudorandom number generator is seeded with the trace ID.
+    """
+    lower, upper = interval
+    if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
+        raise ValueError("Invalid interval: lower must be less than upper")
+
+    rng = Random(trace_id)
+    sample_rand = upper
+    while sample_rand >= upper:
+        sample_rand = rng.uniform(lower, upper)
+
+    # Round down to exactly six decimal-digit precision.
+    # Setting the context is needed to avoid an InvalidOperation exception
+    # in case the user has changed the default precision.
+    return Decimal(sample_rand).quantize(
+        Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
+    )
+
+
+# XXX-potel-ivana: use this
+def _sample_rand_range(parent_sampled, sample_rate):
+    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
+    """
+    Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
+    that a generated sample_rand value must fall into, given the parent_sampled and
+    sample_rate values.
+    """
+    if parent_sampled is None or sample_rate is None:
+        return 0.0, 1.0
+    elif parent_sampled is True:
+        return 0.0, sample_rate
+    else:  # parent_sampled is False
+        return sample_rate, 1.0
+
+
 # Circular imports
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
-    LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )

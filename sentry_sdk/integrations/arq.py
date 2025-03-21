@@ -5,7 +5,7 @@ from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -103,14 +103,14 @@ def patch_run_job():
             scope._name = "arq"
             scope.set_transaction_name(
                 DEFAULT_TRANSACTION_NAME,
-                source=TRANSACTION_SOURCE_TASK,
+                source=TransactionSource.TASK,
             )
             scope.clear_breadcrumbs()
 
             with sentry_sdk.start_span(
                 op=OP.QUEUE_TASK_ARQ,
                 name=DEFAULT_TRANSACTION_NAME,
-                source=TRANSACTION_SOURCE_TASK,
+                source=TransactionSource.TASK,
                 origin=ArqIntegration.origin,
             ) as span:
                 return_value = await old_run_job(self, job_id, score)
@@ -210,12 +210,13 @@ def patch_create_worker():
         if isinstance(settings_cls, dict):
             if "functions" in settings_cls:
                 settings_cls["functions"] = [
-                    _get_arq_function(func) for func in settings_cls["functions"]
+                    _get_arq_function(func)
+                    for func in settings_cls.get("functions", [])
                 ]
             if "cron_jobs" in settings_cls:
                 settings_cls["cron_jobs"] = [
                     _get_arq_cron_job(cron_job)
-                    for cron_job in settings_cls["cron_jobs"]
+                    for cron_job in settings_cls.get("cron_jobs", [])
                 ]
 
         if hasattr(settings_cls, "functions"):
@@ -229,11 +230,11 @@ def patch_create_worker():
 
         if "functions" in kwargs:
             kwargs["functions"] = [
-                _get_arq_function(func) for func in kwargs["functions"]
+                _get_arq_function(func) for func in kwargs.get("functions", [])
             ]
         if "cron_jobs" in kwargs:
             kwargs["cron_jobs"] = [
-                _get_arq_cron_job(cron_job) for cron_job in kwargs["cron_jobs"]
+                _get_arq_cron_job(cron_job) for cron_job in kwargs.get("cron_jobs", [])
             ]
 
         return old_create_worker(*args, **kwargs)

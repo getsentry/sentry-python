@@ -125,16 +125,6 @@ def has_profiling_enabled(options):
     if profiles_sample_rate is not None and profiles_sample_rate > 0:
         return True
 
-    profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-    if profiles_sample_rate is not None:
-        logger.warning(
-            "_experiments['profiles_sample_rate'] is deprecated. "
-            "Please use the non-experimental profiles_sample_rate option "
-            "directly."
-        )
-        if profiles_sample_rate > 0:
-            return True
-
     return False
 
 
@@ -157,16 +147,9 @@ def setup_profiler(options):
     else:
         default_profiler_mode = ThreadScheduler.mode
 
+    profiler_mode = default_profiler_mode
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
-    else:
-        profiler_mode = options.get("_experiments", {}).get("profiler_mode")
-        if profiler_mode is not None:
-            logger.warning(
-                "_experiments['profiler_mode'] is deprecated. Please use the "
-                "non-experimental profiler_mode option directly."
-            )
-        profiler_mode = profiler_mode or default_profiler_mode
 
     if (
         profiler_mode == ThreadScheduler.mode
@@ -283,12 +266,11 @@ class Profile:
 
         options = client.options
 
+        sample_rate = None
         if callable(options.get("profiles_sampler")):
             sample_rate = options["profiles_sampler"](sampling_context)
         elif options["profiles_sample_rate"] is not None:
             sample_rate = options["profiles_sample_rate"]
-        else:
-            sample_rate = options["_experiments"].get("profiles_sample_rate")
 
         # The profiles_sample_rate option was not set, so profiling
         # was never enabled.
@@ -611,7 +593,7 @@ class Scheduler(ABC):
                 if profile.active:
                     profile.write(now, sample)
                 else:
-                    # If a thread is marked inactive, we buffer it
+                    # If a profile is marked inactive, we buffer it
                     # to `inactive_profiles` so it can be removed.
                     # We cannot remove it here as it would result
                     # in a RuntimeError.

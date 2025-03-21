@@ -31,6 +31,7 @@ from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     EndpointType,
 )
+from sentry_sdk._types import Annotated, AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
 
 from typing import TYPE_CHECKING
 
@@ -72,8 +73,6 @@ logger = logging.getLogger("sentry_sdk.errors")
 _installed_modules = None
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
-
-SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
 FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
 TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
@@ -377,84 +376,6 @@ class Auth:
         if self.secret_key is not None:
             rv.append(("sentry_secret", self.secret_key))
         return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
-
-
-class AnnotatedValue:
-    """
-    Meta information for a data field in the event payload.
-    This is to tell Relay that we have tampered with the fields value.
-    See:
-    https://github.com/getsentry/relay/blob/be12cd49a0f06ea932ed9b9f93a655de5d6ad6d1/relay-general/src/types/meta.rs#L407-L423
-    """
-
-    __slots__ = ("value", "metadata")
-
-    def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
-        self.value = value
-        self.metadata = metadata
-
-    def __eq__(self, other):
-        # type: (Any) -> bool
-        if not isinstance(other, AnnotatedValue):
-            return False
-
-        return self.value == other.value and self.metadata == other.metadata
-
-    @classmethod
-    def removed_because_raw_data(cls):
-        # type: () -> AnnotatedValue
-        """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
-        return AnnotatedValue(
-            value="",
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!raw",  # Unparsable raw data
-                        "x",  # The fields original value was removed
-                    ]
-                ]
-            },
-        )
-
-    @classmethod
-    def removed_because_over_size_limit(cls):
-        # type: () -> AnnotatedValue
-        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
-        return AnnotatedValue(
-            value="",
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!config",  # Because of configured maximum size
-                        "x",  # The fields original value was removed
-                    ]
-                ]
-            },
-        )
-
-    @classmethod
-    def substituted_because_contains_sensitive_data(cls):
-        # type: () -> AnnotatedValue
-        """The actual value was removed because it contained sensitive information."""
-        return AnnotatedValue(
-            value=SENSITIVE_DATA_SUBSTITUTE,
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
-                        "s",  # The fields original value was substituted
-                    ]
-                ]
-            },
-        )
-
-
-if TYPE_CHECKING:
-    from typing import TypeVar
-
-    T = TypeVar("T")
-    Annotated = Union[AnnotatedValue, T]
 
 
 def get_type_name(cls):
@@ -854,14 +775,17 @@ def exceptions_from_error(
 ):
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
-    Creates the list of exceptions.
-    This can include chained exceptions and exceptions from an ExceptionGroup.
+    Converts the given exception information into the Sentry structured "exception" format.
+    This will return a list of exceptions (a flattened tree of exceptions) in the
+    format of the Exception Interface documentation:
+    https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
 
-    See the Exception Interface documentation for more details:
-    https://develop.sentry.dev/sdk/event-payloads/exception/
+    This function can handle:
+    - simple exceptions
+    - chained exceptions (raise .. from ..)
+    - exception groups
     """
-
-    parent = single_exception_from_error_tuple(
+    base_exception = single_exception_from_error_tuple(
         exc_type=exc_type,
         exc_value=exc_value,
         tb=tb,
@@ -872,64 +796,63 @@ def exceptions_from_error(
         source=source,
         full_stack=full_stack,
     )
-    exceptions = [parent]
+    exceptions = [base_exception]
 
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
-    if should_supress_context:
-        # Add direct cause.
-        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
-        exception_has_cause = (
+    causing_exception = None
+    exception_source = None
+
+    # Add any causing exceptions, if present.
+    should_suppress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    # Note: __suppress_context__ is True if the exception is raised with the `from` keyword.
+    if should_suppress_context:
+        # Explicitly chained exceptions (Like: raise NewException() from OriginalException())
+        # The field `__cause__` is set to OriginalException
+        has_explicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__cause__")
             and exc_value.__cause__ is not None
         )
-        if exception_has_cause:
-            cause = exc_value.__cause__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(cause),
-                exc_value=cause,
-                tb=getattr(cause, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__cause__",
-                full_stack=full_stack,
-            )
-            exceptions.extend(child_exceptions)
-
+        if has_explicit_causing_exception:
+            exception_source = "__cause__"
+            causing_exception = exc_value.__cause__  # type: ignore
     else:
-        # Add indirect cause.
-        # The field `__context__` is assigned if another exception occurs while handling the exception.
-        exception_has_content = (
+        # Implicitly chained exceptions (when an exception occurs while handling another exception)
+        # The field `__context__` is set in the exception that occurs while handling another exception,
+        # to the other exception.
+        has_implicit_causing_exception = (
             exc_value
             and hasattr(exc_value, "__context__")
             and exc_value.__context__ is not None
         )
-        if exception_has_content:
-            context = exc_value.__context__  # type: ignore
-            (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(context),
-                exc_value=context,
-                tb=getattr(context, "__traceback__", None),
-                client_options=client_options,
-                mechanism=mechanism,
-                exception_id=exception_id,
-                source="__context__",
-                full_stack=full_stack,
-            )
-            exceptions.extend(child_exceptions)
+        if has_implicit_causing_exception:
+            exception_source = "__context__"
+            causing_exception = exc_value.__context__  # type: ignore
 
-    # Add exceptions from an ExceptionGroup.
+    if causing_exception:
+        (exception_id, child_exceptions) = exceptions_from_error(
+            exc_type=type(causing_exception),
+            exc_value=causing_exception,
+            tb=getattr(causing_exception, "__traceback__", None),
+            client_options=client_options,
+            mechanism=mechanism,
+            exception_id=exception_id,
+            parent_id=parent_id,
+            source=exception_source,
+            full_stack=full_stack,
+        )
+        exceptions.extend(child_exceptions)
+
+    # Add child exceptions from an ExceptionGroup.
     is_exception_group = exc_value and hasattr(exc_value, "exceptions")
     if is_exception_group:
-        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
+        for idx, causing_exception in enumerate(exc_value.exceptions):  # type: ignore
             (exception_id, child_exceptions) = exceptions_from_error(
-                exc_type=type(e),
-                exc_value=e,
-                tb=getattr(e, "__traceback__", None),
+                exc_type=type(causing_exception),
+                exc_value=causing_exception,
+                tb=getattr(causing_exception, "__traceback__", None),
                 client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
@@ -949,38 +872,29 @@ def exceptions_from_error_tuple(
     full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> List[Dict[str, Any]]
+    """
+    Convert Python's exception information into Sentry's structured "exception" format in the event.
+    See https://develop.sentry.dev/sdk/data-model/event-payloads/exception/
+    This is the entry point for the exception handling.
+    """
+    # unpack the exception info tuple
     exc_type, exc_value, tb = exc_info
 
-    is_exception_group = BaseExceptionGroup is not None and isinstance(
-        exc_value, BaseExceptionGroup
+    # let exceptions_from_error do the actual work
+    _, exceptions = exceptions_from_error(
+        exc_type=exc_type,
+        exc_value=exc_value,
+        tb=tb,
+        client_options=client_options,
+        mechanism=mechanism,
+        exception_id=0,
+        parent_id=0,
+        full_stack=full_stack,
     )
 
-    if is_exception_group:
-        (_, exceptions) = exceptions_from_error(
-            exc_type=exc_type,
-            exc_value=exc_value,
-            tb=tb,
-            client_options=client_options,
-            mechanism=mechanism,
-            exception_id=0,
-            parent_id=0,
-            full_stack=full_stack,
-        )
-
-    else:
-        exceptions = []
-        for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-            exceptions.append(
-                single_exception_from_error_tuple(
-                    exc_type=exc_type,
-                    exc_value=exc_value,
-                    tb=tb,
-                    client_options=client_options,
-                    mechanism=mechanism,
-                    full_stack=full_stack,
-                )
-            )
-
+    # make sure the exceptions are sorted
+    # from the innermost (oldest)
+    # to the outermost (newest) exception
     exceptions.reverse()
 
     return exceptions
@@ -1462,7 +1376,7 @@ def qualname_from_function(func):
 
     # Python 3: methods, functions, classes
     if func_qualname is not None:
-        if hasattr(func, "__module__"):
+        if hasattr(func, "__module__") and isinstance(func.__module__, str):
             func_qualname = func.__module__ + "." + func_qualname
         func_qualname = prefix + func_qualname + suffix
 
@@ -1705,7 +1619,7 @@ def _generate_installed_modules():
 
         yielded = set()
         for dist in metadata.distributions():
-            name = dist.metadata["Name"]
+            name = dist.metadata.get("Name", None)  # type: ignore[attr-defined]
             # `metadata` values may be `None`, see:
             # https://github.com/python/cpython/issues/91216
             # and
@@ -1956,3 +1870,23 @@ def datetime_from_isoformat(value):
 
         result = datetime.strptime(value, timestamp_format)
     return result.astimezone(timezone.utc)
+
+
+def should_be_treated_as_error(ty, value):
+    # type: (Any, Any) -> bool
+    if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
+        # https://docs.python.org/3/library/exceptions.html#SystemExit
+        return False
+
+    return True
+
+
+def http_client_status_to_breadcrumb_level(status_code):
+    # type: (Optional[int]) -> str
+    if status_code is not None:
+        if 500 <= status_code <= 599:
+            return "error"
+        elif 400 <= status_code <= 499:
+            return "warning"
+
+    return "info"

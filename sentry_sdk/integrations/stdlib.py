@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     get_current_thread_meta,
+    http_client_status_to_breadcrumb_level,
     is_sentry_url,
     logger,
     safe_repr,
@@ -144,14 +145,16 @@ def _install_httplib():
             span_data[SPANDATA.HTTP_STATUS_CODE] = int(rv.status)
             span_data["reason"] = rv.reason
 
+            status_code = int(rv.status)
+            span.set_http_status(status_code)
+            span.set_data("reason", rv.reason)
+
             sentry_sdk.add_breadcrumb(
                 type="http",
                 category="httplib",
                 data=span_data,
+                level=http_client_status_to_breadcrumb_level(status_code),
             )
-
-            span.set_http_status(int(rv.status))
-            span.set_data("reason", rv.reason)
         finally:
             span.__exit__(None, None, None)
 

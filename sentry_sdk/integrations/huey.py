@@ -9,7 +9,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    TRANSACTION_SOURCE_TASK,
+    TransactionSource,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -165,7 +165,7 @@ def patch_execute():
                 with sentry_sdk.start_span(
                     name=task.name,
                     op=OP.QUEUE_TASK_HUEY,
-                    source=TRANSACTION_SOURCE_TASK,
+                    source=TransactionSource.TASK,
                     origin=HueyIntegration.origin,
                 ):
                     return old_execute(self, task, timestamp)

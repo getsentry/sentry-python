@@ -1,9 +1,134 @@
 # Changelog
 
+## 2.24.0
+
+### Various fixes & improvements
+
+- fix(tracing): Fix `InvalidOperation` (#4179) by @szokeasaurusrex
+- Fix memory leak by not piling up breadcrumbs forever in Spark workers.  (#4167) by @antonpirker
+- Update scripts sources (#4166) by @emmanuel-ferdman
+- Fixed flaky test (#4165) by @antonpirker
+- chore(profiler): Add deprecation warning for session functions (#4171) by @sentrivana
+- feat(profiling): reverse profile_session start/stop methods deprecation (#4162) by @viglia
+- Reset `DedupeIntegration`'s `last-seen` if `before_send` dropped the event (#4142) by @sentrivana
+- style(integrations): Fix captured typo (#4161) by @pimuzzo
+- Handle loguru msg levels that are not supported by Sentry (#4147) by @antonpirker
+- feat(tests): Update tox.ini (#4146) by @sentrivana
+- Support Starlette/FastAPI `app.host` (#4157) by @sentrivana
+
+## 2.23.1
+
+### Various fixes & improvements
+
+- Fix import problem in release 2.23.0 (#4140) by @antonpirker
+
+## 2.23.0
+
+### Various fixes & improvements
+
+- Feat(profiling): Add new functions to start/stop continuous profiler (#4056) by @Zylphrex
+- Feat(profiling): Export start/stop profile session (#4079) by @Zylphrex
+- Feat(tracing): Backfill missing `sample_rand` on `PropagationContext` (#4038) by @szokeasaurusrex
+- Feat(logs): Add alpha version of Sentry logs (#4126) by @colin-sentry
+- Security(gha): fix potential for shell injection (#4099) by @mdtro
+- Docs: Add `init()` parameters to ApiDocs. (#4100) by @antonpirker
+- Docs: Document that caller must check `mutable` (#4010) by @szokeasaurusrex
+- Fix(Anthropic): Add partial json support to streams (#3674)
+- Fix(ASGI): Fix KeyError if transaction does not exist (#4095) by @kevinji
+- Fix(asyncio): Improve asyncio integration error handling. (#4129) by @antonpirker
+- Fix(AWS Lambda): Fix capturing errors during AWS Lambda INIT phase (#3943)
+- Fix(Bottle): Prevent internal error on 404 (#4131) by @sentrivana
+- Fix(CI): Fix API doc failure in CI (#4075) by @sentrivana
+- Fix(ClickHouse) ClickHouse in test suite (#4087) by @antonpirker
+- Fix(cloudresourcecontext): Added timeout to HTTP requests in CloudResourceContextIntegration (#4120) by @antonpirker
+- Fix(crons): Fixed bug when `cron_jobs` is set to `None` in arq integration (#4115) by @antonpirker
+- Fix(debug): Take into account parent handlers for debug logger (#4133) by @sentrivana
+- Fix(FastAPI/Starlette):  Fix middleware with positional arguments.  (#4118) by @antonpirker
+- Fix(featureflags): add LRU update/dedupe test coverage (#4082)
+- Fix(logging): Coerce None values into strings in logentry params. (#4121) by @antonpirker
+- Fix(pyspark): Grab `attemptId` more defensively (#4130) by @sentrivana
+- Fix(Quart): Support `quart_flask_patch` (#4132) by @sentrivana
+- Fix(tests): A way to locally run AWS Lambda functions (#4128) by @antonpirker
+- Fix(tests): Add concurrency testcase for arq (#4125) by @sentrivana
+- Fix(tests): Add fail_on_changes to toxgen by @sentrivana
+- Fix(tests): Run AWS Lambda tests locally (#3988) by @antonpirker
+- Fix(tests): Test relevant prereleases and allow to ignore releases
+- Fix(tracing): Move `TRANSACTION_SOURCE_*` constants to `Enum` (#3889) by @mgaligniana
+- Fix(typing): Add more typing info to Scope.update_from_kwargs's "contexts" (#4080)
+- Fix(typing): Set correct type for `set_context` everywhere (#4123) by @sentrivana
+- Chore(tests): Regenerate tox.ini (#4108) by @sentrivana
+- Build(deps): bump actions/create-github-app-token from 1.11.5 to 1.11.6 (#4113) by @dependabot
+- Build(deps): bump codecov/codecov-action from 5.3.1 to 5.4.0 (#4112) by @dependabot
+
+## 2.22.0
+
+### Various fixes & improvements
+
+- **New integration:** Add [Statsig](https://statsig.com/) integration (#4022) by @aliu39
+
+  For more information, see the documentation for the [StatsigIntegration](https://docs.sentry.io/platforms/python/integrations/statsig/).
+
+- Profiling: Continuous profiling lifecycle (#4017) by @Zylphrex
+- Fix: Revert "feat(tracing): Add `propagate_traces` deprecation warning (#3899)" (#4055) by @cmanallen
+- Tests: Generate Web 1 group tox entries by toxgen script (#3980) by @sentrivana
+- Tests: Generate Web 2 group tox entries by toxgen script (#3981) by @sentrivana
+- Tests: Generate Tasks group tox entries by toxgen script (#3976) by @sentrivana
+- Tests: Generate AI group tox entries by toxgen script (#3977) by @sentrivana
+- Tests: Generate DB group tox entries by toxgen script (#3978) by @sentrivana
+- Tests: Generate Misc group tox entries by toxgen script (#3982) by @sentrivana
+- Tests: Generate Flags group tox entries by toxgen script (#3974) by @sentrivana
+- Tests: Generate gRPC tox entries by toxgen script (#3979) by @sentrivana
+- Tests: Remove toxgen cutoff, add statsig (#4048) by @sentrivana
+- Tests: Reduce continuous profiling test flakiness (#4052) by @Zylphrex
+- Tests: Fix Clickhouse test (#4053) by @sentrivana
+- Tests: Fix flaky HTTPS test (#4057) by @Zylphrex
+- Update sample rate in DSC (#4018) by @sentrivana
+- Move the GraphQL group over to the tox gen script (#3975) by @sentrivana
+- Update changelog with `profile_session_sample_rate` (#4046) by @sentrivana
+
+## 2.21.0
+
+### Various fixes & improvements
+
+- Fix incompatibility with new Strawberry version (#4026) by @sentrivana
+- Add `failed_request_status_codes` to Litestar (#4021) by @vrslev
+
+  See https://docs.sentry.io/platforms/python/integrations/litestar/ for details.
+- Deprecate `enable_tracing` option (#3935) by @antonpirker
+
+  The `enable_tracing` option is now deprecated. Please use `traces_sample_rate` instead. See https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate for more information.
+- Explicitly use `None` default when checking metadata (#4039) by @mpurnell1
+- Fix bug where concurrent accesses to the flags property could raise a `RuntimeError` (#4034) by @cmanallen
+- Add more min versions of frameworks (#3973) by @sentrivana
+- Set level based on status code for HTTP client breadcrumbs (#4004) by @sentrivana
+- Don't set transaction status to error on `sys.exit(0)` (#4025) by @sentrivana
+- Continuous profiling sample rate (#4002) by @Zylphrex
+
+  Set `profile_session_sample_rate=1.0` in your `init()` to collect continuous profiles for 100% of profile sessions. See https://docs.sentry.io/platforms/python/profiling/#enable-continuous-profiling for more information.
+- Track and report spans that were dropped (#4005) by @constantinius
+- Change continuous profile buffer size (#3987) by @Zylphrex
+- Handle `MultiPartParserError` to avoid internal sentry crash (#4001) by @orhanhenrik
+- Handle `None` lineno in `get_source_context` (#3925) by @sentrivana
+- Add support for Python 3.12 and 3.13 to AWS Lambda integration (#3965) by @antonpirker
+- Add `propagate_traces` deprecation warning (#3899) by @mgaligniana
+- Check that `__module__` is `str` (#3942) by @szokeasaurusrex
+- Add `__repr__` to `Baggage` (#4043) by @szokeasaurusrex
+- Fix a typo (#3923) by @antonpirker
+- Fix various CI errors on master (#4009) by @Zylphrex
+- Split gevent tests off (#3964) by @sentrivana
+- Add tox generation script, but don't use it yet (#3971) by @sentrivana
+- Use `httpx_mock` in `test_httpx` (#3967) by @sl0thentr0py
+- Fix typo in test name (#4036) by @szokeasaurusrex
+- Fix mypy (#4019) by @sentrivana
+- Test Celery's latest RC (#3938) by @sentrivana
+- Bump `actions/create-github-app-token` from `1.11.2` to `1.11.3` (#4023) by @dependabot
+- Bump `actions/create-github-app-token` from `1.11.1` to `1.11.2` (#4015) by @dependabot
+- Bump `codecov/codecov-action` from `5.1.2` to `5.3.1` (#3995) by @dependabot
+
 ## 2.20.0
 
 - **New integration:** Add [Typer](https://typer.tiangolo.com/) integration (#3869) by @patrick91
-  
+
   For more information, see the documentation for the [TyperIntegration](https://docs.sentry.io/platforms/python/integrations/typer/).
 
 - **New integration:** Add [Unleash](https://www.getunleash.io/) feature flagging integration (#3888) by @aliu39
@@ -85,7 +210,7 @@
 ### Various fixes & improvements
 
 - **New integration:** Add [LaunchDarkly](https://launchdarkly.com/) integration (#3648) by @cmanallen
-  
+
   For more information, see the documentation for the [LaunchDarklyIntegration](https://docs.sentry.io/platforms/python/integrations/launchdarkly/).
 
 - **New integration:** Add [OpenFeature](https://openfeature.dev/) feature flagging integration (#3648) by @cmanallen
@@ -2263,7 +2388,7 @@ By: @mgaligniana (#1773)
 
   import sentry_sdk
   from sentry_sdk.integrations.arq import ArqIntegration
-  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+  from sentry_sdk.tracing import TransactionSource
 
   sentry_sdk.init(
       dsn="...",
@@ -2283,7 +2408,7 @@ By: @mgaligniana (#1773)
       await ctx['session'].aclose()
 
   async def main():
-      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TransactionSource.COMPONENT):
           redis = await create_pool(RedisSettings())
           for url in ('https://facebook.com', 'https://microsoft.com', 'https://github.com', "asdf"
                       ):
@@ -2357,7 +2482,7 @@ By: @mgaligniana (#1773)
 
   import sentry_sdk
   from sentry_sdk.integrations.huey import HueyIntegration
-  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
+  from sentry_sdk.tracing import TransactionSource, Transaction
 
 
   def main():
@@ -2369,7 +2494,7 @@ By: @mgaligniana (#1773)
           traces_sample_rate=1.0,
       )
 
-      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TransactionSource.COMPONENT):
           r = add_numbers(1, 2)
 
   if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import functools
 import inspect
 import sys
 import threading
@@ -8,7 +9,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -321,6 +322,7 @@ def _patch_drf():
             else:
                 old_drf_initial = APIView.initial
 
+                @functools.wraps(old_drf_initial)
                 def sentry_patched_drf_initial(self, request, *args, **kwargs):
                     # type: (APIView, Any, *Any, **Any) -> Any
                     with capture_internal_exceptions():
@@ -398,7 +400,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
         if transaction_name is None:
             transaction_name = request.path_info
-            source = TRANSACTION_SOURCE_URL
+            source = TransactionSource.URL
         else:
             source = SOURCE_FOR_STYLE[transaction_style]
 
@@ -471,6 +473,7 @@ def _patch_get_response():
 
     old_get_response = BaseHandler.get_response
 
+    @functools.wraps(old_get_response)
     def sentry_patched_get_response(self, request):
         # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
         _before_get_response(request)

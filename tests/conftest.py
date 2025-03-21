@@ -28,7 +28,7 @@ from sentry_sdk.integrations import (  # noqa: F401
     _installed_integrations,
     _processed_integrations,
 )
-from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.profiler.transaction_profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise
@@ -588,8 +588,14 @@ def suppress_deprecation_warnings():
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
-        # Process an HTTP GET request and return a response with an HTTP 200 status.
-        self.send_response(200)
+        # Process an HTTP GET request and return a response.
+        # If the path ends with /status/<number>, return status code <number>.
+        # Otherwise return a 200 response.
+        code = 200
+        if "/status/" in self.path:
+            code = int(self.path[-3:])
+
+        self.send_response(code)
         self.end_headers()
         return
 
@@ -660,16 +666,12 @@ class ApproxDict(dict):
         return not self.__eq__(other)
 
 
-@pytest.fixture(name="SortedBaggage")
-def sorted_baggage_matcher():
-    class SortedBaggage:
-        def __init__(self, baggage):
-            self.baggage = baggage
+class SortedBaggage:
+    def __init__(self, baggage):
+        self.baggage = baggage
 
-        def __eq__(self, other):
-            return sorted(self.baggage.split(",")) == sorted(other.split(","))
+    def __eq__(self, other):
+        return sorted(self.baggage.split(",")) == sorted(other.split(","))
 
-        def __ne__(self, other):
-            return not self.__eq__(other)
-
-    return SortedBaggage
+    def __ne__(self, other):
+        return not self.__eq__(other)
