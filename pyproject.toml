@@ -21,3 +21,135 @@ omit = [
 exclude_also = [
     "if TYPE_CHECKING:",
 ]
+
+[tool.mypy]
+allow_redefinition = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+python_version = "3.11" 
+strict_equality = true
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+# Relaxations for code written before mypy was introduced
+# Do not use wildcards in module paths, otherwise added modules will
+# automatically have the same set of relaxed rules as the rest
+[[tool.mypy.overrides]]
+module = "cohere.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "django.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyramid.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "psycopg2.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pytest.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "aiohttp.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "anthropic.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sanic.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tornado.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "fakeredis.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "rq.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyspark.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "asgiref.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "langchain_core.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "executing.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "asttokens.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pure_eval.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "blinker.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sentry_sdk._queue"
+ignore_missing_imports = true
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "sentry_sdk._lru_cache"
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "celery.app.trace"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "flask.signals"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "huey.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "openai.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "openfeature.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "huggingface_hub.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "arq.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "grpc.*"
+ignore_missing_imports = true
