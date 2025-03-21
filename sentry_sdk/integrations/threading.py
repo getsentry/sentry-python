@@ -1,6 +1,7 @@
 import sys
 from functools import wraps
 from threading import Thread, current_thread
+import warnings
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration

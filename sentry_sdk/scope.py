@@ -563,8 +563,10 @@ class Scope:
         """
         span = kwargs.pop("span", None)
         if span is not None:
-            logger.warning(
-                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
+            warnings.warn(
+                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.",
+                stacklevel=2,
+                category=DeprecationWarning,
             )
 
         meta = ""
@@ -734,10 +736,12 @@ class Scope:
         # Without breaking version compatibility, we could make the setter set a
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
-
-        logger.warning(
-            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
+        warnings.warn(
+            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead.",
+            stacklevel=2,
+            category=DeprecationWarning,
         )
+
         self._transaction = value
         if self._span and self._span.containing_transaction:
             self._span.containing_transaction.name = value
