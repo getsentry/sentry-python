@@ -195,7 +195,22 @@ class SentrySampler(Sampler):
             sample_rand = parent_sample_rand
         else:
             lower, upper = _sample_rand_range(parent_sampled, parent_sample_rate)
-            sample_rand = _generate_sample_rand(trace_id, (lower, upper))
+
+            try:
+                sample_rand = _generate_sample_rand(trace_id, (lower, upper))
+            except ValueError:
+                # ValueError is raised if the interval is invalid, i.e. lower >= upper.
+                # lower >= upper might happen if the incoming trace's sampled flag
+                # and sample_rate are inconsistent, e.g. sample_rate=0.0 but sampled=True.
+                # We cannot generate a sensible sample_rand value in this case.
+                logger.debug(
+                    f"Could not backfill sample_rand, since parent_sampled={parent_sampled} "
+                    f"and sample_rate={sample_rate}."
+                )
+                logger.warning(
+                    f"[Tracing] Discarding {name} because of invalid sample rate/sampled."
+                )
+                return dropped_result(parent_span_context, attributes)
 
         # Explicit sampled value provided at start_span
         custom_sampled = cast(

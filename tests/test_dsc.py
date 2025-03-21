@@ -176,10 +176,10 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
     }
 
     # We continue the incoming trace and start a new transaction
-    monkeypatch.setattr(random, "random", lambda: 0.125)
-    with sentry_sdk.continue_trace(incoming_http_headers):
-        with sentry_sdk.start_span(name="foo"):
-            pass
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.125):
+        with sentry_sdk.continue_trace(incoming_http_headers):
+            with sentry_sdk.start_span(name="foo"):
+                pass
 
     assert len(envelopes) == 1
 
