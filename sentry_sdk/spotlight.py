@@ -104,7 +104,7 @@ try:
         @property
         def spotlight_script(self):
             # type: (Self) -> Optional[str]
-            if self._spotlight_script is None:
+            if self._spotlight_url is not None and self._spotlight_script is None:
                 try:
                     spotlight_js_url = urllib.parse.urljoin(
                         self._spotlight_url, SPOTLIGHT_JS_ENTRY_PATH
@@ -174,7 +174,7 @@ try:
 
         def process_exception(self, _request, exception):
             # type: (Self, HttpRequest, Exception) -> Optional[HttpResponseServerError]
-            if not settings.DEBUG:
+            if not settings.DEBUG or not self._spotlight_url:
                 return None
 
             try:
