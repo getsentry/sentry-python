@@ -82,11 +82,11 @@ try:
 
     class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
         _spotlight_script = None  # type: Optional[str]
+        _spotlight_url = None  # type: Optional[str]
 
         def __init__(self, get_response):
             # type: (Self, Callable[..., HttpResponse]) -> None
             super().__init__(get_response)
-            self._spotlight_script = None
 
             import sentry_sdk.api
 
