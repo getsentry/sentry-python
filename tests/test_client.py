@@ -1440,9 +1440,3 @@ class TestSpanClientReports:
 )
 def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_config):
     test_config.run(sentry_init, capture_record_lost_event_calls)
-
-
-@pytest.mark.parametrize("enable_tracing", [True, False])
-def test_enable_tracing_deprecated(sentry_init, enable_tracing):
-    with pytest.warns(DeprecationWarning):
-        sentry_init(enable_tracing=enable_tracing)

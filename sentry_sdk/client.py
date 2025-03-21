@@ -9,7 +9,6 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
-import warnings
 
 from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk.utils import (
@@ -121,9 +120,6 @@ def _get_options(*args, **kwargs):
 
         rv["project_root"] = project_root
 
-    if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
-        rv["traces_sample_rate"] = 1.0
-
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(
             send_default_pii=(
@@ -136,13 +132,6 @@ def _get_options(*args, **kwargs):
             "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
         )
         rv["socket_options"] = None
-
-    if rv["enable_tracing"] is not None:
-        warnings.warn(
-            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     return rv
 

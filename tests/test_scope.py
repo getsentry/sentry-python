@@ -884,7 +884,7 @@ def test_set_tags():
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
@@ -894,7 +894,7 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
@@ -905,7 +905,7 @@ def test_last_event_id_transaction(sentry_init):
 
 
 def test_last_event_id_cleared(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     # Make sure last_event_id is set
     sentry_sdk.capture_exception(Exception("test"))

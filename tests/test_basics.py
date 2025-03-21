@@ -33,7 +33,6 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import datetime_from_isoformat, get_sdk_name, reraise
-from sentry_sdk.tracing_utils import has_tracing_enabled
 
 
 class NoOpIntegration(Integration):
@@ -247,32 +246,6 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     assert crumb["message"] == "Hello"
     assert crumb["data"] == {"foo": "bar"}
     assert crumb["type"] == "default"
-
-
-@pytest.mark.parametrize(
-    "enable_tracing, traces_sample_rate, tracing_enabled, updated_traces_sample_rate",
-    [
-        (None, None, False, None),
-        (False, 0.0, False, 0.0),
-        (False, 1.0, False, 1.0),
-        (None, 1.0, True, 1.0),
-        (True, 1.0, True, 1.0),
-        (None, 0.0, True, 0.0),  # We use this as - it's configured but turned off
-        (True, 0.0, True, 0.0),  # We use this as - it's configured but turned off
-        (True, None, True, 1.0),
-    ],
-)
-def test_option_enable_tracing(
-    sentry_init,
-    enable_tracing,
-    traces_sample_rate,
-    tracing_enabled,
-    updated_traces_sample_rate,
-):
-    sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
-    options = sentry_sdk.get_client().options
-    assert has_tracing_enabled(options) is tracing_enabled
-    assert options["traces_sample_rate"] == updated_traces_sample_rate
 
 
 def test_breadcrumb_arguments(sentry_init, capture_events):
@@ -839,7 +812,7 @@ def test_classmethod_tracing(sentry_init):
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert last_event_id() is None
 
@@ -849,7 +822,7 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert last_event_id() is None
 
@@ -860,7 +833,7 @@ def test_last_event_id_transaction(sentry_init):
 
 
 def test_last_event_id_scope(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     # Should not crash
     with isolation_scope() as scope:

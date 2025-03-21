@@ -6,6 +6,7 @@ import sys
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
+from decimal import ROUND_DOWN, Context, Decimal
 from functools import wraps
 from random import Random
 from urllib.parse import quote, unquote
@@ -93,17 +94,14 @@ def has_tracing_enabled(options):
     # type: (Optional[Dict[str, Any]]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    defined and enable_tracing is set and not false.
+    defined.
     """
     if options is None:
         return False
 
     return bool(
-        options.get("enable_tracing") is not False
-        and (
-            options.get("traces_sample_rate") is not None
-            or options.get("traces_sampler") is not None
-        )
+        options.get("traces_sample_rate") is not None
+        or options.get("traces_sampler") is not None
     )
 
 
@@ -702,8 +700,6 @@ def _generate_sample_rand(
 
     The pseudorandom number generator is seeded with the trace ID.
     """
-    import decimal
-
     lower, upper = interval
     if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
         raise ValueError("Invalid interval: lower must be less than upper")
@@ -714,8 +710,10 @@ def _generate_sample_rand(
         sample_rand = rng.uniform(lower, upper)
 
     # Round down to exactly six decimal-digit precision.
-    return decimal.Decimal(sample_rand).quantize(
-        decimal.Decimal("0.000001"), rounding=decimal.ROUND_DOWN
+    # Setting the context is needed to avoid an InvalidOperation exception
+    # in case the user has changed the default precision.
+    return Decimal(sample_rand).quantize(
+        Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
     )
 
 

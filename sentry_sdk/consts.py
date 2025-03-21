@@ -526,7 +526,6 @@ class ClientConstructor:
         proxy_headers=None,  # type: Optional[Dict[str, str]]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
-        enable_tracing=None,  # type: Optional[bool]
         include_local_variables=True,  # type: Optional[bool]
         include_source_context=True,  # type: Optional[bool]
         trace_propagation_targets=[  # noqa: B006
@@ -914,9 +913,6 @@ class ClientConstructor:
         :param profile_lifecycle:
 
         :param profile_session_sample_rate:
-
-
-        :param enable_tracing:
 
         :param propagate_traces:
 
