@@ -87,15 +87,9 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
     else:
         default_profiler_mode = ThreadContinuousScheduler.mode
 
+    profiler_mode = default_profiler_mode
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
-    else:
-        # TODO: deprecate this and just use the existing `profiler_mode`
-        experiments = options.get("_experiments", {})
-
-        profiler_mode = (
-            experiments.get("continuous_profiling_mode") or default_profiler_mode
-        )
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
 

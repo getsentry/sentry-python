@@ -28,7 +28,7 @@ from sentry_sdk.integrations import (  # noqa: F401
     _installed_integrations,
     _processed_integrations,
 )
-from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.profiler.transaction_profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise

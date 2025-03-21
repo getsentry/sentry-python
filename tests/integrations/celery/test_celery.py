@@ -611,7 +611,7 @@ def test_apply_async_no_args(init_celery):
 def test_messaging_destination_name_default_exchange(
     mock_request, routing_key, init_celery, capture_events
 ):
-    celery_app = init_celery(enable_tracing=True)
+    celery_app = init_celery(traces_sample_rate=1.0)
     events = capture_events()
     mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
 
@@ -635,7 +635,7 @@ def test_messaging_destination_name_nondefault_exchange(
     that the routing key is the queue name. Other exchanges may not guarantee this
     behavior.
     """
-    celery_app = init_celery(enable_tracing=True)
+    celery_app = init_celery(traces_sample_rate=1.0)
     events = capture_events()
     mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
 
@@ -650,7 +650,7 @@ def test_messaging_destination_name_nondefault_exchange(
 
 
 def test_messaging_id(init_celery, capture_events):
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     @celery.task
@@ -664,7 +664,7 @@ def test_messaging_id(init_celery, capture_events):
 
 
 def test_retry_count_zero(init_celery, capture_events):
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     @celery.task()
@@ -681,7 +681,7 @@ def test_retry_count_zero(init_celery, capture_events):
 def test_retry_count_nonzero(mock_request, init_celery, capture_events):
     mock_request.retries = 3
 
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     @celery.task()
@@ -696,7 +696,7 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_events):
 
 @pytest.mark.parametrize("system", ("redis", "amqp"))
 def test_messaging_system(system, init_celery, capture_events):
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     # Does not need to be a real URL, since we use always eager
@@ -721,7 +721,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
 
-    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    sentry_init(integrations=[CeleryIntegration()], traces_sample_rate=1.0)
     celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
     events = capture_events()
 
@@ -759,7 +759,7 @@ def test_receive_latency(init_celery, capture_events):
 
 
 def tests_span_origin_consumer(init_celery, capture_events):
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     celery.conf.broker_url = "redis://example.com"  # noqa: E231
 
     events = capture_events()
@@ -783,7 +783,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
 
-    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    sentry_init(integrations=[CeleryIntegration()], traces_sample_rate=1.0)
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
     events = capture_events()
@@ -812,7 +812,7 @@ def test_send_task_wrapped(
     capture_events,
     reset_integrations,
 ):
-    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    sentry_init(integrations=[CeleryIntegration()], traces_sample_rate=1.0)
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
     events = capture_events()
