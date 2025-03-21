@@ -7,7 +7,7 @@ import sys
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from decimal import ROUND_DOWN, Context, Decimal
+from decimal import ROUND_DOWN, Context, Decimal, InvalidOperation
 from functools import wraps
 from random import Random
 from urllib.parse import quote, unquote
@@ -393,6 +393,9 @@ class PropagationContext:
                     propagation_context = PropagationContext()
                 propagation_context.update(sentrytrace_data)
 
+        if propagation_context is not None:
+            propagation_context._fill_sample_rand()
+
         return propagation_context
 
     @property
@@ -433,6 +436,70 @@ class PropagationContext:
                 setattr(self, key, value)
             except AttributeError:
                 pass
+
+    def _fill_sample_rand(self):
+        # type: () -> None
+        """
+        Ensure that there is a valid sample_rand value in the baggage.
+
+        If there is a valid sample_rand value in the baggage, we keep it.
+        Otherwise, we generate a sample_rand value according to the following:
+
+          - If we have a parent_sampled value and a sample_rate in the DSC, we compute
+            a sample_rand value randomly in the range:
+                - [0, sample_rate) if parent_sampled is True,
+                - or, in the range [sample_rate, 1) if parent_sampled is False.
+
+          - If either parent_sampled or sample_rate is missing, we generate a random
+            value in the range [0, 1).
+
+        The sample_rand is deterministically generated from the trace_id, if present.
+
+        This function does nothing if there is no dynamic_sampling_context.
+        """
+        if self.dynamic_sampling_context is None:
+            return
+
+        try:
+            sample_rand = Decimal(self.baggage.sentry_items.get("sample_rand"))
+        except (TypeError, ValueError, InvalidOperation):
+            sample_rand = None
+
+        if sample_rand is not None and 0 <= sample_rand < 1:
+            # sample_rand is present and valid, so don't overwrite it
+            return
+
+        # Get the sample rate and compute the transformation that will map the random value
+        # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
+        try:
+            sample_rate = float(self.baggage.sentry_items.get("sample_rate"))
+        except (TypeError, ValueError):
+            sample_rate = None
+
+        lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
+
+        try:
+            sample_rand = _generate_sample_rand(self.trace_id, interval=(lower, upper))
+        except ValueError:
+            # ValueError is raised if the interval is invalid, i.e. lower >= upper.
+            # lower >= upper might happen if the incoming trace's sampled flag
+            # and sample_rate are inconsistent, e.g. sample_rate=0.0 but sampled=True.
+            # We cannot generate a sensible sample_rand value in this case.
+            logger.debug(
+                f"Could not backfill sample_rand, since parent_sampled={self.parent_sampled} "
+                f"and sample_rate={sample_rate}."
+            )
+            return
+
+        self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
+
+    def _sample_rand(self):
+        # type: () -> Optional[str]
+        """Convenience method to get the sample_rand value from the dynamic_sampling_context."""
+        if self.baggage is None:
+            return None
+
+        return self.baggage.sentry_items.get("sample_rand")
 
     def __repr__(self):
         # type: (...) -> str

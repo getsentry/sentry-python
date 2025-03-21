@@ -104,11 +104,11 @@ def test_update():
 def test_existing_sample_rand_kept():
     ctx = PropagationContext(
         trace_id="00000000000000000000000000000000",
-        dynamic_sampling_context={"sample_rand": "0.5"},
+        baggage=Baggage(sentry_items={"sample_rand": "0.5"}),
     )
 
-    # If sample_rand was regenerated, the value would be 0.919221 based on the trace_id
     assert ctx.dynamic_sampling_context["sample_rand"] == "0.5"
+    assert ctx.baggage.sentry_items["sample_rand"] == "0.5"
 
 
 @pytest.mark.parametrize(
@@ -158,7 +158,7 @@ def test_sample_rand_filled(parent_sampled, sample_rate, expected_interval):
         )
 
     assert (
-        ctx.dynamic_sampling_context["sample_rand"]
+        ctx.dynamic_sampling_context.get("sample_rand")
         == f"{expected_interval[0]:.6f}"  # noqa: E231
     )
     assert mock_uniform.call_count == 1
