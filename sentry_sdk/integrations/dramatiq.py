@@ -95,7 +95,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         message._scope_manager.__enter__()
 
         scope = sentry_sdk.get_current_scope()
-        scope.transaction = message.actor_name
+        scope.set_transaction_name(message.actor_name)
         scope.set_extra("dramatiq_message_id", message.message_id)
         scope.add_event_processor(_make_message_event_processor(message, integration))
 
