@@ -30,7 +30,6 @@ from sentry_sdk.integrations.opentelemetry.contextvars_context import (
 from sentry_sdk.integrations.opentelemetry.utils import trace_state_from_baggage
 from sentry_sdk.scope import Scope, ScopeType
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import logger
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
