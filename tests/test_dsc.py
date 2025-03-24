@@ -269,7 +269,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         ),
         (  # 4 traces_sampler overrides incoming (incoming not sampled)
             {
-                "incoming_sample_rate": 1.0,
+                "incoming_sample_rate": 0.9,
                 "incoming_sampled": "false",
                 "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
@@ -317,7 +317,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         ),
         (  # 8 traces_sampler overrides incoming  (traces_sample_rate not set) (incoming not sampled)
             {
-                "incoming_sample_rate": 1.0,
+                "incoming_sample_rate": 0.9,
                 "incoming_sampled": "false",
                 "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
