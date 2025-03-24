@@ -97,9 +97,7 @@ def test_baggage_with_tracing_enabled(sentry_init):
     with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.123456):
         with start_span(name="foo") as span:
             expected_baggage = SortedBaggage(
-                "sentry-transaction=foo,sentry-trace_id={},sentry-sample_rand=0.123456,sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={}".format(
-                    span.trace_id, "true" if span.sampled else "false"
-                )
+                f"sentry-transaction=foo,sentry-trace_id={span.trace_id},sentry-sample_rand=0.123456,sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled=true"
             )
             assert expected_baggage == get_baggage()
 
