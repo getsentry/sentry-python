@@ -94,11 +94,14 @@ def test_baggage_with_tracing_disabled(sentry_init):
 @pytest.mark.forked
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
-    with start_span(name="foo") as span:
-        expected_baggage_re = r"^sentry-transaction=foo,sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=1\.0\.0,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
-            span.trace_id, "true" if span.sampled else "false"
-        )
-        assert re.match(expected_baggage_re, get_baggage())
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.123456):
+        with start_span(name="foo") as span:
+            expected_baggage = SortedBaggage(
+                "sentry-transaction=foo,sentry-trace_id={},sentry-sample_rand=0.123456,sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={}".format(
+                    span.trace_id, "true" if span.sampled else "false"
+                )
+            )
+            assert expected_baggage == get_baggage()
 
 
 @pytest.mark.forked
