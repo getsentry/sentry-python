@@ -584,7 +584,7 @@ class DjangoRequestExtractor(RequestExtractor):
         # type: () -> Optional[Dict[str, Any]]
         try:
             return self.request.data
-        except AttributeError:
+        except Exception:
             return RequestExtractor.parsed_body(self)
 
 
