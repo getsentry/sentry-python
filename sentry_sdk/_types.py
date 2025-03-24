@@ -47,11 +47,14 @@ class AnnotatedValue:
         )
 
     @classmethod
-    def removed_because_over_size_limit(cls):
-        # type: () -> AnnotatedValue
-        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
+    def removed_because_over_size_limit(cls, value=""):
+        # type: (Any) -> AnnotatedValue
+        """
+        The actual value was removed because the size of the field exceeded the configured maximum size,
+        for example specified with the max_request_body_size sdk option.
+        """
         return AnnotatedValue(
-            value="",
+            value=value,
             metadata={
                 "rem": [  # Remark
                     [
@@ -160,7 +163,7 @@ if TYPE_CHECKING:
             "errors": list[dict[str, Any]],  # TODO: We can expand on this type
             "event_id": str,
             "exception": dict[
-                Literal["values"], list[dict[str, Any]]
+                Literal["values"], list[Annotated[dict[str, Any]]]
             ],  # TODO: We can expand on this type
             "extra": MutableMapping[str, object],
             "fingerprint": list[str],
