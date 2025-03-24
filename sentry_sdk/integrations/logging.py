@@ -63,7 +63,12 @@ def ignore_logger(
 class LoggingIntegration(Integration):
     identifier = "logging"
 
-    def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
+    def __init__(
+        self,
+        level=DEFAULT_LEVEL,
+        sentry_logs_level=DEFAULT_LEVEL,
+        event_level=DEFAULT_EVENT_LEVEL,
+    ):
         # type: (Optional[int], Optional[int]) -> None
         self._handler = None
         self._breadcrumb_handler = None
@@ -71,6 +76,8 @@ class LoggingIntegration(Integration):
 
         if level is not None:
             self._breadcrumb_handler = BreadcrumbHandler(level=level)
+
+        if sentry_logs_level is not None:
             self._sentry_logs_handler = SentryLogsHandler(level=level)
 
         if event_level is not None:

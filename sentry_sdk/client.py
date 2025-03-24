@@ -886,7 +886,9 @@ class _Client(BaseClient):
 
         propagation_context = scope.get_active_propagation_context()
         if propagation_context is not None:
-            headers["trace_id"] = propagation_context.trace_id
+            if propagation_context.dynamic_sampling_context is not None:
+                headers["trace"] = propagation_context.dynamic_sampling_context
+
             if log["trace_id"] is None:
                 log["trace_id"] = propagation_context.trace_id
 
