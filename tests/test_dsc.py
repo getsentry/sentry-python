@@ -8,7 +8,6 @@ The DSC is propagated between service using a header called "baggage".
 This is not tested in this file.
 """
 
-import random
 from unittest import mock
 
 import pytest
@@ -269,14 +268,14 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         ),
         (  # 4 traces_sampler overrides incoming (incoming not sampled)
             {
-                "incoming_sample_rate": 0.9,
+                "incoming_sample_rate": 0.3,
                 "incoming_sampled": "false",
                 "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
-                "local_traces_sampler_result": 0.5,
+                "local_traces_sampler_result": 0.25,
                 "local_traces_sample_rate": 0.7,
             },
-            0.5,  # expected_sample_rate
+            0.25,  # expected_sample_rate
             "false",  # expected_sampled (traces sampler can override parent sampled)
         ),
         (  # 5 forwarding incoming (traces_sample_rate not set)
@@ -317,14 +316,14 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         ),
         (  # 8 traces_sampler overrides incoming  (traces_sample_rate not set) (incoming not sampled)
             {
-                "incoming_sample_rate": 0.9,
+                "incoming_sample_rate": 0.3,
                 "incoming_sampled": "false",
                 "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
-                "local_traces_sampler_result": 0.5,
+                "local_traces_sampler_result": 0.25,
                 "local_traces_sample_rate": None,
             },
-            0.5,  # expected_sample_rate
+            0.25,  # expected_sample_rate
             "false",  # expected_sampled
         ),
         (  # 9 traces_sample_rate overrides incoming (upstream deferred sampling decision)
@@ -405,7 +404,7 @@ def test_dsc_sample_rate_change(
     }
 
     # We continue the incoming trace and start a new transaction
-    with mock.patch.object(random, "random", return_value=0.2):
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.2):
         with sentry_sdk.continue_trace(incoming_http_headers):
             with sentry_sdk.start_span(name="foo"):
                 pass

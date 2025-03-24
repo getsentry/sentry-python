@@ -495,7 +495,7 @@ class PropagationContext:
 
     def _sample_rand(self):
         # type: () -> Optional[str]
-        """Convenience method to get the sample_rand value from the dynamic_sampling_context."""
+        """Convenience method to get the sample_rand value from the baggage."""
         if self.baggage is None:
             return None
 
