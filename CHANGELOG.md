@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.24.1
+
+### Various fixes & improvements
+
+- build(deps): bump actions/create-github-app-token from 1.11.6 to 1.11.7 (#4188) by @dependabot
+- fix: Always set _spotlight_url (#4186) by @BYK
+- Broader except in django parsed_body (#4189) by @orhanhenrik
+- ci: Move `flake8` config into `pyproject.toml` (#4185) by @antonpirker
+- ci: Move `pytest` config into `pyproject.toml` (#4184) by @antonpirker
+- feat(profiling): add platform header to the chunk item-type in the envelope (#4178) by @viglia
+- ci: Move `mypy` config into `pyproject.toml` (#4181) by @antonpirker
+- meta: Add CODEOWNERS (#4182) by @sentrivana
+
 ## 2.24.0
 
 ### Various fixes & improvements
