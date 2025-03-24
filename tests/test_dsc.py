@@ -413,6 +413,7 @@ def test_dsc_sample_rate_change(
     if expected_sampled == "tracing-disabled-no-transactions-should-be-sent":
         assert len(envelopes) == 0
     else:
+        assert len(envelopes) == 1
         transaction_envelope = envelopes[0]
         dsc_in_envelope_header = transaction_envelope.headers["trace"]
 
