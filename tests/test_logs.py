@@ -272,7 +272,7 @@ def test_no_log_infinite_loop(sentry_init, capture_envelopes):
     """
     sentry_init(
         _experiments={"enable_sentry_logs": True},
-        integrations=[LoggingIntegration(level=logging.DEBUG)],
+        integrations=[LoggingIntegration(sentry_logs_level=logging.DEBUG)],
         debug=True,
     )
     envelopes = capture_envelopes()
