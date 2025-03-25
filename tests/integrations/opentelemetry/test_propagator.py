@@ -201,7 +201,7 @@ def test_inject_head_sdk(sentry_init):
 
     with patch(
         "sentry_sdk.tracing_utils.Random.uniform",
-        return_value=decimal.Decimal("0.123456"),
+        return_value=0.123456,
     ):
         with sentry_sdk.start_span(name="foo") as span:
             SentryPropagator().inject(carrier, setter=setter)

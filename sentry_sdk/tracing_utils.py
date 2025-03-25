@@ -484,8 +484,6 @@ class PropagationContext:
                     f"Failed to convert incoming sample_rate to float: {sample_rate}"
                 )
 
-        # Compute the transformation that will map the random value
-        # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
         lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
 
         try:
