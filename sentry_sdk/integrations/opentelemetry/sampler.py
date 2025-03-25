@@ -204,7 +204,7 @@ class SentrySampler(Sampler):
                 # and sample_rate are inconsistent, e.g. sample_rate=0.0 but sampled=True.
                 # We cannot generate a sensible sample_rand value in this case.
                 logger.debug(
-                    f"Could not backfill sample_rand, since parent_sampled={parent_sampled} "
+                    f"Could not generate sample_rand, since parent_sampled={parent_sampled} "
                     f"and sample_rate={sample_rate}."
                 )
                 logger.warning(
