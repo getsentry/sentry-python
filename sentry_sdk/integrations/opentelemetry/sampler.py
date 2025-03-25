@@ -103,6 +103,9 @@ def dropped_result(parent_span_context, attributes, sample_rate=None, sample_ran
     Update the trace_state with the effective sampled, sample_rate and sample_rand,
     record that we dropped the event for client report purposes, and return
     an OTel SamplingResult with Decision.DROP.
+
+    See for more info about OTel sampling:
+    https://opentelemetry-python.readthedocs.io/en/latest/sdk/trace.sampling.html
     """
     # these will only be added the first time in a root span sampling decision
     # if sample_rate or sample_rand is provided, they'll be updated in trace state
@@ -150,6 +153,9 @@ def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None)
 
     Update the trace_state with the effective sampled, sample_rate and sample_rand,
     and return an OTel SamplingResult with Decision.RECORD_AND_SAMPLE.
+
+    See for more info about OTel sampling:
+    https://opentelemetry-python.readthedocs.io/en/latest/sdk/trace.sampling.html
     """
     # these will only be added the first time in a root span sampling decision
     # if sample_rate or sample_rand is provided, they'll be updated in trace state
