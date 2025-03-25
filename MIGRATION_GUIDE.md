@@ -156,9 +156,13 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `profiles_sample_rate` and `profiler_mode` were removed from options available via `_experiments`. Use the top-level `profiles_sample_rate` and `profiler_mode` options instead.
 - `Transport.capture_event` has been removed. Use `Transport.capture_envelope` instead.
 - Function transports are no longer supported. Subclass the `Transport` instead.
-- `start_transaction` (`start_span`) no longer takes an explicit `sampled` argument.
-- `start_transaction` (`start_span`) no longer takes an explicit `description` argument. Use `name` instead.
-- `start_transaction` (`start_span`) no longer takes an explicit `trace_id` or `span_id` argument. Use `continue_trace` for propagation from headers or environment variables.
+- `start_transaction` (`start_span`) no longer takes the following arguments:
+  - `sampled`: use a `traces_sampler` to adjust the sampling rate
+  - `description`: use `name` instead
+  - `trace_id`, `baggage`: use `continue_trace` for propagation from headers or environment variables
+  - `same_process_as_parent`
+  - `span_id`
+  - `parent_span_id`: you can supply a `parent_span` instead
 
 
 ### Deprecated
