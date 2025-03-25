@@ -69,7 +69,7 @@ class LoggingIntegration(Integration):
         sentry_logs_level=DEFAULT_LEVEL,
         event_level=DEFAULT_EVENT_LEVEL,
     ):
-        # type: (Optional[int], Optional[int]) -> None
+        # type: (Optional[int], Optional[int], Optional[int]) -> None
         self._handler = None
         self._breadcrumb_handler = None
         self._sentry_logs_handler = None
@@ -78,7 +78,7 @@ class LoggingIntegration(Integration):
             self._breadcrumb_handler = BreadcrumbHandler(level=level)
 
         if sentry_logs_level is not None:
-            self._sentry_logs_handler = SentryLogsHandler(level=level)
+            self._sentry_logs_handler = SentryLogsHandler(level=sentry_logs_level)
 
         if event_level is not None:
             self._handler = EventHandler(level=event_level)
