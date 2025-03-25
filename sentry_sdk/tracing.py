@@ -51,35 +51,11 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing_utils import Baggage
 
     class SpanKwargs(TypedDict, total=False):
-        trace_id: str
-        """
-        The trace ID of the root span. If this new span is to be the root span,
-        omit this parameter, and a new trace ID will be generated.
-        """
-
-        span_id: str
-        """The span ID of this span. If omitted, a new span ID will be generated."""
-
-        parent_span_id: str
-        """The span ID of the parent span, if applicable."""
-
-        same_process_as_parent: bool
-        """Whether this span is in the same process as the parent span."""
-
-        sampled: bool
-        """
-        Whether the span should be sampled. Overrides the default sampling decision
-        for this span when provided.
-        """
-
         op: str
         """
         The span's operation. A list of recommended values is available here:
         https://develop.sentry.dev/sdk/performance/span-operations/
         """
-
-        description: str
-        """A description of what operation is being performed within the span. This argument is DEPRECATED. Please use the `name` parameter, instead."""
 
         status: str
         """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
@@ -113,12 +89,6 @@ if TYPE_CHECKING:
         See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations for more information.
         Default "custom".
         """
-
-        parent_sampled: bool
-        """Whether the parent transaction was sampled. If True this transaction will be kept, if False it will be discarded."""
-
-        baggage: "Baggage"
-        """The W3C baggage header value. (see https://www.w3.org/TR/baggage/)"""
 
     ProfileContext = TypedDict(
         "ProfileContext",
@@ -307,7 +277,6 @@ class Span:
         self,
         *,
         op=None,  # type: Optional[str]
-        description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
@@ -349,7 +318,7 @@ class Span:
                     # OTel timestamps have nanosecond precision
                     start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
-                span_name = name or description or op or DEFAULT_SPAN_NAME
+                span_name = name or op or DEFAULT_SPAN_NAME
 
                 # Prepopulate some attrs so that they're accessible in traces_sampler
                 attributes = attributes or {}
@@ -372,7 +341,6 @@ class Span:
                 )
 
                 self.origin = origin or DEFAULT_SPAN_ORIGIN
-                self.description = description
                 self.name = span_name
 
                 if status is not None:
@@ -430,20 +398,6 @@ class Span:
         self.finish()
         context.detach(self._ctx_token)
         del self._ctx_token
-
-    @property
-    def description(self):
-        # type: () -> Optional[str]
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
-        return self.get_attribute(SentrySpanAttribute.DESCRIPTION)
-
-    @description.setter
-    def description(self, value):
-        # type: (Optional[str]) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
-        self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
 
     @property
     def origin(self):
