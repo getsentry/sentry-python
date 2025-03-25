@@ -862,11 +862,12 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_experimental_log(self, scope, log):
+    def _capture_experimental_log(self, current_scope, log):
         # type: (Scope, Log) -> None
         logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
         if not logs_enabled:
             return
+        isolation_scope = current_scope.get_isolation_scope()
 
         headers = {
             "sent_at": format_timestamp(datetime.now(timezone.utc)),
@@ -880,16 +881,16 @@ class _Client(BaseClient):
         if release is not None and "sentry.release" not in log["attributes"]:
             log["attributes"]["sentry.release"] = release
 
-        span = scope.span
+        span = current_scope.span
         if span is not None and "sentry.trace.parent_span_id" not in log["attributes"]:
             log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
 
-        propagation_context = scope.get_active_propagation_context()
-        if propagation_context is not None:
-            if propagation_context.dynamic_sampling_context is not None:
-                headers["trace"] = propagation_context.dynamic_sampling_context
-
-            if log["trace_id"] is None:
+        if log.get("trace_id") is None:
+            transaction = current_scope.transaction
+            propagation_context = isolation_scope.get_active_propagation_context()
+            if transaction is not None:
+                log["trace_id"] = transaction.trace_id
+            elif propagation_context is not None:
                 log["trace_id"] = propagation_context.trace_id
 
         # If debug is enabled, log the log to the console
