@@ -561,14 +561,6 @@ class Scope:
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """
-        span = kwargs.pop("span", None)
-        if span is not None:
-            warnings.warn(
-                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
         meta = ""
 
         sentry_trace = self.get_traceparent()
@@ -719,33 +711,6 @@ class Scope:
         # transaction) or a non-orphan span on the scope
         return self._span.containing_transaction
 
-    @transaction.setter
-    def transaction(self, value):
-        # type: (Any) -> None
-        # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
-        """When set this forces a specific transaction name to be set.
-
-        Deprecated: use set_transaction_name instead."""
-
-        # XXX: the docstring above is misleading. The implementation of
-        # apply_to_event prefers an existing value of event.transaction over
-        # anything set in the scope.
-        # XXX: note that with the introduction of the Scope.transaction getter,
-        # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a Span, the setter sets a transaction name.
-        # Without breaking version compatibility, we could make the setter set a
-        # transaction name or transaction (self._span) depending on the type of
-        # the value argument.
-
-        warnings.warn(
-            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._transaction = value
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = value
-
     def set_transaction_name(self, name, source=None):
         # type: (str, Optional[str]) -> None
         """Set the transaction name and optionally the transaction source."""
@@ -768,12 +733,6 @@ class Scope:
     def transaction_source(self):
         # type: () -> Optional[str]
         return self._transaction_info.get("source")
-
-    @_attr_setter
-    def user(self, value):
-        # type: (Optional[Dict[str, Any]]) -> None
-        """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
-        self.set_user(value)
 
     def set_user(self, value):
         # type: (Optional[Dict[str, Any]]) -> None
