@@ -676,7 +676,7 @@ def single_exception_from_error_tuple(
     source=None,  # type: Optional[str]
     full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
-    # type: (...) -> Annotated[Dict[str, Any]]
+    # type: (...) -> Dict[str, Any]
     """
     Creates a dict that goes into the events `exception.values` list and is ingestible by Sentry.
 
@@ -812,7 +812,7 @@ def exceptions_from_error(
     source=None,  # type: Optional[str]
     full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
-    # type: (...) -> Tuple[int, List[Annotated[Dict[str, Any]]]]
+    # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
     Creates the list of exceptions.
     This can include chained exceptions and exceptions from an ExceptionGroup.
@@ -908,7 +908,7 @@ def exceptions_from_error_tuple(
     mechanism=None,  # type: Optional[Dict[str, Any]]
     full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
-    # type: (...) -> List[Annotated[Dict[str, Any]]]
+    # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
 
     is_exception_group = BaseExceptionGroup is not None and isinstance(

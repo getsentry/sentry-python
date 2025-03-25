@@ -163,7 +163,7 @@ if TYPE_CHECKING:
             "errors": list[dict[str, Any]],  # TODO: We can expand on this type
             "event_id": str,
             "exception": dict[
-                Literal["values"], list[Annotated[dict[str, Any]]]
+                Literal["values"], list[dict[str, Any]]
             ],  # TODO: We can expand on this type
             "extra": MutableMapping[str, object],
             "fingerprint": list[str],
