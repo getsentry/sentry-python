@@ -795,7 +795,7 @@ class Scope:
         # type: (Optional[Dict[str, Any]]) -> None
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
         warnings.warn(
-            "Setting `Scope.user` directly is deprecated. Please use `Scope.set_user()` instead.",
+            "The `Scope.user` setter is deprecated in favor of `Scope.set_user()`.",
             DeprecationWarning,
             stacklevel=2,
         )
