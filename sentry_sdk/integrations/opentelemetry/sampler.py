@@ -97,6 +97,13 @@ def get_parent_sample_rand(parent_context, trace_id):
 
 def dropped_result(parent_span_context, attributes, sample_rate=None, sample_rand=None):
     # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
+    """
+    React to a span getting unsampled and return a DROP SamplingResult.
+
+    Update the trace_state with the effective sampled, sample_rate and sample_rand,
+    record that we dropped the event for client report purposes, and return
+    an OTel SamplingResult with Decision.DROP.
+    """
     # these will only be added the first time in a root span sampling decision
     # if sample_rate or sample_rand is provided, they'll be updated in trace state
     trace_state = parent_span_context.trace_state
@@ -138,6 +145,12 @@ def dropped_result(parent_span_context, attributes, sample_rate=None, sample_ran
 
 def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None):
     # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
+    """
+    React to a span being sampled and return a sampled SamplingResult.
+
+    Update the trace_state with the effective sampled, sample_rate and sample_rand,
+    and return an OTel SamplingResult with Decision.RECORD_AND_SAMPLE.
+    """
     # these will only be added the first time in a root span sampling decision
     # if sample_rate or sample_rand is provided, they'll be updated in trace state
     trace_state = span_context.trace_state

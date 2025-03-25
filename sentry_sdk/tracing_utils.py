@@ -468,7 +468,7 @@ class PropagationContext:
                 sample_rand = Decimal(sentry_baggage["sample_rand"])
             except Exception:
                 logger.debug(
-                    f"Failed to convert incoming sample_rand to int: {sample_rand}"
+                    f"Failed to convert incoming sample_rand to Decimal: {sample_rand}"
                 )
 
         if sample_rand is not None and 0 <= sample_rand < 1:
