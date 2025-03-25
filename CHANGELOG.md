@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.24.1
+
+### Various fixes & improvements
+
+- Always set `_spotlight_url` (#4186) by @BYK
+- Broader except in Django `parsed_body` (#4189) by @orhanhenrik
+- Add platform header to the `chunk` item-type in the envelope (#4178) by @viglia
+- Move `mypy` config into `pyproject.toml` (#4181) by @antonpirker
+- Move `flake8` config into `pyproject.toml` (#4185) by @antonpirker
+- Move `pytest` config into `pyproject.toml` (#4184) by @antonpirker
+- Bump `actions/create-github-app-token` from `1.11.6` to `1.11.7` (#4188) by @dependabot
+- Add `CODEOWNERS` (#4182) by @sentrivana
+
+## 2.24.0
+
+### Various fixes & improvements
+
+- fix(tracing): Fix `InvalidOperation` (#4179) by @szokeasaurusrex
+- Fix memory leak by not piling up breadcrumbs forever in Spark workers.  (#4167) by @antonpirker
+- Update scripts sources (#4166) by @emmanuel-ferdman
+- Fixed flaky test (#4165) by @antonpirker
+- chore(profiler): Add deprecation warning for session functions (#4171) by @sentrivana
+- feat(profiling): reverse profile_session start/stop methods deprecation (#4162) by @viglia
+- Reset `DedupeIntegration`'s `last-seen` if `before_send` dropped the event (#4142) by @sentrivana
+- style(integrations): Fix captured typo (#4161) by @pimuzzo
+- Handle loguru msg levels that are not supported by Sentry (#4147) by @antonpirker
+- feat(tests): Update tox.ini (#4146) by @sentrivana
+- Support Starlette/FastAPI `app.host` (#4157) by @sentrivana
+
 ## 2.23.1
 
 ### Various fixes & improvements
