@@ -309,7 +309,6 @@ class Span:
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
-        sampled=None,  # type: Optional[bool]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
@@ -318,14 +317,9 @@ class Span:
         only_if_parent=False,  # type: bool
         parent_span=None,  # type: Optional[Span]
         otel_span=None,  # type: Optional[OtelSpan]
-        **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
         """
-        For backwards compatibility with old the old Span interface, this class
-        accepts arbitrary keyword arguments, in addition to the ones explicitly
-        listed in the signature. These additional arguments are ignored.
-
         If otel_span is passed explicitly, just acts as a proxy.
 
         If only_if_parent is True, just return an INVALID_SPAN
