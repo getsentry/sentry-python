@@ -4,26 +4,14 @@ import sentry_sdk
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 # Global variables to store sampling context for verification
-sampling_context_data = {
-    "aws_event_present": False,
-    "aws_context_present": False,
-    "event_data": None,
-}
+sampling_context_data = None
 
 
 def trace_sampler(sampling_context):
     # Store the sampling context for verification
     global sampling_context_data
+    sampling_context_data = sampling_context
 
-    # Check if aws_event and aws_context are in the sampling_context
-    if "aws_event" in sampling_context:
-        sampling_context_data["aws_event_present"] = True
-        sampling_context_data["event_data"] = sampling_context["aws_event"]
-
-    if "aws_context" in sampling_context:
-        sampling_context_data["aws_context_present"] = True
-
-    print("Sampling context data:", sampling_context_data)
     return 1.0  # Always sample
 
 
