@@ -457,25 +457,35 @@ class PropagationContext:
 
         This function does nothing if there is no dynamic_sampling_context.
         """
-        if self.dynamic_sampling_context is None:
+        if self.dynamic_sampling_context is None or self.baggage is None:
             return
 
-        try:
-            sample_rand = Decimal(self.baggage.sentry_items.get("sample_rand"))
-        except (TypeError, ValueError, InvalidOperation):
-            sample_rand = None
+        sentry_baggage = self.baggage.sentry_items
+
+        sample_rand = None
+        if sentry_baggage.get("sample_rand"):
+            try:
+                sample_rand = Decimal(sentry_baggage["sample_rand"])
+            except (ValueError, InvalidOperation):
+                logger.debug(
+                    f"Failed to convert incoming sample_rand to int: {sample_rand}"
+                )
 
         if sample_rand is not None and 0 <= sample_rand < 1:
             # sample_rand is present and valid, so don't overwrite it
             return
 
-        # Get the sample rate and compute the transformation that will map the random value
-        # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
-        try:
-            sample_rate = float(self.baggage.sentry_items.get("sample_rate"))
-        except (TypeError, ValueError):
-            sample_rate = None
+        sample_rate = None
+        if sentry_baggage.get("sample_rate"):
+            try:
+                sample_rate = float(sentry_baggage["sample_rate"])
+            except (ValueError, KeyError):
+                logger.debug(
+                    f"Failed to convert incoming sample_rate to float: {sample_rate}"
+                )
 
+        # Compute the transformation that will map the random value
+        # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
         lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
 
         try:
@@ -753,7 +763,7 @@ def get_current_span(scope=None):
 
 
 def _generate_sample_rand(
-    trace_id,  # type: Optional[int]
+    trace_id,  # type: Optional[str]
     interval=(0.0, 1.0),  # type: tuple[float, float]
 ):
     # type: (...) -> decimal.Decimal

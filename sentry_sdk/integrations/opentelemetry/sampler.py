@@ -197,7 +197,7 @@ class SentrySampler(Sampler):
             lower, upper = _sample_rand_range(parent_sampled, parent_sample_rate)
 
             try:
-                sample_rand = _generate_sample_rand(trace_id, (lower, upper))
+                sample_rand = _generate_sample_rand(str(trace_id), (lower, upper))
             except ValueError:
                 # ValueError is raised if the interval is invalid, i.e. lower >= upper.
                 # lower >= upper might happen if the incoming trace's sampled flag
