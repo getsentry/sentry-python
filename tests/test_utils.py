@@ -906,15 +906,14 @@ def test_get_current_thread_meta_failed_to_get_main_thread():
 
     def target():
         with mock.patch("threading.current_thread", side_effect=["fake thread"]):
-            with mock.patch("threading.current_thread", side_effect=["fake thread"]):
-                results.put(get_current_thread_meta())
+            results.put(get_current_thread_meta())
 
     main_thread = threading.main_thread()
 
     thread = threading.Thread(target=target)
     thread.start()
     thread.join()
-    assert (main_thread.ident, main_thread.name) == results.get(timeout=5)
+    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
 
 
 @pytest.mark.parametrize(
