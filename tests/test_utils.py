@@ -902,7 +902,7 @@ def test_get_current_thread_meta_main_thread():
     assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
 
 
-@pytest.mark.skipif(PY38, "Flakes a lot on 3.8 in CI.")
+@pytest.mark.skipif(PY38, reason="Flakes a lot on 3.8 in CI.")
 def test_get_current_thread_meta_failed_to_get_main_thread():
     results = Queue(maxsize=1)
 
