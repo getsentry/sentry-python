@@ -115,12 +115,6 @@ envlist =
     {py3.9,py3.11,py3.12}-langchain-latest
     {py3.9,py3.11,py3.12}-langchain-notiktoken
 
-    # Litestar
-    {py3.8,py3.11}-litestar-v{2.0}
-    {py3.8,py3.11,py3.12}-litestar-v{2.6}
-    {py3.8,py3.11,py3.12}-litestar-v{2.12}
-    {py3.8,py3.11,py3.12}-litestar-latest
-
     # OpenAI
     {py3.9,py3.11,py3.12}-openai-v1.0
     {py3.9,py3.11,py3.12}-openai-v1.22
@@ -346,17 +340,6 @@ deps =
     langchain-{latest,notiktoken}: langchain-openai
     langchain-{latest,notiktoken}: openai>=1.6.1
     langchain-latest: tiktoken~=0.6.0
-
-    # Litestar
-    litestar: pytest-asyncio
-    litestar: python-multipart
-    litestar: requests
-    litestar: cryptography
-    litestar-v{2.0,2.6}: httpx<0.28
-    litestar-v2.0: litestar~=2.0.0
-    litestar-v2.6: litestar~=2.6.0
-    litestar-v2.12: litestar~=2.12.0
-    litestar-latest: litestar
 
     # OpenAI
     openai: pytest-asyncio
