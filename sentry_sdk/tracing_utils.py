@@ -7,7 +7,7 @@ import sys
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from decimal import ROUND_DOWN, Context, Decimal, InvalidOperation
+from decimal import ROUND_DOWN, Context, Decimal
 from functools import wraps
 from random import Random
 from urllib.parse import quote, unquote
@@ -466,7 +466,7 @@ class PropagationContext:
         if sentry_baggage.get("sample_rand"):
             try:
                 sample_rand = Decimal(sentry_baggage["sample_rand"])
-            except (ValueError, InvalidOperation):
+            except Exception:
                 logger.debug(
                     f"Failed to convert incoming sample_rand to int: {sample_rand}"
                 )
@@ -479,7 +479,7 @@ class PropagationContext:
         if sentry_baggage.get("sample_rate"):
             try:
                 sample_rate = float(sentry_baggage["sample_rate"])
-            except (ValueError, KeyError):
+            except Exception:
                 logger.debug(
                     f"Failed to convert incoming sample_rate to float: {sample_rate}"
                 )
