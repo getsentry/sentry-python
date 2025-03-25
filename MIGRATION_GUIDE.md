@@ -156,6 +156,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `profiles_sample_rate` and `profiler_mode` were removed from options available via `_experiments`. Use the top-level `profiles_sample_rate` and `profiler_mode` options instead.
 - `Transport.capture_event` has been removed. Use `Transport.capture_envelope` instead.
 - Function transports are no longer supported. Subclass the `Transport` instead.
+- `start_transaction` (`start_span`) no longer takes an explicit `sampled` argument.
 
 ### Deprecated
 

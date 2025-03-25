@@ -23,19 +23,6 @@ def test_sampling_decided_only_for_root_spans(sentry_init):
         assert root_span2.sampled is not None
 
 
-@pytest.mark.parametrize("sampled", [True, False])
-def test_nested_span_sampling_override(sentry_init, sampled):
-    sentry_init(traces_sample_rate=1.0)
-
-    with start_span(name="outer", sampled=sampled) as outer_span:
-        assert outer_span.sampled is sampled
-        with start_span(name="inner", sampled=(not sampled)) as inner_span:
-            # won't work because the child span inherits the sampling decision
-            # from the parent
-            assert inner_span.sampled is sampled
-        assert outer_span.sampled is sampled
-
-
 def test_no_double_sampling(sentry_init, capture_events):
     # Transactions should not be subject to the global/error sample rate.
     # Only the traces_sample_rate should apply.
@@ -144,19 +131,6 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
             pass
 
     assert span.sampled is not parent_sampling_decision
-
-
-@pytest.mark.parametrize("explicit_decision", [True, False])
-def test_traces_sampler_doesnt_overwrite_explicitly_passed_sampling_decision(
-    sentry_init, explicit_decision
-):
-    # make traces_sampler pick the opposite of the explicit decision, to prove
-    # that the explicit decision takes precedence
-    traces_sampler = mock.Mock(return_value=not explicit_decision)
-    sentry_init(traces_sampler=traces_sampler)
-
-    with start_span(name="dogpark", sampled=explicit_decision) as span:
-        assert span.sampled is explicit_decision
 
 
 @pytest.mark.parametrize("parent_sampling_decision", [True, False])

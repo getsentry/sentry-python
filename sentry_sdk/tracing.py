@@ -20,7 +20,6 @@ from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.utils import (
     _serialize_span_attribute,
     get_current_thread_meta,
-    logger,
     should_be_treated_as_error,
 )
 
@@ -364,8 +363,6 @@ class Span:
                     attributes[SentrySpanAttribute.OP] = op
                 if source is not None:
                     attributes[SentrySpanAttribute.SOURCE] = source
-                if sampled is not None:
-                    attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
                 parent_context = None
                 if parent_span is not None:
