@@ -144,7 +144,7 @@ def test_inject_continue_trace(sentry_init):
 
     with patch(
         "sentry_sdk.tracing_utils.Random.uniform",
-        return_value=decimal.Decimal("0.002849"),
+        return_value=0.002849,
     ):
         with sentry_sdk.continue_trace(incoming_headers):
             with sentry_sdk.start_span(name="foo") as span:
