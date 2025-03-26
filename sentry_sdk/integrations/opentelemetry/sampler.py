@@ -8,7 +8,6 @@ from opentelemetry.trace.span import TraceState
 import sentry_sdk
 from sentry_sdk.tracing_utils import (
     _generate_sample_rand,
-    _sample_rand_range,
     has_tracing_enabled,
 )
 from sentry_sdk.utils import is_valid_sample_rate, logger
@@ -211,25 +210,12 @@ class SentrySampler(Sampler):
         parent_sample_rand = get_parent_sample_rand(parent_span_context, trace_id)
 
         if parent_sample_rand is not None:
+            # We have a sample_rand on the incoming trace or we already backfilled
+            # it in PropagationContext
             sample_rand = parent_sample_rand
         else:
-            lower, upper = _sample_rand_range(parent_sampled, parent_sample_rate)
-
-            try:
-                sample_rand = _generate_sample_rand(str(trace_id), (lower, upper))
-            except ValueError:
-                # ValueError is raised if the interval is invalid, i.e. lower >= upper.
-                # lower >= upper might happen if the incoming trace's sampled flag
-                # and sample_rate are inconsistent, e.g. sample_rate=0.0 but sampled=True.
-                # We cannot generate a sensible sample_rand value in this case.
-                logger.debug(
-                    f"Could not generate sample_rand, since parent_sampled={parent_sampled} "
-                    f"and sample_rate={sample_rate}."
-                )
-                logger.warning(
-                    f"[Tracing] Discarding {name} because of invalid sample rate/sampled."
-                )
-                return dropped_result(parent_span_context, attributes)
+            # There is no sample_rand yet, generate a new one
+            sample_rand = _generate_sample_rand(str(trace_id), (0, 1))
 
         # Explicit sampled value provided at start_span
         custom_sampled = cast(
