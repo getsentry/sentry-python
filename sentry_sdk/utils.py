@@ -741,10 +741,18 @@ def single_exception_from_error_tuple(
             max_value_length=max_value_length,
             custom_repr=custom_repr,
         )
+        # Process at most MAX_STACK_FRAMES + 1 frames, to avoid hanging on
+        # processing a super-long stacktrace.
         for tb, _ in zip(iter_stacks(tb), range(MAX_STACK_FRAMES + 1))
     ]  # type: List[Dict[str, Any]]
 
     if len(frames) > MAX_STACK_FRAMES:
+        # If we have more frames than the limit, we remove the stacktrace completely.
+        # We don't trim the stacktrace here because we have not processed the whole
+        # thing (see above, we stop at MAX_STACK_FRAMES + 1). Normally, Relay would
+        # intelligently trim by removing frames in the middle of the stacktrace, but
+        # since we don't have the whole stacktrace, we can't do that. Instead, we
+        # drop the entire stacktrace.
         exception_value["stacktrace"] = AnnotatedValue.removed_because_over_size_limit(
             value=None
         )
