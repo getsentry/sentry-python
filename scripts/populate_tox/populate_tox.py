@@ -77,7 +77,6 @@ IGNORE = {
     "huggingface_hub",
     "langchain",
     "langchain_notiktoken",
-    "litestar",
     "openai",
     "openai_notiktoken",
     "pure_eval",
