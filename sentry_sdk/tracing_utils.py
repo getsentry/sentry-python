@@ -764,7 +764,7 @@ def _generate_sample_rand(
     trace_id,  # type: Optional[str]
     interval=(0.0, 1.0),  # type: tuple[float, float]
 ):
-    # type: (...) -> decimal.Decimal
+    # type: (...) -> Optional[decimal.Decimal]
     """Generate a sample_rand value from a trace ID.
 
     The generated value will be pseudorandomly chosen from the provided
@@ -802,7 +802,7 @@ def _sample_rand_range(parent_sampled, sample_rate):
 
 
 def _round_sample_rand(sample_rand):
-    # type: (Decimal) -> Optional[Decimal]
+    # type: (Union[Decimal, float, str]) -> Optional[Decimal]
     # Round down to exactly six decimal-digit precision.
     # Setting the context is needed to avoid an InvalidOperation exception
     # in case the user has changed the default precision.

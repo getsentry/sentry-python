@@ -216,8 +216,8 @@ class SentrySampler(Sampler):
             # it in PropagationContext
             sample_rand = parent_sample_rand
         else:
-            # There is no sample_rand yet, generate a new one
-            sample_rand = _generate_sample_rand(str(trace_id), (0, 1))
+            # We are the head SDK and we need to generate a new sample_rand
+            sample_rand = cast(Decimal, _generate_sample_rand(str(trace_id), (0, 1)))
 
         # Explicit sampled value provided at start_span
         custom_sampled = cast(
