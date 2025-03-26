@@ -31,6 +31,7 @@ def patch_views():
     old_make_view_atomic = BaseHandler.make_view_atomic
     old_render = SimpleTemplateResponse.render
 
+    @functools.wraps(old_render)
     def sentry_patched_render(self):
         # type: (SimpleTemplateResponse) -> Any
         with sentry_sdk.start_span(

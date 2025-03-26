@@ -64,6 +64,7 @@ class SentrySpanProcessor(SpanProcessor):
         self._children_spans = defaultdict(
             list
         )  # type: DefaultDict[int, List[ReadableSpan]]
+        self._dropped_spans = defaultdict(lambda: 0)  # type: DefaultDict[int, int]
 
     def on_start(self, span, parent_context=None):
         # type: (Span, Optional[Context]) -> None
@@ -159,12 +160,17 @@ class SentrySpanProcessor(SpanProcessor):
         if not transaction_event:
             return
 
+        collected_spans, dropped_spans = self._collect_children(span)
         spans = []
-        for child in self._collect_children(span):
+        for child in collected_spans:
             span_json = self._span_to_json(child)
             if span_json:
                 spans.append(span_json)
+
         transaction_event["spans"] = spans
+        if dropped_spans > 0:
+            transaction_event["_dropped_spans"] = dropped_spans
+
         # TODO-neel-potel sort and cutoff max spans
 
         sentry_sdk.capture_event(transaction_event)
@@ -182,25 +188,29 @@ class SentrySpanProcessor(SpanProcessor):
         children_spans = self._children_spans[span.parent.span_id]
         if len(children_spans) < max_spans:
             children_spans.append(span)
+        else:
+            self._dropped_spans[span.parent.span_id] += 1
 
     def _collect_children(self, span):
-        # type: (ReadableSpan) -> List[ReadableSpan]
+        # type: (ReadableSpan) -> tuple[List[ReadableSpan], int]
         if not span.context:
-            return []
+            return [], 0
 
         children = []
+        dropped_spans = 0
         bfs_queue = deque()  # type: Deque[int]
         bfs_queue.append(span.context.span_id)
 
         while bfs_queue:
             parent_span_id = bfs_queue.popleft()
             node_children = self._children_spans.pop(parent_span_id, [])
+            dropped_spans += self._dropped_spans.pop(parent_span_id, 0)
             children.extend(node_children)
             bfs_queue.extend(
                 [child.context.span_id for child in node_children if child.context]
             )
 
-        return children
+        return children, dropped_spans
 
     # we construct the event from scratch here
     # and not use the current Transaction class for easier refactoring
@@ -276,9 +286,6 @@ class SentrySpanProcessor(SpanProcessor):
                 "origin": origin or DEFAULT_SPAN_ORIGIN,
             }
         )
-
-        if status:
-            span_json.setdefault("tags", {})["status"] = status
 
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id

@@ -1,4 +1,3 @@
-import random
 from http.client import HTTPConnection, HTTPSConnection
 from socket import SocketIO
 from urllib.error import HTTPError
@@ -70,8 +69,8 @@ def test_crumb_capture(sentry_init, capture_events):
 @pytest.mark.parametrize(
     "status_code,level",
     [
-        (200, None),
-        (301, None),
+        (200, "info"),
+        (301, "info"),
         (403, "warning"),
         (405, "warning"),
         (500, "error"),
@@ -94,12 +93,7 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
 
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-
-    if level is None:
-        assert "level" not in crumb
-    else:
-        assert crumb["level"] == level
-
+    assert crumb["level"] == level
     assert crumb["data"] == ApproxDict(
         {
             "url": url,
@@ -212,7 +206,7 @@ def test_outgoing_trace_headers(
         "baggage": (
             "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
-            "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+            "sentry-user_id=Am%C3%A9lie, sentry-sample_rand=0.132521102938283, other-vendor-value-2=foo;bar;"
         ),
     }
 
@@ -238,28 +232,27 @@ def test_outgoing_trace_headers(
         "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
         "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
         "sentry-sample_rate=1.0,"
-        "sentry-user_id=Am%C3%A9lie"
+        "sentry-user_id=Am%C3%A9lie,"
+        "sentry-sample_rand=0.132521102938283"
     )
 
     assert request_headers["baggage"] == SortedBaggage(expected_outgoing_baggage)
 
 
 def test_outgoing_trace_headers_head_sdk(
-    sentry_init, monkeypatch, capture_request_headers, capture_envelopes
+    sentry_init, capture_request_headers, capture_envelopes
 ):
-    # make sure transaction is always sampled
-    monkeypatch.setattr(random, "random", lambda: 0.1)
-
     sentry_init(traces_sample_rate=0.5, release="foo")
     envelopes = capture_envelopes()
     request_headers = capture_request_headers()
 
-    with isolation_scope():
-        with continue_trace({}):
-            with start_span(name="Head SDK tx") as root_span:
-                conn = HTTPConnection("localhost", PORT)
-                conn.request("GET", "/top-chasers")
-                conn.getresponse()
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
+        with isolation_scope():
+            with continue_trace({}):
+                with start_span(name="Head SDK tx") as root_span:
+                    conn = HTTPConnection("localhost", PORT)
+                    conn.request("GET", "/top-chasers")
+                    conn.getresponse()
 
     (envelope,) = envelopes
     transaction = envelope.get_transaction_event()
@@ -274,6 +267,7 @@ def test_outgoing_trace_headers_head_sdk(
 
     expected_outgoing_baggage = (
         f"sentry-trace_id={root_span.trace_id},"  # noqa: E231
+        "sentry-sample_rand=0.250000,"
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-sample_rate=0.5,"
@@ -394,27 +388,16 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    with start_span(op="op", name="name"):
-        try:
-            conn = HTTPConnection("localhost", PORT)
-            conn.request("GET", "/top-chasers")
+    with pytest.raises(TimeoutError):
+        with start_span(op="op", name="name"):
+            conn = HTTPSConnection("www.example.com")
+            conn.request("GET", "/bla")
             conn.getresponse()
-        except Exception:
-            pass
 
-    items = [
-        item
-        for envelope in envelopes
-        for item in envelope.items
-        if item.type == "transaction"
-    ]
-    assert len(items) == 1
-
-    transaction = items[0].payload.json
+    (transaction_envelope,) = envelopes
+    transaction = transaction_envelope.get_transaction_event()
     assert len(transaction["spans"]) == 1
 
     span = transaction["spans"][0]
     assert span["op"] == "http.client"
-    assert (
-        span["description"] == f"GET http://localhost:{PORT}/top-chasers"  # noqa: E231
-    )
+    assert span["description"] == "GET https://www.example.com/bla"

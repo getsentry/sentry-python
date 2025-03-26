@@ -6,7 +6,9 @@ import sys
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
+from decimal import ROUND_DOWN, Context, Decimal
 from functools import wraps
+from random import Random
 from urllib.parse import quote, unquote
 
 import sentry_sdk
@@ -43,6 +45,7 @@ SENTRY_TRACE_REGEX = re.compile(
     "-?([01])?"  # sampled
     "[ \t]*$"  # whitespace
 )
+
 
 # This is a normal base64 regex, modified to reflect that fact that we strip the
 # trailing = or == off
@@ -91,17 +94,14 @@ def has_tracing_enabled(options):
     # type: (Optional[Dict[str, Any]]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    defined and enable_tracing is set and not false.
+    defined.
     """
     if options is None:
         return False
 
     return bool(
-        options.get("enable_tracing") is not False
-        and (
-            options.get("traces_sample_rate") is not None
-            or options.get("traces_sampler") is not None
-        )
+        options.get("traces_sample_rate") is not None
+        or options.get("traces_sampler") is not None
     )
 
 
@@ -448,6 +448,10 @@ class PropagationContext:
 class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
+
+    Before mutating a `Baggage` object, calling code must check that `mutable` is `True`.
+    Mutating a `Baggage` object that has `mutable` set to `False` is not allowed, but
+    it is the caller's responsibility to enforce this restriction.
     """
 
     __slots__ = ("sentry_items", "third_party_items", "mutable")
@@ -466,8 +470,11 @@ class Baggage:
         self.mutable = mutable
 
     @classmethod
-    def from_incoming_header(cls, header):
-        # type: (Optional[str]) -> Baggage
+    def from_incoming_header(
+        cls,
+        header,  # type: Optional[str]
+    ):
+        # type: (...) -> Baggage
         """
         freeze if incoming header already has sentry baggage
         """
@@ -675,6 +682,55 @@ def get_current_span(scope=None):
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
+
+
+# XXX-potel-ivana: use this
+def _generate_sample_rand(
+    trace_id,  # type: Optional[str]
+    *,
+    interval=(0.0, 1.0),  # type: tuple[float, float]
+):
+    # type: (...) -> Any
+    """Generate a sample_rand value from a trace ID.
+
+    The generated value will be pseudorandomly chosen from the provided
+    interval. Specifically, given (lower, upper) = interval, the generated
+    value will be in the range [lower, upper). The value has 6-digit precision,
+    so when printing with .6f, the value will never be rounded up.
+
+    The pseudorandom number generator is seeded with the trace ID.
+    """
+    lower, upper = interval
+    if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
+        raise ValueError("Invalid interval: lower must be less than upper")
+
+    rng = Random(trace_id)
+    sample_rand = upper
+    while sample_rand >= upper:
+        sample_rand = rng.uniform(lower, upper)
+
+    # Round down to exactly six decimal-digit precision.
+    # Setting the context is needed to avoid an InvalidOperation exception
+    # in case the user has changed the default precision.
+    return Decimal(sample_rand).quantize(
+        Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
+    )
+
+
+# XXX-potel-ivana: use this
+def _sample_rand_range(parent_sampled, sample_rate):
+    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
+    """
+    Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
+    that a generated sample_rand value must fall into, given the parent_sampled and
+    sample_rate values.
+    """
+    if parent_sampled is None or sample_rate is None:
+        return 0.0, 1.0
+    elif parent_sampled is True:
+        return 0.0, sample_rate
+    else:  # parent_sampled is False
+        return sample_rate, 1.0
 
 
 # Circular imports

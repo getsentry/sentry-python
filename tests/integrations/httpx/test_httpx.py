@@ -64,8 +64,8 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
 @pytest.mark.parametrize(
     "status_code,level",
     [
-        (200, None),
-        (301, None),
+        (200, "info"),
+        (301, "info"),
         (403, "warning"),
         (405, "warning"),
         (500, "error"),
@@ -98,12 +98,7 @@ def test_crumb_capture_client_error(
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-
-        if level is None:
-            assert "level" not in crumb
-        else:
-            assert crumb["level"] == level
-
+        assert crumb["level"] == level
         assert crumb["data"] == ApproxDict(
             {
                 "url": url,
@@ -179,32 +174,33 @@ def test_outgoing_trace_headers_append_to_baggage(
 
     url = "http://example.com/"
 
-    with start_span(
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-    ):
-        if asyncio.iscoroutinefunction(httpx_client.get):
-            response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url, headers={"baGGage": "custom=data"})
-            )
-        else:
-            response = httpx_client.get(url, headers={"baGGage": "custom=data"})
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+        with start_span(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+        ):
+            if asyncio.iscoroutinefunction(httpx_client.get):
+                response = asyncio.get_event_loop().run_until_complete(
+                    httpx_client.get(url, headers={"baGGage": "custom=data"})
+                )
+            else:
+                response = httpx_client.get(url, headers={"baGGage": "custom=data"})
 
-    (envelope,) = envelopes
-    transaction = envelope.get_transaction_event()
-    request_span = transaction["spans"][-1]
-    trace_id = transaction["contexts"]["trace"]["trace_id"]
+        (envelope,) = envelopes
+        transaction = envelope.get_transaction_event()
+        request_span = transaction["spans"][-1]
+        trace_id = transaction["contexts"]["trace"]["trace_id"]
 
-    assert response.request.headers[
-        "sentry-trace"
-    ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-        trace_id=trace_id,
-        parent_span_id=request_span["span_id"],
-        sampled=1,
-    )
-    assert response.request.headers["baggage"] == SortedBaggage(
-        f"custom=data,sentry-trace_id={trace_id},sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"  # noqa: E231
-    )
+        assert response.request.headers[
+            "sentry-trace"
+        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=trace_id,
+            parent_span_id=request_span["span_id"],
+            sampled=1,
+        )
+        assert response.request.headers["baggage"] == SortedBaggage(
+            f"custom=data,sentry-trace_id={trace_id},sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"  # noqa: E231
+        )
 
 
 @pytest.mark.parametrize(

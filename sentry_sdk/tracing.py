@@ -1,6 +1,7 @@
+from datetime import datetime
 from enum import Enum
 import json
-from datetime import datetime
+import warnings
 
 from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace import (
@@ -20,6 +21,7 @@ from sentry_sdk.utils import (
     _serialize_span_attribute,
     get_current_thread_meta,
     logger,
+    should_be_treated_as_error,
 )
 
 from typing import TYPE_CHECKING, cast
@@ -285,7 +287,7 @@ class NoOpSpan:
         pass
 
     def set_context(self, key, value):
-        # type: (str, Any) -> None
+        # type: (str, dict[str, Any]) -> None
         pass
 
     def init_span_recorder(self, maxlen):
@@ -424,7 +426,7 @@ class Span:
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        if value is not None:
+        if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
         else:
             status_unset = (
@@ -475,8 +477,10 @@ class Span:
         .. deprecated:: 3.0.0
             This will be removed in the future. Use :func:`root_span` instead.
         """
-        logger.warning(
-            "Deprecated: This will be removed in the future. Use root_span instead."
+        warnings.warn(
+            "Deprecated: This will be removed in the future. Use root_span instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
         return self.root_span
 

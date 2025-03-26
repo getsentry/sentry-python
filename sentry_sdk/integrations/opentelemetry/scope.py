@@ -1,5 +1,6 @@
 from typing import cast
 from contextlib import contextmanager
+import warnings
 
 from opentelemetry.context import (
     get_value,
@@ -123,7 +124,7 @@ class PotelScope(Scope):
         # for twp to work, we also need to consider deferred sampling when the sampling
         # flag is not present, so the above TraceFlags are not sufficient
         if self._propagation_context.parent_sampled is None:
-            trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "deferred")
+            trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "deferred")
 
         span_context = SpanContext(
             trace_id=int(self._propagation_context.trace_id, 16),
@@ -142,8 +143,10 @@ class PotelScope(Scope):
             This function is deprecated and will be removed in a future release.
             Use :py:meth:`sentry_sdk.start_span` instead.
         """
-        logger.warning(
-            "The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`"
+        warnings.warn(
+            "The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`",
+            DeprecationWarning,
+            stacklevel=2,
         )
         return self.start_span(**kwargs)
 

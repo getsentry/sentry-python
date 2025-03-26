@@ -534,8 +534,8 @@ async def test_crumb_capture(
 @pytest.mark.parametrize(
     "status_code,level",
     [
-        (200, None),
-        (301, None),
+        (200, "info"),
+        (301, "info"),
         (403, "warning"),
         (405, "warning"),
         (500, "error"),
@@ -570,10 +570,7 @@ async def test_crumb_capture_client_error(
 
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
-        if level is None:
-            assert "level" not in crumb
-        else:
-            assert crumb["level"] == level
+        assert crumb["level"] == level
         assert crumb["category"] == "httplib"
         assert crumb["data"] == ApproxDict(
             {
@@ -637,24 +634,26 @@ async def test_outgoing_trace_headers_append_to_baggage(
 
     raw_server = await aiohttp_raw_server(handler)
 
-    with start_span(
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-    ) as transaction:
-        client = await aiohttp_client(raw_server)
-        resp = await client.get("/", headers={"bagGage": "custom=value"})
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+        with start_span(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+        ) as transaction:
+            client = await aiohttp_client(raw_server)
+            resp = await client.get("/", headers={"bagGage": "custom=value"})
 
-        assert sorted(resp.request_info.headers["baggage"].split(",")) == sorted(
-            [
-                "custom=value",
-                f"sentry-trace_id={transaction.trace_id}",
-                "sentry-environment=production",
-                "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42",
-                "sentry-transaction=/interactions/other-dogs/new-dog",
-                "sentry-sample_rate=1.0",
-                "sentry-sampled=true",
-            ]
-        )
+            assert sorted(resp.request_info.headers["baggage"].split(",")) == sorted(
+                [
+                    "custom=value",
+                    f"sentry-trace_id={transaction.trace_id}",
+                    "sentry-environment=production",
+                    "sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42",
+                    "sentry-transaction=/interactions/other-dogs/new-dog",
+                    "sentry-sample_rate=1.0",
+                    "sentry-sampled=true",
+                    "sentry-sample_rand=0.500000",
+                ]
+            )
 
 
 @pytest.mark.asyncio

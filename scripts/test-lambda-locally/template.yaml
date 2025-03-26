@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  SentryLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda_deployment_package.zip
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.12
+      Timeout: 30
+      Environment:
+        Variables:
+          SENTRY_DSN: !Ref SentryDsn
+      Events:
+        ApiEventGet:
+          Type: Api
+          Properties:
+            Path: /
+            Method: get
+        ApiEventPost:
+          Type: Api
+          Properties:
+            Path: /
+            Method: post
+
+Parameters:
+  SentryDsn:
+    Type: String
+    Default: ''

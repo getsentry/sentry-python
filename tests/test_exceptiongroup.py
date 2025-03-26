@@ -217,7 +217,10 @@ def test_exception_chain_cause():
         {
             "mechanism": {
                 "handled": False,
-                "type": "test_suite",
+                "type": "chained",
+                "exception_id": 1,
+                "parent_id": 0,
+                "source": "__cause__",
             },
             "module": None,
             "type": "TypeError",
@@ -227,6 +230,7 @@ def test_exception_chain_cause():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
@@ -257,7 +261,10 @@ def test_exception_chain_context():
         {
             "mechanism": {
                 "handled": False,
-                "type": "test_suite",
+                "type": "chained",
+                "exception_id": 1,
+                "parent_id": 0,
+                "source": "__context__",
             },
             "module": None,
             "type": "TypeError",
@@ -267,6 +274,7 @@ def test_exception_chain_context():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
@@ -297,6 +305,7 @@ def test_simple_exception():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
+                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",

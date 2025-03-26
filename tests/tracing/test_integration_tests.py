@@ -1,7 +1,8 @@
 import re
-import pytest
-import random
 import sys
+from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk import (
@@ -37,11 +38,10 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
         span1, span2 = event["spans"]
         parent_span = event
-        assert span1["tags"]["status"] == "internal_error"
         assert span1["status"] == "internal_error"
         assert span1["op"] == "foo"
         assert span1["description"] == "foodesc"
-        assert span2["tags"]["status"] == "ok"
+        assert span2["status"] == "ok"
         assert span2["op"] == "bar"
         assert span2["description"] == "bardesc"
         assert parent_span["transaction"] == "hi"
@@ -142,12 +142,12 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     envelopes = capture_envelopes()
 
     # make sure transaction is sampled for both cases
-    monkeypatch.setattr(random, "random", lambda: 0.1)
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
 
-    with continue_trace({}):
-        with start_span(name="Head SDK tx"):
-            with start_span(op="foo", name="foodesc") as span:
-                baggage = span.get_baggage()
+        with continue_trace({}):
+            with start_span(name="Head SDK tx"):
+                with start_span(op="foo", name="foodesc") as span:
+                    baggage = span.get_baggage()
 
     trace_id = span.trace_id
 
@@ -158,12 +158,14 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "release": "foo",
         "sample_rate": str(sample_rate),
         "sampled": "true" if span.sampled else "false",
+        "sample_rand": "0.250000",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
 
     expected_baggage = (
         "sentry-trace_id=%s,"
+        "sentry-sample_rand=0.250000,"
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-transaction=Head%%20SDK%%20tx,"
@@ -180,6 +182,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "release": "foo",
         "sample_rate": str(sample_rate),
         "sampled": "true" if span.sampled else "false",
+        "sample_rand": "0.250000",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
@@ -253,8 +256,8 @@ def test_non_error_exceptions(
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_span(name="hi") as span:
-        span.set_status(SPANSTATUS.OK)
+    with start_span(name="hi") as root_span:
+        root_span.set_status(SPANSTATUS.OK)
         with pytest.raises(exception_cls):
             with start_span(op="foo", name="foodesc"):
                 raise exception_cls(exception_value)
@@ -264,7 +267,7 @@ def test_non_error_exceptions(
 
     span = event["spans"][0]
     assert "status" not in span.get("tags", {})
-    assert "status" not in event["tags"]
+    assert "status" not in event.get("tags", {})
     assert event["contexts"]["trace"]["status"] == "ok"
 
 
@@ -289,5 +292,5 @@ def test_good_sysexit_doesnt_fail_transaction(
 
     span = event["spans"][0]
     assert "status" not in span.get("tags", {})
-    assert "status" not in event["tags"]
+    assert "status" not in event.get("tags", {})
     assert event["contexts"]["trace"]["status"] == "ok"
