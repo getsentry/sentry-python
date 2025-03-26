@@ -67,7 +67,7 @@ def test_environment():
 
     try:
         # Wait for SAM to be ready
-        LocalLambdaStack.wait_for_stack()
+        LocalLambdaStack.wait_for_stack(log_file=debug_log_file)
 
         def before_test():
             server.clear_envelopes()
