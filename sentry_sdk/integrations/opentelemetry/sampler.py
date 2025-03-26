@@ -8,6 +8,7 @@ from opentelemetry.trace.span import TraceState
 import sentry_sdk
 from sentry_sdk.tracing_utils import (
     _generate_sample_rand,
+    _round_sample_rand,
     has_tracing_enabled,
 )
 from sentry_sdk.utils import is_valid_sample_rate, logger
@@ -86,10 +87,7 @@ def get_parent_sample_rand(parent_context, trace_id):
         if parent_sample_rand is None:
             return None
 
-        try:
-            return Decimal(parent_sample_rand)
-        except Exception:
-            return None
+        return _round_sample_rand(parent_sample_rand)
 
     return None
 
@@ -119,7 +117,9 @@ def dropped_result(parent_span_context, attributes, sample_rate=None, sample_ran
         trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     if sample_rand is not None:
-        trace_state = trace_state.update(TRACESTATE_SAMPLE_RAND_KEY, str(sample_rand))
+        trace_state = trace_state.update(
+            TRACESTATE_SAMPLE_RAND_KEY, f"{sample_rand:.6f}"  # noqa: E231
+        )
 
     is_root_span = not (
         parent_span_context.is_valid and not parent_span_context.is_remote
@@ -169,7 +169,9 @@ def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None)
         trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
     if sample_rand is not None:
-        trace_state = trace_state.update(TRACESTATE_SAMPLE_RAND_KEY, str(sample_rand))
+        trace_state = trace_state.update(
+            TRACESTATE_SAMPLE_RAND_KEY, f"{sample_rand:.6f}"  # noqa: E231
+        )
 
     return SamplingResult(
         Decision.RECORD_AND_SAMPLE,

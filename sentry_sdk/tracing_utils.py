@@ -783,12 +783,7 @@ def _generate_sample_rand(
     while sample_rand >= upper:
         sample_rand = rng.uniform(lower, upper)
 
-    # Round down to exactly six decimal-digit precision.
-    # Setting the context is needed to avoid an InvalidOperation exception
-    # in case the user has changed the default precision.
-    return Decimal(sample_rand).quantize(
-        Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
-    )
+    return _round_sample_rand(sample_rand)
 
 
 def _sample_rand_range(parent_sampled, sample_rate):
@@ -804,6 +799,21 @@ def _sample_rand_range(parent_sampled, sample_rate):
         return 0.0, sample_rate
     else:  # parent_sampled is False
         return sample_rate, 1.0
+
+
+def _round_sample_rand(sample_rand):
+    # type: (Decimal) -> Optional[Decimal]
+    # Round down to exactly six decimal-digit precision.
+    # Setting the context is needed to avoid an InvalidOperation exception
+    # in case the user has changed the default precision.
+    try:
+        return Decimal(sample_rand).quantize(
+            Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
+        )
+    except Exception as ex:
+        logger.debug(f"Failed to round sample_rand {sample_rand}: {ex}")
+
+    return None
 
 
 # Circular imports
