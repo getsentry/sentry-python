@@ -914,8 +914,6 @@ class ClientConstructor:
 
         :param profile_session_sample_rate:
 
-        :param propagate_traces:
-
         :param auto_session_tracking:
 
         :param spotlight:
