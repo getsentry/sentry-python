@@ -227,7 +227,7 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
 
     assert 'meta name="baggage"' in baggage
     baggage_content = re.findall('content="([^"]*)"', baggage)[0]
-    assert baggage_content == root_span.get_baggage().serialize()
+    assert SortedBaggage(baggage_content) == root_span.get_baggage().serialize()
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,6 @@
-import pytest
+from unittest.mock import MagicMock, patch
 
-from unittest.mock import MagicMock
+import pytest
 
 from opentelemetry.trace.propagation import get_current_span
 from opentelemetry.propagators.textmap import DefaultSetter
@@ -139,11 +139,47 @@ def test_inject_continue_trace(sentry_init):
         "HTTP_BAGGAGE": baggage,
     }
 
+    expected_baggage = baggage + ",sentry-sample_rand=0.001111"
+
+    with patch(
+        "sentry_sdk.tracing_utils.Random.uniform",
+        return_value=0.001111,
+    ):
+        with sentry_sdk.continue_trace(incoming_headers):
+            with sentry_sdk.start_span(name="foo") as span:
+                SentryPropagator().inject(carrier, setter=setter)
+                assert carrier["sentry-trace"] == f"{trace_id}-{span.span_id}-1"
+                assert carrier["baggage"] == SortedBaggage(expected_baggage)
+
+
+def test_inject_continue_trace_incoming_sample_rand(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+
+    carrier = {}
+    setter = DefaultSetter()
+
+    trace_id = "771a43a4192642f0b136d5159a501700"
+    sentry_trace = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
+    baggage = (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=frontendpublickey,"
+        "sentry-sample_rate=0.01337,"
+        "sentry-sampled=true,"
+        "sentry-release=myfrontend,"
+        "sentry-environment=bird,"
+        "sentry-transaction=bar,"
+        "sentry-sample_rand=0.002849"
+    )
+    incoming_headers = {
+        "HTTP_SENTRY_TRACE": sentry_trace,
+        "HTTP_BAGGAGE": baggage,
+    }
+
     with sentry_sdk.continue_trace(incoming_headers):
         with sentry_sdk.start_span(name="foo") as span:
             SentryPropagator().inject(carrier, setter=setter)
-            assert (carrier["sentry-trace"]) == f"{trace_id}-{span.span_id}-1"
-            assert (carrier["baggage"]) == SortedBaggage(baggage)
+            assert carrier["sentry-trace"] == f"{trace_id}-{span.span_id}-1"
+            assert carrier["baggage"] == SortedBaggage(baggage)
 
 
 def test_inject_head_sdk(sentry_init):
@@ -152,9 +188,23 @@ def test_inject_head_sdk(sentry_init):
     carrier = {}
     setter = DefaultSetter()
 
-    with sentry_sdk.start_span(name="foo") as span:
-        SentryPropagator().inject(carrier, setter=setter)
-        assert (carrier["sentry-trace"]) == f"{span.trace_id}-{span.span_id}-1"
-        assert (carrier["baggage"]) == SortedBaggage(
-            f"sentry-transaction=foo,sentry-release=release,sentry-environment=production,sentry-trace_id={span.trace_id},sentry-sample_rate=1.0,sentry-sampled=true"  # noqa: E231
-        )
+    expected_baggage = (
+        "sentry-transaction=foo,"
+        "sentry-release=release,"
+        "sentry-environment=production,"
+        "sentry-trace_id={trace_id},"
+        "sentry-sample_rate=1.0,"
+        "sentry-sampled=true,"
+        "sentry-sample_rand=0.111111"
+    )
+
+    with patch(
+        "sentry_sdk.tracing_utils.Random.uniform",
+        return_value=0.111111,
+    ):
+        with sentry_sdk.start_span(name="foo") as span:
+            SentryPropagator().inject(carrier, setter=setter)
+            assert carrier["sentry-trace"] == f"{span.trace_id}-{span.span_id}-1"
+            assert carrier["baggage"] == SortedBaggage(
+                expected_baggage.format(trace_id=span.trace_id)
+            )
