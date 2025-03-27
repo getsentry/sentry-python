@@ -217,7 +217,12 @@ class SentrySampler(Sampler):
             sample_rand = parent_sample_rand
         else:
             # We are the head SDK and we need to generate a new sample_rand
-            sample_rand = cast(Decimal, _generate_sample_rand(str(trace_id), (0, 1)))
+            sample_rand = _generate_sample_rand(str(trace_id), (0, 1))
+
+        if sample_rand is None:
+            # If we failed to generate a sample_rand, abort
+            logger.debug(f"[Tracing] Failed to generate a sample_rand, dropping {name}")
+            return dropped_result(parent_span_context, attributes)
 
         # Explicit sampled value provided at start_span
         custom_sampled = cast(

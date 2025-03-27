@@ -128,7 +128,11 @@ def test_invalid_sampled_and_sample_rate(sentry_init, incoming):
 
     sample_rate, sampled = incoming
 
-    baggage = f"sentry-sample_rate={sample_rate},sentry-sampled={sampled},sentry-trace_id=771a43a4192642f0b136d5159a501700"  # noqa: E231
+    baggage = (
+        f"sentry-sample_rate={sample_rate},"  # noqa: E231
+        f"sentry-sampled={sampled},"  # noqa: E231
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700"
+    )
     sentry_trace = f"771a43a4192642f0b136d5159a501700-1234567890abcdef-{1 if sampled == 'true' else 0}"
 
     with sentry_sdk.continue_trace(

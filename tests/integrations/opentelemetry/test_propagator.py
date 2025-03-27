@@ -139,11 +139,11 @@ def test_inject_continue_trace(sentry_init):
         "HTTP_BAGGAGE": baggage,
     }
 
-    expected_baggage = baggage + ",sentry-sample_rand=0.002849"
+    expected_baggage = baggage + ",sentry-sample_rand=0.001111"
 
     with patch(
         "sentry_sdk.tracing_utils.Random.uniform",
-        return_value=0.002849,
+        return_value=0.001111,
     ):
         with sentry_sdk.continue_trace(incoming_headers):
             with sentry_sdk.start_span(name="foo") as span:
@@ -195,12 +195,12 @@ def test_inject_head_sdk(sentry_init):
         "sentry-trace_id={trace_id},"
         "sentry-sample_rate=1.0,"
         "sentry-sampled=true,"
-        "sentry-sample_rand=0.123456"
+        "sentry-sample_rand=0.111111"
     )
 
     with patch(
         "sentry_sdk.tracing_utils.Random.uniform",
-        return_value=0.123456,
+        return_value=0.111111,
     ):
         with sentry_sdk.start_span(name="foo") as span:
             SentryPropagator().inject(carrier, setter=setter)

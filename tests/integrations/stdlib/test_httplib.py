@@ -233,7 +233,7 @@ def test_outgoing_trace_headers(
         "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
         "sentry-sample_rate=0.01337,"
         "sentry-user_id=Am%C3%A9lie,"
-        "sentry-sample_rand=0.00337,"
+        "sentry-sample_rand=0.003370,"
         "sentry-sampled=true"
     )
 
