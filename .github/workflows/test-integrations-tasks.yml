@@ -21,6 +21,7 @@ env:
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
+    CELERY_BROKER_URL: ${{ matrix.python-version == '3.6' && 'redis://redis:6379/0' || 'redis://localhost:6379/0' }}
 jobs:
   test-tasks-latest:
     name: Tasks (latest)
