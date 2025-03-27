@@ -610,13 +610,6 @@ class Scope:
         If no span is given, the trace data is taken from the scope.
         """
         client = self.get_client()
-        if not client.options.get("propagate_traces"):
-            warnings.warn(
-                "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return
 
         span = kwargs.pop("span", None)
         span = span or self.span
@@ -773,6 +766,11 @@ class Scope:
     def user(self, value):
         # type: (Optional[Dict[str, Any]]) -> None
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
+        warnings.warn(
+            "The `Scope.user` setter is deprecated in favor of `Scope.set_user()`.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.set_user(value)
 
     def set_user(self, value):
