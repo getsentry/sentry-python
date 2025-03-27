@@ -1,7 +1,7 @@
 import uuid
-import random
 import warnings
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
 )
 
 from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
@@ -126,30 +127,37 @@ if TYPE_CHECKING:
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
+
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
-TRANSACTION_SOURCE_CUSTOM = "custom"
-TRANSACTION_SOURCE_URL = "url"
-TRANSACTION_SOURCE_ROUTE = "route"
-TRANSACTION_SOURCE_VIEW = "view"
-TRANSACTION_SOURCE_COMPONENT = "component"
-TRANSACTION_SOURCE_TASK = "task"
+class TransactionSource(str, Enum):
+    COMPONENT = "component"
+    CUSTOM = "custom"
+    ROUTE = "route"
+    TASK = "task"
+    URL = "url"
+    VIEW = "view"
+
+    def __str__(self):
+        # type: () -> str
+        return self.value
+
 
 # These are typically high cardinality and the server hates them
 LOW_QUALITY_TRANSACTION_SOURCES = [
-    TRANSACTION_SOURCE_URL,
+    TransactionSource.URL,
 ]
 
 SOURCE_FOR_STYLE = {
-    "endpoint": TRANSACTION_SOURCE_COMPONENT,
-    "function_name": TRANSACTION_SOURCE_COMPONENT,
-    "handler_name": TRANSACTION_SOURCE_COMPONENT,
-    "method_and_path_pattern": TRANSACTION_SOURCE_ROUTE,
-    "path": TRANSACTION_SOURCE_URL,
-    "route_name": TRANSACTION_SOURCE_COMPONENT,
-    "route_pattern": TRANSACTION_SOURCE_ROUTE,
-    "uri_template": TRANSACTION_SOURCE_ROUTE,
-    "url": TRANSACTION_SOURCE_ROUTE,
+    "endpoint": TransactionSource.COMPONENT,
+    "function_name": TransactionSource.COMPONENT,
+    "handler_name": TransactionSource.COMPONENT,
+    "method_and_path_pattern": TransactionSource.ROUTE,
+    "path": TransactionSource.URL,
+    "route_name": TransactionSource.COMPONENT,
+    "route_pattern": TransactionSource.ROUTE,
+    "uri_template": TransactionSource.ROUTE,
+    "url": TransactionSource.ROUTE,
 }
 
 
@@ -468,6 +476,8 @@ class Span:
     def continue_from_headers(
         cls,
         headers,  # type: Mapping[str, str]
+        *,
+        _sample_rand=None,  # type: Optional[str]
         **kwargs,  # type: Any
     ):
         # type: (...) -> Transaction
@@ -476,6 +486,8 @@ class Span:
         the ``sentry-trace`` and ``baggage`` headers).
 
         :param headers: The dictionary with the HTTP headers to pull information from.
+        :param _sample_rand: If provided, we override the sample_rand value from the
+            incoming headers with this value. (internal use only)
         """
         # TODO move this to the Transaction class
         if cls is Span:
@@ -486,7 +498,9 @@ class Span:
 
         # TODO-neel move away from this kwargs stuff, it's confusing and opaque
         # make more explicit
-        baggage = Baggage.from_incoming_header(headers.get(BAGGAGE_HEADER_NAME))
+        baggage = Baggage.from_incoming_header(
+            headers.get(BAGGAGE_HEADER_NAME), _sample_rand=_sample_rand
+        )
         kwargs.update({BAGGAGE_HEADER_NAME: baggage})
 
         sentrytrace_kwargs = extract_sentrytrace_data(
@@ -770,6 +784,7 @@ class Transaction(Span):
         "_profile",
         "_continuous_profile",
         "_baggage",
+        "_sample_rand",
     )
 
     def __init__(  # type: ignore[misc]
@@ -777,7 +792,7 @@ class Transaction(Span):
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
-        source=TRANSACTION_SOURCE_CUSTOM,  # type: str
+        source=TransactionSource.CUSTOM,  # type: str
         **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None
@@ -793,6 +808,14 @@ class Transaction(Span):
         self._profile = None  # type: Optional[Profile]
         self._continuous_profile = None  # type: Optional[ContinuousProfile]
         self._baggage = baggage
+
+        baggage_sample_rand = (
+            None if self._baggage is None else self._baggage._sample_rand()
+        )
+        if baggage_sample_rand is not None:
+            self._sample_rand = baggage_sample_rand
+        else:
+            self._sample_rand = _generate_sample_rand(self.trace_id)
 
     def __repr__(self):
         # type: () -> str
@@ -1029,7 +1052,7 @@ class Transaction(Span):
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key, value):
-        # type: (str, Any) -> None
+        # type: (str, dict[str, Any]) -> None
         """Sets a context. Transactions can have multiple contexts
         and they should follow the format described in the "Contexts Interface"
         documentation.
@@ -1164,10 +1187,10 @@ class Transaction(Span):
             self.sampled = False
             return
 
-        # Now we roll the dice. random.random is inclusive of 0, but not of 1,
+        # Now we roll the dice. self._sample_rand is inclusive of 0, but not of 1,
         # so strict < is safe here. In case sample_rate is a boolean, cast it
         # to a float (True becomes 1.0 and False becomes 0.0)
-        self.sampled = random.random() < self.sample_rate
+        self.sampled = self._sample_rand < self.sample_rate
 
         if self.sampled:
             logger.debug(
@@ -1264,7 +1287,7 @@ class NoOpSpan(Span):
         pass
 
     def set_context(self, key, value):
-        # type: (str, Any) -> None
+        # type: (str, dict[str, Any]) -> None
         pass
 
     def init_span_recorder(self, maxlen):
@@ -1324,6 +1347,7 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     EnvironHeaders,
     extract_sentrytrace_data,
+    _generate_sample_rand,
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )

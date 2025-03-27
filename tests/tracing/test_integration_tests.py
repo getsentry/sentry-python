@@ -1,8 +1,8 @@
 import gc
-import random
 import re
 import sys
 import weakref
+from unittest import mock
 
 import pytest
 
@@ -169,9 +169,8 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     envelopes = capture_envelopes()
 
     # make sure transaction is sampled for both cases
-    monkeypatch.setattr(random, "random", lambda: 0.1)
-
-    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
+        transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
 
     # will create empty mutable baggage
     baggage = transaction._baggage
@@ -196,12 +195,14 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "release": "foo",
         "sample_rate": str(sample_rate),
         "sampled": "true" if transaction.sampled else "false",
+        "sample_rand": "0.250000",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
 
     expected_baggage = (
         "sentry-trace_id=%s,"
+        "sentry-sample_rand=0.250000,"
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-transaction=Head%%20SDK%%20tx,"
@@ -217,6 +218,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "environment": "production",
         "release": "foo",
         "sample_rate": str(sample_rate),
+        "sample_rand": "0.250000",
         "sampled": "true" if transaction.sampled else "false",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,

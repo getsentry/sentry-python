@@ -59,7 +59,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.5
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -103,7 +104,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.3.1
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -154,7 +155,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.5
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -198,7 +200,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.3.1
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

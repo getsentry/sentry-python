@@ -12,10 +12,12 @@
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
 
-    {% if needs_github_secrets %}
-    needs: check-permissions
+    {% if needs_docker %}
+    services:
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
     {% endif %}
-
     {% if needs_postgres %}
     services:
       postgres:
@@ -40,18 +42,13 @@
 
     steps:
       - uses: actions/checkout@v4.2.2
-      {% if needs_github_secrets %}
-      {% raw %}
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-      {% endraw %}
-      {% endif %}
       - uses: actions/setup-python@v5
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
       {% if needs_clickhouse %}
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.5
       {% endif %}
 
       {% if needs_redis %}
@@ -92,7 +89,7 @@
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        uses: codecov/codecov-action@v5.3.1
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
           files: coverage.xml

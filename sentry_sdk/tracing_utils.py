@@ -5,7 +5,9 @@ import re
 import sys
 from collections.abc import Mapping
 from datetime import timedelta
+from decimal import ROUND_DOWN, Context, Decimal
 from functools import wraps
+from random import Random
 from urllib.parse import quote, unquote
 import uuid
 
@@ -19,6 +21,7 @@ from sentry_sdk.utils import (
     match_regex_list,
     qualname_from_function,
     to_string,
+    try_convert,
     is_sentry_url,
     _is_external_source,
     _is_in_project_root,
@@ -44,6 +47,7 @@ SENTRY_TRACE_REGEX = re.compile(
     "-?([01])?"  # sampled
     "[ \t]*$"  # whitespace
 )
+
 
 # This is a normal base64 regex, modified to reflect that fact that we strip the
 # trailing = or == off
@@ -418,6 +422,9 @@ class PropagationContext:
                     propagation_context = PropagationContext()
                 propagation_context.update(sentrytrace_data)
 
+        if propagation_context is not None:
+            propagation_context._fill_sample_rand()
+
         return propagation_context
 
     @property
@@ -425,6 +432,7 @@ class PropagationContext:
         # type: () -> str
         """The trace id of the Sentry trace."""
         if not self._trace_id:
+            # New trace, don't fill in sample_rand
             self._trace_id = uuid.uuid4().hex
 
         return self._trace_id
@@ -469,10 +477,76 @@ class PropagationContext:
             self.dynamic_sampling_context,
         )
 
+    def _fill_sample_rand(self):
+        # type: () -> None
+        """
+        Ensure that there is a valid sample_rand value in the dynamic_sampling_context.
+
+        If there is a valid sample_rand value in the dynamic_sampling_context, we keep it.
+        Otherwise, we generate a sample_rand value according to the following:
+
+          - If we have a parent_sampled value and a sample_rate in the DSC, we compute
+            a sample_rand value randomly in the range:
+                - [0, sample_rate) if parent_sampled is True,
+                - or, in the range [sample_rate, 1) if parent_sampled is False.
+
+          - If either parent_sampled or sample_rate is missing, we generate a random
+            value in the range [0, 1).
+
+        The sample_rand is deterministically generated from the trace_id, if present.
+
+        This function does nothing if there is no dynamic_sampling_context.
+        """
+        if self.dynamic_sampling_context is None:
+            return
+
+        sample_rand = try_convert(
+            Decimal, self.dynamic_sampling_context.get("sample_rand")
+        )
+        if sample_rand is not None and 0 <= sample_rand < 1:
+            # sample_rand is present and valid, so don't overwrite it
+            return
+
+        # Get the sample rate and compute the transformation that will map the random value
+        # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
+        sample_rate = try_convert(
+            float, self.dynamic_sampling_context.get("sample_rate")
+        )
+        lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
+
+        try:
+            sample_rand = _generate_sample_rand(self.trace_id, interval=(lower, upper))
+        except ValueError:
+            # ValueError is raised if the interval is invalid, i.e. lower >= upper.
+            # lower >= upper might happen if the incoming trace's sampled flag
+            # and sample_rate are inconsistent, e.g. sample_rate=0.0 but sampled=True.
+            # We cannot generate a sensible sample_rand value in this case.
+            logger.debug(
+                f"Could not backfill sample_rand, since parent_sampled={self.parent_sampled} "
+                f"and sample_rate={sample_rate}."
+            )
+            return
+
+        self.dynamic_sampling_context["sample_rand"] = (
+            f"{sample_rand:.6f}"  # noqa: E231
+        )
+
+    def _sample_rand(self):
+        # type: () -> Optional[str]
+        """Convenience method to get the sample_rand value from the dynamic_sampling_context."""
+        if self.dynamic_sampling_context is None:
+            return None
+
+        return self.dynamic_sampling_context.get("sample_rand")
+
 
 class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
+
+    Before mutating a `Baggage` object, calling code must check that `mutable` is `True`.
+    Mutating a `Baggage` object that has `mutable` set to `False` is not allowed, but
+    it is the caller's responsibility to enforce this restriction.
     """
 
     __slots__ = ("sentry_items", "third_party_items", "mutable")
@@ -491,8 +565,13 @@ class Baggage:
         self.mutable = mutable
 
     @classmethod
-    def from_incoming_header(cls, header):
-        # type: (Optional[str]) -> Baggage
+    def from_incoming_header(
+        cls,
+        header,  # type: Optional[str]
+        *,
+        _sample_rand=None,  # type: Optional[str]
+    ):
+        # type: (...) -> Baggage
         """
         freeze if incoming header already has sentry baggage
         """
@@ -514,6 +593,10 @@ class Baggage:
                         mutable = False
                     else:
                         third_party_items += ("," if third_party_items else "") + item
+
+        if _sample_rand is not None:
+            sentry_items["sample_rand"] = str(_sample_rand)
+            mutable = False
 
         return Baggage(sentry_items, third_party_items, mutable)
 
@@ -566,6 +649,7 @@ class Baggage:
         options = client.options or {}
 
         sentry_items["trace_id"] = transaction.trace_id
+        sentry_items["sample_rand"] = str(transaction._sample_rand)
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -637,6 +721,20 @@ class Baggage:
                 if not Baggage.SENTRY_PREFIX_REGEX.match(item.strip())
             )
         )
+
+    def _sample_rand(self):
+        # type: () -> Optional[Decimal]
+        """Convenience method to get the sample_rand value from the sentry_items.
+
+        We validate the value and parse it as a Decimal before returning it. The value is considered
+        valid if it is a Decimal in the range [0, 1).
+        """
+        sample_rand = try_convert(Decimal, self.sentry_items.get("sample_rand"))
+
+        if sample_rand is not None and Decimal(0) <= sample_rand < Decimal(1):
+            return sample_rand
+
+        return None
 
     def __repr__(self):
         # type: () -> str
@@ -746,6 +844,53 @@ def get_current_span(scope=None):
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
+
+
+def _generate_sample_rand(
+    trace_id,  # type: Optional[str]
+    *,
+    interval=(0.0, 1.0),  # type: tuple[float, float]
+):
+    # type: (...) -> Decimal
+    """Generate a sample_rand value from a trace ID.
+
+    The generated value will be pseudorandomly chosen from the provided
+    interval. Specifically, given (lower, upper) = interval, the generated
+    value will be in the range [lower, upper). The value has 6-digit precision,
+    so when printing with .6f, the value will never be rounded up.
+
+    The pseudorandom number generator is seeded with the trace ID.
+    """
+    lower, upper = interval
+    if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
+        raise ValueError("Invalid interval: lower must be less than upper")
+
+    rng = Random(trace_id)
+    sample_rand = upper
+    while sample_rand >= upper:
+        sample_rand = rng.uniform(lower, upper)
+
+    # Round down to exactly six decimal-digit precision.
+    # Setting the context is needed to avoid an InvalidOperation exception
+    # in case the user has changed the default precision.
+    return Decimal(sample_rand).quantize(
+        Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
+    )
+
+
+def _sample_rand_range(parent_sampled, sample_rate):
+    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
+    """
+    Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
+    that a generated sample_rand value must fall into, given the parent_sampled and
+    sample_rate values.
+    """
+    if parent_sampled is None or sample_rate is None:
+        return 0.0, 1.0
+    elif parent_sampled is True:
+        return 0.0, sample_rate
+    else:  # parent_sampled is False
+        return sample_rate, 1.0
 
 
 # Circular imports

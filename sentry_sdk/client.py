@@ -1,7 +1,9 @@
+import json
 import os
 import uuid
 import random
 import socket
+import logging
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -34,6 +36,7 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -55,7 +58,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
@@ -205,6 +208,10 @@ class BaseClient:
     def capture_event(self, *args, **kwargs):
         # type: (*Any, **Any) -> Optional[str]
         return None
+
+    def _capture_experimental_log(self, scope, log):
+        # type: (Scope, Log) -> None
+        pass
 
     def capture_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -599,6 +606,14 @@ class _Client(BaseClient):
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
                     )
+
+                # If this is an exception, reset the DedupeIntegration. It still
+                # remembers the dropped exception as the last exception, meaning
+                # that if the same exception happens again and is not dropped
+                # in before_send, it'd get dropped by DedupeIntegration.
+                if event.get("exception"):
+                    DedupeIntegration.reset_last_seen()
+
             event = new_event
 
         before_send_transaction = self.options["before_send_transaction"]
@@ -846,6 +861,94 @@ class _Client(BaseClient):
             return_value = event_id
 
         return return_value
+
+    def _capture_experimental_log(self, current_scope, log):
+        # type: (Scope, Log) -> None
+        logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
+        if not logs_enabled:
+            return
+        isolation_scope = current_scope.get_isolation_scope()
+
+        headers = {
+            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+        }  # type: dict[str, object]
+
+        environment = self.options.get("environment")
+        if environment is not None and "sentry.environment" not in log["attributes"]:
+            log["attributes"]["sentry.environment"] = environment
+
+        release = self.options.get("release")
+        if release is not None and "sentry.release" not in log["attributes"]:
+            log["attributes"]["sentry.release"] = release
+
+        span = current_scope.span
+        if span is not None and "sentry.trace.parent_span_id" not in log["attributes"]:
+            log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
+
+        if log.get("trace_id") is None:
+            transaction = current_scope.transaction
+            propagation_context = isolation_scope.get_active_propagation_context()
+            if transaction is not None:
+                log["trace_id"] = transaction.trace_id
+            elif propagation_context is not None:
+                log["trace_id"] = propagation_context.trace_id
+
+        # If debug is enabled, log the log to the console
+        debug = self.options.get("debug", False)
+        if debug:
+            severity_text_to_logging_level = {
+                "trace": logging.DEBUG,
+                "debug": logging.DEBUG,
+                "info": logging.INFO,
+                "warn": logging.WARNING,
+                "error": logging.ERROR,
+                "fatal": logging.CRITICAL,
+            }
+            logger.log(
+                severity_text_to_logging_level.get(log["severity_text"], logging.DEBUG),
+                f'[Sentry Logs] {log["body"]}',
+            )
+
+        envelope = Envelope(headers=headers)
+
+        before_emit_log = self.options["_experiments"].get("before_emit_log")
+        if before_emit_log is not None:
+            log = before_emit_log(log, {})
+        if log is None:
+            return
+
+        def format_attribute(key, val):
+            # type: (str, int | float | str | bool) -> Any
+            if isinstance(val, bool):
+                return {"key": key, "value": {"boolValue": val}}
+            if isinstance(val, int):
+                return {"key": key, "value": {"intValue": str(val)}}
+            if isinstance(val, float):
+                return {"key": key, "value": {"doubleValue": val}}
+            if isinstance(val, str):
+                return {"key": key, "value": {"stringValue": val}}
+            return {"key": key, "value": {"stringValue": json.dumps(val)}}
+
+        otel_log = {
+            "severityText": log["severity_text"],
+            "severityNumber": log["severity_number"],
+            "body": {"stringValue": log["body"]},
+            "timeUnixNano": str(log["time_unix_nano"]),
+            "attributes": [
+                format_attribute(k, v) for (k, v) in log["attributes"].items()
+            ],
+        }
+
+        if "trace_id" in log:
+            otel_log["traceId"] = log["trace_id"]
+
+        envelope.add_log(otel_log)  # TODO: batch these
+
+        if self.spotlight:
+            self.spotlight.capture_envelope(envelope)
+
+        if self.transport is not None:
+            self.transport.capture_envelope(envelope)
 
     def capture_session(
         self, session  # type: Session

@@ -79,7 +79,11 @@ class Envelope:
     ):
         # type: (...) -> None
         self.add_item(
-            Item(payload=PayloadRef(json=profile_chunk), type="profile_chunk")
+            Item(
+                payload=PayloadRef(json=profile_chunk),
+                type="profile_chunk",
+                headers={"platform": profile_chunk.get("platform", "python")},
+            )
         )
 
     def add_checkin(
@@ -101,6 +105,12 @@ class Envelope:
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=sessions), type="sessions"))
+
+    def add_log(
+        self, log  # type: Any
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=log), type="otel_log"))
 
     def add_item(
         self, item  # type: Item
@@ -268,6 +278,8 @@ class Item:
             return "transaction"
         elif ty == "event":
             return "error"
+        elif ty == "otel_log":
+            return "log"
         elif ty == "client_report":
             return "internal"
         elif ty == "profile":

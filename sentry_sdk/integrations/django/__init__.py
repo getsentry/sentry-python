@@ -8,7 +8,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -398,7 +398,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
         if transaction_name is None:
             transaction_name = request.path_info
-            source = TRANSACTION_SOURCE_URL
+            source = TransactionSource.URL
         else:
             source = SOURCE_FOR_STYLE[transaction_style]
 
@@ -584,7 +584,7 @@ class DjangoRequestExtractor(RequestExtractor):
         # type: () -> Optional[Dict[str, Any]]
         try:
             return self.request.data
-        except AttributeError:
+        except Exception:
             return RequestExtractor.parsed_body(self)
 
 

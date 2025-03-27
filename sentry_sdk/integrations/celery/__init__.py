@@ -14,7 +14,7 @@ from sentry_sdk.integrations.celery.beat import (
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TransactionSource
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -319,7 +319,7 @@ def _wrap_tracer(task, f):
                     headers,
                     op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
-                    source=TRANSACTION_SOURCE_TASK,
+                    source=TransactionSource.TASK,
                     origin=CeleryIntegration.origin,
                 )
                 transaction.name = task.name
