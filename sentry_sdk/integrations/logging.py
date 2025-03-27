@@ -66,8 +66,8 @@ class LoggingIntegration(Integration):
     def __init__(
         self,
         level=DEFAULT_LEVEL,
-        sentry_logs_level=DEFAULT_LEVEL,
         event_level=DEFAULT_EVENT_LEVEL,
+        sentry_logs_level=DEFAULT_LEVEL,
     ):
         # type: (Optional[int], Optional[int], Optional[int]) -> None
         self._handler = None
