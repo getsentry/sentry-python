@@ -28,9 +28,9 @@ env:
   BUILD_CACHE_KEY: {% raw %}${{ github.sha }}{% endraw %}
   CACHED_BUILD_PATHS: |
     {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}
-  {% if needs_redis %}
-    {% raw %}CELERY_BROKER_URL: ${{ matrix.python-version == '3.6' && 'redis://redis:6379/0' || 'redis://localhost:6379/0' }}{% endraw %}
-  {% endif %}
+{% if needs_redis %}
+  {% raw %}CELERY_BROKER_URL: ${{ matrix.python-version == '3.6' && 'redis://redis:6379/0' || 'redis://localhost:6379/0' }}{% endraw %}
+{% endif %}
 jobs:
 {% for category in categories %}
 {% include "test_group.jinja" %}
