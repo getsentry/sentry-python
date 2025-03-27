@@ -34,7 +34,7 @@ jobs:
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
     services:
       postgres:
         image: postgres
@@ -120,7 +120,7 @@ jobs:
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
     services:
       postgres:
         image: postgres
@@ -199,7 +199,7 @@ jobs:
     needs: test-web_1-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-web_1-pinned.result, 'failure') || contains(needs.test-web_1-pinned.result, 'skipped')
