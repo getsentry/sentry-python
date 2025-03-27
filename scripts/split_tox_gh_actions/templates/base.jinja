@@ -25,6 +25,9 @@ permissions:
   contents: read
 
 env:
+{% if needs_redis %}
+  {% raw %}CELERY_BROKER_URL: ""{% endraw %}
+{% endif %}
   BUILD_CACHE_KEY: {% raw %}${{ github.sha }}{% endraw %}
   CACHED_BUILD_PATHS: |
     {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}

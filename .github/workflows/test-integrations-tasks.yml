@@ -18,6 +18,7 @@ concurrency:
 permissions:
   contents: read
 env:
+  CELERY_BROKER_URL: ""
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
