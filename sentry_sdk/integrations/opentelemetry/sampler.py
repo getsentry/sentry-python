@@ -161,13 +161,11 @@ def _update_trace_state(span_context, sampled, sample_rate=None, sample_rand=Non
     elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
         trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, sampled)
 
-    # sample_rate should always be updated to ensure complete traces
     if sample_rate is not None:
         trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
 
-    # only add sample_rand if there isn't one
     if sample_rand is not None:
-        trace_state = trace_state.add(
+        trace_state = trace_state.update(
             TRACESTATE_SAMPLE_RAND_KEY, f"{sample_rand:.6f}"  # noqa: E231
         )
 
