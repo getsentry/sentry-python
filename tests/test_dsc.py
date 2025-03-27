@@ -8,7 +8,6 @@ The DSC is propagated between service using a header called "baggage".
 This is not tested in this file.
 """
 
-import random
 from unittest import mock
 
 import pytest
@@ -176,10 +175,10 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
     }
 
     # We continue the incoming trace and start a new transaction
-    monkeypatch.setattr(random, "random", lambda: 0.125)
-    with sentry_sdk.continue_trace(incoming_http_headers):
-        with sentry_sdk.start_span(name="foo"):
-            pass
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.125):
+        with sentry_sdk.continue_trace(incoming_http_headers):
+            with sentry_sdk.start_span(name="foo"):
+                pass
 
     assert len(envelopes) == 1
 
@@ -231,7 +230,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         #       The result of the local traces sampler.
         # "local_traces_sample_rate":
         #       The `traces_sample_rate` setting in the local `sentry_init` call.
-        (
+        (  # 1 traces_sample_rate does not override incoming
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
@@ -243,7 +242,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             1.0,  # expected_sample_rate
             "true",  # expected_sampled
         ),
-        (
+        (  # 2 traces_sampler overrides incoming
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
@@ -255,7 +254,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             0.5,  # expected_sample_rate
             "true",  # expected_sampled
         ),
-        (
+        (  # 3 traces_sample_rate does not overrides incoming sample rate or parent (incoming not sampled)
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
@@ -267,19 +266,19 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             None,  # expected_sample_rate
             "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled (because the parent sampled is 0)
         ),
-        (
+        (  # 4 traces_sampler overrides incoming (incoming not sampled)
             {
-                "incoming_sample_rate": 1.0,
+                "incoming_sample_rate": 0.3,
                 "incoming_sampled": "false",
                 "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
-                "local_traces_sampler_result": 0.5,
+                "local_traces_sampler_result": 0.25,
                 "local_traces_sample_rate": 0.7,
             },
-            0.5,  # expected_sample_rate
+            0.25,  # expected_sample_rate
             "false",  # expected_sampled (traces sampler can override parent sampled)
         ),
-        (
+        (  # 5 forwarding incoming (traces_sample_rate not set)
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
@@ -291,7 +290,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             None,  # expected_sample_rate
             "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled (traces_sample_rate=None disables all transaction creation)
         ),
-        (
+        (  # 6 traces_sampler overrides incoming  (traces_sample_rate not set)
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
@@ -303,7 +302,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             0.5,  # expected_sample_rate
             "true",  # expected_sampled (traces sampler overrides the traces_sample_rate setting, so transactions are created)
         ),
-        (
+        (  # 7 forwarding incoming (traces_sample_rate not set) (incoming not sampled)
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
@@ -315,19 +314,19 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             None,  # expected_sample_rate
             "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled (traces_sample_rate=None disables all transaction creation)
         ),
-        (
+        (  # 8 traces_sampler overrides incoming  (traces_sample_rate not set) (incoming not sampled)
             {
-                "incoming_sample_rate": 1.0,
+                "incoming_sample_rate": 0.3,
                 "incoming_sampled": "false",
                 "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
-                "local_traces_sampler_result": 0.5,
+                "local_traces_sampler_result": 0.25,
                 "local_traces_sample_rate": None,
             },
-            0.5,  # expected_sample_rate
+            0.25,  # expected_sample_rate
             "false",  # expected_sampled
         ),
-        (
+        (  # 9 traces_sample_rate overrides incoming (upstream deferred sampling decision)
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": None,
@@ -405,7 +404,7 @@ def test_dsc_sample_rate_change(
     }
 
     # We continue the incoming trace and start a new transaction
-    with mock.patch.object(random, "random", return_value=0.2):
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.2):
         with sentry_sdk.continue_trace(incoming_http_headers):
             with sentry_sdk.start_span(name="foo"):
                 pass
@@ -413,6 +412,7 @@ def test_dsc_sample_rate_change(
     if expected_sampled == "tracing-disabled-no-transactions-should-be-sent":
         assert len(envelopes) == 0
     else:
+        assert len(envelopes) == 1
         transaction_envelope = envelopes[0]
         dsc_in_envelope_header = transaction_envelope.headers["trace"]
 

@@ -1,6 +1,5 @@
 import pytest
 
-import re
 from unittest import mock
 
 from sentry_sdk import (
@@ -94,11 +93,10 @@ def test_baggage_with_tracing_disabled(sentry_init):
 @pytest.mark.forked
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
-    with start_span(name="foo") as span:
-        expected_baggage_re = r"^sentry-transaction=foo,sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=1\.0\.0,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
-            span.trace_id, "true" if span.sampled else "false"
-        )
-        assert re.match(expected_baggage_re, get_baggage())
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.111111):
+        with start_span(name="foo") as span:
+            expected_baggage = f"sentry-transaction=foo,sentry-trace_id={span.trace_id},sentry-sample_rand=0.111111,sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled=true"  # noqa: E231
+            assert get_baggage() == SortedBaggage(expected_baggage)
 
 
 @pytest.mark.forked
@@ -112,7 +110,7 @@ def test_continue_trace(sentry_init):
     with continue_trace(
         {
             "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
-            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19,sentry-sample_rand=0.123456",
+            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19,sentry-sample_rand=0.123456",  # noqa: E231
         },
     ):
         with start_span(name="some name") as span:
