@@ -1,6 +1,5 @@
 import json
 import os
-import time
 import uuid
 import random
 import socket
@@ -210,8 +209,8 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
-        # type: (Scope, str, int, str, **Any) -> None
+    def _capture_experimental_log(self, scope, log):
+        # type: (Scope, Log) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -863,47 +862,36 @@ class _Client(BaseClient):
 
         return return_value
 
-    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
-        # type: (Scope, str, int, str, **Any) -> None
+    def _capture_experimental_log(self, current_scope, log):
+        # type: (Scope, Log) -> None
         logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
         if not logs_enabled:
             return
+        isolation_scope = current_scope.get_isolation_scope()
 
         headers = {
             "sent_at": format_timestamp(datetime.now(timezone.utc)),
         }  # type: dict[str, object]
 
-        attrs = {
-            "sentry.message.template": template,
-        }  # type: dict[str, str | bool | float | int]
-
-        kwargs_attributes = kwargs.get("attributes")
-        if kwargs_attributes is not None:
-            attrs.update(kwargs_attributes)
-
         environment = self.options.get("environment")
-        if environment is not None:
-            attrs["sentry.environment"] = environment
+        if environment is not None and "sentry.environment" not in log["attributes"]:
+            log["attributes"]["sentry.environment"] = environment
 
         release = self.options.get("release")
-        if release is not None:
-            attrs["sentry.release"] = release
+        if release is not None and "sentry.release" not in log["attributes"]:
+            log["attributes"]["sentry.release"] = release
 
-        span = scope.span
-        if span is not None:
-            attrs["sentry.trace.parent_span_id"] = span.span_id
+        span = current_scope.span
+        if span is not None and "sentry.trace.parent_span_id" not in log["attributes"]:
+            log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
 
-        for k, v in kwargs.items():
-            attrs[f"sentry.message.parameters.{k}"] = v
-
-        log = {
-            "severity_text": severity_text,
-            "severity_number": severity_number,
-            "body": template.format(**kwargs),
-            "attributes": attrs,
-            "time_unix_nano": time.time_ns(),
-            "trace_id": None,
-        }  # type: Log
+        if log.get("trace_id") is None:
+            transaction = current_scope.transaction
+            propagation_context = isolation_scope.get_active_propagation_context()
+            if transaction is not None:
+                log["trace_id"] = transaction.trace_id
+            elif propagation_context is not None:
+                log["trace_id"] = propagation_context.trace_id
 
         # If debug is enabled, log the log to the console
         debug = self.options.get("debug", False)
@@ -917,14 +905,9 @@ class _Client(BaseClient):
                 "fatal": logging.CRITICAL,
             }
             logger.log(
-                severity_text_to_logging_level.get(severity_text, logging.DEBUG),
+                severity_text_to_logging_level.get(log["severity_text"], logging.DEBUG),
                 f'[Sentry Logs] {log["body"]}',
             )
-
-        propagation_context = scope.get_active_propagation_context()
-        if propagation_context is not None:
-            headers["trace_id"] = propagation_context.trace_id
-            log["trace_id"] = propagation_context.trace_id
 
         envelope = Envelope(headers=headers)
 
