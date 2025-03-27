@@ -152,7 +152,7 @@ def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None)
 
 
 def _update_trace_state(span_context, sampled, sample_rate=None, sample_rand=None):
-    # type: (..., bool, Optional[float], Optional[Decimal]) -> TraceState
+    # type: (SpanContext, bool, Optional[float], Optional[Decimal]) -> TraceState
     trace_state = span_context.trace_state
 
     sampled = "true" if sampled else "false"
