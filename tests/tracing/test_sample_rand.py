@@ -86,19 +86,18 @@ def test_decimal_context(sentry_init, capture_events):
 @pytest.mark.parametrize(
     "incoming_sample_rand,expected_sample_rand",
     (
-        ("0.0100015", "0.010001"),
-        ("0.1", "0.100000"),
+        ("0.0100015", "0.0100015"),
+        ("0.1", "0.1"),
     ),
 )
-def test_sample_rand_precision(
+def test_unexpected_incoming_sample_rand_precision(
     sentry_init, capture_events, incoming_sample_rand, expected_sample_rand
 ):
     """
-    Test that incoming sample_rand is correctly interpreted and optionally rounded.
+    Test that incoming sample_rand is correctly interpreted even if it looks unexpected.
 
     We shouldn't be getting arbitrary precision sample_rand in incoming headers,
-    but if we do for some reason, check that we have this covered and we round
-    it correctly.
+    but if we do for some reason, check that we don't tamper with it.
     """
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -118,8 +117,30 @@ def test_sample_rand_precision(
     assert len(events) == 1
 
 
+@pytest.mark.parametrize(
+    "incoming_sample_rand",
+    ("abc", "null", "47"),
+)
+def test_invalid_incoming_sample_rand(sentry_init, incoming_sample_rand):
+    """Test that we handle malformed incoming sample_rand."""
+    sentry_init(traces_sample_rate=1.0)
+
+    baggage = f"sentry-sample_rand={incoming_sample_rand},sentry-trace_id=771a43a4192642f0b136d5159a501700"  # noqa: E231
+    sentry_trace = "771a43a4192642f0b136d5159a501700-1234567890abcdef"
+
+    with sentry_sdk.continue_trace(
+        {BAGGAGE_HEADER_NAME: baggage, SENTRY_TRACE_HEADER_NAME: sentry_trace}
+    ):
+        with sentry_sdk.start_span():
+            pass
+
+    # The behavior here is undefined since we got a broken incoming trace,
+    # so as long as the SDK doesn't produce an error we consider this
+    # testcase a success.
+
+
 @pytest.mark.parametrize("incoming", ((0.0, "true"), (1.0, "false")))
-def test_invalid_sampled_and_sample_rate(sentry_init, incoming):
+def test_invalid_incoming_sampled_and_sample_rate(sentry_init, incoming):
     """
     Test that we don't error out in case we can't generate a sample_rand that
     would respect the incoming sampled and sample_rate.

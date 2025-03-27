@@ -8,7 +8,6 @@ from opentelemetry.trace.span import TraceState
 import sentry_sdk
 from sentry_sdk.tracing_utils import (
     _generate_sample_rand,
-    _round_sample_rand,
     has_tracing_enabled,
 )
 from sentry_sdk.utils import is_valid_sample_rate, logger
@@ -87,12 +86,12 @@ def get_parent_sample_rand(parent_context, trace_id):
         if parent_sample_rand is None:
             return None
 
-        return _round_sample_rand(parent_sample_rand)
+        return Decimal(parent_sample_rand)
 
     return None
 
 
-def dropped_result(parent_span_context, attributes, sample_rate=None, sample_rand=None):
+def dropped_result(span_context, attributes, sample_rate=None, sample_rand=None):
     # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
     """
     React to a span getting unsampled and return a DROP SamplingResult.
@@ -104,26 +103,11 @@ def dropped_result(parent_span_context, attributes, sample_rate=None, sample_ran
     See for more info about OTel sampling:
     https://opentelemetry-python.readthedocs.io/en/latest/sdk/trace.sampling.html
     """
-    # these will only be added the first time in a root span sampling decision
-    # if sample_rate or sample_rand is provided, they'll be updated in trace state
-    trace_state = parent_span_context.trace_state
-
-    if TRACESTATE_SAMPLED_KEY not in trace_state:
-        trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
-    elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
-        trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "false")
-
-    if sample_rate is not None:
-        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
-
-    if sample_rand is not None:
-        trace_state = trace_state.update(
-            TRACESTATE_SAMPLE_RAND_KEY, f"{sample_rand:.6f}"  # noqa: E231
-        )
-
-    is_root_span = not (
-        parent_span_context.is_valid and not parent_span_context.is_remote
+    trace_state = _update_trace_state(
+        span_context, sampled=False, sample_rate=sample_rate, sample_rand=sample_rand
     )
+
+    is_root_span = not (span_context.is_valid and not span_context.is_remote)
     if is_root_span:
         # Tell Sentry why we dropped the transaction/root-span
         client = sentry_sdk.get_client()
@@ -156,28 +140,38 @@ def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None)
     See for more info about OTel sampling:
     https://opentelemetry-python.readthedocs.io/en/latest/sdk/trace.sampling.html
     """
-    # these will only be added the first time in a root span sampling decision
-    # if sample_rate or sample_rand is provided, they'll be updated in trace state
-    trace_state = span_context.trace_state
-
-    if TRACESTATE_SAMPLED_KEY not in trace_state:
-        trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "true")
-    elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
-        trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "true")
-
-    if sample_rate is not None:
-        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
-
-    if sample_rand is not None:
-        trace_state = trace_state.update(
-            TRACESTATE_SAMPLE_RAND_KEY, f"{sample_rand:.6f}"  # noqa: E231
-        )
+    trace_state = _update_trace_state(
+        span_context, sampled=True, sample_rate=sample_rate, sample_rand=sample_rand
+    )
 
     return SamplingResult(
         Decision.RECORD_AND_SAMPLE,
         attributes=attributes,
         trace_state=trace_state,
     )
+
+
+def _update_trace_state(span_context, sampled, sample_rate=None, sample_rand=None):
+    # type: (..., bool, Optional[float], Optional[Decimal]) -> TraceState
+    trace_state = span_context.trace_state
+
+    sampled = "true" if sampled else "false"
+    if TRACESTATE_SAMPLED_KEY not in trace_state:
+        trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, sampled)
+    elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
+        trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, sampled)
+
+    # sample_rate should always be updated to ensure complete traces
+    if sample_rate is not None:
+        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+
+    # only add sample_rand if there isn't one
+    if sample_rand is not None:
+        trace_state = trace_state.add(
+            TRACESTATE_SAMPLE_RAND_KEY, f"{sample_rand:.6f}"  # noqa: E231
+        )
+
+    return trace_state
 
 
 class SentrySampler(Sampler):
@@ -274,9 +268,7 @@ class SentrySampler(Sampler):
             logger.warning(
                 f"[Tracing] Discarding {name} because of invalid sample rate."
             )
-            return dropped_result(
-                parent_span_context, attributes, sample_rand=sample_rand
-            )
+            return dropped_result(parent_span_context, attributes)
 
         # Down-sample in case of back pressure monitor says so
         if is_root_span and client.monitor:
@@ -284,7 +276,7 @@ class SentrySampler(Sampler):
             if client.monitor.downsample_factor > 0:
                 sample_rate_to_propagate = sample_rate
 
-        # Roll the dice on sample rate
+        # Compare sample_rand to sample_rate to make the final sampling decision
         sample_rate = float(cast("Union[bool, float, int]", sample_rate))
         sampled = sample_rand < sample_rate
 
@@ -293,14 +285,14 @@ class SentrySampler(Sampler):
                 parent_span_context,
                 attributes,
                 sample_rate=sample_rate_to_propagate,
-                sample_rand=sample_rand,
+                sample_rand=None if sample_rand == parent_sample_rand else sample_rand,
             )
         else:
             return dropped_result(
                 parent_span_context,
                 attributes,
                 sample_rate=sample_rate_to_propagate,
-                sample_rand=sample_rand,
+                sample_rand=None if sample_rand == parent_sample_rand else sample_rand,
             )
 
     def get_description(self) -> str:
