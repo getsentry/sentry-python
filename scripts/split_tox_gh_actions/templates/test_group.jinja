@@ -39,6 +39,10 @@
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
 
     {% endif %}
+    {% if needs_redis %}
+    env:
+      {% raw %}CELERY_BROKER_URL: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
+    {% endif %}
     # Use Docker container only for Python 3.6
     {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
     steps:
