@@ -30,6 +30,7 @@ def connect_signal(request):
 @pytest.fixture
 def init_celery(sentry_init, request):
     def inner(
+        propagate_traces=True,
         backend="always_eager",
         monitor_beat_tasks=False,
         **kwargs,
@@ -37,6 +38,7 @@ def init_celery(sentry_init, request):
         sentry_init(
             integrations=[
                 CeleryIntegration(
+                    propagate_traces=propagate_traces,
                     monitor_beat_tasks=monitor_beat_tasks,
                 )
             ],
@@ -533,7 +535,9 @@ def test_sentry_propagate_traces_override(init_celery):
     Test if the `sentry-propagate-traces` header given to `apply_async`
     overrides the `propagate_traces` parameter in the integration constructor.
     """
-    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
+    celery = init_celery(
+        propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
+    )
 
     # Since we're applying the task inline eagerly,
     # we need to cleanup the otel context for this test.

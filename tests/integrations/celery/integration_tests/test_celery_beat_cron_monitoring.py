@@ -34,10 +34,11 @@ def celery_init(sentry_init, celery_config):
 
     from sentry_sdk.integrations.celery import CeleryIntegration
 
-    def inner(monitor_beat_tasks=False, **kwargs):
+    def inner(propagate_traces=True, monitor_beat_tasks=False, **kwargs):
         sentry_init(
             integrations=[
                 CeleryIntegration(
+                    propagate_traces=propagate_traces,
                     monitor_beat_tasks=monitor_beat_tasks,
                 )
             ],

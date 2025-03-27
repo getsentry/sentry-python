@@ -62,10 +62,12 @@ class CeleryIntegration(Integration):
 
     def __init__(
         self,
+        propagate_traces=True,
         monitor_beat_tasks=False,
         exclude_beat_tasks=None,
     ):
-        # type: (bool, Optional[List[str]]) -> None
+        # type: (bool, bool, Optional[List[str]]) -> None
+        self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
 
@@ -252,6 +254,12 @@ def _wrap_task_run(f):
             return f(*args, **kwargs)
 
         kwarg_headers = kwargs.get("headers") or {}
+        propagate_traces = kwarg_headers.pop(
+            "sentry-propagate-traces", integration.propagate_traces
+        )
+
+        if not propagate_traces:
+            return f(*args, **kwargs)
 
         if isinstance(args[0], Task):
             task_name = args[0].name  # type: str
