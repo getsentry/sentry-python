@@ -70,6 +70,7 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
+            "enable_sentry_logs": Optional[bool],
         },
         total=False,
     )

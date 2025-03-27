@@ -69,6 +69,13 @@ TEST_SUITE_CONFIG = {
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
+    "litestar": {
+        "package": "litestar",
+        "deps": {
+            "*": ["pytest-asyncio", "python-multipart", "requests", "cryptography"],
+            "<2.7": ["httpx<0.28"],
+        },
+    },
     "loguru": {
         "package": "loguru",
     },
