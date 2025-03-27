@@ -39,9 +39,12 @@ jobs:
       docker:
         image: docker:dind  # Required for Docker network management
         options: --privileged  # Required for Docker-in-Docker operations
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
@@ -115,9 +118,12 @@ jobs:
       docker:
         image: docker:dind  # Required for Docker network management
         options: --privileged  # Required for Docker-in-Docker operations
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
