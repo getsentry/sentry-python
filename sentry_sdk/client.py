@@ -418,7 +418,7 @@ class _Client(BaseClient):
             if self.options.get("spotlight"):
                 self.spotlight = setup_spotlight(self.options)
                 if not self.options["dsn"]:
-                    sample_all = lambda c: 1
+                    sample_all = lambda *_args: 1.0
                     self.options["send_default_pii"] = True
                     self.options["error_sampler"] = sample_all
                     self.options["traces_sampler"] = sample_all
@@ -474,7 +474,7 @@ class _Client(BaseClient):
 
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
-        return self.options.get("send_default_pii", False)
+        return self.options.get("send_default_pii") or False
 
     @property
     def dsn(self):
