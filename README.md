@@ -123,3 +123,4 @@ Thanks to everyone who has helped improve the SDK!
 <a href="https://github.com/getsentry/sentry-python/graphs/contributors">
   <img src="https://contributors-img.web.app/image?repo=getsentry/sentry-python" />
 </a>
+.
