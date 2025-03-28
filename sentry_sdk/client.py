@@ -757,6 +757,8 @@ class _Client(BaseClient):
         if exceptions:
             errored = True
             for error in exceptions:
+                if isinstance(error, AnnotatedValue):
+                    error = error.value or {}
                 mechanism = error.get("mechanism")
                 if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
