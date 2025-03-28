@@ -28,6 +28,7 @@ env:
   BUILD_CACHE_KEY: {% raw %}${{ github.sha }}{% endraw %}
   CACHED_BUILD_PATHS: |
     {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}
+
 jobs:
 {% for category in categories %}
 {% include "test_group.jinja" %}
