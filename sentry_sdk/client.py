@@ -418,7 +418,7 @@ class _Client(BaseClient):
             if self.options.get("spotlight"):
                 self.spotlight = setup_spotlight(self.options)
                 if not self.options["dsn"]:
-                    sample_all = lambda *_args: 1.0
+                    sample_all = lambda *_args, **_kwargs: 1.0
                     self.options["send_default_pii"] = True
                     self.options["error_sampler"] = sample_all
                     self.options["traces_sampler"] = sample_all
