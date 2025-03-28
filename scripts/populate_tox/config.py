@@ -148,6 +148,7 @@ TEST_SUITE_CONFIG = {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
             "*": ["httpx"],
+            "<=0.262.5": ["pydantic<2.11"],
         },
     },
     "tornado": {

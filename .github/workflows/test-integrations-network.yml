@@ -34,6 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
@@ -88,6 +89,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
@@ -135,7 +137,7 @@ jobs:
     needs: test-network-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-network-pinned.result, 'failure') || contains(needs.test-network-pinned.result, 'skipped')
