@@ -35,11 +35,11 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
         assert not events
 
 
-@pytest.mark.parametrize("propagate_hub", (True, False))
-def test_propagates_hub(sentry_init, capture_events, propagate_hub):
+@pytest.mark.parametrize("propagate_scope", (True, False))
+def test_propagates_scope(sentry_init, capture_events, propagate_scope):
     sentry_init(
         default_integrations=False,
-        integrations=[ThreadingIntegration(propagate_hub=propagate_hub)],
+        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
     )
     events = capture_events()
 
@@ -65,25 +65,25 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
 
-    if propagate_hub:
+    if propagate_scope:
         assert event["tags"]["stage1"] == "true"
     else:
         assert "stage1" not in event.get("tags", {})
 
 
-@pytest.mark.parametrize("propagate_hub", (True, False))
-def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
+@pytest.mark.parametrize("propagate_scope", (True, False))
+def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scope):
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[ThreadingIntegration(propagate_hub=propagate_hub)],
+        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
     )
     events = capture_events()
 
     def double(number):
-        with sentry_sdk.start_span(op="task", name=str(number)):
+        with sentry_sdk.start_span(op="task", name=str(number), only_if_parent=True):
             return number * 2
 
-    with sentry_sdk.start_transaction(name="test_handles_threadpool"):
+    with sentry_sdk.start_span(name="test_handles_threadpool"):
         with futures.ThreadPoolExecutor(max_workers=1) as executor:
             tasks = [executor.submit(double, number) for number in [1, 2, 3, 4]]
             for future in futures.as_completed(tasks):
@@ -91,7 +91,7 @@ def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
 
     sentry_sdk.flush()
 
-    if propagate_hub:
+    if propagate_scope:
         assert len(events) == 1
         (event,) = events
         assert event["spans"][0]["trace_id"] == event["spans"][1]["trace_id"]
