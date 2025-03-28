@@ -35,9 +35,12 @@ jobs:
       docker:
         image: docker:dind  # Required for Docker network management
         options: --privileged  # Required for Docker-in-Docker operations
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
@@ -101,9 +104,12 @@ jobs:
       docker:
         image: docker:dind  # Required for Docker network management
         options: --privileged  # Required for Docker-in-Docker operations
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
@@ -159,7 +165,7 @@ jobs:
     needs: test-cloud-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-cloud-pinned.result, 'failure') || contains(needs.test-cloud-pinned.result, 'skipped')
