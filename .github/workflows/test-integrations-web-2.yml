@@ -34,7 +34,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
-        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
@@ -117,7 +116,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
-        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
