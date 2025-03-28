@@ -8,7 +8,8 @@ from sentry_sdk.utils import logger
 from tests.integrations.celery.integration_tests import run_beat
 
 
-REDIS_SERVER = "redis://127.0.0.1:6379"
+# REDIS_SERVER = "redis://127.0.0.1:6379"
+REDIS_SERVER = "redis://redis:6379"
 REDIS_DB = 15
 
 
