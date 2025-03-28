@@ -1,4 +1,5 @@
 import os
+import sys
 import pytest
 
 from celery.contrib.testing.worker import start_worker
@@ -8,8 +9,7 @@ from sentry_sdk.utils import logger
 from tests.integrations.celery.integration_tests import run_beat
 
 
-# REDIS_SERVER = "redis://127.0.0.1:6379"
-REDIS_SERVER = "redis://redis:6379"
+REDIS_SERVER = "redis://127.0.0.1:6379"
 REDIS_DB = 15
 
 
@@ -54,6 +54,7 @@ def celery_init(sentry_init, celery_config):
 
 
 @pytest.mark.forked
+@pytest.mark.skipif(sys.version_info < (3, 7), reason="Test requires Python 3.7+")
 def test_explanation(celery_init, capture_envelopes):
     """
     This is a dummy test for explaining how to test using Celery Beat
