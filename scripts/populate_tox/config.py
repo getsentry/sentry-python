@@ -23,8 +23,8 @@ TEST_SUITE_CONFIG = {
         "package": "celery",
         "deps": {
             "*": ["newrelic", "redis"],
-            "py3.7": ["importlib-metadata<5.0"],
         },
+        "python": ">=3.8",
     },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
