@@ -35,8 +35,6 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-22.04]
-    env:
-      CELERY_BROKER_URL: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
@@ -126,8 +124,6 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-22.04]
-    env:
-      CELERY_BROKER_URL: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
