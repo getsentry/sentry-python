@@ -39,5 +39,5 @@ if [ -z "${ENV}" ]; then
 fi
 
 echo "~~~ Running tox with environment: $ENV ~~~"
-exec $TOXPATH -o -e "$ENV" -- "${@:2}"
+exec $TOXPATH -p auto -o -e "$ENV" -- "${@:2}"
 echo "~~~ Tox completed ~~~"
