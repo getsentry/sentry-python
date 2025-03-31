@@ -13,6 +13,8 @@
   This is how you can use it (Sentry Logs is in beta right now so the API can still change):
 
   ```python
+  import logging
+
   import sentry_sdk
   from sentry_sdk.integrations.logging import LoggingIntegration
 
@@ -23,12 +25,11 @@
         "enable_sentry_logs": True
     }
     integrations=[
-      LoggingIntegration(sentry_logs_level="error"),
+      LoggingIntegration(sentry_logs_level=logging.ERROR),
     ]
   )
 
   # Your existing logging setup
-  import logging
   some_logger = logging.Logger("some-logger")
 
   some_logger.info('In this example info events will not be sent to Sentry logs. my_value=%s', my_value)
