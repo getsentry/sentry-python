@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.25.0
+
+### Various fixes & improvements
+
+- feat: Sample everything 100% w/ Spotlight & no DSN set (#4207) by @BYK
+- Update Ubuntu in Github test runners (#4204) by @antonpirker
+- ci: Fix GraphQL failures (#4208) by @sentrivana
+- fix: Don't hang when capturing long stacktrace (#4191) by @szokeasaurusrex
+- feat(logs): Make the `logging` integration send Sentry logs (#4143) by @colin-sentry
+- toxgen: Make it clearer which suites can be migrated (#4196) by @sentrivana
+- tests: Move Litestar under toxgen (#4197) by @sentrivana
+- chore: Deprecate Scope.user (#4194) by @sentrivana
+- Fix flaky test (#4198) by @sentrivana
+- fix(integrations/dramatiq): use set_transaction_name (#4175) by @timdrijvers
+- Added flake8 plugings to pre-commit call of flake8 (#4190) by @antonpirker
+
 ## 2.24.1
 
 ### Various fixes & improvements
