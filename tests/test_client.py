@@ -1058,6 +1058,7 @@ def test_max_breadcrumbs_option(
         add_breadcrumb({"type": "sourdough"})
 
     capture_message("dogs are great")
+
     assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs
 
 

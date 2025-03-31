@@ -40,6 +40,7 @@ def test_span_trimming(sentry_init, capture_events):
 def test_span_data_scrubbing_and_trimming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, _experiments={"max_spans": 3})
     events = capture_events()
+
     with start_transaction(name="hi"):
         with start_span(op="foo", name="bar") as span:
             span.set_data("password", "secret")
