@@ -120,7 +120,6 @@ def test_stack_var_scrubbing(sentry_init, capture_events):
 
 def test_breadcrumb_extra_scrubbing(sentry_init, capture_events):
     sentry_init(max_breadcrumbs=2)
-    # breakpoint()
     events = capture_events()
     logger.info("breadcrumb 1", extra=dict(foo=1, password="secret"))
     logger.info("breadcrumb 2", extra=dict(bar=2, auth="secret"))
