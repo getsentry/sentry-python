@@ -33,9 +33,6 @@ class AnnotatedValue:
     def __str__(self):
         return str({"value": str(self.value), "metadata": str(self.metadata)})
 
-    def __repr__(self):
-        return self
-
     def __len__(self):
         return len(self.value)
 
