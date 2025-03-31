@@ -43,7 +43,6 @@ if TYPE_CHECKING:
         Callable,
         cast,
         ContextManager,
-        Deque,
         Dict,
         Iterator,
         List,
@@ -411,6 +410,7 @@ class Auth:
         if self.secret_key is not None:
             rv.append(("sentry_secret", self.secret_key))
         return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
+
 
 def get_type_name(cls):
     # type: (Optional[type]) -> Optional[str]
