@@ -532,7 +532,6 @@ class _Client(BaseClient):
                 previous_total_breadcrumbs = (
                     len(event["breadcrumbs"]["values"]) + scope._n_breadcrumbs_truncated
                 )
-                logging.debug(previous_total_breadcrumbs)
 
         if (
             self.options["attach_stacktrace"]
