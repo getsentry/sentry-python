@@ -56,7 +56,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.5
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -148,7 +148,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.5
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -211,7 +211,7 @@ jobs:
     needs: test-dbs-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-dbs-pinned.result, 'failure') || contains(needs.test-dbs-pinned.result, 'skipped')

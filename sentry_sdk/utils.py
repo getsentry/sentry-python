@@ -77,6 +77,15 @@ BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
 TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
 
+MAX_STACK_FRAMES = 2000
+"""Maximum number of stack frames to send to Sentry.
+
+If we have more than this number of stack frames, we will stop processing
+the stacktrace to avoid getting stuck in a long-lasting loop. This value
+exceeds the default sys.getrecursionlimit() of 1000, so users will only
+be affected by this limit if they have a custom recursion limit.
+"""
+
 
 def env_to_bool(value, *, strict=False):
     # type: (Any, Optional[bool]) -> bool | None
@@ -707,10 +716,23 @@ def single_exception_from_error_tuple(
             max_value_length=max_value_length,
             custom_repr=custom_repr,
         )
-        for tb in iter_stacks(tb)
+        # Process at most MAX_STACK_FRAMES + 1 frames, to avoid hanging on
+        # processing a super-long stacktrace.
+        for tb, _ in zip(iter_stacks(tb), range(MAX_STACK_FRAMES + 1))
     ]  # type: List[Dict[str, Any]]
 
-    if frames:
+    if len(frames) > MAX_STACK_FRAMES:
+        # If we have more frames than the limit, we remove the stacktrace completely.
+        # We don't trim the stacktrace here because we have not processed the whole
+        # thing (see above, we stop at MAX_STACK_FRAMES + 1). Normally, Relay would
+        # intelligently trim by removing frames in the middle of the stacktrace, but
+        # since we don't have the whole stacktrace, we can't do that. Instead, we
+        # drop the entire stacktrace.
+        exception_value["stacktrace"] = AnnotatedValue.removed_because_over_size_limit(
+            value=None
+        )
+
+    elif frames:
         if not full_stack:
             new_frames = frames
         else:
@@ -909,7 +931,7 @@ def to_string(value):
 
 
 def iter_event_stacktraces(event):
-    # type: (Event) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Annotated[Dict[str, Any]]]
     if "stacktrace" in event:
         yield event["stacktrace"]
     if "threads" in event:
@@ -918,13 +940,16 @@ def iter_event_stacktraces(event):
                 yield thread["stacktrace"]
     if "exception" in event:
         for exception in event["exception"].get("values") or ():
-            if "stacktrace" in exception:
+            if isinstance(exception, dict) and "stacktrace" in exception:
                 yield exception["stacktrace"]
 
 
 def iter_event_frames(event):
     # type: (Event) -> Iterator[Dict[str, Any]]
     for stacktrace in iter_event_stacktraces(event):
+        if isinstance(stacktrace, AnnotatedValue):
+            stacktrace = stacktrace.value or {}
+
         for frame in stacktrace.get("frames") or ():
             yield frame
 
@@ -932,6 +957,9 @@ def iter_event_frames(event):
 def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
     # type: (Event, Optional[List[str]], Optional[List[str]], Optional[str]) -> Event
     for stacktrace in iter_event_stacktraces(event):
+        if isinstance(stacktrace, AnnotatedValue):
+            stacktrace = stacktrace.value or {}
+
         set_in_app_in_frames(
             stacktrace.get("frames"),
             in_app_exclude=in_app_exclude,

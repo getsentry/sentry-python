@@ -7,6 +7,7 @@ from unittest import mock
 from sentry_sdk.integrations.celery import _update_celery_task_headers
 import sentry_sdk
 from sentry_sdk.tracing_utils import Baggage
+from tests.conftest import SortedBaggage
 
 
 BAGGAGE_VALUE = (
@@ -83,10 +84,11 @@ def test_span_with_transaction(sentry_init):
 
             assert outgoing_headers["sentry-trace"] == span.to_traceparent()
             assert outgoing_headers["headers"]["sentry-trace"] == span.to_traceparent()
-            assert outgoing_headers["baggage"] == transaction.get_baggage().serialize()
-            assert (
-                outgoing_headers["headers"]["baggage"]
-                == transaction.get_baggage().serialize()
+            assert outgoing_headers["baggage"] == SortedBaggage(
+                transaction.get_baggage().serialize()
+            )
+            assert outgoing_headers["headers"]["baggage"] == SortedBaggage(
+                transaction.get_baggage().serialize()
             )
 
 
@@ -117,11 +119,11 @@ def test_span_with_transaction_custom_headers(sentry_init):
                     if x is not None and x != ""
                 ]
             )
-            assert outgoing_headers["baggage"] == combined_baggage.serialize(
-                include_third_party=True
+            assert outgoing_headers["baggage"] == SortedBaggage(
+                combined_baggage.serialize(include_third_party=True)
             )
-            assert outgoing_headers["headers"]["baggage"] == combined_baggage.serialize(
-                include_third_party=True
+            assert outgoing_headers["headers"]["baggage"] == SortedBaggage(
+                combined_baggage.serialize(include_third_party=True)
             )
 
 

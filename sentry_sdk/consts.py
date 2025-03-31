@@ -70,6 +70,7 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
+            "enable_sentry_logs": Optional[bool],
         },
         total=False,
     )
@@ -510,7 +511,6 @@ class ClientConstructor:
         debug=None,  # type: Optional[bool]
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
-        propagate_traces=True,  # type: bool
         traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
         profiles_sample_rate=None,  # type: Optional[float]
@@ -913,8 +913,6 @@ class ClientConstructor:
         :param profile_lifecycle:
 
         :param profile_session_sample_rate:
-
-        :param propagate_traces:
 
         :param auto_session_tracking:
 

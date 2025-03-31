@@ -74,7 +74,7 @@ jobs:
     needs: test-gevent-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-gevent-pinned.result, 'failure') || contains(needs.test-gevent-pinned.result, 'skipped')

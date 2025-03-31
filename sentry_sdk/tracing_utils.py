@@ -1,4 +1,5 @@
 import contextlib
+import decimal
 import inspect
 import os
 import re
@@ -392,6 +393,9 @@ class PropagationContext:
                     propagation_context = PropagationContext()
                 propagation_context.update(sentrytrace_data)
 
+        if propagation_context is not None:
+            propagation_context._fill_sample_rand()
+
         return propagation_context
 
     @property
@@ -432,6 +436,78 @@ class PropagationContext:
                 setattr(self, key, value)
             except AttributeError:
                 pass
+
+    def _fill_sample_rand(self):
+        # type: () -> None
+        """
+        Ensure that there is a valid sample_rand value in the baggage.
+
+        If there is a valid sample_rand value in the baggage, we keep it.
+        Otherwise, we generate a sample_rand value according to the following:
+
+          - If we have a parent_sampled value and a sample_rate in the DSC, we compute
+            a sample_rand value randomly in the range:
+                - [0, sample_rate) if parent_sampled is True,
+                - or, in the range [sample_rate, 1) if parent_sampled is False.
+
+          - If either parent_sampled or sample_rate is missing, we generate a random
+            value in the range [0, 1).
+
+        The sample_rand is deterministically generated from the trace_id, if present.
+
+        This function does nothing if there is no dynamic_sampling_context.
+        """
+        if self.dynamic_sampling_context is None or self.baggage is None:
+            return
+
+        sentry_baggage = self.baggage.sentry_items
+
+        sample_rand = None
+        if sentry_baggage.get("sample_rand"):
+            try:
+                sample_rand = Decimal(sentry_baggage["sample_rand"])
+            except Exception:
+                logger.debug(
+                    f"Failed to convert incoming sample_rand to Decimal: {sample_rand}"
+                )
+
+        if sample_rand is not None and 0 <= sample_rand < 1:
+            # sample_rand is present and valid, so don't overwrite it
+            return
+
+        sample_rate = None
+        if sentry_baggage.get("sample_rate"):
+            try:
+                sample_rate = float(sentry_baggage["sample_rate"])
+            except Exception:
+                logger.debug(
+                    f"Failed to convert incoming sample_rate to float: {sample_rate}"
+                )
+
+        lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
+
+        try:
+            sample_rand = _generate_sample_rand(self.trace_id, interval=(lower, upper))
+        except ValueError:
+            # ValueError is raised if the interval is invalid, i.e. lower >= upper.
+            # lower >= upper might happen if the incoming trace's sampled flag
+            # and sample_rate are inconsistent, e.g. sample_rate=0.0 but sampled=True.
+            # We cannot generate a sensible sample_rand value in this case.
+            logger.debug(
+                f"Could not backfill sample_rand, since parent_sampled={self.parent_sampled} "
+                f"and sample_rate={sample_rate}."
+            )
+            return
+
+        self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
+
+    def _sample_rand(self):
+        # type: () -> Optional[str]
+        """Convenience method to get the sample_rand value from the baggage."""
+        if self.baggage is None:
+            return None
+
+        return self.baggage.sentry_items.get("sample_rand")
 
     def __repr__(self):
         # type: (...) -> str
@@ -684,13 +760,11 @@ def get_current_span(scope=None):
     return current_span
 
 
-# XXX-potel-ivana: use this
 def _generate_sample_rand(
     trace_id,  # type: Optional[str]
-    *,
     interval=(0.0, 1.0),  # type: tuple[float, float]
 ):
-    # type: (...) -> Any
+    # type: (...) -> Optional[decimal.Decimal]
     """Generate a sample_rand value from a trace ID.
 
     The generated value will be pseudorandomly chosen from the provided
@@ -709,15 +783,11 @@ def _generate_sample_rand(
     while sample_rand >= upper:
         sample_rand = rng.uniform(lower, upper)
 
-    # Round down to exactly six decimal-digit precision.
-    # Setting the context is needed to avoid an InvalidOperation exception
-    # in case the user has changed the default precision.
     return Decimal(sample_rand).quantize(
         Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
     )
 
 
-# XXX-potel-ivana: use this
 def _sample_rand_range(parent_sampled, sample_rate):
     # type: (Optional[bool], Optional[float]) -> tuple[float, float]
     """
