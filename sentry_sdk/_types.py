@@ -30,6 +30,15 @@ class AnnotatedValue:
 
         return self.value == other.value and self.metadata == other.metadata
 
+    def __str__(self):
+        return str({"value": str(self.value), "metadata": str(self.metadata)})
+
+    def __repr__(self):
+        return str(self)
+
+    def __len__(self):
+        return len(self.value)
+
     @classmethod
     def removed_because_raw_data(cls):
         # type: () -> AnnotatedValue
@@ -81,8 +90,11 @@ class AnnotatedValue:
             },
         )
 
+
 T = TypeVar("T")
 Annotated = Union[AnnotatedValue, T]
+
+
 class AnnotatedDeque(AnnotatedValue):
     """
     Meta information for a data field in the event payload.
@@ -127,6 +139,7 @@ class AnnotatedDeque(AnnotatedValue):
             value=value,
             metadata={"len": [n_truncated]},  # Remark
         )
+
 
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence

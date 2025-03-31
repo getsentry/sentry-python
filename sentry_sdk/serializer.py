@@ -1,3 +1,4 @@
+import logging
 import sys
 import math
 from collections.abc import Mapping, Sequence, Set
@@ -230,6 +231,7 @@ def serialize(event, **kwargs):
     def _flatten_annotated(obj):
         # type: (Any) -> Any
         if isinstance(obj, AnnotatedValue):
+            logging.debug(obj)
             _annotate(**obj.metadata)
             obj = obj.value
         return obj

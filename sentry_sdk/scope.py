@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import warnings
@@ -9,6 +10,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
@@ -33,7 +35,6 @@ from sentry_sdk.tracing import (
     Transaction,
 )
 from sentry_sdk.utils import (
-    AnnotatedDeque,
     capture_internal_exception,
     capture_internal_exceptions,
     ContextVar,
@@ -987,8 +988,14 @@ class Scope:
             logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
 
         while len(self._breadcrumbs) > max_breadcrumbs:
+            logging.debug(
+                f"i am here in the truncation logic before, {self._n_breadcrumbs_truncated}"
+            )
             self._breadcrumbs.popleft()
             self._n_breadcrumbs_truncated += 1
+            logging.debug(
+                f"i am here in the truncation logic after, {self._n_breadcrumbs_truncated}"
+            )
 
     def start_transaction(
         self,
@@ -1388,12 +1395,19 @@ class Scope:
             pass
 
         # Add annotation that breadcrumbs were truncated
+        logging.debug(
+            f"i am here outside of the truncated thing, {self._n_breadcrumbs_truncated} and {len(self._breadcrumbs)}"
+        )
         if self._n_breadcrumbs_truncated:
+            logging.debug("i am here in the truncated thing")
             original_length = (
                 len(event["breadcrumbs"]["values"]) + self._n_breadcrumbs_truncated
             )
-            event["breadcrumbs"]["values"] = AnnotatedDeque.truncated_breadcrumbs(
-                event["breadcrumbs"]["values"], original_length
+            logging.debug(
+                f"in the truncated thing, the original_lenght is {original_length}"
+            )
+            event["breadcrumbs"] = AnnotatedValue(
+                event.get("breadcrumbs", []), {"len": original_length}
             )
 
     def _apply_user_to_event(self, event, hint, options):
@@ -1546,6 +1560,9 @@ class Scope:
 
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
+            # logging.debug(event)
+            logging.debug(event["breadcrumbs"])
+            logging.debug(type(event["breadcrumbs"]))
             self._apply_flags_to_event(event, hint, options)
 
         event = self.run_error_processors(event, hint)
@@ -1579,6 +1596,10 @@ class Scope:
             self._extras.update(scope._extras)
         if scope._breadcrumbs:
             self._breadcrumbs.extend(scope._breadcrumbs)
+        if scope._n_breadcrumbs_truncated:
+            self._n_breadcrumbs_truncated = (
+                self._n_breadcrumbs_truncated + scope._n_breadcrumbs_truncated
+            )
         if scope._span:
             self._span = scope._span
         if scope._attachments:
