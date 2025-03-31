@@ -1,6 +1,6 @@
 mypy
 black
-flake8==5.0.4
+flake8==7.2.0
 flake8-pyproject  # Flake8 plugin to support configuration in pyproject.toml
 flake8-bugbear  # Flake8 plugin
 pep8-naming  # Flake8 plugin
