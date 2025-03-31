@@ -437,7 +437,8 @@ def test_profile_sent(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": 1.0},
+        profiles_sample_rate=1.0,
+        debug=True,
     )
     app = SentryWsgiMiddleware(test_app)
     envelopes = capture_envelopes()
