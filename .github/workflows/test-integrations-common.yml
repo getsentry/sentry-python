@@ -73,7 +73,7 @@ jobs:
     needs: test-common-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-common-pinned.result, 'failure') || contains(needs.test-common-pinned.result, 'skipped')

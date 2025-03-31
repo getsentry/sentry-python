@@ -191,7 +191,7 @@ jobs:
     needs: test-web_2-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-web_2-pinned.result, 'failure') || contains(needs.test-web_2-pinned.result, 'skipped')
