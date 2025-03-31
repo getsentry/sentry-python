@@ -987,14 +987,8 @@ class Scope:
             logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
 
         while len(self._breadcrumbs) > max_breadcrumbs:
-            logging.debug(
-                f"i am here in the truncation logic before, {self._n_breadcrumbs_truncated}"
-            )
             self._breadcrumbs.popleft()
             self._n_breadcrumbs_truncated += 1
-            logging.debug(
-                f"i am here in the truncation logic after, {self._n_breadcrumbs_truncated}"
-            )
 
     def start_transaction(
         self,
