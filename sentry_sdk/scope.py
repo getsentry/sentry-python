@@ -1,4 +1,3 @@
-import logging
 import os
 import sys
 import warnings
@@ -1537,9 +1536,6 @@ class Scope:
 
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
-            # logging.debug(event)
-            logging.debug(event["breadcrumbs"])
-            logging.debug(type(event["breadcrumbs"]))
             self._apply_flags_to_event(event, hint, options)
 
         event = self.run_error_processors(event, hint)
