@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
-from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
@@ -1393,22 +1392,6 @@ class Scope:
         except Exception as err:
             logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
-
-        # Add annotation that breadcrumbs were truncated
-        logging.debug(
-            f"i am here outside of the truncated thing, {self._n_breadcrumbs_truncated} and {len(self._breadcrumbs)}"
-        )
-        if self._n_breadcrumbs_truncated:
-            logging.debug("i am here in the truncated thing")
-            original_length = (
-                len(event["breadcrumbs"]["values"]) + self._n_breadcrumbs_truncated
-            )
-            logging.debug(
-                f"in the truncated thing, the original_lenght is {original_length}"
-            )
-            event["breadcrumbs"] = AnnotatedValue(
-                event.get("breadcrumbs", []), {"len": original_length}
-            )
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
