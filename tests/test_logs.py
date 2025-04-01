@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 import time
-from typing import List, Any
+from typing import List, Any, Mapping, Union
 import pytest
 
 import sentry_sdk
@@ -17,8 +17,10 @@ minimum_python_37 = pytest.mark.skipif(
 )
 
 
-def otel_attributes_to_dict(otel_attrs: List[Any]):
-    def _convert_attr(attr: dict[str, str | int | bool]):
+def otel_attributes_to_dict(otel_attrs):
+    # type: (List[Mapping[str, Any]]) -> Mapping[str, Any]
+    def _convert_attr(attr):
+        # type: (Mapping[str, Union[str, float, bool]]) -> Any
         if "boolValue" in attr:
             return bool(attr["boolValue"])
         if "doubleValue" in attr:
