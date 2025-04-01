@@ -147,7 +147,7 @@ class SentryAsgiMiddleware:
 
     def _capture_lifespan_exception(self, exc):
         # type: (Exception) -> None
-        """Capture exceptions from lifespan handlers.
+        """Capture exceptions raise in application lifespan handlers.
 
         The separate function is needed to support overriding in derived integrations that use different catching mechanisms.
         """
@@ -155,7 +155,7 @@ class SentryAsgiMiddleware:
 
     def _capture_request_exception(self, exc):
         # type: (Exception) -> None
-        """Capture exceptions from request handlers.
+        """Capture exceptions raised in incoming request handlers.
 
         The separate function is needed to support overriding in derived integrations that use different catching mechanisms.
         """
