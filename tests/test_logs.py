@@ -5,7 +5,6 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk import _experimental_logger as sentry_logger
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 minimum_python_37 = pytest.mark.skipif(
@@ -25,12 +24,12 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    sentry_logger.trace("This is a 'trace' log.")
-    sentry_logger.debug("This is a 'debug' log...")
-    sentry_logger.info("This is a 'info' log...")
-    sentry_logger.warn("This is a 'warn' log...")
-    sentry_logger.error("This is a 'error' log...")
-    sentry_logger.fatal("This is a 'fatal' log...")
+    sentry_sdk.logger.trace("This is a 'trace' log.")
+    sentry_sdk.logger.debug("This is a 'debug' log...")
+    sentry_sdk.logger.info("This is a 'info' log...")
+    sentry_sdk.logger.warning("This is a 'warn' log...")
+    sentry_sdk.logger.error("This is a 'error' log...")
+    sentry_sdk.logger.fatal("This is a 'fatal' log...")
     python_logger.warning("sad")
 
     assert len(envelopes) == 0
@@ -41,12 +40,12 @@ def test_logs_basics(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
-    sentry_logger.trace("This is a 'trace' log...")
-    sentry_logger.debug("This is a 'debug' log...")
-    sentry_logger.info("This is a 'info' log...")
-    sentry_logger.warn("This is a 'warn' log...")
-    sentry_logger.error("This is a 'error' log...")
-    sentry_logger.fatal("This is a 'fatal' log...")
+    sentry_sdk.logger.trace("This is a 'trace' log...")
+    sentry_sdk.logger.debug("This is a 'debug' log...")
+    sentry_sdk.logger.info("This is a 'info' log...")
+    sentry_sdk.logger.warning("This is a 'warn' log...")
+    sentry_sdk.logger.error("This is a 'error' log...")
+    sentry_sdk.logger.fatal("This is a 'fatal' log...")
 
     assert (
         len(envelopes) == 6
@@ -96,12 +95,12 @@ def test_logs_before_emit_log(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    sentry_logger.trace("This is a 'trace' log...")
-    sentry_logger.debug("This is a 'debug' log...")
-    sentry_logger.info("This is a 'info' log...")
-    sentry_logger.warn("This is a 'warn' log...")
-    sentry_logger.error("This is a 'error' log...")
-    sentry_logger.fatal("This is a 'fatal' log...")
+    sentry_sdk.logger.trace("This is a 'trace' log...")
+    sentry_sdk.logger.debug("This is a 'debug' log...")
+    sentry_sdk.logger.info("This is a 'info' log...")
+    sentry_sdk.logger.warning("This is a 'warn' log...")
+    sentry_sdk.logger.error("This is a 'error' log...")
+    sentry_sdk.logger.fatal("This is a 'fatal' log...")
 
     assert len(envelopes) == 4
 
@@ -126,7 +125,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
         "attr_string": "string attribute",
     }
 
-    sentry_logger.warn(
+    sentry_sdk.logger.warning(
         "The recorded value was '{my_var}'", my_var="some value", attributes=attrs
     )
 
@@ -151,10 +150,10 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_sentry_logs": True})
     envelopes = capture_envelopes()
 
-    sentry_logger.warn("The recorded value was '{int_var}'", int_var=1)
-    sentry_logger.warn("The recorded value was '{float_var}'", float_var=2.0)
-    sentry_logger.warn("The recorded value was '{bool_var}'", bool_var=False)
-    sentry_logger.warn(
+    sentry_sdk.logger.warning("The recorded value was '{int_var}'", int_var=1)
+    sentry_sdk.logger.warning("The recorded value was '{float_var}'", float_var=2.0)
+    sentry_sdk.logger.warning("The recorded value was '{bool_var}'", bool_var=False)
+    sentry_sdk.logger.warning(
         "The recorded value was '{string_var}'", string_var="some string value"
     )
 
@@ -200,7 +199,7 @@ def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(name="test-transaction") as trx:
-        sentry_logger.warn("This is a log tied to a transaction")
+        sentry_sdk.logger.warning("This is a log tied to a transaction")
 
     log_entry = envelopes[0].items[0].payload.json
     assert log_entry["attributes"][-1] == {
@@ -219,7 +218,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
 
     with sentry_sdk.start_transaction(name="test-transaction"):
         with sentry_sdk.start_span(description="test-span") as span:
-            sentry_logger.warn("This is a log tied to a span")
+            sentry_sdk.logger.warning("This is a log tied to a span")
 
     attrs = otel_attributes_to_dict(envelopes[0].items[0].payload.json["attributes"])
     assert attrs["sentry.trace.parent_span_id"] == {"stringValue": span.span_id}

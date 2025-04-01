@@ -17,7 +17,7 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     if "attributes" in kwargs:
         attrs.update(kwargs.pop("attributes"))
     for k, v in kwargs.items():
-        attrs[f"sentry.message.parameters.{k}"] = v
+        attrs[f"sentry.message.parameters.{k}"] = v if isinstance(v, str) else repr(v)
 
     # noinspection PyProtectedMember
     client._capture_experimental_log(
@@ -36,6 +36,6 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
 trace = functools.partial(_capture_log, "trace", 1)
 debug = functools.partial(_capture_log, "debug", 5)
 info = functools.partial(_capture_log, "info", 9)
-warn = functools.partial(_capture_log, "warn", 13)
+warning = functools.partial(_capture_log, "warning", 13)
 error = functools.partial(_capture_log, "error", 17)
 fatal = functools.partial(_capture_log, "fatal", 21)
