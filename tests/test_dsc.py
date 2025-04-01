@@ -302,7 +302,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             0.5,  # expected_sample_rate
             "true",  # expected_sampled (traces sampler overrides the traces_sample_rate setting, so transactions are created)
         ),
-        (  # 7 not forwarding incoming (traces_sample_rate not set) (incoming not sampled)
+        (  # 7 not forwarding incoming (traces_sample_rate set to None) (incoming not sampled)
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
