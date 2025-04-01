@@ -923,7 +923,8 @@ class _Client(BaseClient):
         if log is None:
             return
 
-        self.log_batcher.add(log)
+        if self.log_batcher:
+            self.log_batcher.add(log)
 
     def capture_session(
         self, session  # type: Session
