@@ -89,7 +89,8 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
 
     def _capture_request_exception(self, exc):
         # type: (Exception) -> None
-        """Ignore exceptions for requests here: we catch them in Litestar.after_exception handler."""
+        """Avoid catching exceptions for requests using SentryAsgiMiddleware mechanism: they're caught in Litestar.after_exception handler."""
+        pass
 
 
 def patch_app_init():
