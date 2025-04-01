@@ -89,7 +89,12 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
 
     def _capture_request_exception(self, exc):
         # type: (Exception) -> None
-        """Avoid catching exceptions for requests using SentryAsgiMiddleware mechanism: they're caught in Litestar.after_exception handler."""
+        """Avoid catching exceptions from request handlers.
+
+        Those exceptions are already caught in Litestar.after_exception handler.
+
+        We still catch exceptions from lifespan handlers.
+        """
         pass
 
 
