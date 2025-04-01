@@ -57,6 +57,17 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
+def _capture_exception(exc, mechanism_type="asgi"):
+    # type: (Any, str) -> None
+
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": mechanism_type, "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
+
+
 def _looks_like_asgi3(app):
     # type: (Any) -> bool
     """
@@ -134,22 +145,13 @@ class SentryAsgiMiddleware:
         else:
             self.__call__ = self._run_asgi2
 
-    def _capture_exception(self, exc):
-        # type: (Exception) -> None
-        event, hint = event_from_exception(
-            exc,
-            client_options=sentry_sdk.get_client().options,
-            mechanism={"type": self.mechanism_type, "handled": False},
-        )
-        sentry_sdk.capture_event(event, hint=hint)
-
     def _capture_lifespan_exception(self, exc):
         # type: (Exception) -> None
-        return self._capture_exception(exc)
+        return _capture_exception(exc=exc, mechanism_type=self.mechanism_type)
 
     def _capture_request_exception(self, exc):
         # type: (Exception) -> None
-        return self._capture_exception(exc)
+        return _capture_exception(exc=exc, mechanism_type=self.mechanism_type)
 
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
