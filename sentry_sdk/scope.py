@@ -740,6 +740,12 @@ class Scope:
         # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
         """Return the transaction (root span) in the scope, if any."""
 
+        warnings.warn(
+            "The `Scope.transaction` property is deprecated. It will be replaced by a property named `Scope.root_span` in the next major version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # there is no span/transaction on the scope
         if self._span is None:
             return None
