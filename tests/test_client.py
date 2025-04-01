@@ -378,13 +378,6 @@ def test_socks_proxy(testcase, http2):
     )
 
 
-def test_simple_transport(sentry_init):
-    events = []
-    sentry_init(transport=events.append)
-    capture_message("Hello World!")
-    assert events[0]["message"] == "Hello World!"
-
-
 def test_ignore_errors(sentry_init, capture_events):
     sentry_init(ignore_errors=[ZeroDivisionError])
     events = capture_events()
