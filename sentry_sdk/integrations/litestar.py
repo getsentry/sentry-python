@@ -92,7 +92,6 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
         """Avoid catching exceptions from request handlers.
 
         Those exceptions are already caught in Litestar.after_exception handler.
-
         We still catch exceptions from lifespan handlers.
         """
         pass
