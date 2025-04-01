@@ -238,7 +238,7 @@ def test_has_trace_if_performance_disabled(
         capture_message("Attempting to fetch the ball")
         raise ValueError("Fetch aborted. The ball was not returned.")
 
-    sentry_init()
+    sentry_init(traces_sample_rate=None)
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()

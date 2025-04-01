@@ -78,7 +78,10 @@ def test_uses_traces_sampler_return_value_correctly(
     traces_sampler_return_value,
     expected_decision,
 ):
-    sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
+    sentry_init(
+        traces_sample_rate=1.0,
+        traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
+    )
 
     with sentry_sdk.continue_trace(
         {
@@ -94,7 +97,10 @@ def test_uses_traces_sampler_return_value_correctly(
 def test_tolerates_traces_sampler_returning_a_boolean(
     sentry_init, traces_sampler_return_value
 ):
-    sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
+    sentry_init(
+        traces_sample_rate=1.0,
+        traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
+    )
 
     with start_span(name="dogpark") as span:
         assert span.sampled is traces_sampler_return_value
@@ -104,7 +110,10 @@ def test_tolerates_traces_sampler_returning_a_boolean(
 def test_only_captures_transaction_when_sampled_is_true(
     sentry_init, sampling_decision, capture_events
 ):
-    sentry_init(traces_sampler=mock.Mock(return_value=sampling_decision))
+    sentry_init(
+        traces_sample_rate=1.0,
+        traces_sampler=mock.Mock(return_value=sampling_decision),
+    )
     events = capture_events()
 
     with start_span(name="dogpark"):
@@ -141,7 +150,10 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
     # make traces_sampler pick the opposite of the inherited decision, to prove
     # that traces_sampler takes precedence
     traces_sampler = mock.Mock(return_value=not parent_sampling_decision)
-    sentry_init(traces_sampler=traces_sampler)
+    sentry_init(
+        traces_sample_rate=1.0,
+        traces_sampler=traces_sampler,
+    )
 
     sentry_trace_header = (
         "12312012123120121231201212312012-1121201211212012-{sampled}".format(
@@ -163,7 +175,10 @@ def test_traces_sampler_doesnt_overwrite_explicitly_passed_sampling_decision(
     # make traces_sampler pick the opposite of the explicit decision, to prove
     # that the explicit decision takes precedence
     traces_sampler = mock.Mock(return_value=not explicit_decision)
-    sentry_init(traces_sampler=traces_sampler)
+    sentry_init(
+        traces_sample_rate=1.0,
+        traces_sampler=traces_sampler,
+    )
 
     with start_span(name="dogpark", sampled=explicit_decision) as span:
         assert span.sampled is explicit_decision
@@ -215,7 +230,7 @@ def test_passes_attributes_from_start_span_to_traces_sampler(
     sentry_init, DictionaryContaining  # noqa: N803
 ):
     traces_sampler = mock.Mock()
-    sentry_init(traces_sampler=traces_sampler)
+    sentry_init(traces_sample_rate=1.0, traces_sampler=traces_sampler)
 
     with start_span(attributes={"dogs": "yes", "cats": "maybe"}):
         traces_sampler.assert_any_call(
@@ -252,7 +267,10 @@ def test_sample_rate_affects_errors(sentry_init, capture_events):
 def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
     sentry_init, traces_sampler_return_value, StringContaining  # noqa: N803
 ):
-    sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
+    sentry_init(
+        traces_sample_rate=None,
+        traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
+    )
 
     with mock.patch.object(logger, "warning", mock.Mock()):
         with start_span(name="dogpark") as span:
@@ -294,13 +312,21 @@ def test_records_lost_event_only_if_traces_sample_rate_enabled(
 @pytest.mark.parametrize(
     "traces_sampler,sampled_output,expected_record_lost_event_calls",
     [
-        (None, False, []),
+        (
+            None,
+            False,
+            [],
+        ),
         (
             lambda _x: 0.0,
             False,
             [("sample_rate", "transaction", None, 1), ("sample_rate", "span", None, 1)],
         ),
-        (lambda _x: 1.0, True, []),
+        (
+            lambda _x: 1.0,
+            True,
+            [],
+        ),
     ],
 )
 def test_records_lost_event_only_if_traces_sampler_enabled(
@@ -310,7 +336,10 @@ def test_records_lost_event_only_if_traces_sampler_enabled(
     sampled_output,
     expected_record_lost_event_calls,
 ):
-    sentry_init(traces_sampler=traces_sampler)
+    sentry_init(
+        traces_sample_rate=None,
+        traces_sampler=traces_sampler,
+    )
     record_lost_event_calls = capture_record_lost_event_calls()
 
     with start_span(name="dogpark") as span:
