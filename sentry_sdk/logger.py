@@ -17,7 +17,11 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     if "attributes" in kwargs:
         attrs.update(kwargs.pop("attributes"))
     for k, v in kwargs.items():
-        attrs[f"sentry.message.parameters.{k}"] = v if isinstance(v, str) else repr(v)
+        attrs[f"sentry.message.parameters.{k}"] = (
+            v
+            if (isinstance(v, str) or isinstance(v, int) or isinstance(v, bool))
+            else repr(v)
+        )
 
     # noinspection PyProtectedMember
     client._capture_experimental_log(
