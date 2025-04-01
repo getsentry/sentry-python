@@ -229,7 +229,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         # "local_traces_sampler_result":
         #       The result of the local traces sampler.
         # "local_traces_sample_rate":
-        #       The `traces_sample_rate` setting in the local `sentry_init` call.
+        #       The `traces_sample_rate` setting in the local `sentry_init` call. If -1, then it will not be set and the default traces_sample_rate will be used.
         (  # 1 traces_sample_rate does not override incoming
             {
                 "incoming_sample_rate": 1.0,
@@ -278,7 +278,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
             0.25,  # expected_sample_rate
             "false",  # expected_sampled (traces sampler can override parent sampled)
         ),
-        (  # 5 forwarding incoming (traces_sample_rate not set)
+        (  # 5 not forwarding incoming (traces_sample_rate set to None)
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "true",
@@ -297,12 +297,12 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
                 "sentry_trace_header_parent_sampled": 1,
                 "use_local_traces_sampler": True,
                 "local_traces_sampler_result": 0.5,
-                "local_traces_sample_rate": None,
+                "local_traces_sample_rate": -1,
             },
             0.5,  # expected_sample_rate
             "true",  # expected_sampled (traces sampler overrides the traces_sample_rate setting, so transactions are created)
         ),
-        (  # 7 forwarding incoming (traces_sample_rate not set) (incoming not sampled)
+        (  # 7 not forwarding incoming (traces_sample_rate not set) (incoming not sampled)
             {
                 "incoming_sample_rate": 1.0,
                 "incoming_sampled": "false",
@@ -321,7 +321,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
                 "sentry_trace_header_parent_sampled": 0,
                 "use_local_traces_sampler": True,
                 "local_traces_sampler_result": 0.25,
-                "local_traces_sample_rate": None,
+                "local_traces_sample_rate": -1,
             },
             0.25,  # expected_sample_rate
             "false",  # expected_sampled
@@ -344,9 +344,9 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
         "2 traces_sampler overrides incoming",
         "3 traces_sample_rate does not overrides incoming sample rate or parent (incoming not sampled)",
         "4 traces_sampler overrides incoming (incoming not sampled)",
-        "5 forwarding incoming (traces_sample_rate not set)",
+        "5 not forwarding incoming (traces_sample_rate set to None)",
         "6 traces_sampler overrides incoming  (traces_sample_rate not set)",
-        "7 forwarding incoming (traces_sample_rate not set) (incoming not sampled)",
+        "7 not forwarding incoming (traces_sample_rate set to None) (incoming not sampled)",
         "8 traces_sampler overrides incoming  (traces_sample_rate not set) (incoming not sampled)",
         "9 traces_sample_rate overrides incoming (upstream deferred sampling decision)",
     ),
@@ -373,7 +373,7 @@ def test_dsc_sample_rate_change(
         "environment": "canary",
     }
 
-    if test_data["local_traces_sample_rate"]:
+    if test_data["local_traces_sample_rate"] != -1:
         init_kwargs["traces_sample_rate"] = test_data["local_traces_sample_rate"]
 
     if test_data["use_local_traces_sampler"]:
