@@ -15,7 +15,9 @@ def test_continue_trace_with_sample_rand(sentry_init):
     """
     Test that an incoming sample_rand is propagated onto the transaction's baggage.
     """
-    sentry_init()
+    sentry_init(
+        traces_sample_rate=None,
+    )
 
     headers = {
         "sentry-trace": "00000000000000000000000000000000-0000000000000000-0",
@@ -31,7 +33,9 @@ def test_continue_trace_missing_sample_rand(sentry_init):
     """
     Test that a missing sample_rand is filled in onto the transaction's baggage.
     """
-    sentry_init()
+    sentry_init(
+        traces_sample_rate=None,
+    )
 
     headers = {
         "sentry-trace": "00000000000000000000000000000000-0000000000000000",

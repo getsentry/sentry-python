@@ -511,7 +511,7 @@ class ClientConstructor:
         debug=None,  # type: Optional[bool]
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
-        traces_sample_rate=None,  # type: Optional[float]
+        traces_sample_rate=0,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
         profiles_sample_rate=None,  # type: Optional[float]
         profiles_sampler=None,  # type: Optional[TracesSampler]
