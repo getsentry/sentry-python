@@ -595,6 +595,11 @@ class Span:
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
+        warnings.warn(
+            "`Span.set_data` is deprecated and will be replaced in the next major version by a new method named `Span.set_attribute`.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._data[key] = value
 
     def set_status(self, value):
