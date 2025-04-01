@@ -254,7 +254,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(name="test-transaction"):
-        with sentry_sdk.start_span(description="test-span") as span:
+        with sentry_sdk.start_span(name="test-span") as span:
             sentry_sdk.logger.warning("This is a log tied to a span")
 
     get_client().flush()

@@ -19,7 +19,12 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     for k, v in kwargs.items():
         attrs[f"sentry.message.parameters.{k}"] = (
             v
-            if (isinstance(v, str) or isinstance(v, int) or isinstance(v, bool))
+            if (
+                isinstance(v, str)
+                or isinstance(v, int)
+                or isinstance(v, bool)
+                or isinstance(v, float)
+            )
             else repr(v)
         )
 
