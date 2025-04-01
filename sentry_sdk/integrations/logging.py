@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime, timezone
 from fnmatch import fnmatch
@@ -360,14 +359,14 @@ class SentryLogsHandler(_BaseHandler):
         otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
         attrs = {
             "sentry.message.template": (
-                record.msg if isinstance(record.msg, str) else json.dumps(record.msg)
+                record.msg if isinstance(record.msg, str) else repr(record.msg)
             ),
         }  # type: dict[str, str | bool | float | int]
         if record.args is not None:
             if isinstance(record.args, tuple):
                 for i, arg in enumerate(record.args):
                     attrs[f"sentry.message.parameters.{i}"] = (
-                        arg if isinstance(arg, str) else json.dumps(arg)
+                        arg if isinstance(arg, str) else repr(arg)
                     )
         if record.lineno:
             attrs["code.line.number"] = record.lineno

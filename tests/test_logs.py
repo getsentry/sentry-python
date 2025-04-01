@@ -281,3 +281,17 @@ def test_no_log_infinite_loop(sentry_init, capture_envelopes):
     python_logger.debug("this is %s a template %s", "1", "2")
 
     assert len(envelopes) == 1
+
+
+@minimum_python_37
+def test_logging_errors(sentry_init, capture_envelopes):
+    """
+    The python logger module should be able to log errors without erroring
+    """
+    sentry_init(_experiments={"enable_sentry_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.error(Exception("test exc"))
+
+    assert len(envelopes) == 2
