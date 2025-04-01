@@ -1,5 +1,52 @@
 # Changelog
 
+## 2.25.0
+
+### Various fixes & improvements
+
+- **New Beta Feature** Enable Sentry logs in `logging` Integration (#4143) by @colin-sentry
+
+  You can now send existing log messages to the new Sentry Logs feature.
+
+  For more information see: https://github.com/getsentry/sentry/discussions/86804
+
+  This is how you can use it (Sentry Logs is in beta right now so the API can still change):
+
+  ```python
+  import logging
+
+  import sentry_sdk
+  from sentry_sdk.integrations.logging import LoggingIntegration
+
+  # Setup Sentry SDK to send log messages with a level of "error" or higher to Sentry.
+  sentry_sdk.init(
+    dsn="...",
+    _experiments={
+        "enable_sentry_logs": True
+    }
+    integrations=[
+      LoggingIntegration(sentry_logs_level=logging.ERROR),
+    ]
+  )
+
+  # Your existing logging setup
+  some_logger = logging.Logger("some-logger")
+
+  some_logger.info('In this example info events will not be sent to Sentry logs. my_value=%s', my_value)
+  some_logger.error('But error events will be sent to Sentry logs. my_value=%s', my_value)
+  ```
+
+- Spotlight: Sample everything 100% w/ Spotlight & no DSN set (#4207) by @BYK
+- Dramatiq: use set_transaction_name (#4175) by @timdrijvers
+- toxgen: Make it clearer which suites can be migrated (#4196) by @sentrivana
+- Move Litestar under toxgen (#4197) by @sentrivana
+- Added flake8 plugings to pre-commit call of flake8 (#4190) by @antonpirker
+- Deprecate Scope.user (#4194) by @sentrivana
+- Fix hanging when capturing long stacktrace (#4191) by @szokeasaurusrex
+- Fix GraphQL failures (#4208) by @sentrivana
+- Fix flaky test (#4198) by @sentrivana
+- Update Ubuntu in Github test runners (#4204) by @antonpirker
+
 ## 2.24.1
 
 ### Various fixes & improvements

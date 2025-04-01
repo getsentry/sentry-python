@@ -34,7 +34,7 @@ jobs:
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
     services:
       postgres:
         image: postgres
@@ -50,17 +50,20 @@ jobs:
         ports:
           - 5432:5432
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.5
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -130,7 +133,7 @@ jobs:
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
     services:
       postgres:
         image: postgres
@@ -146,17 +149,20 @@ jobs:
         ports:
           - 5432:5432
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.5
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -219,7 +225,7 @@ jobs:
     needs: test-dbs-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-dbs-pinned.result, 'failure') || contains(needs.test-dbs-pinned.result, 'skipped')

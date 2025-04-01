@@ -10,7 +10,7 @@
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
 
     {% if needs_docker %}
     services:
@@ -34,21 +34,23 @@
         ports:
           - 5432:5432
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}{% endraw %}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
 
     {% endif %}
-
+    # Use Docker container only for Python 3.6
+    {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
+        {% raw %}if: ${{ matrix.python-version != '3.6' }}{% endraw %}
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.5
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       {% endif %}
 
       {% if needs_redis %}
