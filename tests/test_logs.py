@@ -293,5 +293,6 @@ def test_logging_errors(sentry_init, capture_envelopes):
 
     python_logger = logging.Logger("test-logger")
     python_logger.error(Exception("test exc"))
+    python_logger.error("error is %s", Exception("test exc"))
 
-    assert len(envelopes) == 2
+    assert len(envelopes) == 4
