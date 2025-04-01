@@ -27,7 +27,7 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     sentry_sdk.logger.trace("This is a 'trace' log.")
     sentry_sdk.logger.debug("This is a 'debug' log...")
     sentry_sdk.logger.info("This is a 'info' log...")
-    sentry_sdk.logger.warning("This is a 'warn' log...")
+    sentry_sdk.logger.warning("This is a 'warning' log...")
     sentry_sdk.logger.error("This is a 'error' log...")
     sentry_sdk.logger.fatal("This is a 'fatal' log...")
     python_logger.warning("sad")
@@ -60,7 +60,7 @@ def test_logs_basics(sentry_init, capture_envelopes):
     assert envelopes[2].items[0].payload.json["severityText"] == "info"
     assert envelopes[2].items[0].payload.json["severityNumber"] == 9
 
-    assert envelopes[3].items[0].payload.json["severityText"] == "warn"
+    assert envelopes[3].items[0].payload.json["severityText"] == "warning"
     assert envelopes[3].items[0].payload.json["severityNumber"] == 13
 
     assert envelopes[4].items[0].payload.json["severityText"] == "error"
@@ -98,7 +98,7 @@ def test_logs_before_emit_log(sentry_init, capture_envelopes):
     sentry_sdk.logger.trace("This is a 'trace' log...")
     sentry_sdk.logger.debug("This is a 'debug' log...")
     sentry_sdk.logger.info("This is a 'info' log...")
-    sentry_sdk.logger.warning("This is a 'warn' log...")
+    sentry_sdk.logger.warning("This is a 'warning' log...")
     sentry_sdk.logger.error("This is a 'error' log...")
     sentry_sdk.logger.fatal("This is a 'fatal' log...")
 
@@ -107,7 +107,7 @@ def test_logs_before_emit_log(sentry_init, capture_envelopes):
     assert envelopes[0].items[0].payload.json["severityText"] == "trace"
     assert envelopes[1].items[0].payload.json["severityText"] == "debug"
     assert envelopes[2].items[0].payload.json["severityText"] == "info"
-    assert envelopes[3].items[0].payload.json["severityText"] == "warn"
+    assert envelopes[3].items[0].payload.json["severityText"] == "warning"
 
 
 @minimum_python_37
@@ -247,7 +247,7 @@ def test_logger_integration_warning(sentry_init, capture_envelopes):
     assert attrs["sentry.message.parameters.0"] == {"stringValue": "1"}
     assert attrs["sentry.message.parameters.1"]
     assert log_entry["severityNumber"] == 13
-    assert log_entry["severityText"] == "warn"
+    assert log_entry["severityText"] == "warning"
 
 
 @minimum_python_37
