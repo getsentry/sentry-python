@@ -917,9 +917,9 @@ class _Client(BaseClient):
                 f'[Sentry Logs] {log["body"]}',
             )
 
-        before_emit_log = self.options["_experiments"].get("before_emit_log")
-        if before_emit_log is not None:
-            log = before_emit_log(log, {})
+        before_send_log = self.options["_experiments"].get("before_send_log")
+        if before_send_log is not None:
+            log = before_send_log(log, {})
         if log is None:
             return
 
