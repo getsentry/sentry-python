@@ -3,7 +3,6 @@ import os
 import uuid
 import random
 import socket
-import logging
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -900,17 +899,8 @@ class _Client(BaseClient):
         # If debug is enabled, log the log to the console
         debug = self.options.get("debug", False)
         if debug:
-            severity_text_to_logging_level = {
-                "trace": logging.DEBUG,
-                "debug": logging.DEBUG,
-                "info": logging.INFO,
-                "warn": logging.WARNING,
-                "error": logging.ERROR,
-                "fatal": logging.CRITICAL,
-            }
-            logger.log(
-                severity_text_to_logging_level.get(log["severity_text"], logging.DEBUG),
-                f'[Sentry Logs] {log["body"]}',
+            logger.debug(
+                f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
             )
 
         envelope = Envelope(headers=headers)
