@@ -44,26 +44,32 @@ jobs:
         run: |
           coverage erase
       - name: Test loguru pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru"
       - name: Test opentelemetry pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry"
       - name: Test potel pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-potel"
       - name: Test pure_eval pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pure_eval"
       - name: Test trytond pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond"
       - name: Test typer pinned
+        if: ${{ !cancelled() }}
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-typer"
