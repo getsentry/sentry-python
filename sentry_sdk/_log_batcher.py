@@ -44,7 +44,8 @@ class LogBatcher:
             return True
 
         with self._lock:
-            # Double-checked locking
+            # Recheck to make sure another thread didn't get here and start the
+            # the flusher in the meantime
             if self._flusher_pid == pid:
                 return True
 
