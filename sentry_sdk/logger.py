@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 from sentry_sdk import get_client, get_current_scope
+from sentry_sdk.utils import safe_repr
 
 
 def _capture_log(severity_text, severity_number, template, **kwargs):
@@ -17,7 +18,10 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     if "attributes" in kwargs:
         attrs.update(kwargs.pop("attributes"))
     for k, v in kwargs.items():
-        attrs[f"sentry.message.parameters.{k}"] = (
+        attrs[f"sentry.message.parameters.{k}"] = v
+
+    attrs = {
+        k: (
             v
             if (
                 isinstance(v, str)
@@ -25,8 +29,10 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
                 or isinstance(v, bool)
                 or isinstance(v, float)
             )
-            else repr(v)
+            else safe_repr(v)
         )
+        for k, v in attrs.items()
+    }
 
     # noinspection PyProtectedMember
     client._capture_experimental_log(
