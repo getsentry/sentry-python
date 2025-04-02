@@ -292,7 +292,30 @@ def test_logging_errors(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
-    python_logger.error(Exception("test exc"))
-    python_logger.error("error is %s", Exception("test exc"))
+    python_logger.error(Exception("test exc 1"))
+    python_logger.error("error is %s", Exception("test exc 2"))
+
+    error_event_1 = envelopes[0].items[0].payload.json
+    assert error_event_1["level"] == "error"
+
+    log_event_1 = envelopes[1].items[0].payload.json
+    assert log_event_1["severityText"] == "error"
+    # If only logging an exception, there is no "sentry.message.template" or "sentry.message.parameters.0"
+    assert len(log_event_1["attributes"]) == 10
+    assert log_event_1["attributes"][0]["key"] == "code.line.number"
+
+    error_event_2 = envelopes[2].items[0].payload.json
+    assert error_event_2["level"] == "error"
+
+    log_event_2 = envelopes[3].items[0].payload.json
+    assert log_event_2["severityText"] == "error"
+    assert len(log_event_2["attributes"]) == 12
+    assert log_event_2["attributes"][0]["key"] == "sentry.message.template"
+    assert log_event_2["attributes"][0]["value"] == {"stringValue": "error is %s"}
+    assert log_event_2["attributes"][1]["key"] == "sentry.message.parameters.0"
+    assert log_event_2["attributes"][1]["value"] == {
+        "stringValue": "Exception('test exc 2')"
+    }
+    assert log_event_2["attributes"][2]["key"] == "code.line.number"
 
     assert len(envelopes) == 4
