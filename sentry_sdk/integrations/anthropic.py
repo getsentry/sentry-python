@@ -184,8 +184,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     input_tokens, output_tokens, content_blocks = _collect_ai_data(
                         event, input_tokens, output_tokens, content_blocks
                     )
-                    if event.type != "message_stop":
-                        yield event
+                    yield event
 
                 _add_ai_data_to_span(
                     span, integration, input_tokens, output_tokens, content_blocks
@@ -202,8 +201,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     input_tokens, output_tokens, content_blocks = _collect_ai_data(
                         event, input_tokens, output_tokens, content_blocks
                     )
-                    if event.type != "message_stop":
-                        yield event
+                    yield event
 
                 _add_ai_data_to_span(
                     span, integration, input_tokens, output_tokens, content_blocks
