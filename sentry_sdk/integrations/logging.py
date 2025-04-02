@@ -5,6 +5,7 @@ from fnmatch import fnmatch
 import sentry_sdk
 from sentry_sdk.client import BaseClient
 from sentry_sdk.utils import (
+    safe_repr,
     to_string,
     event_from_exception,
     current_stacktrace,
@@ -364,7 +365,7 @@ class SentryLogsHandler(_BaseHandler):
             if isinstance(record.args, tuple):
                 for i, arg in enumerate(record.args):
                     attrs[f"sentry.message.parameters.{i}"] = (
-                        arg if isinstance(arg, str) else repr(arg)
+                        arg if isinstance(arg, str) else safe_repr(arg)
                     )
         if record.lineno:
             attrs["code.line.number"] = record.lineno
