@@ -110,7 +110,7 @@ def test_logs_basics(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_logs_before_emit_log(sentry_init, capture_envelopes):
+def test_logs_before_send_log(sentry_init, capture_envelopes):
     before_log_called = [False]
 
     def _before_log(record, hint):
@@ -133,7 +133,7 @@ def test_logs_before_emit_log(sentry_init, capture_envelopes):
     sentry_init(
         _experiments={
             "enable_logs": True,
-            "before_emit_log": _before_log,
+            "before_send_log": _before_log,
         }
     )
     envelopes = capture_envelopes()
@@ -348,7 +348,10 @@ def test_logging_errors(sentry_init, capture_envelopes):
 
     assert logs[1]["severity_text"] == "error"
     assert logs[1]["attributes"]["sentry.message.template"] == "error is %s"
-    assert logs[1]["attributes"]["sentry.message.parameters.0"] == "Exception('test exc 2')"
+    assert (
+        logs[1]["attributes"]["sentry.message.parameters.0"]
+        == "Exception('test exc 2')"
+    )
     assert "code.line.number" in logs[1]["attributes"]
 
     assert len(logs) == 2
