@@ -4,13 +4,13 @@
 
 ### Various fixes & improvements
 
-- feat(ourlogs): Add a class which batches groups of logs together. (#4229) by @colin-sentry
-- Debug output from Sentry logs should always be `debug` level. (#4224) by @antonpirker
+- fix(logs): Add a class which batches groups of logs together. (#4229) by @colin-sentry
+- fix(logs): Use repr instead of json for message and arguments (#4227) by @colin-sentry
+- fix(logs): Debug output from Sentry logs should always be `debug` level. (#4224) by @antonpirker
 - fix(ai): Do not consume anthropic streaming stop (#4232) by @colin-sentry
-- fix(ourlogs): Use repr instead of json for message and arguments (#4227) by @colin-sentry
+- fix(spotlight): Do not spam sentry_sdk.warnings logger w/ Spotlight (#4219) by @BYK
+- fix(docs): fixed code snippet (#4218) by @antonpirker
 - build(deps): bump actions/create-github-app-token from 1.11.7 to 1.12.0 (#4214) by @dependabot
-- feat: Do not spam sentry_sdk.warnings logger w/ Spotlight (#4219) by @BYK
-- fixed code snippet (#4218) by @antonpirker
 
 ## 2.25.0
 
