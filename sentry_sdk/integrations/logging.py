@@ -348,7 +348,7 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not client.options["_experiments"].get("enable_sentry_logs", False):
+            if not client.options["_experiments"].get("enable_logs", False):
                 return
 
             SentryLogsHandler._capture_log_from_record(client, record)
@@ -365,7 +365,12 @@ class SentryLogsHandler(_BaseHandler):
             if isinstance(record.args, tuple):
                 for i, arg in enumerate(record.args):
                     attrs[f"sentry.message.parameters.{i}"] = (
-                        arg if isinstance(arg, str) else safe_repr(arg)
+                        arg
+                        if isinstance(arg, str)
+                        or isinstance(arg, float)
+                        or isinstance(arg, int)
+                        or isinstance(arg, bool)
+                        else safe_repr(arg)
                     )
         if record.lineno:
             attrs["code.line.number"] = record.lineno
