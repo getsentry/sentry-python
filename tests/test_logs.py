@@ -300,7 +300,7 @@ def test_logging_errors(sentry_init, capture_envelopes):
 
     log_event_1 = envelopes[1].items[0].payload.json
     assert log_event_1["severityText"] == "error"
-    # If only logging an exception, there is no "sentry.message.template" or "sentry.message.parameters.0"
+    # When only logging an exception, there is no "sentry.message.template" or "sentry.message.parameters.0"
     assert len(log_event_1["attributes"]) == 10
     assert log_event_1["attributes"][0]["key"] == "code.line.number"
 
