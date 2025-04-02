@@ -67,6 +67,7 @@ class LogBatcher:
         # type: (...) -> None
         while self._running:
             self._flush_event.wait(self.FLUSH_WAIT_TIME + random.random())
+            self._flush_event.clear()
             self._flush()
 
     def add(
