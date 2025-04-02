@@ -1,11 +1,10 @@
-import json
 import os
 import random
 import threading
 from datetime import datetime, timezone
 from typing import Optional, List, Callable, TYPE_CHECKING, Any
 
-from sentry_sdk.utils import format_timestamp
+from sentry_sdk.utils import format_timestamp, safe_repr
 from sentry_sdk.envelope import Envelope
 
 if TYPE_CHECKING:
@@ -110,7 +109,7 @@ class LogBatcher:
                 return {"key": key, "value": {"doubleValue": val}}
             if isinstance(val, str):
                 return {"key": key, "value": {"stringValue": val}}
-            return {"key": key, "value": {"stringValue": json.dumps(val)}}
+            return {"key": key, "value": {"stringValue": safe_repr(val)}}
 
         otel_log = {
             "severityText": log["severity_text"],
