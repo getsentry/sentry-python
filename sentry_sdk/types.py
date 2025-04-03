@@ -11,7 +11,7 @@ releases.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Event, EventDataCategory, Hint
+    from sentry_sdk._types import Event, EventDataCategory, Hint, Log
 else:
     from typing import Any
 
@@ -20,5 +20,6 @@ else:
     Event = Any
     EventDataCategory = Any
     Hint = Any
+    Log = Any
 
-__all__ = ("Event", "EventDataCategory", "Hint")
+__all__ = ("Event", "EventDataCategory", "Hint", "Log")
