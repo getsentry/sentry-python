@@ -146,7 +146,7 @@ class EventScrubber:
             if "breadcrumbs" in event:
                 if "values" in event["breadcrumbs"]:
                     if (
-                        isinstance(event["breadcrumbs"]["values"], AnnotatedValue)
+                        isinstance(event["breadcrumbs"], AnnotatedValue)
                         and event["breadcrumbs"]["values"].value is not None
                     ):
                         for value in event["breadcrumbs"]["values"].value:
