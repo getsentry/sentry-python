@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -1187,10 +1188,8 @@ class Transaction(Span):
             self.sampled = False
             return
 
-        # Now we roll the dice. self._sample_rand is inclusive of 0, but not of 1,
-        # so strict < is safe here. In case sample_rate is a boolean, cast it
-        # to a float (True becomes 1.0 and False becomes 0.0)
-        self.sampled = self._sample_rand < self.sample_rate
+        # Now we roll the dice.
+        self.sampled = self._sample_rand < Decimal.from_float(self.sample_rate)
 
         if self.sampled:
             logger.debug(

@@ -1,4 +1,5 @@
 import decimal
+from decimal import Inexact, FloatOperation
 from unittest import mock
 
 import pytest
@@ -58,14 +59,19 @@ def test_transaction_uses_incoming_sample_rand(
 
 def test_decimal_context(sentry_init, capture_events):
     """
-    Ensure that having a decimal context with a precision below 6
+    Ensure that having a user altered decimal context with a precision below 6
     does not cause an InvalidOperation exception.
     """
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
     old_prec = decimal.getcontext().prec
+    old_inexact = decimal.getcontext().traps[Inexact]
+    old_float_operation = decimal.getcontext().traps[FloatOperation]
+
     decimal.getcontext().prec = 2
+    decimal.getcontext().traps[Inexact] = True
+    decimal.getcontext().traps[FloatOperation] = True
 
     try:
         with mock.patch(
@@ -77,5 +83,7 @@ def test_decimal_context(sentry_init, capture_events):
                 )
     finally:
         decimal.getcontext().prec = old_prec
+        decimal.getcontext().traps[Inexact] = old_inexact
+        decimal.getcontext().traps[FloatOperation] = old_float_operation
 
     assert len(events) == 1
