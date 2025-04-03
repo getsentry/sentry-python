@@ -41,27 +41,6 @@ class AnnotatedValue:
         else:
             return 0
 
-    def __getitem__(self, key):
-        # type: (Any) -> Any
-        if self.value is not None:
-            return self.value[key]
-        raise KeyError(key)
-
-    def setdefault(self, key, default=None):
-        # type: (str, Any) -> Any
-        if self.value is not None:
-            return self.value.setdefault(key, default)
-        return default
-
-    def get(self, key, default=None):
-        # type: (Any, Any) -> Any
-        if self.value is not None:
-            try:
-                return self.value[key]
-            except (KeyError, IndexError, TypeError):
-                return default
-        return default
-
     @classmethod
     def removed_because_raw_data(cls):
         # type: () -> AnnotatedValue
