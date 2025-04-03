@@ -35,11 +35,10 @@ TEST_SUITE_CONFIG = {
             "*": [
                 "psycopg2-binary",
                 "djangorestframework",
-                "pytest-asyncio",
                 "pytest-django",
                 "Werkzeug",
-                "channels[daphne]",
             ],
+            ">=3.0": ["pytest-asyncio"],
             ">=2.2,<3.1": ["six"],
             "<3.3": [
                 "djangorestframework>=3.0,<4.0",
