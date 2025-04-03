@@ -38,7 +38,7 @@ class SpotlightClient:
         # type: (str) -> None
         self.url = url
         self.http = urllib3.PoolManager()
-        self.tries = 0
+        self.fails = 0
 
     def capture_envelope(self, envelope):
         # type: (Envelope) -> None
@@ -54,9 +54,18 @@ class SpotlightClient:
                 },
             )
             req.close()
+            self.fails = 0
         except Exception as e:
-            # TODO: Implement buffering and retrying with exponential backoff
-            sentry_logger.warning(str(e))
+            if self.fails < 2:
+                sentry_logger.warning(str(e))
+                self.fails += 1
+            elif self.fails == 2:
+                self.fails += 1
+                sentry_logger.warning(
+                    "Looks like Spotlight is not running, will keep trying to send events but will not log errors."
+                )
+            # omitting self.fails += 1 in the `else:` case intentionally
+            # to avoid overflowing the variable if Spotlight never becomes reachable
 
 
 try:
