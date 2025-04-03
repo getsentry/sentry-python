@@ -170,6 +170,9 @@ async def test_grpc_server_abort(grpc_server_and_channel, capture_events):
     except Exception:
         pass
 
+    # Add a small delay to allow events to be collected
+    await asyncio.sleep(0.1)
+
     assert len(events) == 1
 
 
