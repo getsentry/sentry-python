@@ -78,7 +78,7 @@ if TYPE_CHECKING:
                 Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
             ],
             "metric_code_locations": Optional[bool],
-            "enable_sentry_logs": Optional[bool],
+            "enable_logs": Optional[bool],
         },
         total=False,
     )
@@ -966,4 +966,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.25.0"
+VERSION = "2.25.1"

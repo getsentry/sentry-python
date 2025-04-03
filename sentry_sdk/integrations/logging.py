@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime, timezone
 from fnmatch import fnmatch
@@ -6,6 +5,7 @@ from fnmatch import fnmatch
 import sentry_sdk
 from sentry_sdk.client import BaseClient
 from sentry_sdk.utils import (
+    safe_repr,
     to_string,
     event_from_exception,
     current_stacktrace,
@@ -348,7 +348,7 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not client.options["_experiments"].get("enable_sentry_logs", False):
+            if not client.options["_experiments"].get("enable_logs", False):
                 return
 
             SentryLogsHandler._capture_log_from_record(client, record)
@@ -358,16 +358,19 @@ class SentryLogsHandler(_BaseHandler):
         # type: (BaseClient, LogRecord) -> None
         scope = sentry_sdk.get_current_scope()
         otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
-        attrs = {
-            "sentry.message.template": (
-                record.msg if isinstance(record.msg, str) else json.dumps(record.msg)
-            ),
-        }  # type: dict[str, str | bool | float | int]
+        attrs = {}  # type: dict[str, str | bool | float | int]
+        if isinstance(record.msg, str):
+            attrs["sentry.message.template"] = record.msg
         if record.args is not None:
             if isinstance(record.args, tuple):
                 for i, arg in enumerate(record.args):
                     attrs[f"sentry.message.parameters.{i}"] = (
-                        arg if isinstance(arg, str) else json.dumps(arg)
+                        arg
+                        if isinstance(arg, str)
+                        or isinstance(arg, float)
+                        or isinstance(arg, int)
+                        or isinstance(arg, bool)
+                        else safe_repr(arg)
                     )
         if record.lineno:
             attrs["code.line.number"] = record.lineno

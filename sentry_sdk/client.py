@@ -1,9 +1,7 @@
-import json
 import os
 import uuid
 import random
 import socket
-import logging
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -65,6 +63,7 @@ if TYPE_CHECKING:
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
+    from sentry_sdk._log_batcher import LogBatcher
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
@@ -178,6 +177,7 @@ class BaseClient:
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
         self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+        self.log_batcher = None  # type: Optional[LogBatcher]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -375,6 +375,12 @@ class _Client(BaseClient):
                         "Metrics not supported on Python 3.6 and lower with gevent."
                     )
 
+            self.log_batcher = None
+            if experiments.get("enable_logs", False):
+                from sentry_sdk._log_batcher import LogBatcher
+
+                self.log_batcher = LogBatcher(capture_func=_capture_envelope)
+
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
                 raise ValueError(
@@ -451,6 +457,7 @@ class _Client(BaseClient):
         if (
             self.monitor
             or self.metrics_aggregator
+            or self.log_batcher
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, BaseHttpTransport)
         ):
@@ -868,14 +875,10 @@ class _Client(BaseClient):
 
     def _capture_experimental_log(self, current_scope, log):
         # type: (Scope, Log) -> None
-        logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
+        logs_enabled = self.options["_experiments"].get("enable_logs", False)
         if not logs_enabled:
             return
         isolation_scope = current_scope.get_isolation_scope()
-
-        headers = {
-            "sent_at": format_timestamp(datetime.now(timezone.utc)),
-        }  # type: dict[str, object]
 
         environment = self.options.get("environment")
         if environment is not None and "sentry.environment" not in log["attributes"]:
@@ -900,59 +903,18 @@ class _Client(BaseClient):
         # If debug is enabled, log the log to the console
         debug = self.options.get("debug", False)
         if debug:
-            severity_text_to_logging_level = {
-                "trace": logging.DEBUG,
-                "debug": logging.DEBUG,
-                "info": logging.INFO,
-                "warn": logging.WARNING,
-                "error": logging.ERROR,
-                "fatal": logging.CRITICAL,
-            }
-            logger.log(
-                severity_text_to_logging_level.get(log["severity_text"], logging.DEBUG),
-                f'[Sentry Logs] {log["body"]}',
+            logger.debug(
+                f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
             )
 
-        envelope = Envelope(headers=headers)
-
-        before_emit_log = self.options["_experiments"].get("before_emit_log")
-        if before_emit_log is not None:
-            log = before_emit_log(log, {})
+        before_send_log = self.options["_experiments"].get("before_send_log")
+        if before_send_log is not None:
+            log = before_send_log(log, {})
         if log is None:
             return
 
-        def format_attribute(key, val):
-            # type: (str, int | float | str | bool) -> Any
-            if isinstance(val, bool):
-                return {"key": key, "value": {"boolValue": val}}
-            if isinstance(val, int):
-                return {"key": key, "value": {"intValue": str(val)}}
-            if isinstance(val, float):
-                return {"key": key, "value": {"doubleValue": val}}
-            if isinstance(val, str):
-                return {"key": key, "value": {"stringValue": val}}
-            return {"key": key, "value": {"stringValue": json.dumps(val)}}
-
-        otel_log = {
-            "severityText": log["severity_text"],
-            "severityNumber": log["severity_number"],
-            "body": {"stringValue": log["body"]},
-            "timeUnixNano": str(log["time_unix_nano"]),
-            "attributes": [
-                format_attribute(k, v) for (k, v) in log["attributes"].items()
-            ],
-        }
-
-        if "trace_id" in log:
-            otel_log["traceId"] = log["trace_id"]
-
-        envelope.add_log(otel_log)  # TODO: batch these
-
-        if self.spotlight:
-            self.spotlight.capture_envelope(envelope)
-
-        if self.transport is not None:
-            self.transport.capture_envelope(envelope)
+        if self.log_batcher:
+            self.log_batcher.add(log)
 
     def capture_session(
         self, session  # type: Session
@@ -1006,6 +968,8 @@ class _Client(BaseClient):
             self.session_flusher.kill()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.kill()
+            if self.log_batcher is not None:
+                self.log_batcher.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -1030,6 +994,8 @@ class _Client(BaseClient):
             self.session_flusher.flush()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.flush()
+            if self.log_batcher is not None:
+                self.log_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
