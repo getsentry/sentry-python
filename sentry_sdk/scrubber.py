@@ -147,9 +147,9 @@ class EventScrubber:
                 if "values" in event["breadcrumbs"]:
                     if (
                         isinstance(event["breadcrumbs"], AnnotatedValue)
-                        and event["breadcrumbs"]["values"].value is not None
+                        and event["breadcrumbs"].value["values"] is not None
                     ):
-                        for value in event["breadcrumbs"].value:
+                        for value in event["breadcrumbs"].value["values"]:
                             if "data" in value:
                                 self.scrub_dict(value["data"])
                     else:
