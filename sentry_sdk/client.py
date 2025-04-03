@@ -498,6 +498,7 @@ class _Client(BaseClient):
         # type: (...) -> Optional[Event]
 
         previous_total_spans = None  # type: Optional[int]
+        previous_total_breadcrumbs = None  # type: Optional[int]
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
@@ -534,6 +535,16 @@ class _Client(BaseClient):
             dropped_spans = event.pop("_dropped_spans", 0) + spans_delta  # type: int
             if dropped_spans > 0:
                 previous_total_spans = spans_before + dropped_spans
+            if scope._n_breadcrumbs_truncated > 0:
+                breadcrumbs = event.get("breadcrumbs", {})
+                values = (
+                    breadcrumbs.get("values", [])
+                    if not isinstance(breadcrumbs, AnnotatedValue)
+                    else []
+                )
+                previous_total_breadcrumbs = (
+                    len(values) + scope._n_breadcrumbs_truncated
+                )
 
         if (
             self.options["attach_stacktrace"]
@@ -586,7 +597,10 @@ class _Client(BaseClient):
             event["spans"] = AnnotatedValue(
                 event.get("spans", []), {"len": previous_total_spans}
             )
-
+        if previous_total_breadcrumbs is not None:
+            event["breadcrumbs"] = AnnotatedValue(
+                event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
+            )
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:

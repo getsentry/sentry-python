@@ -144,7 +144,10 @@ class EventScrubber:
         # type: (Event) -> None
         with capture_internal_exceptions():
             if "breadcrumbs" in event:
-                if "values" in event["breadcrumbs"]:
+                if (
+                    not isinstance(event["breadcrumbs"], AnnotatedValue)
+                    and "values" in event["breadcrumbs"]
+                ):
                     for value in event["breadcrumbs"]["values"]:
                         if "data" in value:
                             self.scrub_dict(value["data"])
