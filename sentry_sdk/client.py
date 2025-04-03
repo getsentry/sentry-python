@@ -536,9 +536,14 @@ class _Client(BaseClient):
             if dropped_spans > 0:
                 previous_total_spans = spans_before + dropped_spans
             if scope._n_breadcrumbs_truncated > 0:
+                breadcrumbs = event.get("breadcrumbs", {})
+                values = (
+                    breadcrumbs.get("values", [])
+                    if not isinstance(breadcrumbs, AnnotatedValue)
+                    else []
+                )
                 previous_total_breadcrumbs = (
-                    len(event.get("breadcrumbs", {}).get("values", []))
-                    + scope._n_breadcrumbs_truncated
+                    len(values) + scope._n_breadcrumbs_truncated
                 )
 
         if (

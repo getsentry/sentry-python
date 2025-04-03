@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
@@ -1371,17 +1372,23 @@ class Scope:
 
     def _apply_breadcrumbs_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
-            self._breadcrumbs
-        )
+        event.setdefault("breadcrumbs", {})
+
+        # This check is just for mypy -
+        if not isinstance(event["breadcrumbs"], AnnotatedValue):
+            event["breadcrumbs"].setdefault("values", [])
+            event["breadcrumbs"]["values"].extend(self._breadcrumbs)
 
         # Attempt to sort timestamps
         try:
-            for crumb in event["breadcrumbs"]["values"]:
-                if isinstance(crumb["timestamp"], str):
-                    crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
+            if not isinstance(event["breadcrumbs"], AnnotatedValue):
+                for crumb in event["breadcrumbs"]["values"]:
+                    if isinstance(crumb["timestamp"], str):
+                        crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
 
-            event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+                event["breadcrumbs"]["values"].sort(
+                    key=lambda crumb: crumb["timestamp"]
+                )
         except Exception as err:
             logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
