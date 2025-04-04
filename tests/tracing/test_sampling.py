@@ -6,7 +6,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import start_span, capture_exception
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME
 from sentry_sdk.utils import logger
 
 
@@ -59,9 +59,14 @@ def test_uses_traces_sample_rate_correctly(
 ):
     sentry_init(traces_sample_rate=traces_sample_rate)
 
-    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
-    root_span = start_span(name="dogpark", baggage=baggage)
-    assert root_span.sampled is expected_decision
+    with sentry_sdk.continue_trace(
+        {
+            BAGGAGE_HEADER_NAME: "sentry-sample_rand=0.500000,sentry-trace_id=397f36434d07b20135324b2e6ae70c77",
+            SENTRY_TRACE_HEADER_NAME: "397f36434d07b20135324b2e6ae70c77-1234567890abcdef",
+        }
+    ):
+        with start_span(name="dogpark") as root_span:
+            assert root_span.sampled is expected_decision
 
 
 @pytest.mark.parametrize(
@@ -75,9 +80,14 @@ def test_uses_traces_sampler_return_value_correctly(
 ):
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
-    baggage = Baggage(sentry_items={"sample_rand": "0.500000"})
-    root_span = start_span(name="dogpark", baggage=baggage)
-    assert root_span.sampled is expected_decision
+    with sentry_sdk.continue_trace(
+        {
+            BAGGAGE_HEADER_NAME: "sentry-sample_rand=0.500000,sentry-trace_id=397f36434d07b20135324b2e6ae70c77",
+            SENTRY_TRACE_HEADER_NAME: "397f36434d07b20135324b2e6ae70c77-1234567890abcdef",
+        }
+    ):
+        with start_span(name="dogpark") as root_span:
+            assert root_span.sampled is expected_decision
 
 
 @pytest.mark.parametrize("traces_sampler_return_value", [True, False])

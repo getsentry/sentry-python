@@ -602,13 +602,6 @@ class Scope:
         If no span is given, the trace data is taken from the scope.
         """
         client = self.get_client()
-        if not client.options.get("propagate_traces"):
-            warnings.warn(
-                "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return
 
         span = kwargs.pop("span", None)
         span = span or self.span

@@ -73,7 +73,7 @@ def _install_httplib():
 
         client = sentry_sdk.get_client()
         if client.get_integration(StdlibIntegration) is None or is_sentry_url(
-            client, host
+            client, f"{host}:{port}"  # noqa: E231
         ):
             return real_putrequest(self, method, url, *args, **kwargs)
 

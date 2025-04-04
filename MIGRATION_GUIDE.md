@@ -134,6 +134,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Spans no longer have a `description`. Use `name` instead.
 - Dropped support for Python 3.6.
 - The `enable_tracing` `init` option has been removed. Configure `traces_sample_rate` directly.
+- The `propagate_traces` `init` option has been removed. Use `trace_propagation_targets` instead.
 - The `custom_sampling_context` parameter of `start_transaction` has been removed. Use `attributes` instead to set key-value pairs of data that should be accessible in the traces sampler. Note that span attributes need to conform to the [OpenTelemetry specification](https://opentelemetry.io/docs/concepts/signals/traces/#attributes), meaning only certain types can be set as values.
 - The PyMongo integration no longer sets tags. The data is still accessible via span attributes.
 - The PyMongo integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
@@ -160,6 +161,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Passing a list or `None` for `failed_request_status_codes` in the Starlette integration is no longer supported. Pass a set of integers instead.
 - The `span` argument of `Scope.trace_propagation_meta` is no longer supported.
 - Setting `Scope.user` directly is no longer supported. Use `Scope.set_user()` instead.
+- `start_transaction` (`start_span`) no longer takes a `baggage` argument. Use the `continue_trace()` context manager instead to propagate baggage.
 
 ### Deprecated
 

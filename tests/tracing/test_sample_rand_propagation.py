@@ -7,37 +7,38 @@ where we need to compute it because it is missing.
 """
 
 from unittest import mock
-from unittest.mock import Mock
 
 import sentry_sdk
 
 
-def test_continue_trace_with_sample_rand():
+def test_continue_trace_with_sample_rand(sentry_init):
     """
     Test that an incoming sample_rand is propagated onto the transaction's baggage.
     """
+    sentry_init()
+
     headers = {
         "sentry-trace": "00000000000000000000000000000000-0000000000000000-0",
         "baggage": "sentry-sample_rand=0.1,sentry-sample_rate=0.5",
     }
 
-    transaction = sentry_sdk.continue_trace(headers)
-    assert transaction.get_baggage().sentry_items["sample_rand"] == "0.1"
+    with sentry_sdk.continue_trace(headers):
+        with sentry_sdk.start_span(name="root-span") as root_span:
+            assert root_span.get_baggage().sentry_items["sample_rand"] == "0.1"
 
 
-def test_continue_trace_missing_sample_rand():
+def test_continue_trace_missing_sample_rand(sentry_init):
     """
     Test that a missing sample_rand is filled in onto the transaction's baggage.
     """
+    sentry_init()
 
     headers = {
         "sentry-trace": "00000000000000000000000000000000-0000000000000000",
         "baggage": "sentry-placeholder=asdf",
     }
 
-    mock_uniform = Mock(return_value=0.5)
-
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", mock_uniform):
-        transaction = sentry_sdk.continue_trace(headers)
-
-    assert transaction.get_baggage().sentry_items["sample_rand"] == "0.500000"
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+        with sentry_sdk.continue_trace(headers):
+            with sentry_sdk.start_span(name="root-span") as root_span:
+                assert root_span.get_baggage().sentry_items["sample_rand"] == "0.500000"

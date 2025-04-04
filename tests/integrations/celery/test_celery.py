@@ -228,7 +228,14 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     )
     assert submission_event["spans"] == [
         {
-            "data": ApproxDict(),
+            "data": {
+                "sentry.name": "dummy_task",
+                "sentry.op": "queue.submit.celery",
+                "sentry.origin": "auto.queue.celery",
+                "sentry.source": "custom",
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+            },
             "description": "dummy_task",
             "op": "queue.submit.celery",
             "origin": "auto.queue.celery",
@@ -238,9 +245,6 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "timestamp": submission_event["spans"][0]["timestamp"],
             "trace_id": str(root_span.trace_id),
             "status": "ok",
-            "tags": {
-                "status": "ok",
-            },
         }
     ]
 

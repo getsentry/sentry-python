@@ -1,19 +1,28 @@
+import logging
 import sys
+from typing import List, Any
 from unittest import mock
 import pytest
 
 import sentry_sdk
 from sentry_sdk import _experimental_logger as sentry_logger
-
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 minimum_python_37 = pytest.mark.skipif(
     sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
 )
 
 
+def otel_attributes_to_dict(otel_attrs: List[Any]):
+    return {item["key"]: item["value"] for item in otel_attrs}
+
+
 @minimum_python_37
 def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     sentry_init()
+
+    python_logger = logging.Logger("some-logger")
+
     envelopes = capture_envelopes()
 
     sentry_logger.trace("This is a 'trace' log.")
@@ -22,6 +31,7 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     sentry_logger.warn("This is a 'warn' log...")
     sentry_logger.error("This is a 'error' log...")
     sentry_logger.fatal("This is a 'fatal' log...")
+    python_logger.warning("sad")
 
     assert len(envelopes) == 0
 
@@ -64,14 +74,14 @@ def test_logs_basics(sentry_init, capture_envelopes):
 @minimum_python_37
 def test_logs_before_emit_log(sentry_init, capture_envelopes):
     def _before_log(record, hint):
-        assert list(record.keys()) == [
+        assert set(record.keys()) == {
             "severity_text",
             "severity_number",
             "body",
             "attributes",
             "time_unix_nano",
             "trace_id",
-        ]
+        }
 
         if record["severity_text"] in ["fatal", "error"]:
             return None
@@ -123,34 +133,14 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     log_item = envelopes[0].items[0].payload.json
     assert log_item["body"]["stringValue"] == "The recorded value was 'some value'"
 
-    assert log_item["attributes"][1] == {
-        "key": "attr_int",
-        "value": {"intValue": "1"},
-    }  # TODO: this is strange.
-    assert log_item["attributes"][2] == {
-        "key": "attr_float",
-        "value": {"doubleValue": 2.0},
-    }
-    assert log_item["attributes"][3] == {
-        "key": "attr_bool",
-        "value": {"boolValue": True},
-    }
-    assert log_item["attributes"][4] == {
-        "key": "attr_string",
-        "value": {"stringValue": "string attribute"},
-    }
-    assert log_item["attributes"][5] == {
-        "key": "sentry.environment",
-        "value": {"stringValue": "production"},
-    }
-    assert log_item["attributes"][6] == {
-        "key": "sentry.release",
-        "value": {"stringValue": mock.ANY},
-    }
-    assert log_item["attributes"][7] == {
-        "key": "sentry.message.parameters.my_var",
-        "value": {"stringValue": "some value"},
-    }
+    attrs = otel_attributes_to_dict(log_item["attributes"])
+    assert attrs["attr_int"] == {"intValue": "1"}
+    assert attrs["attr_float"] == {"doubleValue": 2.0}
+    assert attrs["attr_bool"] == {"boolValue": True}
+    assert attrs["attr_string"] == {"stringValue": "string attribute"}
+    assert attrs["sentry.environment"] == {"stringValue": "production"}
+    assert attrs["sentry.release"] == {"stringValue": mock.ANY}
+    assert attrs["sentry.message.parameters.my_var"] == {"stringValue": "some value"}
 
 
 @minimum_python_37
@@ -172,37 +162,33 @@ def test_logs_message_params(sentry_init, capture_envelopes):
         envelopes[0].items[0].payload.json["body"]["stringValue"]
         == "The recorded value was '1'"
     )
-    assert envelopes[0].items[0].payload.json["attributes"][-1] == {
-        "key": "sentry.message.parameters.int_var",
-        "value": {"intValue": "1"},
-    }  # TODO: this is strange.
+    assert otel_attributes_to_dict(envelopes[0].items[0].payload.json["attributes"])[
+        "sentry.message.parameters.int_var"
+    ] == {"intValue": "1"}
 
     assert (
         envelopes[1].items[0].payload.json["body"]["stringValue"]
         == "The recorded value was '2.0'"
     )
-    assert envelopes[1].items[0].payload.json["attributes"][-1] == {
-        "key": "sentry.message.parameters.float_var",
-        "value": {"doubleValue": 2.0},
-    }
+    assert otel_attributes_to_dict(envelopes[1].items[0].payload.json["attributes"])[
+        "sentry.message.parameters.float_var"
+    ] == {"doubleValue": 2.0}
 
     assert (
         envelopes[2].items[0].payload.json["body"]["stringValue"]
         == "The recorded value was 'False'"
     )
-    assert envelopes[2].items[0].payload.json["attributes"][-1] == {
-        "key": "sentry.message.parameters.bool_var",
-        "value": {"boolValue": False},
-    }
+    assert otel_attributes_to_dict(envelopes[2].items[0].payload.json["attributes"])[
+        "sentry.message.parameters.bool_var"
+    ] == {"boolValue": False}
 
     assert (
         envelopes[3].items[0].payload.json["body"]["stringValue"]
         == "The recorded value was 'some string value'"
     )
-    assert envelopes[3].items[0].payload.json["attributes"][-1] == {
-        "key": "sentry.message.parameters.string_var",
-        "value": {"stringValue": "some string value"},
-    }
+    assert otel_attributes_to_dict(envelopes[3].items[0].payload.json["attributes"])[
+        "sentry.message.parameters.string_var"
+    ] == {"stringValue": "some string value"}
 
 
 @minimum_python_37
@@ -235,8 +221,63 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
         with sentry_sdk.start_span(description="test-span") as span:
             sentry_logger.warn("This is a log tied to a span")
 
+    attrs = otel_attributes_to_dict(envelopes[0].items[0].payload.json["attributes"])
+    assert attrs["sentry.trace.parent_span_id"] == {"stringValue": span.span_id}
+
+
+@minimum_python_37
+def test_logger_integration_warning(sentry_init, capture_envelopes):
+    """
+    The python logger module should create 'warn' sentry logs if the flag is on.
+    """
+    sentry_init(_experiments={"enable_sentry_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("this is %s a template %s", "1", "2")
+
     log_entry = envelopes[0].items[0].payload.json
-    assert log_entry["attributes"][-1] == {
-        "key": "sentry.trace.parent_span_id",
-        "value": {"stringValue": span.span_id},
+    attrs = otel_attributes_to_dict(log_entry["attributes"])
+    assert attrs["sentry.message.template"] == {
+        "stringValue": "this is %s a template %s"
     }
+    assert "code.file.path" in attrs
+    assert "code.line.number" in attrs
+    assert attrs["logger.name"] == {"stringValue": "test-logger"}
+    assert attrs["sentry.environment"] == {"stringValue": "production"}
+    assert attrs["sentry.message.parameters.0"] == {"stringValue": "1"}
+    assert attrs["sentry.message.parameters.1"]
+    assert log_entry["severityNumber"] == 13
+    assert log_entry["severityText"] == "warn"
+
+
+@minimum_python_37
+def test_logger_integration_debug(sentry_init, capture_envelopes):
+    """
+    The python logger module should not create 'debug' sentry logs if the flag is on by default
+    """
+    sentry_init(_experiments={"enable_sentry_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.debug("this is %s a template %s", "1", "2")
+
+    assert len(envelopes) == 0
+
+
+@minimum_python_37
+def test_no_log_infinite_loop(sentry_init, capture_envelopes):
+    """
+    If 'debug' mode is true, and you set a low log level in the logging integration, there should be no infinite loops.
+    """
+    sentry_init(
+        _experiments={"enable_sentry_logs": True},
+        integrations=[LoggingIntegration(sentry_logs_level=logging.DEBUG)],
+        debug=True,
+    )
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.debug("this is %s a template %s", "1", "2")
+
+    assert len(envelopes) == 1

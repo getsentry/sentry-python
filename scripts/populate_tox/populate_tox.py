@@ -49,21 +49,25 @@ IGNORE = {
     # suites over to this script. Some entries will probably stay forever
     # as they don't fit the mold (e.g. common, asgi, which don't have a 3rd party
     # pypi package to install in different versions).
+    #
+    # Test suites that will have to remain hardcoded since they don't fit the
+    # toxgen usecase
+    "asgi",
+    "aws_lambda",
+    "cloud_resource_context",
     "common",
     "gevent",
     "opentelemetry",
     "potel",
+    # Integrations that can be migrated -- we should eventually remove all
+    # of these from the IGNORE list
     "aiohttp",
     "anthropic",
     "arq",
-    "asgi",
     "asyncpg",
-    "aws_lambda",
     "beam",
     "boto3",
     "chalice",
-    "cohere",
-    "cloud_resource_context",
     "cohere",
     "django",
     "fastapi",
@@ -73,7 +77,6 @@ IGNORE = {
     "huggingface_hub",
     "langchain",
     "langchain_notiktoken",
-    "litestar",
     "openai",
     "openai_notiktoken",
     "pure_eval",
