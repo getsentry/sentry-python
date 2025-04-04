@@ -33,4 +33,3 @@ class SentrySpanAttribute:
     NAME = "sentry.name"
     SOURCE = "sentry.source"
     CONTEXT = "sentry.context"
-    CUSTOM_SAMPLED = "sentry.custom_sampled"  # used for saving start_span(sampled=X)

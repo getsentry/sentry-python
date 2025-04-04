@@ -51,35 +51,11 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing_utils import Baggage
 
     class SpanKwargs(TypedDict, total=False):
-        trace_id: str
-        """
-        The trace ID of the root span. If this new span is to be the root span,
-        omit this parameter, and a new trace ID will be generated.
-        """
-
-        span_id: str
-        """The span ID of this span. If omitted, a new span ID will be generated."""
-
-        parent_span_id: str
-        """The span ID of the parent span, if applicable."""
-
-        same_process_as_parent: bool
-        """Whether this span is in the same process as the parent span."""
-
-        sampled: bool
-        """
-        Whether the span should be sampled. Overrides the default sampling decision
-        for this span when provided.
-        """
-
         op: str
         """
         The span's operation. A list of recommended values is available here:
         https://develop.sentry.dev/sdk/performance/span-operations/
         """
-
-        description: str
-        """A description of what operation is being performed within the span. This argument is DEPRECATED. Please use the `name` parameter, instead."""
 
         status: str
         """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
@@ -113,12 +89,6 @@ if TYPE_CHECKING:
         See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations for more information.
         Default "custom".
         """
-
-        parent_sampled: bool
-        """Whether the parent transaction was sampled. If True this transaction will be kept, if False it will be discarded."""
-
-        baggage: "Baggage"
-        """The W3C baggage header value. (see https://www.w3.org/TR/baggage/)"""
 
     ProfileContext = TypedDict(
         "ProfileContext",
@@ -309,7 +279,6 @@ class Span:
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
-        sampled=None,  # type: Optional[bool]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
@@ -318,14 +287,9 @@ class Span:
         only_if_parent=False,  # type: bool
         parent_span=None,  # type: Optional[Span]
         otel_span=None,  # type: Optional[OtelSpan]
-        **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
         """
-        For backwards compatibility with old the old Span interface, this class
-        accepts arbitrary keyword arguments, in addition to the ones explicitly
-        listed in the signature. These additional arguments are ignored.
-
         If otel_span is passed explicitly, just acts as a proxy.
 
         If only_if_parent is True, just return an INVALID_SPAN
@@ -363,8 +327,8 @@ class Span:
                     attributes[SentrySpanAttribute.OP] = op
                 if source is not None:
                     attributes[SentrySpanAttribute.SOURCE] = source
-                if sampled is not None:
-                    attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
+                if description is not None:
+                    attributes[SentrySpanAttribute.DESCRIPTION] = description
 
                 parent_context = None
                 if parent_span is not None:
@@ -380,7 +344,6 @@ class Span:
                 )
 
                 self.origin = origin or DEFAULT_SPAN_ORIGIN
-                self.description = description
                 self.name = span_name
 
                 if status is not None:
@@ -622,7 +585,7 @@ class Span:
 
     def start_child(self, **kwargs):
         # type: (**Any) -> Span
-        return Span(sampled=self.sampled, parent_span=self, **kwargs)
+        return Span(parent_span=self, **kwargs)
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
