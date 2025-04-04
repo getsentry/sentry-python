@@ -1,4 +1,4 @@
-import random
+from decimal import Decimal
 from typing import cast
 
 from opentelemetry import trace
@@ -6,10 +6,14 @@ from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace.span import TraceState
 
 import sentry_sdk
-from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.tracing_utils import (
+    _generate_sample_rand,
+    has_tracing_enabled,
+)
 from sentry_sdk.utils import is_valid_sample_rate, logger
 from sentry_sdk.integrations.opentelemetry.consts import (
     TRACESTATE_SAMPLED_KEY,
+    TRACESTATE_SAMPLE_RAND_KEY,
     TRACESTATE_SAMPLE_RATE_KEY,
     SentrySpanAttribute,
 )
@@ -70,23 +74,40 @@ def get_parent_sample_rate(parent_context, trace_id):
     return None
 
 
-def dropped_result(parent_span_context, attributes, sample_rate=None):
-    # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
-    # these will only be added the first time in a root span sampling decision
-    # if sample_rate is provided, it'll be updated in trace state
-    trace_state = parent_span_context.trace_state
+def get_parent_sample_rand(parent_context, trace_id):
+    # type: (Optional[SpanContext], int) -> Optional[Decimal]
+    if parent_context is None:
+        return None
 
-    if TRACESTATE_SAMPLED_KEY not in trace_state:
-        trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "false")
-    elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
-        trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "false")
+    is_span_context_valid = parent_context is not None and parent_context.is_valid
 
-    if sample_rate is not None:
-        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+    if is_span_context_valid and parent_context.trace_id == trace_id:
+        parent_sample_rand = parent_context.trace_state.get(TRACESTATE_SAMPLE_RAND_KEY)
+        if parent_sample_rand is None:
+            return None
 
-    is_root_span = not (
-        parent_span_context.is_valid and not parent_span_context.is_remote
+        return Decimal(parent_sample_rand)
+
+    return None
+
+
+def dropped_result(span_context, attributes, sample_rate=None, sample_rand=None):
+    # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
+    """
+    React to a span getting unsampled and return a DROP SamplingResult.
+
+    Update the trace_state with the effective sampled, sample_rate and sample_rand,
+    record that we dropped the event for client report purposes, and return
+    an OTel SamplingResult with Decision.DROP.
+
+    See for more info about OTel sampling:
+    https://opentelemetry-python.readthedocs.io/en/latest/sdk/trace.sampling.html
+    """
+    trace_state = _update_trace_state(
+        span_context, sampled=False, sample_rate=sample_rate, sample_rand=sample_rand
     )
+
+    is_root_span = not (span_context.is_valid and not span_context.is_remote)
     if is_root_span:
         # Tell Sentry why we dropped the transaction/root-span
         client = sentry_sdk.get_client()
@@ -108,25 +129,47 @@ def dropped_result(parent_span_context, attributes, sample_rate=None):
     )
 
 
-def sampled_result(span_context, attributes, sample_rate):
-    # type: (SpanContext, Attributes, Optional[float]) -> SamplingResult
-    # these will only be added the first time in a root span sampling decision
-    # if sample_rate is provided, it'll be updated in trace state
-    trace_state = span_context.trace_state
+def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None):
+    # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
+    """
+    React to a span being sampled and return a sampled SamplingResult.
 
-    if TRACESTATE_SAMPLED_KEY not in trace_state:
-        trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, "true")
-    elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
-        trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, "true")
+    Update the trace_state with the effective sampled, sample_rate and sample_rand,
+    and return an OTel SamplingResult with Decision.RECORD_AND_SAMPLE.
 
-    if sample_rate is not None:
-        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+    See for more info about OTel sampling:
+    https://opentelemetry-python.readthedocs.io/en/latest/sdk/trace.sampling.html
+    """
+    trace_state = _update_trace_state(
+        span_context, sampled=True, sample_rate=sample_rate, sample_rand=sample_rand
+    )
 
     return SamplingResult(
         Decision.RECORD_AND_SAMPLE,
         attributes=attributes,
         trace_state=trace_state,
     )
+
+
+def _update_trace_state(span_context, sampled, sample_rate=None, sample_rand=None):
+    # type: (SpanContext, bool, Optional[float], Optional[Decimal]) -> TraceState
+    trace_state = span_context.trace_state
+
+    sampled = "true" if sampled else "false"
+    if TRACESTATE_SAMPLED_KEY not in trace_state:
+        trace_state = trace_state.add(TRACESTATE_SAMPLED_KEY, sampled)
+    elif trace_state.get(TRACESTATE_SAMPLED_KEY) == "deferred":
+        trace_state = trace_state.update(TRACESTATE_SAMPLED_KEY, sampled)
+
+    if sample_rate is not None:
+        trace_state = trace_state.update(TRACESTATE_SAMPLE_RATE_KEY, str(sample_rate))
+
+    if sample_rand is not None:
+        trace_state = trace_state.update(
+            TRACESTATE_SAMPLE_RAND_KEY, f"{sample_rand:.6f}"  # noqa: E231
+        )
+
+    return trace_state
 
 
 class SentrySampler(Sampler):
@@ -156,6 +199,18 @@ class SentrySampler(Sampler):
 
         sample_rate = None
 
+        parent_sampled = get_parent_sampled(parent_span_context, trace_id)
+        parent_sample_rate = get_parent_sample_rate(parent_span_context, trace_id)
+        parent_sample_rand = get_parent_sample_rand(parent_span_context, trace_id)
+
+        if parent_sample_rand is not None:
+            # We have a sample_rand on the incoming trace or we already backfilled
+            # it in PropagationContext
+            sample_rand = parent_sample_rand
+        else:
+            # We are the head SDK and we need to generate a new sample_rand
+            sample_rand = cast(Decimal, _generate_sample_rand(str(trace_id), (0, 1)))
+
         # Check if there is a traces_sampler
         # Traces_sampler is responsible to check parent sampled to have full transactions.
         has_traces_sampler = callable(client.options.get("traces_sampler"))
@@ -170,8 +225,6 @@ class SentrySampler(Sampler):
             sample_rate_to_propagate = sample_rate
         else:
             # Check if there is a parent with a sampling decision
-            parent_sampled = get_parent_sampled(parent_span_context, trace_id)
-            parent_sample_rate = get_parent_sample_rate(parent_span_context, trace_id)
             if parent_sampled is not None:
                 sample_rate = bool(parent_sampled)
                 sample_rate_to_propagate = (
@@ -195,17 +248,23 @@ class SentrySampler(Sampler):
             if client.monitor.downsample_factor > 0:
                 sample_rate_to_propagate = sample_rate
 
-        # Roll the dice on sample rate
+        # Compare sample_rand to sample_rate to make the final sampling decision
         sample_rate = float(cast("Union[bool, float, int]", sample_rate))
-        sampled = random.random() < sample_rate
+        sampled = sample_rand < sample_rate
 
         if sampled:
             return sampled_result(
-                parent_span_context, attributes, sample_rate=sample_rate_to_propagate
+                parent_span_context,
+                attributes,
+                sample_rate=sample_rate_to_propagate,
+                sample_rand=None if sample_rand == parent_sample_rand else sample_rand,
             )
         else:
             return dropped_result(
-                parent_span_context, attributes, sample_rate=sample_rate_to_propagate
+                parent_span_context,
+                attributes,
+                sample_rate=sample_rate_to_propagate,
+                sample_rand=None if sample_rand == parent_sample_rand else sample_rand,
             )
 
     def get_description(self) -> str:

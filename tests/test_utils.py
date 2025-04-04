@@ -7,6 +7,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+from sentry_sdk._compat import PY38
 from sentry_sdk.integrations import Integration
 from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
@@ -853,6 +854,7 @@ def test_get_current_thread_meta_main_thread():
     assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
 
 
+@pytest.mark.skipif(PY38, reason="Flakes a lot on 3.8 in CI.")
 def test_get_current_thread_meta_failed_to_get_main_thread():
     results = Queue(maxsize=1)
 

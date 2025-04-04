@@ -67,7 +67,7 @@ def test_environment():
 
     try:
         # Wait for SAM to be ready
-        LocalLambdaStack.wait_for_stack()
+        LocalLambdaStack.wait_for_stack(log_file=debug_log_file)
 
         def before_test():
             server.clear_envelopes()
@@ -137,12 +137,12 @@ def test_basic_no_exception(lambda_client, test_environment):
     }
     assert transaction_event["contexts"]["trace"] == {
         "op": "function.aws",
-        "description": mock.ANY,
         "span_id": mock.ANY,
         "parent_span_id": mock.ANY,
         "trace_id": mock.ANY,
         "origin": "auto.function.aws_lambda",
         "data": mock.ANY,
+        "status": "ok",
     }
 
 
@@ -178,7 +178,6 @@ def test_basic_exception(lambda_client, test_environment):
     }
     assert error_event["contexts"]["trace"] == {
         "op": "function.aws",
-        "description": mock.ANY,
         "span_id": mock.ANY,
         "parent_span_id": mock.ANY,
         "trace_id": mock.ANY,
@@ -314,9 +313,7 @@ def test_non_dict_event(
             "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
             "method": "GET",
             "url": "https://x1.io/1",
-            "query_string": {
-                "done": "f",
-            },
+            "query_string": "done=f",
         }
     else:
         request_data = {"url": "awslambda:///BasicException"}
@@ -343,7 +340,8 @@ def test_request_data(lambda_client, test_environment):
             "X-Forwarded-Proto": "https"
           },
           "queryStringParameters": {
-            "bonkers": "true"
+            "bonkers": "true",
+            "wild": "false"
           },
           "pathParameters": null,
           "stageVariables": null,
@@ -373,7 +371,7 @@ def test_request_data(lambda_client, test_environment):
             "X-Forwarded-Proto": "https",
         },
         "method": "GET",
-        "query_string": {"bonkers": "true"},
+        "query_string": "bonkers=true&wild=false",
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
     }
 
@@ -457,7 +455,19 @@ def test_traces_sampler_has_correct_sampling_context(lambda_client, test_environ
     Test that aws_event and aws_context are passed in the custom_sampling_context
     when using the AWS Lambda integration.
     """
-    test_payload = {"test_key": "test_value"}
+    test_payload = {
+        "test_key": "test_value",
+        "httpMethod": "GET",
+        "queryStringParameters": {
+            "test_query_param": "test_query_value",
+        },
+        "path": "/test",
+        "headers": {
+            "X-Forwarded-Proto": "https",
+            "Host": "example.com",
+            "X-Bla": "blabla",
+        },
+    }
     response = lambda_client.invoke(
         FunctionName="TracesSampler",
         Payload=json.dumps(test_payload),
@@ -466,9 +476,28 @@ def test_traces_sampler_has_correct_sampling_context(lambda_client, test_environ
     sampling_context_data = json.loads(response_payload["body"])[
         "sampling_context_data"
     ]
-    assert sampling_context_data.get("aws_event_present") is True
-    assert sampling_context_data.get("aws_context_present") is True
-    assert sampling_context_data.get("event_data", {}).get("test_key") == "test_value"
+
+    assert sampling_context_data == {
+        "transaction_context": {
+            "name": "TracesSampler",
+            "op": "function.aws",
+            "source": "component",
+        },
+        "http.request.method": "GET",
+        "url.query": "test_query_param=test_query_value",
+        "url.path": "/test",
+        "url.full": "https://example.com/test?test_query_param=test_query_value",
+        "network.protocol.name": "https",
+        "server.address": "example.com",
+        "faas.name": "TracesSampler",
+        "http.request.header.x-forwarded-proto": "https",
+        "http.request.header.host": "example.com",
+        "http.request.header.x-bla": "blabla",
+        "sentry.op": "function.aws",
+        "sentry.source": "component",
+        "parent_sampled": None,
+        "cloud.provider": "aws",
+    }
 
 
 @pytest.mark.parametrize(

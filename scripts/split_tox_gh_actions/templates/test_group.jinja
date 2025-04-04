@@ -35,7 +35,6 @@
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
 
     {% endif %}
-
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
@@ -44,7 +43,7 @@
           allow-prereleases: true
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
-        uses: getsentry/action-clickhouse-in-ci@v1.5
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       {% endif %}
 
       {% if needs_redis %}
