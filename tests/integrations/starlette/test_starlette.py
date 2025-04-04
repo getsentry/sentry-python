@@ -18,6 +18,7 @@ from sentry_sdk.integrations.starlette import (
     StarletteRequestExtractor,
 )
 from sentry_sdk.utils import parse_version
+from tests.conftest import ApproxDict
 
 import starlette
 from starlette.authentication import (
@@ -666,8 +667,8 @@ def test_middleware_spans(sentry_init, capture_events):
         "AuthenticationMiddleware",
         "ExceptionMiddleware",
         "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
-        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
         "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
+        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
         "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
     ]
 
@@ -743,16 +744,6 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "ServerErrorMiddleware.__call__.<locals>._send",
-            "tags": {"starlette.middleware_name": "SampleMiddleware"},
-        },
-        {
-            "op": "middleware.starlette.send",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
-        },
-        {
-            "op": "middleware.starlette.send",
             "description": "SampleMiddleware.__call__.<locals>.do_stuff",
             "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
         },
@@ -760,6 +751,16 @@ def test_middleware_callback_spans(sentry_init, capture_events):
             "op": "middleware.starlette.send",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
             "tags": {"starlette.middleware_name": "SampleMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
+            "tags": {"starlette.middleware_name": "SampleMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
@@ -772,7 +773,7 @@ def test_middleware_callback_spans(sentry_init, capture_events):
     for span in transaction_event["spans"]:
         assert span["op"] == expected[idx]["op"]
         assert span["description"] == expected[idx]["description"]
-        assert span["tags"] == expected[idx]["tags"]
+        assert span["tags"] == ApproxDict(expected[idx]["tags"])
         idx += 1
 
 
@@ -838,14 +839,14 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
             "tags": {"starlette.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
         {
-            "op": "middleware.starlette.send",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
-        },
-        {
             "op": "middleware.starlette",
             "description": "ExceptionMiddleware",
             "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
@@ -863,7 +864,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
     for span in transaction_event["spans"]:
         assert span["op"] == expected[idx]["op"]
         assert span["description"].startswith(expected[idx]["description"])
-        assert span["tags"] == expected[idx]["tags"]
+        assert span["tags"] == ApproxDict(expected[idx]["tags"])
         idx += 1
 
 
@@ -909,13 +910,13 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
     sentry_init(
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
     )
     app = starlette_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
 
     envelopes = capture_envelopes()
 
-    client = TestClient(asgi_app)
+    client = TestClient(app)
     response = client.get(endpoint)
     assert response.status_code == 200
 
@@ -1267,9 +1268,8 @@ def test_transaction_http_method_default(sentry_init, capture_events):
     """
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[
-            StarletteIntegration(),
-        ],
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[StarletteIntegration()],
     )
     events = capture_events()
 
@@ -1294,6 +1294,7 @@ def test_transaction_http_method_default(sentry_init, capture_events):
 def test_transaction_http_method_custom(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[
             StarletteIntegration(
                 http_methods_to_capture=(

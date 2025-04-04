@@ -25,11 +25,10 @@ import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import (  # noqa: F401
-    _DEFAULT_INTEGRATIONS,
     _installed_integrations,
     _processed_integrations,
 )
-from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.profiler.transaction_profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise
@@ -64,6 +63,10 @@ else:
 
 
 from sentry_sdk import scope
+from sentry_sdk.integrations.opentelemetry.scope import (
+    setup_scope_context_management,
+    setup_initial_scopes,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -74,6 +77,8 @@ def clean_scopes():
     scope._global_scope = None
     scope._isolation_scope.set(None)
     scope._current_scope.set(None)
+
+    setup_initial_scopes()
 
 
 @pytest.fixture(autouse=True)
@@ -174,13 +179,8 @@ def reset_integrations():
     with a clean slate to ensure monkeypatching works well,
     but this also means some other stuff will be monkeypatched twice.
     """
-    global _DEFAULT_INTEGRATIONS, _processed_integrations
-    try:
-        _DEFAULT_INTEGRATIONS.remove(
-            "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-        )
-    except ValueError:
-        pass
+    global _installed_integrations, _processed_integrations
+
     _processed_integrations.clear()
     _installed_integrations.clear()
 
@@ -199,6 +199,7 @@ def uninstall_integration():
 @pytest.fixture
 def sentry_init(request):
     def inner(*a, **kw):
+        setup_scope_context_management()
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
         sentry_sdk.get_global_scope().set_client(client)
@@ -660,6 +661,17 @@ class ApproxDict(dict):
         #
         # The other dict may contain additional keys with any value.
         return all(key in other and other[key] == value for key, value in self.items())
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class SortedBaggage:
+    def __init__(self, baggage):
+        self.baggage = baggage
+
+    def __eq__(self, other):
+        return sorted(self.baggage.split(",")) == sorted(other.split(","))
 
     def __ne__(self, other):
         return not self.__eq__(other)
