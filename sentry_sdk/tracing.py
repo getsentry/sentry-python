@@ -585,7 +585,7 @@ class Span:
 
     def start_child(self, **kwargs):
         # type: (**Any) -> Span
-        return Span(sampled=self.sampled, parent_span=self, **kwargs)
+        return Span(parent_span=self, **kwargs)
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
