@@ -20,7 +20,6 @@ from sentry_sdk.utils import parse_version
 FASTAPI_VERSION = parse_version(fastapi.__version__)
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
-from tests.integrations.starlette import test_starlette
 
 
 def fastapi_app_factory():
@@ -526,48 +525,6 @@ def test_transaction_name_in_middleware(
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source
     )
-
-
-@test_starlette.parametrize_test_configurable_status_codes_deprecated
-def test_configurable_status_codes_deprecated(
-    sentry_init,
-    capture_events,
-    failed_request_status_codes,
-    status_code,
-    expected_error,
-):
-    with pytest.warns(DeprecationWarning):
-        starlette_integration = StarletteIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    with pytest.warns(DeprecationWarning):
-        fast_api_integration = FastApiIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    sentry_init(
-        integrations=[
-            starlette_integration,
-            fast_api_integration,
-        ]
-    )
-
-    events = capture_events()
-
-    app = FastAPI()
-
-    @app.get("/error")
-    async def _error():
-        raise HTTPException(status_code)
-
-    client = TestClient(app)
-    client.get("/error")
-
-    if expected_error:
-        assert len(events) == 1
-    else:
-        assert not events
 
 
 @pytest.mark.skipif(
