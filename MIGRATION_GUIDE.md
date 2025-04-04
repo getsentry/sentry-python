@@ -158,6 +158,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `Transport.capture_event` has been removed. Use `Transport.capture_envelope` instead.
 - Function transports are no longer supported. Subclass the `Transport` instead.
 - `start_transaction` (`start_span`) no longer takes a `baggage` argument. Use the `continue_trace()` context manager instead to propagate baggage.
+- Dropped support for Django versions below 2.0.
 - Dropped support for trytond versions below 5.0.
 - Dropped support for Falcon versions below 3.0.
 
