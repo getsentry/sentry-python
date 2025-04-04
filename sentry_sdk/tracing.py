@@ -400,6 +400,20 @@ class Span:
         del self._ctx_token
 
     @property
+    def description(self):
+        # type: () -> Optional[str]
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        return self.get_attribute(SentrySpanAttribute.DESCRIPTION)
+
+    @description.setter
+    def description(self, value):
+        # type: (Optional[str]) -> None
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
+
+    @property
     def origin(self):
         # type: () -> Optional[str]
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
