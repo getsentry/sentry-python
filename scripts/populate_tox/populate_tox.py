@@ -159,13 +159,11 @@ def _prefilter_releases(
 
         uploaded = datetime.fromisoformat(meta["upload_time_iso_8601"])
 
-        if older_than is not None:
-            if uploaded > older_than:
-                continue
+        if older_than is not None and uploaded > older_than:
+            continue
 
-        if CUTOFF is not None:
-            if uploaded < CUTOFF:
-                continue
+        if CUTOFF is not None and uploaded < CUTOFF:
+            continue
 
         version = Version(release)
 
