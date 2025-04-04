@@ -9,7 +9,7 @@ import sys
 import time
 from bisect import bisect_left
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone  # noqa: F401
 from importlib.metadata import metadata
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
@@ -28,6 +28,10 @@ from sentry_sdk.integrations import _MIN_VERSIONS
 from config import TEST_SUITE_CONFIG
 from split_tox_gh_actions.split_tox_gh_actions import GROUPS
 
+
+# Set CUTOFF this to a datetime to ignore packages older than CUTOFF
+CUTOFF = None
+# CUTOFF = datetime.now(tz=timezone.utc) - timedelta(days=365 * 5)
 
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 ENV = Environment(
@@ -153,8 +157,14 @@ def _prefilter_releases(
         if meta["yanked"]:
             continue
 
+        uploaded = datetime.fromisoformat(meta["upload_time_iso_8601"])
+
         if older_than is not None:
-            if datetime.fromisoformat(meta["upload_time_iso_8601"]) > older_than:
+            if uploaded > older_than:
+                continue
+
+        if CUTOFF is not None:
+            if uploaded < CUTOFF:
                 continue
 
         version = Version(release)
