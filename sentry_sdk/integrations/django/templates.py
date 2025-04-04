@@ -1,7 +1,7 @@
 import functools
 
 from django.template import TemplateSyntaxError
-from django.template.loader import LoaderOrigin as Origin
+from django.template.base import Origin
 from django.utils.safestring import mark_safe
 
 import sentry_sdk
