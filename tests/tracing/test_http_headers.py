@@ -8,12 +8,13 @@ from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
 @pytest.mark.parametrize("sampled", [True, False, None])
 def test_to_traceparent(sampled):
-    transaction = Transaction(
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        trace_id="12312012123120121231201212312012",
-        sampled=sampled,
-    )
+    with pytest.warns(DeprecationWarning):
+        transaction = Transaction(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            trace_id="12312012123120121231201212312012",
+            sampled=sampled,
+        )
 
     traceparent = transaction.to_traceparent()
 

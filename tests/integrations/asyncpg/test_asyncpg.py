@@ -480,7 +480,7 @@ async def test_query_source_disabled(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -519,7 +519,7 @@ async def test_query_source_enabled(
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -552,7 +552,7 @@ async def test_query_source(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -604,7 +604,7 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
 
     from asyncpg_helpers.helpers import execute_query_in_connection
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await execute_query_in_connection(
@@ -648,7 +648,7 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         @contextmanager
@@ -693,7 +693,7 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         @contextmanager

@@ -110,7 +110,7 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         with session.begin_nested():
             session.query(Person).first()
 
@@ -184,7 +184,7 @@ def test_transactions_no_engine_url(sentry_init, capture_events):
     Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         with session.begin_nested():
             session.query(Person).first()
 
@@ -305,7 +305,7 @@ def test_query_source_disabled(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -357,7 +357,7 @@ def test_query_source_enabled(sentry_init, capture_events, enable_db_query_sourc
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -404,7 +404,7 @@ def test_query_source(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -474,7 +474,7 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
         query_first_model_from_session,
     )
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -532,7 +532,7 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -598,7 +598,7 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction"):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):

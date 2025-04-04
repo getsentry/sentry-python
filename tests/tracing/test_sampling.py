@@ -28,13 +28,14 @@ def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
 def test_nested_transaction_sampling_override(sentry_init, sampled):
     sentry_init(traces_sample_rate=1.0)
 
-    with start_transaction(name="outer", sampled=sampled) as outer_transaction:
-        assert outer_transaction.sampled is sampled
-        with start_transaction(
-            name="inner", sampled=(not sampled)
-        ) as inner_transaction:
-            assert inner_transaction.sampled is not sampled
-        assert outer_transaction.sampled is sampled
+    with pytest.warns(DeprecationWarning):
+        with start_transaction(name="outer", sampled=sampled) as outer_transaction:
+            assert outer_transaction.sampled is sampled
+            with start_transaction(
+                name="inner", sampled=(not sampled)
+            ) as inner_transaction:
+                assert inner_transaction.sampled is not sampled
+            assert outer_transaction.sampled is sampled
 
 
 def test_no_double_sampling(sentry_init, capture_events):
@@ -55,12 +56,13 @@ def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
 ):
     sentry_init(traces_sample_rate=1.0)
 
-    with start_transaction(name="/", sampled=sampling_decision):
-        with start_span(op="child-span"):
-            with start_span(op="child-child-span"):
-                scope = sentry_sdk.get_current_scope()
-                assert scope.span.op == "child-child-span"
-                assert scope.transaction.name == "/"
+    with pytest.warns(DeprecationWarning):
+        with start_transaction(name="/", sampled=sampling_decision):
+            with start_span(op="child-span"):
+                with start_span(op="child-child-span"):
+                    scope = sentry_sdk.get_current_scope()
+                    assert scope.span.op == "child-child-span"
+                    assert scope.transaction.name == "/"
 
 
 @pytest.mark.parametrize(
@@ -163,8 +165,9 @@ def test_traces_sampler_doesnt_overwrite_explicitly_passed_sampling_decision(
     traces_sampler = mock.Mock(return_value=not explicit_decision)
     sentry_init(traces_sampler=traces_sampler)
 
-    transaction = start_transaction(name="dogpark", sampled=explicit_decision)
-    assert transaction.sampled is explicit_decision
+    with pytest.warns(DeprecationWarning):
+        transaction = start_transaction(name="dogpark", sampled=explicit_decision)
+        assert transaction.sampled is explicit_decision
 
 
 @pytest.mark.parametrize("parent_sampling_decision", [True, False])

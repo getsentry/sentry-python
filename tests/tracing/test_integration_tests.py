@@ -65,20 +65,23 @@ def test_continue_from_headers(
     sentry_init(traces_sample_rate=sample_rate)
     envelopes = capture_envelopes()
 
-    # make a parent transaction (normally this would be in a different service)
-    with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
-        with start_span() as old_span:
-            old_span.sampled = parent_sampled
-            headers = dict(
-                sentry_sdk.get_current_scope().iter_trace_propagation_headers(old_span)
-            )
-            headers["baggage"] = (
-                "other-vendor-value-1=foo;bar;baz, "
-                "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-                "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
-                "sentry-sample_rate=0.01337, sentry-user_id=Amelie, "
-                "other-vendor-value-2=foo;bar;"
-            )
+    with pytest.warns(DeprecationWarning):
+        # make a parent transaction (normally this would be in a different service)
+        with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
+            with start_span() as old_span:
+                old_span.sampled = parent_sampled
+                headers = dict(
+                    sentry_sdk.get_current_scope().iter_trace_propagation_headers(
+                        old_span
+                    )
+                )
+                headers["baggage"] = (
+                    "other-vendor-value-1=foo;bar;baz, "
+                    "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+                    "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
+                    "sentry-sample_rate=0.01337, sentry-user_id=Amelie, "
+                    "other-vendor-value-2=foo;bar;"
+                )
 
     # child transaction, to prove that we can read 'sentry-trace' header data correctly
     child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
