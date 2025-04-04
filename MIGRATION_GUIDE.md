@@ -131,7 +131,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Removed
 
-- Spans no longer have a `description`. Use `name` instead.
 - Dropped support for Python 3.6.
 - The `enable_tracing` `init` option has been removed. Configure `traces_sample_rate` directly.
 - The `propagate_traces` `init` option has been removed. Use `trace_propagation_targets` instead.
@@ -159,7 +158,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Function transports are no longer supported. Subclass the `Transport` instead.
 - `start_transaction` (`start_span`) no longer takes the following arguments:
   - `sampled`: use a `traces_sampler` to adjust the sampling rate
-  - `description`: use `name` instead
   - `trace_id`, `baggage`: use `continue_trace` for propagation from headers or environment variables
   - `same_process_as_parent`
   - `span_id`
