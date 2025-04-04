@@ -277,6 +277,7 @@ class Span:
         self,
         *,
         op=None,  # type: Optional[str]
+        description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
@@ -326,6 +327,8 @@ class Span:
                     attributes[SentrySpanAttribute.OP] = op
                 if source is not None:
                     attributes[SentrySpanAttribute.SOURCE] = source
+                if description is not None:
+                    attributes[SentrySpanAttribute.DESCRIPTION] = description
 
                 parent_context = None
                 if parent_span is not None:
