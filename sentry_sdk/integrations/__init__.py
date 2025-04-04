@@ -134,7 +134,7 @@ _MIN_VERSIONS = {
     "clickhouse_driver": (0, 2, 0),
     "django": (1, 8),
     "dramatiq": (1, 9),
-    "falcon": (1, 4),
+    "falcon": (3, 0),
     "fastapi": (0, 79, 0),
     "flask": (1, 1, 4),
     "gql": (3, 4, 1),
@@ -157,6 +157,7 @@ _MIN_VERSIONS = {
     "statsig": (0, 55, 3),
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
+    "trytond": (5, 0),
     "typer": (0, 15),
     "unleash": (6, 0, 1),
 }
