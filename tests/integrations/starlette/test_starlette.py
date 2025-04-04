@@ -1355,3 +1355,28 @@ def test_configurable_status_codes(
     client.get("/error")
 
     assert len(events) == int(expected_error)
+
+
+@pytest.mark.asyncio
+async def test_starletterequestextractor_malformed_json_error_handling(sentry_init):
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+    ]
+    starlette_request = starlette.requests.Request(scope)
+
+    malformed_json = "{invalid json"
+    malformed_messages = [
+        {"type": "http.request", "body": malformed_json.encode("utf-8")},
+        {"type": "http.disconnect"},
+    ]
+
+    side_effect = [_mock_receive(msg) for msg in malformed_messages]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    assert extractor.is_json()
+
+    result = await extractor.json()
+    assert result is None

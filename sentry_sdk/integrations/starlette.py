@@ -3,6 +3,7 @@ import functools
 import warnings
 from collections.abc import Set
 from copy import deepcopy
+from json import JSONDecodeError
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -683,8 +684,10 @@ class StarletteRequestExtractor:
         # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
         if not self.is_json():
             return None
-
-        return await self.request.json()
+        try:
+            return await self.request.json()
+        except JSONDecodeError:
+            return None
 
 
 def _transaction_name_from_router(scope):
