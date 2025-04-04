@@ -417,9 +417,11 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             if isinstance(handler, str):
                 scope.set_transaction_name(handler)
             else:
-                scope.set_transaction_name(
-                    transaction_from_function(getattr(handler, "view_class", handler))
+                name = transaction_from_function(
+                    getattr(handler, "view_class", handler)
                 )
+                if isinstance(name, str):
+                    scope.set_transaction_name(name)
     except Exception:
         pass
 
