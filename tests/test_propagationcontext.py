@@ -180,3 +180,51 @@ def test_sample_rand_rounds_down():
         )
 
     assert ctx.dynamic_sampling_context["sample_rand"] == "0.999999"
+
+
+def test_from_incoming_data_w3c_traceparent_converts_to_sentry_trace_sampled():
+    """When the W3C traceparent header is present, we should convert it to the sentry-trace format, including the sampled trace-flags."""
+    ctx = PropagationContext().from_incoming_data(
+        {"traceparent": "00-3ba9122f36ec607c1a4d63d1488e554d-27eacbbc7b490cb2-01"}
+    )
+
+    assert ctx._trace_id == "3ba9122f36ec607c1a4d63d1488e554d"
+    assert ctx.trace_id == "3ba9122f36ec607c1a4d63d1488e554d"
+    assert ctx._span_id is None  # this will be set lazily
+    assert ctx.span_id is not None  # this sets _span_id
+    assert ctx._span_id is not None
+    assert ctx.parent_span_id == "27eacbbc7b490cb2"
+    assert ctx.parent_sampled
+
+
+def test_from_incoming_data_w3c_traceparent_converts_to_sentry_trace():
+    """When the W3C traceparent header is present, we should convert it to the sentry-trace format."""
+    ctx = PropagationContext().from_incoming_data(
+        {"traceparent": "00-0668500b0d3ccb9e2cdc4d29eee35549-1e27e03ddf9267c5"}
+    )
+
+    assert ctx._trace_id == "0668500b0d3ccb9e2cdc4d29eee35549"
+    assert ctx.trace_id == "0668500b0d3ccb9e2cdc4d29eee35549"
+    assert ctx._span_id is None  # this will be set lazily
+    assert ctx.span_id is not None  # this sets _span_id
+    assert ctx._span_id is not None
+    assert ctx.parent_span_id == "1e27e03ddf9267c5"
+    assert not ctx.parent_sampled
+
+
+def test_from_incoming_data_sentry_over_w3c_traceparent():
+    """When the W3C traceparent header and sentry-trace are present, we ignore the traceparent."""
+    ctx = PropagationContext().from_incoming_data(
+        {
+            "sentry-trace": "7978114bb8610ea77c10c57bf4210b0b-e840a63563b45c5f",
+            "traceparent": "00-86e2ea0e89e250d07b40d1a8eb77cd6f-2fe04ec920d6eaf7-01",
+        }
+    )
+
+    assert ctx._trace_id == "7978114bb8610ea77c10c57bf4210b0b"
+    assert ctx.trace_id == "7978114bb8610ea77c10c57bf4210b0b"
+    assert ctx._span_id is None  # this will be set lazily
+    assert ctx.span_id is not None  # this sets _span_id
+    assert ctx._span_id is not None
+    assert ctx.parent_span_id == "e840a63563b45c5f"
+    assert not ctx.parent_sampled

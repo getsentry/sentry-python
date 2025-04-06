@@ -3,7 +3,10 @@ from unittest import mock
 import pytest
 
 from sentry_sdk.tracing import Transaction
-from sentry_sdk.tracing_utils import extract_sentrytrace_data
+from sentry_sdk.tracing_utils import (
+    extract_sentrytrace_data,
+    extract_w3c_traceparent_data,
+)
 
 
 @pytest.mark.parametrize("sampled", [True, False, None])
@@ -34,6 +37,20 @@ def test_sentrytrace_extraction(sampling_decision):
     assert extract_sentrytrace_data(sentrytrace_header) == {
         "trace_id": "12312012123120121231201212312012",
         "parent_span_id": "0415201309082013",
+        "parent_sampled": sampling_decision,
+    }
+
+
+@pytest.mark.parametrize("sampling_decision", [True, False])
+def test_w3c_traceparent_extraction(sampling_decision):
+    traceparent_header = (
+        "00-d00afb0f1514f9337a4a921c514955db-903c8c4987adea4b-{}".format(
+            "01" if sampling_decision is True else "00"
+        )
+    )
+    assert extract_w3c_traceparent_data(traceparent_header) == {
+        "trace_id": "d00afb0f1514f9337a4a921c514955db",
+        "parent_span_id": "903c8c4987adea4b",
         "parent_sampled": sampling_decision,
     }
 

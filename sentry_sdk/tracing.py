@@ -126,6 +126,7 @@ if TYPE_CHECKING:
 
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+W3C_TRACE_HEADER_NAME = "traceparent"
 
 
 # Transaction source
@@ -509,7 +510,14 @@ class Span:
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
+        else:
+            w3c_traceparent_kwargs = extract_w3c_traceparent_data(
+                headers.get(W3C_TRACE_HEADER_NAME)
+            )
+            if w3c_traceparent_kwargs is not None:
+                kwargs.update(w3c_traceparent_kwargs)
 
+        if sentrytrace_kwargs is not None or w3c_traceparent_kwargs is not None:
             # If there's an incoming sentry-trace but no incoming baggage header,
             # for instance in traces coming from older SDKs,
             # baggage will be empty and immutable and won't be populated as head SDK.
@@ -1347,6 +1355,7 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     EnvironHeaders,
     extract_sentrytrace_data,
+    extract_w3c_traceparent_data,
     _generate_sample_rand,
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
