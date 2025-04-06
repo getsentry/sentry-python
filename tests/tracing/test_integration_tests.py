@@ -147,6 +147,101 @@ def test_continue_from_headers(
     assert message_payload["message"] == "hello"
 
 
+@pytest.mark.parametrize("parent_sampled", [True, False, None])
+@pytest.mark.parametrize("sample_rate", [0.0, 1.0])
+def test_continue_from_w3c_headers(
+    sentry_init, capture_envelopes, parent_sampled, sample_rate
+):
+    """
+    Ensure data is actually passed along via headers, and that they are read
+    correctly. This test is similar to the one above, but uses W3C headers
+    instead of Sentry headers.
+    """
+    sentry_init(traces_sample_rate=sample_rate)
+    envelopes = capture_envelopes()
+
+    # make a parent transaction (normally this would be in a different service)
+    with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
+        with start_span() as old_span:
+            old_span.sampled = parent_sampled
+            headers = dict(
+                sentry_sdk.get_current_scope().iter_trace_propagation_headers(old_span)
+            )
+            headers["baggage"] = (
+                "other-vendor-value-1=foo;bar;baz, "
+                "sentry-trace_id=d055bff6ed16698222b464d97f980489, "
+                "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
+                "sentry-sample_rate=0.01337, sentry-user_id=Amelie, "
+                "other-vendor-value-2=foo;bar;"
+            )
+
+    # child transaction, to prove that we can read 'sentry-trace' header data correctly
+    child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
+    assert child_transaction is not None
+    assert child_transaction.parent_sampled == parent_sampled
+    assert child_transaction.trace_id == old_span.trace_id
+    assert child_transaction.same_process_as_parent is False
+    assert child_transaction.parent_span_id == old_span.span_id
+    assert child_transaction.span_id != old_span.span_id
+
+    baggage = child_transaction._baggage
+    assert baggage
+    assert not baggage.mutable
+    assert baggage.sentry_items == {
+        "public_key": "49d0f7386ad645858ae85020e393bef3",
+        "trace_id": "d055bff6ed16698222b464d97f980489",
+        "user_id": "Amelie",
+        "sample_rate": "0.01337",
+    }
+
+    # add child transaction to the scope, to show that the captured message will
+    # be tagged with the trace id (since it happens while the transaction is
+    # open)
+    with start_transaction(child_transaction):
+        # change the transaction name from "WRONG" to make sure the change
+        # is reflected in the final data
+        sentry_sdk.get_current_scope().transaction = "ho"
+        capture_message("hello")
+
+    if parent_sampled is False or (sample_rate == 0 and parent_sampled is None):
+        # in this case the child transaction won't be captured
+        trace1, message = envelopes
+        message_payload = message.get_event()
+        trace1_payload = trace1.get_transaction_event()
+
+        assert trace1_payload["transaction"] == "hi"
+    else:
+        trace1, message, trace2 = envelopes
+        trace1_payload = trace1.get_transaction_event()
+        message_payload = message.get_event()
+        trace2_payload = trace2.get_transaction_event()
+
+        assert trace1_payload["transaction"] == "hi"
+        assert trace2_payload["transaction"] == "ho"
+
+        assert (
+            trace1_payload["contexts"]["trace"]["trace_id"]
+            == trace2_payload["contexts"]["trace"]["trace_id"]
+            == child_transaction.trace_id
+            == message_payload["contexts"]["trace"]["trace_id"]
+        )
+
+        if parent_sampled is not None:
+            expected_sample_rate = str(float(parent_sampled))
+        else:
+            expected_sample_rate = str(sample_rate)
+
+        assert trace2.headers["trace"] == baggage.dynamic_sampling_context()
+        assert trace2.headers["trace"] == {
+            "public_key": "49d0f7386ad645858ae85020e393bef3",
+            "trace_id": "d055bff6ed16698222b464d97f980489",
+            "user_id": "Amelie",
+            "sample_rate": expected_sample_rate,
+        }
+
+    assert message_payload["message"] == "hello"
+
+
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_propagate_traces_deprecation_warning(sentry_init, sample_rate):
     sentry_init(traces_sample_rate=sample_rate, propagate_traces=False)

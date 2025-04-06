@@ -62,6 +62,14 @@ def test_iter_headers(monkeypatch):
         mock.Mock(return_value="12312012123120121231201212312012-0415201309082013-0"),
     )
 
+    monkeypatch.setattr(
+        Transaction,
+        "to_w3c_traceparent",
+        mock.Mock(
+            return_value="00-12312012123120121231201212312012-0415201309082013-00"
+        ),
+    )
+
     transaction = Transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
@@ -70,4 +78,8 @@ def test_iter_headers(monkeypatch):
     headers = dict(transaction.iter_headers())
     assert (
         headers["sentry-trace"] == "12312012123120121231201212312012-0415201309082013-0"
+    )
+    assert (
+        headers["traceparent"]
+        == "00-12312012123120121231201212312012-0415201309082013-00"
     )
