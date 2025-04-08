@@ -621,6 +621,7 @@ class HttpTransport(BaseHttpTransport):
         options = {
             "num_pools": 2 if num_pools is None else int(num_pools),
             "cert_reqs": "CERT_REQUIRED",
+            "timeout": urllib3.Timeout(connect=5, read=5),
         }
 
         socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
