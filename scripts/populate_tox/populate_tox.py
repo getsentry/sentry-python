@@ -36,7 +36,7 @@ ENV = Environment(
     lstrip_blocks=True,
 )
 
-PYPI_COOLDOWN = 0.2  # seconds to wait between requests to PyPI
+PYPI_COOLDOWN = 0.15  # seconds to wait between requests to PyPI
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
@@ -97,11 +97,11 @@ def fetch_url(url: str) -> Optional[dict]:
         if pypi_data.status_code == 200:
             return pypi_data.json()
 
-        cooldown = PYPI_COOLDOWN * 2**attempt
+        backoff = PYPI_COOLDOWN * 2**attempt
         print(
-            f"{url} returned an error: {pypi_data.status_code}. Attempt {attempt + 1}/3. Waiting {cooldown}s"
+            f"{url} returned an error: {pypi_data.status_code}. Attempt {attempt + 1}/3. Waiting {backoff}s"
         )
-        time.sleep(cooldown)
+        time.sleep(backoff)
 
     return None
 
