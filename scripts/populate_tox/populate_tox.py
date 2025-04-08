@@ -514,10 +514,9 @@ def _add_python_versions_to_release(
     integration: str, package: str, release: Version
 ) -> None:
     release_pypi_data = fetch_release(package, release)
-
     if release_pypi_data is None:
-        release.python_versions = []
-        return
+        print("Failed to fetch necessary data from PyPI. Aborting.")
+        sys.exit(1)
 
     time.sleep(PYPI_COOLDOWN)  # give PYPI some breathing room
 
