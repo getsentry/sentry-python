@@ -29,6 +29,27 @@ def test_to_traceparent(sampled):
         assert parts[2] == "1" if sampled is True else "0"  # sampled
 
 
+@pytest.mark.parametrize("sampled", [True, False, None])
+def test_to_w3c_traceparent(sampled):
+    transaction = Transaction(
+        name="/interactions/other-dogs/new-dog",
+        op="greeting.sniff",
+        trace_id="4a77088e323f137c4d96381f35b92cf6",
+        sampled=sampled,
+    )
+
+    traceparent = transaction.to_w3c_traceparent()
+
+    parts = traceparent.split("-")
+    assert parts[0] == "00"  # version
+    assert parts[1] == "4a77088e323f137c4d96381f35b92cf6"  # trace_id
+    assert parts[2] == transaction.span_id  # parent_span_id
+    if sampled is not True:
+        assert parts[3] == "00"  # trace-flags
+    else:
+        assert parts[3] == "01"  # trace-flags
+
+
 @pytest.mark.parametrize("sampling_decision", [True, False])
 def test_sentrytrace_extraction(sampling_decision):
     sentrytrace_header = "12312012123120121231201212312012-0415201309082013-{}".format(
