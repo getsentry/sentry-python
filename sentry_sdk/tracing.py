@@ -57,6 +57,9 @@ if TYPE_CHECKING:
         https://develop.sentry.dev/sdk/performance/span-operations/
         """
 
+        description: str
+        """A description of what operation is being performed within the span."""
+
         status: str
         """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
 
