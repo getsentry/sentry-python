@@ -1,8 +1,9 @@
 import pytest
 import requests
-import responses
 import sentry_sdk
+from http.client import HTTPConnection
 
+USE_DEFAULT_TRACES_SAMPLE_RATE = -1
 
 INCOMING_TRACE_ID = "771a43a4192642f0b136d5159a501700"
 INCOMING_HEADERS = {
@@ -20,16 +21,36 @@ INCOMING_HEADERS = {
 
 
 #
-# I want to have propper testing of trace propagation.
+# I want to have proper testing of trace propagation.
 # Testing the matrix of test cases described here:
 # https://docs.google.com/spreadsheets/d/1IyOTYIC2bwu6HeHrxbLHAm6Lq44atVzf2TDJoPCMDZA/edit?gid=0#gid=0
 #
 
 
-@responses.activate
+@pytest.fixture
+def _mock_putheader(monkeypatch):
+    """
+    Mock HTTPConnection.putheader to capture calls to it.
+    """
+    putheader_calls = []
+    original_putheader = HTTPConnection.putheader
+
+    def mock_putheader_fn(self, header, value):
+        putheader_calls.append((header, value))
+        return original_putheader(self, header, value)
+
+    monkeypatch.setattr(HTTPConnection, "putheader", mock_putheader_fn)
+    return putheader_calls
+
+
 @pytest.mark.parametrize(
     "traces_sample_rate",
-    [1, 1, 1, 1],  # [-1, None, 0, 1.0],
+    [
+        USE_DEFAULT_TRACES_SAMPLE_RATE,
+        None,
+        0,
+        1.0,
+    ],
     ids=[
         "default traces_sample_rate",
         "traces_sample_rate=None",
@@ -38,39 +59,188 @@ INCOMING_HEADERS = {
     ],
 )
 def test_trace_propagation_no_incoming_trace(
-    sentry_init, capture_events, traces_sample_rate
+    sentry_init, capture_events, _mock_putheader, traces_sample_rate
 ):
-    # TODO: responses mocks away our stdlib putrequest patch, so I need to find a way to mock the request in another way
-    responses.add(responses.GET, "http://example.com")
-
-    init_kwargs = {
-        "debug": True,
-    }
-    if traces_sample_rate != -1:
+    init_kwargs = {}
+    if traces_sample_rate != USE_DEFAULT_TRACES_SAMPLE_RATE:
         init_kwargs["traces_sample_rate"] = traces_sample_rate
-
     sentry_init(**init_kwargs)
 
     events = capture_events()
 
-    with sentry_sdk.start_span(op="test", name="test"):
-        requests.get("http://example.com")
+    with sentry_sdk.continue_trace({}):
+        with sentry_sdk.start_span(op="test", name="test"):
+            requests.get(
+                "http://example.com", headers={"custom-header": "custom-value"}
+            )
 
-    # CHECK: performance data (a transaction/span) is sent to sentry
+    # CHECK if performance data (a transaction/span) is sent to Sentry
     if traces_sample_rate == 1:
         assert len(events) == 1
     else:
         assert len(events) == 0
 
-    # CHECK: trace information is added to the outgoing request
-    request = responses.calls[0].request
-    if traces_sample_rate == 1:
-        assert "sentry-trace" in request.headers
-        assert "baggage" in request.headers
-        assert INCOMING_TRACE_ID not in request.headers["sentry-trace"]
-        assert INCOMING_TRACE_ID not in request.headers["baggage"]
-    else:
-        assert "sentry-trace" not in request.headers
-        assert "baggage" not in request.headers
+    outgoing_request_headers = {key: value for key, value in _mock_putheader}
+    assert "custom-header" in outgoing_request_headers
 
-    # CHECK: the incoming trace_id and the current trace id do match (or not match)
+    # CHECK if trace information is added to the outgoing request
+    assert "sentry-trace" in outgoing_request_headers
+    assert "baggage" in outgoing_request_headers
+
+    # CHECK if incoming trace is continued
+    # as no incoming data is given to continue_trace() the incoming trace is never continued
+    assert INCOMING_TRACE_ID not in outgoing_request_headers["sentry-trace"]
+    assert INCOMING_TRACE_ID not in outgoing_request_headers["baggage"]
+
+
+@pytest.mark.parametrize(
+    "traces_sample_rate",
+    [
+        USE_DEFAULT_TRACES_SAMPLE_RATE,
+        None,
+        0,
+        1.0,
+    ],
+    ids=[
+        "default traces_sample_rate",
+        "traces_sample_rate=None",
+        "traces_sample_rate=0",
+        "traces_sample_rate=1",
+    ],
+)
+def test_trace_propagation_with_incoming_trace(
+    sentry_init, capture_events, _mock_putheader, traces_sample_rate
+):
+    init_kwargs = {}
+    if traces_sample_rate != USE_DEFAULT_TRACES_SAMPLE_RATE:
+        init_kwargs["traces_sample_rate"] = traces_sample_rate
+    sentry_init(**init_kwargs)
+
+    events = capture_events()
+
+    with sentry_sdk.continue_trace(INCOMING_HEADERS):
+        with sentry_sdk.start_span(op="test", name="test"):
+            requests.get(
+                "http://example.com", headers={"custom-header": "custom-value"}
+            )
+
+    # CHECK if performance data (a transaction/span) is sent to Sentry
+    if traces_sample_rate == 1:
+        assert len(events) == 1
+    else:
+        assert len(events) == 0
+
+    outgoing_request_headers = {key: value for key, value in _mock_putheader}
+    assert "custom-header" in outgoing_request_headers
+
+    # CHECK if trace information is added to the outgoing request
+    assert "sentry-trace" in outgoing_request_headers
+    assert "baggage" in outgoing_request_headers
+
+    # CHECK if incoming trace is continued
+    if traces_sample_rate in (0, 1, USE_DEFAULT_TRACES_SAMPLE_RATE):
+        # continue the incoming trace
+        assert INCOMING_TRACE_ID in outgoing_request_headers["sentry-trace"]
+        assert INCOMING_TRACE_ID in outgoing_request_headers["baggage"]
+    elif traces_sample_rate is None:
+        # do NOT continue the incoming trace
+        assert INCOMING_TRACE_ID not in outgoing_request_headers["sentry-trace"]
+        assert INCOMING_TRACE_ID not in outgoing_request_headers["baggage"]
+
+
+@pytest.mark.parametrize(
+    "traces_sample_rate",
+    [
+        USE_DEFAULT_TRACES_SAMPLE_RATE,
+        None,
+        0,
+        1.0,
+    ],
+    ids=[
+        "default traces_sample_rate",
+        "traces_sample_rate=None",
+        "traces_sample_rate=0",
+        "traces_sample_rate=1",
+    ],
+)
+def test_trace_propagation_no_incoming_trace_and_targets_not_matching(
+    sentry_init, capture_events, _mock_putheader, traces_sample_rate
+):
+    init_kwargs = {
+        "trace_propagation_targets": [
+            "http://someothersite.com",
+        ],
+    }
+    if traces_sample_rate != USE_DEFAULT_TRACES_SAMPLE_RATE:
+        init_kwargs["traces_sample_rate"] = traces_sample_rate
+    sentry_init(**init_kwargs)
+
+    events = capture_events()
+
+    with sentry_sdk.continue_trace({}):
+        with sentry_sdk.start_span(op="test", name="test"):
+            requests.get(
+                "http://example.com", headers={"custom-header": "custom-value"}
+            )
+
+    # CHECK if performance data (a transaction/span) is sent to Sentry
+    if traces_sample_rate == 1:
+        assert len(events) == 1
+    else:
+        assert len(events) == 0
+
+    outgoing_request_headers = {key: value for key, value in _mock_putheader}
+    assert "custom-header" in outgoing_request_headers
+
+    # CHECK if trace information is added to the outgoing request
+    assert "sentry-trace" not in outgoing_request_headers
+    assert "baggage" not in outgoing_request_headers
+
+
+@pytest.mark.parametrize(
+    "traces_sample_rate",
+    [
+        USE_DEFAULT_TRACES_SAMPLE_RATE,
+        None,
+        0,
+        1.0,
+    ],
+    ids=[
+        "default traces_sample_rate",
+        "traces_sample_rate=None",
+        "traces_sample_rate=0",
+        "traces_sample_rate=1",
+    ],
+)
+def test_trace_propagation_with_incoming_trace_and_targets_not_matching(
+    sentry_init, capture_events, _mock_putheader, traces_sample_rate
+):
+    init_kwargs = {
+        "trace_propagation_targets": [
+            "http://someothersite.com",
+        ],
+    }
+    if traces_sample_rate != USE_DEFAULT_TRACES_SAMPLE_RATE:
+        init_kwargs["traces_sample_rate"] = traces_sample_rate
+    sentry_init(**init_kwargs)
+
+    events = capture_events()
+
+    with sentry_sdk.continue_trace(INCOMING_HEADERS):
+        with sentry_sdk.start_span(op="test", name="test"):
+            requests.get(
+                "http://example.com", headers={"custom-header": "custom-value"}
+            )
+
+    # CHECK if performance data (a transaction/span) is sent to Sentry
+    if traces_sample_rate == 1:
+        assert len(events) == 1
+    else:
+        assert len(events) == 0
+
+    outgoing_request_headers = {key: value for key, value in _mock_putheader}
+    assert "custom-header" in outgoing_request_headers
+
+    # CHECK if trace information is added to the outgoing request
+    assert "sentry-trace" not in outgoing_request_headers
+    assert "baggage" not in outgoing_request_headers
