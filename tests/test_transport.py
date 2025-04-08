@@ -34,6 +34,7 @@ from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     _parse_rate_limits,
     HttpTransport,
+    make_multiplexed_transport,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
@@ -202,6 +203,47 @@ def test_transport_works(
     assert capturing_server.captured[0].compressed == should_compress
 
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
+
+
+@pytest.mark.forked
+def test_multiplexed_transport_works(capturing_server, request, make_client):
+    server_address = capturing_server.url[len("http://") :]
+    dsn1 = "http://publickeyone@{}/123".format(server_address)
+    dsn2 = "http://publickeytwo@{}/456".format(server_address)
+
+    client = make_client(transport=make_multiplexed_transport([dsn1, dsn2]))
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+
+    capture_message("some message")
+    client.close()
+
+    assert len(capturing_server.captured) == 2
+    assert {capturing_server.captured[0].path, capturing_server.captured[1].path} == {
+        "/api/123/envelope/",
+        "/api/456/envelope/",
+    }
+    assert {
+        capturing_server.captured[0].envelope.headers["trace"]["public_key"],
+        capturing_server.captured[1].envelope.headers["trace"]["public_key"],
+    } == {"publickeyone", "publickeytwo"}
+    assert (
+        capturing_server.captured[0].envelope.headers["event_id"]
+        == capturing_server.captured[1].envelope.headers["event_id"]
+    )
+    assert (
+        capturing_server.captured[0].envelope.headers["sent_at"]
+        == capturing_server.captured[1].envelope.headers["sent_at"]
+    )
+    # Key not sent to the wrong server
+    assert (
+        "publickeyone" in str(capturing_server.captured[0].envelope.serialize())
+    ) == ("publickeytwo" in str(capturing_server.captured[1].envelope.serialize()))
+    # Python SDK doesn't add a dsn header. Asserting in case it is added in the future.
+    assert {
+        capturing_server.captured[0].envelope.headers.get("dsn"),
+        capturing_server.captured[1].envelope.headers.get("dsn"),
+    } == {None, None}
 
 
 @pytest.mark.parametrize(

@@ -878,6 +878,82 @@ class _FunctionTransport(Transport):
             self.capture_event(event)
 
 
+def make_multiplexed_transport(dsns):
+    # type: (List[str]) -> Type[Transport]
+    class MultiplexedTransport(Transport):
+        def __init__(self, options):
+            # type: (Self, Optional[Dict[str, Any]]) -> None
+            super().__init__(options)
+            self.transports = list(
+                filter(
+                    None,
+                    [
+                        make_transport(
+                            {**(options or {}), "dsn": dsn, "transport": None}
+                        )
+                        for dsn in dsns
+                    ],
+                )
+            )
+
+        @staticmethod
+        def _override_dsn(envelope, dsn):
+            # type: (Envelope, Optional[Dsn]) -> Envelope
+            if (
+                dsn is None
+                or "trace" not in envelope.headers
+                or "public_key" not in envelope.headers["trace"]
+            ):
+                return envelope
+            return Envelope(
+                {
+                    **envelope.headers,
+                    "trace": {
+                        **envelope.headers["trace"],
+                        "public_key": dsn.public_key,
+                    },
+                },
+                envelope.items,
+            )
+
+        def capture_envelope(self, envelope):
+            # type: (Self, Envelope) -> None
+            for transport in self.transports:
+                transport.capture_envelope(
+                    self._override_dsn(envelope, transport.parsed_dsn)
+                )
+
+        def flush(self, timeout, callback=None):
+            # type: (Self, float, Optional[Any]) -> None
+            for transport in self.transports:
+                transport.flush(timeout, callback)
+
+        def kill(self):
+            # type: (Self) -> None
+            for transport in self.transports:
+                transport.kill()
+
+        def record_lost_event(
+            self,
+            reason,  # type: str
+            data_category=None,  # type: Optional[EventDataCategory]
+            item=None,  # type: Optional[Item]
+            *,
+            quantity=1,  # type: int
+        ):
+            # type: (...) -> None
+            for transport in self.transports:
+                transport.record_lost_event(
+                    reason, data_category, item, quantity=quantity
+                )
+
+        def is_healthy(self):
+            # type: (Self) -> bool
+            return all(transport.is_healthy() for transport in self.transports)
+
+    return MultiplexedTransport
+
+
 def make_transport(options):
     # type: (Dict[str, Any]) -> Optional[Transport]
     ref_transport = options["transport"]
