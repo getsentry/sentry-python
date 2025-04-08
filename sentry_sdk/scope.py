@@ -56,8 +56,6 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import Self
 
-    from typing_extensions import Unpack
-
     from sentry_sdk._types import (
         Breadcrumb,
         BreadcrumbHint,
@@ -69,8 +67,6 @@ if TYPE_CHECKING:
         LogLevelStr,
         Type,
     )
-
-    from sentry_sdk.tracing import TransactionKwargs
 
     import sentry_sdk
 
@@ -910,7 +906,7 @@ class Scope:
             self._n_breadcrumbs_truncated += 1
 
     def start_transaction(self, **kwargs):
-        # type: (Unpack[TransactionKwargs]) -> Union[NoOpSpan, Span]
+        # type: (Any) -> Union[NoOpSpan, Span]
         """
         .. deprecated:: 3.0.0
             This function is deprecated and will be removed in a future release.
