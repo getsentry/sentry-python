@@ -274,6 +274,15 @@ def test_keep_alive_on_by_default(make_client):
     assert "socket_options" not in options
 
 
+def test_default_timeout(make_client):
+    client = make_client()
+
+    options = client.transport._get_pool_options()
+    assert "timeout" in options
+    assert options["timeout"].connect_timeout == 5
+    assert options["timeout"].read_timeout == 5
+
+
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_http2_with_https_dsn(make_client):
     client = make_client(_experiments={"transport_http2": True})
