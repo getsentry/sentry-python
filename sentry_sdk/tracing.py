@@ -1,7 +1,6 @@
 from datetime import datetime
 from enum import Enum
 import json
-import warnings
 
 from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace import (
@@ -139,7 +138,7 @@ class NoOpSpan:
         return "<%s>" % self.__class__.__name__
 
     @property
-    def containing_transaction(self):
+    def root_span(self):
         # type: () -> Optional[Span]
         return None
 
@@ -387,22 +386,6 @@ class Span:
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         self.set_attribute(SentrySpanAttribute.ORIGIN, value)
-
-    @property
-    def containing_transaction(self):
-        # type: () -> Optional[Span]
-        """
-        Get the transaction this span is a child of.
-
-        .. deprecated:: 3.0.0
-            This will be removed in the future. Use :func:`root_span` instead.
-        """
-        warnings.warn(
-            "Deprecated: This will be removed in the future. Use root_span instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.root_span
 
     @property
     def root_span(self):
