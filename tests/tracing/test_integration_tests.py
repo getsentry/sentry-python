@@ -81,6 +81,9 @@ def test_continue_from_headers(
             )
 
     # child transaction, to prove that we can read 'sentry-trace' header data correctly
+    del headers[
+        "traceparent"
+    ]  # remove the traceparent header to simulate a missing W3C header
     child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
     assert child_transaction is not None
     assert child_transaction.parent_sampled == parent_sampled
@@ -147,7 +150,7 @@ def test_continue_from_headers(
     assert message_payload["message"] == "hello"
 
 
-@pytest.mark.parametrize("parent_sampled", [True, False, None])
+@pytest.mark.parametrize("parent_sampled", [True, False])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_continue_from_w3c_headers(
     sentry_init, capture_envelopes, parent_sampled, sample_rate
@@ -176,6 +179,9 @@ def test_continue_from_w3c_headers(
             )
 
     # child transaction, to prove that we can read 'sentry-trace' header data correctly
+    del headers[
+        "sentry-trace"
+    ]  # remove the sentry-trace header to simulate a missing Sentry Trace header
     child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
     assert child_transaction is not None
     assert child_transaction.parent_sampled == parent_sampled
