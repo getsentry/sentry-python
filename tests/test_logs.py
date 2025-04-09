@@ -283,6 +283,7 @@ def test_logger_integration_warning(sentry_init, capture_envelopes):
     assert attrs["sentry.environment"] == "production"
     assert attrs["sentry.message.parameters.0"] == "1"
     assert attrs["sentry.message.parameters.1"] == "2"
+    assert attrs["sentry.origin"] == "auto.logger.log"
     assert logs[0]["severity_number"] == 13
     assert logs[0]["severity_text"] == "warn"
 
