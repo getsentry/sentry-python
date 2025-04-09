@@ -321,6 +321,7 @@ async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
 async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
+        traces_sample_rate=None,  # disable all performance monitoring
     )
 
     events = capture_events()
@@ -386,6 +387,7 @@ async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_ev
 async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
+        traces_sample_rate=None,  # disable all performance monitoring
     )
 
     events = capture_events()
