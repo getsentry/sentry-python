@@ -38,8 +38,6 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from typing_extensions import TypedDict
-
     P = ParamSpec("P")
     R = TypeVar("R")
 
@@ -49,56 +47,6 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk.tracing_utils import Baggage
-
-    class SpanKwargs(TypedDict, total=False):
-        op: str
-        """
-        The span's operation. A list of recommended values is available here:
-        https://develop.sentry.dev/sdk/performance/span-operations/
-        """
-
-        description: str
-        """A description of what operation is being performed within the span."""
-
-        status: str
-        """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
-
-        containing_transaction: Optional["Span"]
-        """The transaction that this span belongs to."""
-
-        start_timestamp: Optional[Union[datetime, float]]
-        """
-        The timestamp when the span started. If omitted, the current time
-        will be used.
-        """
-
-        scope: "sentry_sdk.Scope"
-        """The scope to use for this span. If not provided, we use the current scope."""
-
-        origin: Optional[str]
-        """
-        The origin of the span.
-        See https://develop.sentry.dev/sdk/performance/trace-origin/
-        Default "manual".
-        """
-
-        name: str
-        """A string describing what operation is being performed within the span/transaction."""
-
-    class TransactionKwargs(SpanKwargs, total=False):
-        source: str
-        """
-        A string describing the source of the transaction name. This will be used to determine the transaction's type.
-        See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations for more information.
-        Default "custom".
-        """
-
-    ProfileContext = TypedDict(
-        "ProfileContext",
-        {
-            "profiler_id": str,
-        },
-    )
 
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
