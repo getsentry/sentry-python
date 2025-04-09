@@ -310,7 +310,10 @@ def test_records_lost_event_only_if_traces_sampler_enabled(
     sampled_output,
     expected_record_lost_event_calls,
 ):
-    sentry_init(traces_sampler=traces_sampler)
+    sentry_init(
+        traces_sample_rate=None,
+        traces_sampler=traces_sampler,
+    )
     record_lost_event_calls = capture_record_lost_event_calls()
 
     with start_span(name="dogpark") as span:
