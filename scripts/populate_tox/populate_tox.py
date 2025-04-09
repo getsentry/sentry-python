@@ -69,7 +69,6 @@ IGNORE = {
     "boto3",
     "chalice",
     "cohere",
-    "django",
     "fastapi",
     "gcp",
     "httpx",

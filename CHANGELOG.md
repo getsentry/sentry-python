@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.25.1
+
+### Various fixes & improvements
+
+- fix(logs): Add a class which batches groups of logs together. (#4229) by @colin-sentry
+- fix(logs): Use repr instead of json for message and arguments (#4227) by @colin-sentry
+- fix(logs): Debug output from Sentry logs should always be `debug` level. (#4224) by @antonpirker
+- fix(ai): Do not consume anthropic streaming stop (#4232) by @colin-sentry
+- fix(spotlight): Do not spam sentry_sdk.warnings logger w/ Spotlight (#4219) by @BYK
+- fix(docs): fixed code snippet (#4218) by @antonpirker
+- build(deps): bump actions/create-github-app-token from 1.11.7 to 1.12.0 (#4214) by @dependabot
+
 ## 2.25.0
 
 ### Various fixes & improvements
@@ -13,6 +25,8 @@
   This is how you can use it (Sentry Logs is in beta right now so the API can still change):
 
   ```python
+  import logging
+
   import sentry_sdk
   from sentry_sdk.integrations.logging import LoggingIntegration
 
@@ -23,12 +37,11 @@
         "enable_sentry_logs": True
     }
     integrations=[
-      LoggingIntegration(sentry_logs_level="error"),
+      LoggingIntegration(sentry_logs_level=logging.ERROR),
     ]
   )
 
   # Your existing logging setup
-  import logging
   some_logger = logging.Logger("some-logger")
 
   some_logger.info('In this example info events will not be sent to Sentry logs. my_value=%s', my_value)

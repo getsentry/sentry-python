@@ -1182,82 +1182,6 @@ def test_span_origin(sentry_init, capture_events):
         assert span["origin"] == "auto.http.starlette"
 
 
-class NonIterableContainer:
-    """Wraps any container and makes it non-iterable.
-
-    Used to test backwards compatibility with our old way of defining failed_request_status_codes, which allowed
-    passing in a list of (possibly non-iterable) containers. The Python standard library does not provide any built-in
-    non-iterable containers, so we have to define our own.
-    """
-
-    def __init__(self, inner):
-        self.inner = inner
-
-    def __contains__(self, item):
-        return item in self.inner
-
-
-parametrize_test_configurable_status_codes_deprecated = pytest.mark.parametrize(
-    "failed_request_status_codes,status_code,expected_error",
-    [
-        (None, 500, True),
-        (None, 400, False),
-        ([500, 501], 500, True),
-        ([500, 501], 401, False),
-        ([range(400, 499)], 401, True),
-        ([range(400, 499)], 500, False),
-        ([range(400, 499), range(500, 599)], 300, False),
-        ([range(400, 499), range(500, 599)], 403, True),
-        ([range(400, 499), range(500, 599)], 503, True),
-        ([range(400, 403), 500, 501], 401, True),
-        ([range(400, 403), 500, 501], 405, False),
-        ([range(400, 403), 500, 501], 501, True),
-        ([range(400, 403), 500, 501], 503, False),
-        ([], 500, False),
-        ([NonIterableContainer(range(500, 600))], 500, True),
-        ([NonIterableContainer(range(500, 600))], 404, False),
-    ],
-)
-"""Test cases for configurable status codes (deprecated API).
-Also used by the FastAPI tests.
-"""
-
-
-@parametrize_test_configurable_status_codes_deprecated
-def test_configurable_status_codes_deprecated(
-    sentry_init,
-    capture_events,
-    failed_request_status_codes,
-    status_code,
-    expected_error,
-):
-    with pytest.warns(DeprecationWarning):
-        starlette_integration = StarletteIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    sentry_init(integrations=[starlette_integration])
-
-    events = capture_events()
-
-    async def _error(request):
-        raise HTTPException(status_code)
-
-    app = starlette.applications.Starlette(
-        routes=[
-            starlette.routing.Route("/error", _error, methods=["GET"]),
-        ],
-    )
-
-    client = TestClient(app)
-    client.get("/error")
-
-    if expected_error:
-        assert len(events) == 1
-    else:
-        assert not events
-
-
 @pytest.mark.skipif(
     STARLETTE_VERSION < (0, 21),
     reason="Requires Starlette >= 0.21, because earlier versions do not support HTTP 'HEAD' requests",
@@ -1355,3 +1279,28 @@ def test_configurable_status_codes(
     client.get("/error")
 
     assert len(events) == int(expected_error)
+
+
+@pytest.mark.asyncio
+async def test_starletterequestextractor_malformed_json_error_handling(sentry_init):
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+    ]
+    starlette_request = starlette.requests.Request(scope)
+
+    malformed_json = "{invalid json"
+    malformed_messages = [
+        {"type": "http.request", "body": malformed_json.encode("utf-8")},
+        {"type": "http.disconnect"},
+    ]
+
+    side_effect = [_mock_receive(msg) for msg in malformed_messages]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    assert extractor.is_json()
+
+    result = await extractor.json()
+    assert result is None

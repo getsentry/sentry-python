@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
@@ -156,6 +157,7 @@ class Scope:
         "_contexts",
         "_extras",
         "_breadcrumbs",
+        "_n_breadcrumbs_truncated",
         "_event_processors",
         "_error_processors",
         "_should_capture",
@@ -180,6 +182,7 @@ class Scope:
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[PropagationContext]
+        self._n_breadcrumbs_truncated = 0  # type: int
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -213,6 +216,7 @@ class Scope:
         rv._extras = dict(self._extras)
 
         rv._breadcrumbs = copy(self._breadcrumbs)
+        rv._n_breadcrumbs_truncated = copy(self._n_breadcrumbs_truncated)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
         rv._propagation_context = self._propagation_context
@@ -561,14 +565,6 @@ class Scope:
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """
-        span = kwargs.pop("span", None)
-        if span is not None:
-            warnings.warn(
-                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
         meta = ""
 
         sentry_trace = self.get_traceparent()
@@ -712,33 +708,6 @@ class Scope:
         # transaction) or a non-orphan span on the scope
         return self._span.containing_transaction
 
-    @transaction.setter
-    def transaction(self, value):
-        # type: (Any) -> None
-        # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
-        """When set this forces a specific transaction name to be set.
-
-        Deprecated: use set_transaction_name instead."""
-
-        # XXX: the docstring above is misleading. The implementation of
-        # apply_to_event prefers an existing value of event.transaction over
-        # anything set in the scope.
-        # XXX: note that with the introduction of the Scope.transaction getter,
-        # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a Span, the setter sets a transaction name.
-        # Without breaking version compatibility, we could make the setter set a
-        # transaction name or transaction (self._span) depending on the type of
-        # the value argument.
-
-        warnings.warn(
-            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._transaction = value
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = value
-
     def set_transaction_name(self, name, source=None):
         # type: (str, Optional[str]) -> None
         """Set the transaction name and optionally the transaction source."""
@@ -761,17 +730,6 @@ class Scope:
     def transaction_source(self):
         # type: () -> Optional[str]
         return self._transaction_info.get("source")
-
-    @_attr_setter
-    def user(self, value):
-        # type: (Optional[Dict[str, Any]]) -> None
-        """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
-        warnings.warn(
-            "The `Scope.user` setter is deprecated in favor of `Scope.set_user()`.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self.set_user(value)
 
     def set_user(self, value):
         # type: (Optional[Dict[str, Any]]) -> None
@@ -881,6 +839,7 @@ class Scope:
         # type: () -> None
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
+        self._n_breadcrumbs_truncated = 0
 
     def add_attachment(
         self,
@@ -948,6 +907,7 @@ class Scope:
 
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
+            self._n_breadcrumbs_truncated += 1
 
     def start_transaction(self, **kwargs):
         # type: (Unpack[TransactionKwargs]) -> Union[NoOpSpan, Span]
@@ -1177,17 +1137,23 @@ class Scope:
 
     def _apply_breadcrumbs_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
-            self._breadcrumbs
-        )
+        event.setdefault("breadcrumbs", {})
+
+        # This check is just for mypy -
+        if not isinstance(event["breadcrumbs"], AnnotatedValue):
+            event["breadcrumbs"].setdefault("values", [])
+            event["breadcrumbs"]["values"].extend(self._breadcrumbs)
 
         # Attempt to sort timestamps
         try:
-            for crumb in event["breadcrumbs"]["values"]:
-                if isinstance(crumb["timestamp"], str):
-                    crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
+            if not isinstance(event["breadcrumbs"], AnnotatedValue):
+                for crumb in event["breadcrumbs"]["values"]:
+                    if isinstance(crumb["timestamp"], str):
+                        crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
 
-            event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+                event["breadcrumbs"]["values"].sort(
+                    key=lambda crumb: crumb["timestamp"]
+                )
         except Exception as err:
             logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
@@ -1379,6 +1345,10 @@ class Scope:
             self._extras.update(scope._extras)
         if scope._breadcrumbs:
             self._breadcrumbs.extend(scope._breadcrumbs)
+        if scope._n_breadcrumbs_truncated:
+            self._n_breadcrumbs_truncated = (
+                self._n_breadcrumbs_truncated + scope._n_breadcrumbs_truncated
+            )
         if scope._span:
             self._span = scope._span
         if scope._attachments:
