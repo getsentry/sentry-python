@@ -20,7 +20,7 @@ INCOMING_HEADERS = {
 
 
 #
-# I want to have proper testing of trace propagation.
+# Proper high level testing for trace propagation.
 # Testing the matrix of test cases described here:
 # https://docs.google.com/spreadsheets/d/1IyOTYIC2bwu6HeHrxbLHAm6Lq44atVzf2TDJoPCMDZA/edit?gid=0#gid=0
 #
@@ -86,7 +86,7 @@ def test_no_incoming_trace_and_trace_propagation_targets_matching(
     assert "baggage" in outgoing_request_headers
 
     # CHECK if incoming trace is continued
-    # (no assert necessary, because the trace information is not added to the outgoing request (see previous asserts))
+    # (no assert necessary, because there is no incoming trace information)
 
 
 @pytest.mark.parametrize(
@@ -137,7 +137,7 @@ def test_no_incoming_trace_and_trace_propagation_targets_not_matching(
     assert "baggage" not in outgoing_request_headers
 
     # CHECK if incoming trace is continued
-    # (no assert necessary, because the trace information is not added to the outgoing request (see previous asserts))
+    # (no assert necessary, because there is no incoming trace information, and no outgoing trace information either)
 
 
 @pytest.mark.parametrize(
