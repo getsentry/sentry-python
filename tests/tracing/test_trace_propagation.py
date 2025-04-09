@@ -22,7 +22,7 @@ INCOMING_HEADERS = {
 #
 # Proper high level testing for trace propagation.
 # Testing the matrix of test cases described here:
-# https://docs.google.com/spreadsheets/d/1IyOTYIC2bwu6HeHrxbLHAm6Lq44atVzf2TDJoPCMDZA/edit?gid=0#gid=0
+# https://develop.sentry.dev/sdk/telemetry/traces/trace-propagation-cheat-sheet/
 #
 
 
