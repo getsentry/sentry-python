@@ -205,14 +205,9 @@ def test_with_incoming_trace_and_trace_propagation_targets_matching(
     assert "baggage" in outgoing_request_headers
 
     # CHECK if incoming trace is continued
-    if traces_sample_rate in (0, 1, USE_DEFAULT_TRACES_SAMPLE_RATE):
-        # continue the incoming trace
-        assert INCOMING_TRACE_ID in outgoing_request_headers["sentry-trace"]
-        assert INCOMING_TRACE_ID in outgoing_request_headers["baggage"]
-    elif traces_sample_rate is None:
-        # do NOT continue the incoming trace
-        assert INCOMING_TRACE_ID not in outgoing_request_headers["sentry-trace"]
-        assert INCOMING_TRACE_ID not in outgoing_request_headers["baggage"]
+    # Always continue the incoming trace, no matter traces_sample_rate
+    assert INCOMING_TRACE_ID in outgoing_request_headers["sentry-trace"]
+    assert INCOMING_TRACE_ID in outgoing_request_headers["baggage"]
 
 
 @pytest.mark.parametrize(
