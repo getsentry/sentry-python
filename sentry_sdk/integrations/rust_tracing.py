@@ -214,9 +214,9 @@ class RustTracingLayer:
         fields = metadata.get("fields", [])
         for field in fields:
             if self._include_tracing_fields():
-                span.set_data(field, attrs.get(field))
+                span.set_attribute(field, attrs.get(field))
             else:
-                span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
+                span.set_attribute(field, SENSITIVE_DATA_SUBSTITUTE)
 
         return span
 
@@ -229,9 +229,9 @@ class RustTracingLayer:
             deserialized_values = json.loads(values)
             for key, value in deserialized_values.items():
                 if self._include_tracing_fields():
-                    span.set_data(key, value)
+                    span.set_attribute(key, value)
                 else:
-                    span.set_data(key, SENSITIVE_DATA_SUBSTITUTE)
+                    span.set_attribute(key, SENSITIVE_DATA_SUBSTITUTE)
 
 
 class RustTracingIntegration(Integration):

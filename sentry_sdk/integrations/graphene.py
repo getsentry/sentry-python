@@ -138,7 +138,7 @@ def graphql_span(schema, source, kwargs):
     with sentry_sdk.start_span(
         op=op, name=operation_name, only_if_parent=True
     ) as graphql_span:
-        graphql_span.set_data("graphql.document", source)
-        graphql_span.set_data("graphql.operation.name", operation_name)
-        graphql_span.set_data("graphql.operation.type", operation_type)
+        graphql_span.set_attribute("graphql.document", source)
+        graphql_span.set_attribute("graphql.operation.name", operation_name)
+        graphql_span.set_attribute("graphql.operation.type", operation_type)
         yield

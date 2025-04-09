@@ -596,6 +596,12 @@ class Span:
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
+        warnings.warn(
+            "`Span.set_data` is deprecated. Please use `Span.set_attribute` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # TODO-neel-potel we cannot add dicts here
         self.set_attribute(key, value)
 
@@ -662,10 +668,10 @@ class Span:
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
         if thread_id is not None:
-            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
+            self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
 
             if thread_name is not None:
-                self.set_data(SPANDATA.THREAD_NAME, thread_name)
+                self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
     def update_active_thread(self):
         # type: () -> None
@@ -674,7 +680,7 @@ class Span:
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
+        self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
         self.set_status(get_span_status_from_http_code(http_status))
 
     def is_success(self):

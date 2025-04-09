@@ -172,7 +172,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### Deprecated
 
-- `sentry_sdk.start_transaction` is deprecated. Use `sentry_sdk.start_span` instead.
+- `sentry_sdk.start_transaction()` is deprecated. Use `sentry_sdk.start_span()` instead.
+- `Span.set_data()` is deprecated. Use `Span.set_attribute()` instead.
 
 ## Upgrading to 2.0
 
