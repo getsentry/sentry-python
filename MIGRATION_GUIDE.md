@@ -162,7 +162,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   - `same_process_as_parent`
   - `span_id`
   - `parent_span_id`: you can supply a `parent_span` instead
-- Setting `Scope.transaction` directly is no longer supported. Use `Scope.set_transaction_name()` instead.
+- The `Scope.transaction` property has been removed. To obtain the root span, use `Scope.root_span`. To set the root span's name, use `Scope.set_transaction_name()`.
 - Passing a list or `None` for `failed_request_status_codes` in the Starlette integration is no longer supported. Pass a set of integers instead.
 - The `span` argument of `Scope.trace_propagation_meta` is no longer supported.
 - Setting `Scope.user` directly is no longer supported. Use `Scope.set_user()` instead.
