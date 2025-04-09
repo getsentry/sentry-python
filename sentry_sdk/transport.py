@@ -196,6 +196,8 @@ def _parse_rate_limits(header, now=None):
 class BaseHttpTransport(Transport):
     """The base HTTP transport."""
 
+    TIMEOUT = 10  # seconds
+
     def __init__(self, options):
         # type: (Self, Dict[str, Any]) -> None
         from sentry_sdk.consts import VERSION
@@ -621,7 +623,7 @@ class HttpTransport(BaseHttpTransport):
         options = {
             "num_pools": 2 if num_pools is None else int(num_pools),
             "cert_reqs": "CERT_REQUIRED",
-            "timeout": urllib3.Timeout(connect=5, read=5),
+            "timeout": urllib3.Timeout(connect=self.TIMEOUT, read=self.TIMEOUT),
         }
 
         socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
@@ -766,6 +768,14 @@ else:
                 self._auth.get_api_url(endpoint_type),
                 content=body,
                 headers=headers,  # type: ignore
+                extensions={
+                    "timeout": {
+                        "connect": self.TIMEOUT,
+                        "read": self.TIMEOUT,
+                        "write": self.TIMEOUT,
+                        "pool": self.TIMEOUT,
+                    }
+                },
             )
             return response
 
