@@ -34,9 +34,6 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Tuple, Optional, Generator, Dict, Any
-    from typing_extensions import Unpack
-
-    from sentry_sdk.tracing import TransactionKwargs
 
 
 class PotelScope(Scope):
@@ -136,7 +133,7 @@ class PotelScope(Scope):
         return span_context
 
     def start_transaction(self, **kwargs):
-        # type: (Unpack[TransactionKwargs]) -> Span
+        # type: (Any) -> Span
         """
         .. deprecated:: 3.0.0
             This function is deprecated and will be removed in a future release.
