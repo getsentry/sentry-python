@@ -29,6 +29,25 @@ TEST_SUITE_CONFIG = {
     "clickhouse_driver": {
         "package": "clickhouse-driver",
     },
+    "django": {
+        "package": "django",
+        "deps": {
+            "*": [
+                "channels[daphne]",
+                "psycopg2-binary",
+                "djangorestframework",
+                "pytest-django",
+                "Werkzeug",
+            ],
+            ">=3.0": ["pytest-asyncio"],
+            ">=2.2,<3.1": ["six"],
+            "<3.3": [
+                "djangorestframework>=3.0,<4.0",
+                "Werkzeug<2.1.0",
+            ],
+            "<3.1": ["pytest-django<4.0"],
+        },
+    },
     "dramatiq": {
         "package": "dramatiq",
     },

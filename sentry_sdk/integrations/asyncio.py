@@ -1,5 +1,4 @@
 import sys
-import signal
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -36,22 +35,6 @@ def patch_asyncio():
     try:
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
-
-        # Add a shutdown handler to log a helpful message
-        def shutdown_handler():
-            # type: () -> None
-            logger.info(
-                "AsyncIO is shutting down. If you see 'Task was destroyed but it is pending!' "
-                "errors with '_task_with_sentry_span_creation', these are normal during shutdown "
-                "and not a problem with your code or Sentry."
-            )
-
-        try:
-            loop.add_signal_handler(signal.SIGINT, shutdown_handler)
-            loop.add_signal_handler(signal.SIGTERM, shutdown_handler)
-        except (NotImplementedError, AttributeError):
-            # Signal handlers might not be supported on all platforms
-            pass
 
         def _sentry_task_factory(loop, coro, **kwargs):
             # type: (asyncio.AbstractEventLoop, Coroutine[Any, Any, Any], Any) -> asyncio.Future[Any]

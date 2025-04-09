@@ -70,7 +70,7 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
-            "enable_sentry_logs": Optional[bool],
+            "enable_logs": Optional[bool],
         },
         total=False,
     )
@@ -945,4 +945,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.25.0"
+VERSION = "2.25.1"
