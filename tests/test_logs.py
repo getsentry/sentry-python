@@ -11,7 +11,7 @@ from sentry_sdk import get_client
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.types import Log
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, VERSION
 
 minimum_python_37 = pytest.mark.skipif(
     sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
@@ -186,6 +186,8 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     assert "sentry.release" in logs[0]["attributes"]
     assert logs[0]["attributes"]["sentry.message.parameters.my_var"] == "some value"
     assert logs[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
+    assert logs[0]["attributes"]["sentry.sdk.name"] == "sentry.python"
+    assert logs[0]["attributes"]["sentry.sdk.version"] == VERSION
 
 
 @minimum_python_37

@@ -895,6 +895,9 @@ class _Client(BaseClient):
             return
         isolation_scope = current_scope.get_isolation_scope()
 
+        log["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
+        log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
+
         server_name = self.options.get("server_name")
         if server_name is not None and SPANDATA.SERVER_ADDRESS not in log["attributes"]:
             log["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
