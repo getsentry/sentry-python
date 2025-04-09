@@ -279,8 +279,7 @@ def test_default_timeout(make_client):
 
     options = client.transport._get_pool_options()
     assert "timeout" in options
-    assert options["timeout"].connect_timeout == client.transport.TIMEOUT
-    assert options["timeout"].read_timeout == client.transport.TIMEOUT
+    assert options["timeout"].total == client.transport.TIMEOUT
 
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
