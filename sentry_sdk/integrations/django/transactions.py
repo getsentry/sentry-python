@@ -19,12 +19,7 @@ if TYPE_CHECKING:
     from typing import Union
     from re import Pattern
 
-from django import VERSION as DJANGO_VERSION
-
-if DJANGO_VERSION >= (2, 0):
-    from django.urls.resolvers import RoutePattern
-else:
-    RoutePattern = None
+from django.urls.resolvers import RoutePattern
 
 try:
     from django.urls import get_resolver

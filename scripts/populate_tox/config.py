@@ -33,6 +33,7 @@ TEST_SUITE_CONFIG = {
         "package": "django",
         "deps": {
             "*": [
+                "channels[daphne]",
                 "psycopg2-binary",
                 "djangorestframework",
                 "pytest-django",
@@ -45,7 +46,6 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
-            ">=2.0": ["channels[daphne]"],
         },
     },
     "dramatiq": {

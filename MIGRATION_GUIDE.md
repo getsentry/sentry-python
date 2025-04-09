@@ -162,6 +162,9 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `span` argument of `Scope.trace_propagation_meta` is no longer supported.
 - Setting `Scope.user` directly is no longer supported. Use `Scope.set_user()` instead.
 - `start_transaction` (`start_span`) no longer takes a `baggage` argument. Use the `continue_trace()` context manager instead to propagate baggage.
+- Dropped support for Django versions below 2.0.
+- Dropped support for trytond versions below 5.0.
+- Dropped support for Falcon versions below 3.0.
 
 ### Deprecated
 
