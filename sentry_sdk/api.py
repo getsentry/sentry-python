@@ -30,8 +30,6 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import Generator
 
-    from typing_extensions import Unpack
-
     from sentry_sdk.client import BaseClient
     from sentry_sdk._types import (
         Event,
@@ -42,7 +40,7 @@ if TYPE_CHECKING:
         MeasurementUnit,
         LogLevelStr,
     )
-    from sentry_sdk.tracing import Span, TransactionKwargs
+    from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -258,7 +256,7 @@ def start_span(**kwargs):
 
 def start_transaction(
     transaction=None,  # type: Optional[Span]
-    **kwargs,  # type: Unpack[TransactionKwargs]
+    **kwargs,  # type: Any
 ):
     # type: (...) -> Span
     """
