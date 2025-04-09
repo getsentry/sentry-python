@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import brotli
+import httpcore
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
@@ -280,6 +281,30 @@ def test_default_timeout(make_client):
     options = client.transport._get_pool_options()
     assert "timeout" in options
     assert options["timeout"].total == client.transport.TIMEOUT
+
+
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_default_timeout_http2(make_client):
+    client = make_client(_experiments={"transport_http2": True})
+
+    with mock.patch(
+        "sentry_sdk.transport.httpcore.ConnectionPool.request",
+        return_value=httpcore.Response(200),
+    ) as request_mock:
+        sentry_sdk.get_global_scope().set_client(client)
+        capture_message("hi")
+        client.flush()
+
+    request_mock.assert_called_once()
+    assert request_mock.call_args.kwargs["extensions"] == {
+        "timeout": {
+            "pool": client.transport.TIMEOUT,
+            "connect": client.transport.TIMEOUT,
+            "write": client.transport.TIMEOUT,
+            "read": client.transport.TIMEOUT,
+        }
+    }
+    sentry_sdk.get_global_scope().set_client(None)
 
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
