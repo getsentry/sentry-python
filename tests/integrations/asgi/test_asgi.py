@@ -269,7 +269,9 @@ async def test_has_trace_if_performance_disabled(
     asgi3_app_with_error_and_msg,
     capture_events,
 ):
-    sentry_init()
+    sentry_init(
+        traces_sample_rate=None,  # disable all performance monitoring
+    )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
     with pytest.raises(ZeroDivisionError):
