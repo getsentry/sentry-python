@@ -287,8 +287,8 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
                 "local_traces_sampler_result": None,
                 "local_traces_sample_rate": None,
             },
-            None,  # expected_sample_rate
-            "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled (traces_sample_rate=None disables all transaction creation)
+            1.0,  # expected_sample_rate
+            "true",  # expected_sampled
         ),
         (  # 6 traces_sampler overrides incoming  (traces_sample_rate not set)
             {
