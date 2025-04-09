@@ -196,7 +196,7 @@ def _parse_rate_limits(header, now=None):
 class BaseHttpTransport(Transport):
     """The base HTTP transport."""
 
-    TIMEOUT = 10  # seconds
+    TIMEOUT = 30  # seconds
 
     def __init__(self, options):
         # type: (Self, Dict[str, Any]) -> None
@@ -623,7 +623,7 @@ class HttpTransport(BaseHttpTransport):
         options = {
             "num_pools": 2 if num_pools is None else int(num_pools),
             "cert_reqs": "CERT_REQUIRED",
-            "timeout": urllib3.Timeout(connect=self.TIMEOUT, read=self.TIMEOUT),
+            "timeout": urllib3.Timeout(total=self.TIMEOUT),
         }
 
         socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
@@ -739,6 +739,8 @@ else:
     class Http2Transport(BaseHttpTransport):  # type: ignore
         """The HTTP2 transport based on httpcore."""
 
+        TIMEOUT = 15
+
         if TYPE_CHECKING:
             _pool: Union[
                 httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool
@@ -770,10 +772,10 @@ else:
                 headers=headers,  # type: ignore
                 extensions={
                     "timeout": {
-                        "connect": self.TIMEOUT,
-                        "read": self.TIMEOUT,
-                        "write": self.TIMEOUT,
                         "pool": self.TIMEOUT,
+                        "connect": self.TIMEOUT,
+                        "write": self.TIMEOUT,
+                        "read": self.TIMEOUT,
                     }
                 },
             )
