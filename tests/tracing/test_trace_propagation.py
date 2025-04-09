@@ -195,14 +195,13 @@ def test_with_incoming_trace_and_trace_propagation_targets_matching(
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
-    if traces_sample_rate == 1:
-        assert len(events) == 1
-    elif traces_sample_rate == 0:
-        assert len(events) == 1
-    elif traces_sample_rate in (None, USE_DEFAULT_TRACES_SAMPLE_RATE):
+    if traces_sample_rate is None:
         assert len(events) == 0
     else:
-        raise AssertionError(f"Invalid traces_sample_rate: {traces_sample_rate}")
+        if incoming_parent_sampled == "1" or traces_sample_rate == 1:
+            assert len(events) == 1
+        else:
+            assert len(events) == 0
 
     outgoing_request_headers = {key: value for key, value in _mock_putheader}
 
@@ -275,12 +274,13 @@ def test_with_incoming_trace_and_trace_propagation_targets_not_matching(
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
-    if traces_sample_rate == 1:
-        assert len(events) == 1
-    elif traces_sample_rate == 0:
-        assert len(events) == 1
-    else:
+    if traces_sample_rate is None:
         assert len(events) == 0
+    else:
+        if incoming_parent_sampled == "1" or traces_sample_rate == 1:
+            assert len(events) == 1
+        else:
+            assert len(events) == 0
 
     outgoing_request_headers = {key: value for key, value in _mock_putheader}
 
