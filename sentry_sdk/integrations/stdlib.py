@@ -108,7 +108,7 @@ def _install_httplib():
             data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
         for key, value in data.items():
-            span.set_data(key, value)
+            span.set_attribute(key, value)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
@@ -147,7 +147,7 @@ def _install_httplib():
 
             status_code = int(rv.status)
             span.set_http_status(status_code)
-            span.set_data("reason", rv.reason)
+            span.set_attribute("reason", rv.reason)
 
             sentry_sdk.add_breadcrumb(
                 type="http",
@@ -246,7 +246,7 @@ def _install_subprocess():
                 env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
             if cwd:
-                span.set_data("subprocess.cwd", cwd)
+                span.set_attribute("subprocess.cwd", cwd)
 
             rv = old_popen_init(self, *a, **kw)
 
