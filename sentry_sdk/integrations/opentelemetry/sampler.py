@@ -220,11 +220,17 @@ class SentrySampler(Sampler):
                 sample_rate = float(custom_sampled)
                 if sample_rate > 0:
                     return sampled_result(
-                        parent_span_context, attributes, sample_rate=sample_rate
+                        parent_span_context,
+                        attributes,
+                        sample_rate=sample_rate,
+                        sample_rand=sample_rand,
                     )
                 else:
                     return dropped_result(
-                        parent_span_context, attributes, sample_rate=sample_rate
+                        parent_span_context,
+                        attributes,
+                        sample_rate=sample_rate,
+                        sample_rand=sample_rand,
                     )
             else:
                 logger.debug(
