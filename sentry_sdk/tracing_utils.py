@@ -53,7 +53,7 @@ W3C_TRACE_REGEX = re.compile(
     "[0-9]{2}?"  # version
     "-?([0-9a-f]{32})?"  # trace_id
     "-?([0-9a-f]{16})?"  # span_id
-    "-?([01]{2})?"  # trace-flags
+    "-?([0-9]{2})?"  # trace-flags
     "[ \t]*$"  # whitespace
 )
 
@@ -369,7 +369,8 @@ def extract_w3c_traceparent_data(header):
     if parent_span_id:
         parent_span_id = "{:016x}".format(int(parent_span_id, 16))
     if trace_flags:
-        parent_sampled = trace_flags == "01"
+        trace_flags_byte = int(trace_flags, 16)
+        parent_sampled = (trace_flags_byte & 0x01) == 1
 
     return {
         "trace_id": trace_id,
