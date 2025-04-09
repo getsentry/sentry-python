@@ -298,6 +298,7 @@ class Span:
                 )
 
                 self.origin = origin or DEFAULT_SPAN_ORIGIN
+                self.description = description
                 self.name = span_name
 
                 if status is not None:
