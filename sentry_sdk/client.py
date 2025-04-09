@@ -27,6 +27,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
+    SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -893,6 +894,10 @@ class _Client(BaseClient):
         if not logs_enabled:
             return
         isolation_scope = current_scope.get_isolation_scope()
+
+        server_name = self.options.get("server_name")
+        if server_name is not None and SPANDATA.SERVER_ADDRESS not in log["attributes"]:
+            log["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
 
         environment = self.options.get("environment")
         if environment is not None and "sentry.environment" not in log["attributes"]:
