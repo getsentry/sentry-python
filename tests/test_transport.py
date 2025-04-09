@@ -304,7 +304,6 @@ def test_default_timeout_http2(make_client):
             "read": client.transport.TIMEOUT,
         }
     }
-    sentry_sdk.get_global_scope().set_client(None)
 
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
