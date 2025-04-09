@@ -211,6 +211,26 @@ class SentrySampler(Sampler):
             # We are the head SDK and we need to generate a new sample_rand
             sample_rand = cast(Decimal, _generate_sample_rand(str(trace_id), (0, 1)))
 
+        # Explicit sampled value provided at start_span
+        custom_sampled = cast(
+            "Optional[bool]", attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED)
+        )
+        if custom_sampled is not None:
+            if is_root_span:
+                sample_rate = float(custom_sampled)
+                if sample_rate > 0:
+                    return sampled_result(
+                        parent_span_context, attributes, sample_rate=sample_rate
+                    )
+                else:
+                    return dropped_result(
+                        parent_span_context, attributes, sample_rate=sample_rate
+                    )
+            else:
+                logger.debug(
+                    f"[Tracing] Ignoring sampled param for non-root span {name}"
+                )
+
         # Check if there is a traces_sampler
         # Traces_sampler is responsible to check parent sampled to have full transactions.
         has_traces_sampler = callable(client.options.get("traces_sampler"))

@@ -282,6 +282,7 @@ class Span:
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         status=None,  # type: Optional[str]
+        sampled=None,  # type: Optional[bool]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         origin=None,  # type: Optional[str]
         name=None,  # type: Optional[str]
@@ -332,6 +333,8 @@ class Span:
                     attributes[SentrySpanAttribute.SOURCE] = source
                 if description is not None:
                     attributes[SentrySpanAttribute.DESCRIPTION] = description
+                if sampled is not None:
+                    attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
                 parent_context = None
                 if parent_span is not None:

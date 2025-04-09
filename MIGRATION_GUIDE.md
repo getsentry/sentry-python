@@ -157,7 +157,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `Transport.capture_event` has been removed. Use `Transport.capture_envelope` instead.
 - Function transports are no longer supported. Subclass the `Transport` instead.
 - `start_transaction` (`start_span`) no longer takes the following arguments:
-  - `sampled`: use a `traces_sampler` to adjust the sampling rate
   - `trace_id`, `baggage`: use `continue_trace` for propagation from headers or environment variables
   - `same_process_as_parent`
   - `span_id`
