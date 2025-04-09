@@ -239,14 +239,9 @@ class Span:
         only_if_parent=False,  # type: bool
         parent_span=None,  # type: Optional[Span]
         otel_span=None,  # type: Optional[OtelSpan]
-        **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
         """
-        For backwards compatibility with old the old Span interface, this class
-        accepts arbitrary keyword arguments, in addition to the ones explicitly
-        listed in the signature. These additional arguments are ignored.
-
         If otel_span is passed explicitly, just acts as a proxy.
 
         If only_if_parent is True, just return an INVALID_SPAN
@@ -284,6 +279,8 @@ class Span:
                     attributes[SentrySpanAttribute.OP] = op
                 if source is not None:
                     attributes[SentrySpanAttribute.SOURCE] = source
+                if description is not None:
+                    attributes[SentrySpanAttribute.DESCRIPTION] = description
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
@@ -543,7 +540,7 @@ class Span:
 
     def start_child(self, **kwargs):
         # type: (**Any) -> Span
-        return Span(sampled=self.sampled, parent_span=self, **kwargs)
+        return Span(parent_span=self, **kwargs)
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
