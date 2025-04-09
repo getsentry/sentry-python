@@ -7,12 +7,11 @@ USE_DEFAULT_TRACES_SAMPLE_RATE = -1
 
 INCOMING_TRACE_ID = "771a43a4192642f0b136d5159a501700"
 INCOMING_HEADERS = {
-    "sentry-trace": f"{INCOMING_TRACE_ID}-1234567890abcdef-1",
+    "sentry-trace": f"{INCOMING_TRACE_ID}-1234567890abcdef",
     "baggage": (
         f"sentry-trace_id={INCOMING_TRACE_ID}, "
         "sentry-public_key=frontendpublickey,"
         "sentry-sample_rate=0.01337,"
-        "sentry-sampled=true,"
         "sentry-release=myfrontend,"
         "sentry-environment=bird,"
         "sentry-transaction=bar"
@@ -49,7 +48,7 @@ def _mock_putheader(monkeypatch):
         USE_DEFAULT_TRACES_SAMPLE_RATE,
         None,
         0,
-        1.0,
+        1,
     ],
     ids=[
         "traces_sample_rate=DEFAULT",
@@ -98,7 +97,7 @@ def test_no_incoming_trace_and_trace_propagation_targets_matching(
         USE_DEFAULT_TRACES_SAMPLE_RATE,
         None,
         0,
-        1.0,
+        1,
     ],
     ids=[
         "traces_sample_rate=DEFAULT",
@@ -149,7 +148,7 @@ def test_no_incoming_trace_and_trace_propagation_targets_not_matching(
         USE_DEFAULT_TRACES_SAMPLE_RATE,
         None,
         0,
-        1.0,
+        1,
     ],
     ids=[
         "traces_sample_rate=DEFAULT",
@@ -181,15 +180,29 @@ def test_with_incoming_trace_and_trace_propagation_targets_matching(
 
     events = capture_events()
 
-    with sentry_sdk.continue_trace(INCOMING_HEADERS):
+    incoming_headers = INCOMING_HEADERS.copy()
+    if incoming_parent_sampled != "deferred":
+        incoming_headers["sentry-trace"] += f"-{incoming_parent_sampled}"
+        incoming_headers[
+            "baggage"
+        ] += f',sentry-sampled={"true" if incoming_parent_sampled == "1" else "false"}'  # noqa: E231
+
+    print("~~~~~~~~~~~~~~~~~~~~")
+    print(incoming_headers)
+    print("~~~~~~~~~~~~~~~~~~~~")
+    with sentry_sdk.continue_trace(incoming_headers):
         with sentry_sdk.start_span(op="test", name="test"):
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
     if traces_sample_rate == 1:
         assert len(events) == 1
-    else:
+    elif traces_sample_rate == 0:
+        assert len(events) == 1
+    elif traces_sample_rate in (None, USE_DEFAULT_TRACES_SAMPLE_RATE):
         assert len(events) == 0
+    else:
+        raise AssertionError(f"Invalid traces_sample_rate: {traces_sample_rate}")
 
     outgoing_request_headers = {key: value for key, value in _mock_putheader}
 
@@ -214,7 +227,7 @@ def test_with_incoming_trace_and_trace_propagation_targets_matching(
         USE_DEFAULT_TRACES_SAMPLE_RATE,
         None,
         0,
-        1.0,
+        1,
     ],
     ids=[
         "traces_sample_rate=DEFAULT",
@@ -250,12 +263,21 @@ def test_with_incoming_trace_and_trace_propagation_targets_not_matching(
 
     events = capture_events()
 
-    with sentry_sdk.continue_trace(INCOMING_HEADERS):
+    incoming_headers = INCOMING_HEADERS.copy()
+    if incoming_parent_sampled != "deferred":
+        incoming_headers["sentry-trace"] += f"-{incoming_parent_sampled}"
+        incoming_headers[
+            "baggage"
+        ] += f',sentry-sampled={"true" if incoming_parent_sampled == "1" else "false"}'  # noqa: E231
+
+    with sentry_sdk.continue_trace(incoming_headers):
         with sentry_sdk.start_span(op="test", name="test"):
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
     if traces_sample_rate == 1:
+        assert len(events) == 1
+    elif traces_sample_rate == 0:
         assert len(events) == 1
     else:
         assert len(events) == 0
