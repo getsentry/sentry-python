@@ -162,7 +162,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     """
     Passing arbitrary attributes to log messages.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(_experiments={"enable_logs": True}, server_name="test-server")
     envelopes = capture_envelopes()
 
     attrs = {
@@ -185,7 +185,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     assert logs[0]["attributes"]["sentry.environment"] == "production"
     assert "sentry.release" in logs[0]["attributes"]
     assert logs[0]["attributes"]["sentry.message.parameters.my_var"] == "some value"
-    assert logs[0]["attributes"][SPANDATA.SERVER_ADDRESS]
+    assert logs[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
 
 
 @minimum_python_37
