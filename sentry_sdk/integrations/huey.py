@@ -111,10 +111,10 @@ def _capture_exception(exc_info):
     scope = sentry_sdk.get_current_scope()
 
     if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
-        scope.transaction.set_status(SPANSTATUS.ABORTED)
+        scope.root_span.set_status(SPANSTATUS.ABORTED)
         return
 
-    scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+    scope.root_span.set_status(SPANSTATUS.INTERNAL_ERROR)
     event, hint = event_from_exception(
         exc_info,
         client_options=sentry_sdk.get_client().options,
@@ -136,7 +136,7 @@ def _wrap_task_execute(func):
             _capture_exception(exc_info)
             reraise(*exc_info)
         else:
-            sentry_sdk.get_current_scope().transaction.set_status(SPANSTATUS.OK)
+            sentry_sdk.get_current_scope().root_span.set_status(SPANSTATUS.OK)
 
         return result
 
