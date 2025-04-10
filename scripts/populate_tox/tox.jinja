@@ -107,12 +107,6 @@ envlist =
     {py3.9,py3.11,py3.12}-openai-latest
     {py3.9,py3.11,py3.12}-openai-notiktoken
 
-    # OpenTelemetry (OTel)
-    {py3.7,py3.9,py3.12,py3.13}-opentelemetry
-
-    # OpenTelemetry Experimental (POTel)
-    {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
-
     # pure_eval
     {py3.7,py3.12,py3.13}-pure_eval
 
@@ -309,12 +303,6 @@ deps =
     openai-latest: openai
     openai-latest: tiktoken~=0.6.0
     openai-notiktoken: openai
-
-    # OpenTelemetry (OTel)
-    opentelemetry: opentelemetry-distro
-
-    # OpenTelemetry Experimental (POTel)
-    potel: -e .[opentelemetry-experimental]
 
     # pure_eval
     pure_eval: pure_eval
