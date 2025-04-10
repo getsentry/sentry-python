@@ -679,7 +679,7 @@ def _set_db_data(span, cursor_or_db):
     # type: (Span, Any) -> None
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
-    span.set_data(SPANDATA.DB_SYSTEM, vendor)
+    span.set_attribute(SPANDATA.DB_SYSTEM, vendor)
 
     # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
     # actually has a `connection` and the `connection` has a `get_dsn_parameters`
@@ -712,16 +712,16 @@ def _set_db_data(span, cursor_or_db):
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
-        span.set_data(SPANDATA.DB_NAME, db_name)
+        span.set_attribute(SPANDATA.DB_NAME, db_name)
 
     server_address = connection_params.get("host")
     if server_address is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+        span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
 
     server_port = connection_params.get("port")
     if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, str(server_port))
+        span.set_attribute(SPANDATA.SERVER_PORT, str(server_port))
 
     server_socket_address = connection_params.get("unix_socket")
     if server_socket_address is not None:
-        span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
+        span.set_attribute(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)

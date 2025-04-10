@@ -698,21 +698,21 @@ class Scope:
             return None
 
         # there is an orphan span on the scope
-        if self._span.containing_transaction is None:
+        if self._span.root_span is None:
             return None
-        # there is either a transaction (which is its own containing
-        # transaction) or a non-orphan span on the scope
-        return self._span.containing_transaction
+        # there is either a root span (which is its own root
+        # span) or a non-orphan span on the scope
+        return self._span.root_span
 
     def set_transaction_name(self, name, source=None):
         # type: (str, Optional[str]) -> None
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
 
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = name
+        if self._span and self._span.root_span:
+            self._span.root_span.name = name
             if source:
-                self._span.containing_transaction.source = source
+                self._span.root_span.source = source
 
         if source:
             self._transaction_info["source"] = source

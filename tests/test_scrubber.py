@@ -155,8 +155,8 @@ def test_span_data_scrubbing(sentry_init, capture_events):
 
     with start_span(name="hi"):
         with start_span(op="foo", name="bar") as span:
-            span.set_data("password", "secret")
-            span.set_data("datafoo", "databar")
+            span.set_attribute("password", "secret")
+            span.set_attribute("datafoo", "databar")
 
     (event,) = events
     assert event["spans"][0]["data"] == ApproxDict(

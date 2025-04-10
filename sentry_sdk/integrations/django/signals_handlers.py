@@ -71,7 +71,7 @@ def patch_signals():
                     origin=DjangoIntegration.origin,
                     only_if_parent=True,
                 ) as span:
-                    span.set_data("signal", signal_name)
+                    span.set_attribute("signal", signal_name)
                     return receiver(*args, **kwargs)
 
             return wrapper

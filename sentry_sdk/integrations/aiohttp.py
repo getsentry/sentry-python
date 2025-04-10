@@ -245,7 +245,7 @@ def create_trace_config():
             data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
         for key, value in data.items():
-            span.set_data(key, value)
+            span.set_attribute(key, value)
 
         client = sentry_sdk.get_client()
 
@@ -291,7 +291,7 @@ def create_trace_config():
 
         span = trace_config_ctx.span
         span.set_http_status(int(params.response.status))
-        span.set_data("reason", params.response.reason)
+        span.set_attribute("reason", params.response.reason)
         span.finish()
 
     trace_config = TraceConfig()

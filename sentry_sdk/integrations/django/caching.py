@@ -60,22 +60,22 @@ def _patch_cache_method(cache, method_name, address, port):
 
             with capture_internal_exceptions():
                 if address is not None:
-                    span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
+                    span.set_attribute(SPANDATA.NETWORK_PEER_ADDRESS, address)
 
                 if port is not None:
-                    span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
+                    span.set_attribute(SPANDATA.NETWORK_PEER_PORT, port)
 
                 key = _get_safe_key(method_name, args, kwargs)
                 if key is not None:
-                    span.set_data(SPANDATA.CACHE_KEY, key)
+                    span.set_attribute(SPANDATA.CACHE_KEY, key)
 
                 item_size = None
                 if is_get_operation:
                     if value:
                         item_size = len(str(value))
-                        span.set_data(SPANDATA.CACHE_HIT, True)
+                        span.set_attribute(SPANDATA.CACHE_HIT, True)
                     else:
-                        span.set_data(SPANDATA.CACHE_HIT, False)
+                        span.set_attribute(SPANDATA.CACHE_HIT, False)
                 else:  # TODO: We don't handle `get_or_set` which we should
                     arg_count = len(args)
                     if arg_count >= 2:
@@ -86,7 +86,7 @@ def _patch_cache_method(cache, method_name, address, port):
                         item_size = len(str(args[0]))
 
                 if item_size is not None:
-                    span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
+                    span.set_attribute(SPANDATA.CACHE_ITEM_SIZE, item_size)
 
             return value
 

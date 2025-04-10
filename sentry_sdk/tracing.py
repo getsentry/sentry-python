@@ -139,7 +139,7 @@ class NoOpSpan:
         return "<%s>" % self.__class__.__name__
 
     @property
-    def containing_transaction(self):
+    def root_span(self):
         # type: () -> Optional[Span]
         return None
 
@@ -239,14 +239,9 @@ class Span:
         only_if_parent=False,  # type: bool
         parent_span=None,  # type: Optional[Span]
         otel_span=None,  # type: Optional[OtelSpan]
-        **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
         """
-        For backwards compatibility with old the old Span interface, this class
-        accepts arbitrary keyword arguments, in addition to the ones explicitly
-        listed in the signature. These additional arguments are ignored.
-
         If otel_span is passed explicitly, just acts as a proxy.
 
         If only_if_parent is True, just return an INVALID_SPAN
@@ -284,6 +279,8 @@ class Span:
                     attributes[SentrySpanAttribute.OP] = op
                 if source is not None:
                     attributes[SentrySpanAttribute.SOURCE] = source
+                if description is not None:
+                    attributes[SentrySpanAttribute.DESCRIPTION] = description
                 if sampled is not None:
                     attributes[SentrySpanAttribute.CUSTOM_SAMPLED] = sampled
 
@@ -387,22 +384,6 @@ class Span:
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         self.set_attribute(SentrySpanAttribute.ORIGIN, value)
-
-    @property
-    def containing_transaction(self):
-        # type: () -> Optional[Span]
-        """
-        Get the transaction this span is a child of.
-
-        .. deprecated:: 3.0.0
-            This will be removed in the future. Use :func:`root_span` instead.
-        """
-        warnings.warn(
-            "Deprecated: This will be removed in the future. Use root_span instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.root_span
 
     @property
     def root_span(self):
@@ -543,7 +524,7 @@ class Span:
 
     def start_child(self, **kwargs):
         # type: (**Any) -> Span
-        return Span(sampled=self.sampled, parent_span=self, **kwargs)
+        return Span(parent_span=self, **kwargs)
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
@@ -599,6 +580,12 @@ class Span:
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
+        warnings.warn(
+            "`Span.set_data` is deprecated. Please use `Span.set_attribute` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # TODO-neel-potel we cannot add dicts here
         self.set_attribute(key, value)
 
@@ -665,10 +652,10 @@ class Span:
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
         if thread_id is not None:
-            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
+            self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
 
             if thread_name is not None:
-                self.set_data(SPANDATA.THREAD_NAME, thread_name)
+                self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
     def update_active_thread(self):
         # type: () -> None
@@ -677,7 +664,7 @@ class Span:
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
+        self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
         self.set_status(get_span_status_from_http_code(http_status))
 
     def is_success(self):

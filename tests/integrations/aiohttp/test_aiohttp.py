@@ -448,7 +448,10 @@ async def test_trace_from_headers_if_performance_enabled(
 async def test_trace_from_headers_if_performance_disabled(
     sentry_init, aiohttp_client, capture_events
 ):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=None,  # disable all performance monitoring
+    )
 
     async def hello(request):
         capture_message("It's a good day to try dividing by 0")
