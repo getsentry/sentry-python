@@ -110,11 +110,13 @@ def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
     scope = sentry_sdk.get_current_scope()
 
-    if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
-        scope.root_span.set_status(SPANSTATUS.ABORTED)
-        return
+    if scope.root_span is not None:
+        if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
+            scope.root_span.set_status(SPANSTATUS.ABORTED)
+            return
 
-    scope.root_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+        scope.root_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+
     event, hint = event_from_exception(
         exc_info,
         client_options=sentry_sdk.get_client().options,
@@ -135,8 +137,10 @@ def _wrap_task_execute(func):
             exc_info = sys.exc_info()
             _capture_exception(exc_info)
             reraise(*exc_info)
-        else:
-            sentry_sdk.get_current_scope().root_span.set_status(SPANSTATUS.OK)
+
+        root_span = sentry_sdk.get_current_scope().root_span
+        if root_span is not None:
+            root_span.set_status(SPANSTATUS.OK)
 
         return result
 
