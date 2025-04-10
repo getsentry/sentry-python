@@ -9,7 +9,7 @@ import sys
 import time
 from bisect import bisect_left
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone  # noqa: F401
 from importlib.metadata import metadata
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
@@ -29,12 +29,18 @@ from config import TEST_SUITE_CONFIG
 from split_tox_gh_actions.split_tox_gh_actions import GROUPS
 
 
+# Set CUTOFF this to a datetime to ignore packages older than CUTOFF
+CUTOFF = None
+# CUTOFF = datetime.now(tz=timezone.utc) - timedelta(days=365 * 5)
+
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 ENV = Environment(
     loader=FileSystemLoader(Path(__file__).resolve().parent),
     trim_blocks=True,
     lstrip_blocks=True,
 )
+
+PYPI_COOLDOWN = 0.15  # seconds to wait between requests to PyPI
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
@@ -88,27 +94,34 @@ IGNORE = {
 }
 
 
+def fetch_url(url: str) -> Optional[dict]:
+    for attempt in range(3):
+        pypi_data = requests.get(url)
+
+        if pypi_data.status_code == 200:
+            return pypi_data.json()
+
+        backoff = PYPI_COOLDOWN * 2**attempt
+        print(
+            f"{url} returned an error: {pypi_data.status_code}. Attempt {attempt + 1}/3. Waiting {backoff}s"
+        )
+        time.sleep(backoff)
+
+    return None
+
+
 @functools.cache
-def fetch_package(package: str) -> dict:
+def fetch_package(package: str) -> Optional[dict]:
     """Fetch package metadata from PyPI."""
     url = PYPI_PROJECT_URL.format(project=package)
-    pypi_data = requests.get(url)
-
-    if pypi_data.status_code != 200:
-        print(f"{package} not found")
-
-    return pypi_data.json()
+    return fetch_url(url)
 
 
 @functools.cache
-def fetch_release(package: str, version: Version) -> dict:
+def fetch_release(package: str, version: Version) -> Optional[dict]:
+    """Fetch release metadata from PyPI."""
     url = PYPI_VERSION_URL.format(project=package, version=version)
-    pypi_data = requests.get(url)
-
-    if pypi_data.status_code != 200:
-        print(f"{package} not found")
-
-    return pypi_data.json()
+    return fetch_url(url)
 
 
 def _prefilter_releases(
@@ -153,9 +166,13 @@ def _prefilter_releases(
         if meta["yanked"]:
             continue
 
-        if older_than is not None:
-            if datetime.fromisoformat(meta["upload_time_iso_8601"]) > older_than:
-                continue
+        uploaded = datetime.fromisoformat(meta["upload_time_iso_8601"])
+
+        if older_than is not None and uploaded > older_than:
+            continue
+
+        if CUTOFF is not None and uploaded < CUTOFF:
+            continue
 
         version = Version(release)
 
@@ -229,8 +246,14 @@ def get_supported_releases(
         expected_python_versions = SpecifierSet(f">={MIN_PYTHON_VERSION}")
 
     def _supports_lowest(release: Version) -> bool:
-        time.sleep(0.1)  # don't DoS PYPI
-        py_versions = determine_python_versions(fetch_release(package, release))
+        time.sleep(PYPI_COOLDOWN)  # don't DoS PYPI
+
+        pypi_data = fetch_release(package, release)
+        if pypi_data is None:
+            print("Failed to fetch necessary data from PyPI. Aborting.")
+            sys.exit(1)
+
+        py_versions = determine_python_versions(pypi_data)
         target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
         if target_python_versions:
             target_python_versions = SpecifierSet(target_python_versions)
@@ -499,7 +522,11 @@ def _add_python_versions_to_release(
     integration: str, package: str, release: Version
 ) -> None:
     release_pypi_data = fetch_release(package, release)
-    time.sleep(0.1)  # give PYPI some breathing room
+    if release_pypi_data is None:
+        print("Failed to fetch necessary data from PyPI. Aborting.")
+        sys.exit(1)
+
+    time.sleep(PYPI_COOLDOWN)  # give PYPI some breathing room
 
     target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
     if target_python_versions:
@@ -592,6 +619,9 @@ def main(fail_on_changes: bool = False) -> None:
 
             # Fetch data for the main package
             pypi_data = fetch_package(package)
+            if pypi_data is None:
+                print("Failed to fetch necessary data from PyPI. Aborting.")
+                sys.exit(1)
 
             # Get the list of all supported releases
 
