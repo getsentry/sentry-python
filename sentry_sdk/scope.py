@@ -689,8 +689,7 @@ class Scope:
 
     @property
     def root_span(self):
-        # type: () -> Any
-        # would be type: () -> Optional[Span], see https://github.com/python/mypy/issues/3004
+        # type: () -> Optional[Span]
         """Return the root span in the scope, if any."""
 
         # there is no span/transaction on the scope
