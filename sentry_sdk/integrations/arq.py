@@ -5,7 +5,7 @@ from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -36,6 +36,8 @@ if TYPE_CHECKING:
     from arq.worker import Function
 
 ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
+
+DEFAULT_TRANSACTION_NAME = "unknown arq task"
 
 
 class ArqIntegration(Integration):
@@ -76,7 +78,10 @@ def patch_enqueue_job():
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         with sentry_sdk.start_span(
-            op=OP.QUEUE_SUBMIT_ARQ, name=function, origin=ArqIntegration.origin
+            op=OP.QUEUE_SUBMIT_ARQ,
+            name=function,
+            origin=ArqIntegration.origin,
+            only_if_parent=True,
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
@@ -96,18 +101,24 @@ def patch_run_job():
 
         with sentry_sdk.isolation_scope() as scope:
             scope._name = "arq"
+            scope.set_transaction_name(
+                DEFAULT_TRANSACTION_NAME,
+                source=TransactionSource.TASK,
+            )
             scope.clear_breadcrumbs()
 
-            transaction = Transaction(
-                name="unknown arq task",
-                status="ok",
+            with sentry_sdk.start_span(
                 op=OP.QUEUE_TASK_ARQ,
-                source=TRANSACTION_SOURCE_TASK,
+                name=DEFAULT_TRANSACTION_NAME,
+                source=TransactionSource.TASK,
                 origin=ArqIntegration.origin,
-            )
+            ) as span:
+                return_value = await old_run_job(self, job_id, score)
 
-            with sentry_sdk.start_transaction(transaction):
-                return await old_run_job(self, job_id, score)
+                if span.status is None:
+                    span.set_status(SPANSTATUS.OK)
+
+                return return_value
 
     Worker.run_job = _sentry_run_job
 
@@ -199,12 +210,13 @@ def patch_create_worker():
         if isinstance(settings_cls, dict):
             if "functions" in settings_cls:
                 settings_cls["functions"] = [
-                    _get_arq_function(func) for func in settings_cls["functions"]
+                    _get_arq_function(func)
+                    for func in settings_cls.get("functions", [])
                 ]
             if "cron_jobs" in settings_cls:
                 settings_cls["cron_jobs"] = [
                     _get_arq_cron_job(cron_job)
-                    for cron_job in settings_cls["cron_jobs"]
+                    for cron_job in settings_cls.get("cron_jobs", [])
                 ]
 
         if hasattr(settings_cls, "functions"):
@@ -218,11 +230,11 @@ def patch_create_worker():
 
         if "functions" in kwargs:
             kwargs["functions"] = [
-                _get_arq_function(func) for func in kwargs["functions"]
+                _get_arq_function(func) for func in kwargs.get("functions", [])
             ]
         if "cron_jobs" in kwargs:
             kwargs["cron_jobs"] = [
-                _get_arq_cron_job(cron_job) for cron_job in kwargs["cron_jobs"]
+                _get_arq_cron_job(cron_job) for cron_job in kwargs.get("cron_jobs", [])
             ]
 
         return old_create_worker(*args, **kwargs)

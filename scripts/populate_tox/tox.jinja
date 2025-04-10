@@ -18,10 +18,10 @@ requires =
     virtualenv<20.26.3
 envlist =
     # === Common ===
-    {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common
+    {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common
 
     # === Gevent ===
-    {py3.6,py3.8,py3.10,py3.11,py3.12}-gevent
+    {py3.8,py3.10,py3.11,py3.12}-gevent
 
     # === Integrations ===
     # General format is {pythonversion}-{integrationname}-v{frameworkversion}
@@ -57,46 +57,28 @@ envlist =
     {py3.8,py3.11,py3.12}-asyncpg-latest
 
     # AWS Lambda
-    # The aws_lambda tests deploy to the real AWS and have their own
-    # matrix of Python versions to run the test lambda function in.
-    # see `lambda_runtime` fixture in tests/integrations/aws_lambda.py
-    {py3.9}-aws_lambda
+    {py3.8,py3.9,py3.11,py3.13}-aws_lambda
 
     # Beam
     {py3.7}-beam-v{2.12}
     {py3.8,py3.11}-beam-latest
 
     # Boto3
-    {py3.6,py3.7}-boto3-v{1.12}
+    {py3.7}-boto3-v{1.12}
     {py3.7,py3.11,py3.12}-boto3-v{1.23}
     {py3.11,py3.12}-boto3-v{1.34}
     {py3.11,py3.12,py3.13}-boto3-latest
 
     # Chalice
-    {py3.6,py3.9}-chalice-v{1.16}
+    {py3.7,py3.9}-chalice-v{1.16}
     {py3.8,py3.12,py3.13}-chalice-latest
 
     # Cloud Resource Context
-    {py3.6,py3.12,py3.13}-cloud_resource_context
+    {py3.7,py3.12,py3.13}-cloud_resource_context
 
     # Cohere
     {py3.9,py3.11,py3.12}-cohere-v5
     {py3.9,py3.11,py3.12}-cohere-latest
-
-    # Django
-    # - Django 1.x
-    {py3.6,py3.7}-django-v{1.11}
-    # - Django 2.x
-    {py3.6,py3.7}-django-v{2.0}
-    {py3.6,py3.9}-django-v{2.2}
-    # - Django 3.x
-    {py3.6,py3.9}-django-v{3.0}
-    {py3.6,py3.9,py3.11}-django-v{3.2}
-    # - Django 4.x
-    {py3.8,py3.11,py3.12}-django-v{4.0,4.1,4.2}
-    # - Django 5.x
-    {py3.10,py3.11,py3.12}-django-v{5.0,5.1}
-    {py3.10,py3.12,py3.13}-django-latest
 
     # FastAPI
     {py3.7,py3.10}-fastapi-v{0.79}
@@ -106,8 +88,8 @@ envlist =
     {py3.7}-gcp
 
     # HTTPX
-    {py3.6,py3.9}-httpx-v{0.16,0.18}
-    {py3.6,py3.10}-httpx-v{0.20,0.22}
+    {py3.7,py3.9}-httpx-v{0.16,0.18}
+    {py3.7,py3.10}-httpx-v{0.20,0.22}
     {py3.7,py3.11,py3.12}-httpx-v{0.23,0.24}
     {py3.9,py3.11,py3.12}-httpx-v{0.25,0.27}
     {py3.9,py3.12,py3.13}-httpx-latest
@@ -117,12 +99,6 @@ envlist =
     {py3.9,py3.11,py3.12}-langchain-v0.3
     {py3.9,py3.11,py3.12}-langchain-latest
     {py3.9,py3.11,py3.12}-langchain-notiktoken
-
-    # Litestar
-    {py3.8,py3.11}-litestar-v{2.0}
-    {py3.8,py3.11,py3.12}-litestar-v{2.6}
-    {py3.8,py3.11,py3.12}-litestar-v{2.12}
-    {py3.8,py3.11,py3.12}-litestar-latest
 
     # OpenAI
     {py3.9,py3.11,py3.12}-openai-v1.0
@@ -138,7 +114,7 @@ envlist =
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-potel
 
     # pure_eval
-    {py3.6,py3.12,py3.13}-pure_eval
+    {py3.7,py3.12,py3.13}-pure_eval
 
     # Quart
     {py3.7,py3.11}-quart-v{0.16}
@@ -150,24 +126,23 @@ envlist =
     {py3.10,py3.11}-ray-latest
 
     # Redis
-    {py3.6,py3.8}-redis-v{3}
+    {py3.7,py3.8}-redis-v{3}
     {py3.7,py3.8,py3.11}-redis-v{4}
     {py3.7,py3.11,py3.12}-redis-v{5}
     {py3.7,py3.12,py3.13}-redis-latest
 
     # Requests
-    {py3.6,py3.8,py3.12,py3.13}-requests
+    {py3.7,py3.8,py3.12,py3.13}-requests
 
     # RQ (Redis Queue)
-    {py3.6}-rq-v{0.6}
-    {py3.6,py3.9}-rq-v{0.13,1.0}
-    {py3.6,py3.11}-rq-v{1.5,1.10}
+    {py3.7,py3.9}-rq-v{0.13,1.0}
+    {py3.7,py3.11}-rq-v{1.5,1.10}
     {py3.7,py3.11,py3.12}-rq-v{1.15,1.16}
     {py3.7,py3.12,py3.13}-rq-latest
 
     # Sanic
-    {py3.6,py3.7}-sanic-v{0.8}
-    {py3.6,py3.8}-sanic-v{20}
+    {py3.7}-sanic-v{0.8}
+    {py3.8}-sanic-v{20}
     {py3.8,py3.11,py3.12}-sanic-v{24.6}
     {py3.9,py3.12,py3.13}-sanic-latest
 
@@ -202,16 +177,16 @@ deps =
     # See https://github.com/pytest-dev/pytest/issues/9621
     # and https://github.com/pytest-dev/pytest-forked/issues/67
     # for justification of the upper bound on pytest
-    {py3.6,py3.7}-common: pytest<7.0.0
+    py3.7-common: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common: pytest
 
     # === Gevent ===
-    {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11}-gevent: gevent>=22.10.0, <22.11.0
+    {py3.7,py3.8,py3.9,py3.10,py3.11}-gevent: gevent>=22.10.0, <22.11.0
     {py3.12}-gevent: gevent
     # See https://github.com/pytest-dev/pytest/issues/9621
     # and https://github.com/pytest-dev/pytest-forked/issues/67
     # for justification of the upper bound on pytest
-    {py3.6,py3.7}-gevent: pytest<7.0.0
+    py3.7-gevent: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
 
     # === Integrations ===
@@ -250,7 +225,12 @@ deps =
     asyncpg: pytest-asyncio
 
     # AWS Lambda
+    aws_lambda: aws-cdk-lib
+    aws_lambda: aws-sam-cli
     aws_lambda: boto3
+    aws_lambda: fastapi
+    aws_lambda: requests
+    aws_lambda: uvicorn
 
     # Beam
     beam-v2.12: apache-beam~=2.12.0
@@ -270,35 +250,6 @@ deps =
     # Cohere
     cohere-v5: cohere~=5.3.3
     cohere-latest: cohere
-
-    # Django
-    django: psycopg2-binary
-    django-v{1.11,2.0,2.1,2.2,3.0,3.1,3.2}: djangorestframework>=3.0.0,<4.0.0
-    django-v{2.0,2.2,3.0,3.2,4.0,4.1,4.2,5.0,5.1}: channels[daphne]
-    django-v{2.2,3.0}: six
-    django-v{1.11,2.0,2.2,3.0,3.2}: Werkzeug<2.1.0
-    django-v{1.11,2.0,2.2,3.0}: pytest-django<4.0
-    django-v{3.2,4.0,4.1,4.2,5.0,5.1}: pytest-django
-    django-v{4.0,4.1,4.2,5.0,5.1}: djangorestframework
-    django-v{4.0,4.1,4.2,5.0,5.1}: pytest-asyncio
-    django-v{4.0,4.1,4.2,5.0,5.1}: Werkzeug
-    django-latest: djangorestframework
-    django-latest: pytest-asyncio
-    django-latest: pytest-django
-    django-latest: Werkzeug
-    django-latest: channels[daphne]
-
-    django-v1.11: Django~=1.11.0
-    django-v2.0: Django~=2.0.0
-    django-v2.2: Django~=2.2.0
-    django-v3.0: Django~=3.0.0
-    django-v3.2: Django~=3.2.0
-    django-v4.0: Django~=4.0.0
-    django-v4.1: Django~=4.1.0
-    django-v4.2: Django~=4.2.0
-    django-v5.0: Django~=5.0.0
-    django-v5.1: Django==5.1rc1
-    django-latest: Django
 
     # FastAPI
     fastapi: httpx
@@ -345,17 +296,6 @@ deps =
     langchain-{latest,notiktoken}: openai>=1.6.1
     langchain-latest: tiktoken~=0.6.0
 
-    # Litestar
-    litestar: pytest-asyncio
-    litestar: python-multipart
-    litestar: requests
-    litestar: cryptography
-    litestar-v{2.0,2.6}: httpx<0.28
-    litestar-v2.0: litestar~=2.0.0
-    litestar-v2.6: litestar~=2.6.0
-    litestar-v2.12: litestar~=2.12.0
-    litestar-latest: litestar
-
     # OpenAI
     openai: pytest-asyncio
     openai-v1.0: openai~=1.0.0
@@ -382,6 +322,7 @@ deps =
     # Quart
     quart: quart-auth
     quart: pytest-asyncio
+    quart-{v0.19,latest}: quart-flask-patch
     quart-v0.16: blinker<1.6
     quart-v0.16: jinja2<3.1.0
     quart-v0.16: Werkzeug<2.1.0
@@ -399,7 +340,7 @@ deps =
     # Redis
     redis: fakeredis!=1.7.4
     redis: pytest<8.0.0
-    {py3.6,py3.7}-redis: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    py3.7-redis: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
     {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-redis: pytest-asyncio
     redis-v3: redis~=3.0
     redis-v4: redis~=4.0
@@ -411,13 +352,11 @@ deps =
 
     # RQ (Redis Queue)
     # https://github.com/jamesls/fakeredis/issues/245
-    rq-v{0.6}: fakeredis<1.0
-    rq-v{0.6}: redis<3.2.2
     rq-v{0.13,1.0,1.5,1.10}: fakeredis>=1.0,<1.7.4
-    rq-v{1.15,1.16}: fakeredis
-    {py3.6,py3.7}-rq-v{1.15,1.16}: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
-    rq-latest: fakeredis
-    {py3.6,py3.7}-rq-latest: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    rq-v{1.15,1.16}: fakeredis<2.28.0
+    py3.7-rq-v{1.15,1.16}: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    rq-latest: fakeredis<2.28.0
+    py3.7-rq-latest: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
     rq-v0.6: rq~=0.6.0
     rq-v0.13: rq~=0.13.0
     rq-v1.0: rq~=1.0.0
@@ -432,7 +371,6 @@ deps =
     sanic: aiohttp
     sanic-v{24.6}: sanic_testing
     sanic-latest: sanic_testing
-    {py3.6}-sanic: aiocontextvars==0.2.1
     sanic-v0.8: sanic~=0.8.0
     sanic-v20: sanic~=20.0
     sanic-v24.6: sanic~=24.6.0
@@ -464,9 +402,9 @@ setenv =
     PYTHONDONTWRITEBYTECODE=1
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     COVERAGE_FILE=.coverage-sentry-{envname}
-    py3.6: COVERAGE_RCFILE=.coveragerc36
 
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
+    py3.12-django: PIP_CONSTRAINT=constraints.txt
 
     common: TESTPATH=tests
     gevent: TESTPATH=tests
@@ -528,8 +466,6 @@ setenv =
     socket: TESTPATH=tests/integrations/socket
 
 passenv =
-    SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID
-    SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY
     SENTRY_PYTHON_TEST_POSTGRES_HOST
     SENTRY_PYTHON_TEST_POSTGRES_USER
     SENTRY_PYTHON_TEST_POSTGRES_PASSWORD
@@ -544,7 +480,6 @@ extras =
     pymongo: pymongo
 
 basepython =
-    py3.6: python3.6
     py3.7: python3.7
     py3.8: python3.8
     py3.9: python3.9

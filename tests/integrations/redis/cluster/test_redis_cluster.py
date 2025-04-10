@@ -1,7 +1,7 @@
 import pytest
-from sentry_sdk import capture_message
+
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.api import start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
 
@@ -27,7 +27,7 @@ def test_rediscluster_breadcrumb(sentry_init, capture_events):
 
     rc = redis.RedisCluster(host="localhost", port=6379)
     rc.get("foobar")
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
     (event,) = events
     crumbs = event["breadcrumbs"]["values"]
@@ -68,7 +68,7 @@ def test_rediscluster_basic(sentry_init, capture_events, send_default_pii, descr
     )
     events = capture_events()
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         rc = redis.RedisCluster(host="localhost", port=6379)
         rc.set("bar", 1)
 
@@ -117,7 +117,7 @@ def test_rediscluster_pipeline(
     events = capture_events()
 
     rc = redis.RedisCluster(host="localhost", port=6379)
-    with start_transaction():
+    with sentry_sdk.start_span():
         pipeline = rc.pipeline()
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -128,12 +128,10 @@ def test_rediscluster_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
+    assert span["data"]["redis.commands.count"] == 3
+    assert span["data"]["redis.commands.first_ten"] == expected_first_ten
     assert span["data"] == ApproxDict(
         {
-            "redis.commands": {
-                "count": 3,
-                "first_ten": expected_first_ten,
-            },
             SPANDATA.DB_SYSTEM: "redis",
             # ClusterNode converts localhost to 127.0.0.1
             SPANDATA.SERVER_ADDRESS: "127.0.0.1",
@@ -154,7 +152,7 @@ def test_rediscluster_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     rc = redis.RedisCluster(host="localhost", port=6379)
-    with start_transaction(name="custom_transaction"):
+    with sentry_sdk.start_span(name="custom_transaction"):
         # default case
         rc.set("somekey", "somevalue")
 

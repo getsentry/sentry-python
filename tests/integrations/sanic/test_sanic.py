@@ -10,7 +10,7 @@ import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import TransactionSource
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
 from sanic.response import HTTPResponse
@@ -346,8 +346,9 @@ class TransactionTestConfig:
         expected_status,
         expected_transaction_name,
         expected_source=None,
+        has_transaction_event=True,
     ):
-        # type: (Iterable[Optional[Container[int]]], str, int, Optional[str], Optional[str]) -> None
+        # type: (Iterable[Optional[Container[int]]], str, int, Optional[str], Optional[str], bool) -> None
         """
         expected_transaction_name of None indicates we expect to not receive a transaction
         """
@@ -356,6 +357,7 @@ class TransactionTestConfig:
         self.expected_status = expected_status
         self.expected_transaction_name = expected_transaction_name
         self.expected_source = expected_source
+        self.has_transaction_event = has_transaction_event
 
 
 @pytest.mark.skipif(
@@ -370,7 +372,7 @@ class TransactionTestConfig:
             url="/message",
             expected_status=200,
             expected_transaction_name="hi",
-            expected_source=TRANSACTION_SOURCE_COMPONENT,
+            expected_source=TransactionSource.COMPONENT,
         ),
         TransactionTestConfig(
             # Transaction still recorded when we have an internal server error
@@ -378,7 +380,7 @@ class TransactionTestConfig:
             url="/500",
             expected_status=500,
             expected_transaction_name="fivehundred",
-            expected_source=TRANSACTION_SOURCE_COMPONENT,
+            expected_source=TransactionSource.COMPONENT,
         ),
         TransactionTestConfig(
             # By default, no transaction when we have a 404 error
@@ -386,6 +388,7 @@ class TransactionTestConfig:
             url="/404",
             expected_status=404,
             expected_transaction_name=None,
+            has_transaction_event=False,
         ),
         TransactionTestConfig(
             # With no ignored HTTP statuses, we should get transactions for 404 errors
@@ -393,7 +396,7 @@ class TransactionTestConfig:
             url="/404",
             expected_status=404,
             expected_transaction_name="/404",
-            expected_source=TRANSACTION_SOURCE_URL,
+            expected_source=TransactionSource.URL,
         ),
         TransactionTestConfig(
             # Transaction can be suppressed for other HTTP statuses, too, by passing config to the integration
@@ -401,6 +404,7 @@ class TransactionTestConfig:
             url="/message",
             expected_status=200,
             expected_transaction_name=None,
+            has_transaction_event=False,
         ),
     ],
 )
@@ -430,9 +434,7 @@ def test_transactions(test_config, sentry_init, app, capture_events):
     (transaction_event, *_) = [*transaction_events, None]
 
     # We should have no transaction event if and only if we expect no transactions
-    assert (transaction_event is None) == (
-        test_config.expected_transaction_name is None
-    )
+    assert bool(transaction_event) == test_config.has_transaction_event
 
     # If a transaction was expected, ensure it is correct
     assert (

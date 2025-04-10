@@ -30,6 +30,17 @@ class AnnotatedValue:
 
         return self.value == other.value and self.metadata == other.metadata
 
+    def __str__(self):
+        # type: (AnnotatedValue) -> str
+        return str({"value": str(self.value), "metadata": str(self.metadata)})
+
+    def __len__(self):
+        # type: (AnnotatedValue) -> int
+        if self.value is not None:
+            return len(self.value)
+        else:
+            return 0
+
     @classmethod
     def removed_because_raw_data(cls):
         # type: () -> AnnotatedValue
@@ -47,11 +58,14 @@ class AnnotatedValue:
         )
 
     @classmethod
-    def removed_because_over_size_limit(cls):
-        # type: () -> AnnotatedValue
-        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
+    def removed_because_over_size_limit(cls, value=""):
+        # type: (Any) -> AnnotatedValue
+        """
+        The actual value was removed because the size of the field exceeded the configured maximum size,
+        for example specified with the max_request_body_size sdk option.
+        """
         return AnnotatedValue(
-            value="",
+            value=value,
             metadata={
                 "rem": [  # Remark
                     [
@@ -95,7 +109,6 @@ if TYPE_CHECKING:
     from typing import Mapping
     from typing import NotRequired
     from typing import Optional
-    from typing import Tuple
     from typing import Type
     from typing_extensions import Literal, TypedDict
 
@@ -149,8 +162,8 @@ if TYPE_CHECKING:
     Event = TypedDict(
         "Event",
         {
-            "breadcrumbs": dict[
-                Literal["values"], list[dict[str, Any]]
+            "breadcrumbs": Annotated[
+                dict[Literal["values"], list[dict[str, Any]]]
             ],  # TODO: We can expand on this type
             "check_in_id": str,
             "contexts": dict[str, dict[str, object]],
@@ -196,7 +209,6 @@ if TYPE_CHECKING:
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
             "_dropped_spans": int,
-            "_metrics_summary": dict[str, object],
         },
         total=False,
     )
@@ -207,6 +219,17 @@ if TYPE_CHECKING:
     ]
 
     Hint = Dict[str, Any]
+    Log = TypedDict(
+        "Log",
+        {
+            "severity_text": str,
+            "severity_number": int,
+            "body": str,
+            "attributes": dict[str, str | bool | float | int],
+            "time_unix_nano": int,
+            "trace_id": Optional[str],
+        },
+    )
 
     Breadcrumb = Dict[str, Any]
     BreadcrumbHint = Dict[str, Any]
@@ -217,6 +240,7 @@ if TYPE_CHECKING:
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
     TransactionProcessor = Callable[[Event, Hint], Optional[Event]]
+    LogProcessor = Callable[[Log, Hint], Optional[Log]]
 
     TracesSampler = Callable[[SamplingContext], Union[float, int, bool]]
 
@@ -234,34 +258,14 @@ if TYPE_CHECKING:
         "internal",
         "profile",
         "profile_chunk",
-        "metric_bucket",
         "monitor",
         "span",
+        "log",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
     ContinuousProfilerMode = Literal["thread", "gevent", "unknown"]
     ProfilerMode = Union[ContinuousProfilerMode, Literal["sleep"]]
-
-    # Type of the metric.
-    MetricType = Literal["d", "s", "g", "c"]
-
-    # Value of the metric.
-    MetricValue = Union[int, float, str]
-
-    # Internal representation of tags as a tuple of tuples (this is done in order to allow for the same key to exist
-    # multiple times).
-    MetricTagsInternal = Tuple[Tuple[str, str], ...]
-
-    # External representation of tags as a dictionary.
-    MetricTagValue = Union[str, int, float, None]
-    MetricTags = Mapping[str, MetricTagValue]
-
-    # Value inside the generator for the metric value.
-    FlushedMetricValue = Union[int, float]
-
-    BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
-    MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]
 
     MonitorConfigScheduleType = Literal["crontab", "interval"]
     MonitorConfigScheduleUnit = Literal[
@@ -298,3 +302,5 @@ if TYPE_CHECKING:
     )
 
     HttpStatusCodeRange = Union[int, Container[int]]
+
+    OtelExtractedSpanData = tuple[str, str, Optional[str], Optional[int], Optional[str]]

@@ -1,3 +1,4 @@
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,
@@ -14,6 +15,47 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Optional, Sequence
     from sentry_sdk.tracing import Span
+
+
+TAG_KEYS = [
+    "redis.command",
+    "redis.is_cluster",
+    "redis.key",
+    "redis.transaction",
+    SPANDATA.DB_OPERATION,
+]
+
+
+def _update_span(span, *data_bags):
+    # type: (Span, *dict[str, Any]) -> None
+    """
+    Set tags and data on the given span to data from the given data bags.
+    """
+    for data in data_bags:
+        for key, value in data.items():
+            if key in TAG_KEYS:
+                span.set_tag(key, value)
+            else:
+                span.set_attribute(key, value)
+
+
+def _create_breadcrumb(message, *data_bags):
+    # type: (str, *dict[str, Any]) -> None
+    """
+    Create a breadcrumb containing the tags data from the given data bags.
+    """
+    data = {}
+    for data in data_bags:
+        for key, value in data.items():
+            if key in TAG_KEYS:
+                data[key] = value
+
+    sentry_sdk.add_breadcrumb(
+        message=message,
+        type="redis",
+        category="redis",
+        data=data,
+    )
 
 
 def _get_safe_command(name, args):
@@ -105,12 +147,12 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
-def _set_pipeline_data(
-    span, is_cluster, get_command_args_fn, is_transaction, command_stack
-):
-    # type: (Span, bool, Any, bool, Sequence[Any]) -> None
-    span.set_tag("redis.is_cluster", is_cluster)
-    span.set_tag("redis.transaction", is_transaction)
+def _get_pipeline_data(is_cluster, get_command_args_fn, is_transaction, command_stack):
+    # type: (bool, Any, bool, Sequence[Any]) -> dict[str, Any]
+    data = {
+        "redis.is_cluster": is_cluster,
+        "redis.transaction": is_transaction,
+    }  # type: dict[str, Any]
 
     commands = []
     for i, arg in enumerate(command_stack):
@@ -120,25 +162,27 @@ def _set_pipeline_data(
         command = get_command_args_fn(arg)
         commands.append(_get_safe_command(command[0], command[1:]))
 
-    span.set_data(
-        "redis.commands",
-        {
-            "count": len(command_stack),
-            "first_ten": commands,
-        },
-    )
+    data["redis.commands.count"] = len(command_stack)
+    data["redis.commands.first_ten"] = commands
+
+    return data
 
 
-def _set_client_data(span, is_cluster, name, *args):
-    # type: (Span, bool, str, *Any) -> None
-    span.set_tag("redis.is_cluster", is_cluster)
+def _get_client_data(is_cluster, name, *args):
+    # type: (bool, str, *Any) -> dict[str, Any]
+    data = {
+        "redis.is_cluster": is_cluster,
+    }  # type: dict[str, Any]
+
     if name:
-        span.set_tag("redis.command", name)
-        span.set_tag(SPANDATA.DB_OPERATION, name)
+        data["redis.command"] = name
+        data[SPANDATA.DB_OPERATION] = name
 
     if name and args:
         name_low = name.lower()
         if (name_low in _SINGLE_KEY_COMMANDS) or (
             name_low in _MULTI_KEY_COMMANDS and len(args) == 1
         ):
-            span.set_tag("redis.key", args[0])
+            data["redis.key"] = args[0]
+
+    return data

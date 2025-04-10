@@ -11,12 +11,22 @@ from sentry_sdk import (
 )
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import (
-    Scope,
+    Scope as BaseScope,
     ScopeType,
-    use_isolation_scope,
-    use_scope,
     should_send_default_pii,
 )
+from sentry_sdk.integrations.opentelemetry.scope import (
+    PotelScope as Scope,
+    use_scope,
+    use_isolation_scope,
+    setup_scope_context_management,
+)
+from tests.conftest import ApproxDict
+
+
+@pytest.fixture(autouse=True)
+def setup_otel_scope_management():
+    setup_scope_context_management()
 
 
 def test_copying():
@@ -230,7 +240,7 @@ def test_get_isolation_scope():
 def test_get_global_scope():
     scope = Scope.get_global_scope()
     assert scope is not None
-    assert scope.__class__ == Scope
+    assert scope.__class__ == BaseScope
     assert scope._type == ScopeType.GLOBAL
 
 
@@ -797,7 +807,7 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
         with sentry_sdk.new_scope() as scope2:
             scope2.set_tag("current_scope2", 1)
 
-            with sentry_sdk.start_transaction(name="trx") as trx:
+            with sentry_sdk.start_span(name="trx") as trx:
                 trx.set_tag("trx", 1)
 
                 with sentry_sdk.start_span(op="span1") as span1:
@@ -813,8 +823,8 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
     transaction = envelope.items[0].get_transaction_event()
 
     assert transaction["tags"] == {"isolation_scope1": 1, "current_scope2": 1, "trx": 1}
-    assert transaction["spans"][0]["tags"] == {"a": 1}
-    assert transaction["spans"][1]["tags"] == {"b": 1}
+    assert transaction["spans"][0]["tags"] == ApproxDict({"a": 1})
+    assert transaction["spans"][1]["tags"] == ApproxDict({"b": 1})
 
 
 def test_should_send_default_pii_true(sentry_init):
@@ -874,7 +884,7 @@ def test_set_tags():
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
@@ -884,18 +894,18 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
-    with sentry_sdk.start_transaction(name="test"):
+    with sentry_sdk.start_span(name="test"):
         pass
 
     assert Scope.last_event_id() is None, "Transaction should not set last_event_id"
 
 
 def test_last_event_id_cleared(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     # Make sure last_event_id is set
     sentry_sdk.capture_exception(Exception("test"))

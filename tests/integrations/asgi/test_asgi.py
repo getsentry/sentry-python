@@ -3,6 +3,7 @@ from collections import Counter
 import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.integrations._asgi_common import _get_ip, _get_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 
@@ -129,7 +130,9 @@ def asgi3_ws_app():
 @pytest.fixture
 def asgi3_custom_transaction_app():
     async def app(scope, receive, send):
-        sentry_sdk.get_current_scope().set_transaction_name("foobar", source="custom")
+        sentry_sdk.get_current_scope().set_transaction_name(
+            "foobar", source=TransactionSource.CUSTOM
+        )
         await send(
             {
                 "type": "http.response.start",
@@ -266,7 +269,9 @@ async def test_has_trace_if_performance_disabled(
     asgi3_app_with_error_and_msg,
     capture_events,
 ):
-    sentry_init()
+    sentry_init(
+        traces_sample_rate=None,  # disable all performance monitoring
+    )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
     with pytest.raises(ZeroDivisionError):
@@ -322,7 +327,9 @@ async def test_trace_from_headers_if_performance_disabled(
     asgi3_app_with_error_and_msg,
     capture_events,
 ):
-    sentry_init()
+    sentry_init(
+        traces_sample_rate=None,  # disable all performance monitoring
+    )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -720,3 +727,26 @@ async def test_custom_transaction_name(
     assert transaction_event["type"] == "transaction"
     assert transaction_event["transaction"] == "foobar"
     assert transaction_event["transaction_info"] == {"source": "custom"}
+
+
+@pytest.mark.asyncio
+async def test_asgi_scope_in_traces_sampler(sentry_init, asgi3_app):
+    def dummy_traces_sampler(sampling_context):
+        assert sampling_context["url.path"] == "/test"
+        assert sampling_context["url.scheme"] == "http"
+        assert sampling_context["url.query"] == "hello=there"
+        assert sampling_context["url.full"] == "/test?hello=there"
+        assert sampling_context["http.request.method"] == "GET"
+        assert sampling_context["network.protocol.version"] == "1.1"
+        assert sampling_context["network.protocol.name"] == "http"
+        assert sampling_context["http.request.header.custom-header"] == "Custom Value"
+
+    sentry_init(
+        traces_sampler=dummy_traces_sampler,
+        traces_sample_rate=1.0,
+    )
+
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    async with TestClient(app) as client:
+        await client.get("/test?hello=there", headers={"Custom-Header": "Custom Value"})

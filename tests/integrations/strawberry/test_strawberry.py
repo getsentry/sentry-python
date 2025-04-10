@@ -204,7 +204,9 @@ def test_capture_request_if_available_and_send_pii_is_on(
 
     (error_event,) = events
 
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
+    assert len(error_event["exception"]["values"]) == 2
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
     assert error_event["request"]["data"] == {
         "query": query,
@@ -258,7 +260,10 @@ def test_do_not_capture_request_if_send_pii_is_off(
     assert len(events) == 1
 
     (error_event,) = events
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
+
+    assert len(error_event["exception"]["values"]) == 2
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
     assert "response" not in error_event["contexts"]
 
@@ -505,7 +510,7 @@ def test_transaction_no_operation_name(
     query_span = query_spans[0]
     assert query_span["description"] == "query"
     assert query_span["data"]["graphql.operation.type"] == "query"
-    assert query_span["data"]["graphql.operation.name"] is None
+    assert "graphql.operation.name" not in query_span["data"]
     assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
 
@@ -582,7 +587,7 @@ def test_transaction_mutation(
     query_span = query_spans[0]
     assert query_span["description"] == "mutation"
     assert query_span["data"]["graphql.operation.type"] == "mutation"
-    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.operation.name"] == "Change"
     assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
 

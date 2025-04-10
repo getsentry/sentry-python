@@ -4,6 +4,7 @@
 *.db
 *.pid
 .python-version
+.tool-versions
 .coverage
 .coverage-sentry*
 coverage.xml
@@ -28,3 +29,6 @@ relay
 pip-wheel-metadata
 .mypy_cache
 .vscode/
+
+# for running AWS Lambda tests using AWS SAM
+sam.template.yaml

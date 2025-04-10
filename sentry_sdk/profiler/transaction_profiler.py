@@ -33,7 +33,6 @@ import sys
 import threading
 import time
 import uuid
-import warnings
 from abc import ABC, abstractmethod
 from collections import deque
 
@@ -49,7 +48,6 @@ from sentry_sdk.utils import (
     is_gevent,
     is_valid_sample_rate,
     logger,
-    nanosecond_time,
     set_in_app_in_frames,
 )
 
@@ -127,16 +125,6 @@ def has_profiling_enabled(options):
     if profiles_sample_rate is not None and profiles_sample_rate > 0:
         return True
 
-    profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-    if profiles_sample_rate is not None:
-        logger.warning(
-            "_experiments['profiles_sample_rate'] is deprecated. "
-            "Please use the non-experimental profiles_sample_rate option "
-            "directly."
-        )
-        if profiles_sample_rate > 0:
-            return True
-
     return False
 
 
@@ -159,16 +147,9 @@ def setup_profiler(options):
     else:
         default_profiler_mode = ThreadScheduler.mode
 
+    profiler_mode = default_profiler_mode
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
-    else:
-        profiler_mode = options.get("_experiments", {}).get("profiler_mode")
-        if profiler_mode is not None:
-            logger.warning(
-                "_experiments['profiler_mode'] is deprecated. Please use the "
-                "non-experimental profiler_mode option directly."
-            )
-        profiler_mode = profiler_mode or default_profiler_mode
 
     if (
         profiler_mode == ThreadScheduler.mode
@@ -210,7 +191,6 @@ class Profile:
         self,
         sampled,  # type: Optional[bool]
         start_ns,  # type: int
-        hub=None,  # type: Optional[sentry_sdk.Hub]
         scheduler=None,  # type: Optional[Scheduler]
     ):
         # type: (...) -> None
@@ -240,16 +220,6 @@ class Profile:
         self.samples = []  # type: List[ProcessedSample]
 
         self.unique_samples = 0
-
-        # Backwards compatibility with the old hub property
-        self._hub = None  # type: Optional[sentry_sdk.Hub]
-        if hub is not None:
-            self._hub = hub
-            warnings.warn(
-                "The `hub` parameter is deprecated. Please do not use it.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
     def update_active_thread_id(self):
         # type: () -> None
@@ -296,12 +266,11 @@ class Profile:
 
         options = client.options
 
+        sample_rate = None
         if callable(options.get("profiles_sampler")):
             sample_rate = options["profiles_sampler"](sampling_context)
         elif options["profiles_sample_rate"] is not None:
             sample_rate = options["profiles_sample_rate"]
-        else:
-            sample_rate = options["_experiments"].get("profiles_sample_rate")
 
         # The profiles_sample_rate option was not set, so profiling
         # was never enabled.
@@ -342,7 +311,7 @@ class Profile:
         logger.debug("[Profiling] Starting profile")
         self.active = True
         if not self.start_ns:
-            self.start_ns = nanosecond_time()
+            self.start_ns = time.perf_counter_ns()
         self.scheduler.start_profiling(self)
 
     def stop(self):
@@ -353,7 +322,7 @@ class Profile:
         assert self.scheduler, "No scheduler specified"
         logger.debug("[Profiling] Stopping profile")
         self.active = False
-        self.stop_ns = nanosecond_time()
+        self.stop_ns = time.perf_counter_ns()
 
     def __enter__(self):
         # type: () -> Profile
@@ -517,26 +486,6 @@ class Profile:
 
         return True
 
-    @property
-    def hub(self):
-        # type: () -> Optional[sentry_sdk.Hub]
-        warnings.warn(
-            "The `hub` attribute is deprecated. Please do not access it.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self._hub
-
-    @hub.setter
-    def hub(self, value):
-        # type: (Optional[sentry_sdk.Hub]) -> None
-        warnings.warn(
-            "The `hub` attribute is deprecated. Please do not set it.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._hub = value
-
 
 class Scheduler(ABC):
     mode = "unknown"  # type: ProfilerMode
@@ -612,7 +561,7 @@ class Scheduler(ABC):
             # were started after this point.
             new_profiles = len(self.new_profiles)
 
-            now = nanosecond_time()
+            now = time.perf_counter_ns()
 
             try:
                 sample = [

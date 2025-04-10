@@ -2,14 +2,14 @@ import sys
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
+from sentry_sdk.api import get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    TRANSACTION_SOURCE_TASK,
+    TransactionSource,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -61,6 +61,7 @@ def patch_enqueue():
             op=OP.QUEUE_SUBMIT_HUEY,
             name=task.name,
             origin=HueyIntegration.origin,
+            only_if_parent=True,
         ):
             if not isinstance(task, PeriodicTask):
                 # Attach trace propagation data to task kwargs. We do
@@ -134,6 +135,8 @@ def _wrap_task_execute(func):
             exc_info = sys.exc_info()
             _capture_exception(exc_info)
             reraise(*exc_info)
+        else:
+            sentry_sdk.get_current_scope().transaction.set_status(SPANSTATUS.OK)
 
         return result
 
@@ -153,22 +156,18 @@ def patch_execute():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(task))
 
-            sentry_headers = task.kwargs.pop("sentry_headers", None)
-
-            transaction = continue_trace(
-                sentry_headers or {},
-                name=task.name,
-                op=OP.QUEUE_TASK_HUEY,
-                source=TRANSACTION_SOURCE_TASK,
-                origin=HueyIntegration.origin,
-            )
-            transaction.set_status(SPANSTATUS.OK)
-
             if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)
                 task._sentry_is_patched = True
 
-            with sentry_sdk.start_transaction(transaction):
-                return old_execute(self, task, timestamp)
+            sentry_headers = task.kwargs.pop("sentry_headers", {})
+            with sentry_sdk.continue_trace(sentry_headers):
+                with sentry_sdk.start_span(
+                    name=task.name,
+                    op=OP.QUEUE_TASK_HUEY,
+                    source=TransactionSource.TASK,
+                    origin=HueyIntegration.origin,
+                ):
+                    return old_execute(self, task, timestamp)
 
     Huey._execute = _sentry_execute

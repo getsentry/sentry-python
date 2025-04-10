@@ -1,8 +1,8 @@
 import functools
 
 from django.template import TemplateSyntaxError
+from django.template.base import Origin
 from django.utils.safestring import mark_safe
-from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -16,13 +16,6 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Iterator
     from typing import Tuple
-
-try:
-    # support Django 1.9
-    from django.template.base import Origin
-except ImportError:
-    # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin
 
 
 def get_template_frame_from_exception(exc_value):
@@ -72,14 +65,15 @@ def patch_templates():
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(self.template_name),
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data("context", self.context_data)
+            if isinstance(self.context_data, dict):
+                for k, v in self.context_data.items():
+                    span.set_attribute(f"context.{k}", v)
             return real_rendered_content.fget(self)
 
     SimpleTemplateResponse.rendered_content = rendered_content
 
-    if DJANGO_VERSION < (1, 7):
-        return
     import django.shortcuts
 
     real_render = django.shortcuts.render
@@ -100,8 +94,10 @@ def patch_templates():
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(template_name),
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data("context", context)
+            for k, v in context.items():
+                span.set_attribute(f"context.{k}", v)
             return real_render(request, template_name, context, *args, **kwargs)
 
     django.shortcuts.render = render

@@ -5,9 +5,11 @@ from unittest import mock
 import pytest
 from celery import Celery, VERSION
 from celery.bin import worker
+from celery.app.task import Task
+from opentelemetry import trace as otel_trace, context
 
 import sentry_sdk
-from sentry_sdk import start_transaction, get_current_span
+from sentry_sdk import get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
@@ -126,14 +128,14 @@ def test_simple_with_performance(capture_events, init_celery, celery_invocation)
         foo = 42  # noqa
         return x / y
 
-    with start_transaction(op="unit test transaction") as transaction:
+    with sentry_sdk.start_span(op="unit test transaction") as root_span:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
     (_, error_event, _, _) = events
 
-    assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert error_event["contexts"]["trace"]["span_id"] != transaction.span_id
+    assert error_event["contexts"]["trace"]["trace_id"] == root_span.trace_id
+    assert error_event["contexts"]["trace"]["span_id"] != root_span.span_id
     assert error_event["transaction"] == "dummy_task"
     assert "celery_task_id" in error_event["tags"]
     assert error_event["extra"]["celery-job"] == dict(
@@ -190,17 +192,14 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     def dummy_task(x, y):
         return x / y
 
-    # XXX: For some reason the first call does not get instrumented properly.
-    celery_invocation(dummy_task, 1, 1)
-
     events = capture_events()
 
-    with start_transaction(name="submission") as transaction:
+    with sentry_sdk.start_span(name="submission") as root_span:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     if task_fails:
         error_event = events.pop(0)
-        assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert error_event["contexts"]["trace"]["trace_id"] == root_span.trace_id
         assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
     execution_event, submission_event = events
@@ -211,8 +210,8 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert submission_event["transaction_info"] == {"source": "custom"}
 
     assert execution_event["type"] == submission_event["type"] == "transaction"
-    assert execution_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert submission_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert execution_event["contexts"]["trace"]["trace_id"] == root_span.trace_id
+    assert submission_event["contexts"]["trace"]["trace_id"] == root_span.trace_id
 
     if task_fails:
         assert execution_event["contexts"]["trace"]["status"] == "internal_error"
@@ -220,28 +219,32 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
         assert execution_event["contexts"]["trace"]["status"] == "ok"
 
     assert len(execution_event["spans"]) == 1
-    assert (
-        execution_event["spans"][0].items()
-        >= {
-            "trace_id": str(transaction.trace_id),
-            "same_process_as_parent": True,
+    assert execution_event["spans"][0] == ApproxDict(
+        {
+            "trace_id": str(root_span.trace_id),
             "op": "queue.process",
             "description": "dummy_task",
-            "data": ApproxDict(),
-        }.items()
+        }
     )
     assert submission_event["spans"] == [
         {
-            "data": ApproxDict(),
+            "data": {
+                "sentry.name": "dummy_task",
+                "sentry.op": "queue.submit.celery",
+                "sentry.origin": "auto.queue.celery",
+                "sentry.source": "custom",
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+            },
             "description": "dummy_task",
             "op": "queue.submit.celery",
             "origin": "auto.queue.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
-            "same_process_as_parent": True,
             "span_id": submission_event["spans"][0]["span_id"],
             "start_timestamp": submission_event["spans"][0]["start_timestamp"],
             "timestamp": submission_event["spans"][0]["timestamp"],
-            "trace_id": str(transaction.trace_id),
+            "trace_id": str(root_span.trace_id),
+            "status": "ok",
         }
     ]
 
@@ -275,11 +278,11 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with start_transaction() as transaction:
+    with sentry_sdk.start_span(name="task") as root_span:
         dummy_task.delay()
 
     (event,) = events
-    assert event["contexts"]["trace"]["trace_id"] != transaction.trace_id
+    assert event["contexts"]["trace"]["trace_id"] != root_span.trace_id
     assert event["transaction"] == "dummy_task"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -350,7 +353,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
         runs.append(1)
         1 / 0
 
-    with start_transaction(name="submit_celery"):
+    with sentry_sdk.start_span(name="submit_celery"):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
@@ -430,7 +433,7 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
 
 
 def test_traces_sampler_gets_task_info_in_sampling_context(
-    init_celery, celery_invocation, DictionaryContaining  # noqa:N803
+    init_celery, celery_invocation
 ):
     traces_sampler = mock.Mock()
     celery = init_celery(traces_sampler=traces_sampler)
@@ -445,11 +448,12 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
         walk_dogs, [["Maisey", "Charlie", "Bodhi", "Cory"], "Dog park round trip"], 1
     )
 
-    traces_sampler.assert_any_call(
-        # depending on the iteration of celery_invocation, the data might be
-        # passed as args or as kwargs, so make this generic
-        DictionaryContaining({"celery_job": dict(task="dog_walk", **args_kwargs)})
-    )
+    sampling_context = traces_sampler.call_args_list[0][0][0]
+    assert sampling_context["celery.job.task"] == "dog_walk"
+    for i, arg in enumerate(args_kwargs["args"]):
+        assert sampling_context[f"celery.job.args.{i}"] == str(arg)
+    for kwarg, value in args_kwargs["kwargs"].items():
+        assert sampling_context[f"celery.job.kwargs.{kwarg}"] == str(value)
 
 
 def test_abstract_task(capture_events, celery, celery_invocation):
@@ -468,7 +472,7 @@ def test_abstract_task(capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with start_transaction():
+    with sentry_sdk.start_span(name="celery"):
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
@@ -509,22 +513,25 @@ def test_baggage_propagation(init_celery):
     def dummy_task(self, x, y):
         return _get_headers(self)
 
-    with start_transaction() as transaction:
-        result = dummy_task.apply_async(
-            args=(1, 0),
-            headers={"baggage": "custom=value"},
-        ).get()
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+        with sentry_sdk.start_span(name="task") as root_span:
+            result = dummy_task.apply_async(
+                args=(1, 0),
+                headers={"baggage": "custom=value"},
+            ).get()
 
-        assert sorted(result["baggage"].split(",")) == sorted(
-            [
-                "sentry-release=abcdef",
-                "sentry-trace_id={}".format(transaction.trace_id),
-                "sentry-environment=production",
-                "sentry-sample_rate=1.0",
-                "sentry-sampled=true",
-                "custom=value",
-            ]
-        )
+            assert sorted(result["baggage"].split(",")) == sorted(
+                [
+                    "sentry-release=abcdef",
+                    "sentry-trace_id={}".format(root_span.trace_id),
+                    "sentry-transaction=task",
+                    "sentry-environment=production",
+                    "sentry-sample_rand=0.500000",
+                    "sentry-sample_rate=1.0",
+                    "sentry-sampled=true",
+                    "custom=value",
+                ]
+            )
 
 
 def test_sentry_propagate_traces_override(init_celery):
@@ -536,26 +543,42 @@ def test_sentry_propagate_traces_override(init_celery):
         propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
     )
 
+    # Since we're applying the task inline eagerly,
+    # we need to cleanup the otel context for this test.
+    # and since we patch build_tracer, we need to do this before that runs...
+    # TODO: the right way is to not test this inline
+    original_apply = Task.apply
+
+    def cleaned_apply(*args, **kwargs):
+        token = context.attach(otel_trace.set_span_in_context(otel_trace.INVALID_SPAN))
+        rv = original_apply(*args, **kwargs)
+        context.detach(token)
+        return rv
+
+    Task.apply = cleaned_apply
+
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
         trace_id = get_current_span().trace_id
         return trace_id
 
-    with start_transaction() as transaction:
-        transaction_trace_id = transaction.trace_id
+    with sentry_sdk.start_span(name="task") as root_span:
+        root_span_trace_id = root_span.trace_id
 
         # should propagate trace
-        task_transaction_id = dummy_task.apply_async(
+        task_trace_id = dummy_task.apply_async(
             args=("some message",),
         ).get()
-        assert transaction_trace_id == task_transaction_id
+        assert root_span_trace_id == task_trace_id, "Trace should be propagated"
 
         # should NOT propagate trace (overrides `propagate_traces` parameter in integration constructor)
-        task_transaction_id = dummy_task.apply_async(
+        task_trace_id = dummy_task.apply_async(
             args=("another message",),
             headers={"sentry-propagate-traces": False},
         ).get()
-        assert transaction_trace_id != task_transaction_id
+        assert root_span_trace_id != task_trace_id, "Trace should NOT be propagated"
+
+    Task.apply = original_apply
 
 
 def test_apply_async_manually_span(sentry_init):
@@ -592,7 +615,7 @@ def test_apply_async_no_args(init_celery):
 def test_messaging_destination_name_default_exchange(
     mock_request, routing_key, init_celery, capture_events
 ):
-    celery_app = init_celery(enable_tracing=True)
+    celery_app = init_celery(traces_sample_rate=1.0)
     events = capture_events()
     mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
 
@@ -616,7 +639,7 @@ def test_messaging_destination_name_nondefault_exchange(
     that the routing key is the queue name. Other exchanges may not guarantee this
     behavior.
     """
-    celery_app = init_celery(enable_tracing=True)
+    celery_app = init_celery(traces_sample_rate=1.0)
     events = capture_events()
     mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
 
@@ -631,7 +654,7 @@ def test_messaging_destination_name_nondefault_exchange(
 
 
 def test_messaging_id(init_celery, capture_events):
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     @celery.task
@@ -645,7 +668,7 @@ def test_messaging_id(init_celery, capture_events):
 
 
 def test_retry_count_zero(init_celery, capture_events):
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     @celery.task()
@@ -662,7 +685,7 @@ def test_retry_count_zero(init_celery, capture_events):
 def test_retry_count_nonzero(mock_request, init_celery, capture_events):
     mock_request.retries = 3
 
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     @celery.task()
@@ -677,7 +700,7 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_events):
 
 @pytest.mark.parametrize("system", ("redis", "amqp"))
 def test_messaging_system(system, init_celery, capture_events):
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     # Does not need to be a real URL, since we use always eager
@@ -702,14 +725,14 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
 
-    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    sentry_init(integrations=[CeleryIntegration()], traces_sample_rate=1.0)
     celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
     events = capture_events()
 
     @celery.task()
     def task(): ...
 
-    with start_transaction():
+    with sentry_sdk.start_span(name="task"):
         task.apply_async()
 
     (event,) = events
@@ -740,7 +763,7 @@ def test_receive_latency(init_celery, capture_events):
 
 
 def tests_span_origin_consumer(init_celery, capture_events):
-    celery = init_celery(enable_tracing=True)
+    celery = init_celery(traces_sample_rate=1.0)
     celery.conf.broker_url = "redis://example.com"  # noqa: E231
 
     events = capture_events()
@@ -764,7 +787,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
 
-    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    sentry_init(integrations=[CeleryIntegration()], traces_sample_rate=1.0)
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
     events = capture_events()
@@ -772,7 +795,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
     @celery.task()
     def task(): ...
 
-    with start_transaction(name="custom_transaction"):
+    with sentry_sdk.start_span(name="custom_transaction"):
         task.apply_async()
 
     (event,) = events
@@ -793,12 +816,12 @@ def test_send_task_wrapped(
     capture_events,
     reset_integrations,
 ):
-    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    sentry_init(integrations=[CeleryIntegration()], traces_sample_rate=1.0)
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="custom_transaction"):
+    with sentry_sdk.start_span(name="custom_transaction"):
         celery.send_task("very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"})
 
     (call,) = patched_send_task.call_args_list  # We should have exactly one call

@@ -6,9 +6,8 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
-import warnings
 
-from sentry_sdk._compat import PY37, check_uwsgi_thread_support
+from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk.utils import (
     AnnotatedValue,
     ContextVar,
@@ -20,7 +19,6 @@ from sentry_sdk.utils import (
     get_type_name,
     get_default_release,
     handle_in_app,
-    is_gevent,
     logger,
 )
 from sentry_sdk.serializer import serialize
@@ -29,11 +27,11 @@ from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
-    INSTRUMENTER,
     VERSION,
     ClientConstructor,
 )
-from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.integrations import setup_integrations
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -55,13 +53,13 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log
     from sentry_sdk.integrations import Integration
-    from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
+    from sentry_sdk._log_batcher import LogBatcher
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
@@ -112,9 +110,6 @@ def _get_options(*args, **kwargs):
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
 
-    if rv["instrumenter"] is None:
-        rv["instrumenter"] = INSTRUMENTER.SENTRY
-
     if rv["project_root"] is None:
         try:
             project_root = os.getcwd()
@@ -122,9 +117,6 @@ def _get_options(*args, **kwargs):
             project_root = None
 
         rv["project_root"] = project_root
-
-    if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
-        rv["traces_sample_rate"] = 1.0
 
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(
@@ -139,22 +131,7 @@ def _get_options(*args, **kwargs):
         )
         rv["socket_options"] = None
 
-    if rv["enable_tracing"] is not None:
-        warnings.warn(
-            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
     return rv
-
-
-try:
-    # Python 3.6+
-    module_not_found_error = ModuleNotFoundError
-except Exception:
-    # Older Python versions
-    module_not_found_error = ImportError  # type: ignore
 
 
 class BaseClient:
@@ -174,7 +151,7 @@ class BaseClient:
 
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
-        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+        self.log_batcher = None  # type: Optional[LogBatcher]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -205,6 +182,10 @@ class BaseClient:
     def capture_event(self, *args, **kwargs):
         # type: (*Any, **Any) -> Optional[str]
         return None
+
+    def _capture_experimental_log(self, scope, log):
+        # type: (Scope, Log) -> None
+        pass
 
     def capture_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -295,7 +276,7 @@ class _Client(BaseClient):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
                 logger.debug("Enabled tracing for %s", function_qualname)
-            except module_not_found_error:
+            except ModuleNotFoundError:
                 try:
                     # Try to import a class
                     # ex: "mymodule.submodule.MyClassName.member_function"
@@ -348,25 +329,12 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
-            if experiments.get("enable_metrics", True):
-                # Context vars are not working correctly on Python <=3.6
-                # with gevent.
-                metrics_supported = not is_gevent() or PY37
-                if metrics_supported:
-                    from sentry_sdk.metrics import MetricsAggregator
+            self.log_batcher = None
+            if experiments.get("enable_logs", False):
+                from sentry_sdk._log_batcher import LogBatcher
 
-                    self.metrics_aggregator = MetricsAggregator(
-                        capture_func=_capture_envelope,
-                        enable_code_locations=bool(
-                            experiments.get("metric_code_locations", True)
-                        ),
-                    )
-                else:
-                    logger.info(
-                        "Metrics not supported on Python 3.6 and lower with gevent."
-                    )
+                self.log_batcher = LogBatcher(capture_func=_capture_envelope)
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -375,19 +343,6 @@ class _Client(BaseClient):
                         max_request_body_size
                     )
                 )
-
-            if self.options["_experiments"].get("otel_powered_performance", False):
-                logger.debug(
-                    "[OTel] Enabling experimental OTel-powered performance monitoring."
-                )
-                self.options["instrumenter"] = INSTRUMENTER.OTEL
-                if (
-                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-                    not in _DEFAULT_INTEGRATIONS
-                ):
-                    _DEFAULT_INTEGRATIONS.append(
-                        "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
-                    )
 
             self.integrations = setup_integrations(
                 self.options["integrations"],
@@ -410,6 +365,12 @@ class _Client(BaseClient):
 
             if self.options.get("spotlight"):
                 self.spotlight = setup_spotlight(self.options)
+                if not self.options["dsn"]:
+                    sample_all = lambda *_args, **_kwargs: 1.0
+                    self.options["send_default_pii"] = True
+                    self.options["error_sampler"] = sample_all
+                    self.options["traces_sampler"] = sample_all
+                    self.options["profiles_sampler"] = sample_all
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name
@@ -437,7 +398,7 @@ class _Client(BaseClient):
 
         if (
             self.monitor
-            or self.metrics_aggregator
+            or self.log_batcher
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, BaseHttpTransport)
         ):
@@ -461,11 +422,7 @@ class _Client(BaseClient):
 
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
-        result = self.options.get("send_default_pii")
-        if result is None:
-            result = not self.options["dsn"] and self.spotlight is not None
-
-        return result
+        return self.options.get("send_default_pii") or False
 
     @property
     def dsn(self):
@@ -482,6 +439,7 @@ class _Client(BaseClient):
         # type: (...) -> Optional[Event]
 
         previous_total_spans = None  # type: Optional[int]
+        previous_total_breadcrumbs = None  # type: Optional[int]
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
@@ -506,7 +464,7 @@ class _Client(BaseClient):
                         )
                 return None
 
-            event = event_
+            event = event_  # type: Optional[Event]  # type: ignore[no-redef]
             spans_delta = spans_before - len(
                 cast(List[Dict[str, object]], event.get("spans", []))
             )
@@ -518,6 +476,16 @@ class _Client(BaseClient):
             dropped_spans = event.pop("_dropped_spans", 0) + spans_delta  # type: int
             if dropped_spans > 0:
                 previous_total_spans = spans_before + dropped_spans
+            if scope._n_breadcrumbs_truncated > 0:
+                breadcrumbs = event.get("breadcrumbs", {})
+                values = (
+                    breadcrumbs.get("values", [])
+                    if not isinstance(breadcrumbs, AnnotatedValue)
+                    else []
+                )
+                previous_total_breadcrumbs = (
+                    len(values) + scope._n_breadcrumbs_truncated
+                )
 
         if (
             self.options["attach_stacktrace"]
@@ -570,7 +538,10 @@ class _Client(BaseClient):
             event["spans"] = AnnotatedValue(
                 event.get("spans", []), {"len": previous_total_spans}
             )
-
+        if previous_total_breadcrumbs is not None:
+            event["breadcrumbs"] = AnnotatedValue(
+                event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
+            )
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
@@ -590,7 +561,7 @@ class _Client(BaseClient):
             and event is not None
             and event.get("type") != "transaction"
         ):
-            new_event = None
+            new_event = None  # type: Optional[Event]
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
             if new_event is None:
@@ -599,7 +570,15 @@ class _Client(BaseClient):
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
                     )
-            event = new_event
+
+                # If this is an exception, reset the DedupeIntegration. It still
+                # remembers the dropped exception as the last exception, meaning
+                # that if the same exception happens again and is not dropped
+                # in before_send, it'd get dropped by DedupeIntegration.
+                if event.get("exception"):
+                    DedupeIntegration.reset_last_seen()
+
+            event = new_event  # type: Optional[Event]  # type: ignore[no-redef]
 
         before_send_transaction = self.options["before_send_transaction"]
         if (
@@ -623,13 +602,15 @@ class _Client(BaseClient):
                         quantity=spans_before + 1,  # +1 for the transaction itself
                     )
             else:
-                spans_delta = spans_before - len(new_event.get("spans", []))
+                spans_delta = spans_before - len(
+                    cast(List[Dict[str, object]], new_event.get("spans", []))
+                )
                 if spans_delta > 0 and self.transport is not None:
                     self.transport.record_lost_event(
                         reason="before_send", data_category="span", quantity=spans_delta
                     )
 
-            event = new_event
+            event = new_event  # type: Optional[Event]  # type: ignore[no-redef]
 
         return event
 
@@ -740,6 +721,8 @@ class _Client(BaseClient):
         if exceptions:
             errored = True
             for error in exceptions:
+                if isinstance(error, AnnotatedValue):
+                    error = error.value or {}
                 mechanism = error.get("mechanism")
                 if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
@@ -847,6 +830,49 @@ class _Client(BaseClient):
 
         return return_value
 
+    def _capture_experimental_log(self, current_scope, log):
+        # type: (Scope, Log) -> None
+        logs_enabled = self.options["_experiments"].get("enable_logs", False)
+        if not logs_enabled:
+            return
+        isolation_scope = current_scope.get_isolation_scope()
+
+        environment = self.options.get("environment")
+        if environment is not None and "sentry.environment" not in log["attributes"]:
+            log["attributes"]["sentry.environment"] = environment
+
+        release = self.options.get("release")
+        if release is not None and "sentry.release" not in log["attributes"]:
+            log["attributes"]["sentry.release"] = release
+
+        span = current_scope.span
+        if span is not None and "sentry.trace.parent_span_id" not in log["attributes"]:
+            log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
+
+        if log.get("trace_id") is None:
+            transaction = current_scope.transaction
+            propagation_context = isolation_scope.get_active_propagation_context()
+            if transaction is not None:
+                log["trace_id"] = transaction.trace_id
+            elif propagation_context is not None:
+                log["trace_id"] = propagation_context.trace_id
+
+        # If debug is enabled, log the log to the console
+        debug = self.options.get("debug", False)
+        if debug:
+            logger.debug(
+                f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
+            )
+
+        before_send_log = self.options["_experiments"].get("before_send_log")
+        if before_send_log is not None:
+            log = before_send_log(log, {})
+        if log is None:
+            return
+
+        if self.log_batcher:
+            self.log_batcher.add(log)
+
     def capture_session(
         self, session  # type: Session
     ):
@@ -896,11 +922,15 @@ class _Client(BaseClient):
         """
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
+
             self.session_flusher.kill()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.kill()
+
+            if self.log_batcher is not None:
+                self.log_batcher.kill()
+
             if self.monitor:
                 self.monitor.kill()
+
             self.transport.kill()
             self.transport = None
 
@@ -921,8 +951,10 @@ class _Client(BaseClient):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self.session_flusher.flush()
-            if self.metrics_aggregator is not None:
-                self.metrics_aggregator.flush()
+
+            if self.log_batcher is not None:
+                self.log_batcher.flush()
+
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):

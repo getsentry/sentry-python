@@ -1,13 +1,21 @@
 import inspect
-import warnings
 from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
-from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.tracing import NoOpSpan, Transaction, trace
+from sentry_sdk.tracing import trace
 from sentry_sdk.crons import monitor
+
+# TODO-neel-potel make 2 scope strategies/impls and switch
+from sentry_sdk.scope import Scope as BaseScope
+from sentry_sdk.integrations.opentelemetry.scope import (
+    PotelScope as Scope,
+    new_scope,
+    isolation_scope,
+    use_scope,
+    use_isolation_scope,
+)
+
 
 from typing import TYPE_CHECKING
 
@@ -16,15 +24,11 @@ if TYPE_CHECKING:
 
     from typing import Any
     from typing import Dict
-    from typing import Generator
     from typing import Optional
-    from typing import overload
     from typing import Callable
     from typing import TypeVar
-    from typing import ContextManager
     from typing import Union
-
-    from typing_extensions import Unpack
+    from typing import Generator
 
     from sentry_sdk.client import BaseClient
     from sentry_sdk._types import (
@@ -35,17 +39,11 @@ if TYPE_CHECKING:
         ExcInfo,
         MeasurementUnit,
         LogLevelStr,
-        SamplingContext,
     )
-    from sentry_sdk.tracing import Span, TransactionKwargs
+    from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
-else:
-
-    def overload(x):
-        # type: (T) -> T
-        return x
 
 
 # When changing this, update __all__ in __init__.py too
@@ -55,7 +53,6 @@ __all__ = [
     "capture_event",
     "capture_exception",
     "capture_message",
-    "configure_scope",
     "continue_trace",
     "flush",
     "get_baggage",
@@ -69,7 +66,6 @@ __all__ = [
     "isolation_scope",
     "last_event_id",
     "new_scope",
-    "push_scope",
     "set_context",
     "set_extra",
     "set_level",
@@ -81,6 +77,8 @@ __all__ = [
     "start_transaction",
     "trace",
     "monitor",
+    "use_scope",
+    "use_isolation_scope",
 ]
 
 
@@ -124,7 +122,7 @@ def is_initialized():
 
 @scopemethod
 def get_global_scope():
-    # type: () -> Scope
+    # type: () -> BaseScope
     return Scope.get_global_scope()
 
 
@@ -194,101 +192,6 @@ def add_breadcrumb(
     return get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
 
-@overload
-def configure_scope():
-    # type: () -> ContextManager[Scope]
-    pass
-
-
-@overload
-def configure_scope(  # noqa: F811
-    callback,  # type: Callable[[Scope], None]
-):
-    # type: (...) -> None
-    pass
-
-
-def configure_scope(  # noqa: F811
-    callback=None,  # type: Optional[Callable[[Scope], None]]
-):
-    # type: (...) -> Optional[ContextManager[Scope]]
-    """
-    Reconfigures the scope.
-
-    :param callback: If provided, call the callback with the current scope.
-
-    :returns: If no callback is provided, returns a context manager that returns the scope.
-    """
-    warnings.warn(
-        "sentry_sdk.configure_scope is deprecated and will be removed in the next major version. "
-        "Please consult our migration guide to learn how to migrate to the new API: "
-        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-configuring",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    scope = get_isolation_scope()
-    scope.generate_propagation_context()
-
-    if callback is not None:
-        # TODO: used to return None when client is None. Check if this changes behavior.
-        callback(scope)
-
-        return None
-
-    @contextmanager
-    def inner():
-        # type: () -> Generator[Scope, None, None]
-        yield scope
-
-    return inner()
-
-
-@overload
-def push_scope():
-    # type: () -> ContextManager[Scope]
-    pass
-
-
-@overload
-def push_scope(  # noqa: F811
-    callback,  # type: Callable[[Scope], None]
-):
-    # type: (...) -> None
-    pass
-
-
-def push_scope(  # noqa: F811
-    callback=None,  # type: Optional[Callable[[Scope], None]]
-):
-    # type: (...) -> Optional[ContextManager[Scope]]
-    """
-    Pushes a new layer on the scope stack.
-
-    :param callback: If provided, this method pushes a scope, calls
-        `callback`, and pops the scope again.
-
-    :returns: If no `callback` is provided, a context manager that should
-        be used to pop the scope again.
-    """
-    warnings.warn(
-        "sentry_sdk.push_scope is deprecated and will be removed in the next major version. "
-        "Please consult our migration guide to learn how to migrate to the new API: "
-        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-pushing",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    if callback is not None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            with push_scope() as scope:
-                callback(scope)
-        return None
-
-    return _ScopeManager()
-
-
 @scopemethod
 def set_tag(key, value):
     # type: (str, Any) -> None
@@ -334,23 +237,33 @@ def flush(
     return get_client().flush(timeout=timeout, callback=callback)
 
 
-@scopemethod
-def start_span(
-    **kwargs,  # type: Any
-):
-    # type: (...) -> Span
+def start_span(**kwargs):
+    # type: (Any) -> Span
+    """
+    Start and return a span.
+
+    This is the entry point to manual tracing instrumentation.
+
+    A tree structure can be built by adding child spans to the span.
+    To start a new child span within the span, call the `start_child()` method.
+
+    When used as a context manager, spans are automatically finished at the end
+    of the `with` block. If not using context managers, call the `finish()`
+    method.
+    """
     return get_current_scope().start_span(**kwargs)
 
 
-@scopemethod
 def start_transaction(
-    transaction=None,  # type: Optional[Transaction]
-    instrumenter=INSTRUMENTER.SENTRY,  # type: str
-    custom_sampling_context=None,  # type: Optional[SamplingContext]
-    **kwargs,  # type: Unpack[TransactionKwargs]
+    transaction=None,  # type: Optional[Span]
+    **kwargs,  # type: Any
 ):
-    # type: (...) -> Union[Transaction, NoOpSpan]
+    # type: (...) -> Span
     """
+    .. deprecated:: 3.0.0
+        This function is deprecated and will be removed in a future release.
+        Use :py:meth:`sentry_sdk.start_span` instead.
+
     Start and return a transaction on the current scope.
 
     Start an existing transaction if given, otherwise create and start a new
@@ -374,15 +287,13 @@ def start_transaction(
 
     :param transaction: The transaction to start. If omitted, we create and
         start a new transaction.
-    :param instrumenter: This parameter is meant for internal use only. It
-        will be removed in the next major version.
-    :param custom_sampling_context: The transaction's custom sampling context.
     :param kwargs: Optional keyword arguments to be passed to the Transaction
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
-    return get_current_scope().start_transaction(
-        transaction, instrumenter, custom_sampling_context, **kwargs
+    return start_span(
+        span=transaction,
+        **kwargs,
     )
 
 
@@ -421,13 +332,11 @@ def get_baggage():
     return None
 
 
-def continue_trace(
-    environ_or_headers, op=None, name=None, source=None, origin="manual"
-):
-    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+@contextmanager
+def continue_trace(environ_or_headers):
+    # type: (Dict[str, Any]) -> Generator[None, None, None]
     """
-    Sets the propagation context from environment or headers and returns a transaction.
+    Sets the propagation context from environment or headers to continue an incoming trace.
     """
-    return get_isolation_scope().continue_trace(
-        environ_or_headers, op, name, source, origin
-    )
+    with get_isolation_scope().continue_trace(environ_or_headers):
+        yield

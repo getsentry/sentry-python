@@ -1,10 +1,9 @@
-from contextlib import contextmanager
 import json
 from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, logger
+from sentry_sdk.utils import AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
 
 try:
     from django.http.request import RawPostDataException
@@ -16,12 +15,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
-    from typing import Iterator
     from typing import Mapping
     from typing import MutableMapping
     from typing import Optional
     from typing import Union
-    from sentry_sdk._types import Event, HttpStatusCodeRange
+    from sentry_sdk._types import Event
 
 
 SENSITIVE_ENV_KEYS = (
@@ -50,13 +48,6 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "PUT",
     "TRACE",
 )
-
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext():
-    # type: () -> Iterator[None]
-    yield
 
 
 def request_body_within_bounds(client, content_length):
@@ -237,35 +228,15 @@ def _filter_headers(headers):
     }
 
 
-def _in_http_status_code_range(code, code_ranges):
-    # type: (object, list[HttpStatusCodeRange]) -> bool
-    for target in code_ranges:
-        if isinstance(target, int):
-            if code == target:
-                return True
-            continue
+def _request_headers_to_span_attributes(headers):
+    # type: (dict[str, str]) -> dict[str, str]
+    attributes = {}
 
-        try:
-            if code in target:
-                return True
-        except TypeError:
-            logger.warning(
-                "failed_request_status_codes has to be a list of integers or containers"
-            )
+    headers = _filter_headers(headers)
 
-    return False
+    for header, value in headers.items():
+        if isinstance(value, AnnotatedValue):
+            value = SENSITIVE_DATA_SUBSTITUTE
+        attributes[f"http.request.header.{header.lower()}"] = value
 
-
-class HttpCodeRangeContainer:
-    """
-    Wrapper to make it possible to use list[HttpStatusCodeRange] as a Container[int].
-    Used for backwards compatibility with the old `failed_request_status_codes` option.
-    """
-
-    def __init__(self, code_ranges):
-        # type: (list[HttpStatusCodeRange]) -> None
-        self._code_ranges = code_ranges
-
-    def __contains__(self, item):
-        # type: (object) -> bool
-        return _in_http_status_code_range(item, self._code_ranges)
+    return attributes

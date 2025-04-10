@@ -10,7 +10,6 @@ from unittest.mock import patch
 from werkzeug.test import Client
 
 from django import VERSION as DJANGO_VERSION
-from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
@@ -242,6 +241,7 @@ def test_trace_from_headers_if_performance_disabled(
                 http_methods_to_capture=("HEAD",),
             )
         ],
+        traces_sample_rate=None,  # disable all performance monitoring
     )
 
     events = capture_events()
@@ -292,6 +292,9 @@ def test_user_captured(sentry_init, client, capture_events):
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
+
+    from django.contrib.auth.models import User
+
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
 
     try:
@@ -932,6 +935,11 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
 
+        render_span = next(
+            span for span in transaction["spans"] if span["op"] == "template.render"
+        )
+        assert "context.user_age" in render_span["data"]
+
 
 if DJANGO_VERSION >= (1, 10):
     EXPECTED_MIDDLEWARE_SPANS = """\
@@ -1117,6 +1125,9 @@ def test_csrf(sentry_init, client):
     assert content == b"ok"
 
 
+# This test is forked because it doesn't clean up after itself properly and makes
+# other tests fail to resolve routes
+@pytest.mark.forked
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 def test_custom_urlconf_middleware(
     settings, sentry_init, client, capture_events, render_span_tree
@@ -1206,14 +1217,19 @@ def test_transaction_http_method_default(sentry_init, client, capture_events):
     By default OPTIONS and HEAD requests do not create a transaction.
     """
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client.get("/nomessage")
-    client.options("/nomessage")
-    client.head("/nomessage")
+    client.get(reverse("nomessage"))
+    client.options(reverse("nomessage"))
+    client.head(reverse("nomessage"))
 
     (event,) = events
 
@@ -1229,6 +1245,8 @@ def test_transaction_http_method_custom(sentry_init, client, capture_events):
                     "OPTIONS",
                     "head",
                 ),  # capitalization does not matter
+                middleware_spans=False,
+                signals_spans=False,
             )
         ],
         traces_sample_rate=1.0,

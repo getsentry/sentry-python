@@ -20,7 +20,6 @@ from sentry_sdk.utils import parse_version
 FASTAPI_VERSION = parse_version(fastapi.__version__)
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
-from tests.integrations.starlette import test_starlette
 
 
 def fastapi_app_factory():
@@ -247,7 +246,6 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
 
 
-@pytest.mark.asyncio
 def test_response_status_code_ok_in_transaction_context(sentry_init, capture_envelopes):
     """
     Tests that the response status code is added to the transaction "response" context.
@@ -276,7 +274,6 @@ def test_response_status_code_ok_in_transaction_context(sentry_init, capture_env
     assert transaction["contexts"]["response"]["status_code"] == 200
 
 
-@pytest.mark.asyncio
 def test_response_status_code_error_in_transaction_context(
     sentry_init,
     capture_envelopes,
@@ -313,7 +310,6 @@ def test_response_status_code_error_in_transaction_context(
     assert transaction["contexts"]["response"]["status_code"] == 500
 
 
-@pytest.mark.asyncio
 def test_response_status_code_not_found_in_transaction_context(
     sentry_init,
     capture_envelopes,
@@ -531,48 +527,6 @@ def test_transaction_name_in_middleware(
     )
 
 
-@test_starlette.parametrize_test_configurable_status_codes_deprecated
-def test_configurable_status_codes_deprecated(
-    sentry_init,
-    capture_events,
-    failed_request_status_codes,
-    status_code,
-    expected_error,
-):
-    with pytest.warns(DeprecationWarning):
-        starlette_integration = StarletteIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    with pytest.warns(DeprecationWarning):
-        fast_api_integration = FastApiIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    sentry_init(
-        integrations=[
-            starlette_integration,
-            fast_api_integration,
-        ]
-    )
-
-    events = capture_events()
-
-    app = FastAPI()
-
-    @app.get("/error")
-    async def _error():
-        raise HTTPException(status_code)
-
-    client = TestClient(app)
-    client.get("/error")
-
-    if expected_error:
-        assert len(events) == 1
-    else:
-        assert not events
-
-
 @pytest.mark.skipif(
     FASTAPI_VERSION < (0, 80),
     reason="Requires FastAPI >= 0.80, because earlier versions do not support HTTP 'HEAD' requests",
@@ -682,3 +636,38 @@ def test_configurable_status_codes(
     client.get("/error")
 
     assert len(events) == int(expected_error)
+
+
+@pytest.mark.parametrize("transaction_style", ["endpoint", "url"])
+def test_app_host(sentry_init, capture_events, transaction_style):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(transaction_style=transaction_style),
+            FastApiIntegration(transaction_style=transaction_style),
+        ],
+    )
+
+    app = FastAPI()
+    subapp = FastAPI()
+
+    @subapp.get("/subapp")
+    async def subapp_route():
+        return {"message": "Hello world!"}
+
+    app.host("subapp", subapp)
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.get("/subapp", headers={"Host": "subapp"})
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert "transaction" in event
+
+    if transaction_style == "url":
+        assert event["transaction"] == "/subapp"
+    else:
+        assert event["transaction"].endswith("subapp_route")

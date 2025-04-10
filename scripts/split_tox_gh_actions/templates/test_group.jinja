@@ -6,16 +6,14 @@
       fail-fast: false
       matrix:
         python-version: [{{ py_versions.get(category)|join(",") }}]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
 
-    {% if needs_github_secrets %}
-    needs: check-permissions
+    {% if needs_docker %}
+    services:
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
     {% endif %}
-
     {% if needs_postgres %}
     services:
       postgres:
@@ -37,21 +35,15 @@
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
 
     {% endif %}
-
     steps:
       - uses: actions/checkout@v4.2.2
-      {% if needs_github_secrets %}
-      {% raw %}
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-      {% endraw %}
-      {% endif %}
       - uses: actions/setup-python@v5
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
       {% if needs_clickhouse %}
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       {% endif %}
 
       {% if needs_redis %}
@@ -77,22 +69,15 @@
           {% endif %}
       {% endfor %}
 
-      - name: Generate coverage XML (Python 3.6)
-        if: {% raw %}${{ !cancelled() && matrix.python-version == '3.6' }}{% endraw %}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-
       - name: Generate coverage XML
-        if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %}
+        if: {% raw %}${{ !cancelled() }}{% endraw %}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        uses: codecov/codecov-action@v5.3.1
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
           files: coverage.xml

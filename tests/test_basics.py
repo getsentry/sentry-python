@@ -1,30 +1,26 @@
-import datetime
 import importlib
 import logging
 import os
 import sys
 import time
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 
 import pytest
-from sentry_sdk.client import Client
-from sentry_sdk.utils import datetime_from_isoformat
 from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
 import sentry_sdk.scope
 from sentry_sdk import (
     get_client,
-    push_scope,
     capture_event,
     capture_exception,
     capture_message,
-    start_transaction,
+    start_span,
     last_event_id,
     add_breadcrumb,
     isolation_scope,
     new_scope,
-    Hub,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
@@ -36,8 +32,7 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import get_sdk_name, reraise
-from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.utils import datetime_from_isoformat, get_sdk_name, reraise
 
 
 class NoOpIntegration(Integration):
@@ -178,7 +173,7 @@ def test_option_before_send_transaction(sentry_init, capture_events):
         traces_sample_rate=1.0,
     )
     events = capture_events()
-    transaction = start_transaction(name="foo")
+    transaction = start_span(name="foo")
     transaction.finish()
 
     (event,) = events
@@ -195,7 +190,7 @@ def test_option_before_send_transaction_discard(sentry_init, capture_events):
         traces_sample_rate=1.0,
     )
     events = capture_events()
-    transaction = start_transaction(name="foo")
+    transaction = start_span(name="foo")
     transaction.finish()
 
     assert len(events) == 0
@@ -253,32 +248,6 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     assert crumb["type"] == "default"
 
 
-@pytest.mark.parametrize(
-    "enable_tracing, traces_sample_rate, tracing_enabled, updated_traces_sample_rate",
-    [
-        (None, None, False, None),
-        (False, 0.0, False, 0.0),
-        (False, 1.0, False, 1.0),
-        (None, 1.0, True, 1.0),
-        (True, 1.0, True, 1.0),
-        (None, 0.0, True, 0.0),  # We use this as - it's configured but turned off
-        (True, 0.0, True, 0.0),  # We use this as - it's configured but turned off
-        (True, None, True, 1.0),
-    ],
-)
-def test_option_enable_tracing(
-    sentry_init,
-    enable_tracing,
-    traces_sample_rate,
-    tracing_enabled,
-    updated_traces_sample_rate,
-):
-    sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
-    options = sentry_sdk.get_client().options
-    assert has_tracing_enabled(options) is tracing_enabled
-    assert options["traces_sample_rate"] == updated_traces_sample_rate
-
-
 def test_breadcrumb_arguments(sentry_init, capture_events):
     assert_hint = {"bar": 42}
 
@@ -296,76 +265,6 @@ def test_breadcrumb_arguments(sentry_init, capture_events):
     assert_hint.clear()
     add_breadcrumb(foo=42)
     add_breadcrumb(crumb=dict(foo=42))
-
-
-def test_push_scope(sentry_init, capture_events, suppress_deprecation_warnings):
-    sentry_init()
-    events = capture_events()
-
-    with push_scope() as scope:
-        scope.level = "warning"
-        try:
-            1 / 0
-        except Exception as e:
-            capture_exception(e)
-
-    (event,) = events
-
-    assert event["level"] == "warning"
-    assert "exception" in event
-
-
-def test_push_scope_null_client(
-    sentry_init, capture_events, suppress_deprecation_warnings
-):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    sentry_init()
-    events = capture_events()
-
-    Hub.current.bind_client(None)
-
-    with push_scope() as scope:
-        scope.level = "warning"
-        try:
-            1 / 0
-        except Exception as e:
-            capture_exception(e)
-
-    assert len(events) == 0
-
-
-@pytest.mark.skip(
-    reason="This test is not valid anymore, because push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
-)
-@pytest.mark.parametrize("null_client", (True, False))
-def test_push_scope_callback(sentry_init, null_client, capture_events):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    sentry_init()
-
-    if null_client:
-        Hub.current.bind_client(None)
-
-    outer_scope = Hub.current.scope
-
-    calls = []
-
-    @push_scope
-    def _(scope):
-        assert scope is Hub.current.scope
-        assert scope is not outer_scope
-        calls.append(1)
-
-    # push_scope always needs to execute the callback regardless of
-    # client state, because that actually runs usercode in it, not
-    # just scope config code
-    assert calls == [1]
-
-    # Assert scope gets popped correctly
-    assert Hub.current.scope is outer_scope
 
 
 def test_breadcrumbs(sentry_init, capture_events):
@@ -401,12 +300,12 @@ def test_breadcrumbs(sentry_init, capture_events):
 def test_breadcrumb_ordering(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
-    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
 
     timestamps = [
-        now - datetime.timedelta(days=10),
-        now - datetime.timedelta(days=8),
-        now - datetime.timedelta(days=12),
+        now - timedelta(days=10),
+        now - timedelta(days=8),
+        now - timedelta(days=12),
     ]
 
     for timestamp in timestamps:
@@ -430,24 +329,24 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 def test_breadcrumb_ordering_different_types(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.now(timezone.utc)
 
     timestamps = [
-        now - datetime.timedelta(days=10),
-        now - datetime.timedelta(days=8),
-        now.replace(microsecond=0) - datetime.timedelta(days=12),
-        now - datetime.timedelta(days=9),
-        now - datetime.timedelta(days=13),
-        now.replace(microsecond=0) - datetime.timedelta(days=11),
+        now - timedelta(days=10),
+        now - timedelta(days=8),
+        now.replace(microsecond=0) - timedelta(days=12),
+        now - timedelta(days=9),
+        now - timedelta(days=13),
+        now.replace(microsecond=0) - timedelta(days=11),
     ]
 
     breadcrumb_timestamps = [
         timestamps[0],
         timestamps[1].isoformat(),
-        datetime.datetime.strftime(timestamps[2], "%Y-%m-%dT%H:%M:%S") + "Z",
-        datetime.datetime.strftime(timestamps[3], "%Y-%m-%dT%H:%M:%S.%f") + "+00:00",
-        datetime.datetime.strftime(timestamps[4], "%Y-%m-%dT%H:%M:%S.%f") + "+0000",
-        datetime.datetime.strftime(timestamps[5], "%Y-%m-%dT%H:%M:%S.%f") + "-0000",
+        datetime.strftime(timestamps[2], "%Y-%m-%dT%H:%M:%S") + "Z",
+        datetime.strftime(timestamps[3], "%Y-%m-%dT%H:%M:%S.%f") + "+00:00",
+        datetime.strftime(timestamps[4], "%Y-%m-%dT%H:%M:%S.%f") + "+0000",
+        datetime.strftime(timestamps[5], "%Y-%m-%dT%H:%M:%S.%f") + "-0000",
     ]
 
     for i, timestamp in enumerate(timestamps):
@@ -578,71 +477,6 @@ def test_integrations(
     } == expected_integrations
 
 
-@pytest.mark.skip(
-    reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed"
-)
-def test_client_initialized_within_scope(sentry_init, caplog):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    caplog.set_level(logging.WARNING)
-
-    sentry_init()
-
-    with push_scope():
-        Hub.current.bind_client(Client())
-
-    (record,) = (x for x in caplog.records if x.levelname == "WARNING")
-
-    assert record.msg.startswith("init() called inside of pushed scope.")
-
-
-@pytest.mark.skip(
-    reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
-)
-def test_scope_leaks_cleaned_up(sentry_init, caplog):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    caplog.set_level(logging.WARNING)
-
-    sentry_init()
-
-    old_stack = list(Hub.current._stack)
-
-    with push_scope():
-        push_scope()
-
-    assert Hub.current._stack == old_stack
-
-    (record,) = (x for x in caplog.records if x.levelname == "WARNING")
-
-    assert record.message.startswith("Leaked 1 scopes:")
-
-
-@pytest.mark.skip(
-    reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed"
-)
-def test_scope_popped_too_soon(sentry_init, caplog):
-    """
-    This test can be removed when we remove push_scope and the Hub from the SDK.
-    """
-    caplog.set_level(logging.ERROR)
-
-    sentry_init()
-
-    old_stack = list(Hub.current._stack)
-
-    with push_scope():
-        Hub.current.pop_scope_unsafe()
-
-    assert Hub.current._stack == old_stack
-
-    (record,) = (x for x in caplog.records if x.levelname == "ERROR")
-
-    assert record.message == ("Scope popped too soon. Popped 1 scopes too many.")
-
-
 def test_scope_event_processor_order(sentry_init, capture_events):
     def before_send(event, hint):
         event["message"] += "baz"
@@ -710,6 +544,37 @@ def test_dedupe_event_processor_drop_records_client_report(
     assert lost_event_call == ("event_processor", "error", None, 1)
 
 
+def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_events):
+    # Two exceptions happen one after another. The first one is dropped in the
+    # user's before_send. The second one isn't.
+    # Originally, DedupeIntegration would drop the second exception. This test
+    # is making sure that that is no longer the case -- i.e., DedupeIntegration
+    # doesn't consider exceptions dropped in before_send.
+    count = 0
+
+    def before_send(event, hint):
+        nonlocal count
+        count += 1
+        if count == 1:
+            return None
+        return event
+
+    sentry_init(before_send=before_send)
+    events = capture_events()
+
+    exc = ValueError("aha!")
+    for _ in range(2):
+        # The first ValueError will be dropped by before_send. The second
+        # ValueError will be accepted by before_send, and should be sent to
+        # Sentry.
+        try:
+            raise exc
+        except Exception:
+            capture_exception()
+
+    assert len(events) == 1
+
+
 def test_event_processor_drop_records_client_report(
     sentry_init, capture_events, capture_record_lost_event_calls
 ):
@@ -731,7 +596,7 @@ def test_event_processor_drop_records_client_report(
 
         capture_message("dropped")
 
-        with start_transaction(name="dropped"):
+        with start_span(name="dropped"):
             pass
 
         assert len(events) == 0
@@ -836,7 +701,7 @@ def test_functions_to_trace(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="something"):
+    with start_span(name="something"):
         time.sleep(0)
 
         for word in ["World", "You"]:
@@ -872,7 +737,7 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="something"):
+    with start_span(name="something"):
         wg = WorldGreeter("World")
         wg.greet()
         wg.greet("You")
@@ -947,7 +812,7 @@ def test_classmethod_tracing(sentry_init):
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert last_event_id() is None
 
@@ -957,40 +822,22 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert last_event_id() is None
 
-    with start_transaction(name="test"):
+    with start_span(name="test"):
         pass
 
     assert last_event_id() is None, "Transaction should not set last_event_id"
 
 
 def test_last_event_id_scope(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     # Should not crash
     with isolation_scope() as scope:
         assert scope.last_event_id() is None
-
-
-def test_hub_constructor_deprecation_warning():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
-        Hub()
-
-
-def test_hub_current_deprecation_warning():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning) as warning_records:
-        Hub.current
-
-    # Make sure we only issue one deprecation warning
-    assert len(warning_records) == 1
-
-
-def test_hub_main_deprecation_warnings():
-    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
-        Hub.main
 
 
 @pytest.mark.skipif(sys.version_info < (3, 11), reason="add_note() not supported")
@@ -1034,3 +881,47 @@ def test_notes_safe_str(sentry_init, capture_events):
     (event,) = events
 
     assert event["exception"]["values"][0]["value"] == "aha!\nnote 1\nnote 3"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="this test appears to cause a segfault on Python < 3.11",
+)
+def test_stacktrace_big_recursion(sentry_init, capture_events):
+    """
+    Ensure that if the recursion limit is increased, the full stacktrace is not captured,
+    as it would take too long to process the entire stack trace.
+    Also, ensure that the capturing does not take too long.
+    """
+    sentry_init()
+    events = capture_events()
+
+    def recurse():
+        recurse()
+
+    old_recursion_limit = sys.getrecursionlimit()
+
+    try:
+        sys.setrecursionlimit(100_000)
+        recurse()
+    except RecursionError as e:
+        capture_start_time = time.perf_counter_ns()
+        sentry_sdk.capture_exception(e)
+        capture_end_time = time.perf_counter_ns()
+    finally:
+        sys.setrecursionlimit(old_recursion_limit)
+
+    (event,) = events
+
+    assert event["exception"]["values"][0]["stacktrace"] is None
+    assert event["_meta"] == {
+        "exception": {
+            "values": {"0": {"stacktrace": {"": {"rem": [["!config", "x"]]}}}}
+        }
+    }
+
+    # On my machine, it takes about 100-200ms to capture the exception,
+    # so this limit should be generous enough.
+    assert (
+        capture_end_time - capture_start_time < 10**9
+    ), "stacktrace capture took too long, check that frame limit is set correctly"

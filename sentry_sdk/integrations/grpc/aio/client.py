@@ -44,14 +44,17 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
         request: Message,
     ) -> Union[UnaryUnaryCall, Message]:
         method = client_call_details.method
+        if isinstance(method, bytes):
+            method = method.decode()
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            name="unary unary call to %s" % method.decode(),
+            name="unary unary call to %s" % method,
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         ) as span:
-            span.set_data("type", "unary unary")
-            span.set_data("method", method)
+            span.set_attribute("type", "unary unary")
+            span.set_attribute("method", method)
 
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
@@ -59,7 +62,7 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
 
             response = await continuation(client_call_details, request)
             status_code = await response.code()
-            span.set_data("code", status_code.name)
+            span.set_attribute("code", status_code.name)
 
             return response
 
@@ -74,14 +77,17 @@ class SentryUnaryStreamClientInterceptor(
         request: Message,
     ) -> Union[AsyncIterable[Any], UnaryStreamCall]:
         method = client_call_details.method
+        if isinstance(method, bytes):
+            method = method.decode()
 
         with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT,
-            name="unary stream call to %s" % method.decode(),
+            name="unary stream call to %s" % method,
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         ) as span:
-            span.set_data("type", "unary stream")
-            span.set_data("method", method)
+            span.set_attribute("type", "unary stream")
+            span.set_attribute("method", method)
 
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
@@ -89,6 +95,6 @@ class SentryUnaryStreamClientInterceptor(
 
             response = await continuation(client_call_details, request)
             # status_code = await response.code()
-            # span.set_data("code", status_code)
+            # span.set_attribute("code", status_code)
 
             return response

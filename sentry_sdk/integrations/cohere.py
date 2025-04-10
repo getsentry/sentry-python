@@ -147,6 +147,7 @@ def _wrap_chat(f, streaming):
             op=consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
             name="cohere.client.Chat",
             origin=CohereIntegration.origin,
+            only_if_parent=True,
         )
         span.__enter__()
         try:
@@ -233,6 +234,7 @@ def _wrap_embed(f):
             op=consts.OP.COHERE_EMBEDDINGS_CREATE,
             name="Cohere Embedding Creation",
             origin=CohereIntegration.origin,
+            only_if_parent=True,
         ) as span:
             if "texts" in kwargs and (
                 should_send_default_pii() and integration.include_prompts

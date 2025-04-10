@@ -5,7 +5,6 @@ import gzip
 import socket
 import ssl
 import time
-import warnings
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from urllib.request import getproxies
@@ -18,7 +17,6 @@ except ImportError:
 import urllib3
 import certifi
 
-import sentry_sdk
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
@@ -41,7 +39,7 @@ if TYPE_CHECKING:
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk._types import Event, EventDataCategory
+    from sentry_sdk._types import EventDataCategory
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
@@ -73,25 +71,6 @@ class Transport(ABC):
             self.parsed_dsn = Dsn(options["dsn"])
         else:
             self.parsed_dsn = None
-
-    def capture_event(self, event):
-        # type: (Self, Event) -> None
-        """
-        DEPRECATED: Please use capture_envelope instead.
-
-        This gets invoked with the event dictionary when an event should
-        be sent to sentry.
-        """
-
-        warnings.warn(
-            "capture_event is deprecated, please use capture_envelope instead!",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        envelope = Envelope()
-        envelope.add_event(event)
-        self.capture_envelope(envelope)
 
     @abstractmethod
     def capture_envelope(self, envelope):
@@ -178,17 +157,8 @@ def _parse_rate_limits(header, now=None):
 
             retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
-                if category == "metric_bucket":
-                    try:
-                        namespaces = parameters[4].split(";")
-                    except IndexError:
-                        namespaces = []
-
-                    if not namespaces or "custom" in namespaces:
-                        yield category, retry_after  # type: ignore
-
-                else:
-                    yield category, retry_after  # type: ignore
+                category = cast("Optional[EventDataCategory]", category)
+                yield category, retry_after
         except (LookupError, ValueError):
             continue
 
@@ -214,9 +184,6 @@ class BaseHttpTransport(Transport):
         self._last_client_report_sent = time.time()
 
         self._pool = self._make_pool()
-
-        # Backwards compatibility for deprecated `self.hub_class` attribute
-        self._hub_cls = sentry_sdk.Hub
 
         experiments = options.get("_experiments", {})
         compression_level = experiments.get(
@@ -424,12 +391,6 @@ class BaseHttpTransport(Transport):
         # type: (str) -> bool
         def _disabled(bucket):
             # type: (Any) -> bool
-
-            # The envelope item type used for metrics is statsd
-            # whereas the rate limit category is metric_bucket
-            if bucket == "statsd":
-                bucket = "metric_bucket"
-
             ts = self._disabled_until.get(bucket)
             return ts is not None and ts > datetime.now(timezone.utc)
 
@@ -456,7 +417,7 @@ class BaseHttpTransport(Transport):
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
-                if item.data_category in ("transaction", "error", "default", "statsd"):
+                if item.data_category in ("transaction", "error", "default"):
                     self.on_dropped_event("self_rate_limits")
                 self.record_lost_event("ratelimit_backoff", item=item)
             else:
@@ -584,30 +545,6 @@ class BaseHttpTransport(Transport):
         # type: (Self) -> None
         logger.debug("Killing HTTP transport")
         self._worker.kill()
-
-    @staticmethod
-    def _warn_hub_cls():
-        # type: () -> None
-        """Convenience method to warn users about the deprecation of the `hub_cls` attribute."""
-        warnings.warn(
-            "The `hub_cls` attribute is deprecated and will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-    @property
-    def hub_cls(self):
-        # type: (Self) -> type[sentry_sdk.Hub]
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        return self._hub_cls
-
-    @hub_cls.setter
-    def hub_cls(self, value):
-        # type: (Self, type[sentry_sdk.Hub]) -> None
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        self._hub_cls = value
 
 
 class HttpTransport(BaseHttpTransport):
@@ -849,35 +786,6 @@ else:
             return httpcore.ConnectionPool(**opts)
 
 
-class _FunctionTransport(Transport):
-    """
-    DEPRECATED: Users wishing to provide a custom transport should subclass
-    the Transport class, rather than providing a function.
-    """
-
-    def __init__(
-        self, func  # type: Callable[[Event], None]
-    ):
-        # type: (...) -> None
-        Transport.__init__(self)
-        self._func = func
-
-    def capture_event(
-        self, event  # type: Event
-    ):
-        # type: (...) -> None
-        self._func(event)
-        return None
-
-    def capture_envelope(self, envelope: Envelope) -> None:
-        # Since function transports expect to be called with an event, we need
-        # to iterate over the envelope and call the function for each event, via
-        # the deprecated capture_event method.
-        event = envelope.get_event()
-        if event is not None:
-            self.capture_event(event)
-
-
 def make_transport(options):
     # type: (Dict[str, Any]) -> Optional[Transport]
     ref_transport = options["transport"]
@@ -893,14 +801,6 @@ def make_transport(options):
         return ref_transport
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
-    elif callable(ref_transport):
-        warnings.warn(
-            "Function transports are deprecated and will be removed in a future release."
-            "Please provide a Transport instance or subclass, instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not
     # empty or None

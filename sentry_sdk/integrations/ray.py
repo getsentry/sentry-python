@@ -4,7 +4,7 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     event_from_exception,
     logger,
@@ -25,6 +25,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional
     from sentry_sdk.utils import ExcInfo
+
+DEFAULT_TRANSACTION_NAME = "unknown Ray function"
 
 
 def _check_sentry_initialized():
@@ -58,25 +60,28 @@ def _patch_ray_remote():
             """
             _check_sentry_initialized()
 
-            transaction = sentry_sdk.continue_trace(
-                _tracing or {},
-                op=OP.QUEUE_TASK_RAY,
-                name=qualname_from_function(f),
-                origin=RayIntegration.origin,
-                source=TRANSACTION_SOURCE_TASK,
+            root_span_name = qualname_from_function(f) or DEFAULT_TRANSACTION_NAME
+            sentry_sdk.get_current_scope().set_transaction_name(
+                root_span_name,
+                source=TransactionSource.TASK,
             )
+            with sentry_sdk.continue_trace(_tracing or {}):
+                with sentry_sdk.start_span(
+                    op=OP.QUEUE_TASK_RAY,
+                    name=root_span_name,
+                    origin=RayIntegration.origin,
+                    source=TransactionSource.TASK,
+                ) as root_span:
+                    try:
+                        result = f(*f_args, **f_kwargs)
+                        root_span.set_status(SPANSTATUS.OK)
+                    except Exception:
+                        root_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                        exc_info = sys.exc_info()
+                        _capture_exception(exc_info)
+                        reraise(*exc_info)
 
-            with sentry_sdk.start_transaction(transaction) as transaction:
-                try:
-                    result = f(*f_args, **f_kwargs)
-                    transaction.set_status(SPANSTATUS.OK)
-                except Exception:
-                    transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    exc_info = sys.exc_info()
-                    _capture_exception(exc_info)
-                    reraise(*exc_info)
-
-                return result
+                    return result
 
         rv = old_remote(_f, *args, *kwargs)
         old_remote_method = rv.remote
@@ -90,6 +95,7 @@ def _patch_ray_remote():
                 op=OP.QUEUE_SUBMIT_RAY,
                 name=qualname_from_function(f),
                 origin=RayIntegration.origin,
+                only_if_parent=True,
             ) as span:
                 tracing = {
                     k: v

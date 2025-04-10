@@ -1,13 +1,190 @@
-# Sentry SDK 2.0 Migration Guide
+# Sentry SDK Migration Guide
 
-Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed. Looking for a more digestable summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/1.x-to-2.x) with the most common migration patterns.
+## Upgrading to 3.0
 
-## New Features
+Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of what's changed. Looking for a more digestible summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x) with the most common migration patterns.
+
+### New Features
+
+### Changed
+
+- The SDK now supports Python 3.7 and higher.
+- The default of `traces_sample_rate` changed to `0`. Meaning: Incoming traces will be continued by default. For example, if your frontend sends a `sentry-trace/baggage` headers pair, your SDK will create Spans and send them to Sentry. (The default used to be `None` meaning by default no Spans where created, no matter what headers the frontend sent to your project.) See also: https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate
+- `sentry_sdk.start_span` now only takes keyword arguments.
+- `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
+- You can no longer change the sampled status of a span with `span.sampled = False` after starting it.
+- The `Span()` constructor does not accept a `hub` parameter anymore.
+- `Span.finish()` does not accept a `hub` parameter anymore.
+- `Span.finish()` no longer returns the `event_id` if the event is sent to sentry.
+- The `Profile()` constructor does not accept a `hub` parameter anymore.
+- A `Profile` object does not have a `.hub` property anymore.
+- `MAX_PROFILE_DURATION_NS`, `PROFILE_MINIMUM_SAMPLES`, `Profile`, `Scheduler`, `ThreadScheduler`, `GeventScheduler`, `has_profiling_enabled`, `setup_profiler`, `teardown_profiler` are no longer accessible from `sentry_sdk.profiler`. They're still accessible from `sentry_sdk.profiler.transaction_profiler`.
+- `DEFAULT_SAMPLING_FREQUENCY`, `MAX_STACK_DEPTH`, `get_frame_name`, `extract_frame`, `extract_stack`, `frame_id` are no longer accessible from `sentry_sdk.profiler`. They're still accessible from `sentry_sdk.profiler.utils`.
+- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
+- Redis integration: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
+- clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
+- `sentry_sdk.init` now returns `None` instead of a context manager.
+- The `sampling_context` argument of `traces_sampler` and `profiles_sampler` now additionally contains all span attributes known at span start.
+- We updated how we handle `ExceptionGroup`s. You will now get more data if ExceptionGroups are appearing in chained exceptions. It could happen that after updating the SDK the grouping of issues change because of this. So eventually you will see the same exception in two Sentry issues (one from before the update, one from after the update)
+- The integration-specific content of the `sampling_context` argument of `traces_sampler` and `profiles_sampler` now looks different.
+  - The Celery integration doesn't add the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
+
+    | Dictionary keys        | Sampling context key        | Example                        |
+    | ---------------------- | --------------------------- | ------------------------------ |
+    | `celery_job["args"]`   | `celery.job.args.{index}`   | `celery.job.args.0`            |
+    | `celery_job["kwargs"]` | `celery.job.kwargs.{kwarg}` | `celery.job.kwargs.kwarg_name` |
+    | `celery_job["task"]`   | `celery.job.task`           |                                |
+
+    Note that all of these are serialized, i.e., not the original `args` and `kwargs` but rather OpenTelemetry-friendly span attributes.
+
+  - The AIOHTTP integration doesn't add the `aiohttp_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+
+    | Request property  | Sampling context key(s)         |
+    | ----------------- | ------------------------------- |
+    | `path`            | `url.path`                      |
+    | `query_string`    | `url.query`                     |
+    | `method`          | `http.request.method`           |
+    | `host`            | `server.address`, `server.port` |
+    | `scheme`          | `url.scheme`                    |
+    | full URL          | `url.full`                      |
+    | `request.headers` | `http.request.header.{header}`  |
+
+  - The Tornado integration doesn't add the `tornado_request` object anymore. Instead, some of the individual properties of the request are accessible, if available, as follows:
+
+    | Request property  | Sampling context key(s)                             |
+    | ----------------- | --------------------------------------------------- |
+    | `path`            | `url.path`                                          |
+    | `query`           | `url.query`                                         |
+    | `protocol`        | `url.scheme`                                        |
+    | `method`          | `http.request.method`                               |
+    | `host`            | `server.address`, `server.port`                     |
+    | `version`         | `network.protocol.name`, `network.protocol.version` |
+    | full URL          | `url.full`                                          |
+    | `request.headers` | `http.request.header.{header}`                      |
+
+  - The WSGI integration doesn't add the `wsgi_environ` object anymore. Instead, the individual properties of the environment are accessible, if available, as follows:
+
+    | Env property      | Sampling context key(s)                           |
+    | ----------------- | ------------------------------------------------- |
+    | `PATH_INFO`       | `url.path`                                        |
+    | `QUERY_STRING`    | `url.query`                                       |
+    | `REQUEST_METHOD`  | `http.request.method`                             |
+    | `SERVER_NAME`     | `server.address`                                  |
+    | `SERVER_PORT`     | `server.port`                                     |
+    | `SERVER_PROTOCOL` | `server.protocol.name`, `server.protocol.version` |
+    | `wsgi.url_scheme` | `url.scheme`                                      |
+    | full URL          | `url.full`                                        |
+    | `HTTP_*`          | `http.request.header.{header}`                    |
+
+  - The ASGI integration doesn't add the `asgi_scope` object anymore. Instead, the individual properties of the scope, if available, are accessible as follows:
+
+    | Scope property | Sampling context key(s)         |
+    | -------------- | ------------------------------- |
+    | `type`         | `network.protocol.name`         |
+    | `scheme`       | `url.scheme`                    |
+    | `path`         | `url.path`                      |
+    | `query`        | `url.query`                     |
+    | `http_version` | `network.protocol.version`      |
+    | `method`       | `http.request.method`           |
+    | `server`       | `server.address`, `server.port` |
+    | `client`       | `client.address`, `client.port` |
+    | full URL       | `url.full`                      |
+    | `headers`      | `http.request.header.{header}`  |
+
+  -The RQ integration doesn't add the `rq_job` object anymore. Instead, the individual properties of the job and the queue, if available, are accessible as follows:
+
+    | RQ property     | Sampling context key         | Example                |
+    | --------------- | ---------------------------- | ---------------------- |
+    | `rq_job.args`   | `rq.job.args.{index}`        | `rq.job.args.0`        |
+    | `rq_job.kwargs` | `rq.job.kwargs.{kwarg}`      | `rq.job.args.my_kwarg` |
+    | `rq_job.func`   | `rq.job.func`                |                        |
+    | `queue.name`    | `messaging.destination.name` |                        |
+    | `rq_job.id`     | `messaging.message.id`       |                        |
+
+    Note that `rq.job.args`, `rq.job.kwargs`, and `rq.job.func` are serialized and not the actual objects on the job.
+
+  - The AWS Lambda integration doesn't add the `aws_event` and `aws_context` objects anymore. Instead, the following, if available, is accessible:
+
+    | AWS property                                | Sampling context key(s)         |
+    | ------------------------------------------- | ------------------------------- |
+    | `aws_event["httpMethod"]`                   | `http.request.method`           |
+    | `aws_event["queryStringParameters"]`        | `url.query`                     |
+    | `aws_event["path"]`                         | `url.path`                      |
+    | full URL                                    | `url.full`                      |
+    | `aws_event["headers"]["X-Forwarded-Proto"]` | `network.protocol.name`         |
+    | `aws_event["headers"]["Host"]`              | `server.address`                |
+    | `aws_context["function_name"]`              | `faas.name`                     |
+    | `aws_event["headers"]`                      | `http.request.headers.{header}` |
+
+  - The GCP integration doesn't add the `gcp_env` and `gcp_event` keys anymore. Instead, the following, if available, is accessible:
+
+    | Old sampling context key          | New sampling context key       |
+    | --------------------------------- | ------------------------------ |
+    | `gcp_env["function_name"]`        | `faas.name`                    |
+    | `gcp_env["function_region"]`      | `faas.region`                  |
+    | `gcp_env["function_project"]`     | `gcp.function.project`         |
+    | `gcp_env["function_identity"]`    | `gcp.function.identity`        |
+    | `gcp_env["function_entry_point"]` | `gcp.function.entry_point`     |
+    | `gcp_event.method`                | `http.request.method`          |
+    | `gcp_event.query_string`          | `url.query`                    |
+    | `gcp_event.headers`               | `http.request.header.{header}` |
+
+
+### Removed
+
+- Dropped support for Python 3.6.
+- The `enable_tracing` `init` option has been removed. Configure `traces_sample_rate` directly.
+- The `propagate_traces` `init` option has been removed. Use `trace_propagation_targets` instead.
+- The `custom_sampling_context` parameter of `start_transaction` has been removed. Use `attributes` instead to set key-value pairs of data that should be accessible in the traces sampler. Note that span attributes need to conform to the [OpenTelemetry specification](https://opentelemetry.io/docs/concepts/signals/traces/#attributes), meaning only certain types can be set as values.
+- The PyMongo integration no longer sets tags. The data is still accessible via span attributes.
+- The PyMongo integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
+- `sentry_sdk.metrics` and associated metrics APIs have been removed as Sentry no longer accepts metrics data in this form. See https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics
+- The experimental options `enable_metrics`, `before_emit_metric` and `metric_code_locations` have been removed.
+- When setting span status, the HTTP status code is no longer automatically added as a tag.
+- Class `Hub` has been removed.
+- Class `_ScopeManager` has been removed.
+- The context manager `auto_session_tracking()` has been removed. Use `track_session()` instead.
+- The context manager `auto_session_tracking_scope()` has been removed. Use `track_session()` instead.
+- Utility function `is_auto_session_tracking_enabled()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function) It accepts a `scope` parameter instead of the previously used `hub` parameter.
+- Utility function `is_auto_session_tracking_enabled_scope()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function).
+- Setting `scope.level` has been removed. Use `scope.set_level` instead.
+- `span.containing_transaction` has been removed. Use `span.root_span` instead.
+- `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.
+- `PropagationContext` constructor no longer takes a `dynamic_sampling_context` but takes a `baggage` object instead.
+- `ThreadingIntegration` no longer takes the `propagate_hub` argument.
+- `Baggage.populate_from_transaction` has been removed.
+- `debug.configure_debug_hub` was removed.
+- `profiles_sample_rate` and `profiler_mode` were removed from options available via `_experiments`. Use the top-level `profiles_sample_rate` and `profiler_mode` options instead.
+- `Transport.capture_event` has been removed. Use `Transport.capture_envelope` instead.
+- Function transports are no longer supported. Subclass the `Transport` instead.
+- `start_transaction` (`start_span`) no longer takes the following arguments:
+  - `trace_id`, `baggage`: use `continue_trace` for propagation from headers or environment variables
+  - `same_process_as_parent`
+  - `span_id`
+  - `parent_span_id`: you can supply a `parent_span` instead
+- Setting `Scope.transaction` directly is no longer supported. Use `Scope.set_transaction_name()` instead.
+- Passing a list or `None` for `failed_request_status_codes` in the Starlette integration is no longer supported. Pass a set of integers instead.
+- The `span` argument of `Scope.trace_propagation_meta` is no longer supported.
+- Setting `Scope.user` directly is no longer supported. Use `Scope.set_user()` instead.
+- Dropped support for Django versions below 2.0.
+- Dropped support for trytond versions below 5.0.
+- Dropped support for Falcon versions below 3.0.
+
+### Deprecated
+
+- `sentry_sdk.start_transaction()` is deprecated. Use `sentry_sdk.start_span()` instead.
+- `Span.set_data()` is deprecated. Use `Span.set_attribute()` instead.
+
+## Upgrading to 2.0
+
+Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed. Looking for a more digestible summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/1.x-to-2.x) with the most common migration patterns.
+
+### New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
 - While refactoring the [inner workings](https://docs.sentry.io/platforms/python/enriching-events/scopes/) of the SDK we added new top-level APIs for custom instrumentation called `new_scope` and `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
 
-## Changed
+### Changed
 
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
 - The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
@@ -59,7 +236,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 
     </details>
 
-## Removed
+### Removed
 
 - Removed support for Python 2 and Python 3.5. The SDK now requires at least Python 3.6.
 - Removed support for Celery 3.\*.
@@ -82,7 +259,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - Removed the experimental `metrics_summary_sample_rate` config option.
 - Removed the experimental `should_summarize_metric` config option.
 
-## Deprecated
+### Deprecated
 
 - Using the `Hub` directly as well as using hub-based APIs has been deprecated. Where available, use [the top-level API instead](sentry_sdk/api.py); otherwise use the [scope API](sentry_sdk/scope.py) or the [client API](sentry_sdk/client.py).
 

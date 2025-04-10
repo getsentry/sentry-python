@@ -10,14 +10,6 @@ The tests use the following credentials to establish a database connection.
 """
 
 import os
-
-
-PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
-PG_PORT = int(os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"))
-PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
-PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
-PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
-
 import datetime
 from contextlib import contextmanager
 from unittest import mock
@@ -26,17 +18,25 @@ import asyncpg
 import pytest
 import pytest_asyncio
 from asyncpg import connect, Connection
+from freezegun import freeze_time
 
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message, start_span
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
 
 
+PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+PG_PORT = int(os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"))
+PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
+PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
+PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
+
 PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(
     PG_USER, PG_PASSWORD, PG_HOST, PG_NAME
 )
+
 CRUMBS_CONNECT = {
     "category": "query",
     "data": ApproxDict(
@@ -84,7 +84,7 @@ async def test_connect(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -123,7 +123,7 @@ async def test_execute(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -179,7 +179,7 @@ async def test_execute_many(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -216,7 +216,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -259,13 +259,13 @@ async def test_cursor(sentry_init, capture_events) -> None:
         async for record in conn.cursor(
             "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
         ):
-            print(record)
+            pass
 
     await conn.close()
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -278,14 +278,24 @@ async def test_cursor(sentry_init, capture_events) -> None:
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
-        {"category": "query", "data": {}, "message": "BEGIN;", "type": "default"},
+        {
+            "category": "query",
+            "data": {},
+            "message": "BEGIN;",
+            "type": "default",
+        },
         {
             "category": "query",
             "data": {},
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
-        {"category": "query", "data": {}, "message": "COMMIT;", "type": "default"},
+        {
+            "category": "query",
+            "data": {},
+            "message": "COMMIT;",
+            "type": "default",
+        },
     ]
 
 
@@ -306,24 +316,22 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             ("Alice", "pw", datetime.date(1990, 12, 25)),
         ],
     )
-    #
+
     async with conn.transaction():
         # Postgres requires non-scrollable cursors to be created
         # and used in a transaction.
         cur = await conn.cursor(
             "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
         )
-        record = await cur.fetchrow()
-        print(record)
+        await cur.fetchrow()
         while await cur.forward(1):
-            record = await cur.fetchrow()
-            print(record)
+            await cur.fetchrow()
 
     await conn.close()
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -336,14 +344,24 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
-        {"category": "query", "data": {}, "message": "BEGIN;", "type": "default"},
+        {
+            "category": "query",
+            "data": {},
+            "message": "BEGIN;",
+            "type": "default",
+        },
         {
             "category": "query",
             "data": {},
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
-        {"category": "query", "data": {}, "message": "COMMIT;", "type": "default"},
+        {
+            "category": "query",
+            "data": {},
+            "message": "COMMIT;",
+            "type": "default",
+        },
     ]
 
 
@@ -367,14 +385,14 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
 
     stmt = await conn.prepare("SELECT * FROM users WHERE name = $1")
 
-    print(await stmt.fetchval("Bob"))
-    print(await stmt.fetchval("Alice"))
+    await stmt.fetchval("Bob")
+    await stmt.fetchval("Alice")
 
     await conn.close()
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -426,7 +444,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
 
     capture_message("hi")
 
-    (event,) = events
+    event = events[-1]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -471,7 +489,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
 async def test_query_source_disabled(sentry_init, capture_events):
     sentry_options = {
         "integrations": [AsyncPGIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
     }
@@ -480,7 +498,7 @@ async def test_query_source_disabled(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -509,7 +527,7 @@ async def test_query_source_enabled(
 ):
     sentry_options = {
         "integrations": [AsyncPGIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
@@ -519,7 +537,7 @@ async def test_query_source_enabled(
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -545,14 +563,14 @@ async def test_query_source_enabled(
 async def test_query_source(sentry_init, capture_events):
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute(
@@ -595,7 +613,7 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
     """
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
@@ -604,7 +622,7 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
 
     from asyncpg_helpers.helpers import execute_query_in_connection
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await execute_query_in_connection(
@@ -641,31 +659,33 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
 async def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
-                pass
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
-            yield span
+            with freeze_time(datetime.datetime(2024, 1, 1, microsecond=99999)):
+                with record_sql_queries(*args, **kwargs) as span:
+                    yield span
 
         with mock.patch(
-            "sentry_sdk.integrations.asyncpg.record_sql_queries",
-            fake_record_sql_queries,
+            "sentry_sdk.tracing.Span.start_timestamp",
+            datetime.datetime(2024, 1, 1, microsecond=0, tzinfo=datetime.timezone.utc),
         ):
-            await conn.execute(
-                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-            )
+            with mock.patch(
+                "sentry_sdk.integrations.asyncpg.record_sql_queries",
+                fake_record_sql_queries,
+            ):
+                await conn.execute(
+                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+                )
 
         await conn.close()
 
@@ -686,31 +706,33 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 async def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
     sentry_init(
         integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
-                pass
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
-            yield span
+            with freeze_time(datetime.datetime(2024, 1, 1, microsecond=100001)):
+                with record_sql_queries(*args, **kwargs) as span:
+                    yield span
 
         with mock.patch(
-            "sentry_sdk.integrations.asyncpg.record_sql_queries",
-            fake_record_sql_queries,
+            "sentry_sdk.tracing.Span.start_timestamp",
+            datetime.datetime(2024, 1, 1, microsecond=0, tzinfo=datetime.timezone.utc),
         ):
-            await conn.execute(
-                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-            )
+            with mock.patch(
+                "sentry_sdk.integrations.asyncpg.record_sql_queries",
+                fake_record_sql_queries,
+            ):
+                await conn.execute(
+                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+                )
 
         await conn.close()
 
@@ -753,7 +775,7 @@ async def test_span_origin(sentry_init, capture_events):
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction"):
+    with start_span(name="test_span"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         await conn.execute("SELECT 1")

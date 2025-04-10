@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import event_from_exception
 
 from typing import TYPE_CHECKING
@@ -44,26 +44,24 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                     return await handler(request, context)
 
                 # What if the headers are empty?
-                transaction = Transaction.continue_from_headers(
-                    dict(context.invocation_metadata()),
-                    op=OP.GRPC_SERVER,
-                    name=name,
-                    source=TRANSACTION_SOURCE_CUSTOM,
-                    origin=SPAN_ORIGIN,
-                )
-
-                with sentry_sdk.start_transaction(transaction=transaction):
-                    try:
-                        return await handler.unary_unary(request, context)
-                    except AbortError:
-                        raise
-                    except Exception as exc:
-                        event, hint = event_from_exception(
-                            exc,
-                            mechanism={"type": "grpc", "handled": False},
-                        )
-                        sentry_sdk.capture_event(event, hint=hint)
-                        raise
+                with sentry_sdk.continue_trace(dict(context.invocation_metadata())):
+                    with sentry_sdk.start_span(
+                        op=OP.GRPC_SERVER,
+                        name=name,
+                        source=TransactionSource.CUSTOM,
+                        origin=SPAN_ORIGIN,
+                    ):
+                        try:
+                            return await handler.unary_unary(request, context)
+                        except AbortError:
+                            raise
+                        except Exception as exc:
+                            event, hint = event_from_exception(
+                                exc,
+                                mechanism={"type": "grpc", "handled": False},
+                            )
+                            sentry_sdk.capture_event(event, hint=hint)
+                            raise
 
         elif not handler.request_streaming and handler.response_streaming:
             handler_factory = grpc.unary_stream_rpc_method_handler

@@ -8,7 +8,6 @@ The DSC is propagated between service using a header called "baggage".
 This is not tested in this file.
 """
 
-import random
 from unittest import mock
 
 import pytest
@@ -30,8 +29,8 @@ def test_dsc_head_of_trace(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    # We start a new transaction
-    with sentry_sdk.start_transaction(name="foo"):
+    # We start a new root_span
+    with sentry_sdk.start_span(name="foo"):
         pass
 
     assert len(envelopes) == 1
@@ -98,10 +97,10 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
         "HTTP_BAGGAGE": baggage,
     }
 
-    # We continue the incoming trace and start a new transaction
-    transaction = sentry_sdk.continue_trace(incoming_http_headers)
-    with sentry_sdk.start_transaction(transaction, name="foo"):
-        pass
+    # We continue the incoming trace and start a new root span
+    with sentry_sdk.continue_trace(incoming_http_headers):
+        with sentry_sdk.start_span(name="foo"):
+            pass
 
     assert len(envelopes) == 1
 
@@ -118,7 +117,7 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
 
     assert "sample_rate" in envelope_trace_header
     assert type(envelope_trace_header["sample_rate"]) == str
-    assert envelope_trace_header["sample_rate"] == "1.0"
+    assert envelope_trace_header["sample_rate"] == "0.01337"
 
     assert "sampled" in envelope_trace_header
     assert type(envelope_trace_header["sampled"]) == str
@@ -138,7 +137,7 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
 
 
 def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
-    sentry_init, capture_envelopes
+    sentry_init, capture_envelopes, monkeypatch
 ):
     """
     Another service calls our service and passes tracing information to us.
@@ -176,10 +175,10 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
     }
 
     # We continue the incoming trace and start a new transaction
-    with mock.patch.object(random, "random", return_value=0.2):
-        transaction = sentry_sdk.continue_trace(incoming_http_headers)
-        with sentry_sdk.start_transaction(transaction, name="foo"):
-            pass
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.125):
+        with sentry_sdk.continue_trace(incoming_http_headers):
+            with sentry_sdk.start_span(name="foo"):
+                pass
 
     assert len(envelopes) == 1
 
@@ -215,6 +214,213 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
     assert envelope_trace_header["transaction"] == "bar"
 
 
+@pytest.mark.parametrize(
+    "test_data, expected_sample_rate, expected_sampled",
+    [
+        # Test data:
+        # "incoming_sample_rate":
+        #       The "sentry-sample_rate" in the incoming `baggage` header.
+        # "incoming_sampled":
+        #       The "sentry-sampled" in the incoming `baggage` header.
+        # "sentry_trace_header_parent_sampled":
+        #       The number at the end in the `sentry-trace` header, called "parent_sampled".
+        # "use_local_traces_sampler":
+        #       Whether the local traces sampler is used.
+        # "local_traces_sampler_result":
+        #       The result of the local traces sampler.
+        # "local_traces_sample_rate":
+        #       The `traces_sample_rate` setting in the local `sentry_init` call.
+        (  # 1 traces_sample_rate does not override incoming
+            {
+                "incoming_sample_rate": 1.0,
+                "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": 1,
+                "use_local_traces_sampler": False,
+                "local_traces_sampler_result": None,
+                "local_traces_sample_rate": 0.7,
+            },
+            1.0,  # expected_sample_rate
+            "true",  # expected_sampled
+        ),
+        (  # 2 traces_sampler overrides incoming
+            {
+                "incoming_sample_rate": 1.0,
+                "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": 1,
+                "use_local_traces_sampler": True,
+                "local_traces_sampler_result": 0.5,
+                "local_traces_sample_rate": 0.7,
+            },
+            0.5,  # expected_sample_rate
+            "true",  # expected_sampled
+        ),
+        (  # 3 traces_sample_rate does not overrides incoming sample rate or parent (incoming not sampled)
+            {
+                "incoming_sample_rate": 1.0,
+                "incoming_sampled": "false",
+                "sentry_trace_header_parent_sampled": 0,
+                "use_local_traces_sampler": False,
+                "local_traces_sampler_result": None,
+                "local_traces_sample_rate": 0.7,
+            },
+            None,  # expected_sample_rate
+            "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled (because the parent sampled is 0)
+        ),
+        (  # 4 traces_sampler overrides incoming (incoming not sampled)
+            {
+                "incoming_sample_rate": 0.3,
+                "incoming_sampled": "false",
+                "sentry_trace_header_parent_sampled": 0,
+                "use_local_traces_sampler": True,
+                "local_traces_sampler_result": 0.25,
+                "local_traces_sample_rate": 0.7,
+            },
+            0.25,  # expected_sample_rate
+            "false",  # expected_sampled (traces sampler can override parent sampled)
+        ),
+        (  # 5 forwarding incoming (traces_sample_rate not set)
+            {
+                "incoming_sample_rate": 1.0,
+                "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": 1,
+                "use_local_traces_sampler": False,
+                "local_traces_sampler_result": None,
+                "local_traces_sample_rate": None,
+            },
+            1.0,  # expected_sample_rate
+            "true",  # expected_sampled
+        ),
+        (  # 6 traces_sampler overrides incoming  (traces_sample_rate not set)
+            {
+                "incoming_sample_rate": 1.0,
+                "incoming_sampled": "true",
+                "sentry_trace_header_parent_sampled": 1,
+                "use_local_traces_sampler": True,
+                "local_traces_sampler_result": 0.5,
+                "local_traces_sample_rate": None,
+            },
+            0.5,  # expected_sample_rate
+            "true",  # expected_sampled (traces sampler overrides the traces_sample_rate setting, so transactions are created)
+        ),
+        (  # 7 forwarding incoming (traces_sample_rate not set) (incoming not sampled)
+            {
+                "incoming_sample_rate": 1.0,
+                "incoming_sampled": "false",
+                "sentry_trace_header_parent_sampled": 0,
+                "use_local_traces_sampler": False,
+                "local_traces_sampler_result": None,
+                "local_traces_sample_rate": None,
+            },
+            None,  # expected_sample_rate
+            "tracing-disabled-no-transactions-should-be-sent",  # expected_sampled (traces_sample_rate=None disables all transaction creation)
+        ),
+        (  # 8 traces_sampler overrides incoming  (traces_sample_rate not set) (incoming not sampled)
+            {
+                "incoming_sample_rate": 0.3,
+                "incoming_sampled": "false",
+                "sentry_trace_header_parent_sampled": 0,
+                "use_local_traces_sampler": True,
+                "local_traces_sampler_result": 0.25,
+                "local_traces_sample_rate": None,
+            },
+            0.25,  # expected_sample_rate
+            "false",  # expected_sampled
+        ),
+        (  # 9 traces_sample_rate overrides incoming (upstream deferred sampling decision)
+            {
+                "incoming_sample_rate": 1.0,
+                "incoming_sampled": None,
+                "sentry_trace_header_parent_sampled": None,
+                "use_local_traces_sampler": False,
+                "local_traces_sampler_result": 0.5,
+                "local_traces_sample_rate": 0.7,
+            },
+            0.7,  # expected_sample_rate
+            "true",  # expected_sampled
+        ),
+    ],
+    ids=(
+        "1 traces_sample_rate does not override incoming",
+        "2 traces_sampler overrides incoming",
+        "3 traces_sample_rate does not overrides incoming sample rate or parent (incoming not sampled)",
+        "4 traces_sampler overrides incoming (incoming not sampled)",
+        "5 forwarding incoming (traces_sample_rate not set)",
+        "6 traces_sampler overrides incoming  (traces_sample_rate not set)",
+        "7 forwarding incoming (traces_sample_rate not set) (incoming not sampled)",
+        "8 traces_sampler overrides incoming  (traces_sample_rate not set) (incoming not sampled)",
+        "9 traces_sample_rate overrides incoming (upstream deferred sampling decision)",
+    ),
+)
+def test_dsc_sample_rate_change(
+    sentry_init,
+    capture_envelopes,
+    test_data,
+    expected_sample_rate,
+    expected_sampled,
+):
+    """
+    Another service calls our service and passes tracing information to us.
+    Our service is continuing the trace, but modifies the sample rate.
+    The DSC in transaction envelopes should contain the updated sample rate.
+    """
+
+    def my_traces_sampler(sampling_context):
+        return test_data["local_traces_sampler_result"]
+
+    init_kwargs = {
+        "dsn": "https://mysecret@bla.ingest.sentry.io/12312012",
+        "release": "myapp@0.0.1",
+        "environment": "canary",
+    }
+
+    if test_data["local_traces_sample_rate"]:
+        init_kwargs["traces_sample_rate"] = test_data["local_traces_sample_rate"]
+
+    if test_data["use_local_traces_sampler"]:
+        init_kwargs["traces_sampler"] = my_traces_sampler
+
+    sentry_init(**init_kwargs)
+    envelopes = capture_envelopes()
+
+    # This is what the upstream service sends us
+    incoming_trace_id = "771a43a4192642f0b136d5159a501700"
+    if test_data["sentry_trace_header_parent_sampled"] is None:
+        sentry_trace = f"{incoming_trace_id}-1234567890abcdef"
+    else:
+        sentry_trace = f"{incoming_trace_id}-1234567890abcdef-{test_data['sentry_trace_header_parent_sampled']}"
+
+    baggage = (
+        f"sentry-trace_id={incoming_trace_id}, "
+        f"sentry-sample_rate={str(test_data['incoming_sample_rate'])}, "
+        f"sentry-sampled={test_data['incoming_sampled']}, "
+        "sentry-public_key=frontendpublickey, "
+        "sentry-release=myapp@0.0.1, "
+        "sentry-environment=prod, "
+        "sentry-transaction=foo, "
+    )
+    incoming_http_headers = {
+        "HTTP_SENTRY_TRACE": sentry_trace,
+        "HTTP_BAGGAGE": baggage,
+    }
+
+    # We continue the incoming trace and start a new transaction
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.2):
+        with sentry_sdk.continue_trace(incoming_http_headers):
+            with sentry_sdk.start_span(name="foo"):
+                pass
+
+    if expected_sampled == "tracing-disabled-no-transactions-should-be-sent":
+        assert len(envelopes) == 0
+    else:
+        assert len(envelopes) == 1
+        transaction_envelope = envelopes[0]
+        dsc_in_envelope_header = transaction_envelope.headers["trace"]
+
+        assert dsc_in_envelope_header["sample_rate"] == str(expected_sample_rate)
+        assert dsc_in_envelope_header["sampled"] == str(expected_sampled).lower()
+        assert dsc_in_envelope_header["trace_id"] == incoming_trace_id
+
+
 def test_dsc_issue(sentry_init, capture_envelopes):
     """
     Our service is a standalone service that does not have tracing enabled. Just uses Sentry for error reporting.
@@ -226,7 +432,7 @@ def test_dsc_issue(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    # No transaction is started, just an error is captured
+    # No root span is started, just an error is captured
     try:
         1 / 0
     except ZeroDivisionError as exp:
@@ -262,8 +468,8 @@ def test_dsc_issue(sentry_init, capture_envelopes):
 
 def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     """
-    Our service has tracing enabled and an error occurs in an transaction.
-    Envelopes containing errors also have the same DSC than the transaction envelopes.
+    Our service has tracing enabled and an error occurs in an root span.
+    Envelopes containing errors also have the same DSC than the root span envelopes.
     """
     sentry_init(
         dsn="https://mysecret@bla.ingest.sentry.io/12312012",
@@ -273,8 +479,8 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    # We start a new transaction and an error occurs
-    with sentry_sdk.start_transaction(name="foo"):
+    # We start a new root span and an error occurs
+    with sentry_sdk.start_span(name="foo"):
         try:
             1 / 0
         except ZeroDivisionError as exp:
@@ -320,7 +526,7 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     "traces_sample_rate",
     [
         0,  # no traces will be started, but if incoming traces will be continued (by our instrumentations, not happening in this test)
-        None,  # no tracing at all. This service will never create transactions.
+        None,  # no tracing at all. This service will never create root spans.
     ],
 )
 def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
@@ -359,14 +565,14 @@ def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
     }
 
     # We continue the trace (meaning: saving the incoming trace information on the scope)
-    # but in this test, we do not start a transaction.
-    sentry_sdk.continue_trace(incoming_http_headers)
+    # but in this test, we do not start a root span.
+    with sentry_sdk.continue_trace(incoming_http_headers):
 
-    # No transaction is started, just an error is captured
-    try:
-        1 / 0
-    except ZeroDivisionError as exp:
-        sentry_sdk.capture_exception(exp)
+        # No root span is started, just an error is captured
+        try:
+            1 / 0
+        except ZeroDivisionError as exp:
+            sentry_sdk.capture_exception(exp)
 
     assert len(envelopes) == 1
 

@@ -8,7 +8,7 @@ from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
 )
-from sentry_sdk.integrations.redis.modules.queries import _set_db_data
+from sentry_sdk.integrations.redis.modules.queries import _get_db_data
 
 from typing import TYPE_CHECKING
 
@@ -26,13 +26,13 @@ def _patch_redis(StrictRedis, client):  # noqa: N803
     patch_redis_client(
         StrictRedis,
         is_cluster=False,
-        set_db_data_fn=_set_db_data,
+        get_db_data_fn=_get_db_data,
     )
     patch_redis_pipeline(
         client.Pipeline,
         is_cluster=False,
         get_command_args_fn=_get_redis_command_args,
-        set_db_data_fn=_set_db_data,
+        get_db_data_fn=_get_db_data,
     )
     try:
         strict_pipeline = client.StrictPipeline
@@ -43,7 +43,7 @@ def _patch_redis(StrictRedis, client):  # noqa: N803
             strict_pipeline,
             is_cluster=False,
             get_command_args_fn=_get_redis_command_args,
-            set_db_data_fn=_set_db_data,
+            get_db_data_fn=_get_db_data,
         )
 
     try:
@@ -59,11 +59,11 @@ def _patch_redis(StrictRedis, client):  # noqa: N803
         patch_redis_async_client(
             redis.asyncio.client.StrictRedis,
             is_cluster=False,
-            set_db_data_fn=_set_db_data,
+            get_db_data_fn=_get_db_data,
         )
         patch_redis_async_pipeline(
             redis.asyncio.client.Pipeline,
             False,
             _get_redis_command_args,
-            set_db_data_fn=_set_db_data,
+            get_db_data_fn=_get_db_data,
         )

@@ -4,7 +4,6 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk import isolation_scope
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
@@ -14,7 +13,7 @@ from sentry_sdk.integrations.celery.beat import (
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TransactionSource
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -113,7 +112,6 @@ def _capture_exception(task, exc_info):
         return
 
     if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
-        # ??? Doesn't map to anything
         _set_status("aborted")
         return
 
@@ -277,6 +275,7 @@ def _wrap_task_run(f):
                 op=OP.QUEUE_SUBMIT_CELERY,
                 name=task_name,
                 origin=CeleryIntegration.origin,
+                only_if_parent=True,
             )
             if not task_started_from_beat
             else NoOpMgr()
@@ -307,40 +306,29 @@ def _wrap_tracer(task, f):
         with isolation_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
+            scope.set_transaction_name(task.name, source=TransactionSource.TASK)
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
-
-            transaction = None
 
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
-            with capture_internal_exceptions():
-                headers = args[3].get("headers") or {}
-                transaction = continue_trace(
-                    headers,
+            headers = args[3].get("headers") or {}
+
+            with sentry_sdk.continue_trace(headers):
+                with sentry_sdk.start_span(
                     op=OP.QUEUE_TASK_CELERY,
-                    name="unknown celery task",
-                    source=TRANSACTION_SOURCE_TASK,
+                    name=task.name,
+                    source=TransactionSource.TASK,
                     origin=CeleryIntegration.origin,
-                )
-                transaction.name = task.name
-                transaction.set_status(SPANSTATUS.OK)
+                    # for some reason, args[1] is a list if non-empty but a
+                    # tuple if empty
+                    attributes=_prepopulate_attributes(task, list(args[1]), args[2]),
+                ) as root_span:
+                    return_value = f(*args, **kwargs)
 
-            if transaction is None:
-                return f(*args, **kwargs)
+                    if root_span.status is None:
+                        root_span.set_status(SPANSTATUS.OK)
 
-            with sentry_sdk.start_transaction(
-                transaction,
-                custom_sampling_context={
-                    "celery_job": {
-                        "task": task.name,
-                        # for some reason, args[1] is a list if non-empty but a
-                        # tuple if empty
-                        "args": list(args[1]),
-                        "kwargs": args[2],
-                    }
-                },
-            ):
-                return f(*args, **kwargs)
+                    return return_value
 
     return _inner  # type: ignore
 
@@ -355,7 +343,7 @@ def _set_messaging_destination_name(task, span):
             if delivery_info.get("exchange") == "" and routing_key is not None:
                 # Empty exchange indicates the default exchange, meaning the tasks
                 # are sent to the queue with the same name as the routing key.
-                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+                span.set_attribute(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
 
 def _wrap_task_call(task, f):
@@ -377,6 +365,7 @@ def _wrap_task_call(task, f):
                 op=OP.QUEUE_PROCESS,
                 name=task.name,
                 origin=CeleryIntegration.origin,
+                only_if_parent=True,
             ) as span:
                 _set_messaging_destination_name(task, span)
 
@@ -391,23 +380,26 @@ def _wrap_task_call(task, f):
                         )
 
                 if latency is not None:
-                    span.set_data(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
+                    span.set_attribute(
+                        SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency
+                    )
 
                 with capture_internal_exceptions():
-                    span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+                    span.set_attribute(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
 
                 with capture_internal_exceptions():
-                    span.set_data(
+                    span.set_attribute(
                         SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
                     )
 
                 with capture_internal_exceptions():
-                    span.set_data(
+                    span.set_attribute(
                         SPANDATA.MESSAGING_SYSTEM,
                         task.app.connection().transport.driver_type,
                     )
 
                 return f(*args, **kwargs)
+
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
@@ -506,23 +498,41 @@ def _patch_producer_publish():
             op=OP.QUEUE_PUBLISH,
             name=task_name,
             origin=CeleryIntegration.origin,
+            only_if_parent=True,
         ) as span:
             if task_id is not None:
-                span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
+                span.set_attribute(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
 
             if exchange == "" and routing_key is not None:
                 # Empty exchange indicates the default exchange, meaning messages are
                 # routed to the queue with the same name as the routing key.
-                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+                span.set_attribute(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
             if retries is not None:
-                span.set_data(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
+                span.set_attribute(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
 
             with capture_internal_exceptions():
-                span.set_data(
+                span.set_attribute(
                     SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
                 )
 
             return original_publish(self, *args, **kwargs)
 
     Producer.publish = sentry_publish
+
+
+def _prepopulate_attributes(task, args, kwargs):
+    # type: (Any, *Any, **Any) -> dict[str, str]
+    attributes = {
+        "celery.job.task": task.name,
+    }
+
+    for i, arg in enumerate(args):
+        with capture_internal_exceptions():
+            attributes[f"celery.job.args.{i}"] = str(arg)
+
+    for kwarg, value in kwargs.items():
+        with capture_internal_exceptions():
+            attributes[f"celery.job.kwargs.{kwarg}"] = str(value)
+
+    return attributes

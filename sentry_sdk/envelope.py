@@ -79,7 +79,11 @@ class Envelope:
     ):
         # type: (...) -> None
         self.add_item(
-            Item(payload=PayloadRef(json=profile_chunk), type="profile_chunk")
+            Item(
+                payload=PayloadRef(json=profile_chunk),
+                type="profile_chunk",
+                headers={"platform": profile_chunk.get("platform", "python")},
+            )
         )
 
     def add_checkin(
@@ -101,6 +105,12 @@ class Envelope:
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=sessions), type="sessions"))
+
+    def add_log(
+        self, log  # type: Any
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=log), type="otel_log"))
 
     def add_item(
         self, item  # type: Item
@@ -268,14 +278,14 @@ class Item:
             return "transaction"
         elif ty == "event":
             return "error"
+        elif ty == "otel_log":
+            return "log"
         elif ty == "client_report":
             return "internal"
         elif ty == "profile":
             return "profile"
         elif ty == "profile_chunk":
             return "profile_chunk"
-        elif ty == "statsd":
-            return "metric_bucket"
         elif ty == "check_in":
             return "monitor"
         else:
@@ -335,7 +345,7 @@ class Item:
             # if no length was specified we need to read up to the end of line
             # and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)
             payload = f.readline().rstrip(b"\n")
-        if headers.get("type") in ("event", "transaction", "metric_buckets"):
+        if headers.get("type") in ("event", "transaction"):
             rv = cls(headers=headers, payload=PayloadRef(json=parse_json(payload)))
         else:
             rv = cls(headers=headers, payload=payload)

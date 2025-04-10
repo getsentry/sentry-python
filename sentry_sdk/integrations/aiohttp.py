@@ -3,7 +3,6 @@ import weakref
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
@@ -15,18 +14,20 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.sessions import track_session
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
+    _request_headers_to_span_attributes,
     request_body_within_bounds,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SOURCE_FOR_STYLE,
-    TRANSACTION_SOURCE_ROUTE,
+    TransactionSource,
 )
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    http_client_status_to_breadcrumb_level,
     logger,
     parse_url,
     parse_version,
@@ -66,6 +67,13 @@ if TYPE_CHECKING:
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
+
+REQUEST_PROPERTY_TO_ATTRIBUTE = {
+    "query_string": "url.query",
+    "method": "http.request.method",
+    "scheme": "url.scheme",
+    "path": "url.path",
+}
 
 
 class AioHttpIntegration(Integration):
@@ -123,51 +131,38 @@ class AioHttpIntegration(Integration):
                     scope.add_event_processor(_make_request_processor(weak_request))
 
                     headers = dict(request.headers)
-                    transaction = continue_trace(
-                        headers,
-                        op=OP.HTTP_SERVER,
-                        # If this transaction name makes it to the UI, AIOHTTP's
-                        # URL resolver did not find a route or died trying.
-                        name="generic AIOHTTP request",
-                        source=TRANSACTION_SOURCE_ROUTE,
-                        origin=AioHttpIntegration.origin,
-                    )
-                    with sentry_sdk.start_transaction(
-                        transaction,
-                        custom_sampling_context={"aiohttp_request": request},
-                    ):
-                        try:
-                            response = await old_handle(self, request)
-                        except HTTPException as e:
-                            transaction.set_http_status(e.status_code)
+                    with sentry_sdk.continue_trace(headers):
+                        with sentry_sdk.start_span(
+                            op=OP.HTTP_SERVER,
+                            # If this transaction name makes it to the UI, AIOHTTP's
+                            # URL resolver did not find a route or died trying.
+                            name="generic AIOHTTP request",
+                            source=TransactionSource.ROUTE,
+                            origin=AioHttpIntegration.origin,
+                            attributes=_prepopulate_attributes(request),
+                        ) as span:
+                            try:
+                                response = await old_handle(self, request)
+                            except HTTPException as e:
+                                span.set_http_status(e.status_code)
 
-                            if (
-                                e.status_code
-                                in integration._failed_request_status_codes
-                            ):
-                                _capture_exception()
+                                if (
+                                    e.status_code
+                                    in integration._failed_request_status_codes
+                                ):
+                                    _capture_exception()
 
-                            raise
-                        except (asyncio.CancelledError, ConnectionResetError):
-                            transaction.set_status(SPANSTATUS.CANCELLED)
-                            raise
-                        except Exception:
-                            # This will probably map to a 500 but seems like we
-                            # have no way to tell. Do not set span status.
-                            reraise(*_capture_exception())
+                                raise
+                            except (asyncio.CancelledError, ConnectionResetError):
+                                span.set_status(SPANSTATUS.CANCELLED)
+                                raise
+                            except Exception:
+                                # This will probably map to a 500 but seems like we
+                                # have no way to tell. Do not set span status.
+                                reraise(*_capture_exception())
 
-                        try:
-                            # A valid response handler will return a valid response with a status. But, if the handler
-                            # returns an invalid response (e.g. None), the line below will raise an AttributeError.
-                            # Even though this is likely invalid, we need to handle this case to ensure we don't break
-                            # the application.
-                            response_status = response.status
-                        except AttributeError:
-                            pass
-                        else:
-                            transaction.set_http_status(response_status)
-
-                        return response
+                            span.set_http_status(response.status)
+                            return response
 
         Application._handle = sentry_app_handle
 
@@ -238,12 +233,19 @@ def create_trace_config():
             name="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin=AioHttpIntegration.origin,
+            only_if_parent=True,
         )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
+
+        data = {
+            SPANDATA.HTTP_METHOD: method,
+        }
         if parsed_url is not None:
-            span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            data["url"] = parsed_url.url
+            data[SPANDATA.HTTP_QUERY] = parsed_url.query
+            data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
+        for key, value in data.items():
+            span.set_attribute(key, value)
 
         client = sentry_sdk.get_client()
 
@@ -268,15 +270,28 @@ def create_trace_config():
                     params.headers[key] = value
 
         trace_config_ctx.span = span
+        trace_config_ctx.span_data = data
 
     async def on_request_end(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
         if trace_config_ctx.span is None:
             return
 
+        span_data = trace_config_ctx.span_data or {}
+        status_code = int(params.response.status)
+        span_data[SPANDATA.HTTP_STATUS_CODE] = status_code
+        span_data["reason"] = params.response.reason
+
+        sentry_sdk.add_breadcrumb(
+            type="http",
+            category="httplib",
+            data=span_data,
+            level=http_client_status_to_breadcrumb_level(status_code),
+        )
+
         span = trace_config_ctx.span
         span.set_http_status(int(params.response.status))
-        span.set_data("reason", params.response.reason)
+        span.set_attribute("reason", params.response.reason)
         span.finish()
 
     trace_config = TraceConfig()
@@ -355,3 +370,30 @@ def get_aiohttp_request_data(request):
 
     # request has no body
     return None
+
+
+def _prepopulate_attributes(request):
+    # type: (Request) -> dict[str, Any]
+    """Construct initial span attributes that can be used in traces sampler."""
+    attributes = {}
+
+    for prop, attr in REQUEST_PROPERTY_TO_ATTRIBUTE.items():
+        if getattr(request, prop, None) is not None:
+            attributes[attr] = getattr(request, prop)
+
+    if getattr(request, "host", None) is not None:
+        try:
+            host, port = request.host.split(":")
+            attributes["server.address"] = host
+            attributes["server.port"] = port
+        except ValueError:
+            attributes["server.address"] = request.host
+
+    with capture_internal_exceptions():
+        url = f"{request.scheme}://{request.host}{request.path}"  # noqa: E231
+        if request.query_string:
+            attributes["url.full"] = f"{url}?{request.query_string}"
+
+    attributes.update(_request_headers_to_span_attributes(dict(request.headers)))
+
+    return attributes

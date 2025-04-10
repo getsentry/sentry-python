@@ -1,7 +1,7 @@
 import sys
 import logging
 
-from sentry_sdk import capture_exception, capture_event, start_transaction, start_span
+from sentry_sdk import capture_exception, capture_event, start_span
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk.scrubber import EventScrubber
 from tests.conftest import ApproxDict
@@ -119,25 +119,33 @@ def test_stack_var_scrubbing(sentry_init, capture_events):
 
 
 def test_breadcrumb_extra_scrubbing(sentry_init, capture_events):
-    sentry_init()
+    sentry_init(max_breadcrumbs=2)
     events = capture_events()
-
-    logger.info("bread", extra=dict(foo=42, password="secret"))
+    logger.info("breadcrumb 1", extra=dict(foo=1, password="secret"))
+    logger.info("breadcrumb 2", extra=dict(bar=2, auth="secret"))
+    logger.info("breadcrumb 3", extra=dict(foobar=3, password="secret"))
     logger.critical("whoops", extra=dict(bar=69, auth="secret"))
 
     (event,) = events
 
     assert event["extra"]["bar"] == 69
     assert event["extra"]["auth"] == "[Filtered]"
-
     assert event["breadcrumbs"]["values"][0]["data"] == {
-        "foo": 42,
+        "bar": 2,
+        "auth": "[Filtered]",
+    }
+    assert event["breadcrumbs"]["values"][1]["data"] == {
+        "foobar": 3,
         "password": "[Filtered]",
     }
 
     assert event["_meta"]["extra"]["auth"] == {"": {"rem": [["!config", "s"]]}}
     assert event["_meta"]["breadcrumbs"] == {
-        "values": {"0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}}
+        "": {"len": 3},
+        "values": {
+            "0": {"data": {"auth": {"": {"rem": [["!config", "s"]]}}}},
+            "1": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}},
+        },
     }
 
 
@@ -145,10 +153,10 @@ def test_span_data_scrubbing(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction(name="hi"):
+    with start_span(name="hi"):
         with start_span(op="foo", name="bar") as span:
-            span.set_data("password", "secret")
-            span.set_data("datafoo", "databar")
+            span.set_attribute("password", "secret")
+            span.set_attribute("datafoo", "databar")
 
     (event,) = events
     assert event["spans"][0]["data"] == ApproxDict(

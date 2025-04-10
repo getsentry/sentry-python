@@ -3,7 +3,7 @@ from unittest import mock
 import pytest
 from fakeredis import FakeStrictRedis
 
-from sentry_sdk import capture_message, start_transaction
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
@@ -23,7 +23,7 @@ def test_basic(sentry_init, capture_events):
     connection = FakeStrictRedis()
 
     connection.get("foobar")
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
     (event,) = events
     (crumb,) = event["breadcrumbs"]["values"]
@@ -60,7 +60,7 @@ def test_redis_pipeline(
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with start_transaction():
+    with sentry_sdk.start_span():
         pipeline = connection.pipeline(transaction=is_transaction)
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -72,17 +72,15 @@ def test_redis_pipeline(
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
     assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
-    assert span["data"]["redis.commands"] == {
-        "count": 3,
-        "first_ten": expected_first_ten,
-    }
+    assert span["data"]["redis.commands.count"] == 3
+    assert span["data"]["redis.commands.first_ten"] == expected_first_ten
     assert span["tags"] == {
         "redis.transaction": is_transaction,
         "redis.is_cluster": False,
     }
 
 
-def test_sensitive_data(sentry_init, capture_events):
+def test_sensitive_data(sentry_init, capture_events, render_span_tree):
     # fakeredis does not support the AUTH command, so we need to mock it
     with mock.patch(
         "sentry_sdk.integrations.redis.utils._COMMANDS_INCLUDING_SENSITIVE_DATA",
@@ -96,18 +94,22 @@ def test_sensitive_data(sentry_init, capture_events):
         events = capture_events()
 
         connection = FakeStrictRedis()
-        with start_transaction():
+        with sentry_sdk.start_span():
             connection.get(
                 "this is super secret"
             )  # because fakeredis does not support AUTH we use GET instead
 
         (event,) = events
-        spans = event["spans"]
-        assert spans[0]["op"] == "db.redis"
-        assert spans[0]["description"] == "GET [Filtered]"
+        assert (
+            render_span_tree(event)
+            == """\
+- op="<unlabeled span>": description=null
+  - op="db.redis": description="GET [Filtered]"\
+"""
+        )
 
 
-def test_pii_data_redacted(sentry_init, capture_events):
+def test_pii_data_redacted(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
@@ -115,22 +117,26 @@ def test_pii_data_redacted(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with start_transaction():
+    with sentry_sdk.start_span():
         connection.set("somekey1", "my secret string1")
         connection.set("somekey2", "my secret string2")
         connection.get("somekey2")
         connection.delete("somekey1", "somekey2")
 
     (event,) = events
-    spans = event["spans"]
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' [Filtered]"
-    assert spans[1]["description"] == "SET 'somekey2' [Filtered]"
-    assert spans[2]["description"] == "GET 'somekey2'"
-    assert spans[3]["description"] == "DEL 'somekey1' [Filtered]"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="<unlabeled span>": description=null
+  - op="db.redis": description="SET 'somekey1' [Filtered]"
+  - op="db.redis": description="SET 'somekey2' [Filtered]"
+  - op="db.redis": description="GET 'somekey2'"
+  - op="db.redis": description="DEL 'somekey1' [Filtered]"\
+"""
+    )
 
 
-def test_pii_data_sent(sentry_init, capture_events):
+def test_pii_data_sent(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
@@ -139,22 +145,26 @@ def test_pii_data_sent(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with start_transaction():
+    with sentry_sdk.start_span():
         connection.set("somekey1", "my secret string1")
         connection.set("somekey2", "my secret string2")
         connection.get("somekey2")
         connection.delete("somekey1", "somekey2")
 
     (event,) = events
-    spans = event["spans"]
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' 'my secret string1'"
-    assert spans[1]["description"] == "SET 'somekey2' 'my secret string2'"
-    assert spans[2]["description"] == "GET 'somekey2'"
-    assert spans[3]["description"] == "DEL 'somekey1' 'somekey2'"
+    assert (
+        render_span_tree(event)
+        == """\
+- op="<unlabeled span>": description=null
+  - op="db.redis": description="SET 'somekey1' 'my secret string1'"
+  - op="db.redis": description="SET 'somekey2' 'my secret string2'"
+  - op="db.redis": description="GET 'somekey2'"
+  - op="db.redis": description="DEL 'somekey1' 'somekey2'"\
+"""
+    )
 
 
-def test_data_truncation(sentry_init, capture_events):
+def test_data_truncation(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
@@ -163,22 +173,24 @@ def test_data_truncation(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with start_transaction():
+    with sentry_sdk.start_span():
         long_string = "a" * 100000
         connection.set("somekey1", long_string)
         short_string = "b" * 10
         connection.set("somekey2", short_string)
 
     (event,) = events
-    spans = event["spans"]
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' '%s..." % (
-        long_string[: 1024 - len("...") - len("SET 'somekey1' '")],
+    assert (
+        render_span_tree(event)
+        == f"""\
+- op="<unlabeled span>": description=null
+  - op="db.redis": description="SET 'somekey1' '{long_string[: 1024 - len("...") - len("SET 'somekey1' '")]}..."
+  - op="db.redis": description="SET 'somekey2' 'bbbbbbbbbb'"\
+"""  # noqa:  E221
     )
-    assert spans[1]["description"] == "SET 'somekey2' '%s'" % (short_string,)
 
 
-def test_data_truncation_custom(sentry_init, capture_events):
+def test_data_truncation_custom(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[RedisIntegration(max_data_size=30)],
         traces_sample_rate=1.0,
@@ -187,19 +199,21 @@ def test_data_truncation_custom(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with start_transaction():
+    with sentry_sdk.start_span():
         long_string = "a" * 100000
         connection.set("somekey1", long_string)
         short_string = "b" * 10
         connection.set("somekey2", short_string)
 
     (event,) = events
-    spans = event["spans"]
-    assert spans[0]["op"] == "db.redis"
-    assert spans[0]["description"] == "SET 'somekey1' '%s..." % (
-        long_string[: 30 - len("...") - len("SET 'somekey1' '")],
+    assert (
+        render_span_tree(event)
+        == f"""\
+- op="<unlabeled span>": description=null
+  - op="db.redis": description="SET 'somekey1' '{long_string[: 30 - len("...") - len("SET 'somekey1' '")]}..."
+  - op="db.redis": description="SET 'somekey2' '{short_string}'"\
+"""  # noqa:  E221
     )
-    assert spans[1]["description"] == "SET 'somekey2' '%s'" % (short_string,)
 
 
 def test_breadcrumbs(sentry_init, capture_events):
@@ -216,7 +230,7 @@ def test_breadcrumbs(sentry_init, capture_events):
     short_string = "b" * 10
     connection.set("somekey2", short_string)
 
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
     (event,) = events
     crumbs = event["breadcrumbs"]["values"]
@@ -254,7 +268,7 @@ def test_db_connection_attributes_client(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
         connection.get("foobar")
 
@@ -276,7 +290,7 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with start_transaction():
+    with sentry_sdk.start_span():
         connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
         pipeline = connection.pipeline(transaction=False)
         pipeline.get("foo")
@@ -303,7 +317,7 @@ def test_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with start_transaction(name="custom_transaction"):
+    with sentry_sdk.start_span(name="custom_transaction"):
         # default case
         connection.set("somekey", "somevalue")
 

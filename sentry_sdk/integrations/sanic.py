@@ -4,12 +4,11 @@ from inspect import isawaitable
 from urllib.parse import urlsplit
 
 import sentry_sdk
-from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -182,21 +181,25 @@ async def _context_enter(request):
         return
 
     weak_request = weakref.ref(request)
-    request.ctx._sentry_scope = sentry_sdk.isolation_scope()
-    scope = request.ctx._sentry_scope.__enter__()
+    request.ctx._sentry_scope_manager = sentry_sdk.isolation_scope()
+    scope = request.ctx._sentry_scope_manager.__enter__()
+    request.ctx._sentry_scope = scope
+
+    scope.set_transaction_name(request.path, TransactionSource.URL)
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
-    transaction = continue_trace(
-        dict(request.headers),
+    # TODO-neel-potel test if this works
+    request.ctx._sentry_continue_trace = sentry_sdk.continue_trace(
+        dict(request.headers)
+    )
+    request.ctx._sentry_continue_trace.__enter__()
+    request.ctx._sentry_transaction = sentry_sdk.start_span(
         op=OP.HTTP_SERVER,
         # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
         name=request.path,
-        source=TRANSACTION_SOURCE_URL,
+        source=TransactionSource.URL,
         origin=SanicIntegration.origin,
-    )
-    request.ctx._sentry_transaction = sentry_sdk.start_transaction(
-        transaction
     ).__enter__()
 
 
@@ -211,16 +214,23 @@ async def _context_exit(request, response=None):
         response_status = None if response is None else response.status
 
         # This capture_internal_exceptions block has been intentionally nested here, so that in case an exception
-        # happens while trying to end the transaction, we still attempt to exit the hub.
+        # happens while trying to end the transaction, we still attempt to exit the scope.
         with capture_internal_exceptions():
             request.ctx._sentry_transaction.set_http_status(response_status)
-            request.ctx._sentry_transaction.sampled &= (
-                isinstance(integration, SanicIntegration)
-                and response_status not in integration._unsampled_statuses
-            )
-            request.ctx._sentry_transaction.__exit__(None, None, None)
 
-        request.ctx._sentry_scope.__exit__(None, None, None)
+            if (
+                isinstance(integration, SanicIntegration)
+                and response_status in integration._unsampled_statuses
+            ):
+                # drop the event in an event processor
+                request.ctx._sentry_scope.add_event_processor(
+                    lambda _event, _hint: None
+                )
+
+            request.ctx._sentry_transaction.__exit__(None, None, None)
+            request.ctx._sentry_continue_trace.__exit__(None, None, None)
+
+        request.ctx._sentry_scope_manager.__exit__(None, None, None)
 
 
 async def _set_transaction(request, route, **_):
@@ -229,7 +239,7 @@ async def _set_transaction(request, route, **_):
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
             route_name = route.name.replace(request.app.name, "").strip(".")
-            scope.set_transaction_name(route_name, source=TRANSACTION_SOURCE_COMPONENT)
+            scope.set_transaction_name(route_name, source=TransactionSource.COMPONENT)
 
 
 def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
@@ -304,11 +314,11 @@ def _legacy_router_get(self, *args):
                     sanic_route = sanic_route[len(sanic_app_name) + 1 :]
 
                 scope.set_transaction_name(
-                    sanic_route, source=TRANSACTION_SOURCE_COMPONENT
+                    sanic_route, source=TransactionSource.COMPONENT
                 )
             else:
                 scope.set_transaction_name(
-                    rv[0].__name__, source=TRANSACTION_SOURCE_COMPONENT
+                    rv[0].__name__, source=TransactionSource.COMPONENT
                 )
 
     return rv

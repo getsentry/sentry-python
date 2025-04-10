@@ -1,6 +1,6 @@
 import socket
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.integrations.socket import SocketIntegration
 from tests.conftest import ApproxDict
 
@@ -9,7 +9,7 @@ def test_getaddrinfo_trace(sentry_init, capture_events):
     sentry_init(integrations=[SocketIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction():
+    with start_span(name="socket"):
         socket.getaddrinfo("example.com", 443)
 
     (event,) = events
@@ -31,7 +31,7 @@ def test_create_connection_trace(sentry_init, capture_events):
     sentry_init(integrations=[SocketIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction():
+    with start_span(name="socket"):
         socket.create_connection(("example.com", 443), timeout, None)
 
     (event,) = events
@@ -42,9 +42,9 @@ def test_create_connection_trace(sentry_init, capture_events):
     assert connect_span["description"] == "example.com:443"
     assert connect_span["data"] == ApproxDict(
         {
-            "address": ["example.com", 443],
+            "address.host": "example.com",
+            "address.port": 443,
             "timeout": timeout,
-            "source_address": None,
         }
     )
 
@@ -65,7 +65,7 @@ def test_span_origin(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with start_transaction(name="foo"):
+    with start_span(name="foo"):
         socket.create_connection(("example.com", 443), 1, None)
 
     (event,) = events

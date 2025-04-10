@@ -1,13 +1,16 @@
 import contextlib
+import decimal
 import inspect
 import os
 import re
 import sys
-from collections.abc import Mapping
-from datetime import timedelta
-from functools import wraps
-from urllib.parse import quote, unquote
 import uuid
+from collections.abc import Mapping
+from datetime import datetime, timedelta, timezone
+from decimal import ROUND_DOWN, Context, Decimal
+from functools import wraps
+from random import Random
+from urllib.parse import quote, unquote
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -33,7 +36,6 @@ if TYPE_CHECKING:
     from typing import Generator
     from typing import Optional
     from typing import Union
-
     from types import FrameType
 
 
@@ -44,6 +46,7 @@ SENTRY_TRACE_REGEX = re.compile(
     "-?([01])?"  # sampled
     "[ \t]*$"  # whitespace
 )
+
 
 # This is a normal base64 regex, modified to reflect that fact that we strip the
 # trailing = or == off
@@ -92,17 +95,14 @@ def has_tracing_enabled(options):
     # type: (Optional[Dict[str, Any]]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    defined and enable_tracing is set and not false.
+    defined.
     """
     if options is None:
         return False
 
     return bool(
-        options.get("enable_tracing") is not False
-        and (
-            options.get("traces_sample_rate") is not None
-            or options.get("traces_sampler") is not None
-        )
+        options.get("traces_sample_rate") is not None
+        or options.get("traces_sampler") is not None
     )
 
 
@@ -114,7 +114,7 @@ def record_sql_queries(
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
     record_cursor_repr=False,  # type: bool
-    span_origin="manual",  # type: str
+    span_origin=None,  # type: Optional[str]
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
@@ -148,42 +148,11 @@ def record_sql_queries(
         op=OP.DB,
         name=query,
         origin=span_origin,
+        only_if_parent=True,
     ) as span:
         for k, v in data.items():
-            span.set_data(k, v)
+            span.set_attribute(k, v)
         yield span
-
-
-def maybe_create_breadcrumbs_from_span(scope, span):
-    # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
-    if span.op == OP.DB_REDIS:
-        scope.add_breadcrumb(
-            message=span.description, type="redis", category="redis", data=span._tags
-        )
-
-    elif span.op == OP.HTTP_CLIENT:
-        level = None
-        status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)
-        if status_code:
-            if 500 <= status_code <= 599:
-                level = "error"
-            elif 400 <= status_code <= 499:
-                level = "warning"
-
-        if level:
-            scope.add_breadcrumb(
-                type="http", category="httplib", data=span._data, level=level
-            )
-        else:
-            scope.add_breadcrumb(type="http", category="httplib", data=span._data)
-
-    elif span.op == "subprocess":
-        scope.add_breadcrumb(
-            type="subprocess",
-            category="subprocess",
-            message=span.description,
-            data=span._data,
-        )
 
 
 def _get_frame_module_abs_path(frame):
@@ -223,14 +192,17 @@ def add_query_source(span):
     if not client.is_active():
         return
 
-    if span.timestamp is None or span.start_timestamp is None:
+    if span.start_timestamp is None:
         return
 
     should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
-    duration = span.timestamp - span.start_timestamp
+    # We assume here that the query is just ending now. We can't use
+    # the actual end timestamp of the span because in OTel the span
+    # can't be finished in order to set any attributes on it.
+    duration = datetime.now(tz=timezone.utc) - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 
@@ -277,14 +249,14 @@ def add_query_source(span):
         except Exception:
             lineno = None
         if lineno is not None:
-            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+            span.set_attribute(SPANDATA.CODE_LINENO, frame.f_lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+            span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -294,7 +266,7 @@ def add_query_source(span):
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
-            span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+            span.set_attribute(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -302,7 +274,7 @@ def add_query_source(span):
             code_function = None
 
         if code_function is not None:
-            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def extract_sentrytrace_data(header):
@@ -367,7 +339,7 @@ class PropagationContext:
         "_span_id",
         "parent_span_id",
         "parent_sampled",
-        "dynamic_sampling_context",
+        "baggage",
     )
 
     def __init__(
@@ -376,7 +348,7 @@ class PropagationContext:
         span_id=None,  # type: Optional[str]
         parent_span_id=None,  # type: Optional[str]
         parent_sampled=None,  # type: Optional[bool]
-        dynamic_sampling_context=None,  # type: Optional[Dict[str, str]]
+        baggage=None,  # type: Optional[Baggage]
     ):
         # type: (...) -> None
         self._trace_id = trace_id
@@ -394,8 +366,13 @@ class PropagationContext:
         Important when the parent span originated in an upstream service,
         because we want to sample the whole trace, or nothing from the trace."""
 
-        self.dynamic_sampling_context = dynamic_sampling_context
-        """Data that is used for dynamic sampling decisions."""
+        self.baggage = baggage
+        """Baggage object used for dynamic sampling decisions."""
+
+    @property
+    def dynamic_sampling_context(self):
+        # type: () -> Optional[Dict[str, str]]
+        return self.baggage.dynamic_sampling_context() if self.baggage else None
 
     @classmethod
     def from_incoming_data(cls, incoming_data):
@@ -406,9 +383,7 @@ class PropagationContext:
         baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
         if baggage_header:
             propagation_context = PropagationContext()
-            propagation_context.dynamic_sampling_context = Baggage.from_incoming_header(
-                baggage_header
-            ).dynamic_sampling_context()
+            propagation_context.baggage = Baggage.from_incoming_header(baggage_header)
 
         sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
         if sentry_trace_header:
@@ -417,6 +392,9 @@ class PropagationContext:
                 if propagation_context is None:
                     propagation_context = PropagationContext()
                 propagation_context.update(sentrytrace_data)
+
+        if propagation_context is not None:
+            propagation_context._fill_sample_rand()
 
         return propagation_context
 
@@ -459,13 +437,86 @@ class PropagationContext:
             except AttributeError:
                 pass
 
+    def _fill_sample_rand(self):
+        # type: () -> None
+        """
+        Ensure that there is a valid sample_rand value in the baggage.
+
+        If there is a valid sample_rand value in the baggage, we keep it.
+        Otherwise, we generate a sample_rand value according to the following:
+
+          - If we have a parent_sampled value and a sample_rate in the DSC, we compute
+            a sample_rand value randomly in the range:
+                - [0, sample_rate) if parent_sampled is True,
+                - or, in the range [sample_rate, 1) if parent_sampled is False.
+
+          - If either parent_sampled or sample_rate is missing, we generate a random
+            value in the range [0, 1).
+
+        The sample_rand is deterministically generated from the trace_id, if present.
+
+        This function does nothing if there is no dynamic_sampling_context.
+        """
+        if self.dynamic_sampling_context is None or self.baggage is None:
+            return
+
+        sentry_baggage = self.baggage.sentry_items
+
+        sample_rand = None
+        if sentry_baggage.get("sample_rand"):
+            try:
+                sample_rand = Decimal(sentry_baggage["sample_rand"])
+            except Exception:
+                logger.debug(
+                    f"Failed to convert incoming sample_rand to Decimal: {sample_rand}"
+                )
+
+        if sample_rand is not None and 0 <= sample_rand < 1:
+            # sample_rand is present and valid, so don't overwrite it
+            return
+
+        sample_rate = None
+        if sentry_baggage.get("sample_rate"):
+            try:
+                sample_rate = float(sentry_baggage["sample_rate"])
+            except Exception:
+                logger.debug(
+                    f"Failed to convert incoming sample_rate to float: {sample_rate}"
+                )
+
+        lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
+
+        try:
+            sample_rand = _generate_sample_rand(self.trace_id, interval=(lower, upper))
+        except ValueError:
+            # ValueError is raised if the interval is invalid, i.e. lower >= upper.
+            # lower >= upper might happen if the incoming trace's sampled flag
+            # and sample_rate are inconsistent, e.g. sample_rate=0.0 but sampled=True.
+            # We cannot generate a sensible sample_rand value in this case.
+            logger.debug(
+                f"Could not backfill sample_rand, since parent_sampled={self.parent_sampled} "
+                f"and sample_rate={sample_rate}."
+            )
+            return
+
+        self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
+
+    def _sample_rand(self):
+        # type: () -> Optional[str]
+        """Convenience method to get the sample_rand value from the baggage."""
+        if self.baggage is None:
+            return None
+
+        return self.baggage.sentry_items.get("sample_rand")
+
     def __repr__(self):
         # type: (...) -> str
-        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} dynamic_sampling_context={}>".format(
+        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} baggage={} dynamic_sampling_context={}>".format(
             self._trace_id,
             self._span_id,
             self.parent_span_id,
             self.parent_sampled,
+            self.baggage,
             self.dynamic_sampling_context,
         )
 
@@ -473,6 +524,10 @@ class PropagationContext:
 class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
+
+    Before mutating a `Baggage` object, calling code must check that `mutable` is `True`.
+    Mutating a `Baggage` object that has `mutable` set to `False` is not allowed, but
+    it is the caller's responsibility to enforce this restriction.
     """
 
     __slots__ = ("sentry_items", "third_party_items", "mutable")
@@ -491,8 +546,11 @@ class Baggage:
         self.mutable = mutable
 
     @classmethod
-    def from_incoming_header(cls, header):
-        # type: (Optional[str]) -> Baggage
+    def from_incoming_header(
+        cls,
+        header,  # type: Optional[str]
+    ):
+        # type: (...) -> Baggage
         """
         freeze if incoming header already has sentry baggage
         """
@@ -549,52 +607,6 @@ class Baggage:
             sentry_items["sample_rate"] = str(options["traces_sample_rate"])
 
         return Baggage(sentry_items, third_party_items, mutable)
-
-    @classmethod
-    def populate_from_transaction(cls, transaction):
-        # type: (sentry_sdk.tracing.Transaction) -> Baggage
-        """
-        Populate fresh baggage entry with sentry_items and make it immutable
-        if this is the head SDK which originates traces.
-        """
-        client = sentry_sdk.get_client()
-        sentry_items = {}  # type: Dict[str, str]
-
-        if not client.is_active():
-            return Baggage(sentry_items)
-
-        options = client.options or {}
-
-        sentry_items["trace_id"] = transaction.trace_id
-
-        if options.get("environment"):
-            sentry_items["environment"] = options["environment"]
-
-        if options.get("release"):
-            sentry_items["release"] = options["release"]
-
-        if options.get("dsn"):
-            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
-
-        if (
-            transaction.name
-            and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
-        ):
-            sentry_items["transaction"] = transaction.name
-
-        if transaction.sample_rate is not None:
-            sentry_items["sample_rate"] = str(transaction.sample_rate)
-
-        if transaction.sampled is not None:
-            sentry_items["sampled"] = "true" if transaction.sampled else "false"
-
-        # there's an existing baggage but it was mutable,
-        # which is why we are creating this new baggage.
-        # However, if by chance the user put some sentry items in there, give them precedence.
-        if transaction._baggage and transaction._baggage.sentry_items:
-            sentry_items.update(transaction._baggage.sentry_items)
-
-        return Baggage(sentry_items, mutable=False)
 
     def freeze(self):
         # type: () -> None
@@ -739,7 +751,7 @@ def start_child_span_decorator(func):
 
 
 def get_current_span(scope=None):
-    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[sentry_sdk.tracing.Span]
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -748,12 +760,51 @@ def get_current_span(scope=None):
     return current_span
 
 
+def _generate_sample_rand(
+    trace_id,  # type: Optional[str]
+    interval=(0.0, 1.0),  # type: tuple[float, float]
+):
+    # type: (...) -> Optional[decimal.Decimal]
+    """Generate a sample_rand value from a trace ID.
+
+    The generated value will be pseudorandomly chosen from the provided
+    interval. Specifically, given (lower, upper) = interval, the generated
+    value will be in the range [lower, upper). The value has 6-digit precision,
+    so when printing with .6f, the value will never be rounded up.
+
+    The pseudorandom number generator is seeded with the trace ID.
+    """
+    lower, upper = interval
+    if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
+        raise ValueError("Invalid interval: lower must be less than upper")
+
+    rng = Random(trace_id)
+    sample_rand = upper
+    while sample_rand >= upper:
+        sample_rand = rng.uniform(lower, upper)
+
+    return Decimal(sample_rand).quantize(
+        Decimal("0.000001"), rounding=ROUND_DOWN, context=Context(prec=6)
+    )
+
+
+def _sample_rand_range(parent_sampled, sample_rate):
+    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
+    """
+    Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
+    that a generated sample_rand value must fall into, given the parent_sampled and
+    sample_rate values.
+    """
+    if parent_sampled is None or sample_rate is None:
+        return 0.0, 1.0
+    elif parent_sampled is True:
+        return 0.0, sample_rate
+    else:  # parent_sampled is False
+        return sample_rate, 1.0
+
+
 # Circular imports
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
-    LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span

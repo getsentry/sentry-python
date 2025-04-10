@@ -29,12 +29,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        python-version: ["3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
+        os: [ubuntu-22.04]
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5
@@ -63,20 +59,14 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-strawberry"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
       - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
+        if: ${{ !cancelled() }}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.3.1
+        uses: codecov/codecov-action@v5.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -95,7 +85,7 @@ jobs:
     needs: test-graphql-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
         if: contains(needs.test-graphql-pinned.result, 'failure') || contains(needs.test-graphql-pinned.result, 'skipped')

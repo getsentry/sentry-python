@@ -3,13 +3,9 @@ import contextlib
 from inspect import iscoroutinefunction
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import (
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_ROUTE,
-)
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -23,13 +19,15 @@ from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
     _filter_headers,
     _is_json_content_type,
+    _request_headers_to_span_attributes,
 )
 from sentry_sdk.integrations.logging import ignore_logger
 
 try:
     from tornado import version_info as TORNADO_VERSION
-    from tornado.web import RequestHandler, HTTPError
     from tornado.gen import coroutine
+    from tornado.httputil import HTTPServerRequest
+    from tornado.web import RequestHandler, HTTPError
 except ImportError:
     raise DidNotEnable("Tornado not installed")
 
@@ -43,6 +41,14 @@ if TYPE_CHECKING:
     from typing import Generator
 
     from sentry_sdk._types import Event, EventProcessor
+
+
+REQUEST_PROPERTY_TO_ATTRIBUTE = {
+    "method": "http.request.method",
+    "path": "url.path",
+    "query": "url.query",
+    "protocol": "url.scheme",
+}
 
 
 class TornadoIntegration(Integration):
@@ -114,22 +120,19 @@ def _handle_request_impl(self):
         processor = _make_event_processor(weak_handler)
         scope.add_event_processor(processor)
 
-        transaction = continue_trace(
-            headers,
-            op=OP.HTTP_SERVER,
-            # Like with all other integrations, this is our
-            # fallback transaction in case there is no route.
-            # sentry_urldispatcher_resolve is responsible for
-            # setting a transaction name later.
-            name="generic Tornado request",
-            source=TRANSACTION_SOURCE_ROUTE,
-            origin=TornadoIntegration.origin,
-        )
-
-        with sentry_sdk.start_transaction(
-            transaction, custom_sampling_context={"tornado_request": self.request}
-        ):
-            yield
+        with sentry_sdk.continue_trace(headers):
+            with sentry_sdk.start_span(
+                op=OP.HTTP_SERVER,
+                # Like with all other integrations, this is our
+                # fallback transaction in case there is no route.
+                # sentry_urldispatcher_resolve is responsible for
+                # setting a transaction name later.
+                name="generic Tornado request",
+                source=TransactionSource.ROUTE,
+                origin=TornadoIntegration.origin,
+                attributes=_prepopulate_attributes(self.request),
+            ):
+                yield
 
 
 @ensure_integration_enabled(TornadoIntegration)
@@ -160,7 +163,7 @@ def _make_event_processor(weak_handler):
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
             event["transaction"] = transaction_from_function(method) or ""
-            event["transaction_info"] = {"source": TRANSACTION_SOURCE_COMPONENT}
+            event["transaction_info"] = {"source": TransactionSource.COMPONENT}
 
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)
@@ -221,3 +224,36 @@ class TornadoRequestExtractor(RequestExtractor):
     def size_of_file(self, file):
         # type: (Any) -> int
         return len(file.body or ())
+
+
+def _prepopulate_attributes(request):
+    # type: (HTTPServerRequest) -> dict[str, Any]
+    # https://www.tornadoweb.org/en/stable/httputil.html#tornado.httputil.HTTPServerRequest
+    attributes = {}
+
+    for prop, attr in REQUEST_PROPERTY_TO_ATTRIBUTE.items():
+        if getattr(request, prop, None) is not None:
+            attributes[attr] = getattr(request, prop)
+
+    if getattr(request, "version", None):
+        try:
+            proto, version = request.version.split("/")
+            attributes["network.protocol.name"] = proto
+            attributes["network.protocol.version"] = version
+        except ValueError:
+            attributes["network.protocol.name"] = request.version
+
+    if getattr(request, "host", None):
+        try:
+            address, port = request.host.split(":")
+            attributes["server.address"] = address
+            attributes["server.port"] = port
+        except ValueError:
+            attributes["server.address"] = request.host
+
+    with capture_internal_exceptions():
+        attributes["url.full"] = request.full_url()
+
+    attributes.update(_request_headers_to_span_attributes(request.headers))
+
+    return attributes

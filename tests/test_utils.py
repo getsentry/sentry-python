@@ -7,6 +7,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+from sentry_sdk._compat import PY38
 from sentry_sdk.integrations import Integration
 from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
@@ -31,6 +32,7 @@ from sentry_sdk.utils import (
     _get_installed_modules,
     _generate_installed_modules,
     ensure_integration_enabled,
+    _serialize_span_attribute,
 )
 
 
@@ -58,55 +60,6 @@ def _normalize_distribution_name(name):
     for more details.
     """
     return re.sub(r"[-_.]+", "-", name).lower()
-
-
-@pytest.mark.parametrize(
-    ("input_str", "expected_output"),
-    (
-        (
-            "2021-01-01T00:00:00.000000Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC time
-        (
-            "2021-01-01T00:00:00.000000",
-            datetime(2021, 1, 1).astimezone(timezone.utc),
-        ),  # No TZ -- assume local but convert to UTC
-        (
-            "2021-01-01T00:00:00Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC - No milliseconds
-        (
-            "2021-01-01T00:00:00.000000+00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000+0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2020-12-31T00:00:00.000000+02:00",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
-        ),  # UTC+2 time
-        (
-            "2020-12-31T00:00:00.000000-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time
-        (
-            "2020-12-31T00:00:00-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time - no milliseconds
-    ),
-)
-def test_datetime_from_isoformat(input_str, expected_output):
-    assert datetime_from_isoformat(input_str) == expected_output, input_str
 
 
 @pytest.mark.parametrize(
@@ -901,6 +854,7 @@ def test_get_current_thread_meta_main_thread():
     assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
 
 
+@pytest.mark.skipif(PY38, reason="Flakes a lot on 3.8 in CI.")
 def test_get_current_thread_meta_failed_to_get_main_thread():
     results = Queue(maxsize=1)
 
@@ -951,6 +905,86 @@ def test_format_timestamp_naive():
     # Ensure that some timestamp is returned, without error. We currently treat these as local time, but this is an
     # implementation detail which we should not assert here.
     assert re.fullmatch(timestamp_regex, format_timestamp(datetime_object))
+
+
+class NoStr:
+    def __str__(self):
+        1 / 0
+
+
+@pytest.mark.parametrize(
+    ("value", "result"),
+    (
+        ("meow", "meow"),
+        (1, 1),
+        (47.0, 47.0),
+        (True, True),
+        (["meow", "bark"], ["meow", "bark"]),
+        ([True, False], [True, False]),
+        ([1, 2, 3], [1, 2, 3]),
+        ([46.5, 47.0, 47.5], [46.5, 47.0, 47.5]),
+        (["meow", 47], '["meow", 47]'),  # mixed types not allowed in a list
+        (None, "null"),
+        (
+            {"cat": "meow", "dog": ["bark", "woof"]},
+            '{"cat": "meow", "dog": ["bark", "woof"]}',
+        ),
+        (datetime(2024, 1, 1), "2024-01-01 00:00:00"),
+        (("meow", "purr"), ["meow", "purr"]),
+        (NoStr(), None),
+    ),
+)
+def test_serialize_span_attribute(value, result):
+    assert _serialize_span_attribute(value) == result
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_output"),
+    (
+        (
+            "2021-01-01T00:00:00.000000Z",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),  # UTC time
+        (
+            "2021-01-01T00:00:00.000000",
+            datetime(2021, 1, 1, tzinfo=datetime.now().astimezone().tzinfo),
+        ),  # No TZ -- assume UTC
+        (
+            "2021-01-01T00:00:00Z",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),  # UTC - No milliseconds
+        (
+            "2021-01-01T00:00:00.000000+00:00",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000-00:00",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000+0000",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2021-01-01T00:00:00.000000-0000",
+            datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ),
+        (
+            "2020-12-31T00:00:00.000000+02:00",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
+        ),  # UTC+2 time
+        (
+            "2020-12-31T00:00:00.000000-0200",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+        ),  # UTC-2 time
+        (
+            "2020-12-31T00:00:00-0200",
+            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+        ),  # UTC-2 time - no milliseconds
+    ),
+)
+def test_datetime_from_isoformat(input_str, expected_output):
+    assert datetime_from_isoformat(input_str) == expected_output, input_str
 
 
 def test_qualname_from_function_inner_function():

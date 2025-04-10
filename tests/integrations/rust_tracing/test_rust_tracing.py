@@ -11,7 +11,8 @@ from sentry_sdk.integrations.rust_tracing import (
     RustTracingLevel,
     EventTypeMapping,
 )
-from sentry_sdk import start_transaction, capture_message
+from sentry_sdk import start_span, capture_message
+from tests.conftest import ApproxDict
 
 
 def _test_event_type_mapping(metadata: Dict[str, object]) -> EventTypeMapping:
@@ -74,11 +75,11 @@ def test_on_new_span_on_close(sentry_init, capture_events):
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     events = capture_events()
-    with start_transaction():
+    with start_span():
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         sentry_first_rust_span = sentry_sdk.get_current_span()
-        _, rust_first_rust_span = rust_tracing.spans[3]
+        rust_first_rust_span = rust_tracing.spans[3]
 
         assert sentry_first_rust_span == rust_first_rust_span
 
@@ -102,7 +103,7 @@ def test_on_new_span_on_close(sentry_init, capture_events):
     data = span["data"]
     assert data["use_memoized"]
     assert data["index"] == 10
-    assert data["version"] is None
+    assert "version" not in data
 
 
 def test_nested_on_new_span_on_close(sentry_init, capture_events):
@@ -115,23 +116,19 @@ def test_nested_on_new_span_on_close(sentry_init, capture_events):
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     events = capture_events()
-    with start_transaction():
+    with start_span():
         original_sentry_span = sentry_sdk.get_current_span()
 
         rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
         sentry_first_rust_span = sentry_sdk.get_current_span()
-        _, rust_first_rust_span = rust_tracing.spans[3]
 
         # Use a different `index_arg` value for the inner span to help
         # distinguish the two at the end of the test
         rust_tracing.new_span(RustTracingLevel.Info, 5, index_arg=9)
         sentry_second_rust_span = sentry_sdk.get_current_span()
-        rust_parent_span, rust_second_rust_span = rust_tracing.spans[5]
+        rust_second_rust_span = rust_tracing.spans[5]
 
         assert rust_second_rust_span == sentry_second_rust_span
-        assert rust_parent_span == sentry_first_rust_span
-        assert rust_parent_span == rust_first_rust_span
-        assert rust_parent_span != rust_second_rust_span
 
         rust_tracing.close_span(5)
 
@@ -171,12 +168,12 @@ def test_nested_on_new_span_on_close(sentry_init, capture_events):
     first_span_data = first_span["data"]
     assert first_span_data["use_memoized"]
     assert first_span_data["index"] == 10
-    assert first_span_data["version"] is None
+    assert "version" not in first_span_data
 
     second_span_data = second_span["data"]
     assert second_span_data["use_memoized"]
     assert second_span_data["index"] == 9
-    assert second_span_data["version"] is None
+    assert "version" not in second_span_data
 
 
 def test_on_new_span_without_transaction(sentry_init):
@@ -192,7 +189,7 @@ def test_on_new_span_without_transaction(sentry_init):
     rust_tracing.new_span(RustTracingLevel.Info, 3)
     current_span = sentry_sdk.get_current_span()
     assert current_span is not None
-    assert current_span.containing_transaction is None
+    assert current_span.root_span is None
 
 
 def test_on_event_exception(sentry_init, capture_events):
@@ -207,7 +204,7 @@ def test_on_event_exception(sentry_init, capture_events):
     events = capture_events()
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with start_transaction():
+    with start_span():
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Exception
@@ -243,7 +240,7 @@ def test_on_event_breadcrumb(sentry_init, capture_events):
     events = capture_events()
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with start_transaction():
+    with start_span():
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Breadcrumb
@@ -274,7 +271,7 @@ def test_on_event_event(sentry_init, capture_events):
     events = capture_events()
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with start_transaction():
+    with start_span():
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Mapped to Event
@@ -311,7 +308,7 @@ def test_on_event_ignored(sentry_init, capture_events):
     events = capture_events()
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    with start_transaction():
+    with start_span():
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         # Ignored
@@ -344,7 +341,7 @@ def test_span_filter(sentry_init, capture_events):
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
     events = capture_events()
-    with start_transaction():
+    with start_span():
         original_sentry_span = sentry_sdk.get_current_span()
 
         # Span is not ignored
@@ -377,16 +374,16 @@ def test_record(sentry_init):
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
-    with start_transaction():
+    with start_span():
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         span_before_record = sentry_sdk.get_current_span().to_json()
-        assert span_before_record["data"]["version"] is None
+        assert "version" not in span_before_record["attributes"]
 
         rust_tracing.record(3)
 
         span_after_record = sentry_sdk.get_current_span().to_json()
-        assert span_after_record["data"]["version"] == "memoized"
+        assert span_after_record["attributes"]["version"] == "memoized"
 
 
 def test_record_in_ignored_span(sentry_init):
@@ -403,18 +400,18 @@ def test_record_in_ignored_span(sentry_init):
     )
     sentry_init(integrations=[integration], traces_sample_rate=1.0)
 
-    with start_transaction():
+    with start_span():
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         span_before_record = sentry_sdk.get_current_span().to_json()
-        assert span_before_record["data"]["version"] is None
+        assert "version" not in span_before_record["attributes"]
 
         rust_tracing.new_span(RustTracingLevel.Trace, 5)
         rust_tracing.record(5)
 
         # `on_record()` should not do anything to the current Sentry span if the associated Rust span was ignored
         span_after_record = sentry_sdk.get_current_span().to_json()
-        assert span_after_record["data"]["version"] is None
+        assert "version" not in span_after_record["attributes"]
 
 
 @pytest.mark.parametrize(
@@ -443,33 +440,37 @@ def test_include_tracing_fields(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
-    with start_transaction():
+    with start_span():
         rust_tracing.new_span(RustTracingLevel.Info, 3)
 
         span_before_record = sentry_sdk.get_current_span().to_json()
         if tracing_fields_expected:
-            assert span_before_record["data"]["version"] is None
+            assert "version" not in span_before_record["attributes"]
         else:
-            assert span_before_record["data"]["version"] == "[Filtered]"
+            assert span_before_record["attributes"]["version"] == "[Filtered]"
 
         rust_tracing.record(3)
 
         span_after_record = sentry_sdk.get_current_span().to_json()
 
         if tracing_fields_expected:
-            assert span_after_record["data"] == {
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-                "use_memoized": True,
-                "version": "memoized",
-                "index": 10,
-            }
+            assert span_after_record["attributes"] == ApproxDict(
+                {
+                    "thread.id": mock.ANY,
+                    "thread.name": mock.ANY,
+                    "use_memoized": True,
+                    "version": "memoized",
+                    "index": 10,
+                }
+            )
 
         else:
-            assert span_after_record["data"] == {
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-                "use_memoized": "[Filtered]",
-                "version": "[Filtered]",
-                "index": "[Filtered]",
-            }
+            assert span_after_record["attributes"] == ApproxDict(
+                {
+                    "thread.id": mock.ANY,
+                    "thread.name": mock.ANY,
+                    "use_memoized": "[Filtered]",
+                    "version": "[Filtered]",
+                    "index": "[Filtered]",
+                }
+            )

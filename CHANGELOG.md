@@ -1,5 +1,137 @@
 # Changelog
 
+## 2.25.1
+
+### Various fixes & improvements
+
+- fix(logs): Add a class which batches groups of logs together. (#4229) by @colin-sentry
+- fix(logs): Use repr instead of json for message and arguments (#4227) by @colin-sentry
+- fix(logs): Debug output from Sentry logs should always be `debug` level. (#4224) by @antonpirker
+- fix(ai): Do not consume anthropic streaming stop (#4232) by @colin-sentry
+- fix(spotlight): Do not spam sentry_sdk.warnings logger w/ Spotlight (#4219) by @BYK
+- fix(docs): fixed code snippet (#4218) by @antonpirker
+- build(deps): bump actions/create-github-app-token from 1.11.7 to 1.12.0 (#4214) by @dependabot
+
+## 2.25.0
+
+### Various fixes & improvements
+
+- **New Beta Feature** Enable Sentry logs in `logging` Integration (#4143) by @colin-sentry
+
+  You can now send existing log messages to the new Sentry Logs feature.
+
+  For more information see: https://github.com/getsentry/sentry/discussions/86804
+
+  This is how you can use it (Sentry Logs is in beta right now so the API can still change):
+
+  ```python
+  import logging
+
+  import sentry_sdk
+  from sentry_sdk.integrations.logging import LoggingIntegration
+
+  # Setup Sentry SDK to send log messages with a level of "error" or higher to Sentry.
+  sentry_sdk.init(
+    dsn="...",
+    _experiments={
+        "enable_sentry_logs": True
+    }
+    integrations=[
+      LoggingIntegration(sentry_logs_level=logging.ERROR),
+    ]
+  )
+
+  # Your existing logging setup
+  some_logger = logging.Logger("some-logger")
+
+  some_logger.info('In this example info events will not be sent to Sentry logs. my_value=%s', my_value)
+  some_logger.error('But error events will be sent to Sentry logs. my_value=%s', my_value)
+  ```
+
+- Spotlight: Sample everything 100% w/ Spotlight & no DSN set (#4207) by @BYK
+- Dramatiq: use set_transaction_name (#4175) by @timdrijvers
+- toxgen: Make it clearer which suites can be migrated (#4196) by @sentrivana
+- Move Litestar under toxgen (#4197) by @sentrivana
+- Added flake8 plugings to pre-commit call of flake8 (#4190) by @antonpirker
+- Deprecate Scope.user (#4194) by @sentrivana
+- Fix hanging when capturing long stacktrace (#4191) by @szokeasaurusrex
+- Fix GraphQL failures (#4208) by @sentrivana
+- Fix flaky test (#4198) by @sentrivana
+- Update Ubuntu in Github test runners (#4204) by @antonpirker
+
+## 2.24.1
+
+### Various fixes & improvements
+
+- Always set `_spotlight_url` (#4186) by @BYK
+- Broader except in Django `parsed_body` (#4189) by @orhanhenrik
+- Add platform header to the `chunk` item-type in the envelope (#4178) by @viglia
+- Move `mypy` config into `pyproject.toml` (#4181) by @antonpirker
+- Move `flake8` config into `pyproject.toml` (#4185) by @antonpirker
+- Move `pytest` config into `pyproject.toml` (#4184) by @antonpirker
+- Bump `actions/create-github-app-token` from `1.11.6` to `1.11.7` (#4188) by @dependabot
+- Add `CODEOWNERS` (#4182) by @sentrivana
+
+## 2.24.0
+
+### Various fixes & improvements
+
+- fix(tracing): Fix `InvalidOperation` (#4179) by @szokeasaurusrex
+- Fix memory leak by not piling up breadcrumbs forever in Spark workers.  (#4167) by @antonpirker
+- Update scripts sources (#4166) by @emmanuel-ferdman
+- Fixed flaky test (#4165) by @antonpirker
+- chore(profiler): Add deprecation warning for session functions (#4171) by @sentrivana
+- feat(profiling): reverse profile_session start/stop methods deprecation (#4162) by @viglia
+- Reset `DedupeIntegration`'s `last-seen` if `before_send` dropped the event (#4142) by @sentrivana
+- style(integrations): Fix captured typo (#4161) by @pimuzzo
+- Handle loguru msg levels that are not supported by Sentry (#4147) by @antonpirker
+- feat(tests): Update tox.ini (#4146) by @sentrivana
+- Support Starlette/FastAPI `app.host` (#4157) by @sentrivana
+
+## 2.23.1
+
+### Various fixes & improvements
+
+- Fix import problem in release 2.23.0 (#4140) by @antonpirker
+
+## 2.23.0
+
+### Various fixes & improvements
+
+- Feat(profiling): Add new functions to start/stop continuous profiler (#4056) by @Zylphrex
+- Feat(profiling): Export start/stop profile session (#4079) by @Zylphrex
+- Feat(tracing): Backfill missing `sample_rand` on `PropagationContext` (#4038) by @szokeasaurusrex
+- Feat(logs): Add alpha version of Sentry logs (#4126) by @colin-sentry
+- Security(gha): fix potential for shell injection (#4099) by @mdtro
+- Docs: Add `init()` parameters to ApiDocs. (#4100) by @antonpirker
+- Docs: Document that caller must check `mutable` (#4010) by @szokeasaurusrex
+- Fix(Anthropic): Add partial json support to streams (#3674)
+- Fix(ASGI): Fix KeyError if transaction does not exist (#4095) by @kevinji
+- Fix(asyncio): Improve asyncio integration error handling. (#4129) by @antonpirker
+- Fix(AWS Lambda): Fix capturing errors during AWS Lambda INIT phase (#3943)
+- Fix(Bottle): Prevent internal error on 404 (#4131) by @sentrivana
+- Fix(CI): Fix API doc failure in CI (#4075) by @sentrivana
+- Fix(ClickHouse) ClickHouse in test suite (#4087) by @antonpirker
+- Fix(cloudresourcecontext): Added timeout to HTTP requests in CloudResourceContextIntegration (#4120) by @antonpirker
+- Fix(crons): Fixed bug when `cron_jobs` is set to `None` in arq integration (#4115) by @antonpirker
+- Fix(debug): Take into account parent handlers for debug logger (#4133) by @sentrivana
+- Fix(FastAPI/Starlette):  Fix middleware with positional arguments.  (#4118) by @antonpirker
+- Fix(featureflags): add LRU update/dedupe test coverage (#4082)
+- Fix(logging): Coerce None values into strings in logentry params. (#4121) by @antonpirker
+- Fix(pyspark): Grab `attemptId` more defensively (#4130) by @sentrivana
+- Fix(Quart): Support `quart_flask_patch` (#4132) by @sentrivana
+- Fix(tests): A way to locally run AWS Lambda functions (#4128) by @antonpirker
+- Fix(tests): Add concurrency testcase for arq (#4125) by @sentrivana
+- Fix(tests): Add fail_on_changes to toxgen by @sentrivana
+- Fix(tests): Run AWS Lambda tests locally (#3988) by @antonpirker
+- Fix(tests): Test relevant prereleases and allow to ignore releases
+- Fix(tracing): Move `TRANSACTION_SOURCE_*` constants to `Enum` (#3889) by @mgaligniana
+- Fix(typing): Add more typing info to Scope.update_from_kwargs's "contexts" (#4080)
+- Fix(typing): Set correct type for `set_context` everywhere (#4123) by @sentrivana
+- Chore(tests): Regenerate tox.ini (#4108) by @sentrivana
+- Build(deps): bump actions/create-github-app-token from 1.11.5 to 1.11.6 (#4113) by @dependabot
+- Build(deps): bump codecov/codecov-action from 5.3.1 to 5.4.0 (#4112) by @dependabot
+
 ## 2.22.0
 
 ### Various fixes & improvements
@@ -2328,7 +2460,7 @@ By: @mgaligniana (#1773)
 
   import sentry_sdk
   from sentry_sdk.integrations.arq import ArqIntegration
-  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+  from sentry_sdk.tracing import TransactionSource
 
   sentry_sdk.init(
       dsn="...",
@@ -2348,7 +2480,7 @@ By: @mgaligniana (#1773)
       await ctx['session'].aclose()
 
   async def main():
-      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TransactionSource.COMPONENT):
           redis = await create_pool(RedisSettings())
           for url in ('https://facebook.com', 'https://microsoft.com', 'https://github.com', "asdf"
                       ):
@@ -2422,7 +2554,7 @@ By: @mgaligniana (#1773)
 
   import sentry_sdk
   from sentry_sdk.integrations.huey import HueyIntegration
-  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
+  from sentry_sdk.tracing import TransactionSource, Transaction
 
 
   def main():
@@ -2434,7 +2566,7 @@ By: @mgaligniana (#1773)
           traces_sample_rate=1.0,
       )
 
-      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TransactionSource.COMPONENT):
           r = add_numbers(1, 2)
 
   if __name__ == "__main__":

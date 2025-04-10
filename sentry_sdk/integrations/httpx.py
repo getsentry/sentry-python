@@ -7,6 +7,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
+    http_client_status_to_breadcrumb_level,
     logger,
     parse_url,
 )
@@ -60,12 +61,18 @@ def _install_httpx_client():
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
             ),
             origin=HttpxIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data(SPANDATA.HTTP_METHOD, request.method)
+            data = {
+                SPANDATA.HTTP_METHOD: request.method,
+            }
             if parsed_url is not None:
-                span.set_data("url", parsed_url.url)
-                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                data["url"] = parsed_url.url
+                data[SPANDATA.HTTP_QUERY] = parsed_url.query
+                data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
+            for key, value in data.items():
+                span.set_attribute(key, value)
 
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
@@ -86,7 +93,17 @@ def _install_httpx_client():
             rv = real_send(self, request, **kwargs)
 
             span.set_http_status(rv.status_code)
-            span.set_data("reason", rv.reason_phrase)
+            span.set_attribute("reason", rv.reason_phrase)
+
+            data[SPANDATA.HTTP_STATUS_CODE] = rv.status_code
+            data["reason"] = rv.reason_phrase
+
+            sentry_sdk.add_breadcrumb(
+                type="http",
+                category="httplib",
+                data=data,
+                level=http_client_status_to_breadcrumb_level(rv.status_code),
+            )
 
             return rv
 
@@ -114,12 +131,18 @@ def _install_httpx_async_client():
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
             ),
             origin=HttpxIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data(SPANDATA.HTTP_METHOD, request.method)
+            data = {
+                SPANDATA.HTTP_METHOD: request.method,
+            }
             if parsed_url is not None:
-                span.set_data("url", parsed_url.url)
-                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                data["url"] = parsed_url.url
+                data[SPANDATA.HTTP_QUERY] = parsed_url.query
+                data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
+
+            for key, value in data.items():
+                span.set_attribute(key, value)
 
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
@@ -142,7 +165,17 @@ def _install_httpx_async_client():
             rv = await real_send(self, request, **kwargs)
 
             span.set_http_status(rv.status_code)
-            span.set_data("reason", rv.reason_phrase)
+            span.set_attribute("reason", rv.reason_phrase)
+
+            data[SPANDATA.HTTP_STATUS_CODE] = rv.status_code
+            data["reason"] = rv.reason_phrase
+
+            sentry_sdk.add_breadcrumb(
+                type="http",
+                category="httplib",
+                data=data,
+                level=http_client_status_to_breadcrumb_level(rv.status_code),
+            )
 
             return rv
 

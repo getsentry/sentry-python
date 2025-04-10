@@ -1,12 +1,11 @@
 import copy
-import json
 
 import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS, SPANDATA, OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, _serialize_span_attribute
 
 try:
     from pymongo import monitoring
@@ -127,55 +126,49 @@ class CommandTracer(monitoring.CommandListener):
             command.pop("$clusterTime", None)
             command.pop("$signature", None)
 
-            tags = {
-                "db.name": event.database_name,
+            data = {
+                SPANDATA.DB_NAME: event.database_name,
                 SPANDATA.DB_SYSTEM: "mongodb",
                 SPANDATA.DB_OPERATION: event.command_name,
                 SPANDATA.DB_MONGODB_COLLECTION: command.get(event.command_name),
             }
 
             try:
-                tags["net.peer.name"] = event.connection_id[0]
-                tags["net.peer.port"] = str(event.connection_id[1])
+                data["net.peer.name"] = event.connection_id[0]
+                data["net.peer.port"] = str(event.connection_id[1])
             except TypeError:
                 pass
 
-            data = {"operation_ids": {}}  # type: Dict[str, Any]
-            data["operation_ids"]["operation"] = event.operation_id
-            data["operation_ids"]["request"] = event.request_id
-
-            data.update(_get_db_data(event))
-
             try:
                 lsid = command.pop("lsid")["id"]
-                data["operation_ids"]["session"] = str(lsid)
+                data["session_id"] = str(lsid)
             except KeyError:
                 pass
 
             if not should_send_default_pii():
                 command = _strip_pii(command)
 
-            query = json.dumps(command, default=str)
+            query = _serialize_span_attribute(command)
             span = sentry_sdk.start_span(
                 op=OP.DB,
                 name=query,
                 origin=PyMongoIntegration.origin,
+                only_if_parent=True,
             )
-
-            for tag, value in tags.items():
-                # set the tag for backwards-compatibility.
-                # TODO: remove the set_tag call in the next major release!
-                span.set_tag(tag, value)
-
-                span.set_data(tag, value)
-
-            for key, value in data.items():
-                span.set_data(key, value)
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
-                    message=query, category="query", type=OP.DB, data=tags
+                    message=query, category="query", type=OP.DB, data=data
                 )
+
+            for key, value in data.items():
+                span.set_attribute(key, value)
+
+            for key, value in _get_db_data(event).items():
+                span.set_attribute(key, value)
+
+            span.set_attribute("operation_id", event.operation_id)
+            span.set_attribute("request_id", event.request_id)
 
             self._ongoing_operations[self._operation_key(event)] = span.__enter__()
 

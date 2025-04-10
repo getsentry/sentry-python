@@ -1,3 +1,4 @@
+import functools
 import inspect
 import sys
 import threading
@@ -8,7 +9,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -55,6 +56,7 @@ try:
 except ImportError:
     raise DidNotEnable("Django not installed")
 
+from sentry_sdk.integrations.django.caching import patch_caching
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import (
     get_template_frame_from_exception,
@@ -63,11 +65,6 @@ from sentry_sdk.integrations.django.templates import (
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.views import patch_views
-
-if DJANGO_VERSION[:2] > (1, 8):
-    from sentry_sdk.integrations.django.caching import patch_caching
-else:
-    patch_caching = None  # type: ignore
 
 from typing import TYPE_CHECKING
 
@@ -87,19 +84,6 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
-
-
-if DJANGO_VERSION < (1, 10):
-
-    def is_authenticated(request_user):
-        # type: (Any) -> bool
-        return request_user.is_authenticated()
-
-else:
-
-    def is_authenticated(request_user):
-        # type: (Any) -> bool
-        return request_user.is_authenticated
 
 
 TRANSACTION_STYLE_VALUES = ("function_name", "url")
@@ -321,6 +305,7 @@ def _patch_drf():
             else:
                 old_drf_initial = APIView.initial
 
+                @functools.wraps(old_drf_initial)
                 def sentry_patched_drf_initial(self, request, *args, **kwargs):
                     # type: (APIView, Any, *Any, **Any) -> Any
                     with capture_internal_exceptions():
@@ -398,7 +383,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
         if transaction_name is None:
             transaction_name = request.path_info
-            source = TRANSACTION_SOURCE_URL
+            source = TransactionSource.URL
         else:
             source = SOURCE_FOR_STYLE[transaction_style]
 
@@ -413,11 +398,13 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         if hasattr(urlconf, "handler404"):
             handler = urlconf.handler404
             if isinstance(handler, str):
-                scope.transaction = handler
+                scope.set_transaction_name(handler)
             else:
-                scope.transaction = transaction_from_function(
+                name = transaction_from_function(
                     getattr(handler, "view_class", handler)
                 )
+                if isinstance(name, str):
+                    scope.set_transaction_name(name)
     except Exception:
         pass
 
@@ -471,6 +458,7 @@ def _patch_get_response():
 
     old_get_response = BaseHandler.get_response
 
+    @functools.wraps(old_get_response)
     def sentry_patched_get_response(self, request):
         # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
         _before_get_response(request)
@@ -584,7 +572,7 @@ class DjangoRequestExtractor(RequestExtractor):
         # type: () -> Optional[Dict[str, Any]]
         try:
             return self.request.data
-        except AttributeError:
+        except Exception:
             return RequestExtractor.parsed_body(self)
 
 
@@ -594,7 +582,7 @@ def _set_user_info(request, event):
 
     user = getattr(request, "user", None)
 
-    if user is None or not is_authenticated(user):
+    if user is None or not user.is_authenticated:
         return
 
     try:
@@ -621,20 +609,11 @@ def install_sql_hook():
     except ImportError:
         from django.db.backends.util import CursorWrapper
 
-    try:
-        # django 1.6 and 1.7 compatability
-        from django.db.backends import BaseDatabaseWrapper
-    except ImportError:
-        # django 1.8 or later
-        from django.db.backends.base.base import BaseDatabaseWrapper
+    from django.db.backends.base.base import BaseDatabaseWrapper
 
-    try:
-        real_execute = CursorWrapper.execute
-        real_executemany = CursorWrapper.executemany
-        real_connect = BaseDatabaseWrapper.connect
-    except AttributeError:
-        # This won't work on Django versions < 1.6
-        return
+    real_execute = CursorWrapper.execute
+    real_executemany = CursorWrapper.executemany
+    real_connect = BaseDatabaseWrapper.connect
 
     @ensure_integration_enabled(DjangoIntegration, real_execute)
     def execute(self, sql, params=None):
@@ -650,8 +629,8 @@ def install_sql_hook():
             _set_db_data(span, self)
             result = real_execute(self, sql, params)
 
-        with capture_internal_exceptions():
-            add_query_source(span)
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return result
 
@@ -670,8 +649,8 @@ def install_sql_hook():
 
             result = real_executemany(self, sql, param_list)
 
-        with capture_internal_exceptions():
-            add_query_source(span)
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return result
 
@@ -685,6 +664,7 @@ def install_sql_hook():
             op=OP.DB,
             name="connect",
             origin=DjangoIntegration.origin_db,
+            only_if_parent=True,
         ) as span:
             _set_db_data(span, self)
             return real_connect(self)
@@ -699,7 +679,7 @@ def _set_db_data(span, cursor_or_db):
     # type: (Span, Any) -> None
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
-    span.set_data(SPANDATA.DB_SYSTEM, vendor)
+    span.set_attribute(SPANDATA.DB_SYSTEM, vendor)
 
     # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
     # actually has a `connection` and the `connection` has a `get_dsn_parameters`
@@ -732,16 +712,16 @@ def _set_db_data(span, cursor_or_db):
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
-        span.set_data(SPANDATA.DB_NAME, db_name)
+        span.set_attribute(SPANDATA.DB_NAME, db_name)
 
     server_address = connection_params.get("host")
     if server_address is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+        span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
 
     server_port = connection_params.get("port")
     if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, str(server_port))
+        span.set_attribute(SPANDATA.SERVER_PORT, str(server_port))
 
     server_socket_address = connection_params.get("unix_socket")
     if server_socket_address is not None:
-        span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
+        span.set_attribute(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)

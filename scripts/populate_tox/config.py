@@ -23,11 +23,30 @@ TEST_SUITE_CONFIG = {
         "package": "celery",
         "deps": {
             "*": ["newrelic", "redis"],
-            "py3.7": ["importlib-metadata<5.0"],
         },
+        "python": ">=3.8",
     },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
+    },
+    "django": {
+        "package": "django",
+        "deps": {
+            "*": [
+                "channels[daphne]",
+                "psycopg2-binary",
+                "djangorestframework",
+                "pytest-django",
+                "Werkzeug",
+            ],
+            ">=3.0": ["pytest-asyncio"],
+            ">=2.2,<3.1": ["six"],
+            "<3.3": [
+                "djangorestframework>=3.0,<4.0",
+                "Werkzeug<2.1.0",
+            ],
+            "<3.1": ["pytest-django<4.0"],
+        },
     },
     "dramatiq": {
         "package": "dramatiq",
@@ -68,6 +87,13 @@ TEST_SUITE_CONFIG = {
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
+    },
+    "litestar": {
+        "package": "litestar",
+        "deps": {
+            "*": ["pytest-asyncio", "python-multipart", "requests", "cryptography"],
+            "<2.7": ["httpx<0.28"],
+        },
     },
     "loguru": {
         "package": "loguru",
@@ -141,6 +167,7 @@ TEST_SUITE_CONFIG = {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
             "*": ["httpx"],
+            "<=0.262.5": ["pydantic<2.11"],
         },
     },
     "tornado": {
@@ -157,7 +184,7 @@ TEST_SUITE_CONFIG = {
         "package": "trytond",
         "deps": {
             "*": ["werkzeug"],
-            "<=5.0": ["werkzeug<1.0"],
+            "<5.1": ["werkzeug<1.0"],
         },
     },
     "typer": {

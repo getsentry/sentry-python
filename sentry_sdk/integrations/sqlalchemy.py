@@ -68,14 +68,14 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
         context, "_sentry_sql_span_manager", None
     )  # type: Optional[ContextManager[Any]]
 
-    if ctx_mgr is not None:
-        context._sentry_sql_span_manager = None
-        ctx_mgr.__exit__(None, None, None)
-
     span = getattr(context, "_sentry_sql_span", None)  # type: Optional[Span]
     if span is not None:
         with capture_internal_exceptions():
             add_query_source(span)
+
+    if ctx_mgr is not None:
+        context._sentry_sql_span_manager = None
+        ctx_mgr.__exit__(None, None, None)
 
 
 def _handle_error(context, *args):
@@ -128,19 +128,19 @@ def _set_db_data(span, conn):
     # type: (Span, Any) -> None
     db_system = _get_db_system(conn.engine.name)
     if db_system is not None:
-        span.set_data(SPANDATA.DB_SYSTEM, db_system)
+        span.set_attribute(SPANDATA.DB_SYSTEM, db_system)
 
     if conn.engine.url is None:
         return
 
     db_name = conn.engine.url.database
     if db_name is not None:
-        span.set_data(SPANDATA.DB_NAME, db_name)
+        span.set_attribute(SPANDATA.DB_NAME, db_name)
 
     server_address = conn.engine.url.host
     if server_address is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+        span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
 
     server_port = conn.engine.url.port
     if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, server_port)
+        span.set_attribute(SPANDATA.SERVER_PORT, server_port)

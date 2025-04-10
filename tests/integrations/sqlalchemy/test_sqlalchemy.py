@@ -1,8 +1,10 @@
+import contextlib
 import os
 from datetime import datetime
 from unittest import mock
 
 import pytest
+from freezegun import freeze_time
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
@@ -10,7 +12,6 @@ from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy import text
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
@@ -53,7 +54,7 @@ def test_orm_queries(sentry_init, capture_events):
 
     assert session.query(Person).first() == bob
 
-    capture_message("hi")
+    sentry_sdk.capture_message("hi")
 
     (event,) = events
 
@@ -110,7 +111,7 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.start_span(name="test_transaction", sampled=True):
         with session.begin_nested():
             session.query(Person).first()
 
@@ -134,7 +135,7 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     assert (
         render_span_tree(event)
         == """\
-- op=null: description=null
+- op="test_transaction": description=null
   - op="db": description="SAVEPOINT sa_savepoint_1"
   - op="db": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
   - op="db": description="RELEASE SAVEPOINT sa_savepoint_1"
@@ -184,7 +185,7 @@ def test_transactions_no_engine_url(sentry_init, capture_events):
     Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.start_span(name="test_transaction", sampled=True):
         with session.begin_nested():
             session.query(Person).first()
 
@@ -216,7 +217,7 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     engine = create_engine(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}
     )
-    with start_transaction(name="test"):
+    with sentry_sdk.start_span(name="test"):
         with engine.connect() as con:
             con.execute(text(" UNION ".join("SELECT {}".format(i) for i in range(100))))
 
@@ -245,7 +246,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     engine = create_engine(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}
     )
-    with start_transaction(name="test"):
+    with sentry_sdk.start_span(name="test"):
         with engine.connect() as con:
             for _ in range(1500):
                 con.execute(
@@ -294,18 +295,16 @@ def test_engine_name_not_string(sentry_init):
 
 
 def test_query_source_disabled(sentry_init, capture_events):
-    sentry_options = {
-        "integrations": [SqlalchemyIntegration()],
-        "enable_tracing": True,
-        "enable_db_query_source": False,
-        "db_query_source_threshold_ms": 0,
-    }
-
-    sentry_init(**sentry_options)
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=False,
+        db_query_source_threshold_ms=0,
+    )
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.start_span(name="test_transaction", sampled=True):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -347,7 +346,7 @@ def test_query_source_disabled(sentry_init, capture_events):
 def test_query_source_enabled(sentry_init, capture_events, enable_db_query_source):
     sentry_options = {
         "integrations": [SqlalchemyIntegration()],
-        "enable_tracing": True,
+        "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
@@ -357,7 +356,7 @@ def test_query_source_enabled(sentry_init, capture_events, enable_db_query_sourc
 
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.start_span(name="test_transaction", sampled=True):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -398,13 +397,13 @@ def test_query_source_enabled(sentry_init, capture_events, enable_db_query_sourc
 def test_query_source(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.start_span(name="test_transaction", sampled=True):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -463,7 +462,7 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
     """
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
     )
@@ -474,7 +473,7 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
         query_first_model_from_session,
     )
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.start_span(name="test_transaction", sampled=True):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -526,13 +525,13 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
 def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.start_span(name="test_transaction", sampled=True):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -553,11 +552,13 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
 
         class fake_record_sql_queries:  # noqa: N801
             def __init__(self, *args, **kwargs):
-                with record_sql_queries(*args, **kwargs) as span:
-                    self.span = span
+                with freeze_time(datetime(2024, 1, 1, microsecond=0)):
+                    with record_sql_queries(*args, **kwargs) as span:
+                        self.span = span
+                        freezer = freeze_time(datetime(2024, 1, 1, microsecond=99999))
+                        freezer.start()
 
-                self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
+                    freezer.stop()
 
             def __enter__(self):
                 return self.span
@@ -592,13 +593,13 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
 def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
-        enable_tracing=True,
+        traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
     events = capture_events()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.start_span(name="test_transaction", sampled=True):
         Base = declarative_base()  # noqa: N806
 
         class Person(Base):
@@ -617,19 +618,15 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
         bob = Person(name="Bob")
         session.add(bob)
 
-        class fake_record_sql_queries:  # noqa: N801
-            def __init__(self, *args, **kwargs):
+        @contextlib.contextmanager
+        def fake_record_sql_queries(*args, **kwargs):  # noqa: N801
+            with freeze_time(datetime(2024, 1, 1, second=0)):
                 with record_sql_queries(*args, **kwargs) as span:
-                    self.span = span
+                    freezer = freeze_time(datetime(2024, 1, 1, second=1))
+                    freezer.start()
+                    yield span
 
-                self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
-
-            def __enter__(self):
-                return self.span
-
-            def __exit__(self, type, value, traceback):
-                pass
+                freezer.stop()
 
         with mock.patch(
             "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
@@ -682,7 +679,7 @@ def test_span_origin(sentry_init, capture_events):
     engine = create_engine(
         "sqlite:///:memory:", connect_args={"check_same_thread": False}
     )
-    with start_transaction(name="foo"):
+    with sentry_sdk.start_span(name="foo"):
         with engine.connect() as con:
             con.execute(text("SELECT 0"))
 

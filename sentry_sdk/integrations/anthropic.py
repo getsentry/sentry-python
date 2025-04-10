@@ -101,6 +101,8 @@ def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
             elif event.type == "content_block_delta":
                 if hasattr(event.delta, "text"):
                     content_blocks.append(event.delta.text)
+                elif hasattr(event.delta, "partial_json"):
+                    content_blocks.append(event.delta.partial_json)
             elif event.type == "content_block_stop":
                 pass
             elif event.type == "message_delta":
@@ -119,13 +121,13 @@ def _add_ai_data_to_span(
     with capture_internal_exceptions():
         if should_send_default_pii() and integration.include_prompts:
             complete_message = "".join(content_blocks)
-            span.set_data(
+            span.set_attribute(
                 SPANDATA.AI_RESPONSES,
                 [{"type": "text", "text": complete_message}],
             )
         total_tokens = input_tokens + output_tokens
         record_token_usage(span, input_tokens, output_tokens, total_tokens)
-        span.set_data(SPANDATA.AI_STREAMING, True)
+        span.set_attribute(SPANDATA.AI_STREAMING, True)
 
 
 def _sentry_patched_create_common(f, *args, **kwargs):
@@ -146,6 +148,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         op=OP.ANTHROPIC_MESSAGES_CREATE,
         description="Anthropic messages create",
         origin=AnthropicIntegration.origin,
+        only_if_parent=True,
     )
     span.__enter__()
 
@@ -156,15 +159,17 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     model = kwargs.get("model")
 
     with capture_internal_exceptions():
-        span.set_data(SPANDATA.AI_MODEL_ID, model)
-        span.set_data(SPANDATA.AI_STREAMING, False)
+        span.set_attribute(SPANDATA.AI_MODEL_ID, model)
+        span.set_attribute(SPANDATA.AI_STREAMING, False)
 
         if should_send_default_pii() and integration.include_prompts:
-            span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
+            span.set_attribute(SPANDATA.AI_INPUT_MESSAGES, messages)
 
         if hasattr(result, "content"):
             if should_send_default_pii() and integration.include_prompts:
-                span.set_data(SPANDATA.AI_RESPONSES, _get_responses(result.content))
+                span.set_attribute(
+                    SPANDATA.AI_RESPONSES, _get_responses(result.content)
+                )
             _calculate_token_usage(result, span)
             span.__exit__(None, None, None)
 
@@ -182,8 +187,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     input_tokens, output_tokens, content_blocks = _collect_ai_data(
                         event, input_tokens, output_tokens, content_blocks
                     )
-                    if event.type != "message_stop":
-                        yield event
+                    yield event
 
                 _add_ai_data_to_span(
                     span, integration, input_tokens, output_tokens, content_blocks
@@ -200,8 +204,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     input_tokens, output_tokens, content_blocks = _collect_ai_data(
                         event, input_tokens, output_tokens, content_blocks
                     )
-                    if event.type != "message_stop":
-                        yield event
+                    yield event
 
                 _add_ai_data_to_span(
                     span, integration, input_tokens, output_tokens, content_blocks
@@ -214,7 +217,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 result._iterator = new_iterator()
 
         else:
-            span.set_data("unknown_response", True)
+            span.set_attribute("unknown_response", True)
             span.__exit__(None, None, None)
 
     return result

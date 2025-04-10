@@ -77,42 +77,42 @@ def test_tracing_in_ray_tasks():
 
         return sentry_sdk.get_client().transport.envelopes
 
-    with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
+    with sentry_sdk.start_span(op="test", name="ray client root span"):
         worker_envelopes = ray.get(example_task.remote())
 
     client_envelope = sentry_sdk.get_client().transport.envelopes[0]
-    client_transaction = client_envelope.get_transaction_event()
-    assert client_transaction["transaction"] == "ray test transaction"
-    assert client_transaction["transaction_info"] == {"source": "custom"}
+    client_root_span = client_envelope.get_transaction_event()
+    assert client_root_span["transaction"] == "ray client root span"
+    assert client_root_span["transaction_info"] == {"source": "custom"}
 
     worker_envelope = worker_envelopes[0]
-    worker_transaction = worker_envelope.get_transaction_event()
+    worker_root_span = worker_envelope.get_transaction_event()
     assert (
-        worker_transaction["transaction"]
+        worker_root_span["transaction"]
         == "tests.integrations.ray.test_ray.test_tracing_in_ray_tasks.<locals>.example_task"
     )
-    assert worker_transaction["transaction_info"] == {"source": "task"}
+    assert worker_root_span["transaction_info"] == {"source": "task"}
 
-    (span,) = client_transaction["spans"]
+    (span,) = client_root_span["spans"]
     assert span["op"] == "queue.submit.ray"
     assert span["origin"] == "auto.queue.ray"
     assert (
         span["description"]
         == "tests.integrations.ray.test_ray.test_tracing_in_ray_tasks.<locals>.example_task"
     )
-    assert span["parent_span_id"] == client_transaction["contexts"]["trace"]["span_id"]
-    assert span["trace_id"] == client_transaction["contexts"]["trace"]["trace_id"]
+    assert span["parent_span_id"] == client_root_span["contexts"]["trace"]["span_id"]
+    assert span["trace_id"] == client_root_span["contexts"]["trace"]["trace_id"]
 
-    (span,) = worker_transaction["spans"]
+    (span,) = worker_root_span["spans"]
     assert span["op"] == "task"
     assert span["origin"] == "manual"
     assert span["description"] == "example task step"
-    assert span["parent_span_id"] == worker_transaction["contexts"]["trace"]["span_id"]
-    assert span["trace_id"] == worker_transaction["contexts"]["trace"]["trace_id"]
+    assert span["parent_span_id"] == worker_root_span["contexts"]["trace"]["span_id"]
+    assert span["trace_id"] == worker_root_span["contexts"]["trace"]["trace_id"]
 
     assert (
-        client_transaction["contexts"]["trace"]["trace_id"]
-        == worker_transaction["contexts"]["trace"]["trace_id"]
+        client_root_span["contexts"]["trace"]["trace_id"]
+        == worker_root_span["contexts"]["trace"]["trace_id"]
     )
 
 
@@ -132,7 +132,7 @@ def test_errors_in_ray_tasks():
     def example_task():
         1 / 0
 
-    with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
+    with sentry_sdk.start_span(op="test", name="ray client root span"):
         with pytest.raises(ZeroDivisionError):
             future = example_task.remote()
             ray.get(future)
@@ -167,22 +167,24 @@ def test_tracing_in_ray_actors():
             self.n = 0
 
         def increment(self):
-            with sentry_sdk.start_span(op="task", name="example actor execution"):
+            with sentry_sdk.start_span(
+                op="test", name="custom span in actor execution", only_if_parent=True
+            ):
                 self.n += 1
 
             return sentry_sdk.get_client().transport.envelopes
 
-    with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
+    with sentry_sdk.start_span(op="test", name="ray client root span"):
         counter = Counter.remote()
         worker_envelopes = ray.get(counter.increment.remote())
 
     client_envelope = sentry_sdk.get_client().transport.envelopes[0]
-    client_transaction = client_envelope.get_transaction_event()
+    client_root_span = client_envelope.get_transaction_event()
 
     # Spans for submitting the actor task are not created (actors are not supported yet)
-    assert client_transaction["spans"] == []
+    assert client_root_span["spans"] == []
 
-    # Transaction are not yet created when executing ray actors (actors are not supported yet)
+    # Root spans are not yet automatically created when executing ray actors (actors are not supported yet)
     assert worker_envelopes == []
 
 
@@ -204,12 +206,14 @@ def test_errors_in_ray_actors():
             self.n = 0
 
         def increment(self):
-            with sentry_sdk.start_span(op="task", name="example actor execution"):
+            with sentry_sdk.start_span(
+                op="test", name="custom span in actor execution", only_if_parent=True
+            ):
                 1 / 0
 
             return sentry_sdk.get_client().transport.envelopes
 
-    with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
+    with sentry_sdk.start_span(op="test", name="ray client root span"):
         with pytest.raises(ZeroDivisionError):
             counter = Counter.remote()
             future = counter.increment.remote()
