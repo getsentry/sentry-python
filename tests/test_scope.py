@@ -915,3 +915,18 @@ def test_last_event_id_cleared(sentry_init):
     Scope.get_isolation_scope().clear()
 
     assert Scope.last_event_id() is None, "last_event_id should be cleared"
+
+
+def test_root_span(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+
+    assert sentry_sdk.get_current_scope().root_span is None
+
+    with sentry_sdk.start_span(name="test") as root_span:
+        assert sentry_sdk.get_current_scope().root_span == root_span
+        with sentry_sdk.start_span(name="child"):
+            assert sentry_sdk.get_current_scope().root_span == root_span
+            with sentry_sdk.start_span(name="grandchild"):
+                assert sentry_sdk.get_current_scope().root_span == root_span
+
+    assert sentry_sdk.get_current_scope().root_span is None
