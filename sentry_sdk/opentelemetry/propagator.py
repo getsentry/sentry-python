@@ -21,7 +21,7 @@ from opentelemetry.trace import (
     TraceFlags,
 )
 
-from sentry_sdk.integrations.opentelemetry.consts import (
+from sentry_sdk.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
     SENTRY_SCOPES_KEY,

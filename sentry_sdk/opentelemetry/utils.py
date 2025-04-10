@@ -18,13 +18,13 @@ from opentelemetry.sdk.trace import ReadableSpan
 import sentry_sdk
 from sentry_sdk.utils import Dsn
 from sentry_sdk.consts import SPANSTATUS, OP, SPANDATA
+from sentry_sdk.opentelemetry.consts import SentrySpanAttribute
 from sentry_sdk.tracing import (
     get_span_status_from_http_code,
     DEFAULT_SPAN_ORIGIN,
     LOW_QUALITY_TRANSACTION_SOURCES,
 )
 from sentry_sdk.tracing_utils import Baggage
-from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
 from sentry_sdk._types import TYPE_CHECKING
 

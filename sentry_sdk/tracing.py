@@ -17,6 +17,19 @@ from opentelemetry.sdk.trace import ReadableSpan
 
 import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS, SPANDATA
+from sentry_sdk.opentelemetry.consts import (
+    TRACESTATE_SAMPLE_RATE_KEY,
+    SentrySpanAttribute,
+)
+from sentry_sdk.opentelemetry.utils import (
+    baggage_from_trace_state,
+    convert_from_otel_timestamp,
+    convert_to_otel_timestamp,
+    get_trace_context,
+    get_trace_state,
+    get_sentry_meta,
+    serialize_trace_state,
+)
 from sentry_sdk.utils import (
     _serialize_span_attribute,
     get_current_thread_meta,
@@ -260,12 +273,6 @@ class Span:
             if skip_span:
                 self._otel_span = INVALID_SPAN
             else:
-                from sentry_sdk.integrations.opentelemetry.consts import (
-                    SentrySpanAttribute,
-                )
-                from sentry_sdk.integrations.opentelemetry.utils import (
-                    convert_to_otel_timestamp,
-                )
 
                 if start_timestamp is not None:
                     # OTel timestamps have nanosecond precision
@@ -360,38 +367,26 @@ class Span:
     @property
     def description(self):
         # type: () -> Optional[str]
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         return self.get_attribute(SentrySpanAttribute.DESCRIPTION)
 
     @description.setter
     def description(self, value):
         # type: (Optional[str]) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
 
     @property
     def origin(self):
         # type: () -> Optional[str]
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         return self.get_attribute(SentrySpanAttribute.ORIGIN)
 
     @origin.setter
     def origin(self, value):
         # type: (Optional[str]) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         self.set_attribute(SentrySpanAttribute.ORIGIN, value)
 
     @property
     def root_span(self):
         # type: () -> Optional[Span]
-        from sentry_sdk.integrations.opentelemetry.utils import (
-            get_sentry_meta,
-        )
-
         root_otel_span = cast(
             "Optional[OtelSpan]", get_sentry_meta(self._otel_span, "root_span")
         )
@@ -437,10 +432,6 @@ class Span:
     @property
     def sample_rate(self):
         # type: () -> Optional[float]
-        from sentry_sdk.integrations.opentelemetry.consts import (
-            TRACESTATE_SAMPLE_RATE_KEY,
-        )
-
         sample_rate = self._otel_span.get_span_context().trace_state.get(
             TRACESTATE_SAMPLE_RATE_KEY
         )
@@ -449,36 +440,26 @@ class Span:
     @property
     def op(self):
         # type: () -> Optional[str]
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         return self.get_attribute(SentrySpanAttribute.OP)
 
     @op.setter
     def op(self, value):
         # type: (Optional[str]) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         self.set_attribute(SentrySpanAttribute.OP, value)
 
     @property
     def name(self):
         # type: () -> Optional[str]
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         return self.get_attribute(SentrySpanAttribute.NAME)
 
     @name.setter
     def name(self, value):
         # type: (Optional[str]) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         self.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property
     def source(self):
         # type: () -> str
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         return (
             self.get_attribute(SentrySpanAttribute.SOURCE) or TransactionSource.CUSTOM
         )
@@ -486,8 +467,6 @@ class Span:
     @source.setter
     def source(self, value):
         # type: (str) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         self.set_attribute(SentrySpanAttribute.SOURCE, value)
 
     @property
@@ -499,10 +478,6 @@ class Span:
         start_time = self._otel_span.start_time
         if start_time is None:
             return None
-
-        from sentry_sdk.integrations.opentelemetry.utils import (
-            convert_from_otel_timestamp,
-        )
 
         return convert_from_otel_timestamp(start_time)
 
@@ -516,10 +491,6 @@ class Span:
         if end_time is None:
             return None
 
-        from sentry_sdk.integrations.opentelemetry.utils import (
-            convert_from_otel_timestamp,
-        )
-
         return convert_from_otel_timestamp(end_time)
 
     def start_child(self, **kwargs):
@@ -529,11 +500,6 @@ class Span:
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
-
-        from sentry_sdk.integrations.opentelemetry.utils import (
-            serialize_trace_state,
-        )
-
         yield BAGGAGE_HEADER_NAME, serialize_trace_state(self.trace_state)
 
     def to_traceparent(self):
@@ -554,10 +520,6 @@ class Span:
     @property
     def trace_state(self):
         # type: () -> TraceState
-        from sentry_sdk.integrations.opentelemetry.utils import (
-            get_trace_state,
-        )
-
         return get_trace_state(self._otel_span)
 
     def to_baggage(self):
@@ -566,16 +528,10 @@ class Span:
 
     def get_baggage(self):
         # type: () -> Baggage
-        from sentry_sdk.integrations.opentelemetry.utils import (
-            baggage_from_trace_state,
-        )
-
         return baggage_from_trace_state(self.trace_state)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         self.set_attribute(f"{SentrySpanAttribute.TAG}.{key}", value)
 
     def set_data(self, key, value):
@@ -642,8 +598,6 @@ class Span:
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         # Stringify value here since OTel expects all seq items to be of one type
         self.set_attribute(
             f"{SentrySpanAttribute.MEASUREMENT}.{name}", (str(value), unit)
@@ -674,10 +628,6 @@ class Span:
     def finish(self, end_timestamp=None):
         # type: (Optional[Union[float, datetime]]) -> None
         if end_timestamp is not None:
-            from sentry_sdk.integrations.opentelemetry.utils import (
-                convert_to_otel_timestamp,
-            )
-
             self._otel_span.end(convert_to_otel_timestamp(end_timestamp))
         else:
             self._otel_span.end()
@@ -696,16 +646,10 @@ class Span:
         if not isinstance(self._otel_span, ReadableSpan):
             return {}
 
-        from sentry_sdk.integrations.opentelemetry.utils import (
-            get_trace_context,
-        )
-
         return get_trace_context(self._otel_span)
 
     def set_context(self, key, value):
         # type: (str, Any) -> None
-        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
-
         # TODO-neel-potel we cannot add dicts here
 
         self.set_attribute(f"{SentrySpanAttribute.CONTEXT}.{key}", value)
