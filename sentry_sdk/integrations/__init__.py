@@ -69,7 +69,6 @@ _DEFAULT_INTEGRATIONS = [
     "sentry_sdk.integrations.excepthook.ExcepthookIntegration",
     "sentry_sdk.integrations.logging.LoggingIntegration",
     "sentry_sdk.integrations.modules.ModulesIntegration",
-    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
     "sentry_sdk.integrations.stdlib.StdlibIntegration",
     "sentry_sdk.integrations.threading.ThreadingIntegration",
 ]
