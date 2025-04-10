@@ -182,9 +182,9 @@ class SentryAsyncExtension(SchemaExtension):
             origin=StrawberryIntegration.origin,
             only_if_parent=True,
         ) as graphql_span:
-            graphql_span.set_data("graphql.operation.type", operation_type)
-            graphql_span.set_data("graphql.document", self.execution_context.query)
-            graphql_span.set_data("graphql.resource_name", self._resource_name)
+            graphql_span.set_attribute("graphql.operation.type", operation_type)
+            graphql_span.set_attribute("graphql.document", self.execution_context.query)
+            graphql_span.set_attribute("graphql.resource_name", self._resource_name)
 
             yield
 
@@ -192,7 +192,9 @@ class SentryAsyncExtension(SchemaExtension):
             self._operation_name = self.execution_context.operation_name
 
             if self._operation_name is not None:
-                graphql_span.set_data("graphql.operation.name", self._operation_name)
+                graphql_span.set_attribute(
+                    "graphql.operation.name", self._operation_name
+                )
 
                 sentry_sdk.get_current_scope().set_transaction_name(
                     self._operation_name,
@@ -246,10 +248,10 @@ class SentryAsyncExtension(SchemaExtension):
             name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
         ) as span:
-            span.set_data("graphql.field_name", info.field_name)
-            span.set_data("graphql.parent_type", info.parent_type.name)
-            span.set_data("graphql.field_path", field_path)
-            span.set_data("graphql.path", ".".join(map(str, info.path.as_list())))
+            span.set_attribute("graphql.field_name", info.field_name)
+            span.set_attribute("graphql.parent_type", info.parent_type.name)
+            span.set_attribute("graphql.field_path", field_path)
+            span.set_attribute("graphql.path", ".".join(map(str, info.path.as_list())))
 
             return await self._resolve(_next, root, info, *args, **kwargs)
 
@@ -267,10 +269,10 @@ class SentrySyncExtension(SentryAsyncExtension):
             name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
         ) as span:
-            span.set_data("graphql.field_name", info.field_name)
-            span.set_data("graphql.parent_type", info.parent_type.name)
-            span.set_data("graphql.field_path", field_path)
-            span.set_data("graphql.path", ".".join(map(str, info.path.as_list())))
+            span.set_attribute("graphql.field_name", info.field_name)
+            span.set_attribute("graphql.parent_type", info.parent_type.name)
+            span.set_attribute("graphql.field_path", field_path)
+            span.set_attribute("graphql.path", ".".join(map(str, info.path.as_list())))
 
             return _next(root, info, *args, **kwargs)
 

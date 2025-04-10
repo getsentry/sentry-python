@@ -10,7 +10,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
-from sentry_sdk.propagator import SentryPropagator
+from sentry_sdk.opentelemetry.propagator import SentryPropagator
 from tests.conftest import SortedBaggage
 
 

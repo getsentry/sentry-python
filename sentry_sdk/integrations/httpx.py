@@ -72,7 +72,7 @@ def _install_httpx_client():
                 data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
             for key, value in data.items():
-                span.set_data(key, value)
+                span.set_attribute(key, value)
 
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
@@ -93,7 +93,7 @@ def _install_httpx_client():
             rv = real_send(self, request, **kwargs)
 
             span.set_http_status(rv.status_code)
-            span.set_data("reason", rv.reason_phrase)
+            span.set_attribute("reason", rv.reason_phrase)
 
             data[SPANDATA.HTTP_STATUS_CODE] = rv.status_code
             data["reason"] = rv.reason_phrase
@@ -142,7 +142,7 @@ def _install_httpx_async_client():
                 data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
             for key, value in data.items():
-                span.set_data(key, value)
+                span.set_attribute(key, value)
 
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
@@ -165,7 +165,7 @@ def _install_httpx_async_client():
             rv = await real_send(self, request, **kwargs)
 
             span.set_http_status(rv.status_code)
-            span.set_data("reason", rv.reason_phrase)
+            span.set_attribute("reason", rv.reason_phrase)
 
             data[SPANDATA.HTTP_STATUS_CODE] = rv.status_code
             data["reason"] = rv.reason_phrase

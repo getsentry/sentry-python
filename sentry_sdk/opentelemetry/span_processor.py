@@ -13,9 +13,9 @@ from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.sampler import create_sampling_context
 from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
 from sentry_sdk.utils import get_current_thread_meta
+from sentry_sdk.opentelemetry.sampler import create_sampling_context
 from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     get_profiler_id,
