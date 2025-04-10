@@ -1,6 +1,7 @@
 from functools import wraps
 from typing import Any, TYPE_CHECKING
 
+import sentry_sdk
 from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations import Integration, DidNotEnable, _check_minimum_version
 from sentry_sdk.utils import parse_version
@@ -30,8 +31,15 @@ class StatsigIntegration(Integration):
         @wraps(old_check_gate)
         def sentry_check_gate(user, gate, *args, **kwargs):
             # type: (StatsigUser, str, *Any, **Any) -> Any
+            # Errors support.
             enabled = old_check_gate(user, gate, *args, **kwargs)
             add_feature_flag(gate, enabled)
+
+            # Spans support.
+            span = sentry_sdk.get_current_span()
+            if span:
+                span.set_data(f"flag.{gate}", enabled)
+
             return enabled
 
         statsig_module.check_gate = sentry_check_gate

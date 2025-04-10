@@ -53,8 +53,15 @@ class LaunchDarklyHook(Hook):
     def after_evaluation(self, series_context, data, detail):
         # type: (EvaluationSeriesContext, dict[Any, Any], EvaluationDetail) -> dict[Any, Any]
         if isinstance(detail.value, bool):
+            # Errors support.
             flags = sentry_sdk.get_current_scope().flags
             flags.set(series_context.key, detail.value)
+
+            # Spans support.
+            span = sentry_sdk.get_current_span()
+            if span:
+                span.set_data(f"flag.{series_context.key}", detail.value)
+
         return data
 
     def before_evaluation(self, series_context, data):

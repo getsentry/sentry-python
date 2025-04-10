@@ -5,6 +5,8 @@ from statsig import statsig
 from statsig.statsig_user import StatsigUser
 from random import random
 from unittest.mock import Mock
+from sentry_sdk import start_span, start_transaction
+from tests.conftest import ApproxDict
 
 import pytest
 
@@ -181,3 +183,18 @@ def test_wrapper_attributes(sentry_init, uninstall_integration):
 
     # Clean up
     statsig.check_gate = original_check_gate
+
+
+def test_statsig_span_integration(sentry_init, capture_events, uninstall_integration):
+    uninstall_integration(StatsigIntegration.identifier)
+
+    with mock_statsig({"hello": True, "world": False}):
+        sentry_init(traces_sample_rate=1, integrations=[StatsigIntegration()])
+        events = capture_events()
+        user = StatsigUser(user_id="user-id")
+        with start_transaction(name="hi"):
+            with start_span(op="foo", name="bar"):
+                statsig.check_gate(user, "hello")
+
+    (event,) = events
+    assert event["spans"][0]["data"] == ApproxDict({"flag.hello": True})

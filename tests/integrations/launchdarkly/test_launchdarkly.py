@@ -12,6 +12,8 @@ from ldclient.integrations.test_data import TestData
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
+from sentry_sdk import start_span, start_transaction
+from tests.conftest import ApproxDict
 
 
 @pytest.mark.parametrize(
@@ -202,3 +204,40 @@ def test_launchdarkly_integration_did_not_enable(monkeypatch):
     monkeypatch.setattr(client, "is_initialized", lambda: False)
     with pytest.raises(DidNotEnable):
         LaunchDarklyIntegration(ld_client=client)
+
+
+@pytest.mark.parametrize(
+    "use_global_client",
+    (False, True),
+)
+def test_launchdarkly_span_integration(
+    sentry_init, use_global_client, capture_events, uninstall_integration
+):
+    td = TestData.data_source()
+    td.update(td.flag("hello").variation_for_all(True))
+    td.update(td.flag("world").variation_for_all(True))
+    # Disable background requests as we aren't using a server.
+    config = Config(
+        "sdk-key", update_processor_class=td, diagnostic_opt_out=True, send_events=False
+    )
+
+    uninstall_integration(LaunchDarklyIntegration.identifier)
+    if use_global_client:
+        ldclient.set_config(config)
+        sentry_init(traces_sample_rate=1, integrations=[LaunchDarklyIntegration()])
+        client = ldclient.get()
+    else:
+        client = LDClient(config=config)
+        sentry_init(
+            traces_sample_rate=1,
+            integrations=[LaunchDarklyIntegration(ld_client=client)],
+        )
+
+    events = capture_events()
+
+    with start_transaction(name="hi"):
+        with start_span(op="foo", name="bar"):
+            client.variation("hello", Context.create("my-org", "organization"), False)
+
+    (event,) = events
+    assert event["spans"][0]["data"] == ApproxDict({"flag.hello": True})

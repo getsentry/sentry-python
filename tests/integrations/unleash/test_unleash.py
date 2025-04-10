@@ -8,7 +8,9 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations.unleash import UnleashIntegration
+from sentry_sdk import start_span, start_transaction
 from tests.integrations.unleash.testutils import mock_unleash_client
+from tests.conftest import ApproxDict
 
 
 def test_is_enabled(sentry_init, capture_events, uninstall_integration):
@@ -164,3 +166,18 @@ def test_wrapper_attributes(sentry_init, uninstall_integration):
         # Mock clients methods have not lost their qualified names after decoration.
         assert client.is_enabled.__name__ == "is_enabled"
         assert client.is_enabled.__qualname__ == original_is_enabled.__qualname__
+
+
+def test_unleash_span_integration(sentry_init, capture_events, uninstall_integration):
+    uninstall_integration(UnleashIntegration.identifier)
+
+    with mock_unleash_client():
+        sentry_init(traces_sample_rate=1, integrations=[UnleashIntegration()])
+        events = capture_events()
+        client = UnleashClient()  # type: ignore[arg-type]
+        with start_transaction(name="hi"):
+            with start_span(op="foo", name="bar"):
+                client.is_enabled("hello")
+
+    (event,) = events
+    assert event["spans"][0]["data"] == ApproxDict({"flag.hello": True})
