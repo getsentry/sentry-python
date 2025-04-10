@@ -18,7 +18,7 @@ def test_continue_trace_with_sample_rand(sentry_init):
     sentry_init()
 
     headers = {
-        "sentry-trace": "00000000000000000000000000000000-0000000000000000-0",
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-0",
         "baggage": "sentry-sample_rand=0.1,sentry-sample_rate=0.5",
     }
 
@@ -34,7 +34,7 @@ def test_continue_trace_missing_sample_rand(sentry_init):
     sentry_init()
 
     headers = {
-        "sentry-trace": "00000000000000000000000000000000-0000000000000000",
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef",
         "baggage": "sentry-placeholder=asdf",
     }
 

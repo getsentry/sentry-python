@@ -229,9 +229,9 @@ def test_span_data_started_with_sentry(capture_envelopes):
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_span(op="http", description="request") as request_span:
-        request_span.set_data("foo", "bar")
+        request_span.set_attribute("foo", "bar")
         with sentry_sdk.start_span(op="db", description="statement") as db_span:
-            db_span.set_data("baz", 42)
+            db_span.set_attribute("baz", 42)
 
     (envelope,) = envelopes
     (item,) = envelope.items

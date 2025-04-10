@@ -189,7 +189,7 @@ def test_on_new_span_without_transaction(sentry_init):
     rust_tracing.new_span(RustTracingLevel.Info, 3)
     current_span = sentry_sdk.get_current_span()
     assert current_span is not None
-    assert current_span.containing_transaction is None
+    assert current_span.root_span is None
 
 
 def test_on_event_exception(sentry_init, capture_events):

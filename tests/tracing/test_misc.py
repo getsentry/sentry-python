@@ -37,8 +37,8 @@ def test_span_data_scrubbing_and_trimming(sentry_init, capture_events):
 
     with start_span(name="hi"):
         with start_span(op="foo", name="bar") as span:
-            span.set_data("password", "secret")
-            span.set_data("datafoo", "databar")
+            span.set_attribute("password", "secret")
+            span.set_attribute("datafoo", "databar")
 
         for i in range(10):
             with start_span(op=f"foo{i}"):
@@ -83,9 +83,9 @@ def test_root_span_data(sentry_init, capture_events):
 
     with start_span(name="test-root-span"):
         root_span = sentry_sdk.get_current_span()
-        root_span.set_data("foo", "bar")
+        root_span.set_attribute("foo", "bar")
         with start_span(op="test-span") as span:
-            span.set_data("spanfoo", "spanbar")
+            span.set_attribute("spanfoo", "spanbar")
 
     assert len(events) == 1
 

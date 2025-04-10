@@ -151,7 +151,7 @@ def record_sql_queries(
         only_if_parent=True,
     ) as span:
         for k, v in data.items():
-            span.set_data(k, v)
+            span.set_attribute(k, v)
         yield span
 
 
@@ -249,14 +249,14 @@ def add_query_source(span):
         except Exception:
             lineno = None
         if lineno is not None:
-            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+            span.set_attribute(SPANDATA.CODE_LINENO, frame.f_lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+            span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -266,7 +266,7 @@ def add_query_source(span):
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
-            span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+            span.set_attribute(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -274,7 +274,7 @@ def add_query_source(span):
             code_function = None
 
         if code_function is not None:
-            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def extract_sentrytrace_data(header):

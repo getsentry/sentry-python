@@ -77,7 +77,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
         data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
     for key, value in data.items():
-        span.set_data(key, value)
+        span.set_attribute(key, value)
 
     span.set_tag("aws.service_id", service_id)
     span.set_tag("aws.operation_name", operation_name)

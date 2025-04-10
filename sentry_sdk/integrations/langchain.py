@@ -229,7 +229,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not model and "anthropic" in all_params.get("_type"):
                 model = "claude-2"
             if model:
-                span.set_data(SPANDATA.AI_MODEL_ID, model)
+                span.set_attribute(SPANDATA.AI_MODEL_ID, model)
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,

@@ -36,7 +36,7 @@ def _update_span(span, *data_bags):
             if key in TAG_KEYS:
                 span.set_tag(key, value)
             else:
-                span.set_data(key, value)
+                span.set_attribute(key, value)
 
 
 def _create_breadcrumb(message, *data_bags):
