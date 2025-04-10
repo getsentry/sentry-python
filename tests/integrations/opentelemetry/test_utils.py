@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from opentelemetry.trace import SpanKind, Status, StatusCode
 
-from sentry_sdk.integrations.opentelemetry.utils import (
+from sentry_sdk.opentelemetry.utils import (
     extract_span_data,
     extract_span_status,
     span_data_for_db_query,

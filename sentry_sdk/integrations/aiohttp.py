@@ -3,7 +3,14 @@ import weakref
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import (
+    OP,
+    SPANSTATUS,
+    SPANDATA,
+    BAGGAGE_HEADER_NAME,
+    SOURCE_FOR_STYLE,
+    TransactionSource,
+)
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     _check_minimum_version,
@@ -16,11 +23,6 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     _request_headers_to_span_attributes,
     request_body_within_bounds,
-)
-from sentry_sdk.tracing import (
-    BAGGAGE_HEADER_NAME,
-    SOURCE_FOR_STYLE,
-    TransactionSource,
 )
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (

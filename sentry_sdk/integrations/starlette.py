@@ -5,7 +5,7 @@ from copy import deepcopy
 from json import JSONDecodeError
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.integrations import (
     DidNotEnable,
     Integration,
@@ -18,10 +18,6 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import (
-    SOURCE_FOR_STYLE,
-    TransactionSource,
-)
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,

@@ -10,7 +10,7 @@ from copy import deepcopy
 from functools import partial
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SOURCE_FOR_STYLE, TransactionSource
 
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
@@ -23,10 +23,6 @@ from sentry_sdk.integrations._wsgi_common import (
     _request_headers_to_span_attributes,
 )
 from sentry_sdk.sessions import track_session
-from sentry_sdk.tracing import (
-    SOURCE_FOR_STYLE,
-    TransactionSource,
-)
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,

@@ -6,17 +6,17 @@ from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
 from opentelemetry.trace.span import TraceState
 
 import sentry_sdk
-from sentry_sdk.tracing_utils import (
-    _generate_sample_rand,
-    has_tracing_enabled,
-)
-from sentry_sdk.utils import is_valid_sample_rate, logger
-from sentry_sdk.integrations.opentelemetry.consts import (
+from sentry_sdk.opentelemetry.consts import (
     TRACESTATE_SAMPLED_KEY,
     TRACESTATE_SAMPLE_RAND_KEY,
     TRACESTATE_SAMPLE_RATE_KEY,
     SentrySpanAttribute,
 )
+from sentry_sdk.tracing_utils import (
+    _generate_sample_rand,
+    has_tracing_enabled,
+)
+from sentry_sdk.utils import is_valid_sample_rate, logger
 
 from typing import TYPE_CHECKING
 
