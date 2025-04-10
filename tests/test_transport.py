@@ -10,10 +10,14 @@ from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import brotli
-import httpcore
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
+
+try:
+    import httpcore
+except (ImportError, ModuleNotFoundError):
+    httpcore = None
 
 try:
     import gevent
