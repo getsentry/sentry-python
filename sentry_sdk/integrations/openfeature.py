@@ -48,4 +48,6 @@ class OpenFeatureHook(Hook):
             # Spans support.
             span = sentry_sdk.get_current_span()
             if span:
-                span.set_data(f"flag.{hook_context.flag_key}", hook_context.value)
+                span.set_data(
+                    f"flag.{hook_context.flag_key}", hook_context.default_value
+                )
