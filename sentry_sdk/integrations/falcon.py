@@ -19,8 +19,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Event, EventProcessor
 
-# In Falcon 3.0 `falcon.api_helpers` is renamed to `falcon.app_helpers`
-# and `falcon.API` to `falcon.App`
 
 try:
     import falcon  # type: ignore
@@ -29,24 +27,15 @@ try:
 except ImportError:
     raise DidNotEnable("Falcon not installed")
 
-try:
-    import falcon.app_helpers  # type: ignore
+import falcon.app_helpers  # type: ignore
 
-    falcon_helpers = falcon.app_helpers
-    falcon_app_class = falcon.App
-    FALCON3 = True
-except ImportError:
-    import falcon.api_helpers  # type: ignore
-
-    falcon_helpers = falcon.api_helpers
-    falcon_app_class = falcon.API
-    FALCON3 = False
+falcon_helpers = falcon.app_helpers
+falcon_app_class = falcon.App
 
 
 _FALCON_UNSET = None  # type: Optional[object]
-if FALCON3:  # falcon.request._UNSET is only available in Falcon 3.0+
-    with capture_internal_exceptions():
-        from falcon.request import _UNSET as _FALCON_UNSET  # type: ignore[import-not-found, no-redef]
+with capture_internal_exceptions():
+    from falcon.request import _UNSET as _FALCON_UNSET  # type: ignore[import-not-found, no-redef]
 
 
 class FalconRequestExtractor(RequestExtractor):
@@ -232,14 +221,7 @@ def _exception_leads_to_http_5xx(ex, response):
         ex, (falcon.HTTPError, falcon.http_status.HTTPStatus)
     )
 
-    # We only check the HTTP status on Falcon 3 because in Falcon 2, the status on the response
-    # at the stage where we capture it is listed as 200, even though we would expect to see a 500
-    # status. Since at the time of this change, Falcon 2 is ca. 4 years old, we have decided to
-    # only perform this check on Falcon 3+, despite the risk that some handled errors might be
-    # reported to Sentry as unhandled on Falcon 2.
-    return (is_server_error or is_unhandled_error) and (
-        not FALCON3 or _has_http_5xx_status(response)
-    )
+    return (is_server_error or is_unhandled_error) and _has_http_5xx_status(response)
 
 
 def _has_http_5xx_status(response):

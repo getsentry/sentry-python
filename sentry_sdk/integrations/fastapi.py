@@ -89,8 +89,8 @@ def patch_get_request_handler():
             def _sentry_call(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 current_scope = sentry_sdk.get_current_scope()
-                if current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
+                if current_scope.root_span is not None:
+                    current_scope.root_span.update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
                 if sentry_scope.profile is not None:

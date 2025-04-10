@@ -1,6 +1,5 @@
 import asyncio
 import functools
-import warnings
 from collections.abc import Set
 from copy import deepcopy
 from json import JSONDecodeError
@@ -14,7 +13,6 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    HttpCodeRangeContainer,
     _is_json_content_type,
     request_body_within_bounds,
 )
@@ -37,9 +35,9 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
+    from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
-    from sentry_sdk._types import Event, HttpStatusCodeRange
+    from sentry_sdk._types import Event
 
 try:
     import starlette  # type: ignore
@@ -89,7 +87,7 @@ class StarletteIntegration(Integration):
     def __init__(
         self,
         transaction_style="url",  # type: str
-        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Union[Set[int], list[HttpStatusCodeRange], None]
+        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
         middleware_spans=True,  # type: bool
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
@@ -103,24 +101,7 @@ class StarletteIntegration(Integration):
         self.middleware_spans = middleware_spans
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
-        if isinstance(failed_request_status_codes, Set):
-            self.failed_request_status_codes = (
-                failed_request_status_codes
-            )  # type: Container[int]
-        else:
-            warnings.warn(
-                "Passing a list or None for failed_request_status_codes is deprecated. "
-                "Please pass a set of int instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-            if failed_request_status_codes is None:
-                self.failed_request_status_codes = _DEFAULT_FAILED_REQUEST_STATUS_CODES
-            else:
-                self.failed_request_status_codes = HttpCodeRangeContainer(
-                    failed_request_status_codes
-                )
+        self.failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
     def setup_once():
@@ -164,6 +145,7 @@ def _enable_span_for_middleware(middleware_class):
             op=OP.MIDDLEWARE_STARLETTE,
             name=middleware_name,
             origin=StarletteIntegration.origin,
+            only_if_parent=True,
         ) as middleware_span:
             middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
@@ -174,6 +156,7 @@ def _enable_span_for_middleware(middleware_class):
                     op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
                     origin=StarletteIntegration.origin,
+                    only_if_parent=True,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -189,6 +172,7 @@ def _enable_span_for_middleware(middleware_class):
                     op=OP.MIDDLEWARE_STARLETTE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
                     origin=StarletteIntegration.origin,
+                    only_if_parent=True,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
                     return await send(*args, **kwargs)
@@ -329,7 +313,7 @@ def _add_user_to_sentry_scope(scope):
         user_info.setdefault("email", starlette_user.email)
 
     sentry_scope = sentry_sdk.get_isolation_scope()
-    sentry_scope.user = user_info
+    sentry_scope.set_user(user_info)
 
 
 def patch_authentication_middleware(middleware_class):
@@ -493,8 +477,8 @@ def patch_request_response():
                     return old_func(*args, **kwargs)
 
                 current_scope = sentry_sdk.get_current_scope()
-                if current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
+                if current_scope.root_span is not None:
+                    current_scope.root_span.update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
                 if sentry_scope.profile is not None:

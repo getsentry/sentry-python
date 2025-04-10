@@ -29,4 +29,4 @@ def _normalize_data(data):
 def set_data_normalized(span, key, value):
     # type: (Span, str, Any) -> None
     normalized = _normalize_data(value)
-    span.set_data(key, normalized)
+    span.set_attribute(key, normalized)

@@ -751,12 +751,14 @@ def test_tracing_success(sentry_init, capture_events, app):
 
     assert transaction_event["type"] == "transaction"
     assert transaction_event["transaction"] == "hi_tx"
+    assert transaction_event["transaction_info"] == {"source": "component"}
     assert transaction_event["contexts"]["trace"]["status"] == "ok"
     assert transaction_event["tags"]["view"] == "yes"
     assert transaction_event["tags"]["before_request"] == "yes"
 
     assert message_event["message"] == "hi"
     assert message_event["transaction"] == "hi_tx"
+    assert message_event["transaction_info"] == {"source": "component"}
     assert message_event["tags"]["view"] == "yes"
     assert message_event["tags"]["before_request"] == "yes"
 

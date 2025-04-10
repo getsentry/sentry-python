@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from redis import Redis
     from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.tracing import Span
     from typing import Any
 
 
@@ -43,26 +42,30 @@ def _get_db_span_description(integration, command_name, args):
     return description
 
 
-def _set_db_data_on_span(span, connection_params):
-    # type: (Span, dict[str, Any]) -> None
-    span.set_data(SPANDATA.DB_SYSTEM, "redis")
+def _get_connection_data(connection_params):
+    # type: (dict[str, Any]) -> dict[str, Any]
+    data = {
+        SPANDATA.DB_SYSTEM: "redis",
+    }
 
     db = connection_params.get("db")
     if db is not None:
-        span.set_data(SPANDATA.DB_NAME, str(db))
+        data[SPANDATA.DB_NAME] = str(db)
 
     host = connection_params.get("host")
     if host is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, host)
+        data[SPANDATA.SERVER_ADDRESS] = host
 
     port = connection_params.get("port")
     if port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, port)
+        data[SPANDATA.SERVER_PORT] = port
+
+    return data
 
 
-def _set_db_data(span, redis_instance):
-    # type: (Span, Redis[Any]) -> None
+def _get_db_data(redis_instance):
+    # type: (Redis[Any]) -> dict[str, Any]
     try:
-        _set_db_data_on_span(span, redis_instance.connection_pool.connection_kwargs)
+        return _get_connection_data(redis_instance.connection_pool.connection_kwargs)
     except AttributeError:
-        pass  # connections_kwargs may be missing in some cases
+        return {}  # connections_kwargs may be missing in some cases

@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk.integrations.redis import RedisIntegration
-    from sentry_sdk.tracing import Span
     from typing import Any, Optional
 
 
@@ -75,22 +74,24 @@ def _get_cache_span_description(redis_command, args, kwargs, integration):
     return description
 
 
-def _set_cache_data(span, redis_client, properties, return_value):
-    # type: (Span, Any, dict[str, Any], Optional[Any]) -> None
+def _get_cache_data(redis_client, properties, return_value):
+    # type: (Any, dict[str, Any], Optional[Any]) -> dict[str, Any]
+    data = {}
+
     with capture_internal_exceptions():
-        span.set_data(SPANDATA.CACHE_KEY, properties["key"])
+        data[SPANDATA.CACHE_KEY] = properties["key"]
 
         if properties["redis_command"] in GET_COMMANDS:
             if return_value is not None:
-                span.set_data(SPANDATA.CACHE_HIT, True)
+                data[SPANDATA.CACHE_HIT] = True
                 size = (
                     len(str(return_value).encode("utf-8"))
                     if not isinstance(return_value, bytes)
                     else len(return_value)
                 )
-                span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+                data[SPANDATA.CACHE_ITEM_SIZE] = size
             else:
-                span.set_data(SPANDATA.CACHE_HIT, False)
+                data[SPANDATA.CACHE_HIT] = False
 
         elif properties["redis_command"] in SET_COMMANDS:
             if properties["value"] is not None:
@@ -99,7 +100,7 @@ def _set_cache_data(span, redis_client, properties, return_value):
                     if not isinstance(properties["value"], bytes)
                     else len(properties["value"])
                 )
-                span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+                data[SPANDATA.CACHE_ITEM_SIZE] = size
 
         try:
             connection_params = redis_client.connection_pool.connection_kwargs
@@ -114,8 +115,10 @@ def _set_cache_data(span, redis_client, properties, return_value):
 
         host = connection_params.get("host")
         if host is not None:
-            span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, host)
+            data[SPANDATA.NETWORK_PEER_ADDRESS] = host
 
         port = connection_params.get("port")
         if port is not None:
-            span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
+            data[SPANDATA.NETWORK_PEER_PORT] = port
+
+    return data

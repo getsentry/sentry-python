@@ -18,6 +18,7 @@ from sentry_sdk.integrations.starlette import (
     StarletteRequestExtractor,
 )
 from sentry_sdk.utils import parse_version
+from tests.conftest import ApproxDict
 
 import starlette
 from starlette.authentication import (
@@ -666,8 +667,8 @@ def test_middleware_spans(sentry_init, capture_events):
         "AuthenticationMiddleware",
         "ExceptionMiddleware",
         "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
-        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
         "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
+        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
         "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
     ]
 
@@ -743,16 +744,6 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "ServerErrorMiddleware.__call__.<locals>._send",
-            "tags": {"starlette.middleware_name": "SampleMiddleware"},
-        },
-        {
-            "op": "middleware.starlette.send",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
-        },
-        {
-            "op": "middleware.starlette.send",
             "description": "SampleMiddleware.__call__.<locals>.do_stuff",
             "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
         },
@@ -760,6 +751,16 @@ def test_middleware_callback_spans(sentry_init, capture_events):
             "op": "middleware.starlette.send",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
             "tags": {"starlette.middleware_name": "SampleMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
+            "tags": {"starlette.middleware_name": "SampleMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
@@ -772,7 +773,7 @@ def test_middleware_callback_spans(sentry_init, capture_events):
     for span in transaction_event["spans"]:
         assert span["op"] == expected[idx]["op"]
         assert span["description"] == expected[idx]["description"]
-        assert span["tags"] == expected[idx]["tags"]
+        assert span["tags"] == ApproxDict(expected[idx]["tags"])
         idx += 1
 
 
@@ -838,14 +839,14 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
             "tags": {"starlette.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
         {
-            "op": "middleware.starlette.send",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
-        },
-        {
             "op": "middleware.starlette",
             "description": "ExceptionMiddleware",
             "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
@@ -863,7 +864,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
     for span in transaction_event["spans"]:
         assert span["op"] == expected[idx]["op"]
         assert span["description"].startswith(expected[idx]["description"])
-        assert span["tags"] == expected[idx]["tags"]
+        assert span["tags"] == ApproxDict(expected[idx]["tags"])
         idx += 1
 
 
@@ -909,13 +910,13 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
     sentry_init(
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
     )
     app = starlette_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
 
     envelopes = capture_envelopes()
 
-    client = TestClient(asgi_app)
+    client = TestClient(app)
     response = client.get(endpoint)
     assert response.status_code == 200
 
@@ -1181,82 +1182,6 @@ def test_span_origin(sentry_init, capture_events):
         assert span["origin"] == "auto.http.starlette"
 
 
-class NonIterableContainer:
-    """Wraps any container and makes it non-iterable.
-
-    Used to test backwards compatibility with our old way of defining failed_request_status_codes, which allowed
-    passing in a list of (possibly non-iterable) containers. The Python standard library does not provide any built-in
-    non-iterable containers, so we have to define our own.
-    """
-
-    def __init__(self, inner):
-        self.inner = inner
-
-    def __contains__(self, item):
-        return item in self.inner
-
-
-parametrize_test_configurable_status_codes_deprecated = pytest.mark.parametrize(
-    "failed_request_status_codes,status_code,expected_error",
-    [
-        (None, 500, True),
-        (None, 400, False),
-        ([500, 501], 500, True),
-        ([500, 501], 401, False),
-        ([range(400, 499)], 401, True),
-        ([range(400, 499)], 500, False),
-        ([range(400, 499), range(500, 599)], 300, False),
-        ([range(400, 499), range(500, 599)], 403, True),
-        ([range(400, 499), range(500, 599)], 503, True),
-        ([range(400, 403), 500, 501], 401, True),
-        ([range(400, 403), 500, 501], 405, False),
-        ([range(400, 403), 500, 501], 501, True),
-        ([range(400, 403), 500, 501], 503, False),
-        ([], 500, False),
-        ([NonIterableContainer(range(500, 600))], 500, True),
-        ([NonIterableContainer(range(500, 600))], 404, False),
-    ],
-)
-"""Test cases for configurable status codes (deprecated API).
-Also used by the FastAPI tests.
-"""
-
-
-@parametrize_test_configurable_status_codes_deprecated
-def test_configurable_status_codes_deprecated(
-    sentry_init,
-    capture_events,
-    failed_request_status_codes,
-    status_code,
-    expected_error,
-):
-    with pytest.warns(DeprecationWarning):
-        starlette_integration = StarletteIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    sentry_init(integrations=[starlette_integration])
-
-    events = capture_events()
-
-    async def _error(request):
-        raise HTTPException(status_code)
-
-    app = starlette.applications.Starlette(
-        routes=[
-            starlette.routing.Route("/error", _error, methods=["GET"]),
-        ],
-    )
-
-    client = TestClient(app)
-    client.get("/error")
-
-    if expected_error:
-        assert len(events) == 1
-    else:
-        assert not events
-
-
 @pytest.mark.skipif(
     STARLETTE_VERSION < (0, 21),
     reason="Requires Starlette >= 0.21, because earlier versions do not support HTTP 'HEAD' requests",
@@ -1267,9 +1192,8 @@ def test_transaction_http_method_default(sentry_init, capture_events):
     """
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[
-            StarletteIntegration(),
-        ],
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[StarletteIntegration()],
     )
     events = capture_events()
 
@@ -1294,6 +1218,7 @@ def test_transaction_http_method_default(sentry_init, capture_events):
 def test_transaction_http_method_custom(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[
             StarletteIntegration(
                 http_methods_to_capture=(
