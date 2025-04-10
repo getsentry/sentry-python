@@ -24,10 +24,10 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_USE_ISOLATION_SCOPE_KEY,
     TRACESTATE_SAMPLED_KEY,
 )
-from sentry_sdk.integrations.opentelemetry.contextvars_context import (
+from sentry_sdk.integrations.opentelemetry.utils import trace_state_from_baggage
+from sentry_sdk.opentelemetry.contextvars_context import (
     SentryContextVarsRuntimeContext,
 )
-from sentry_sdk.integrations.opentelemetry.utils import trace_state_from_baggage
 from sentry_sdk.scope import Scope, ScopeType
 from sentry_sdk.tracing import Span
 from sentry_sdk._types import TYPE_CHECKING
