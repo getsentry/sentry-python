@@ -858,7 +858,7 @@ class _Client(BaseClient):
             log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
 
         if log.get("trace_id") is None:
-            transaction = current_scope.transaction
+            transaction = current_scope.root_span
             propagation_context = isolation_scope.get_active_propagation_context()
             if transaction is not None:
                 log["trace_id"] = transaction.trace_id
