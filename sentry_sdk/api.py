@@ -30,17 +30,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import Generator
 
-    from sentry_sdk.client import BaseClient
-    from sentry_sdk._types import (
-        Event,
-        Hint,
-        Breadcrumb,
-        BreadcrumbHint,
-        ExcInfo,
-        MeasurementUnit,
-        LogLevelStr,
-    )
-    from sentry_sdk.tracing import Span
+    import sentry_sdk
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -102,7 +92,7 @@ def clientmethod(f):
 
 @scopemethod
 def get_client():
-    # type: () -> BaseClient
+    # type: () -> sentry_sdk.client.BaseClient
     return Scope.get_client()
 
 
@@ -150,8 +140,8 @@ def last_event_id():
 
 @scopemethod
 def capture_event(
-    event,  # type: Event
-    hint=None,  # type: Optional[Hint]
+    event,  # type: sentry_sdk._types.Event
+    hint=None,  # type: Optional[sentry_sdk._types.Hint]
     scope=None,  # type: Optional[Any]
     **scope_kwargs,  # type: Any
 ):
@@ -162,7 +152,7 @@ def capture_event(
 @scopemethod
 def capture_message(
     message,  # type: str
-    level=None,  # type: Optional[LogLevelStr]
+    level=None,  # type: Optional[sentry_sdk._types.LogLevelStr]
     scope=None,  # type: Optional[Any]
     **scope_kwargs,  # type: Any
 ):
@@ -174,7 +164,7 @@ def capture_message(
 
 @scopemethod
 def capture_exception(
-    error=None,  # type: Optional[Union[BaseException, ExcInfo]]
+    error=None,  # type: Optional[Union[BaseException, sentry_sdk._types.ExcInfo]]
     scope=None,  # type: Optional[Any]
     **scope_kwargs,  # type: Any
 ):
@@ -184,8 +174,8 @@ def capture_exception(
 
 @scopemethod
 def add_breadcrumb(
-    crumb=None,  # type: Optional[Breadcrumb]
-    hint=None,  # type: Optional[BreadcrumbHint]
+    crumb=None,  # type: Optional[sentry_sdk._types.Breadcrumb]
+    hint=None,  # type: Optional[sentry_sdk._types.BreadcrumbHint]
     **kwargs,  # type: Any
 ):
     # type: (...) -> None
@@ -224,7 +214,7 @@ def set_user(value):
 
 @scopemethod
 def set_level(value):
-    # type: (LogLevelStr) -> None
+    # type: (sentry_sdk._types.LogLevelStr) -> None
     return get_isolation_scope().set_level(value)
 
 
@@ -238,7 +228,7 @@ def flush(
 
 
 def start_span(**kwargs):
-    # type: (Any) -> Span
+    # type: (Any) -> sentry_sdk.tracing.Span
     """
     Start and return a span.
 
@@ -255,10 +245,10 @@ def start_span(**kwargs):
 
 
 def start_transaction(
-    transaction=None,  # type: Optional[Span]
+    transaction=None,  # type: Optional[sentry_sdk.tracing.Span]
     **kwargs,  # type: Any
 ):
-    # type: (...) -> Span
+    # type: (...) -> sentry_sdk.tracing.Span
     """
     .. deprecated:: 3.0.0
         This function is deprecated and will be removed in a future release.
@@ -298,14 +288,14 @@ def start_transaction(
 
 
 def set_measurement(name, value, unit=""):
-    # type: (str, float, MeasurementUnit) -> None
+    # type: (str, float, sentry_sdk._types.MeasurementUnit) -> None
     transaction = get_current_scope().transaction
     if transaction is not None:
         transaction.set_measurement(name, value, unit)
 
 
 def get_current_span(scope=None):
-    # type: (Optional[Scope]) -> Optional[Span]
+    # type: (Optional[Scope]) -> Optional[sentry_sdk.tracing.Span]
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
