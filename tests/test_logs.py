@@ -11,6 +11,7 @@ from sentry_sdk import get_client
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.types import Log
+from sentry_sdk.consts import SPANDATA, VERSION
 
 minimum_python_37 = pytest.mark.skipif(
     sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
@@ -161,7 +162,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     """
     Passing arbitrary attributes to log messages.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(_experiments={"enable_logs": True}, server_name="test-server")
     envelopes = capture_envelopes()
 
     attrs = {
@@ -184,6 +185,9 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     assert logs[0]["attributes"]["sentry.environment"] == "production"
     assert "sentry.release" in logs[0]["attributes"]
     assert logs[0]["attributes"]["sentry.message.parameters.my_var"] == "some value"
+    assert logs[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
+    assert logs[0]["attributes"]["sentry.sdk.name"] == "sentry.python"
+    assert logs[0]["attributes"]["sentry.sdk.version"] == VERSION
 
 
 @minimum_python_37
@@ -283,6 +287,7 @@ def test_logger_integration_warning(sentry_init, capture_envelopes):
     assert attrs["sentry.environment"] == "production"
     assert attrs["sentry.message.parameters.0"] == "1"
     assert attrs["sentry.message.parameters.1"] == "2"
+    assert attrs["sentry.origin"] == "auto.logger.log"
     assert logs[0]["severity_number"] == 13
     assert logs[0]["severity_text"] == "warn"
 

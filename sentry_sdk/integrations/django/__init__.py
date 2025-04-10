@@ -115,7 +115,7 @@ class DjangoIntegration(Integration):
         transaction_style="url",  # type: str
         middleware_spans=True,  # type: bool
         signals_spans=True,  # type: bool
-        cache_spans=False,  # type: bool
+        cache_spans=True,  # type: bool
         signals_denylist=None,  # type: Optional[list[signals.Signal]]
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
     ):
