@@ -15,7 +15,7 @@ from sentry_sdk.scope import (
     ScopeType,
     should_send_default_pii,
 )
-from sentry_sdk.integrations.opentelemetry.scope import (
+from sentry_sdk.opentelemetry.scope import (
     PotelScope as Scope,
     use_scope,
     use_isolation_scope,
