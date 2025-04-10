@@ -12,8 +12,7 @@ from opentelemetry.context import Context
 from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.tracing import DEFAULT_SPAN_ORIGIN
+from sentry_sdk.consts import SPANDATA, DEFAULT_SPAN_ORIGIN
 from sentry_sdk.utils import get_current_thread_meta
 from sentry_sdk.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,

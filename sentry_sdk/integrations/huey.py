@@ -3,12 +3,15 @@ from datetime import datetime
 
 import sentry_sdk
 from sentry_sdk.api import get_baggage, get_traceparent
-from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.consts import (
+    OP,
+    SPANSTATUS,
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+)
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
     TransactionSource,
 )
 from sentry_sdk.utils import (

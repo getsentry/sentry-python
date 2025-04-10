@@ -21,14 +21,14 @@ from opentelemetry.trace import (
     TraceFlags,
 )
 
+from sentry_sdk.consts import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+)
 from sentry_sdk.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
     SENTRY_SCOPES_KEY,
-)
-from sentry_sdk.tracing import (
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
 )
 from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
 

@@ -945,4 +945,43 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+
+DEFAULT_SPAN_ORIGIN = "manual"
+DEFAULT_SPAN_NAME = "<unlabeled span>"
+
+
+# Transaction source
+# see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
+class TransactionSource(str, Enum):
+    COMPONENT = "component"
+    CUSTOM = "custom"
+    ROUTE = "route"
+    TASK = "task"
+    URL = "url"
+    VIEW = "view"
+
+    def __str__(self):
+        # type: () -> str
+        return self.value
+
+
+# These are typically high cardinality and the server hates them
+LOW_QUALITY_TRANSACTION_SOURCES = [
+    TransactionSource.URL,
+]
+
+SOURCE_FOR_STYLE = {
+    "endpoint": TransactionSource.COMPONENT,
+    "function_name": TransactionSource.COMPONENT,
+    "handler_name": TransactionSource.COMPONENT,
+    "method_and_path_pattern": TransactionSource.ROUTE,
+    "path": TransactionSource.URL,
+    "route_name": TransactionSource.COMPONENT,
+    "route_pattern": TransactionSource.ROUTE,
+    "uri_template": TransactionSource.ROUTE,
+    "url": TransactionSource.ROUTE,
+}
+
 VERSION = "2.25.1"

@@ -4,7 +4,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk import isolation_scope
-from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA, BAGGAGE_HEADER_NAME
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -13,7 +13,7 @@ from sentry_sdk.integrations.celery.beat import (
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TransactionSource
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
