@@ -178,6 +178,9 @@ def test_unleash_span_integration(sentry_init, capture_events, uninstall_integra
         with start_transaction(name="hi"):
             with start_span(op="foo", name="bar"):
                 client.is_enabled("hello")
+                client.is_enabled("other")
 
     (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict({"flag.hello": True})
+    assert event["spans"][0]["data"] == ApproxDict(
+        {"flag.hello": True, "flag.other": False}
+    )

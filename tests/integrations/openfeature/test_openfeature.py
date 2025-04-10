@@ -171,6 +171,9 @@ def test_openfeature_span_integration(
     with start_transaction(name="hi"):
         with start_span(op="foo", name="bar"):
             client.get_boolean_value("hello", default_value=False)
+            client.get_boolean_value("world", default_value=False)
 
     (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict({"flag.hello": True})
+    assert event["spans"][0]["data"] == ApproxDict(
+        {"flag.hello": True, "flag.world": False}
+    )

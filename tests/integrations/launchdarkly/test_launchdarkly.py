@@ -238,6 +238,9 @@ def test_launchdarkly_span_integration(
     with start_transaction(name="hi"):
         with start_span(op="foo", name="bar"):
             client.variation("hello", Context.create("my-org", "organization"), False)
+            client.variation("other", Context.create("my-org", "organization"), False)
 
     (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict({"flag.hello": True})
+    assert event["spans"][0]["data"] == ApproxDict(
+        {"flag.hello": True, "flag.other": False}
+    )

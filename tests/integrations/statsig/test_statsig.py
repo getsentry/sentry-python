@@ -188,13 +188,16 @@ def test_wrapper_attributes(sentry_init, uninstall_integration):
 def test_statsig_span_integration(sentry_init, capture_events, uninstall_integration):
     uninstall_integration(StatsigIntegration.identifier)
 
-    with mock_statsig({"hello": True, "world": False}):
+    with mock_statsig({"hello": True}):
         sentry_init(traces_sample_rate=1, integrations=[StatsigIntegration()])
         events = capture_events()
         user = StatsigUser(user_id="user-id")
         with start_transaction(name="hi"):
             with start_span(op="foo", name="bar"):
                 statsig.check_gate(user, "hello")
+                statsig.check_gate(user, "world")
 
     (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict({"flag.hello": True})
+    assert event["spans"][0]["data"] == ApproxDict(
+        {"flag.hello": True, "flag.world": False}
+    )
