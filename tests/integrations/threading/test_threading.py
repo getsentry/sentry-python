@@ -176,15 +176,15 @@ def test_wrapper_attributes(sentry_init):
 
 def test_scope_data_not_leaked_in_threads(sentry_init):
     sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[ThreadingIntegration(propagate_hub=True)],
+        integrations=[ThreadingIntegration()],
     )
 
+    sentry_sdk.set_tag("initial_tag", "initial_value")
     initial_iso_scope = sentry_sdk.get_isolation_scope()
 
     def do_some_work(number):
         # change data in isolation scope in thread
-        sentry_sdk.set_tag("foo", "bar")
+        sentry_sdk.set_tag("thread_tag", "thread_value")
 
     with futures.ThreadPoolExecutor(max_workers=2) as executor:
         all_futures = []
@@ -192,6 +192,6 @@ def test_scope_data_not_leaked_in_threads(sentry_init):
             all_futures.append(executor.submit(do_some_work, number))
         futures.wait(all_futures)
 
-    assert (
-        initial_iso_scope._tags == {}
-    ), "The isolation scope in the main thread should not be modified by the started threads."
+    assert initial_iso_scope._tags == {
+        "initial_tag": "initial_value"
+    }, "The isolation scope in the main thread should not be modified by the started threads."
