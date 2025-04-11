@@ -174,24 +174,36 @@ def test_wrapper_attributes(sentry_init):
     assert t.run.__qualname__ == original_run.__qualname__
 
 
-def test_scope_data_not_leaked_in_threads(sentry_init):
+@pytest.mark.parametrize(
+    "propagate_scope",
+    (True, False),
+    ids=["propagate_scope=True", "propagate_scope=False"],
+)
+def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
     sentry_init(
-        integrations=[ThreadingIntegration()],
+        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
     )
 
     sentry_sdk.set_tag("initial_tag", "initial_value")
     initial_iso_scope = sentry_sdk.get_isolation_scope()
 
-    def do_some_work(number):
+    def do_some_work():
+        # check if we have the initial scope data propagated into the thread
+        if propagate_scope:
+            assert sentry_sdk.get_isolation_scope()._tags == {
+                "initial_tag": "initial_value"
+            }
+        else:
+            assert sentry_sdk.get_isolation_scope()._tags == {}
+
         # change data in isolation scope in thread
         sentry_sdk.set_tag("thread_tag", "thread_value")
 
-    with futures.ThreadPoolExecutor(max_workers=2) as executor:
-        all_futures = []
-        for number in range(10):
-            all_futures.append(executor.submit(do_some_work, number))
-        futures.wait(all_futures)
+    t = Thread(target=do_some_work)
+    t.start()
+    t.join()
 
+    # check if the initial scope data is not modified by the started thread
     assert initial_iso_scope._tags == {
         "initial_tag": "initial_value"
-    }, "The isolation scope in the main thread should not be modified by the started threads."
+    }, "The isolation scope in the main thread should not be modified by the started thread."
