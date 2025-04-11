@@ -118,7 +118,7 @@ The SDK is open-source and available under the MIT license. Check out the [LICEN
 
 ## 😘 Contributors
 
-Thanks to everyone who has helped improve the SDK!
+Thanks to everyone who has helped improve the SDK! xoxo
 
 <a href="https://github.com/getsentry/sentry-python/graphs/contributors">
   <img src="https://contributors-img.web.app/image?repo=getsentry/sentry-python" />
