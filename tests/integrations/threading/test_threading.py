@@ -226,3 +226,26 @@ def test_trx_in_trx_not_working(sentry_init, capture_events):
     assert (
         wrong_span_found_in_trx
     ), "No wrong span found in transaction. It is excepted that there is one. (as we are testing a race condition, this test might fail randomly)"
+
+
+def test_scope_data_not_leaked_in_threads(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[ThreadingIntegration(propagate_hub=True)],
+    )
+
+    initial_iso_scope = sentry_sdk.get_isolation_scope()
+
+    def do_some_work(number):
+        # change data in isolation scope in thread
+        sentry_sdk.set_tag("foo", "bar")
+
+    with futures.ThreadPoolExecutor(max_workers=2) as executor:
+        all_futures = []
+        for number in range(10):
+            all_futures.append(executor.submit(do_some_work, number))
+        futures.wait(all_futures)
+
+    assert (
+        initial_iso_scope._tags == {}
+    ), "The isolation scope in the main thread should not be modified by the started threads."
