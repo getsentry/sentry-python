@@ -172,7 +172,7 @@ def test_unleash_span_integration(sentry_init, capture_events, uninstall_integra
     uninstall_integration(UnleashIntegration.identifier)
 
     with mock_unleash_client():
-        sentry_init(traces_sample_rate=1, integrations=[UnleashIntegration()])
+        sentry_init(traces_sample_rate=1.0, integrations=[UnleashIntegration()])
         events = capture_events()
         client = UnleashClient()  # type: ignore[arg-type]
         with start_transaction(name="hi"):
