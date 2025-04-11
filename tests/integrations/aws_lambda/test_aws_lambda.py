@@ -386,9 +386,41 @@ def test_trace_continuation(lambda_client, test_environment):
 
     # We simulate here AWS Api Gateway's behavior of passing HTTP headers
     # as the `headers` dict in the event passed to the Lambda function.
+    # If both sentry-trace and traceparent headers are present, sentry-trace takes precedence.
+    # See: https://github.com/getsentry/team-sdks/issues/41
     payload = {
         "headers": {
             "sentry-trace": sentry_trace_header,
+            "traceparent": "00-071a43a4192642f0b136d5159a501701-6e8f22c393e68f19-01",
+        }
+    }
+
+    lambda_client.invoke(
+        FunctionName="BasicException",
+        Payload=json.dumps(payload),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (error_event, transaction_event) = envelopes
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )
+
+
+def test_trace_continuation_w3c_traceparent(lambda_client, test_environment):
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = "01"
+    w3c_trace_header = "00-{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    # We simulate here AWS Api Gateway's behavior of passing HTTP headers
+    # as the `headers` dict in the event passed to the Lambda function.
+    payload = {
+        "headers": {
+            "traceparent": w3c_trace_header,
         }
     }
 
@@ -516,11 +548,58 @@ def test_error_has_existing_trace_context(
 
     # We simulate here AWS Api Gateway's behavior of passing HTTP headers
     # as the `headers` dict in the event passed to the Lambda function.
+    # If both sentry-trace and traceparent headers are present, sentry-trace takes precedence.
+    # See: https://github.com/getsentry/team-sdks/issues/41
     payload = {
         "headers": {
             "sentry-trace": sentry_trace_header,
+            "traceparent": "00-071a43a4192642f0b136d5159a501701-6e8f22c393e68f19-01",
         }
     }
+
+    lambda_client.invoke(
+        FunctionName=lambda_function_name,
+        Payload=json.dumps(payload),
+    )
+    envelopes = test_environment["server"].envelopes
+
+    if lambda_function_name == "RaiseErrorPerformanceEnabled":
+        (error_event, transaction_event) = envelopes
+    else:
+        (error_event,) = envelopes
+        transaction_event = None
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )
+
+    if transaction_event:
+        assert "trace" in transaction_event["contexts"]
+        assert "trace_id" in transaction_event["contexts"]["trace"]
+        assert (
+            transaction_event["contexts"]["trace"]["trace_id"]
+            == "471a43a4192642f0b136d5159a501701"
+        )
+
+
+@pytest.mark.parametrize(
+    "lambda_function_name",
+    ["RaiseErrorPerformanceEnabled", "RaiseErrorPerformanceDisabled"],
+)
+def test_error_has_existing_w3c_trace_context(
+    lambda_client, test_environment, lambda_function_name
+):
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = "01"
+    w3c_trace_header = "00-{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    # We simulate here AWS Api Gateway's behavior of passing HTTP headers
+    # as the `headers` dict in the event passed to the Lambda function.
+    payload = {"headers": {"traceparent": w3c_trace_header}}
 
     lambda_client.invoke(
         FunctionName=lambda_function_name,

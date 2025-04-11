@@ -137,6 +137,49 @@ async def test_grpc_server_continues_transaction(
 
 
 @pytest.mark.asyncio
+async def test_grpc_server_continues_transaction_from_w3c_traceparent(
+    grpc_server_and_channel, capture_events
+):
+    _, channel = grpc_server_and_channel
+    events = capture_events()
+
+    # Use the provided channel
+    stub = gRPCTestServiceStub(channel)
+
+    with sentry_sdk.start_transaction() as transaction:
+        metadata = (
+            (
+                "baggage",
+                "sentry-trace_id={trace_id},sentry-environment=test,"
+                "sentry-transaction=test-transaction,sentry-sample_rate=1.0".format(
+                    trace_id=transaction.trace_id
+                ),
+            ),
+            (
+                "traceparent",
+                "00-{trace_id}-{parent_span_id}-{sampled}".format(
+                    trace_id=transaction.trace_id,
+                    parent_span_id=transaction.span_id,
+                    sampled="01",
+                ),
+            ),
+        )
+
+        await stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)
+
+    (event, _) = events
+    span = event["spans"][0]
+
+    assert event["type"] == "transaction"
+    assert event["transaction_info"] == {
+        "source": "custom",
+    }
+    assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
+    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert span["op"] == "test"
+
+
+@pytest.mark.asyncio
 async def test_grpc_server_exception(grpc_server_and_channel, capture_events):
     _, channel = grpc_server_and_channel
     events = capture_events()

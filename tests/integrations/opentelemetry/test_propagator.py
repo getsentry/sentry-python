@@ -199,6 +199,51 @@ def test_inject_sentry_span_no_baggage():
         )
 
 
+@pytest.mark.forked
+def test_inject_w3c_span_no_baggage():
+    """
+    Inject a W3C span with no baggage.
+    """
+    carrier = None
+    context = get_current()
+    setter = MagicMock()
+    setter.set = MagicMock()
+
+    trace_id = "ec2da13ee483f41e7323f8c78ed8f4e4"
+    span_id = "4c6d5fcab571acb0"
+
+    span_context = SpanContext(
+        trace_id=int(trace_id, 16),
+        span_id=int(span_id, 16),
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        is_remote=True,
+    )
+    span = MagicMock()
+    span.get_span_context.return_value = span_context
+
+    sentry_span = MagicMock()
+    sentry_span.to_w3c_traceparent = mock.Mock(
+        return_value="00-ec2da13ee483f41e7323f8c78ed8f4e4-4c6d5fcab571acb0-01"
+    )
+    sentry_span.containing_transaction.get_baggage = mock.Mock(return_value=None)
+
+    span_processor = SentrySpanProcessor()
+    span_processor.otel_span_map[span_id] = sentry_span
+
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.propagator.trace.get_current_span",
+        return_value=span,
+    ):
+        full_context = set_span_in_context(span, context)
+        SentryPropagator().inject(carrier, full_context, setter)
+
+        setter.set.assert_called_once_with(
+            carrier,
+            "traceparent",
+            "00-ec2da13ee483f41e7323f8c78ed8f4e4-4c6d5fcab571acb0-01",
+        )
+
+
 def test_inject_sentry_span_empty_baggage():
     """
     Inject a sentry span with no baggage.

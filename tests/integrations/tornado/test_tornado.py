@@ -300,7 +300,7 @@ def test_error_has_new_trace_context_performance_enabled(
     tornado_testcase, sentry_init, capture_events
 ):
     """
-    Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
+    Check if an 'trace' context is added to errors and transactions when performance monitoring is enabled.
     """
     sentry_init(
         integrations=[TornadoIntegration()],
@@ -333,7 +333,7 @@ def test_error_has_new_trace_context_performance_disabled(
     tornado_testcase, sentry_init, capture_events
 ):
     """
-    Check if an 'trace' context is added to errros and transactions when performance monitoring is disabled.
+    Check if an 'trace' context is added to errors and transactions when performance monitoring is disabled.
     """
     sentry_init(
         integrations=[TornadoIntegration()],
@@ -362,7 +362,7 @@ def test_error_has_existing_trace_context_performance_enabled(
     tornado_testcase, sentry_init, capture_events
 ):
     """
-    Check if an 'trace' context is added to errros and transactions
+    Check if an 'trace' context is added to errors and transactions
     from the incoming 'sentry-trace' header when performance monitoring is enabled.
     """
     sentry_init(
@@ -400,11 +400,53 @@ def test_error_has_existing_trace_context_performance_enabled(
     )
 
 
+def test_error_has_existing_w3c_trace_context_performance_enabled(
+    tornado_testcase, sentry_init, capture_events
+):
+    """
+    Check if an 'trace' context is added to errors and transactions
+    from the incoming 'traceparent' header when performance monitoring is enabled.
+    """
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    trace_id = "d6a6892c89ff99522ab2041c4cd71a68"
+    parent_span_id = "6fac8cb0c8a904d0"
+    parent_sampled = "01"
+    w3c_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    headers = {"traceparent": w3c_trace_header}
+
+    client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
+    client.fetch("/hi", headers=headers)
+
+    (msg_event, error_event, transaction_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == "d6a6892c89ff99522ab2041c4cd71a68"
+    )
+
+
 def test_error_has_existing_trace_context_performance_disabled(
     tornado_testcase, sentry_init, capture_events
 ):
     """
-    Check if an 'trace' context is added to errros and transactions
+    Check if an 'trace' context is added to errors and transactions
     from the incoming 'sentry-trace' header when performance monitoring is disabled.
     """
     sentry_init(

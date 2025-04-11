@@ -297,11 +297,21 @@ async def test_trace_from_headers_if_performance_enabled(
 
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+    w3c_trace_header = "00-082b43a4192642f0b136d5159a501701-6e8f22c393e68f19-01"
+
+    # If both sentry-trace and traceparent headers are present, sentry-trace takes precedence.
+    # See: https://github.com/getsentry/team-sdks/issues/41
 
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
             events = capture_events()
-            await client.get("/", headers={"sentry-trace": sentry_trace_header})
+            await client.get(
+                "/",
+                headers={
+                    "sentry-trace": sentry_trace_header,
+                    "traceparent": w3c_trace_header,
+                },
+            )
 
     msg_event, error_event, transaction_event = events
 
@@ -330,11 +340,21 @@ async def test_trace_from_headers_if_performance_disabled(
 
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+    w3c_trace_header = "00-082b43a4192642f0b136d5159a501701-6e8f22c393e68f19-01"
+
+    # If both sentry-trace and traceparent headers are present, sentry-trace takes precedence.
+    # See: https://github.com/getsentry/team-sdks/issues/41
 
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
             events = capture_events()
-            await client.get("/", headers={"sentry-trace": sentry_trace_header})
+            await client.get(
+                "/",
+                headers={
+                    "sentry-trace": sentry_trace_header,
+                    "traceparent": w3c_trace_header,
+                },
+            )
 
     msg_event, error_event = events
 

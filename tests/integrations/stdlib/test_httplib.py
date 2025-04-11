@@ -215,7 +215,13 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
             parent_span_id=request_span.span_id,
             sampled=1,
         )
+        expected_w3c_trace = "00-{trace_id}-{parent_span_id}-{trace_flags}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=request_span.span_id,
+            trace_flags="01",
+        )
         assert request_headers["sentry-trace"] == expected_sentry_trace
+        assert request_headers["traceparent"] == expected_w3c_trace
 
         expected_outgoing_baggage = (
             "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
@@ -255,7 +261,13 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
             parent_span_id=request_span.span_id,
             sampled=1,
         )
+        expected_w3c_trace = "00-{trace_id}-{parent_span_id}-{trace_flags}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=request_span.span_id,
+            trace_flags="01",
+        )
         assert request_headers["sentry-trace"] == expected_sentry_trace
+        assert request_headers["traceparent"] == expected_w3c_trace
 
         expected_outgoing_baggage = (
             "sentry-trace_id=%s,"
@@ -368,9 +380,11 @@ def test_option_trace_propagation_targets(
 
         if trace_propagated:
             assert "sentry-trace" in request_headers
+            assert "traceparent" in request_headers
             assert "baggage" in request_headers
         else:
             assert "sentry-trace" not in request_headers
+            assert "traceparent" not in request_headers
             assert "baggage" not in request_headers
 
 

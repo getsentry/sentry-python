@@ -149,6 +149,13 @@ def test_outgoing_trace_headers(sentry_init, httpx_client, httpx_mock):
             parent_span_id=request_span.span_id,
             sampled=1,
         )
+        assert response.request.headers[
+            "traceparent"
+        ] == "00-{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=request_span.span_id,
+            sampled="01",
+        )
 
 
 @pytest.mark.parametrize(
@@ -338,8 +345,10 @@ def test_option_trace_propagation_targets(
 
     if trace_propagated:
         assert "sentry-trace" in request_headers
+        assert "traceparent" in request_headers
     else:
         assert "sentry-trace" not in request_headers
+        assert "traceparent" not in request_headers
 
 
 def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
@@ -356,6 +365,7 @@ def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
 
     request_headers = httpx_mock.get_request().headers
     assert "sentry-trace" not in request_headers
+    assert "traceparent" not in request_headers
 
 
 @pytest.mark.tests_internal_exceptions
