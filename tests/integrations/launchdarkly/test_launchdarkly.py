@@ -223,12 +223,12 @@ def test_launchdarkly_span_integration(
     uninstall_integration(LaunchDarklyIntegration.identifier)
     if use_global_client:
         ldclient.set_config(config)
-        sentry_init(traces_sample_rate=1, integrations=[LaunchDarklyIntegration()])
+        sentry_init(traces_sample_rate=1.0, integrations=[LaunchDarklyIntegration()])
         client = ldclient.get()
     else:
         client = LDClient(config=config)
         sentry_init(
-            traces_sample_rate=1,
+            traces_sample_rate=1.0,
             integrations=[LaunchDarklyIntegration(ld_client=client)],
         )
 
