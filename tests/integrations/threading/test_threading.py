@@ -8,7 +8,6 @@ import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
-from sentry_sdk.utils import get_current_thread_meta
 
 original_start = Thread.start
 original_run = Thread.run
@@ -227,8 +226,7 @@ def test_spans_from_multiple_threads(
 
     def do_some_work(number):
         with sentry_sdk.start_span(
-            op=f"inner-run-{number}",
-            name=f"Thread: {get_current_thread_meta()[1]}",
+            op=f"inner-run-{number}", name=f"Thread: child-{number}"
         ):
             pass
 
@@ -237,8 +235,7 @@ def test_spans_from_multiple_threads(
     with sentry_sdk.start_transaction(op="outer-trx"):
         for number in range(5):
             with sentry_sdk.start_span(
-                op=f"outer-submit-{number}",
-                name=f"Thread: {get_current_thread_meta()[1]}",
+                op=f"outer-submit-{number}", name="Thread: main"
             ):
                 t = Thread(target=do_some_work, args=(number,))
                 t.start()
@@ -252,16 +249,16 @@ def test_spans_from_multiple_threads(
         assert render_span_tree(event) == dedent(
             """\
             - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: MainThread"
-                - op="inner-run-0": description="Thread: Thread-1 (do_some_work)"
-              - op="outer-submit-1": description="Thread: MainThread"
-                - op="inner-run-1": description="Thread: Thread-2 (do_some_work)"
-              - op="outer-submit-2": description="Thread: MainThread"
-                - op="inner-run-2": description="Thread: Thread-3 (do_some_work)"
-              - op="outer-submit-3": description="Thread: MainThread"
-                - op="inner-run-3": description="Thread: Thread-4 (do_some_work)"
-              - op="outer-submit-4": description="Thread: MainThread"
-                - op="inner-run-4": description="Thread: Thread-5 (do_some_work)"\
+              - op="outer-submit-0": description="Thread: main"
+                - op="inner-run-0": description="Thread: child-0"
+              - op="outer-submit-1": description="Thread: main"
+                - op="inner-run-1": description="Thread: child-1"
+              - op="outer-submit-2": description="Thread: main"
+                - op="inner-run-2": description="Thread: child-2"
+              - op="outer-submit-3": description="Thread: main"
+                - op="inner-run-3": description="Thread: child-3"
+              - op="outer-submit-4": description="Thread: main"
+                - op="inner-run-4": description="Thread: child-4"\
 """
         )
 
@@ -269,10 +266,10 @@ def test_spans_from_multiple_threads(
         assert render_span_tree(event) == dedent(
             """\
             - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: MainThread"
-              - op="outer-submit-1": description="Thread: MainThread"
-              - op="outer-submit-2": description="Thread: MainThread"
-              - op="outer-submit-3": description="Thread: MainThread"
-              - op="outer-submit-4": description="Thread: MainThread"\
+              - op="outer-submit-0": description="Thread: main"
+              - op="outer-submit-1": description="Thread: main"
+              - op="outer-submit-2": description="Thread: main"
+              - op="outer-submit-3": description="Thread: main"
+              - op="outer-submit-4": description="Thread: main"\
 """
         )
