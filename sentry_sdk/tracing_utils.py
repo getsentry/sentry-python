@@ -48,6 +48,14 @@ SENTRY_TRACE_REGEX = re.compile(
     "[ \t]*$"  # whitespace
 )
 
+W3C_TRACE_REGEX = re.compile(
+    "^[ \t]*"  # whitespace
+    "[0-9]{2}?"  # version
+    "-?([0-9a-f]{32})?"  # trace_id
+    "-?([0-9a-f]{16})?"  # span_id
+    "-?([01]{2})?"  # trace-flags
+    "[ \t]*$"  # whitespace
+)
 
 # This is a normal base64 regex, modified to reflect that fact that we strip the
 # trailing = or == off
@@ -341,6 +349,35 @@ def extract_sentrytrace_data(header):
     }
 
 
+def extract_w3c_traceparent_data(header):
+    # type: (Optional[str]) -> Optional[Dict[str, Union[str, bool, None]]]
+    """
+    Given a `traceparent` header string, return a dictionary of data.
+    """
+    if not header or not header.startswith("00-"):
+        return None
+
+    match = W3C_TRACE_REGEX.match(header)
+    if not match:
+        return None
+
+    trace_id, parent_span_id, trace_flags = match.groups()
+    parent_sampled = None
+
+    if trace_id:
+        trace_id = "{:032x}".format(int(trace_id, 16))
+    if parent_span_id:
+        parent_span_id = "{:016x}".format(int(parent_span_id, 16))
+    if trace_flags:
+        parent_sampled = trace_flags == "01"
+
+    return {
+        "trace_id": trace_id,
+        "parent_span_id": parent_span_id,
+        "parent_sampled": parent_sampled,
+    }
+
+
 def _format_sql(cursor, sql):
     # type: (Any, str) -> Optional[str]
 
@@ -421,6 +458,15 @@ class PropagationContext:
                 if propagation_context is None:
                     propagation_context = PropagationContext()
                 propagation_context.update(sentrytrace_data)
+
+        if sentry_trace_header is None:
+            w3c_trace_header = normalized_data.get(W3C_TRACE_HEADER_NAME)
+            if w3c_trace_header:
+                w3c_trace_data = extract_w3c_traceparent_data(w3c_trace_header)
+                if w3c_trace_data is not None:
+                    if propagation_context is None:
+                        propagation_context = PropagationContext()
+                    propagation_context.update(w3c_trace_data)
 
         if propagation_context is not None:
             propagation_context._fill_sample_rand()
@@ -898,6 +944,7 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
+    W3C_TRACE_HEADER_NAME,
 )
 
 if TYPE_CHECKING:

@@ -3,7 +3,10 @@ from unittest import mock
 import pytest
 
 from sentry_sdk.tracing import Transaction
-from sentry_sdk.tracing_utils import extract_sentrytrace_data
+from sentry_sdk.tracing_utils import (
+    extract_sentrytrace_data,
+    extract_w3c_traceparent_data,
+)
 
 
 @pytest.mark.parametrize("sampled", [True, False, None])
@@ -26,6 +29,27 @@ def test_to_traceparent(sampled):
         assert parts[2] == "1" if sampled is True else "0"  # sampled
 
 
+@pytest.mark.parametrize("sampled", [True, False, None])
+def test_to_w3c_traceparent(sampled):
+    transaction = Transaction(
+        name="/interactions/other-dogs/new-dog",
+        op="greeting.sniff",
+        trace_id="4a77088e323f137c4d96381f35b92cf6",
+        sampled=sampled,
+    )
+
+    traceparent = transaction.to_w3c_traceparent()
+
+    parts = traceparent.split("-")
+    assert parts[0] == "00"  # version
+    assert parts[1] == "4a77088e323f137c4d96381f35b92cf6"  # trace_id
+    assert parts[2] == transaction.span_id  # parent_span_id
+    if sampled is not True:
+        assert parts[3] == "00"  # trace-flags
+    else:
+        assert parts[3] == "01"  # trace-flags
+
+
 @pytest.mark.parametrize("sampling_decision", [True, False])
 def test_sentrytrace_extraction(sampling_decision):
     sentrytrace_header = "12312012123120121231201212312012-0415201309082013-{}".format(
@@ -38,11 +62,33 @@ def test_sentrytrace_extraction(sampling_decision):
     }
 
 
+@pytest.mark.parametrize("sampling_decision", [True, False])
+def test_w3c_traceparent_extraction(sampling_decision):
+    traceparent_header = (
+        "00-d00afb0f1514f9337a4a921c514955db-903c8c4987adea4b-{}".format(
+            "01" if sampling_decision is True else "00"
+        )
+    )
+    assert extract_w3c_traceparent_data(traceparent_header) == {
+        "trace_id": "d00afb0f1514f9337a4a921c514955db",
+        "parent_span_id": "903c8c4987adea4b",
+        "parent_sampled": sampling_decision,
+    }
+
+
 def test_iter_headers(monkeypatch):
     monkeypatch.setattr(
         Transaction,
         "to_traceparent",
         mock.Mock(return_value="12312012123120121231201212312012-0415201309082013-0"),
+    )
+
+    monkeypatch.setattr(
+        Transaction,
+        "to_w3c_traceparent",
+        mock.Mock(
+            return_value="00-12312012123120121231201212312012-0415201309082013-00"
+        ),
     )
 
     transaction = Transaction(
@@ -53,4 +99,8 @@ def test_iter_headers(monkeypatch):
     headers = dict(transaction.iter_headers())
     assert (
         headers["sentry-trace"] == "12312012123120121231201212312012-0415201309082013-0"
+    )
+    assert (
+        headers["traceparent"]
+        == "00-12312012123120121231201212312012-0415201309082013-00"
     )

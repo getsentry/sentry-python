@@ -126,6 +126,7 @@ if TYPE_CHECKING:
 
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+W3C_TRACE_HEADER_NAME = "traceparent"
 
 
 # Transaction source
@@ -516,7 +517,14 @@ class Span:
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
+        else:
+            w3c_traceparent_kwargs = extract_w3c_traceparent_data(
+                headers.get(W3C_TRACE_HEADER_NAME)
+            )
+            if w3c_traceparent_kwargs is not None:
+                kwargs.update(w3c_traceparent_kwargs)
 
+        if sentrytrace_kwargs is not None or w3c_traceparent_kwargs is not None:
             # If there's an incoming sentry-trace but no incoming baggage header,
             # for instance in traces coming from older SDKs,
             # baggage will be empty and immutable and won't be populated as head SDK.
@@ -530,7 +538,8 @@ class Span:
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         """
-        Creates a generator which returns the span's ``sentry-trace`` and ``baggage`` headers.
+        Creates a generator which returns the span's ``sentry-trace`` and ``baggage`` headers,
+        as well as a ``traceparent`` header for W3C compatibility.
         If the span's containing transaction doesn't yet have a ``baggage`` value,
         this will cause one to be generated and stored.
         """
@@ -542,6 +551,7 @@ class Span:
             return
 
         yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
+        yield W3C_TRACE_HEADER_NAME, self.to_w3c_traceparent()
 
         baggage = self.containing_transaction.get_baggage().serialize()
         if baggage:
@@ -585,6 +595,16 @@ class Span:
         if sampled is not None:
             traceparent += "-%s" % (sampled,)
 
+        return traceparent
+
+    def to_w3c_traceparent(self):
+        # type: () -> str
+        if self.sampled is True:
+            trace_flags = "01"
+        else:
+            trace_flags = "00"
+
+        traceparent = "00-%s-%s-%s" % (self.trace_id, self.span_id, trace_flags)
         return traceparent
 
     def to_baggage(self):
@@ -1232,6 +1252,10 @@ class NoOpSpan(Span):
         # type: () -> str
         return ""
 
+    def to_w3c_traceparent(self):
+        # type: () -> str
+        return ""
+
     def to_baggage(self):
         # type: () -> Optional[Baggage]
         return None
@@ -1354,6 +1378,7 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     EnvironHeaders,
     extract_sentrytrace_data,
+    extract_w3c_traceparent_data,
     _generate_sample_rand,
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
