@@ -189,7 +189,7 @@ def test_statsig_span_integration(sentry_init, capture_events, uninstall_integra
     uninstall_integration(StatsigIntegration.identifier)
 
     with mock_statsig({"hello": True}):
-        sentry_init(traces_sample_rate=1, integrations=[StatsigIntegration()])
+        sentry_init(traces_sample_rate=1.0, integrations=[StatsigIntegration()])
         events = capture_events()
         user = StatsigUser(user_id="user-id")
         with start_transaction(name="hi"):
