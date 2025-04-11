@@ -69,4 +69,4 @@ def add_feature_flag(flag, result):
 
     span = sentry_sdk.get_current_span()
     if span:
-        span.set_data(f"flag.evaluation.{flag}", result)
+        span.set_flag(f"flag.evaluation.{flag}", result)
