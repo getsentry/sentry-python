@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
-import sentry_sdk
 
+from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations import DidNotEnable, Integration
 
 try:
@@ -29,26 +29,9 @@ class OpenFeatureHook(Hook):
     def after(self, hook_context, details, hints):
         # type: (HookContext, FlagEvaluationDetails[bool], HookHints) -> None
         if isinstance(details.value, bool):
-            # Errors support.
-            flags = sentry_sdk.get_current_scope().flags
-            flags.set(details.flag_key, details.value)
-
-            # Spans support.
-            span = sentry_sdk.get_current_span()
-            if span:
-                span.set_data(f"flag.evaluation.{details.flag_key}", details.value)
+            add_feature_flag(details.flag_key, details.value)
 
     def error(self, hook_context, exception, hints):
         # type: (HookContext, Exception, HookHints) -> None
         if isinstance(hook_context.default_value, bool):
-            # Errors support.
-            flags = sentry_sdk.get_current_scope().flags
-            flags.set(hook_context.flag_key, hook_context.default_value)
-
-            # Spans support.
-            span = sentry_sdk.get_current_span()
-            if span:
-                span.set_data(
-                    f"flag.evaluation.{hook_context.flag_key}",
-                    hook_context.default_value,
-                )
+            add_feature_flag(hook_context.flag_key, hook_context.default_value)

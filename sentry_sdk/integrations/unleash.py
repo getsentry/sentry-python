@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Any
 
-import sentry_sdk
+from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations import Integration, DidNotEnable
 
 try:
@@ -24,17 +24,9 @@ class UnleashIntegration(Integration):
             # type: (UnleashClient, str, *Any, **Any) -> Any
             enabled = old_is_enabled(self, feature, *args, **kwargs)
 
-            # Errors support.
-            #
             # We have no way of knowing what type of unleash feature this is, so we have to treat
             # it as a boolean / toggle feature.
-            flags = sentry_sdk.get_current_scope().flags
-            flags.set(feature, enabled)
-
-            # Spans support.
-            span = sentry_sdk.get_current_span()
-            if span:
-                span.set_data(f"flag.evaluation.{feature}", enabled)
+            add_feature_flag(feature, enabled)
 
             return enabled
 
