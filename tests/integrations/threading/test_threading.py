@@ -1,5 +1,6 @@
 import gc
 from concurrent import futures
+from textwrap import dedent
 from threading import Thread
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
+from sentry_sdk.utils import get_current_thread_meta
 
 original_start = Thread.start
 original_run = Thread.run
@@ -207,3 +209,70 @@ def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
     assert initial_iso_scope._tags == {
         "initial_tag": "initial_value"
     }, "The isolation scope in the main thread should not be modified by the started thread."
+
+
+@pytest.mark.parametrize(
+    "propagate_scope",
+    (True, False),
+    ids=["propagate_scope=True", "propagate_scope=False"],
+)
+def test_spans_from_multiple_threads(
+    sentry_init, capture_events, render_span_tree, propagate_scope
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
+    )
+    events = capture_events()
+
+    def do_some_work(number):
+        with sentry_sdk.start_span(
+            op=f"inner-run-{number}",
+            name=f"Thread: {get_current_thread_meta()[1]}",
+        ):
+            pass
+
+    threads = []
+
+    with sentry_sdk.start_transaction(op="outer-trx"):
+        for number in range(5):
+            with sentry_sdk.start_span(
+                op=f"outer-submit-{number}",
+                name=f"Thread: {get_current_thread_meta()[1]}",
+            ):
+                t = Thread(target=do_some_work, args=(number,))
+                t.start()
+                threads.append(t)
+
+        for t in threads:
+            t.join()
+
+    (event,) = events
+    if propagate_scope:
+        assert render_span_tree(event) == dedent(
+            """\
+            - op="outer-trx": description=null
+              - op="outer-submit-0": description="Thread: MainThread"
+                - op="inner-run-0": description="Thread: Thread-1 (do_some_work)"
+              - op="outer-submit-1": description="Thread: MainThread"
+                - op="inner-run-1": description="Thread: Thread-2 (do_some_work)"
+              - op="outer-submit-2": description="Thread: MainThread"
+                - op="inner-run-2": description="Thread: Thread-3 (do_some_work)"
+              - op="outer-submit-3": description="Thread: MainThread"
+                - op="inner-run-3": description="Thread: Thread-4 (do_some_work)"
+              - op="outer-submit-4": description="Thread: MainThread"
+                - op="inner-run-4": description="Thread: Thread-5 (do_some_work)"\
+"""
+        )
+
+    elif not propagate_scope:
+        assert render_span_tree(event) == dedent(
+            """\
+            - op="outer-trx": description=null
+              - op="outer-submit-0": description="Thread: MainThread"
+              - op="outer-submit-1": description="Thread: MainThread"
+              - op="outer-submit-2": description="Thread: MainThread"
+              - op="outer-submit-3": description="Thread: MainThread"
+              - op="outer-submit-4": description="Thread: MainThread"\
+"""
+        )
