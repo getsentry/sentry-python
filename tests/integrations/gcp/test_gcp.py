@@ -465,8 +465,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_cloud_function
             x = 3/0
             return "3"
         """
-            % sentry_trace_header,
-            w3c_trace_header,
+            % (sentry_trace_header, w3c_trace_header)
         )
         + FUNCTIONS_PRELUDE
         + dedent(
