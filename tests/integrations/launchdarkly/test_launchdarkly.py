@@ -229,7 +229,7 @@ def test_launchdarkly_span_integration(
     else:
         client = LDClient(config=config)
         sentry_init(
-            traces_sample_rate=1,
+            traces_sample_rate=1.0,
             integrations=[LaunchDarklyIntegration(ld_client=client)],
         )
 
