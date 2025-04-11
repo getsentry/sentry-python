@@ -34,7 +34,7 @@ class UnleashIntegration(Integration):
             # Spans support.
             span = sentry_sdk.get_current_span()
             if span:
-                span.set_data(f"flag.{feature}", enabled)
+                span.set_data(f"flag.evaluation.{feature}", enabled)
 
             return enabled
 

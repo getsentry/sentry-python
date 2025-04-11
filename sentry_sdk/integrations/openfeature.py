@@ -36,7 +36,7 @@ class OpenFeatureHook(Hook):
             # Spans support.
             span = sentry_sdk.get_current_span()
             if span:
-                span.set_data(f"flag.{details.flag_key}", details.value)
+                span.set_data(f"flag.evaluation.{details.flag_key}", details.value)
 
     def error(self, hook_context, exception, hints):
         # type: (HookContext, Exception, HookHints) -> None
@@ -49,5 +49,6 @@ class OpenFeatureHook(Hook):
             span = sentry_sdk.get_current_span()
             if span:
                 span.set_data(
-                    f"flag.{hook_context.flag_key}", hook_context.default_value
+                    f"flag.evaluation.{hook_context.flag_key}",
+                    hook_context.default_value,
                 )

@@ -241,5 +241,5 @@ def test_launchdarkly_span_integration(
 
     (event,) = events
     assert event["spans"][0]["data"] == ApproxDict(
-        {"flag.hello": True, "flag.other": False}
+        {"flag.evaluation.hello": True, "flag.evaluation.other": False}
     )

@@ -175,5 +175,5 @@ def test_openfeature_span_integration(
 
     (event,) = events
     assert event["spans"][0]["data"] == ApproxDict(
-        {"flag.hello": True, "flag.world": False}
+        {"flag.evaluation.hello": True, "flag.evaluation.world": False}
     )

@@ -38,7 +38,7 @@ class StatsigIntegration(Integration):
             # Spans support.
             span = sentry_sdk.get_current_span()
             if span:
-                span.set_data(f"flag.{gate}", enabled)
+                span.set_data(f"flag.evaluation.{gate}", enabled)
 
             return enabled
 

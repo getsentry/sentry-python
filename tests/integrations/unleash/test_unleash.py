@@ -182,5 +182,5 @@ def test_unleash_span_integration(sentry_init, capture_events, uninstall_integra
 
     (event,) = events
     assert event["spans"][0]["data"] == ApproxDict(
-        {"flag.hello": True, "flag.other": False}
+        {"flag.evaluation.hello": True, "flag.evaluation.other": False}
     )

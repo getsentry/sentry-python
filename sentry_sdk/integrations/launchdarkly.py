@@ -60,7 +60,7 @@ class LaunchDarklyHook(Hook):
             # Spans support.
             span = sentry_sdk.get_current_span()
             if span:
-                span.set_data(f"flag.{series_context.key}", detail.value)
+                span.set_data(f"flag.evaluation.{series_context.key}", detail.value)
 
         return data
 
