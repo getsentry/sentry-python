@@ -172,3 +172,57 @@ def test_wrapper_attributes(sentry_init):
     assert Thread.run.__qualname__ == original_run.__qualname__
     assert t.run.__name__ == "run"
     assert t.run.__qualname__ == original_run.__qualname__
+
+
+def test_trx_in_trx_not_working(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[ThreadingIntegration(propagate_hub=True)],
+    )
+    events = capture_events()
+
+    def do_some_work(number):
+        with sentry_sdk.start_transaction(name=f"inner-trx-{number}") as trx_inner:
+            print(f"Inner Trx: {trx_inner}")
+            with sentry_sdk.start_span(op=f"inner-{number}-a", name=str(number)):
+                with sentry_sdk.start_span(op=f"inner-{number}-b", name=str(number)):
+                    with sentry_sdk.start_span(
+                        op=f"inner-{number}-c", name=str(number)
+                    ):
+                        with sentry_sdk.start_span(
+                            op=f"inner-{number}-d", name=str(number)
+                        ):
+                            with sentry_sdk.start_span(
+                                op=f"inner-{number}-e", name=str(number)
+                            ):
+                                with sentry_sdk.start_span(
+                                    op=f"inner-{number}-f", name=str(number)
+                                ):
+                                    pass
+
+    with sentry_sdk.start_transaction(name="outer-trx") as trx_outer:
+        print(f"Outer Trx: {trx_outer}")
+        with futures.ThreadPoolExecutor(max_workers=2) as executor:
+            for number in range(20):
+                with sentry_sdk.start_span(
+                    op=f"outer1-{number}", name=str(number)
+                ) as span:
+                    with sentry_sdk.start_span(
+                        op=f"outer2-{number}", name=str(number)
+                    ) as span:
+                        with sentry_sdk.start_span(
+                            op=f"outer3-{number}", name=str(number)
+                        ) as span:
+                            executor.submit(do_some_work, number)
+
+    wrong_span_found_in_trx = False
+    for event in events:
+        prefix = "inner" if event["transaction"].startswith("inner") else "outer"
+        for span in event["spans"]:
+            if not span["op"].startswith(prefix):
+                wrong_span_found_in_trx = True
+                break
+
+    assert (
+        wrong_span_found_in_trx
+    ), "No wrong span found in transaction. It is excepted that there is one. (as we are testing a race condition, this test might fail randomly)"
