@@ -215,7 +215,6 @@ def test_launchdarkly_span_integration(
 ):
     td = TestData.data_source()
     td.update(td.flag("hello").variation_for_all(True))
-    td.update(td.flag("world").variation_for_all(True))
     # Disable background requests as we aren't using a server.
     config = Config(
         "sdk-key", update_processor_class=td, diagnostic_opt_out=True, send_events=False
