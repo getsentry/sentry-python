@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
-import sentry_sdk
 
+from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations import DidNotEnable, Integration
 
 try:
@@ -53,8 +53,8 @@ class LaunchDarklyHook(Hook):
     def after_evaluation(self, series_context, data, detail):
         # type: (EvaluationSeriesContext, dict[Any, Any], EvaluationDetail) -> dict[Any, Any]
         if isinstance(detail.value, bool):
-            flags = sentry_sdk.get_current_scope().flags
-            flags.set(series_context.key, detail.value)
+            add_feature_flag(series_context.key, detail.value)
+
         return data
 
     def before_evaluation(self, series_context, data):

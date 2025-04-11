@@ -7,7 +7,9 @@ from openfeature import api
 from openfeature.provider.in_memory_provider import InMemoryFlag, InMemoryProvider
 
 import sentry_sdk
+from sentry_sdk import start_span, start_transaction
 from sentry_sdk.integrations.openfeature import OpenFeatureIntegration
+from tests.conftest import ApproxDict
 
 
 def test_openfeature_integration(sentry_init, capture_events, uninstall_integration):
@@ -151,3 +153,27 @@ def test_openfeature_integration_asyncio(
             {"flag": "world", "result": False},
         ]
     }
+
+
+def test_openfeature_span_integration(
+    sentry_init, capture_events, uninstall_integration
+):
+    uninstall_integration(OpenFeatureIntegration.identifier)
+    sentry_init(traces_sample_rate=1.0, integrations=[OpenFeatureIntegration()])
+
+    api.set_provider(
+        InMemoryProvider({"hello": InMemoryFlag("on", {"on": True, "off": False})})
+    )
+    client = api.get_client()
+
+    events = capture_events()
+
+    with start_transaction(name="hi"):
+        with start_span(op="foo", name="bar"):
+            client.get_boolean_value("hello", default_value=False)
+            client.get_boolean_value("world", default_value=False)
+
+    (event,) = events
+    assert event["spans"][0]["data"] == ApproxDict(
+        {"flag.evaluation.hello": True, "flag.evaluation.world": False}
+    )
