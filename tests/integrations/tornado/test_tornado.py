@@ -416,7 +416,7 @@ def test_error_has_existing_w3c_trace_context_performance_enabled(
     trace_id = "d6a6892c89ff99522ab2041c4cd71a68"
     parent_span_id = "6fac8cb0c8a904d0"
     parent_sampled = "01"
-    w3c_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    w3c_trace_header = "00-{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
     headers = {"traceparent": w3c_trace_header}
 

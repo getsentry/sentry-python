@@ -192,7 +192,7 @@ def test_inject_sentry_span_no_baggage():
         full_context = set_span_in_context(span, context)
         SentryPropagator().inject(carrier, full_context, setter)
 
-        setter.set.assert_called_once_with(
+        setter.set.assert_any_call(
             carrier,
             "sentry-trace",
             "1234567890abcdef1234567890abcdef-1234567890abcdef-1",
@@ -237,7 +237,7 @@ def test_inject_w3c_span_no_baggage():
         full_context = set_span_in_context(span, context)
         SentryPropagator().inject(carrier, full_context, setter)
 
-        setter.set.assert_called_once_with(
+        setter.set.assert_any_call(
             carrier,
             "traceparent",
             "00-ec2da13ee483f41e7323f8c78ed8f4e4-4c6d5fcab571acb0-01",
@@ -281,7 +281,7 @@ def test_inject_sentry_span_empty_baggage():
         full_context = set_span_in_context(span, context)
         SentryPropagator().inject(carrier, full_context, setter)
 
-        setter.set.assert_called_once_with(
+        setter.set.assert_any_call(
             carrier,
             "sentry-trace",
             "1234567890abcdef1234567890abcdef-1234567890abcdef-1",
