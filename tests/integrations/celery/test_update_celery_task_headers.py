@@ -83,6 +83,10 @@ def test_span_with_transaction(sentry_init):
 
             assert outgoing_headers["sentry-trace"] == span.to_traceparent()
             assert outgoing_headers["headers"]["sentry-trace"] == span.to_traceparent()
+            assert outgoing_headers["traceparent"] == span.to_w3c_traceparent()
+            assert (
+                outgoing_headers["headers"]["traceparent"] == span.to_w3c_traceparent()
+            )
             assert outgoing_headers["baggage"] == transaction.get_baggage().serialize()
             assert (
                 outgoing_headers["headers"]["baggage"]
@@ -103,6 +107,10 @@ def test_span_with_transaction_custom_headers(sentry_init):
 
             assert outgoing_headers["sentry-trace"] == span.to_traceparent()
             assert outgoing_headers["headers"]["sentry-trace"] == span.to_traceparent()
+            assert outgoing_headers["traceparent"] == span.to_w3c_traceparent()
+            assert (
+                outgoing_headers["headers"]["traceparent"] == span.to_w3c_traceparent()
+            )
 
             incoming_baggage = Baggage.from_incoming_header(headers["baggage"])
             combined_baggage = copy(transaction.get_baggage())
@@ -145,6 +153,8 @@ def test_celery_trace_propagation_default(sentry_init, monitor_beat_tasks):
 
     assert outgoing_headers["sentry-trace"] == scope.get_traceparent()
     assert outgoing_headers["headers"]["sentry-trace"] == scope.get_traceparent()
+    assert outgoing_headers["traceparent"] == scope._get_w3c_traceparent()
+    assert outgoing_headers["headers"]["traceparent"] == scope._get_w3c_traceparent()
     assert outgoing_headers["baggage"] == scope.get_baggage().serialize()
     assert outgoing_headers["headers"]["baggage"] == scope.get_baggage().serialize()
 
@@ -181,6 +191,8 @@ def test_celery_trace_propagation_traces_sample_rate(
 
     assert outgoing_headers["sentry-trace"] == scope.get_traceparent()
     assert outgoing_headers["headers"]["sentry-trace"] == scope.get_traceparent()
+    assert outgoing_headers["traceparent"] == scope._get_w3c_traceparent()
+    assert outgoing_headers["headers"]["traceparent"] == scope._get_w3c_traceparent()
     assert outgoing_headers["baggage"] == scope.get_baggage().serialize()
     assert outgoing_headers["headers"]["baggage"] == scope.get_baggage().serialize()
 
@@ -217,6 +229,8 @@ def test_celery_trace_propagation_enable_tracing(
 
     assert outgoing_headers["sentry-trace"] == scope.get_traceparent()
     assert outgoing_headers["headers"]["sentry-trace"] == scope.get_traceparent()
+    assert outgoing_headers["traceparent"] == scope._get_w3c_traceparent()
+    assert outgoing_headers["headers"]["traceparent"] == scope._get_w3c_traceparent()
     assert outgoing_headers["baggage"] == scope.get_baggage().serialize()
     assert outgoing_headers["headers"]["baggage"] == scope.get_baggage().serialize()
 
