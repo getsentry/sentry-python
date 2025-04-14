@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional, Set
-    import sentry_sdk.integrations.opentelemetry.scope as scope
+    import sentry_sdk.opentelemetry.scope as scope
 
 
 class SentryPropagator(TextMapPropagator):

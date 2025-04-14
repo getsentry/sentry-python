@@ -15,7 +15,7 @@ from sentry_sdk.opentelemetry.consts import (
 if TYPE_CHECKING:
     from typing import Optional
     from contextvars import Token
-    import sentry_sdk.integrations.opentelemetry.scope as scope
+    import sentry_sdk.opentelemetry.scope as scope
 
 
 class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):

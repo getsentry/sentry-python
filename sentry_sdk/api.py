@@ -8,7 +8,7 @@ from sentry_sdk.crons import monitor
 
 # TODO-neel-potel make 2 scope strategies/impls and switch
 from sentry_sdk.scope import Scope as BaseScope
-from sentry_sdk.integrations.opentelemetry.scope import (
+from sentry_sdk.opentelemetry.scope import (
     PotelScope as Scope,
     new_scope,
     isolation_scope,

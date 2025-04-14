@@ -63,7 +63,7 @@ else:
 
 
 from sentry_sdk import scope
-from sentry_sdk.integrations.opentelemetry.scope import (
+from sentry_sdk.opentelemetry.scope import (
     setup_scope_context_management,
     setup_initial_scopes,
 )

@@ -85,7 +85,9 @@ setup(
         "unleash": ["UnleashClient>=6.0.1"],
     },
     entry_points={
-        "opentelemetry_propagator": ["sentry=sentry_sdk.opentelemetry:SentryPropagator"]
+        "opentelemetry_propagator": [
+            "sentry=sentry_sdk.opentelemetry:SentryPropagator"
+        ],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

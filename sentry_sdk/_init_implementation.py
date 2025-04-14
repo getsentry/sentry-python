@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import ClientConstructor
-from sentry_sdk.integrations.opentelemetry.scope import setup_scope_context_management
+from sentry_sdk.opentelemetry.scope import setup_scope_context_management
 
 if TYPE_CHECKING:
     from typing import Any, Optional
