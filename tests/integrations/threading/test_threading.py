@@ -175,6 +175,7 @@ def test_wrapper_attributes(sentry_init):
     assert t.run.__qualname__ == original_run.__qualname__
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "propagate_scope",
     (True, False),
@@ -210,6 +211,7 @@ def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
     }, "The isolation scope in the main thread should not be modified by the started thread."
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "propagate_scope",
     (True, False),
