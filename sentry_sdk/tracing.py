@@ -6,7 +6,7 @@ from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace import (
     format_trace_id,
     format_span_id,
-    Span as OtelSpan,
+    Span as OTelSpan,
     TraceState,
     get_current_span,
     INVALID_SPAN,
@@ -182,7 +182,7 @@ class Span:
         attributes=None,  # type: Optional[dict[str, Any]]
         only_if_parent=False,  # type: bool
         parent_span=None,  # type: Optional[Span]
-        otel_span=None,  # type: Optional[OtelSpan]
+        otel_span=None,  # type: Optional[OTelSpan]
     ):
         # type: (...) -> None
         """
@@ -319,7 +319,7 @@ class Span:
     def root_span(self):
         # type: () -> Optional[Span]
         root_otel_span = cast(
-            "Optional[OtelSpan]", get_sentry_meta(self._otel_span, "root_span")
+            "Optional[OTelSpan]", get_sentry_meta(self._otel_span, "root_span")
         )
         return Span(otel_span=root_otel_span) if root_otel_span else None
 
