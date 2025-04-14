@@ -127,12 +127,12 @@ def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
     scope = sentry_sdk.get_current_scope()
 
-    if scope.transaction is not None:
+    if scope.root_span is not None:
         if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
-            scope.transaction.set_status(SPANSTATUS.ABORTED)
+            scope.root_span.set_status(SPANSTATUS.ABORTED)
             return
 
-        scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+        scope.root_span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     event, hint = event_from_exception(
         exc_info,
@@ -149,8 +149,8 @@ def _make_event_processor(ctx, *args, **kwargs):
 
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
-            if scope.transaction is not None:
-                scope.transaction.name = ctx["job_name"]
+            if scope.root_span is not None:
+                scope.root_span.name = ctx["job_name"]
                 event["transaction"] = ctx["job_name"]
 
             tags = event.setdefault("tags", {})

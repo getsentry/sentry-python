@@ -289,7 +289,7 @@ def start_transaction(
 
 def set_measurement(name, value, unit=""):
     # type: (str, float, sentry_sdk._types.MeasurementUnit) -> None
-    transaction = get_current_scope().transaction
+    transaction = get_current_scope().root_span
     if transaction is not None:
         transaction.set_measurement(name, value, unit)
 
