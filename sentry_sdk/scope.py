@@ -8,6 +8,7 @@ from enum import Enum
 from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
+
 from opentelemetry.trace import Span as OTelSpan
 
 from sentry_sdk._types import AnnotatedValue
