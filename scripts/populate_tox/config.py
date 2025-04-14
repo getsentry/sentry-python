@@ -45,8 +45,7 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
-            "<3.0": ["channels[daphne]"],
-            # "py3.6": ["aiocontextvars"],
+            ">=2.0,<3.0": ["channels[daphne]"],
         },
     },
     "dramatiq": {
