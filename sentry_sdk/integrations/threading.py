@@ -1,4 +1,5 @@
 import sys
+import warnings
 from functools import wraps
 from threading import Thread, current_thread
 
@@ -57,8 +58,36 @@ class ThreadingIntegration(Integration):
                 return old_start(self, *a, **kw)
 
             if integration.propagate_scope:
-                isolation_scope = sentry_sdk.get_isolation_scope().fork()
-                current_scope = sentry_sdk.get_current_scope().fork()
+                django_version = None
+                channels_version = None
+                try:
+                    from django import VERSION as django_version  # noqa: N811
+                    import channels
+
+                    channels_version = channels.__version__
+                except ImportError:
+                    pass
+
+                if (
+                    sys.version_info <= (3, 8)
+                    and channels_version is not None
+                    and channels_version < "4.0.0"
+                    and django_version is not None
+                    and django_version >= (3, 0)
+                    and django_version < (4, 0)
+                ):
+                    warnings.warn(
+                        "Sentry is not supported with Django channels 2.x and 3.x. when using Python 3.8 or older. "
+                        "Please either upgrade to Django channels 4.x or later, or upgrade to Python 3.9 or later.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    isolation_scope = sentry_sdk.get_isolation_scope()
+                    current_scope = sentry_sdk.get_current_scope()
+
+                else:
+                    isolation_scope = sentry_sdk.get_isolation_scope().fork()
+                    current_scope = sentry_sdk.get_current_scope().fork()
             else:
                 isolation_scope = None
                 current_scope = None
