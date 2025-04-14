@@ -8,7 +8,6 @@ from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
 
 from sentry_sdk._compat import check_uwsgi_thread_support
-
 from sentry_sdk.utils import (
     AnnotatedValue,
     ContextVar,
