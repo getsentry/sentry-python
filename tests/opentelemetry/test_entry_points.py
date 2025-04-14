@@ -3,7 +3,7 @@ import os
 from unittest.mock import patch
 
 from opentelemetry import propagate
-from sentry_sdk.opentelemetry.propagator import SentryPropagator
+from sentry_sdk.opentelemetry import SentryPropagator
 
 
 def test_propagator_loaded_if_mentioned_in_environment_variable():
