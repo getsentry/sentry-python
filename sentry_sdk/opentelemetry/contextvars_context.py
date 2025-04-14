@@ -5,7 +5,7 @@ from opentelemetry.context import Context, get_value, set_value
 from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
 
 import sentry_sdk
-from sentry_sdk.integrations.opentelemetry.consts import (
+from sentry_sdk.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
     SENTRY_USE_CURRENT_SCOPE_KEY,

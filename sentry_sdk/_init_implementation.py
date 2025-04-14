@@ -1,12 +1,11 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import ClientConstructor
 from sentry_sdk.integrations.opentelemetry.scope import setup_scope_context_management
 
 if TYPE_CHECKING:
     from typing import Any, Optional
-
-    import sentry_sdk.consts
 
 
 def _check_python_deprecations():
@@ -36,7 +35,7 @@ if TYPE_CHECKING:
     # Use `ClientConstructor` to define the argument types of `init` and
     # `ContextManager[Any]` to tell static analyzers about the return type.
 
-    class init(sentry_sdk.consts.ClientConstructor):  # noqa: N801
+    class init(ClientConstructor):  # noqa: N801
         pass
 
 else:
