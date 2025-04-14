@@ -35,10 +35,7 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.opentelemetry.integration import (
-    patch_readable_span,
-    setup_sentry_tracing,
-)
+
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import (
     has_profiling_enabled,
@@ -395,6 +392,11 @@ class _Client(BaseClient):
                     )
                 except Exception as e:
                     logger.debug("Can not set up continuous profiler. (%s)", e)
+
+            from sentry_sdk.opentelemetry.integration import (
+                patch_readable_span,
+                setup_sentry_tracing,
+            )
 
             patch_readable_span()
             setup_sentry_tracing()
