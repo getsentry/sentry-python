@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.integrations.logging - sentry-python 2.25.1 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.integrations.logging - sentry-python 2.26.0 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=397bb51e" />
@@ -474,51 +474,53 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="358">        <span class="c1"># type: (BaseClient, LogRecord) -&gt; None</span>
 </span><span data-line="359">        <span class="n">scope</span> <span class="o">=</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
 </span><span data-line="360">        <span class="n">otel_severity_number</span><span class="p">,</span> <span class="n">otel_severity_text</span> <span class="o">=</span> <span class="n">_python_level_to_otel</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelno</span><span class="p">)</span>
-</span><span data-line="361">        <span class="n">attrs</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: dict[str, str | bool | float | int]</span>
-</span><span data-line="362">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-</span><span data-line="363">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;sentry.message.template&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">msg</span>
-</span><span data-line="364">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="365">            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-</span><span data-line="366">                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">):</span>
-</span><span data-line="367">                    <span class="n">attrs</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;sentry.message.parameters.</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-</span><span data-line="368">                        <span class="n">arg</span>
-</span><span data-line="369">                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
-</span><span data-line="370">                        <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
-</span><span data-line="371">                        <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
-</span><span data-line="372">                        <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
-</span><span data-line="373">                        <span class="k">else</span> <span class="n">safe_repr</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
-</span><span data-line="374">                    <span class="p">)</span>
-</span><span data-line="375">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">lineno</span><span class="p">:</span>
-</span><span data-line="376">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;code.line.number&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">lineno</span>
-</span><span data-line="377">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">pathname</span><span class="p">:</span>
-</span><span data-line="378">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;code.file.path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">pathname</span>
-</span><span data-line="379">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">funcName</span><span class="p">:</span>
-</span><span data-line="380">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;code.function.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">funcName</span>
-</span><span data-line="381">
-</span><span data-line="382">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">thread</span><span class="p">:</span>
-</span><span data-line="383">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;thread.id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">thread</span>
-</span><span data-line="384">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">threadName</span><span class="p">:</span>
-</span><span data-line="385">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;thread.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">threadName</span>
-</span><span data-line="386">
-</span><span data-line="387">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">process</span><span class="p">:</span>
-</span><span data-line="388">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;process.pid&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">process</span>
-</span><span data-line="389">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">processName</span><span class="p">:</span>
-</span><span data-line="390">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;process.executable.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">processName</span>
-</span><span data-line="391">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
-</span><span data-line="392">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;logger.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
-</span><span data-line="393">
-</span><span data-line="394">        <span class="c1"># noinspection PyProtectedMember</span>
-</span><span data-line="395">        <span class="n">client</span><span class="o">.</span><span class="n">_capture_experimental_log</span><span class="p">(</span>
-</span><span data-line="396">            <span class="n">scope</span><span class="p">,</span>
-</span><span data-line="397">            <span class="p">{</span>
-</span><span data-line="398">                <span class="s2">&quot;severity_text&quot;</span><span class="p">:</span> <span class="n">otel_severity_text</span><span class="p">,</span>
-</span><span data-line="399">                <span class="s2">&quot;severity_number&quot;</span><span class="p">:</span> <span class="n">otel_severity_number</span><span class="p">,</span>
-</span><span data-line="400">                <span class="s2">&quot;body&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
-</span><span data-line="401">                <span class="s2">&quot;attributes&quot;</span><span class="p">:</span> <span class="n">attrs</span><span class="p">,</span>
-</span><span data-line="402">                <span class="s2">&quot;time_unix_nano&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span> <span class="o">*</span> <span class="mf">1e9</span><span class="p">),</span>
-</span><span data-line="403">                <span class="s2">&quot;trace_id&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="404">            <span class="p">},</span>
-</span><span data-line="405">        <span class="p">)</span>
+</span><span data-line="361">        <span class="n">attrs</span> <span class="o">=</span> <span class="p">{</span>
+</span><span data-line="362">            <span class="s2">&quot;sentry.origin&quot;</span><span class="p">:</span> <span class="s2">&quot;auto.logger.log&quot;</span><span class="p">,</span>
+</span><span data-line="363">        <span class="p">}</span>  <span class="c1"># type: dict[str, str | bool | float | int]</span>
+</span><span data-line="364">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+</span><span data-line="365">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;sentry.message.template&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">msg</span>
+</span><span data-line="366">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="367">            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+</span><span data-line="368">                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">):</span>
+</span><span data-line="369">                    <span class="n">attrs</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;sentry.message.parameters.</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+</span><span data-line="370">                        <span class="n">arg</span>
+</span><span data-line="371">                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+</span><span data-line="372">                        <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
+</span><span data-line="373">                        <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+</span><span data-line="374">                        <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
+</span><span data-line="375">                        <span class="k">else</span> <span class="n">safe_repr</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+</span><span data-line="376">                    <span class="p">)</span>
+</span><span data-line="377">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">lineno</span><span class="p">:</span>
+</span><span data-line="378">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;code.line.number&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">lineno</span>
+</span><span data-line="379">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">pathname</span><span class="p">:</span>
+</span><span data-line="380">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;code.file.path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">pathname</span>
+</span><span data-line="381">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">funcName</span><span class="p">:</span>
+</span><span data-line="382">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;code.function.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">funcName</span>
+</span><span data-line="383">
+</span><span data-line="384">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">thread</span><span class="p">:</span>
+</span><span data-line="385">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;thread.id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">thread</span>
+</span><span data-line="386">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">threadName</span><span class="p">:</span>
+</span><span data-line="387">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;thread.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">threadName</span>
+</span><span data-line="388">
+</span><span data-line="389">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">process</span><span class="p">:</span>
+</span><span data-line="390">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;process.pid&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">process</span>
+</span><span data-line="391">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">processName</span><span class="p">:</span>
+</span><span data-line="392">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;process.executable.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">processName</span>
+</span><span data-line="393">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+</span><span data-line="394">            <span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;logger.name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
+</span><span data-line="395">
+</span><span data-line="396">        <span class="c1"># noinspection PyProtectedMember</span>
+</span><span data-line="397">        <span class="n">client</span><span class="o">.</span><span class="n">_capture_experimental_log</span><span class="p">(</span>
+</span><span data-line="398">            <span class="n">scope</span><span class="p">,</span>
+</span><span data-line="399">            <span class="p">{</span>
+</span><span data-line="400">                <span class="s2">&quot;severity_text&quot;</span><span class="p">:</span> <span class="n">otel_severity_text</span><span class="p">,</span>
+</span><span data-line="401">                <span class="s2">&quot;severity_number&quot;</span><span class="p">:</span> <span class="n">otel_severity_number</span><span class="p">,</span>
+</span><span data-line="402">                <span class="s2">&quot;body&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
+</span><span data-line="403">                <span class="s2">&quot;attributes&quot;</span><span class="p">:</span> <span class="n">attrs</span><span class="p">,</span>
+</span><span data-line="404">                <span class="s2">&quot;time_unix_nano&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span> <span class="o">*</span> <span class="mf">1e9</span><span class="p">),</span>
+</span><span data-line="405">                <span class="s2">&quot;trace_id&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="406">            <span class="p">},</span>
+</span><span data-line="407">        <span class="p">)</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -549,7 +551,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../../_static/documentation_options.js?v=9951af7d"></script>
+      <script src="../../../_static/documentation_options.js?v=af56f58f"></script>
       <script src="../../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../../_static/shibuya.js?v=e2230717"></script></body>

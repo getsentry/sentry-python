@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scrubber - sentry-python 2.25.1 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scrubber - sentry-python 2.26.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
@@ -259,34 +259,37 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="144">        <span class="c1"># type: (Event) -&gt; None</span>
 </span><span data-line="145">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="146">            <span class="k">if</span> <span class="s2">&quot;breadcrumbs&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-</span><span data-line="147">                <span class="k">if</span> <span class="s2">&quot;values&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">]:</span>
-</span><span data-line="148">                    <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">][</span><span class="s2">&quot;values&quot;</span><span class="p">]:</span>
-</span><span data-line="149">                        <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
-</span><span data-line="150">                            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
-</span><span data-line="151">
-</span><span data-line="152">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="153">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="154">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="155">            <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">iter_event_frames</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
-</span><span data-line="156">                <span class="k">if</span> <span class="s2">&quot;vars&quot;</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">:</span>
-</span><span data-line="157">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">&quot;vars&quot;</span><span class="p">])</span>
-</span><span data-line="158">
-</span><span data-line="159">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_spans</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="160">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="161">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="162">            <span class="k">if</span> <span class="s2">&quot;spans&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-</span><span data-line="163">                <span class="k">for</span> <span class="n">span</span> <span class="ow">in</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]],</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;spans&quot;</span><span class="p">]):</span>
-</span><span data-line="164">                    <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">span</span><span class="p">:</span>
-</span><span data-line="165">                        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">span</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
-</span><span data-line="166">
-</span><span data-line="167">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="168">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="169">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_request</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="170">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_extra</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="171">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_user</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="172">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_breadcrumbs</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="173">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_frames</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="174">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_spans</span><span class="p">(</span><span class="n">event</span><span class="p">)</span></div>
+</span><span data-line="147">                <span class="k">if</span> <span class="p">(</span>
+</span><span data-line="148">                    <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">],</span> <span class="n">AnnotatedValue</span><span class="p">)</span>
+</span><span data-line="149">                    <span class="ow">and</span> <span class="s2">&quot;values&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">]</span>
+</span><span data-line="150">                <span class="p">):</span>
+</span><span data-line="151">                    <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">][</span><span class="s2">&quot;values&quot;</span><span class="p">]:</span>
+</span><span data-line="152">                        <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+</span><span data-line="153">                            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
+</span><span data-line="154">
+</span><span data-line="155">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="156">        <span class="c1"># type: (Event) -&gt; None</span>
+</span><span data-line="157">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="158">            <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">iter_event_frames</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+</span><span data-line="159">                <span class="k">if</span> <span class="s2">&quot;vars&quot;</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">:</span>
+</span><span data-line="160">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">&quot;vars&quot;</span><span class="p">])</span>
+</span><span data-line="161">
+</span><span data-line="162">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_spans</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="163">        <span class="c1"># type: (Event) -&gt; None</span>
+</span><span data-line="164">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="165">            <span class="k">if</span> <span class="s2">&quot;spans&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
+</span><span data-line="166">                <span class="k">for</span> <span class="n">span</span> <span class="ow">in</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]],</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;spans&quot;</span><span class="p">]):</span>
+</span><span data-line="167">                    <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">span</span><span class="p">:</span>
+</span><span data-line="168">                        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">span</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
+</span><span data-line="169">
+</span><span data-line="170">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+</span><span data-line="171">        <span class="c1"># type: (Event) -&gt; None</span>
+</span><span data-line="172">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_request</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="173">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_extra</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="174">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_user</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="175">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_breadcrumbs</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="176">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_frames</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="177">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_spans</span><span class="p">(</span><span class="n">event</span><span class="p">)</span></div>
 
 </span></pre></div>
         </article><button class="back-to-top" type="button">
@@ -318,7 +321,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=9951af7d"></script>
+      <script src="../../_static/documentation_options.js?v=af56f58f"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=e2230717"></script></body>
