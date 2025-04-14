@@ -234,3 +234,33 @@ def test_ignore_logger_wildcard(sentry_init, capture_events):
 
     (event,) = events
     assert event["logentry"]["message"] == "hi"
+
+
+def test_logging_dictionary_interpolation(sentry_init, capture_events):
+    """Here we test an entire dictionary being interpolated into the log message."""
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.error("this is a log with a dictionary %s", {"foo": "bar"})
+
+    (event,) = events
+    assert event["logentry"]["message"] == "this is a log with a dictionary %s"
+    assert event["logentry"]["params"] == {"foo": "bar"}
+
+
+def test_logging_dictionary_args(sentry_init, capture_events):
+    """Here we test items from a dictionary being interpolated into the log message."""
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.error(
+        "the value of foo is %(foo)s, and the value of bar is %(bar)s",
+        {"foo": "bar", "bar": "baz"},
+    )
+
+    (event,) = events
+    assert (
+        event["logentry"]["message"]
+        == "the value of foo is %(foo)s, and the value of bar is %(bar)s"
+    )
+    assert event["logentry"]["params"] == {"foo": "bar", "bar": "baz"}
