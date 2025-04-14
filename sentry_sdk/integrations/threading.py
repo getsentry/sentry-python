@@ -57,8 +57,10 @@ class ThreadingIntegration(Integration):
                 return old_start(self, *a, **kw)
 
             if integration.propagate_scope:
-                isolation_scope = sentry_sdk.get_isolation_scope().fork()
-                current_scope = sentry_sdk.get_current_scope().fork()
+                # isolation_scope = sentry_sdk.get_isolation_scope().fork()
+                # current_scope = sentry_sdk.get_current_scope().fork()
+                isolation_scope = sentry_sdk.get_isolation_scope()
+                current_scope = sentry_sdk.get_current_scope()
             else:
                 isolation_scope = None
                 current_scope = None
