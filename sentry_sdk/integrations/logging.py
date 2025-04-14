@@ -259,11 +259,13 @@ class EventHandler(_BaseHandler):
 
             event["logentry"] = {
                 "message": msg,
+                "formatted": record.getMessage(),
                 "params": (),
             }
 
         else:
             event["logentry"] = {
+                "formatted": record.getMessage(),
                 "message": to_string(record.msg),
                 "params": record.args,
             }
