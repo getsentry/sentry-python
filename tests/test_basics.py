@@ -7,7 +7,6 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
 import sentry_sdk.scope
@@ -769,46 +768,100 @@ class TracingTestClass:
         return cls, arg
 
 
-def test_staticmethod_tracing(sentry_init):
-    test_staticmethod_name = "tests.test_basics.TracingTestClass.static"
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_staticmethod_class_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.static"}
+        ],
+    )
 
-    assert (
-        ".".join(
-            [
-                TracingTestClass.static.__module__,
-                TracingTestClass.static.__qualname__,
-            ]
-        )
-        == test_staticmethod_name
-    ), "The test static method was moved or renamed. Please update the name accordingly"
+    events = capture_events()
 
-    sentry_init(functions_to_trace=[{"qualified_name": test_staticmethod_name}])
+    with sentry_sdk.start_span(name="test"):
+        assert TracingTestClass.static(1) == 1
 
-    for instance_or_class in (TracingTestClass, TracingTestClass()):
-        with patch_start_tracing_child() as fake_start_child:
-            assert instance_or_class.static(1) == 1
-            assert fake_start_child.call_count == 1
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.static"
 
 
-def test_classmethod_tracing(sentry_init):
-    test_classmethod_name = "tests.test_basics.TracingTestClass.class_"
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_staticmethod_instance_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.static"}
+        ],
+    )
 
-    assert (
-        ".".join(
-            [
-                TracingTestClass.class_.__module__,
-                TracingTestClass.class_.__qualname__,
-            ]
-        )
-        == test_classmethod_name
-    ), "The test class method was moved or renamed. Please update the name accordingly"
+    events = capture_events()
 
-    sentry_init(functions_to_trace=[{"qualified_name": test_classmethod_name}])
+    with sentry_sdk.start_span(name="test"):
+        assert TracingTestClass().static(1) == 1
 
-    for instance_or_class in (TracingTestClass, TracingTestClass()):
-        with patch_start_tracing_child() as fake_start_child:
-            assert instance_or_class.class_(1) == (TracingTestClass, 1)
-            assert fake_start_child.call_count == 1
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.static"
+
+
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_classmethod_class_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
+        ],
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_span(name="test"):
+        assert TracingTestClass.class_(1) == (TracingTestClass, 1)
+
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.class_"
+
+
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_classmethod_instance_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
+        ],
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_span(name="test"):
+        assert TracingTestClass().class_(1) == (TracingTestClass, 1)
+
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.class_"
 
 
 def test_last_event_id(sentry_init):
