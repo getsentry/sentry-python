@@ -285,7 +285,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         try:
             raise ValueError("stuff")
         except Exception:
-            logging.exception("stuff happened")
+            sentry_sdk.capture_exception()
         1 / 0
 
     envelopes = capture_envelopes()
@@ -875,7 +875,12 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
 
 
 def test_request_not_modified_by_reference(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(
+        integrations=[
+            flask_sentry.FlaskIntegration(),
+            LoggingIntegration(event_level="ERROR"),
+        ]
+    )
 
     @app.route("/", methods=["POST"])
     def index():

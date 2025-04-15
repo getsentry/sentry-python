@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from typing import Optional
 
 DEFAULT_LEVEL = logging.INFO
-DEFAULT_EVENT_LEVEL = logging.ERROR
+DEFAULT_EVENT_LEVEL = None  # None means no events are captured
 LOGGING_TO_EVENT_LEVEL = {
     logging.NOTSET: "notset",
     logging.DEBUG: "debug",

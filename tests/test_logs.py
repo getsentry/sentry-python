@@ -331,7 +331,10 @@ def test_logging_errors(sentry_init, capture_envelopes):
     """
     The python logger module should be able to log errors without erroring
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(
+        _experiments={"enable_logs": True},
+        integrations=[LoggingIntegration(event_level="ERROR")],
+    )
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")

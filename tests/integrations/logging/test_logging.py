@@ -15,6 +15,52 @@ def reset_level():
     logger.setLevel(logging.DEBUG)
 
 
+@pytest.mark.parametrize("integrations", [None, [], [LoggingIntegration()]])
+@pytest.mark.parametrize(
+    "kwargs", [{"exc_info": None}, {}, {"exc_info": 0}, {"exc_info": False}]
+)
+def test_logging_defaults(integrations, sentry_init, capture_events, kwargs):
+    sentry_init(integrations=integrations)
+    events = capture_events()
+
+    logger.info("bread")
+    logger.error("error")
+    logger.critical("LOL", **kwargs)
+
+    assert len(events) == 0
+
+
+@pytest.mark.parametrize(
+    "kwargs", [{"exc_info": None}, {}, {"exc_info": 0}, {"exc_info": False}]
+)
+def test_logging_basic(sentry_init, capture_events, kwargs):
+    sentry_init(integrations=[LoggingIntegration(event_level=logging.ERROR)])
+    events = capture_events()
+
+    logger.info("bread")
+    logger.error("error")
+    logger.critical("LOL", **kwargs)
+    (error_event, critical_event) = events
+
+    assert error_event["level"] == "error"
+    assert any(
+        crumb["message"] == "bread" for crumb in error_event["breadcrumbs"]["values"]
+    )
+    assert not any(
+        crumb["message"] == "LOL" for crumb in error_event["breadcrumbs"]["values"]
+    )
+    assert "threads" not in error_event
+
+    assert critical_event["level"] == "fatal"
+    assert any(
+        crumb["message"] == "bread" for crumb in critical_event["breadcrumbs"]["values"]
+    )
+    assert not any(
+        crumb["message"] == "LOL" for crumb in critical_event["breadcrumbs"]["values"]
+    )
+    assert "threads" not in critical_event
+
+
 @pytest.mark.parametrize("logger", [logger, other_logger])
 def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
     sentry_init(integrations=[LoggingIntegration(event_level="ERROR")])
@@ -29,28 +75,11 @@ def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"]["values"])
 
 
-@pytest.mark.parametrize("integrations", [None, [], [LoggingIntegration()]])
-@pytest.mark.parametrize(
-    "kwargs", [{"exc_info": None}, {}, {"exc_info": 0}, {"exc_info": False}]
-)
-def test_logging_defaults(integrations, sentry_init, capture_events, kwargs):
-    sentry_init(integrations=integrations)
-    events = capture_events()
-
-    logger.info("bread")
-    logger.critical("LOL", **kwargs)
-    (event,) = events
-
-    assert event["level"] == "fatal"
-    assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"]["values"])
-    assert not any(
-        crumb["message"] == "LOL" for crumb in event["breadcrumbs"]["values"]
-    )
-    assert "threads" not in event
-
-
 def test_logging_extra_data(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     logger.info("bread", extra=dict(foo=42))
@@ -67,7 +96,10 @@ def test_logging_extra_data(sentry_init, capture_events):
 
 
 def test_logging_extra_data_integer_keys(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     logger.critical("integer in extra keys", extra={1: 1})
@@ -85,7 +117,10 @@ def test_logging_extra_data_integer_keys(sentry_init, capture_events):
     ),
 )
 def test_logging_stack_trace(sentry_init, capture_events, enable_stack_trace_kwarg):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     logger.error("first", **enable_stack_trace_kwarg)
@@ -104,7 +139,10 @@ def test_logging_stack_trace(sentry_init, capture_events, enable_stack_trace_kwa
 
 
 def test_logging_level(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     logger.setLevel(logging.WARNING)
@@ -158,7 +196,10 @@ def test_custom_log_level_names(sentry_init, capture_events):
 
 
 def test_logging_filters(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     should_log = False
@@ -210,7 +251,10 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
 
 
 def test_ignore_logger(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     ignore_logger("testfoo")
@@ -221,7 +265,10 @@ def test_ignore_logger(sentry_init, capture_events):
 
 
 def test_ignore_logger_wildcard(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     ignore_logger("testfoo.*")
