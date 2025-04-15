@@ -1,0 +1,43 @@
+name: Generate tox
+
+on:
+  schedule:
+    - cron: '59 11 * * 2'
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    name: Generate tox and CI YAMLs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+
+      - name: Set up git
+        run: |
+          git config user.name "sentry-toxgen-bot"
+          git config user.email "bot@sentry.io"
+
+      - name: Checkout branch
+        run: |
+          git checkout -b toxgen/generate-tox-and-ci-yamls
+
+      - name: Run generate-test-files
+        run: |
+          sh scripts/generate-test-files.sh
+
+      - name: Commit and open PR
+        run: |
+          git add --all
+          git commit -m 'Regenerate tox.ini and CI config'
+          git push -u origin toxgen/generate-tox-and-ci-yamls
+
+      - name: Open PR
+        run: |
+          gh pr create -B master -H toxgen/generate-tox-and-ci-yamls --title 'tests: Update tox.ini' --body $'This PR was created automatically in order to make sure we are testing the latest versions of integrated frameworks and libraries.\n\nShort rundown of how this works:\n  - We query PyPI for all supported releases of each framework and pick a handful to test.\n  - We generate a new `tox.ini` from a template, filling in the new versions we've picked.\n  - We regenerate the CI YAML files responsible for running integration tests.\n\nSee `scripts/populate_tox/README.md` for more info.'
