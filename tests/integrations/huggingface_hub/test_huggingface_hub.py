@@ -1,4 +1,5 @@
 import itertools
+from unittest import mock
 
 import pytest
 from huggingface_hub import (
@@ -8,8 +9,6 @@ from huggingface_hub.errors import OverloadedError
 
 from sentry_sdk import start_span
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
-
-from unittest import mock  # python 3.3 and above
 
 
 def mock_client_post(client, post_mock):
@@ -33,7 +32,7 @@ def test_nonstreaming_chat_completion(
     )
     events = capture_events()
 
-    client = InferenceClient("some-model")
+    client = InferenceClient()
     if details_arg:
         post_mock = mock.Mock(
             return_value=b"""[{
@@ -92,7 +91,7 @@ def test_streaming_chat_completion(
     )
     events = capture_events()
 
-    client = InferenceClient("some-model")
+    client = InferenceClient()
 
     post_mock = mock.Mock(
         return_value=[
@@ -116,7 +115,6 @@ def test_streaming_chat_completion(
             )
         )
     assert len(response) == 2
-    print(response)
     if details_arg:
         assert response[0].token.text + response[1].token.text == "the model response"
     else:
@@ -142,7 +140,7 @@ def test_bad_chat_completion(sentry_init, capture_events):
     sentry_init(integrations=[HuggingfaceHubIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    client = InferenceClient("some-model")
+    client = InferenceClient()
     post_mock = mock.Mock(side_effect=OverloadedError("The server is overloaded"))
     mock_client_post(client, post_mock)
 
@@ -160,7 +158,7 @@ def test_span_origin(sentry_init, capture_events):
     )
     events = capture_events()
 
-    client = InferenceClient("some-model")
+    client = InferenceClient()
     post_mock = mock.Mock(
         return_value=[
             b"""data:{

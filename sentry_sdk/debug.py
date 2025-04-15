@@ -18,7 +18,7 @@ class _DebugFilter(logging.Filter):
 
 def init_debug_support():
     # type: () -> None
-    if not logger.hasHandlers():
+    if not logger.handlers:
         configure_logger()
 
 
