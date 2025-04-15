@@ -29,6 +29,9 @@ TEST_SUITE_CONFIG = {
     "clickhouse_driver": {
         "package": "clickhouse-driver",
     },
+    "cohere": {
+        "package": "cohere",
+    },
     "django": {
         "package": "django",
         "deps": {
