@@ -60,7 +60,7 @@ class ThreadingIntegration(Integration):
             if integration.propagate_scope:
                 try:
                     from django import VERSION as django_version  # noqa: N811
-                    import channels
+                    import channels  # type: ignore[import-not-found]
 
                     channels_version = channels.__version__
                 except ImportError:
