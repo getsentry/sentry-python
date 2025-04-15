@@ -65,6 +65,13 @@ TEST_SUITE_CONFIG = {
                 "requests",
                 "anyio<4",
             ],
+            # There's an incompatibility between FastAPI's TestClient, which is
+            # actually Starlette's TestClient, which is actually httpx's Client.
+            # httpx dropped a deprecated Client argument in 0.28.0, Starlette
+            # dropped it from its TestClient in 0.37.2, and FastAPI only pinned
+            # Starlette>=0.37.2 from version 0.110.1 onwards -- so for older
+            # FastAPI versions we use older httpx which still supports the
+            # deprecated argument.
             "<0.110.1": ["httpx<0.28.0"],
         },
     },
@@ -150,7 +157,8 @@ TEST_SUITE_CONFIG = {
                 "jinja2",
                 "httpx",
             ],
-            "<0.37": ["httpx<0.28.0"],
+            # See the comment on FastAPI's httpx bound for more info
+            "<0.37.2": ["httpx<0.28.0"],
             "<0.15": ["jinja2<3.1"],
             "py3.6": ["aiocontextvars"],
         },
