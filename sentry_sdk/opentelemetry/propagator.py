@@ -21,14 +21,14 @@ from opentelemetry.trace import (
     TraceFlags,
 )
 
-from sentry_sdk.integrations.opentelemetry.consts import (
+from sentry_sdk.consts import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+)
+from sentry_sdk.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
     SENTRY_SCOPES_KEY,
-)
-from sentry_sdk.tracing import (
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
 )
 from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
 
@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional, Set
-    import sentry_sdk.integrations.opentelemetry.scope as scope
+    import sentry_sdk.opentelemetry.scope as scope
 
 
 class SentryPropagator(TextMapPropagator):

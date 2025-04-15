@@ -17,17 +17,17 @@ from opentelemetry.trace import (
     use_span,
 )
 
-from sentry_sdk.integrations.opentelemetry.consts import (
+from sentry_sdk.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
     SENTRY_USE_CURRENT_SCOPE_KEY,
     SENTRY_USE_ISOLATION_SCOPE_KEY,
     TRACESTATE_SAMPLED_KEY,
 )
-from sentry_sdk.integrations.opentelemetry.contextvars_context import (
+from sentry_sdk.opentelemetry.contextvars_context import (
     SentryContextVarsRuntimeContext,
 )
-from sentry_sdk.integrations.opentelemetry.utils import trace_state_from_baggage
+from sentry_sdk.opentelemetry.utils import trace_state_from_baggage
 from sentry_sdk.scope import Scope, ScopeType
 from sentry_sdk.tracing import Span
 from sentry_sdk._types import TYPE_CHECKING

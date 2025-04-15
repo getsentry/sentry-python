@@ -6,11 +6,11 @@ from opentelemetry.trace.propagation import get_current_span
 from opentelemetry.propagators.textmap import DefaultSetter
 
 import sentry_sdk
-from sentry_sdk.integrations.opentelemetry.consts import (
+from sentry_sdk.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
-from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
+from sentry_sdk.opentelemetry import SentryPropagator
 from tests.conftest import SortedBaggage
 
 

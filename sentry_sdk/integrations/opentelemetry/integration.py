@@ -5,11 +5,11 @@ removed at any time without prior notice.
 """
 
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
-from sentry_sdk.integrations.opentelemetry.span_processor import (
+from sentry_sdk.opentelemetry import (
+    SentryPropagator,
+    SentrySampler,
     SentrySpanProcessor,
 )
-from sentry_sdk.opentelemetry.sampler import SentrySampler
 from sentry_sdk.utils import logger
 
 try:

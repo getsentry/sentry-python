@@ -11,7 +11,12 @@ from itertools import chain
 
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES
+from sentry_sdk.consts import (
+    DEFAULT_MAX_BREADCRUMBS,
+    FALSE_VALUES,
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+)
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
@@ -21,8 +26,6 @@ from sentry_sdk.tracing_utils import (
     PropagationContext,
 )
 from sentry_sdk.tracing import (
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
     NoOpSpan,
     Span,
 )

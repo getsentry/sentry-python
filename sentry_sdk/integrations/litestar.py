@@ -1,6 +1,6 @@
 from collections.abc import Set
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, TransactionSource, SOURCE_FOR_STYLE
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -9,7 +9,6 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TransactionSource, SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,

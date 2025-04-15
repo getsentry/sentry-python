@@ -86,8 +86,8 @@ setup(
     },
     entry_points={
         "opentelemetry_propagator": [
-            "sentry=sentry_sdk.integrations.opentelemetry:SentryPropagator"
-        ]
+            "sentry=sentry_sdk.opentelemetry:SentryPropagator"
+        ],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
