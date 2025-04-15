@@ -13,6 +13,7 @@ import pytest
 
 from sentry_sdk import capture_message, get_baggage, get_traceparent
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
     StarletteRequestExtractor,
@@ -943,7 +944,9 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):
-    sentry_init(integrations=[StarletteIntegration()])
+    sentry_init(
+        integrations=[StarletteIntegration(), LoggingIntegration(event_level="ERROR")]
+    )
 
     events = capture_events()
 
