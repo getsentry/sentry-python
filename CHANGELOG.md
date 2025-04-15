@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.26.1
+
+### Various fixes & improvements
+
+- ref(logging): Clarify separate warnings case is for Python <3.11 (#4296) by @szokeasaurusrex
+- fix: Data leak in ThreadingIntegration between threads (#4281) by @antonpirker
+- Revert "chore: Deprecate `same_process_as_parent` (#4244)" (#4290) by @sentrivana
+- feat(logging): Add formatted message to log events (#4292) by @szokeasaurusrex
+- fix(logging): Send raw logging parameters (#4291) by @szokeasaurusrex
+
 ## 2.26.0
 
 ### Various fixes & improvements
