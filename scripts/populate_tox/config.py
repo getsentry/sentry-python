@@ -55,6 +55,12 @@ TEST_SUITE_CONFIG = {
         "package": "falcon",
         "python": "<3.13",
     },
+    "fastapi": {
+        "package": "fastapi",
+        "deps": {
+            "*": ["httpx", "pytest-asyncio", "python-multipart", "requests", "anyio<4"],
+        },
+    },
     "flask": {
         "package": "flask",
         "deps": {

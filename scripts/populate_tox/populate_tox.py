@@ -75,7 +75,6 @@ IGNORE = {
     "boto3",
     "chalice",
     "cohere",
-    "fastapi",
     "gcp",
     "httpx",
     "langchain",
