@@ -1,4 +1,5 @@
 import itertools
+from unittest import mock
 
 import pytest
 from huggingface_hub import (
@@ -8,8 +9,6 @@ from huggingface_hub.errors import OverloadedError
 
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
-
-from unittest import mock  # python 3.3 and above
 
 
 def mock_client_post(client, post_mock):
@@ -116,7 +115,6 @@ def test_streaming_chat_completion(
             )
         )
     assert len(response) == 2
-    print(response)
     if details_arg:
         assert response[0].token.text + response[1].token.text == "the model response"
     else:
