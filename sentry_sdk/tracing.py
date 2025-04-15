@@ -316,7 +316,7 @@ class Span:
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         self._flags = {}  # type: Dict[str, bool]
-        self._flags_capacity = 0
+        self._flags_capacity = 3
 
         if hub is not None:
             warnings.warn(
@@ -610,7 +610,7 @@ class Span:
 
     def set_flag(self, flag, result):
         # type: (str, bool) -> None
-        if len(self._flags) >= self._flags_capacity:
+        if len(self._flags) < self._flags_capacity:
             self._flags[flag] = result
 
     def set_status(self, value):

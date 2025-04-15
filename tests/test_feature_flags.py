@@ -7,6 +7,8 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.feature_flags import add_feature_flag, FlagBuffer
+from sentry_sdk import start_span, start_transaction
+from tests.conftest import ApproxDict
 
 
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
@@ -220,3 +222,26 @@ def test_flag_buffer_concurrent_access():
     # shared resource. When deepcopying we should have exclusive access to the underlying
     # memory.
     assert error_occurred is False
+
+
+def test_flag_limit(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with start_transaction(name="hi"):
+        with start_span(op="foo", name="bar"):
+            add_feature_flag("first", True)
+            add_feature_flag("second", True)
+            add_feature_flag("third", True)
+            add_feature_flag("fourth", True)
+
+    (event,) = events
+    assert event["spans"][0]["data"] == ApproxDict(
+        {
+            "flag.evaluation.first": True,
+            "flag.evaluation.second": True,
+            "flag.evaluation.third": True,
+        }
+    )
+    assert "flag.evaluation.fourth" not in event["spans"][0]["data"]
