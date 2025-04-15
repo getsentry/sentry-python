@@ -39,7 +39,10 @@ async def test_basic(sentry_init, capture_events, application):
     events = capture_events()
 
     if sys.version_info <= (3, 8):
-        with pytest.warns(DeprecationWarning):
+        # We emit a UserWarning for channels 2.x and 3.x on Python 3.8 and older
+        # because the async support was not really good back then and there is a known issue.
+        # See the TreadingIntegration for details.
+        with pytest.warns(UserWarning):
             comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
             response = await comm.get_response()
             await comm.wait()
