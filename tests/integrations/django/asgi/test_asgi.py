@@ -38,7 +38,14 @@ async def test_basic(sentry_init, capture_events, application):
 
     events = capture_events()
 
-    if sys.version_info < (3, 9):
+    import channels  # type: ignore[import-not-found]
+
+    if (
+        sys.version_info < (3, 9)
+        and channels.__version__ < "4.0.0"
+        and django.VERSION >= (3, 0)
+        and django.VERSION < (4, 0)
+    ):
         # We emit a UserWarning for channels 2.x and 3.x on Python 3.8 and older
         # because the async support was not really good back then and there is a known issue.
         # See the TreadingIntegration for details.
