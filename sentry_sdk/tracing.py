@@ -323,13 +323,6 @@ class Span:
 
             self.scope = self.scope or hub.scope
 
-        if same_process_as_parent is not None:
-            warnings.warn(
-                "The `same_process_as_parent` parameter is deprecated.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
         if start_timestamp is None:
             start_timestamp = datetime.now(timezone.utc)
         elif isinstance(start_timestamp, float):
