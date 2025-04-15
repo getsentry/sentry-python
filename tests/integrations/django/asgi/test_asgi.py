@@ -31,23 +31,22 @@ if django.VERSION >= (3, 0):
 @pytest.mark.asyncio
 @pytest.mark.forked
 async def test_basic(sentry_init, capture_events, application):
-    if sys.version_info <= (3, 8):
-        with pytest.warns(DeprecationWarning):
-            sentry_init(
-                integrations=[DjangoIntegration()],
-                send_default_pii=True,
-            )
-    else:
-        sentry_init(
-            integrations=[DjangoIntegration()],
-            send_default_pii=True,
-        )
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+    )
 
     events = capture_events()
 
-    comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
-    response = await comm.get_response()
-    await comm.wait()
+    if sys.version_info <= (3, 8):
+        with pytest.warns(DeprecationWarning):
+            comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
+            response = await comm.get_response()
+            await comm.wait()
+    else:
+        comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
+        response = await comm.get_response()
+        await comm.wait()
 
     assert response["status"] == 500
 
