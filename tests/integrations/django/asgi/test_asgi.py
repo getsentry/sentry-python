@@ -31,10 +31,17 @@ if django.VERSION >= (3, 0):
 @pytest.mark.asyncio
 @pytest.mark.forked
 async def test_basic(sentry_init, capture_events, application):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=True,
-    )
+    if sys.version_info <= (3, 8):
+        with pytest.warns(DeprecationWarning):
+            sentry_init(
+                integrations=[DjangoIntegration()],
+                send_default_pii=True,
+            )
+    else:
+        sentry_init(
+            integrations=[DjangoIntegration()],
+            send_default_pii=True,
+        )
 
     events = capture_events()
 

@@ -78,8 +78,8 @@ class ThreadingIntegration(Integration):
                     warnings.warn(
                         "There is a known issue with Django channels 2.x and 3.x when using Python 3.8 or older. "
                         "(Async support is emulated using threads and some Sentry data may be leaked between those threads.) "
-                        "Please either upgrade to Django channels 4.x or later, use Django's async features "
-                        "available in Django 3.1 and later, or upgrade to Python 3.9 or later.",
+                        "Please either upgrade to Django channels 4.0+, use Django's async features "
+                        "available in Django 3.1+ instead of Django channels, or upgrade to Python 3.9+.",
                         stacklevel=2,
                     )
                     isolation_scope = sentry_sdk.get_isolation_scope()
