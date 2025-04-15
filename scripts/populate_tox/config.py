@@ -73,6 +73,7 @@ TEST_SUITE_CONFIG = {
             # FastAPI versions we use older httpx which still supports the
             # deprecated argument.
             "<0.110.1": ["httpx<0.28.0"],
+            "py3.6": ["aiocontextvars"],
         },
     },
     "flask": {
