@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+from opentelemetry.trace import Span as OTelSpan
+
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import (
@@ -748,7 +750,10 @@ class Scope:
     def span(self, span):
         # type: (Optional[Span]) -> None
         """Set current tracing span."""
-        self._span = span
+        if isinstance(span, OTelSpan):
+            self._span = Span(otel_span=span)
+        else:
+            self._span = span
 
     @property
     def profile(self):
