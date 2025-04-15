@@ -33,7 +33,7 @@ def test_nonstreaming_chat_completion(
     )
     events = capture_events()
 
-    client = InferenceClient("some-model")
+    client = InferenceClient()
     if details_arg:
         post_mock = mock.Mock(
             return_value=b"""[{
@@ -92,7 +92,7 @@ def test_streaming_chat_completion(
     )
     events = capture_events()
 
-    client = InferenceClient("some-model")
+    client = InferenceClient()
 
     post_mock = mock.Mock(
         return_value=[
@@ -142,7 +142,7 @@ def test_bad_chat_completion(sentry_init, capture_events):
     sentry_init(integrations=[HuggingfaceHubIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    client = InferenceClient("some-model")
+    client = InferenceClient()
     post_mock = mock.Mock(side_effect=OverloadedError("The server is overloaded"))
     mock_client_post(client, post_mock)
 
@@ -160,7 +160,7 @@ def test_span_origin(sentry_init, capture_events):
     )
     events = capture_events()
 
-    client = InferenceClient("some-model")
+    client = InferenceClient()
     post_mock = mock.Mock(
         return_value=[
             b"""data:{
