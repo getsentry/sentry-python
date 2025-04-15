@@ -58,7 +58,13 @@ TEST_SUITE_CONFIG = {
     "fastapi": {
         "package": "fastapi",
         "deps": {
-            "*": ["httpx", "pytest-asyncio", "python-multipart", "requests", "anyio<4"],
+            "*": [
+                "httpx",
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "anyio<4",
+            ],
         },
     },
     "flask": {
