@@ -58,15 +58,14 @@ class ThreadingIntegration(Integration):
                 return old_start(self, *a, **kw)
 
             if integration.propagate_scope:
-                django_version = None
-                channels_version = None
                 try:
                     from django import VERSION as django_version  # noqa: N811
                     import channels
 
                     channels_version = channels.__version__
                 except ImportError:
-                    pass
+                    django_version = None
+                    channels_version = None
 
                 if (
                     sys.version_info <= (3, 8)
@@ -77,9 +76,10 @@ class ThreadingIntegration(Integration):
                     and django_version < (4, 0)
                 ):
                     warnings.warn(
-                        "Sentry is not supported with Django channels 2.x and 3.x. when using Python 3.8 or older. "
-                        "Please either upgrade to Django channels 4.x or later, or upgrade to Python 3.9 or later.",
-                        DeprecationWarning,
+                        "There is a known issue with Django channels 2.x and 3.x when using Python 3.8 or older. "
+                        "(Async support is emulated using threads and some Sentry data may be leaked between those threads.) "
+                        "Please either upgrade to Django channels 4.x or later, use Django's async features "
+                        "available in Django 3.1 and later, or upgrade to Python 3.9 or later.",
                         stacklevel=2,
                     )
                     isolation_scope = sentry_sdk.get_isolation_scope()
