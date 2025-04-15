@@ -31,6 +31,7 @@ TEST_SUITE_CONFIG = {
     },
     "cohere": {
         "package": "cohere",
+        "python": ">=3.9",
     },
     "django": {
         "package": "django",
