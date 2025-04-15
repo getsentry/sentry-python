@@ -393,7 +393,7 @@ class _Client(BaseClient):
                 except Exception as e:
                     logger.debug("Can not set up continuous profiler. (%s)", e)
 
-            from sentry_sdk.opentelemetry.integration import (
+            from sentry_sdk.opentelemetry.tracing import (
                 patch_readable_span,
                 setup_sentry_tracing,
             )
