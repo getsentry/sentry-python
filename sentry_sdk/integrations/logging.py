@@ -259,17 +259,15 @@ class EventHandler(_BaseHandler):
 
             event["logentry"] = {
                 "message": msg,
+                "formatted": record.getMessage(),
                 "params": (),
             }
 
         else:
             event["logentry"] = {
+                "formatted": record.getMessage(),
                 "message": to_string(record.msg),
-                "params": (
-                    tuple(str(arg) if arg is None else arg for arg in record.args)
-                    if record.args
-                    else ()
-                ),
+                "params": record.args,
             }
 
         event["extra"] = self._extra_from_record(record)
