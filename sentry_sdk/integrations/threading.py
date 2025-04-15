@@ -50,6 +50,15 @@ class ThreadingIntegration(Integration):
         # type: () -> None
         old_start = Thread.start
 
+        try:
+            from django import VERSION as django_version  # noqa: N811
+            import channels  # type: ignore[import-not-found]
+
+            channels_version = channels.__version__
+        except ImportError:
+            django_version = None
+            channels_version = None
+
         @wraps(old_start)
         def sentry_start(self, *a, **kw):
             # type: (Thread, *Any, **Any) -> Any
@@ -58,17 +67,8 @@ class ThreadingIntegration(Integration):
                 return old_start(self, *a, **kw)
 
             if integration.propagate_scope:
-                try:
-                    from django import VERSION as django_version  # noqa: N811
-                    import channels  # type: ignore[import-not-found]
-
-                    channels_version = channels.__version__
-                except ImportError:
-                    django_version = None
-                    channels_version = None
-
                 if (
-                    sys.version_info <= (3, 8)
+                    sys.version_info < (3, 9)
                     and channels_version is not None
                     and channels_version < "4.0.0"
                     and django_version is not None
