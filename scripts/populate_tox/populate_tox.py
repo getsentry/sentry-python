@@ -78,7 +78,6 @@ IGNORE = {
     "fastapi",
     "gcp",
     "httpx",
-    "huey",
     "langchain",
     "langchain_notiktoken",
     "openai",
