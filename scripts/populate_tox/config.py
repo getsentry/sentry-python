@@ -65,6 +65,7 @@ TEST_SUITE_CONFIG = {
                 "requests",
                 "anyio<4",
             ],
+            "<0.110.1": ["httpx<0.28.0"],
         },
     },
     "flask": {
