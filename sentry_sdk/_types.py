@@ -129,6 +129,22 @@ Log = TypedDict(
 # "critical" is an alias of "fatal" recognized by Relay
 LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
 
+EventDataCategory = Literal[
+    "default",
+    "error",
+    "crash",
+    "transaction",
+    "security",
+    "attachment",
+    "session",
+    "internal",
+    "profile",
+    "profile_chunk",
+    "monitor",
+    "span",
+    "log",
+]
+
 DurationUnit = Literal[
     "nanosecond",
     "microsecond",
@@ -249,21 +265,6 @@ if TYPE_CHECKING:
     # https://github.com/python/mypy/issues/5710
     NotImplementedType = Any
 
-    EventDataCategory = Literal[
-        "default",
-        "error",
-        "crash",
-        "transaction",
-        "security",
-        "attachment",
-        "session",
-        "internal",
-        "profile",
-        "profile_chunk",
-        "monitor",
-        "span",
-        "log",
-    ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
     ContinuousProfilerMode = Literal["thread", "gevent", "unknown"]
