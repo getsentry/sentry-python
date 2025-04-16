@@ -36,11 +36,10 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
         assert not events
 
 
-@pytest.mark.parametrize("propagate_scope", (True, False))
-def test_propagates_scope(sentry_init, capture_events, propagate_scope):
+def test_propagates_scope(sentry_init, capture_events):
     sentry_init(
         default_integrations=False,
-        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
+        integrations=[ThreadingIntegration()],
     )
     events = capture_events()
 
@@ -66,17 +65,13 @@ def test_propagates_scope(sentry_init, capture_events, propagate_scope):
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
 
-    if propagate_scope:
-        assert event["tags"]["stage1"] == "true"
-    else:
-        assert "stage1" not in event.get("tags", {})
+    assert event["tags"]["stage1"] == "true"
 
 
-@pytest.mark.parametrize("propagate_scope", (True, False))
-def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scope):
+def test_propagates_threadpool_scope(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
+        integrations=[ThreadingIntegration()],
     )
     events = capture_events()
 
@@ -92,16 +87,12 @@ def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scop
 
     sentry_sdk.flush()
 
-    if propagate_scope:
-        assert len(events) == 1
-        (event,) = events
-        assert event["spans"][0]["trace_id"] == event["spans"][1]["trace_id"]
-        assert event["spans"][1]["trace_id"] == event["spans"][2]["trace_id"]
-        assert event["spans"][2]["trace_id"] == event["spans"][3]["trace_id"]
-        assert event["spans"][3]["trace_id"] == event["spans"][0]["trace_id"]
-    else:
-        (event,) = events
-        assert len(event["spans"]) == 0
+    assert len(events) == 1
+    (event,) = events
+    assert event["spans"][0]["trace_id"] == event["spans"][1]["trace_id"]
+    assert event["spans"][1]["trace_id"] == event["spans"][2]["trace_id"]
+    assert event["spans"][2]["trace_id"] == event["spans"][3]["trace_id"]
+    assert event["spans"][3]["trace_id"] == event["spans"][0]["trace_id"]
 
 
 def test_circular_references(sentry_init, request):
@@ -174,14 +165,9 @@ def test_wrapper_attributes(sentry_init):
     assert t.run.__qualname__ == original_run.__qualname__
 
 
-@pytest.mark.parametrize(
-    "propagate_scope",
-    (True, False),
-    ids=["propagate_scope=True", "propagate_scope=False"],
-)
-def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
+def test_scope_data_not_leaked_in_threads(sentry_init):
     sentry_init(
-        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
+        integrations=[ThreadingIntegration()],
     )
 
     sentry_sdk.set_tag("initial_tag", "initial_value")
@@ -189,12 +175,9 @@ def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
 
     def do_some_work():
         # check if we have the initial scope data propagated into the thread
-        if propagate_scope:
-            assert sentry_sdk.get_isolation_scope()._tags == {
-                "initial_tag": "initial_value"
-            }
-        else:
-            assert sentry_sdk.get_isolation_scope()._tags == {}
+        assert sentry_sdk.get_isolation_scope()._tags == {
+            "initial_tag": "initial_value"
+        }
 
         # change data in isolation scope in thread
         sentry_sdk.set_tag("thread_tag", "thread_value")
@@ -209,17 +192,14 @@ def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
     }, "The isolation scope in the main thread should not be modified by the started thread."
 
 
-@pytest.mark.parametrize(
-    "propagate_scope",
-    (True, False),
-    ids=["propagate_scope=True", "propagate_scope=False"],
-)
 def test_spans_from_multiple_threads(
-    sentry_init, capture_events, render_span_tree, propagate_scope
+    sentry_init,
+    capture_events,
+    render_span_tree,
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
+        integrations=[ThreadingIntegration()],
     )
     events = capture_events()
 
@@ -244,31 +224,19 @@ def test_spans_from_multiple_threads(
             t.join()
 
     (event,) = events
-    if propagate_scope:
-        assert render_span_tree(event) == dedent(
-            """\
-            - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: main"
-                - op="inner-run-0": description="Thread: child-0"
-              - op="outer-submit-1": description="Thread: main"
-                - op="inner-run-1": description="Thread: child-1"
-              - op="outer-submit-2": description="Thread: main"
-                - op="inner-run-2": description="Thread: child-2"
-              - op="outer-submit-3": description="Thread: main"
-                - op="inner-run-3": description="Thread: child-3"
-              - op="outer-submit-4": description="Thread: main"
-                - op="inner-run-4": description="Thread: child-4"\
-"""
-        )
 
-    elif not propagate_scope:
-        assert render_span_tree(event) == dedent(
-            """\
-            - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: main"
-              - op="outer-submit-1": description="Thread: main"
-              - op="outer-submit-2": description="Thread: main"
-              - op="outer-submit-3": description="Thread: main"
-              - op="outer-submit-4": description="Thread: main"\
+    assert render_span_tree(event) == dedent(
+        """\
+        - op="outer-trx": description=null
+          - op="outer-submit-0": description="Thread: main"
+            - op="inner-run-0": description="Thread: child-0"
+          - op="outer-submit-1": description="Thread: main"
+            - op="inner-run-1": description="Thread: child-1"
+          - op="outer-submit-2": description="Thread: main"
+            - op="inner-run-2": description="Thread: child-2"
+          - op="outer-submit-3": description="Thread: main"
+            - op="inner-run-3": description="Thread: child-3"
+          - op="outer-submit-4": description="Thread: main"
+            - op="inner-run-4": description="Thread: child-4"\
 """
-        )
+    )

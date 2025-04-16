@@ -27,10 +27,6 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(self, propagate_scope=True):
-        # type: (bool) -> None
-        self.propagate_scope = propagate_scope
-
     @staticmethod
     def setup_once():
         # type: () -> None
@@ -52,31 +48,27 @@ class ThreadingIntegration(Integration):
             if integration is None:
                 return old_start(self, *a, **kw)
 
-            if integration.propagate_scope:
-                if (
-                    sys.version_info < (3, 9)
-                    and channels_version is not None
-                    and channels_version < "4.0.0"
-                    and django_version is not None
-                    and django_version >= (3, 0)
-                    and django_version < (4, 0)
-                ):
-                    warnings.warn(
-                        "There is a known issue with Django channels 2.x and 3.x when using Python 3.8 or older. "
-                        "(Async support is emulated using threads and some Sentry data may be leaked between those threads.) "
-                        "Please either upgrade to Django channels 4.0+, use Django's async features "
-                        "available in Django 3.1+ instead of Django channels, or upgrade to Python 3.9+.",
-                        stacklevel=2,
-                    )
-                    isolation_scope = sentry_sdk.get_isolation_scope()
-                    current_scope = sentry_sdk.get_current_scope()
+            if (
+                sys.version_info < (3, 9)
+                and channels_version is not None
+                and channels_version < "4.0.0"
+                and django_version is not None
+                and django_version >= (3, 0)
+                and django_version < (4, 0)
+            ):
+                warnings.warn(
+                    "There is a known issue with Django channels 2.x and 3.x when using Python 3.8 or older. "
+                    "(Async support is emulated using threads and some Sentry data may be leaked between those threads.) "
+                    "Please either upgrade to Django channels 4.0+, use Django's async features "
+                    "available in Django 3.1+ instead of Django channels, or upgrade to Python 3.9+.",
+                    stacklevel=2,
+                )
+                isolation_scope = sentry_sdk.get_isolation_scope()
+                current_scope = sentry_sdk.get_current_scope()
 
-                else:
-                    isolation_scope = sentry_sdk.get_isolation_scope().fork()
-                    current_scope = sentry_sdk.get_current_scope().fork()
             else:
-                isolation_scope = None
-                current_scope = None
+                isolation_scope = sentry_sdk.get_isolation_scope().fork()
+                current_scope = sentry_sdk.get_current_scope().fork()
 
             # Patching instance methods in `start()` creates a reference cycle if
             # done in a naive way. See
@@ -114,9 +106,6 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
             with sentry_sdk.use_isolation_scope(isolation_scope_to_use):
                 with sentry_sdk.use_scope(current_scope_to_use):
                     return _run_old_run_func()
-        else:
-            with sentry_sdk.isolation_scope():
-                return _run_old_run_func()
 
     return run  # type: ignore
 
