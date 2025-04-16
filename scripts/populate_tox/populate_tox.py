@@ -74,7 +74,6 @@ IGNORE = {
     "beam",
     "boto3",
     "chalice",
-    "cohere",
     "gcp",
     "httpx",
     "langchain",
