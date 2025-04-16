@@ -106,6 +106,9 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
             with sentry_sdk.use_isolation_scope(isolation_scope_to_use):
                 with sentry_sdk.use_scope(current_scope_to_use):
                     return _run_old_run_func()
+        else:
+            with sentry_sdk.isolation_scope():
+                return _run_old_run_func()
 
     return run  # type: ignore
 
