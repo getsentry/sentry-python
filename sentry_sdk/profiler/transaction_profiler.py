@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Set
     from typing import Type
-    from typing_extensions import TypedDict
+    from typing import TypedDict
 
     from sentry_sdk.profiler.utils import (
         ProcessedStack,

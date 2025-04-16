@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
+    from typing import Literal
     from typing import Optional
     from typing import Union
-    from typing_extensions import Literal
 
     from sentry_sdk.utils import AnnotatedValue
 

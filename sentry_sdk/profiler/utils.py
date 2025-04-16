@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Sequence
     from typing import Tuple
-    from typing_extensions import TypedDict
+    from typing import TypedDict
 
     ThreadId = str
 

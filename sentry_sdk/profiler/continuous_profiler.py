@@ -34,8 +34,9 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Set
     from typing import Type
+    from typing import TypedDict
     from typing import Union
-    from typing_extensions import TypedDict
+
     from sentry_sdk._types import ContinuousProfilerMode, SDKInfo
     from sentry_sdk.profiler.utils import (
         ExtractedSample,

@@ -32,14 +32,14 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Callable
     from typing import Union
+    from typing import Literal
     from typing import List
     from typing import Type
     from typing import Dict
     from typing import Any
     from typing import Sequence
     from typing import Tuple
-    from typing_extensions import Literal
-    from typing_extensions import TypedDict
+    from typing import TypedDict
 
     from sentry_sdk._types import (
         BreadcrumbProcessor,
