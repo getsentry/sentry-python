@@ -183,16 +183,22 @@ class Span:
         only_if_parent=False,  # type: bool
         parent_span=None,  # type: Optional[Span]
         otel_span=None,  # type: Optional[OtelSpan]
+        span=None,  # type: Optional[Span]
     ):
         # type: (...) -> None
         """
         If otel_span is passed explicitly, just acts as a proxy.
+
+        If span is passed explicitly, use it. The only purpose of this param
+        if backwards compatibility with start_transaction(transaction=...).
 
         If only_if_parent is True, just return an INVALID_SPAN
         and avoid instrumentation if there's no active parent span.
         """
         if otel_span is not None:
             self._otel_span = otel_span
+        elif span is not None:
+            self._otel_span = span._otel_span
         else:
             skip_span = False
             if only_if_parent and parent_span is None:
