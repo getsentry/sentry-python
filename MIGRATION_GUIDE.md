@@ -152,7 +152,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `span.containing_transaction` has been removed. Use `span.root_span` instead.
 - `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.
 - `PropagationContext` constructor no longer takes a `dynamic_sampling_context` but takes a `baggage` object instead.
-- `ThreadingIntegration` no longer takes the `propagate_hub` argument.
+- `ThreadingIntegration` no longer takes the `propagate_hub` and `propagate_scope` arguments. Scope data will be propagated by default.
 - `Baggage.populate_from_transaction` has been removed.
 - `debug.configure_debug_hub` was removed.
 - `profiles_sample_rate` and `profiler_mode` were removed from options available via `_experiments`. Use the top-level `profiles_sample_rate` and `profiler_mode` options instead.
