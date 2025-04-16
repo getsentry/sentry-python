@@ -104,7 +104,6 @@ def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scop
         assert len(event["spans"]) == 0
 
 
-@pytest.mark.skip(reason="Temporarily disable to release SDK 2.0a1.")
 def test_circular_references(sentry_init, request):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
 
@@ -232,7 +231,7 @@ def test_spans_from_multiple_threads(
 
     threads = []
 
-    with sentry_sdk.start_transaction(op="outer-trx"):
+    with sentry_sdk.start_span(op="outer-trx"):
         for number in range(5):
             with sentry_sdk.start_span(
                 op=f"outer-submit-{number}", name="Thread: main"

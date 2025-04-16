@@ -1,4 +1,5 @@
 import sentry_sdk
+from sentry_sdk.tracing import Transaction
 
 
 def test_transaction_name_span_description_compat(
@@ -52,3 +53,47 @@ def test_transaction_name_span_description_compat(
     assert span["op"] == "span-op"
     assert span["data"]["sentry.op"] == "span-op"
     assert span["data"]["sentry.description"] == "span-desc"
+
+
+def test_start_transaction_compat(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(
+        name="trx-name",
+        op="trx-op",
+    ):
+        ...
+
+    transaction = events[0]
+    assert transaction["transaction"] == "trx-name"
+    assert transaction["contexts"]["trace"]["op"] == "trx-op"
+    assert transaction["contexts"]["trace"]["data"]["sentry.op"] == "trx-op"
+    assert transaction["contexts"]["trace"]["data"]["sentry.name"] == "trx-name"
+    assert "sentry.description" not in transaction["contexts"]["trace"]["data"]
+
+
+def test_start_transaction_with_explicit_transaction_compat(
+    sentry_init,
+    capture_events,
+):
+    """It should still be possible to provide a ready-made Transaction to start_transaction."""
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    transaction = Transaction(name="trx-name", op="trx-op")
+
+    with sentry_sdk.start_transaction(transaction=transaction):
+        pass
+
+    transaction = events[0]
+    assert transaction["transaction"] == "trx-name"
+    assert transaction["contexts"]["trace"]["op"] == "trx-op"
+    assert transaction["contexts"]["trace"]["data"]["sentry.op"] == "trx-op"
+    assert transaction["contexts"]["trace"]["data"]["sentry.name"] == "trx-name"
+    assert "sentry.description" not in transaction["contexts"]["trace"]["data"]
