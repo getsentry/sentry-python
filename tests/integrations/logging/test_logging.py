@@ -296,7 +296,10 @@ def test_ignore_logger_wildcard(sentry_init, capture_events):
 
 def test_logging_dictionary_interpolation(sentry_init, capture_events):
     """Here we test an entire dictionary being interpolated into the log message."""
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     logger.error("this is a log with a dictionary %s", {"foo": "bar"})
@@ -312,7 +315,10 @@ def test_logging_dictionary_interpolation(sentry_init, capture_events):
 
 def test_logging_dictionary_args(sentry_init, capture_events):
     """Here we test items from a dictionary being interpolated into the log message."""
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+        default_integrations=False,
+    )
     events = capture_events()
 
     logger.error(
