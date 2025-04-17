@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from opentelemetry.trace import SpanKind, Status, StatusCode
+from opentelemetry.version import __version__ as OTEL_VERSION
 
 from sentry_sdk.opentelemetry.utils import (
     extract_span_data,
@@ -9,6 +10,9 @@ from sentry_sdk.opentelemetry.utils import (
     span_data_for_db_query,
     span_data_for_http_method,
 )
+from sentry_sdk.utils import parse_version
+
+OTEL_VERSION = parse_version(OTEL_VERSION)
 
 
 @pytest.mark.parametrize(
@@ -276,6 +280,9 @@ def test_span_data_for_db_query():
             {
                 "status": "unavailable",
                 "http_status_code": 503,
+                # old otel versions won't take the new attribute into account
+                "status_old": "internal_error",
+                "http_status_code_old": 502,
             },
         ),
         (
@@ -290,6 +297,9 @@ def test_span_data_for_db_query():
             {
                 "status": "unavailable",
                 "http_status_code": 503,
+                # old otel versions won't take the new attribute into account
+                "status_old": "internal_error",
+                "http_status_code_old": 502,
             },
         ),
         (
@@ -311,6 +321,7 @@ def test_span_data_for_db_query():
                 "http.method": "POST",
                 "http.route": "/some/route",
                 "http.response.status_code": 200,
+                "http.status_code": 200,
             },
             {
                 "status": "ok",
@@ -326,6 +337,7 @@ def test_span_data_for_db_query():
                 "http.method": "POST",
                 "http.route": "/some/route",
                 "http.response.status_code": 401,
+                "http.status_code": 401,
             },
             {
                 "status": "unauthenticated",
@@ -339,6 +351,7 @@ def test_span_data_for_db_query():
                 "http.method": "POST",
                 "http.route": "/some/route",
                 "http.response.status_code": 418,
+                "http.status_code": 418,
             },
             {
                 "status": "invalid_argument",
@@ -372,4 +385,20 @@ def test_extract_span_status(kind, status, attributes, expected):
         "status": status,
         "http_status_code": http_status_code,
     }
+
+    if (
+        OTEL_VERSION < (1, 21)
+        and "status_old" in expected
+        and "http_status_code_old" in expected
+    ):
+        expected = {
+            "status": expected["status_old"],
+            "http_status_code": expected["http_status_code_old"],
+        }
+    else:
+        expected = {
+            "status": expected["status"],
+            "http_status_code": expected["http_status_code"],
+        }
+
     assert result == expected

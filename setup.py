@@ -41,7 +41,7 @@ setup(
     install_requires=[
         "urllib3>=1.26.11",
         "certifi",
-        "opentelemetry-distro>=0.35b0",  # XXX check lower bound
+        "opentelemetry-sdk>=1.4.0",
     ],
     extras_require={
         "aiohttp": ["aiohttp>=3.5"],
@@ -70,7 +70,6 @@ setup(
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "openfeature": ["openfeature-sdk>=0.7.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
-        "opentelemetry-experimental": ["opentelemetry-distro"],
         "pure-eval": ["pure_eval", "executing", "asttokens"],
         "pymongo": ["pymongo>=3.1"],
         "pyspark": ["pyspark>=2.4.4"],
