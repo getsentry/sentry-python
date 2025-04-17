@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 import warnings
 
-from opentelemetry import trace as otel_trace, context, __version__ as OTEL_VERSION
+from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace import (
     format_trace_id,
     format_span_id,
@@ -24,6 +24,7 @@ from sentry_sdk.consts import (
     SPANDATA,
     TransactionSource,
 )
+from sentry_sdk.opentelemetry import OTEL_VERSION
 from sentry_sdk.opentelemetry.consts import (
     TRACESTATE_SAMPLE_RATE_KEY,
     SentrySpanAttribute,
@@ -41,7 +42,6 @@ from sentry_sdk.tracing_utils import get_span_status_from_http_code
 from sentry_sdk.utils import (
     _serialize_span_attribute,
     get_current_thread_meta,
-    parse_version,
     should_be_treated_as_error,
 )
 
@@ -70,8 +70,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk.tracing_utils import Baggage
 
-
-OTEL_VERSION = parse_version(OTEL_VERSION)
 
 tracer = otel_trace.get_tracer(__name__)
 
