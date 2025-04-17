@@ -158,21 +158,6 @@ be expressed like so:
 }
 ```
 
-### `prereleases`
-
-By default, we ignore all prereleases but the newest one. Some packages only have
-prereleases though. When `prereleases` is set to `True`, we will consider
-prereleases just like we do normal releases and they will not be filtered out.
-
-```python
-"common": {
-    # opentelemetry-distro is only available in beta
-    "package": "opentelemetry-distro",
-    "prereleases": True,
-    ...
-}
-```
-
 ### `test_on_all_python_versions`
 
 By default, the script will cherry-pick a few Python versions to test each

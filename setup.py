@@ -41,7 +41,7 @@ setup(
     install_requires=[
         "urllib3>=1.26.11",
         "certifi",
-        "opentelemetry-distro>=0.35b0",  # XXX check lower bound
+        "opentelemetry-sdk",
     ],
     extras_require={
         "aiohttp": ["aiohttp>=3.5"],

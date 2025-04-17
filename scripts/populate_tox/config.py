@@ -30,8 +30,7 @@ TEST_SUITE_CONFIG = {
         "package": "clickhouse-driver",
     },
     "common": {
-        "package": "opentelemetry-distro",
-        "prereleases": True,
+        "package": "opentelemetry-sdk",
         "test_on_all_python_versions": True,
         "deps": {
             "*": ["pytest", "pytest-asyncio"],
