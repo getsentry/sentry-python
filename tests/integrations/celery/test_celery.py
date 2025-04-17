@@ -496,6 +496,7 @@ def test_task_headers(celery):
     expected_headers = sentry_crons_setup.copy()
     # Newly added headers
     expected_headers["sentry-trace"] = mock.ANY
+    expected_headers["traceparent"] = mock.ANY
     expected_headers["baggage"] = mock.ANY
     expected_headers["sentry-task-enqueued-time"] = mock.ANY
 
@@ -569,6 +570,7 @@ def test_apply_async_manually_span(sentry_init):
     def dummy_function(*args, **kwargs):
         headers = kwargs.get("headers")
         assert "sentry-trace" in headers
+        assert "traceparent" in headers
         assert "baggage" in headers
 
     wrapped = _wrap_task_run(dummy_function)
@@ -813,17 +815,22 @@ def test_send_task_wrapped(
     assert set(kwargs["headers"].keys()) == {
         "sentry-task-enqueued-time",
         "sentry-trace",
+        "traceparent",
         "baggage",
         "headers",
     }
     assert set(kwargs["headers"]["headers"].keys()) == {
         "sentry-trace",
+        "traceparent",
         "baggage",
         "sentry-task-enqueued-time",
     }
     assert (
         kwargs["headers"]["sentry-trace"]
         == kwargs["headers"]["headers"]["sentry-trace"]
+    )
+    assert (
+        kwargs["headers"]["traceparent"] == kwargs["headers"]["headers"]["traceparent"]
     )
 
     (event,) = events  # We should have exactly one event (the transaction)

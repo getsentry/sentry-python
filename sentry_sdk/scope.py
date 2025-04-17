@@ -29,6 +29,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
+    W3C_TRACE_HEADER_NAME,
     NoOpSpan,
     Span,
     Transaction,
@@ -533,6 +534,30 @@ class Scope:
         # Fall back to isolation scope's traceparent. It always has one
         return self.get_isolation_scope().get_traceparent()
 
+    def _get_w3c_traceparent(self, *args, **kwargs):
+        # type: (Any, Any) -> Optional[str]
+        """
+        Returns the W3C "traceparent" header from the
+        currently active span or the scopes Propagation Context.
+        """
+        client = self.get_client()
+
+        # If we have an active span, return traceparent from there
+        if has_tracing_enabled(client.options) and self.span is not None:
+            return self.span.to_w3c_traceparent()
+
+        # If this scope has a propagation context, return traceparent from there
+        if self._propagation_context is not None:
+            traceparent = "00-%s-%s-%s" % (
+                self._propagation_context.trace_id,
+                self._propagation_context.span_id,
+                "01" if self._propagation_context.parent_sampled is True else "00",
+            )
+            return traceparent
+
+        # Fall back to isolation scope's traceparent. It always has one
+        return self.get_isolation_scope()._get_w3c_traceparent()
+
     def get_baggage(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[Baggage]
         """
@@ -608,12 +633,16 @@ class Scope:
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         """
-        Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
+        Creates a generator which returns the `sentry-trace`, `traceparent`, and `baggage` headers from the Propagation Context.
         """
         if self._propagation_context is not None:
             traceparent = self.get_traceparent()
             if traceparent is not None:
                 yield SENTRY_TRACE_HEADER_NAME, traceparent
+
+            w3c_traceparent = self._get_w3c_traceparent()
+            if w3c_traceparent is not None:
+                yield W3C_TRACE_HEADER_NAME, w3c_traceparent
 
             dsc = self.get_dynamic_sampling_context()
             if dsc is not None:

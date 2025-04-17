@@ -153,6 +153,53 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
 
 
 @pytest.mark.forked
+def test_grpc_server_continues_transaction_from_w3c_traceparent(
+    sentry_init, capture_events_forksafe
+):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+
+    server, channel = _set_up()
+
+    # Use the provided channel
+    stub = gRPCTestServiceStub(channel)
+
+    with start_transaction() as transaction:
+        metadata = (
+            (
+                "baggage",
+                "sentry-trace_id={trace_id},sentry-environment=test,"
+                "sentry-transaction=test-transaction,sentry-sample_rate=1.0".format(
+                    trace_id=transaction.trace_id
+                ),
+            ),
+            (
+                "traceparent",
+                "00-{trace_id}-{parent_span_id}-{sampled}".format(
+                    trace_id=transaction.trace_id,
+                    parent_span_id=transaction.span_id,
+                    sampled="01",
+                ),
+            ),
+        )
+        stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)
+
+    _tear_down(server=server)
+
+    events.write_file.close()
+    event = events.read_event()
+    span = event["spans"][0]
+
+    assert event["type"] == "transaction"
+    assert event["transaction_info"] == {
+        "source": "custom",
+    }
+    assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
+    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert span["op"] == "test"
+
+
+@pytest.mark.forked
 def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()

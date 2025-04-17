@@ -61,6 +61,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
         "User-Agent": request["headers"]["User-Agent"],
         "baggage": mock.ANY,
         "sentry-trace": mock.ANY,
+        "traceparent": mock.ANY,
     }
 
 
