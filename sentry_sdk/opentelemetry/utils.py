@@ -286,7 +286,8 @@ def get_http_status_code(span_attributes):
         http_status = span_attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE)
     except AttributeError:
         # HTTP_RESPONSE_STATUS_CODE was added in 1.21, so if we're on an older
-        # OTel version this will not work
+        # OTel version SpanAttributes.HTTP_RESPONSE_STATUS_CODE will throw an
+        # AttributeError
         http_status = None
 
     if http_status is None:
