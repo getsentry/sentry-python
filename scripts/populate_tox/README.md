@@ -18,6 +18,7 @@ then determining which versions make sense to test to get good coverage.
 
 The lowest supported and latest version of a framework are always tested, with
 a number of releases in between:
+
 - If the package has majors, we pick the highest version of each major. For the
   latest major, we also pick the lowest version in that major.
 - If the package doesn't have multiple majors, we pick two versions in between
@@ -70,11 +71,12 @@ The test dependencies of the test suite. They're defined as a dictionary of
 in the package list of a rule will be installed as long as the rule applies.
 
 `rule`s are predefined. Each `rule` must be one of the following:
-  - `*`: packages will be always installed
-  - a version specifier on the main package (e.g. `<=0.32`): packages will only
-    be installed if the main package falls into the version bounds specified
-  - specific Python version(s) in the form `py3.8,py3.9`: packages will only be
-    installed if the Python version matches one from the list
+
+- `*`: packages will be always installed
+- a version specifier on the main package (e.g. `<=0.32`): packages will only
+  be installed if the main package falls into the version bounds specified
+- specific Python version(s) in the form `py3.8,py3.9`: packages will only be
+  installed if the Python version matches one from the list
 
 Rules can be used to specify version bounds on older versions of the main
 package's dependencies, for example. If e.g. Flask tests generally need
@@ -103,6 +105,7 @@ Python versions, you can say:
     ...
 }
 ```
+
 This key is optional.
 
 ### `python`
@@ -147,7 +150,6 @@ The `include` key can also be used to exclude a set of specific versions by usin
 `!=` version specifiers. For example, the Starlite restriction above could equivalently
 be expressed like so:
 
-
 ```python
 "starlite": {
     "include": "!=2.0.0a1,!=2.0.0a2",
@@ -168,7 +170,6 @@ By default, we ignore all prereleases but the newest one. Some packages only hav
 }
 ```
 
-
 ### `test_on_all_python_versions`
 
 By default, the script will cherry-pick a few Python versions to test each integration on.
@@ -177,12 +178,11 @@ If you want a test suite to run on all supported Python versions instead, set
 
 ```python
 "common": {
-    # The common test suite should run on all Python versions.
+    # The common test suite should run on all Python versions
     "test_on_all_python_versions": True,
     ...
 }
 ```
-
 
 ## How-Tos
 
@@ -215,6 +215,7 @@ You might have to introduce additional version bounds on the dependencies of the
 package. Try to determine the source of the failure and address it.
 
 Common scenarios:
+
 - An old version of the tested package installs a dependency without defining
   an upper version bound on it. A new version of the dependency is installed that
   is incompatible with the package. In this case you need to determine which
