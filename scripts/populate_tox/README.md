@@ -46,6 +46,8 @@ integration_name: {
      },
      "python": python_version_specifier,
      "include": package_version_specifier,
+     "prereleases": bool,
+     "test_on_all_python_versions": bool,
 }
 ```
 
@@ -149,6 +151,34 @@ be expressed like so:
 ```python
 "starlite": {
     "include": "!=2.0.0a1,!=2.0.0a2",
+    ...
+}
+```
+
+### `prereleases`
+
+By default, we ignore all prereleases but the newest one. Some packages only have prereleases though. When `prereleases` is set to `True`, we will consider prereleases just like we do normal releases and they will not be filtered out.
+
+```python
+"common": {
+    # opentelemetry-distro is only available in beta
+    "package": "opentelemetry-distro",
+    "prereleases": True,
+    ...
+}
+```
+
+
+### `test_on_all_python_versions`
+
+By default, the script will cherry-pick a few Python versions to test each integration on.
+If you want a test suite to run on all supported Python versions instead, set
+`test_on_all_python_versions=True`.
+
+```python
+"common": {
+    # The common test suite should run on all Python versions.
+    "test_on_all_python_versions": True,
     ...
 }
 ```
