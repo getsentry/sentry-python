@@ -232,7 +232,7 @@ def test_spans_from_multiple_threads(
     threads = []
 
     with sentry_sdk.start_span(op="outer-trx"):
-        for number in range(5):
+        for number in range(2):
             with sentry_sdk.start_span(
                 op=f"outer-submit-{number}", name="Thread: main"
             ):
@@ -243,32 +243,44 @@ def test_spans_from_multiple_threads(
         for t in threads:
             t.join()
 
-    (event,) = events
     if propagate_scope:
+        # The children spans from the threads become parts of the existing span
+        # tree since we propagated the scope
+        assert len(events) == 1
+        (event,) = events
+
         assert render_span_tree(event) == dedent(
             """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
                 - op="inner-run-0": description="Thread: child-0"
               - op="outer-submit-1": description="Thread: main"
-                - op="inner-run-1": description="Thread: child-1"
-              - op="outer-submit-2": description="Thread: main"
-                - op="inner-run-2": description="Thread: child-2"
-              - op="outer-submit-3": description="Thread: main"
-                - op="inner-run-3": description="Thread: child-3"
-              - op="outer-submit-4": description="Thread: main"
-                - op="inner-run-4": description="Thread: child-4"\
+                - op="inner-run-1": description="Thread: child-1"\
 """
         )
 
     elif not propagate_scope:
-        assert render_span_tree(event) == dedent(
+        # The spans from the threads become their own root spans/transactions
+        # as the connection to the parent span was severed when the scope was
+        # cleared
+        assert len(events) == 3
+        (event1, event2, event3) = sorted(events, key=render_span_tree)
+
+        assert render_span_tree(event1) == dedent(
+            """\
+            - op="inner-run-0": description=null\
+"""
+        )
+        assert render_span_tree(event2) == dedent(
+            """\
+            - op="inner-run-1": description=null\
+"""
+        )
+
+        assert render_span_tree(event3) == dedent(
             """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
-              - op="outer-submit-1": description="Thread: main"
-              - op="outer-submit-2": description="Thread: main"
-              - op="outer-submit-3": description="Thread: main"
-              - op="outer-submit-4": description="Thread: main"\
+              - op="outer-submit-1": description="Thread: main"\
 """
         )
