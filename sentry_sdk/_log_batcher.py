@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Callable, TYPE_CHECKING, Any
 
 from sentry_sdk.utils import format_timestamp, safe_repr
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Log
@@ -97,34 +97,36 @@ class LogBatcher:
         self._flush()
 
     @staticmethod
-    def _log_to_otel(log):
+    def _log_to_transport_format(log):
         # type: (Log) -> Any
-        def format_attribute(key, val):
-            # type: (str, int | float | str | bool) -> Any
+        def format_attribute(val):
+            # type: (int | float | str | bool) -> Any
             if isinstance(val, bool):
-                return {"key": key, "value": {"boolValue": val}}
+                return {"value": val, "type": "boolean"}
             if isinstance(val, int):
-                return {"key": key, "value": {"intValue": str(val)}}
+                return {"value": val, "type": "integer"}
             if isinstance(val, float):
-                return {"key": key, "value": {"doubleValue": val}}
+                return {"value": val, "type": "double"}
             if isinstance(val, str):
-                return {"key": key, "value": {"stringValue": val}}
-            return {"key": key, "value": {"stringValue": safe_repr(val)}}
+                return {"value": val, "type": "string"}
+            return {"value": safe_repr(val), "type": "string"}
 
-        otel_log = {
-            "severityText": log["severity_text"],
-            "severityNumber": log["severity_number"],
-            "body": {"stringValue": log["body"]},
-            "timeUnixNano": str(log["time_unix_nano"]),
-            "attributes": [
-                format_attribute(k, v) for (k, v) in log["attributes"].items()
-            ],
+        if "sentry.severity_number" not in log["attributes"]:
+            log["attributes"]["sentry.severity_number"] = log["severity_number"]
+        if "sentry.severity_text" not in log["attributes"]:
+            log["attributes"]["sentry.severity_text"] = log["severity_text"]
+
+        res = {
+            "timestamp": int(log["time_unix_nano"]) / 1.0e9,
+            "trace_id": log.get("trace_id", "00000000-0000-0000-0000-000000000000"),
+            "level": str(log["severity_text"]),
+            "body": str(log["body"]),
+            "attributes": {
+                k: format_attribute(v) for (k, v) in log["attributes"].items()
+            },
         }
 
-        if "trace_id" in log:
-            otel_log["traceId"] = log["trace_id"]
-
-        return otel_log
+        return res
 
     def _flush(self):
         # type: (...) -> Optional[Envelope]
@@ -133,10 +135,27 @@ class LogBatcher:
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
         )
         with self._lock:
-            for log in self._log_buffer:
-                envelope.add_log(self._log_to_otel(log))
+            if len(self._log_buffer) == 0:
+                return None
+
+            envelope.add_item(
+                Item(
+                    type="log",
+                    content_type="application/vnd.sentry.items.log+json",
+                    headers={
+                        "item_count": len(self._log_buffer),
+                    },
+                    payload=PayloadRef(
+                        json={
+                            "items": [
+                                self._log_to_transport_format(log)
+                                for log in self._log_buffer
+                            ]
+                        }
+                    ),
+                )
+            )
             self._log_buffer.clear()
-        if envelope.items:
-            self._capture_func(envelope)
-            return envelope
-        return None
+
+        self._capture_func(envelope)
+        return envelope
