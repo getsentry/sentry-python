@@ -23,11 +23,11 @@ def otel_attributes_to_dict(otel_attrs):
     def _convert_attr(attr):
         # type: (Mapping[str, Union[str, float, bool]]) -> Any
         if attr["type"] == "boolean":
-            return bool(attr["value"])
+            return attr["value"]
         if attr["type"] == "double":
-            return float(attr["value"])
+            return attr["value"]
         if attr["type"] == "integer":
-            return int(attr["value"])
+            return attr["value"]
         if attr["value"].startswith("{"):
             try:
                 return json.loads(attr["stringValue"])

@@ -104,7 +104,7 @@ class LogBatcher:
             if isinstance(val, bool):
                 return {"value": val, "type": "boolean"}
             if isinstance(val, int):
-                return {"value": str(val), "type": "integer"}
+                return {"value": val, "type": "integer"}
             if isinstance(val, float):
                 return {"value": val, "type": "double"}
             if isinstance(val, str):
