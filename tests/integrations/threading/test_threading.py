@@ -244,6 +244,8 @@ def test_spans_from_multiple_threads(
             t.join()
 
     if propagate_scope:
+        # The children spans from the threads become parts of the existing span
+        # tree since we propagated the scope
         assert len(events) == 1
         (event,) = events
 
@@ -258,6 +260,9 @@ def test_spans_from_multiple_threads(
         )
 
     elif not propagate_scope:
+        # The spans from the threads become their own root spans/transactions
+        # as the connection to the parent span was severed when the scope was
+        # cleared
         assert len(events) == 3
         (event1, event2, event3) = events
 
