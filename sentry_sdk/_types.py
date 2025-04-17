@@ -220,7 +220,9 @@ if TYPE_CHECKING:
         tuple[None, None, None],
     ]
 
+    # TODO: Make a proper type definition for this
     Hint = Dict[str, Any]
+
     Log = TypedDict(
         "Log",
         {
@@ -233,9 +235,13 @@ if TYPE_CHECKING:
         },
     )
 
+    # TODO: Make a proper type definition for this
     Breadcrumb = Dict[str, Any]
+
+    # TODO: Make a proper type definition for this
     BreadcrumbHint = Dict[str, Any]
 
+    # TODO: Make a proper type definition for this
     SamplingContext = Dict[str, Any]
 
     EventProcessor = Callable[[Event, Hint], Optional[Event]]
