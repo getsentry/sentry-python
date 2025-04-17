@@ -264,7 +264,7 @@ def test_spans_from_multiple_threads(
         # as the connection to the parent span was severed when the scope was
         # cleared
         assert len(events) == 3
-        (event1, event2, event3) = events
+        (event1, event2, event3) = sorted(events, key=render_span_tree)
 
         assert render_span_tree(event1) == dedent(
             """\
