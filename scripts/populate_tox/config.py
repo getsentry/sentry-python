@@ -41,6 +41,10 @@ TEST_SUITE_CONFIG = {
             "py3.8": ["hypothesis"],
         },
     },
+    "cohere": {
+        "package": "cohere",
+        "python": ">=3.9",
+    },
     "django": {
         "package": "django",
         "deps": {
