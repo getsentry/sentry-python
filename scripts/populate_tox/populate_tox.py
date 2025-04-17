@@ -74,7 +74,6 @@ IGNORE = {
     "beam",
     "boto3",
     "chalice",
-    "cohere",
     "gcp",
     "httpx",
     "langchain",
@@ -234,13 +233,6 @@ def get_supported_releases(
     releases, latest_prerelease = _prefilter_releases(
         integration, pypi_data["releases"], older_than
     )
-
-    # Determine Python support
-    expected_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-    if expected_python_versions:
-        expected_python_versions = SpecifierSet(expected_python_versions)
-    else:
-        expected_python_versions = SpecifierSet(f">={MIN_PYTHON_VERSION}")
 
     def _supports_lowest(release: Version) -> bool:
         time.sleep(PYPI_COOLDOWN)  # don't DoS PYPI
