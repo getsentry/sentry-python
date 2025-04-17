@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from sentry_sdk.tracing_utils import PropagationContext
+from sentry_sdk.tracing_utils import Baggage, PropagationContext
 
 
 SAMPLED_FLAG = {
@@ -29,23 +29,26 @@ def test_empty_context():
 
 
 def test_context_with_values():
+    baggage = Baggage(
+        sentry_items={
+            "sentry-trace": "1234567890abcdef1234567890abcdef-1234567890abcdef-1"
+        },
+        third_party_items={"foo": "bar"},
+        mutable=False,
+    )
     ctx = PropagationContext(
         trace_id="1234567890abcdef1234567890abcdef",
         span_id="1234567890abcdef",
         parent_span_id="abcdef1234567890",
         parent_sampled=True,
-        dynamic_sampling_context={
-            "foo": "bar",
-        },
+        baggage=baggage,
     )
 
     assert ctx.trace_id == "1234567890abcdef1234567890abcdef"
     assert ctx.span_id == "1234567890abcdef"
     assert ctx.parent_span_id == "abcdef1234567890"
     assert ctx.parent_sampled
-    assert ctx.dynamic_sampling_context == {
-        "foo": "bar",
-    }
+    assert ctx.baggage == baggage
 
 
 def test_lazy_uuids():
@@ -101,11 +104,11 @@ def test_update():
 def test_existing_sample_rand_kept():
     ctx = PropagationContext(
         trace_id="00000000000000000000000000000000",
-        dynamic_sampling_context={"sample_rand": "0.5"},
+        baggage=Baggage(sentry_items={"sample_rand": "0.5"}),
     )
 
-    # If sample_rand was regenerated, the value would be 0.919221 based on the trace_id
     assert ctx.dynamic_sampling_context["sample_rand"] == "0.5"
+    assert ctx.baggage.sentry_items["sample_rand"] == "0.5"
 
 
 @pytest.mark.parametrize(
@@ -155,7 +158,7 @@ def test_sample_rand_filled(parent_sampled, sample_rate, expected_interval):
         )
 
     assert (
-        ctx.dynamic_sampling_context["sample_rand"]
+        ctx.dynamic_sampling_context.get("sample_rand")
         == f"{expected_interval[0]:.6f}"  # noqa: E231
     )
     assert mock_uniform.call_count == 1

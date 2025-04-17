@@ -88,6 +88,7 @@ def patch_django_asgi_handler_impl(cls):
 
     old_app = cls.__call__
 
+    @functools.wraps(old_app)
     async def sentry_patched_asgi_handler(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
@@ -125,6 +126,7 @@ def patch_get_response_async(cls, _before_get_response):
     # type: (Any, Any) -> None
     old_get_response_async = cls.get_response_async
 
+    @functools.wraps(old_get_response_async)
     async def sentry_patched_get_response_async(self, request):
         # type: (Any, Any) -> Union[HttpResponse, BaseException]
         _before_get_response(request)
@@ -142,6 +144,7 @@ def patch_channels_asgi_handler_impl(cls):
     if channels.__version__ < "3.0.0":
         old_app = cls.__call__
 
+        @functools.wraps(old_app)
         async def sentry_patched_asgi_handler(self, receive, send):
             # type: (Any, Any, Any) -> Any
             integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
@@ -173,8 +176,8 @@ def wrap_async_view(callback):
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         current_scope = sentry_sdk.get_current_scope()
-        if current_scope.transaction is not None:
-            current_scope.transaction.update_active_thread()
+        if current_scope.root_span is not None:
+            current_scope.root_span.update_active_thread()
 
         sentry_scope = sentry_sdk.get_isolation_scope()
         if sentry_scope.profile is not None:
@@ -184,6 +187,7 @@ def wrap_async_view(callback):
             op=OP.VIEW_RENDER,
             name=request.resolver_match.view_name,
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ):
             return await callback(request, *args, **kwargs)
 

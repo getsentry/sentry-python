@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from typing import Optional
 
 DEFAULT_LEVEL = logging.INFO
-DEFAULT_EVENT_LEVEL = logging.ERROR
+DEFAULT_EVENT_LEVEL = None  # None means no events are captured
 LOGGING_TO_EVENT_LEVEL = {
     logging.NOTSET: "notset",
     logging.DEBUG: "debug",
@@ -43,7 +43,12 @@ LOGGING_TO_EVENT_LEVEL = {
 # Note: Ignoring by logger name here is better than mucking with thread-locals.
 # We do not necessarily know whether thread-locals work 100% correctly in the user's environment.
 _IGNORED_LOGGERS = set(
-    ["sentry_sdk.errors", "urllib3.connectionpool", "urllib3.connection"]
+    [
+        "sentry_sdk.errors",
+        "urllib3.connectionpool",
+        "urllib3.connection",
+        "opentelemetry.*",
+    ]
 )
 
 

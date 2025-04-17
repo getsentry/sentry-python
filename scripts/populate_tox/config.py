@@ -23,8 +23,8 @@ TEST_SUITE_CONFIG = {
         "package": "celery",
         "deps": {
             "*": ["newrelic", "redis"],
-            "py3.7": ["importlib-metadata<5.0"],
         },
+        "python": ">=3.8",
     },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
@@ -37,6 +37,7 @@ TEST_SUITE_CONFIG = {
         "package": "django",
         "deps": {
             "*": [
+                "channels[daphne]",
                 "psycopg2-binary",
                 "djangorestframework",
                 "pytest-django",
@@ -49,7 +50,6 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
-            ">=2.0": ["channels[daphne]"],
         },
     },
     "dramatiq": {
@@ -210,7 +210,7 @@ TEST_SUITE_CONFIG = {
         "package": "trytond",
         "deps": {
             "*": ["werkzeug"],
-            "<=5.0": ["werkzeug<1.0"],
+            "<5.1": ["werkzeug<1.0"],
         },
     },
     "typer": {

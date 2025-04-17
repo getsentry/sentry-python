@@ -337,6 +337,7 @@ async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
 async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
+        traces_sample_rate=None,  # disable all performance monitoring
     )
 
     events = capture_events()
@@ -402,6 +403,7 @@ async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_ev
 async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
+        traces_sample_rate=None,  # disable all performance monitoring
     )
 
     events = capture_events()
@@ -662,7 +664,12 @@ async def test_transaction_http_method_default(
     By default OPTIONS and HEAD requests do not create a transaction.
     """
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=False,
+                signals_spans=False,
+            ),
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
@@ -691,6 +698,8 @@ async def test_transaction_http_method_custom(sentry_init, capture_events, appli
     sentry_init(
         integrations=[
             DjangoIntegration(
+                middleware_spans=False,
+                signals_spans=False,
                 http_methods_to_capture=(
                     "OPTIONS",
                     "head",
