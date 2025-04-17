@@ -282,7 +282,12 @@ def infer_status_from_attributes(span_attributes):
 
 def get_http_status_code(span_attributes):
     # type: (Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]) -> Optional[int]
-    http_status = span_attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE)
+    try:
+        http_status = span_attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE)
+    except AttributeError:
+        # HTTP_RESPONSE_STATUS_CODE was added in 1.21, so if we're on an older
+        # OTel version this will not work
+        http_status = None
 
     if http_status is None:
         # Fall back to the deprecated attribute
