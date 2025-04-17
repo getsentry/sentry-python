@@ -48,7 +48,6 @@ integration_name: {
      },
      "python": python_version_specifier,
      "include": package_version_specifier,
-     "prereleases": bool,
      "test_on_all_python_versions": bool,
 }
 ```
