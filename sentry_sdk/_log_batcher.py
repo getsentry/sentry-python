@@ -1,4 +1,3 @@
-import json
 import os
 import random
 import threading
@@ -6,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Callable, TYPE_CHECKING, Any
 
 from sentry_sdk.utils import format_timestamp, safe_repr
-from sentry_sdk.envelope import Envelope, Item
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Log
@@ -112,7 +111,11 @@ class LogBatcher:
                 return {"value": val, "type": "string"}
             return {"value": safe_repr(val), "type": "string"}
 
-        print(log["attributes"])
+        if "sentry.severity_number" not in log["attributes"]:
+            log["attributes"]["sentry.severity_number"] = log["severity_number"]
+        if "sentry.severity_text" not in log["attributes"]:
+            log["attributes"]["sentry.severity_text"] = log["severity_text"]
+
         res = {
             "timestamp": int(log["time_unix_nano"]) / 1.0e9,
             "trace_id": log.get("trace_id", "00000000-0000-0000-0000-000000000000"),
@@ -122,10 +125,6 @@ class LogBatcher:
                 k: format_attribute(v) for (k, v) in log["attributes"].items()
             },
         }
-
-        res["attributes"]["sentry.severity_number"] = format_attribute(
-            log["severity_number"]
-        )
 
         return res
 
@@ -146,8 +145,8 @@ class LogBatcher:
                     headers={
                         "item_count": len(self._log_buffer),
                     },
-                    payload=json.dumps(
-                        {
+                    payload=PayloadRef(
+                        json={
                             "items": [
                                 self._log_to_transport_format(log)
                                 for log in self._log_buffer

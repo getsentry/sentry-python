@@ -19,42 +19,44 @@ minimum_python_37 = pytest.mark.skipif(
 
 
 def otel_attributes_to_dict(otel_attrs):
-    # type: (List[Mapping[str, Any]]) -> Mapping[str, Any]
+    # type: (Mapping[str, Any]) -> Mapping[str, Any]
     def _convert_attr(attr):
         # type: (Mapping[str, Union[str, float, bool]]) -> Any
-        if "boolValue" in attr:
-            return bool(attr["boolValue"])
-        if "doubleValue" in attr:
-            return float(attr["doubleValue"])
-        if "intValue" in attr:
-            return int(attr["intValue"])
-        if attr["stringValue"].startswith("{"):
+        if attr["type"] == "boolean":
+            return bool(attr["value"])
+        if attr["type"] == "double":
+            return float(attr["value"])
+        if attr["type"] == "integer":
+            return int(attr["value"])
+        if attr["value"].startswith("{"):
             try:
                 return json.loads(attr["stringValue"])
             except ValueError:
                 pass
-        return str(attr["stringValue"])
+        return str(attr["value"])
 
-    return {item["key"]: _convert_attr(item["value"]) for item in otel_attrs}
+    return {k: _convert_attr(v) for (k, v) in otel_attrs.items()}
 
 
 def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
     res = []  # type: List[Log]
     for envelope in envelopes:
         for item in envelope.items:
-            if item.type == "otel_log":
-                log_json = item.payload.json
-                log = {
-                    "severity_text": log_json["severityText"],
-                    "severity_number": log_json["severityNumber"],
-                    "body": log_json["body"]["stringValue"],
-                    "attributes": otel_attributes_to_dict(log_json["attributes"]),
-                    "time_unix_nano": int(log_json["timeUnixNano"]),
-                    "trace_id": None,
-                }  # type: Log
-                if "traceId" in log_json:
-                    log["trace_id"] = log_json["traceId"]
-                res.append(log)
+            if item.type == "log":
+                for log_json in item.payload.json["items"]:
+                    log = {
+                        "severity_text": log_json["attributes"]["sentry.severity_text"][
+                            "value"
+                        ],
+                        "severity_number": int(
+                            log_json["attributes"]["sentry.severity_number"]["value"]
+                        ),
+                        "body": log_json["body"],
+                        "attributes": otel_attributes_to_dict(log_json["attributes"]),
+                        "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
+                        "trace_id": log_json["trace_id"],
+                    }  # type: Log
+                    res.append(log)
     return res
 
 
