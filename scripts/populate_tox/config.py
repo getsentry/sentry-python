@@ -6,12 +6,6 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
-    #
-    # AIOHTTP
-    # aiohttp-latest: aiohttp
-    # aiohttp: pytest-aiohttp
-    # aiohttp-v3.8: pytest-asyncio
-    # aiohttp-latest: pytest-asyncio
     "aiohttp": {
         "package": "aiohttp",
         "deps": {
