@@ -5,6 +5,12 @@ from contextlib import suppress
 from unittest import mock
 
 import pytest
+
+try:
+    import pytest_asyncio
+except ImportError:
+    pytest_asyncio = None
+
 from aiohttp import web, ClientSession
 from aiohttp.client import ServerDisconnectedError
 from aiohttp.web_request import Request
@@ -19,6 +25,14 @@ from aiohttp.web_exceptions import (
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from tests.conftest import ApproxDict
+
+
+if pytest_asyncio is None:
+    # `loop` was deprecated in `pytest-aiohttp`
+    # in favor of `event_loop` from `pytest-asyncio`
+    @pytest.fixture
+    def event_loop(loop):
+        yield loop
 
 
 @pytest.mark.asyncio
