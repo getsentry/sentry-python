@@ -343,3 +343,16 @@ def test_inject_sentry_span_baggage():
             "baggage",
             baggage.serialize(),
         )
+
+
+def test_fields_returns_known_headers():
+    """
+    Test that the fields property returns all expected headers.
+    """
+    propagator = SentryPropagator()
+    expected_fields = [
+        "sentry-trace",
+        "baggage",
+        "traceparent",
+    ]
+    assert not propagator.fields ^ set(expected_fields)
