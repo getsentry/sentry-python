@@ -192,8 +192,8 @@ class SentryAsgiMiddleware:
 
                     method = scope.get("method", "").upper()
                     transaction = None
-                    if method in self.http_methods_to_capture:
-                        if ty in ("http", "websocket"):
+                    if ty in ("http", "websocket"):
+                        if ty == "websocket" or method in self.http_methods_to_capture:
                             transaction = continue_trace(
                                 _get_headers(scope),
                                 op="{}.server".format(ty),
@@ -205,17 +205,18 @@ class SentryAsgiMiddleware:
                                 "[ASGI] Created transaction (continuing trace): %s",
                                 transaction,
                             )
-                        else:
-                            transaction = Transaction(
-                                op=OP.HTTP_SERVER,
-                                name=transaction_name,
-                                source=transaction_source,
-                                origin=self.span_origin,
-                            )
-                            logger.debug(
-                                "[ASGI] Created transaction (new): %s", transaction
-                            )
+                    else:
+                        transaction = Transaction(
+                            op=OP.HTTP_SERVER,
+                            name=transaction_name,
+                            source=transaction_source,
+                            origin=self.span_origin,
+                        )
+                        logger.debug(
+                            "[ASGI] Created transaction (new): %s", transaction
+                        )
 
+                    if transaction:
                         transaction.set_tag("asgi.type", ty)
                         logger.debug(
                             "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
