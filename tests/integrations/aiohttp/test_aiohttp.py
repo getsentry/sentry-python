@@ -1,6 +1,6 @@
 import asyncio
 import json
-import sys
+
 from contextlib import suppress
 from unittest import mock
 
@@ -472,14 +472,6 @@ async def test_trace_from_headers_if_performance_disabled(
 
     assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
-
-
-if sys.version_info < (3, 12):
-    # `loop` was deprecated in `pytest-aiohttp`
-    # in favor of `event_loop` from `pytest-asyncio`
-    @pytest.fixture
-    def event_loop(loop):
-        yield loop
 
 
 @pytest.mark.asyncio
