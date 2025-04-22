@@ -279,6 +279,8 @@ class Span:
         "scope",
         "origin",
         "name",
+        "_flags",
+        "_flags_capacity",
     )
 
     def __init__(
@@ -314,6 +316,8 @@ class Span:
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
+        self._flags = {}  # type: Dict[str, bool]
+        self._flags_capacity = 10
 
         if hub is not None:
             warnings.warn(
@@ -617,6 +621,11 @@ class Span:
         # type: (str, Any) -> None
         self._data[key] = value
 
+    def set_flag(self, flag, result):
+        # type: (str, bool) -> None
+        if len(self._flags) < self._flags_capacity:
+            self._flags[flag] = result
+
     def set_status(self, value):
         # type: (str) -> None
         self.status = value
@@ -720,7 +729,9 @@ class Span:
         if tags:
             rv["tags"] = tags
 
-        data = self._data
+        data = {}
+        data.update(self._flags)
+        data.update(self._data)
         if data:
             rv["data"] = data
 
