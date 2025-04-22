@@ -18,6 +18,7 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-aiohttp"],
             ">=3.8": ["pytest-asyncio"],
         },
+        "python": ">=3.7",
     },
     "ariadne": {
         "package": "ariadne",
