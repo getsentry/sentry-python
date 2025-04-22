@@ -8,8 +8,6 @@
 TEST_SUITE_CONFIG = {
     #
     # AIOHTTP
-    # aiohttp-v3.4: aiohttp~=3.4.0
-    # aiohttp-v3.8: aiohttp~=3.8.0
     # aiohttp-latest: aiohttp
     # aiohttp: pytest-aiohttp
     # aiohttp-v3.8: pytest-asyncio
@@ -17,7 +15,8 @@ TEST_SUITE_CONFIG = {
     "aiohttp": {
         "package": "aiohttp",
         "deps": {
-            "*": ["pytest-aiohttp", "pytest-asyncio"],
+            "*": ["pytest-aiohttp"],
+            ">=3.8": ["pytest-asyncio"],
         },
     },
     "ariadne": {
