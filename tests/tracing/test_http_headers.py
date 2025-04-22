@@ -76,6 +76,28 @@ def test_w3c_traceparent_extraction(sampling_decision):
     }
 
 
+@pytest.mark.parametrize(
+    "traceparent_header",
+    [
+        None,  # No header
+        "",  # Empty header
+        "0-d00afb0f1514f9337a4a921c514955db-903c8c4987adea4b-01",  # No regex match because of invalid version
+        "00-d00afb0f1514f9337a4a921c514955d-903c8c4987adea4b",  # No regex match because of invalid trace_id
+        "00-d00afb0f1514f9337a4a921c514955db-903c8c4987adea4",  # No regex match because of invalid trace_id
+        "01-d00afb0f1514f9337a4a921c514955db-903c8c4987adea4b",  # Invalid version
+    ],
+)
+def test_w3c_traceparent_extraction_invalid_headers_returns_none(traceparent_header):
+    """
+    Test that extracting the W3C traceparent header returns None for invalid or unsupported headers.
+    """
+    extracted_header = extract_w3c_traceparent_data(traceparent_header)
+    if extracted_header is not None:
+        pytest.fail(
+            f"Extracted traceparent from W3C header {traceparent_header} error returned {extracted_header} but should have been None."
+        )
+
+
 def test_iter_headers(monkeypatch):
     monkeypatch.setattr(
         Transaction,
