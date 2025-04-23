@@ -145,7 +145,9 @@ def _prefilter_releases(
 
     include_versions = None
     if TEST_SUITE_CONFIG[integration].get("include") is not None:
-        include_versions = SpecifierSet(TEST_SUITE_CONFIG[integration]["include"])
+        include_versions = SpecifierSet(
+            TEST_SUITE_CONFIG[integration]["include"], prereleases=True
+        )
 
     filtered_releases = []
     last_prerelease = None
