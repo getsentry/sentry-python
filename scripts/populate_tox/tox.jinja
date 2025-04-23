@@ -36,11 +36,6 @@ envlist =
     # At a minimum, we should test against at least the lowest
     # and the latest supported version of a framework.
 
-    # AIOHTTP
-    {py3.7}-aiohttp-v{3.4}
-    {py3.7,py3.9,py3.11}-aiohttp-v{3.8}
-    {py3.8,py3.12,py3.13}-aiohttp-latest
-
     # Anthropic
     {py3.8,py3.11,py3.12}-anthropic-v{0.16,0.28,0.40}
     {py3.7,py3.11,py3.12}-anthropic-latest
@@ -183,14 +178,6 @@ deps =
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
 
     # === Integrations ===
-
-    # AIOHTTP
-    aiohttp-v3.4: aiohttp~=3.4.0
-    aiohttp-v3.8: aiohttp~=3.8.0
-    aiohttp-latest: aiohttp
-    aiohttp: pytest-aiohttp
-    aiohttp-v3.8: pytest-asyncio
-    aiohttp-latest: pytest-asyncio
 
     # Anthropic
     anthropic: pytest-asyncio

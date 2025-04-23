@@ -67,7 +67,6 @@ IGNORE = {
     "potel",
     # Integrations that can be migrated -- we should eventually remove all
     # of these from the IGNORE list
-    "aiohttp",
     "anthropic",
     "arq",
     "asyncpg",
