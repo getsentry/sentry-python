@@ -108,8 +108,9 @@ def test_circular_references(sentry_init, request):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
 
     gc.disable()
-    gc.collect()
     request.addfinalizer(gc.enable)
+
+    gc.collect()
 
     class MyThread(Thread):
         def run(self):
