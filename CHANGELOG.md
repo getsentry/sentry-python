@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.26.1
+
+### Various fixes & improvements
+
+- fix(threading): Data leak in ThreadingIntegration between threads (#4281) by @antonpirker
+- fix(logging): Clarify separate warnings case is for Python <3.11 (#4296) by @szokeasaurusrex
+- fix(logging): Add formatted message to log events (#4292) by @szokeasaurusrex
+- fix(logging): Send raw logging parameters (#4291) by @szokeasaurusrex
+- fix: Revert "chore: Deprecate `same_process_as_parent` (#4244)" (#4290) by @sentrivana
+
+## 2.26.0
+
+### Various fixes & improvements
+
+- fix(debug): Do not consider parent loggers for debug logging (#4286) by @szokeasaurusrex
+- test(tracing): Simplify static/classmethod tracing tests (#4278) by @szokeasaurusrex
+- feat(transport): Add a timeout (#4252) by @sentrivana
+- meta: Change CODEOWNERS back to Python SDK owners (#4269) by @sentrivana
+- feat(logs): Add sdk name and version as log attributes (#4262) by @AbhiPrasad
+- feat(logs): Add server.address to logs (#4257) by @AbhiPrasad
+- chore: Deprecate `same_process_as_parent` (#4244) by @sentrivana
+- feat(logs): Add sentry.origin attribute for log handler (#4250) by @AbhiPrasad
+- feat(tests): Add optional cutoff to toxgen (#4243) by @sentrivana
+- toxgen: Retry & fail if we fail to fetch PyPI data (#4251) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 1.12.0 to 2.0.2 (#4248) by @dependabot
+- Trying to prevent the grpc setup from being flaky (#4233) by @antonpirker
+- feat(breadcrumbs): add `_meta` information for truncation of breadcrumbs (#4007) by @shellmayr
+- tests: Move django under toxgen (#4238) by @sentrivana
+- fix: Handle JSONDecodeError gracefully in StarletteRequestExtractor (#4226) by @moodix
+- fix(asyncio): Remove shutdown handler (#4237) by @sentrivana
+
 ## 2.25.1
 
 ### Various fixes & improvements

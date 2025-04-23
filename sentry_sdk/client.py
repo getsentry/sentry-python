@@ -27,6 +27,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
+    SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -498,6 +499,7 @@ class _Client(BaseClient):
         # type: (...) -> Optional[Event]
 
         previous_total_spans = None  # type: Optional[int]
+        previous_total_breadcrumbs = None  # type: Optional[int]
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
@@ -534,6 +536,16 @@ class _Client(BaseClient):
             dropped_spans = event.pop("_dropped_spans", 0) + spans_delta  # type: int
             if dropped_spans > 0:
                 previous_total_spans = spans_before + dropped_spans
+            if scope._n_breadcrumbs_truncated > 0:
+                breadcrumbs = event.get("breadcrumbs", {})
+                values = (
+                    breadcrumbs.get("values", [])
+                    if not isinstance(breadcrumbs, AnnotatedValue)
+                    else []
+                )
+                previous_total_breadcrumbs = (
+                    len(values) + scope._n_breadcrumbs_truncated
+                )
 
         if (
             self.options["attach_stacktrace"]
@@ -586,7 +598,10 @@ class _Client(BaseClient):
             event["spans"] = AnnotatedValue(
                 event.get("spans", []), {"len": previous_total_spans}
             )
-
+        if previous_total_breadcrumbs is not None:
+            event["breadcrumbs"] = AnnotatedValue(
+                event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
+            )
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
@@ -879,6 +894,13 @@ class _Client(BaseClient):
         if not logs_enabled:
             return
         isolation_scope = current_scope.get_isolation_scope()
+
+        log["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
+        log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
+
+        server_name = self.options.get("server_name")
+        if server_name is not None and SPANDATA.SERVER_ADDRESS not in log["attributes"]:
+            log["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
 
         environment = self.options.get("environment")
         if environment is not None and "sentry.environment" not in log["attributes"]:

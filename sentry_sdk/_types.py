@@ -30,6 +30,17 @@ class AnnotatedValue:
 
         return self.value == other.value and self.metadata == other.metadata
 
+    def __str__(self):
+        # type: (AnnotatedValue) -> str
+        return str({"value": str(self.value), "metadata": str(self.metadata)})
+
+    def __len__(self):
+        # type: (AnnotatedValue) -> int
+        if self.value is not None:
+            return len(self.value)
+        else:
+            return 0
+
     @classmethod
     def removed_because_raw_data(cls):
         # type: () -> AnnotatedValue
@@ -152,8 +163,8 @@ if TYPE_CHECKING:
     Event = TypedDict(
         "Event",
         {
-            "breadcrumbs": dict[
-                Literal["values"], list[dict[str, Any]]
+            "breadcrumbs": Annotated[
+                dict[Literal["values"], list[dict[str, Any]]]
             ],  # TODO: We can expand on this type
             "check_in_id": str,
             "contexts": dict[str, dict[str, object]],
@@ -209,7 +220,9 @@ if TYPE_CHECKING:
         tuple[None, None, None],
     ]
 
+    # TODO: Make a proper type definition for this (PRs welcome!)
     Hint = Dict[str, Any]
+
     Log = TypedDict(
         "Log",
         {
@@ -222,9 +235,13 @@ if TYPE_CHECKING:
         },
     )
 
+    # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]
+
+    # TODO: Make a proper type definition for this (PRs welcome!)
     BreadcrumbHint = Dict[str, Any]
 
+    # TODO: Make a proper type definition for this (PRs welcome!)
     SamplingContext = Dict[str, Any]
 
     EventProcessor = Callable[[Event, Hint], Optional[Event]]
