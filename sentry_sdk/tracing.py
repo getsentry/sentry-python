@@ -535,7 +535,7 @@ class Span:
             otel_status = StatusCode.ERROR
             otel_description = status
 
-        if _OTEL_VERSION is not None and _OTEL_VERSION >= (1, 12, 0):
+        if _OTEL_VERSION is None or _OTEL_VERSION >= (1, 12, 0):
             self._otel_span.set_status(otel_status, otel_description)
         else:
             self._otel_span.set_status(Status(otel_status, otel_description))
