@@ -104,6 +104,7 @@ def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scop
         assert len(event["spans"]) == 0
 
 
+@pytest.mark.forked
 def test_circular_references(sentry_init, request):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
 
