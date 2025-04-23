@@ -191,8 +191,8 @@ def _prefilter_releases(
                 version.major == saved_version.major
                 and version.minor == saved_version.minor
             ):
+                # Don't save all patch versions of a release, just the newest one
                 if version.micro > saved_version.micro:
-                    # Don't save all patch versions of a release, just the newest one
                     filtered_releases[i] = version
                 break
         else:
