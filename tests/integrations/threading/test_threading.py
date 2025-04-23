@@ -107,8 +107,8 @@ def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scop
 
 
 @pytest.mark.skipif(
-    sys.version[:2] == [3, 8] and (1, 12) <= _OTEL_VERSION < (1, 15),
-    reason="Fails in CI on 3.8 and specific OTel versions, works locally",
+    sys.version[:3] == "3.8" and (1, 12) <= _OTEL_VERSION < (1, 15),
+    reason="Fails in CI on 3.8 and specific OTel versions",
 )
 def test_circular_references(sentry_init, request):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
