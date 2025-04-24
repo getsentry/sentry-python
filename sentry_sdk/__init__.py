@@ -1,4 +1,6 @@
-from sentry_sdk.scope import Scope
+# TODO-neel scope switch
+# TODO-neel avoid duplication between api and __init__
+from sentry_sdk.opentelemetry.scope import PotelScope as Scope
 from sentry_sdk.transport import Transport, HttpTransport
 from sentry_sdk.client import Client
 
