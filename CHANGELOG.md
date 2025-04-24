@@ -4,20 +4,20 @@
 
 ### Various fixes & improvements
 
-- Make sure to use the default decimal context in our code (#4231) by @antonpirker
+- fix: Make sure to use the default decimal context in our code (#4231) by @antonpirker
+- fix(integrations): ASGI integration not capture transactions in Websocket (#4293) by @guodong000
+- feat(typing): Make all relevant types public (#4315) by @antonpirker
+- feat(spans): Record flag evaluations as span attributes (#4280) by @cmanallen
+- test(logs): Avoid failure when running with integrations enabled (#4316) by @rominf
+- tests: Remove unused code and rerun (#4313) by @sentrivana
+- tests: Add cohere to toxgen (#4304) by @sentrivana
+- tests: Migrate fastapi to toxgen (#4302) by @sentrivana
+- tests: Add huggingface_hub to toxgen (#4299) by @sentrivana
+- tests: Add huey to toxgen (#4298) by @sentrivana
+- tests: Update tox.ini (#4297) by @sentrivana
 - tests: Move aiohttp under toxgen (#4319) by @sentrivana
 - tests: Fix version picking in toxgen (#4323) by @sentrivana
-- fix(integrations): ASGI integration not capture transactions in Websocket (#4293) by @guodong000
-- Make all relevant types public (#4315) by @antonpirker
 - build(deps): bump codecov/codecov-action from 5.4.0 to 5.4.2 (#4318) by @dependabot
-- test(logs): Avoid failure when running with integrations enabled (#4316) by @rominf
-- feat(spans): Record flag evaluations as span attributes (#4280) by @cmanallen
-- toxgen: Remove unused code and rerun (#4313) by @sentrivana
-- toxgen: Add cohere (#4304) by @sentrivana
-- toxgen: Migrate fastapi (#4302) by @sentrivana
-- toxgen: Add huggingface_hub (#4299) by @sentrivana
-- toxgen: Add huey (#4298) by @sentrivana
-- tests: Update tox.ini (#4297) by @sentrivana
 
 ## 2.26.1
 
