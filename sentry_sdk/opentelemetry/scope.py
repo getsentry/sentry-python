@@ -175,7 +175,7 @@ def setup_scope_context_management():
 
 @contextmanager
 def isolation_scope():
-    # type: () -> Generator[Scope, None, None]
+    # type: () -> Generator[PotelScope, None, None]
     context = set_value(SENTRY_FORK_ISOLATION_SCOPE_KEY, True)
     token = attach(context)
     try:
@@ -186,7 +186,7 @@ def isolation_scope():
 
 @contextmanager
 def new_scope():
-    # type: () -> Generator[Scope, None, None]
+    # type: () -> Generator[PotelScope, None, None]
     token = attach(get_current())
     try:
         yield PotelScope.get_current_scope()
@@ -196,7 +196,7 @@ def new_scope():
 
 @contextmanager
 def use_scope(scope):
-    # type: (Scope) -> Generator[Scope, None, None]
+    # type: (PotelScope) -> Generator[PotelScope, None, None]
     context = set_value(SENTRY_USE_CURRENT_SCOPE_KEY, scope)
     token = attach(context)
 
@@ -208,7 +208,7 @@ def use_scope(scope):
 
 @contextmanager
 def use_isolation_scope(isolation_scope):
-    # type: (Scope) -> Generator[Scope, None, None]
+    # type: (PotelScope) -> Generator[PotelScope, None, None]
     context = set_value(SENTRY_USE_ISOLATION_SCOPE_KEY, isolation_scope)
     token = attach(context)
 
