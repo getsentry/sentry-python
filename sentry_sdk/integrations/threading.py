@@ -4,6 +4,8 @@ from functools import wraps
 from threading import Thread, current_thread
 
 import sentry_sdk
+from sentry_sdk import Scope
+from sentry_sdk.scope import ScopeType
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import (
     event_from_exception,
@@ -17,7 +19,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import TypeVar
     from typing import Callable
-    from typing import Optional
 
     from sentry_sdk._types import ExcInfo
 
@@ -75,8 +76,8 @@ class ThreadingIntegration(Integration):
                     isolation_scope = sentry_sdk.get_isolation_scope().fork()
                     current_scope = sentry_sdk.get_current_scope().fork()
             else:
-                isolation_scope = None
-                current_scope = None
+                isolation_scope = Scope(ty=ScopeType.ISOLATION)
+                current_scope = Scope(ty=ScopeType.CURRENT)
 
             # Patching instance methods in `start()` creates a reference cycle if
             # done in a naive way. See
@@ -98,7 +99,7 @@ class ThreadingIntegration(Integration):
 
 
 def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
-    # type: (Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope], F) -> F
+    # type: (sentry_sdk.Scope, sentry_sdk.Scope, F) -> F
     @wraps(old_run_func)
     def run(*a, **kw):
         # type: (*Any, **Any) -> Any
@@ -110,12 +111,8 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
             except Exception:
                 reraise(*_capture_exception())
 
-        if isolation_scope_to_use is not None and current_scope_to_use is not None:
-            with sentry_sdk.use_isolation_scope(isolation_scope_to_use):
-                with sentry_sdk.use_scope(current_scope_to_use):
-                    return _run_old_run_func()
-        else:
-            with sentry_sdk.isolation_scope():
+        with sentry_sdk.use_isolation_scope(isolation_scope_to_use):
+            with sentry_sdk.use_scope(current_scope_to_use):
                 return _run_old_run_func()
 
     return run  # type: ignore

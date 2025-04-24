@@ -254,7 +254,7 @@ class _ScopedResponse:
     __slots__ = ("_response", "_scope")
 
     def __init__(self, scope, response):
-        # type: (sentry_sdk.scope.Scope, Iterator[bytes]) -> None
+        # type: (sentry_sdk.Scope, Iterator[bytes]) -> None
         self._scope = scope
         self._response = response
 
