@@ -61,7 +61,6 @@ IGNORE = {
     "asgi",
     "aws_lambda",
     "cloud_resource_context",
-    "common",
     "gevent",
     "opentelemetry",
     "potel",
@@ -348,22 +347,28 @@ def supported_python_versions(
     return supported
 
 
-def pick_python_versions_to_test(python_versions: list[Version]) -> list[Version]:
+def pick_python_versions_to_test(
+    python_versions: list[Version], test_all: bool = False
+) -> list[Version]:
     """
     Given a list of Python versions, pick those that make sense to test on.
 
     Currently, this is the oldest, the newest, and the second newest Python
     version.
     """
-    filtered_python_versions = {
-        python_versions[0],
-    }
+    if test_all:
+        filtered_python_versions = python_versions
 
-    filtered_python_versions.add(python_versions[-1])
-    try:
-        filtered_python_versions.add(python_versions[-2])
-    except IndexError:
-        pass
+    else:
+        filtered_python_versions = {
+            python_versions[0],
+        }
+
+        filtered_python_versions.add(python_versions[-1])
+        try:
+            filtered_python_versions.add(python_versions[-2])
+        except IndexError:
+            pass
 
     return sorted(filtered_python_versions)
 
@@ -517,6 +522,9 @@ def _add_python_versions_to_release(
 
     time.sleep(PYPI_COOLDOWN)  # give PYPI some breathing room
 
+    test_on_all_python_versions = (
+        TEST_SUITE_CONFIG[integration].get("test_on_all_python_versions") or False
+    )
     target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
     if target_python_versions:
         target_python_versions = SpecifierSet(target_python_versions)
@@ -525,7 +533,8 @@ def _add_python_versions_to_release(
         supported_python_versions(
             determine_python_versions(release_pypi_data),
             target_python_versions,
-        )
+        ),
+        test_all=test_on_all_python_versions,
     )
 
     release.rendered_python_versions = _render_python_versions(release.python_versions)

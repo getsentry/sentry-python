@@ -11,8 +11,9 @@ from opentelemetry.trace import (
     get_current_span,
     INVALID_SPAN,
 )
-from opentelemetry.trace.status import StatusCode
+from opentelemetry.trace.status import Status, StatusCode
 from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.version import __version__ as otel_version
 
 import sentry_sdk
 from sentry_sdk.consts import (
@@ -41,6 +42,7 @@ from sentry_sdk.tracing_utils import get_span_status_from_http_code
 from sentry_sdk.utils import (
     _serialize_span_attribute,
     get_current_thread_meta,
+    parse_version,
     should_be_treated_as_error,
 )
 
@@ -69,6 +71,8 @@ if TYPE_CHECKING:
 
     from sentry_sdk.tracing_utils import Baggage
 
+
+_OTEL_VERSION = parse_version(otel_version)
 
 tracer = otel_trace.get_tracer(__name__)
 
@@ -531,7 +535,10 @@ class Span:
             otel_status = StatusCode.ERROR
             otel_description = status
 
-        self._otel_span.set_status(otel_status, otel_description)
+        if _OTEL_VERSION is None or _OTEL_VERSION >= (1, 12, 0):
+            self._otel_span.set_status(otel_status, otel_description)
+        else:
+            self._otel_span.set_status(Status(otel_status, otel_description))
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None

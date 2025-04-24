@@ -29,6 +29,18 @@ TEST_SUITE_CONFIG = {
     "clickhouse_driver": {
         "package": "clickhouse-driver",
     },
+    "common": {
+        "package": "opentelemetry-sdk",
+        "test_on_all_python_versions": True,
+        "deps": {
+            "*": ["pytest", "pytest-asyncio"],
+            # See https://github.com/pytest-dev/pytest/issues/9621
+            # and https://github.com/pytest-dev/pytest-forked/issues/67
+            # for justification of the upper bound on pytest
+            "py3.7": ["pytest<7.0.0"],
+            "py3.8": ["hypothesis"],
+        },
+    },
     "cohere": {
         "package": "cohere",
         "python": ">=3.9",

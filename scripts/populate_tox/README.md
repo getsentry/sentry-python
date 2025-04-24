@@ -18,6 +18,7 @@ then determining which versions make sense to test to get good coverage.
 
 The lowest supported and latest version of a framework are always tested, with
 a number of releases in between:
+
 - If the package has majors, we pick the highest version of each major. For the
   latest major, we also pick the lowest version in that major.
 - If the package doesn't have multiple majors, we pick two versions in between
@@ -35,7 +36,8 @@ the main package (framework, library) to test with; any additional test
 dependencies, optionally gated behind specific conditions; and optionally
 the Python versions to test on.
 
-Constraints are defined using the format specified below. The following sections describe each key.
+Constraints are defined using the format specified below. The following sections
+describe each key.
 
 ```
 integration_name: {
@@ -46,6 +48,7 @@ integration_name: {
      },
      "python": python_version_specifier,
      "include": package_version_specifier,
+     "test_on_all_python_versions": bool,
 }
 ```
 
@@ -68,11 +71,12 @@ The test dependencies of the test suite. They're defined as a dictionary of
 in the package list of a rule will be installed as long as the rule applies.
 
 `rule`s are predefined. Each `rule` must be one of the following:
-  - `*`: packages will be always installed
-  - a version specifier on the main package (e.g. `<=0.32`): packages will only
-    be installed if the main package falls into the version bounds specified
-  - specific Python version(s) in the form `py3.8,py3.9`: packages will only be
-    installed if the Python version matches one from the list
+
+- `*`: packages will be always installed
+- a version specifier on the main package (e.g. `<=0.32`): packages will only
+  be installed if the main package falls into the version bounds specified
+- specific Python version(s) in the form `py3.8,py3.9`: packages will only be
+  installed if the Python version matches one from the list
 
 Rules can be used to specify version bounds on older versions of the main
 package's dependencies, for example. If e.g. Flask tests generally need
@@ -101,6 +105,7 @@ Python versions, you can say:
     ...
 }
 ```
+
 This key is optional.
 
 ### `python`
@@ -145,7 +150,6 @@ The `include` key can also be used to exclude a set of specific versions by usin
 `!=` version specifiers. For example, the Starlite restriction above could equivalently
 be expressed like so:
 
-
 ```python
 "starlite": {
     "include": "!=2.0.0a1,!=2.0.0a2",
@@ -153,6 +157,19 @@ be expressed like so:
 }
 ```
 
+### `test_on_all_python_versions`
+
+By default, the script will cherry-pick a few Python versions to test each
+integration on. If you want a test suite to run on all supported Python versions
+instead, set `test_on_all_python_versions` to `True`.
+
+```python
+"common": {
+    # The common test suite should run on all Python versions
+    "test_on_all_python_versions": True,
+    ...
+}
+```
 
 ## How-Tos
 
@@ -176,7 +193,8 @@ A handful of integration test suites are still hardcoded. The goal is to migrate
 them all to `populate_tox.py` over time.
 
 1. Remove the integration from the `IGNORE` list in `populate_tox.py`.
-2. Remove the hardcoded entries for the integration from the `envlist` and `deps` sections of `tox.jinja`.
+2. Remove the hardcoded entries for the integration from the `envlist` and `deps`
+   sections of `tox.jinja`.
 3. Run `scripts/generate-test-files.sh`.
 4. Run the test suite, either locally or by creating a PR.
 5. Address any test failures that happen.
@@ -185,6 +203,7 @@ You might have to introduce additional version bounds on the dependencies of the
 package. Try to determine the source of the failure and address it.
 
 Common scenarios:
+
 - An old version of the tested package installs a dependency without defining
   an upper version bound on it. A new version of the dependency is installed that
   is incompatible with the package. In this case you need to determine which

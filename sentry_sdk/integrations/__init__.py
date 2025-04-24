@@ -131,6 +131,7 @@ _MIN_VERSIONS = {
     "celery": (4, 4, 7),
     "chalice": (1, 16, 0),
     "clickhouse_driver": (0, 2, 0),
+    "common": (1, 4, 0),  # opentelemetry-sdk
     "cohere": (5, 4, 0),
     "django": (2, 0),
     "dramatiq": (1, 9),
