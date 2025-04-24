@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.27.0
+
+### Various fixes & improvements
+
+- Make sure to use the default decimal context in our code (#4231) by @antonpirker
+- tests: Move aiohttp under toxgen (#4319) by @sentrivana
+- tests: Fix version picking in toxgen (#4323) by @sentrivana
+- fix(integrations): ASGI integration not capture transactions in Websocket (#4293) by @guodong000
+- Make all relevant types public (#4315) by @antonpirker
+- build(deps): bump codecov/codecov-action from 5.4.0 to 5.4.2 (#4318) by @dependabot
+- test(logs): Avoid failure when running with integrations enabled (#4316) by @rominf
+- feat(spans): Record flag evaluations as span attributes (#4280) by @cmanallen
+- toxgen: Remove unused code and rerun (#4313) by @sentrivana
+- toxgen: Add cohere (#4304) by @sentrivana
+- toxgen: Migrate fastapi (#4302) by @sentrivana
+- toxgen: Add huggingface_hub (#4299) by @sentrivana
+- toxgen: Add huey (#4298) by @sentrivana
+- tests: Update tox.ini (#4297) by @sentrivana
+
 ## 2.26.1
 
 ### Various fixes & improvements
