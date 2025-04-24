@@ -694,16 +694,9 @@ class Scope:
     def root_span(self):
         # type: () -> Optional[Span]
         """Return the root span in the scope, if any."""
-
-        # there is no span/transaction on the scope
         if self._span is None:
             return None
 
-        # there is an orphan span on the scope
-        if self._span.root_span is None:
-            return None
-        # there is either a root span (which is its own root
-        # span) or a non-orphan span on the scope
         return self._span.root_span
 
     def set_transaction_name(self, name, source=None):
