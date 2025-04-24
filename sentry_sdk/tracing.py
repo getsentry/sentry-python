@@ -71,7 +71,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk.tracing_utils import Baggage
 
-
+_FLAGS_CAPACITY = 10
 _OTEL_VERSION = parse_version(otel_version)
 
 tracer = otel_trace.get_tracer(__name__)
@@ -597,6 +597,13 @@ class Span:
         # TODO-neel-potel we cannot add dicts here
 
         self.set_attribute(f"{SentrySpanAttribute.CONTEXT}.{key}", value)
+
+    def set_flag(self, flag, value):
+        # type: (str, bool) -> None
+        flag_count = self.get_attribute("flag.count") or 0
+        if flag_count < _FLAGS_CAPACITY:
+            self.set_attribute(f"flag.evaluation.{flag}", value)
+            self.set_attribute("flag.count", flag_count + 1)
 
 
 # TODO-neel-potel add deprecation

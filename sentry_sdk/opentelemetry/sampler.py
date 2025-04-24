@@ -276,7 +276,7 @@ class SentrySampler(Sampler):
 
         # Compare sample_rand to sample_rate to make the final sampling decision
         sample_rate = float(cast("Union[bool, float, int]", sample_rate))
-        sampled = sample_rand < sample_rate
+        sampled = sample_rand < Decimal.from_float(sample_rate)
 
         if sampled:
             return sampled_result(

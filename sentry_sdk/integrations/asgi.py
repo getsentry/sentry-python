@@ -204,7 +204,9 @@ class SentryAsgiMiddleware:
                     ty = scope["type"]
 
                     method = scope.get("method", "").upper()
-                    should_trace = method in self.http_methods_to_capture
+                    should_trace = ty == "websocket" or (
+                        ty == "http" and method in self.http_methods_to_capture
+                    )
                     if not should_trace:
                         return await self._run_original_app(
                             scope, receive, send, asgi_version

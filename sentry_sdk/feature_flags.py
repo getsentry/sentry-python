@@ -66,3 +66,7 @@ def add_feature_flag(flag, result):
     """
     flags = sentry_sdk.get_current_scope().flags
     flags.set(flag, result)
+
+    span = sentry_sdk.get_current_span()
+    if span:
+        span.set_flag(flag, result)

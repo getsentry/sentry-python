@@ -1,11 +1,16 @@
 import asyncio
 import json
 import re
-import sys
 from contextlib import suppress
 from unittest import mock
 
 import pytest
+
+try:
+    import pytest_asyncio
+except ImportError:
+    pytest_asyncio = None
+
 from aiohttp import web, ClientSession
 from aiohttp.client import ServerDisconnectedError
 from aiohttp.web_exceptions import (
@@ -19,6 +24,14 @@ from aiohttp.web_exceptions import (
 from sentry_sdk import capture_message, start_span
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from tests.conftest import ApproxDict
+
+
+if pytest_asyncio is None:
+    # `loop` was deprecated in `pytest-aiohttp`
+    # in favor of `event_loop` from `pytest-asyncio`
+    @pytest.fixture
+    def event_loop(loop):
+        yield loop
 
 
 @pytest.mark.asyncio
@@ -481,14 +494,6 @@ async def test_trace_from_headers_if_performance_disabled(
 
     assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
-
-
-if sys.version_info < (3, 12):
-    # `loop` was deprecated in `pytest-aiohttp`
-    # in favor of `event_loop` from `pytest-asyncio`
-    @pytest.fixture
-    def event_loop(loop):
-        yield loop
 
 
 @pytest.mark.asyncio

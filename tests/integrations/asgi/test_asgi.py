@@ -353,34 +353,31 @@ async def test_trace_from_headers_if_performance_disabled(
 
 @pytest.mark.asyncio
 async def test_websocket(sentry_init, asgi3_ws_app, capture_events, request):
-    sentry_init(send_default_pii=True)
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
 
     events = capture_events()
 
     asgi3_ws_app = SentryAsgiMiddleware(asgi3_ws_app)
 
-    scope = {
-        "type": "websocket",
-        "endpoint": asgi3_app,
-        "client": ("127.0.0.1", 60457),
-        "route": "some_url",
-        "headers": [
-            ("accept", "*/*"),
-        ],
-    }
+    request_url = "/ws"
 
     with pytest.raises(ValueError):
-        async with TestClient(asgi3_ws_app, scope=scope) as client:
-            async with client.websocket_connect("/ws") as ws:
-                await ws.receive_text()
+        client = TestClient(asgi3_ws_app)
+        async with client.websocket_connect(request_url) as ws:
+            await ws.receive_text()
 
-    msg_event, error_event = events
+    msg_event, error_event, transaction_event = events
 
+    assert msg_event["transaction"] == request_url
+    assert msg_event["transaction_info"] == {"source": "url"}
     assert msg_event["message"] == "Some message to the world!"
 
     (exc,) = error_event["exception"]["values"]
     assert exc["type"] == "ValueError"
     assert exc["value"] == "Oh no"
+
+    assert transaction_event["transaction"] == request_url
+    assert transaction_event["transaction_info"] == {"source": "url"}
 
 
 @pytest.mark.asyncio
