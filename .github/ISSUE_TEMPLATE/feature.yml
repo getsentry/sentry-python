@@ -1,6 +1,6 @@
 name: 💡 Feature Request
 description: Create a feature request for sentry-python SDK.
-labels: 'enhancement'
+labels: ["Python", "Feature"]
 body:
   - type: markdown
     attributes:
