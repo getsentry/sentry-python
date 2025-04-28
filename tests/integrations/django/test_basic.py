@@ -241,7 +241,6 @@ def test_trace_from_headers_if_performance_disabled(
                 http_methods_to_capture=("HEAD",),
             )
         ],
-        traces_sample_rate=None,  # disable all performance monitoring
     )
 
     events = capture_events()
