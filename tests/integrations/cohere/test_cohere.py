@@ -64,9 +64,9 @@ def test_nonstreaming_chat(
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
 
-    assert span["data"]["ai.completion_tokens_used"] == 10
-    assert span["data"]["ai.prompt_tokens_used"] == 20
-    assert span["data"]["ai.total_tokens_used"] == 30
+    assert span["data"]["ai.completion_tokens.used"] == 10
+    assert span["data"]["ai.prompt_tokens.used"] == 20
+    assert span["data"]["ai.total_tokens.used"] == 30
 
 
 # noinspection PyTypeChecker
@@ -136,9 +136,9 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
 
-    assert span["data"]["ai.completion_tokens_used"] == 10
-    assert span["data"]["ai.prompt_tokens_used"] == 20
-    assert span["data"]["ai.total_tokens_used"] == 30
+    assert span["data"]["ai.completion_tokens.used"] == 10
+    assert span["data"]["ai.prompt_tokens.used"] == 20
+    assert span["data"]["ai.total_tokens.used"] == 30
 
 
 def test_bad_chat(sentry_init, capture_events):
@@ -200,8 +200,8 @@ def test_embed(sentry_init, capture_events, send_default_pii, include_prompts):
     else:
         assert "ai.input_messages" not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens_used"] == 10
-    assert span["data"]["ai.total_tokens_used"] == 10
+    assert span["data"]["ai.prompt_tokens.used"] == 10
+    assert span["data"]["ai.total_tokens.used"] == 10
 
 
 def test_span_origin_chat(sentry_init, capture_events):

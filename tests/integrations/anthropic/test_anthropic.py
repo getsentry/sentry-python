@@ -127,9 +127,9 @@ def test_nonstreaming_create_message(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens_used"] == 10
-    assert span["data"]["ai.completion_tokens_used"] == 20
-    assert span["data"]["ai.total_tokens_used"] == 30
+    assert span["data"]["ai.prompt_tokens.used"] == 10
+    assert span["data"]["ai.completion_tokens.used"] == 20
+    assert span["data"]["ai.total_tokens.used"] == 30
     assert span["data"]["ai.streaming"] is False
 
 
@@ -197,9 +197,9 @@ async def test_nonstreaming_create_message_async(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens_used"] == 10
-    assert span["data"]["ai.completion_tokens_used"] == 20
-    assert span["data"]["ai.total_tokens_used"] == 30
+    assert span["data"]["ai.prompt_tokens.used"] == 10
+    assert span["data"]["ai.completion_tokens.used"] == 20
+    assert span["data"]["ai.total_tokens.used"] == 30
     assert span["data"]["ai.streaming"] is False
 
 
@@ -299,9 +299,9 @@ def test_streaming_create_message(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens_used"] == 10
-    assert span["data"]["ai.completion_tokens_used"] == 30
-    assert span["data"]["ai.total_tokens_used"] == 40
+    assert span["data"]["ai.prompt_tokens.used"] == 10
+    assert span["data"]["ai.completion_tokens.used"] == 30
+    assert span["data"]["ai.total_tokens.used"] == 40
     assert span["data"]["ai.streaming"] is True
 
 
@@ -404,9 +404,9 @@ async def test_streaming_create_message_async(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens_used"] == 10
-    assert span["data"]["ai.completion_tokens_used"] == 30
-    assert span["data"]["ai.total_tokens_used"] == 40
+    assert span["data"]["ai.prompt_tokens.used"] == 10
+    assert span["data"]["ai.completion_tokens.used"] == 30
+    assert span["data"]["ai.total_tokens.used"] == 40
     assert span["data"]["ai.streaming"] is True
 
 
@@ -536,9 +536,9 @@ def test_streaming_create_message_with_input_json_delta(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens_used"] == 366
-    assert span["data"]["ai.completion_tokens_used"] == 51
-    assert span["data"]["ai.total_tokens_used"] == 417
+    assert span["data"]["ai.prompt_tokens.used"] == 366
+    assert span["data"]["ai.completion_tokens.used"] == 51
+    assert span["data"]["ai.total_tokens.used"] == 417
     assert span["data"]["ai.streaming"] is True
 
 
@@ -675,9 +675,9 @@ async def test_streaming_create_message_with_input_json_delta_async(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens_used"] == 366
-    assert span["data"]["ai.completion_tokens_used"] == 51
-    assert span["data"]["ai.total_tokens_used"] == 417
+    assert span["data"]["ai.prompt_tokens.used"] == 366
+    assert span["data"]["ai.completion_tokens.used"] == 51
+    assert span["data"]["ai.total_tokens.used"] == 417
     assert span["data"]["ai.streaming"] is True
 
 
@@ -831,6 +831,6 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init, capture_events):
         [{"type": "text", "text": "{'test': 'data','more': 'json'}"}]
     )
     assert span["data"]["ai.streaming"] is True
-    assert span["data"]["ai.prompt_tokens_used"] == 10
-    assert span["data"]["ai.completion_tokens_used"] == 20
-    assert span["data"]["ai.total_tokens_used"] == 30
+    assert span["data"]["ai.prompt_tokens.used"] == 10
+    assert span["data"]["ai.completion_tokens.used"] == 20
+    assert span["data"]["ai.total_tokens.used"] == 30
