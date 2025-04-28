@@ -274,4 +274,4 @@ def test_flag_counter_not_sent(sentry_init, capture_events):
             add_feature_flag("3", True)
 
     (event,) = events
-    assert "flag.counter" not in event["spans"][0]["data"]
+    assert "_flag.count" not in event["spans"][0]["data"]

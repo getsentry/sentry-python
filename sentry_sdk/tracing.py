@@ -600,10 +600,10 @@ class Span:
 
     def set_flag(self, flag, value):
         # type: (str, bool) -> None
-        flag_count = self.get_attribute("flag.count") or 0
+        flag_count = self.get_attribute("_flag.count") or 0
         if flag_count < _FLAGS_CAPACITY:
             self.set_attribute(f"flag.evaluation.{flag}", value)
-            self.set_attribute("flag.count", flag_count + 1)
+            self.set_attribute("_flag.count", flag_count + 1)
 
 
 # TODO-neel-potel add deprecation
