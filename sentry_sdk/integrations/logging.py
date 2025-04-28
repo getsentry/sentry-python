@@ -355,6 +355,7 @@ class SentryLogsHandler(_BaseHandler):
         # type: (BaseClient, LogRecord) -> None
         scope = sentry_sdk.get_current_scope()
         otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
+        project_root = client.options["project_root"]
         attrs = {
             "sentry.origin": "auto.logger.log",
         }  # type: dict[str, str | bool | float | int]
@@ -374,7 +375,10 @@ class SentryLogsHandler(_BaseHandler):
         if record.lineno:
             attrs["code.line.number"] = record.lineno
         if record.pathname:
-            attrs["code.file.path"] = record.pathname
+            if record.pathname.startswith(project_root):
+                attrs["code.file.path"] = record.pathname[len(project_root) + 1 :]
+            else:
+                attrs["code.file.path"] = record.pathname
         if record.funcName:
             attrs["code.function.name"] = record.funcName
 
