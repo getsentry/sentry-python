@@ -259,3 +259,19 @@ def test_flag_limit(sentry_init, capture_events):
         }
     )
     assert "flag.evaluation.10" not in event["spans"][0]["data"]
+
+
+def test_flag_counter_not_sent(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with start_transaction(name="hi"):
+        with start_span(op="foo", name="bar"):
+            add_feature_flag("0", True)
+            add_feature_flag("1", True)
+            add_feature_flag("2", True)
+            add_feature_flag("3", True)
+
+    (event,) = events
+    assert "_flag.count" not in event["spans"][0]["data"]

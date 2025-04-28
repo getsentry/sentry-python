@@ -65,7 +65,6 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
     from sentry_sdk._types import (
-        MeasurementUnit,
         SamplingContext,
     )
 
@@ -148,10 +147,6 @@ class NoOpSpan:
         end_timestamp=None,  # type: Optional[Union[float, datetime]]
     ):
         # type: (...) -> None
-        pass
-
-    def set_measurement(self, name, value, unit=""):
-        # type: (str, float, MeasurementUnit) -> None
         pass
 
     def set_context(self, key, value):
@@ -540,13 +535,6 @@ class Span:
         else:
             self._otel_span.set_status(Status(otel_status, otel_description))
 
-    def set_measurement(self, name, value, unit=""):
-        # type: (str, float, MeasurementUnit) -> None
-        # Stringify value here since OTel expects all seq items to be of one type
-        self.set_attribute(
-            f"{SentrySpanAttribute.MEASUREMENT}.{name}", (str(value), unit)
-        )
-
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
         if thread_id is not None:
@@ -600,10 +588,10 @@ class Span:
 
     def set_flag(self, flag, value):
         # type: (str, bool) -> None
-        flag_count = self.get_attribute("flag.count") or 0
+        flag_count = self.get_attribute("_flag.count") or 0
         if flag_count < _FLAGS_CAPACITY:
             self.set_attribute(f"flag.evaluation.{flag}", value)
-            self.set_attribute("flag.count", flag_count + 1)
+            self.set_attribute("_flag.count", flag_count + 1)
 
 
 # TODO-neel-potel add deprecation

@@ -9,7 +9,6 @@ import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
-from sentry_sdk.tracing import _OTEL_VERSION
 
 original_start = Thread.start
 original_run = Thread.run
@@ -106,10 +105,7 @@ def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scop
         assert len(event["spans"]) == 0
 
 
-@pytest.mark.skipif(
-    sys.version[:3] == "3.8" and (1, 12) <= _OTEL_VERSION < (1, 16),
-    reason="Fails in CI on 3.8 and specific OTel versions",
-)
+@pytest.mark.skipif(sys.version[:3] == "3.8", reason="Fails in CI on 3.8")
 def test_circular_references(sentry_init, request):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
 
