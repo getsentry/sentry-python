@@ -289,8 +289,12 @@ class SentrySpanProcessor(SpanProcessor):
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id
 
-        if span.attributes:
-            span_json["data"] = dict(span.attributes)
+        attributes = getattr(span, "attributes", {}) or {}
+        if attributes:
+            span_json["data"] = {}
+            for key, value in attributes.items():
+                if not key.startswith("_"):
+                    span_json["data"][key] = value
 
         return span_json
 
