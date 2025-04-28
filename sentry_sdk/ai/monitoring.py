@@ -106,9 +106,9 @@ def record_token_usage(
     if ai_pipeline_name:
         span.set_attribute("ai.pipeline.name", ai_pipeline_name)
     if prompt_tokens is not None:
-        span.set_attribute("ai.prompt_tokens_used", prompt_tokens)
+        span.set_attribute("ai.prompt_tokens.used", prompt_tokens)
     if completion_tokens is not None:
-        span.set_attribute("ai.completion_tokens_used", completion_tokens)
+        span.set_attribute("ai.completion_tokens.used", completion_tokens)
     if (
         total_tokens is None
         and prompt_tokens is not None
@@ -116,4 +116,4 @@ def record_token_usage(
     ):
         total_tokens = prompt_tokens + completion_tokens
     if total_tokens is not None:
-        span.set_attribute("ai.total_tokens_used", total_tokens)
+        span.set_attribute("ai.total_tokens.used", total_tokens)
