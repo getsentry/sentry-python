@@ -86,6 +86,13 @@ exceeds the default sys.getrecursionlimit() of 1000, so users will only
 be affected by this limit if they have a custom recursion limit.
 """
 
+MAX_EXCEPTIONS = 25
+"""Maximum number of exceptions in a chain or group to send to Sentry.
+
+This is a sanity limit to avoid ending in an infinite loop of exceptions when the same exception is in the root and a leave
+of the exception tree.
+"""
+
 
 def env_to_bool(value, *, strict=False):
     # type: (Any, Optional[bool]) -> bool | None
@@ -823,6 +830,9 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
+    if exception_id > MAX_EXCEPTIONS - 1:
+        return (exception_id, exceptions)
+
     causing_exception = None
     exception_source = None
 
@@ -852,6 +862,18 @@ def exceptions_from_error(
         if has_implicit_causing_exception:
             exception_source = "__context__"
             causing_exception = exc_value.__context__  # type: ignore
+
+    if causing_exception:
+        # Some frameworks (e.g. FastAPI) wrap the causing exception in an
+        # ExceptionGroup that only contain one exception: the causing exception.
+        # This would lead to an infinite loop, so we skip the causing exception
+        # in this case. (because it is the same as the base_exception above)
+        if (
+            isinstance(causing_exception, ExceptionGroup)
+            and len(causing_exception.exceptions) == 1
+            and causing_exception.exceptions[0] == exc_value
+        ):
+            causing_exception = None
 
     if causing_exception:
         (exception_id, child_exceptions) = exceptions_from_error(
