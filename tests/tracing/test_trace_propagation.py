@@ -190,7 +190,11 @@ def test_with_incoming_trace_and_trace_propagation_targets_matching(
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
-    if traces_sample_rate is None or incoming_parent_sampled == "0":
+    if (
+        traces_sample_rate is None
+        or traces_sample_rate == USE_DEFAULT_TRACES_SAMPLE_RATE
+        or incoming_parent_sampled == "0"
+    ):
         assert len(events) == 0
     else:
         if incoming_parent_sampled == "1" or traces_sample_rate == 1:
@@ -264,7 +268,11 @@ def test_with_incoming_trace_and_trace_propagation_targets_not_matching(
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
-    if traces_sample_rate is None or incoming_parent_sampled == "0":
+    if (
+        traces_sample_rate is None
+        or traces_sample_rate == USE_DEFAULT_TRACES_SAMPLE_RATE
+        or incoming_parent_sampled == "0"
+    ):
         assert len(events) == 0
     else:
         if incoming_parent_sampled == "1" or traces_sample_rate == 1:
