@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 
 import sentry_sdk
-from sentry_sdk import start_span, set_measurement, get_current_scope
+from sentry_sdk import start_span, get_current_scope
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import Dsn
@@ -113,46 +113,6 @@ def test_finds_spans_on_scope(sentry_init):
         with start_span(name="child") as child_span:
             assert get_current_scope().span == child_span
             assert child_span.root_span == root_span
-
-
-def test_set_measurement(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-
-    events = capture_events()
-
-    with start_span(name="measuring stuff") as span:
-
-        with pytest.raises(TypeError):
-            span.set_measurement()
-
-        with pytest.raises(TypeError):
-            span.set_measurement("metric.foo")
-
-        span.set_measurement("metric.foo", 123)
-        span.set_measurement("metric.bar", 456, unit="second")
-        span.set_measurement("metric.baz", 420.69, unit="custom")
-        span.set_measurement("metric.foobar", 12, unit="percent")
-        span.set_measurement("metric.foobar", 17.99, unit="percent")
-
-    (event,) = events
-    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
-    assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
-    assert event["measurements"]["metric.baz"] == {"value": 420.69, "unit": "custom"}
-    assert event["measurements"]["metric.foobar"] == {"value": 17.99, "unit": "percent"}
-
-
-def test_set_measurement_public_api(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-
-    events = capture_events()
-
-    with start_span(name="measuring stuff"):
-        set_measurement("metric.foo", 123)
-        set_measurement("metric.bar", 456, unit="second")
-
-    (event,) = events
-    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
-    assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
 
 
 @pytest.mark.parametrize(
