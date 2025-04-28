@@ -1,10 +1,7 @@
-import json
 import os
-import time
 import uuid
 import random
 import socket
-import logging
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -30,6 +27,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
+    SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -66,6 +64,7 @@ if TYPE_CHECKING:
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
+    from sentry_sdk._log_batcher import LogBatcher
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
@@ -179,6 +178,7 @@ class BaseClient:
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
         self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+        self.log_batcher = None  # type: Optional[LogBatcher]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -210,8 +210,8 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
-        # type: (Scope, str, int, str, **Any) -> None
+    def _capture_experimental_log(self, scope, log):
+        # type: (Scope, Log) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -376,6 +376,12 @@ class _Client(BaseClient):
                         "Metrics not supported on Python 3.6 and lower with gevent."
                     )
 
+            self.log_batcher = None
+            if experiments.get("enable_logs", False):
+                from sentry_sdk._log_batcher import LogBatcher
+
+                self.log_batcher = LogBatcher(capture_func=_capture_envelope)
+
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
                 raise ValueError(
@@ -418,6 +424,12 @@ class _Client(BaseClient):
 
             if self.options.get("spotlight"):
                 self.spotlight = setup_spotlight(self.options)
+                if not self.options["dsn"]:
+                    sample_all = lambda *_args, **_kwargs: 1.0
+                    self.options["send_default_pii"] = True
+                    self.options["error_sampler"] = sample_all
+                    self.options["traces_sampler"] = sample_all
+                    self.options["profiles_sampler"] = sample_all
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name
@@ -446,6 +458,7 @@ class _Client(BaseClient):
         if (
             self.monitor
             or self.metrics_aggregator
+            or self.log_batcher
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, BaseHttpTransport)
         ):
@@ -469,11 +482,7 @@ class _Client(BaseClient):
 
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
-        result = self.options.get("send_default_pii")
-        if result is None:
-            result = not self.options["dsn"] and self.spotlight is not None
-
-        return result
+        return self.options.get("send_default_pii") or False
 
     @property
     def dsn(self):
@@ -490,6 +499,7 @@ class _Client(BaseClient):
         # type: (...) -> Optional[Event]
 
         previous_total_spans = None  # type: Optional[int]
+        previous_total_breadcrumbs = None  # type: Optional[int]
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
@@ -526,6 +536,16 @@ class _Client(BaseClient):
             dropped_spans = event.pop("_dropped_spans", 0) + spans_delta  # type: int
             if dropped_spans > 0:
                 previous_total_spans = spans_before + dropped_spans
+            if scope._n_breadcrumbs_truncated > 0:
+                breadcrumbs = event.get("breadcrumbs", {})
+                values = (
+                    breadcrumbs.get("values", [])
+                    if not isinstance(breadcrumbs, AnnotatedValue)
+                    else []
+                )
+                previous_total_breadcrumbs = (
+                    len(values) + scope._n_breadcrumbs_truncated
+                )
 
         if (
             self.options["attach_stacktrace"]
@@ -578,7 +598,10 @@ class _Client(BaseClient):
             event["spans"] = AnnotatedValue(
                 event.get("spans", []), {"len": previous_total_spans}
             )
-
+        if previous_total_breadcrumbs is not None:
+            event["breadcrumbs"] = AnnotatedValue(
+                event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
+            )
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
@@ -756,6 +779,8 @@ class _Client(BaseClient):
         if exceptions:
             errored = True
             for error in exceptions:
+                if isinstance(error, AnnotatedValue):
+                    error = error.value or {}
                 mechanism = error.get("mechanism")
                 if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
@@ -863,109 +888,55 @@ class _Client(BaseClient):
 
         return return_value
 
-    def capture_log(self, scope, severity_text, severity_number, template, **kwargs):
-        # type: (Scope, str, int, str, **Any) -> None
-        logs_enabled = self.options["_experiments"].get("enable_sentry_logs", False)
+    def _capture_experimental_log(self, current_scope, log):
+        # type: (Scope, Log) -> None
+        logs_enabled = self.options["_experiments"].get("enable_logs", False)
         if not logs_enabled:
             return
+        isolation_scope = current_scope.get_isolation_scope()
 
-        headers = {
-            "sent_at": format_timestamp(datetime.now(timezone.utc)),
-        }  # type: dict[str, object]
+        log["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
+        log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
 
-        attrs = {
-            "sentry.message.template": template,
-        }  # type: dict[str, str | bool | float | int]
-
-        kwargs_attributes = kwargs.get("attributes")
-        if kwargs_attributes is not None:
-            attrs.update(kwargs_attributes)
+        server_name = self.options.get("server_name")
+        if server_name is not None and SPANDATA.SERVER_ADDRESS not in log["attributes"]:
+            log["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
 
         environment = self.options.get("environment")
-        if environment is not None:
-            attrs["sentry.environment"] = environment
+        if environment is not None and "sentry.environment" not in log["attributes"]:
+            log["attributes"]["sentry.environment"] = environment
 
         release = self.options.get("release")
-        if release is not None:
-            attrs["sentry.release"] = release
+        if release is not None and "sentry.release" not in log["attributes"]:
+            log["attributes"]["sentry.release"] = release
 
-        span = scope.span
-        if span is not None:
-            attrs["sentry.trace.parent_span_id"] = span.span_id
+        span = current_scope.span
+        if span is not None and "sentry.trace.parent_span_id" not in log["attributes"]:
+            log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
 
-        for k, v in kwargs.items():
-            attrs[f"sentry.message.parameters.{k}"] = v
-
-        log = {
-            "severity_text": severity_text,
-            "severity_number": severity_number,
-            "body": template.format(**kwargs),
-            "attributes": attrs,
-            "time_unix_nano": time.time_ns(),
-            "trace_id": None,
-        }  # type: Log
+        if log.get("trace_id") is None:
+            transaction = current_scope.transaction
+            propagation_context = isolation_scope.get_active_propagation_context()
+            if transaction is not None:
+                log["trace_id"] = transaction.trace_id
+            elif propagation_context is not None:
+                log["trace_id"] = propagation_context.trace_id
 
         # If debug is enabled, log the log to the console
         debug = self.options.get("debug", False)
         if debug:
-            severity_text_to_logging_level = {
-                "trace": logging.DEBUG,
-                "debug": logging.DEBUG,
-                "info": logging.INFO,
-                "warn": logging.WARNING,
-                "error": logging.ERROR,
-                "fatal": logging.CRITICAL,
-            }
-            logger.log(
-                severity_text_to_logging_level.get(severity_text, logging.DEBUG),
-                f'[Sentry Logs] {log["body"]}',
+            logger.debug(
+                f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
             )
 
-        propagation_context = scope.get_active_propagation_context()
-        if propagation_context is not None:
-            headers["trace_id"] = propagation_context.trace_id
-            log["trace_id"] = propagation_context.trace_id
-
-        envelope = Envelope(headers=headers)
-
-        before_emit_log = self.options["_experiments"].get("before_emit_log")
-        if before_emit_log is not None:
-            log = before_emit_log(log, {})
+        before_send_log = self.options["_experiments"].get("before_send_log")
+        if before_send_log is not None:
+            log = before_send_log(log, {})
         if log is None:
             return
 
-        def format_attribute(key, val):
-            # type: (str, int | float | str | bool) -> Any
-            if isinstance(val, bool):
-                return {"key": key, "value": {"boolValue": val}}
-            if isinstance(val, int):
-                return {"key": key, "value": {"intValue": str(val)}}
-            if isinstance(val, float):
-                return {"key": key, "value": {"doubleValue": val}}
-            if isinstance(val, str):
-                return {"key": key, "value": {"stringValue": val}}
-            return {"key": key, "value": {"stringValue": json.dumps(val)}}
-
-        otel_log = {
-            "severityText": log["severity_text"],
-            "severityNumber": log["severity_number"],
-            "body": {"stringValue": log["body"]},
-            "timeUnixNano": str(log["time_unix_nano"]),
-            "attributes": [
-                format_attribute(k, v) for (k, v) in log["attributes"].items()
-            ],
-        }
-
-        if "trace_id" in log:
-            otel_log["traceId"] = log["trace_id"]
-
-        envelope.add_log(otel_log)  # TODO: batch these
-
-        if self.spotlight:
-            self.spotlight.capture_envelope(envelope)
-
-        if self.transport is not None:
-            self.transport.capture_envelope(envelope)
+        if self.log_batcher:
+            self.log_batcher.add(log)
 
     def capture_session(
         self, session  # type: Session
@@ -1019,6 +990,8 @@ class _Client(BaseClient):
             self.session_flusher.kill()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.kill()
+            if self.log_batcher is not None:
+                self.log_batcher.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -1043,6 +1016,8 @@ class _Client(BaseClient):
             self.session_flusher.flush()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.flush()
+            if self.log_batcher is not None:
+                self.log_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):

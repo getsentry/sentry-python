@@ -17,6 +17,12 @@ repos:
     rev: 5.0.4
     hooks:
     -   id: flake8
+        additional_dependencies:
+            [
+                flake8-pyproject,
+                flake8-bugbear,
+                pep8-naming,
+            ]
 
 # Disabled for now, because it lists a lot of problems.
 #-   repo: https://github.com/pre-commit/mirrors-mypy

@@ -1,5 +1,143 @@
 # Changelog
 
+## 2.27.0
+
+### Various fixes & improvements
+
+- fix: Make sure to use the default decimal context in our code (#4231) by @antonpirker
+- fix(integrations): ASGI integration not capture transactions in Websocket (#4293) by @guodong000
+- feat(typing): Make all relevant types public (#4315) by @antonpirker
+- feat(spans): Record flag evaluations as span attributes (#4280) by @cmanallen
+- test(logs): Avoid failure when running with integrations enabled (#4316) by @rominf
+- tests: Remove unused code and rerun (#4313) by @sentrivana
+- tests: Add cohere to toxgen (#4304) by @sentrivana
+- tests: Migrate fastapi to toxgen (#4302) by @sentrivana
+- tests: Add huggingface_hub to toxgen (#4299) by @sentrivana
+- tests: Add huey to toxgen (#4298) by @sentrivana
+- tests: Update tox.ini (#4297) by @sentrivana
+- tests: Move aiohttp under toxgen (#4319) by @sentrivana
+- tests: Fix version picking in toxgen (#4323) by @sentrivana
+- build(deps): bump codecov/codecov-action from 5.4.0 to 5.4.2 (#4318) by @dependabot
+
+## 2.26.1
+
+### Various fixes & improvements
+
+- fix(threading): Data leak in ThreadingIntegration between threads (#4281) by @antonpirker
+- fix(logging): Clarify separate warnings case is for Python <3.11 (#4296) by @szokeasaurusrex
+- fix(logging): Add formatted message to log events (#4292) by @szokeasaurusrex
+- fix(logging): Send raw logging parameters (#4291) by @szokeasaurusrex
+- fix: Revert "chore: Deprecate `same_process_as_parent` (#4244)" (#4290) by @sentrivana
+
+## 2.26.0
+
+### Various fixes & improvements
+
+- fix(debug): Do not consider parent loggers for debug logging (#4286) by @szokeasaurusrex
+- test(tracing): Simplify static/classmethod tracing tests (#4278) by @szokeasaurusrex
+- feat(transport): Add a timeout (#4252) by @sentrivana
+- meta: Change CODEOWNERS back to Python SDK owners (#4269) by @sentrivana
+- feat(logs): Add sdk name and version as log attributes (#4262) by @AbhiPrasad
+- feat(logs): Add server.address to logs (#4257) by @AbhiPrasad
+- chore: Deprecate `same_process_as_parent` (#4244) by @sentrivana
+- feat(logs): Add sentry.origin attribute for log handler (#4250) by @AbhiPrasad
+- feat(tests): Add optional cutoff to toxgen (#4243) by @sentrivana
+- toxgen: Retry & fail if we fail to fetch PyPI data (#4251) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 1.12.0 to 2.0.2 (#4248) by @dependabot
+- Trying to prevent the grpc setup from being flaky (#4233) by @antonpirker
+- feat(breadcrumbs): add `_meta` information for truncation of breadcrumbs (#4007) by @shellmayr
+- tests: Move django under toxgen (#4238) by @sentrivana
+- fix: Handle JSONDecodeError gracefully in StarletteRequestExtractor (#4226) by @moodix
+- fix(asyncio): Remove shutdown handler (#4237) by @sentrivana
+
+## 2.25.1
+
+### Various fixes & improvements
+
+- fix(logs): Add a class which batches groups of logs together. (#4229) by @colin-sentry
+- fix(logs): Use repr instead of json for message and arguments (#4227) by @colin-sentry
+- fix(logs): Debug output from Sentry logs should always be `debug` level. (#4224) by @antonpirker
+- fix(ai): Do not consume anthropic streaming stop (#4232) by @colin-sentry
+- fix(spotlight): Do not spam sentry_sdk.warnings logger w/ Spotlight (#4219) by @BYK
+- fix(docs): fixed code snippet (#4218) by @antonpirker
+- build(deps): bump actions/create-github-app-token from 1.11.7 to 1.12.0 (#4214) by @dependabot
+
+## 2.25.0
+
+### Various fixes & improvements
+
+- **New Beta Feature** Enable Sentry logs in `logging` Integration (#4143) by @colin-sentry
+
+  You can now send existing log messages to the new Sentry Logs feature.
+
+  For more information see: https://github.com/getsentry/sentry/discussions/86804
+
+  This is how you can use it (Sentry Logs is in beta right now so the API can still change):
+
+  ```python
+  import logging
+
+  import sentry_sdk
+  from sentry_sdk.integrations.logging import LoggingIntegration
+
+  # Setup Sentry SDK to send log messages with a level of "error" or higher to Sentry.
+  sentry_sdk.init(
+    dsn="...",
+    _experiments={
+        "enable_sentry_logs": True
+    }
+    integrations=[
+      LoggingIntegration(sentry_logs_level=logging.ERROR),
+    ]
+  )
+
+  # Your existing logging setup
+  some_logger = logging.Logger("some-logger")
+
+  some_logger.info('In this example info events will not be sent to Sentry logs. my_value=%s', my_value)
+  some_logger.error('But error events will be sent to Sentry logs. my_value=%s', my_value)
+  ```
+
+- Spotlight: Sample everything 100% w/ Spotlight & no DSN set (#4207) by @BYK
+- Dramatiq: use set_transaction_name (#4175) by @timdrijvers
+- toxgen: Make it clearer which suites can be migrated (#4196) by @sentrivana
+- Move Litestar under toxgen (#4197) by @sentrivana
+- Added flake8 plugings to pre-commit call of flake8 (#4190) by @antonpirker
+- Deprecate Scope.user (#4194) by @sentrivana
+- Fix hanging when capturing long stacktrace (#4191) by @szokeasaurusrex
+- Fix GraphQL failures (#4208) by @sentrivana
+- Fix flaky test (#4198) by @sentrivana
+- Update Ubuntu in Github test runners (#4204) by @antonpirker
+
+## 2.24.1
+
+### Various fixes & improvements
+
+- Always set `_spotlight_url` (#4186) by @BYK
+- Broader except in Django `parsed_body` (#4189) by @orhanhenrik
+- Add platform header to the `chunk` item-type in the envelope (#4178) by @viglia
+- Move `mypy` config into `pyproject.toml` (#4181) by @antonpirker
+- Move `flake8` config into `pyproject.toml` (#4185) by @antonpirker
+- Move `pytest` config into `pyproject.toml` (#4184) by @antonpirker
+- Bump `actions/create-github-app-token` from `1.11.6` to `1.11.7` (#4188) by @dependabot
+- Add `CODEOWNERS` (#4182) by @sentrivana
+
+## 2.24.0
+
+### Various fixes & improvements
+
+- fix(tracing): Fix `InvalidOperation` (#4179) by @szokeasaurusrex
+- Fix memory leak by not piling up breadcrumbs forever in Spark workers.  (#4167) by @antonpirker
+- Update scripts sources (#4166) by @emmanuel-ferdman
+- Fixed flaky test (#4165) by @antonpirker
+- chore(profiler): Add deprecation warning for session functions (#4171) by @sentrivana
+- feat(profiling): reverse profile_session start/stop methods deprecation (#4162) by @viglia
+- Reset `DedupeIntegration`'s `last-seen` if `before_send` dropped the event (#4142) by @sentrivana
+- style(integrations): Fix captured typo (#4161) by @pimuzzo
+- Handle loguru msg levels that are not supported by Sentry (#4147) by @antonpirker
+- feat(tests): Update tox.ini (#4146) by @sentrivana
+- Support Starlette/FastAPI `app.host` (#4157) by @sentrivana
+
 ## 2.23.1
 
 ### Various fixes & improvements

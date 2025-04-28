@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
 from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
@@ -186,6 +187,7 @@ class Scope:
         "_contexts",
         "_extras",
         "_breadcrumbs",
+        "_n_breadcrumbs_truncated",
         "_event_processors",
         "_error_processors",
         "_should_capture",
@@ -210,6 +212,7 @@ class Scope:
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[PropagationContext]
+        self._n_breadcrumbs_truncated = 0  # type: int
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -243,6 +246,7 @@ class Scope:
         rv._extras = dict(self._extras)
 
         rv._breadcrumbs = copy(self._breadcrumbs)
+        rv._n_breadcrumbs_truncated = copy(self._n_breadcrumbs_truncated)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
         rv._propagation_context = self._propagation_context
@@ -794,6 +798,11 @@ class Scope:
     def user(self, value):
         # type: (Optional[Dict[str, Any]]) -> None
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
+        warnings.warn(
+            "The `Scope.user` setter is deprecated in favor of `Scope.set_user()`.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.set_user(value)
 
     def set_user(self, value):
@@ -911,6 +920,7 @@ class Scope:
         # type: () -> None
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
+        self._n_breadcrumbs_truncated = 0
 
     def add_attachment(
         self,
@@ -978,6 +988,7 @@ class Scope:
 
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
+            self._n_breadcrumbs_truncated += 1
 
     def start_transaction(
         self,
@@ -1361,17 +1372,23 @@ class Scope:
 
     def _apply_breadcrumbs_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
-            self._breadcrumbs
-        )
+        event.setdefault("breadcrumbs", {})
+
+        # This check is just for mypy -
+        if not isinstance(event["breadcrumbs"], AnnotatedValue):
+            event["breadcrumbs"].setdefault("values", [])
+            event["breadcrumbs"]["values"].extend(self._breadcrumbs)
 
         # Attempt to sort timestamps
         try:
-            for crumb in event["breadcrumbs"]["values"]:
-                if isinstance(crumb["timestamp"], str):
-                    crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
+            if not isinstance(event["breadcrumbs"], AnnotatedValue):
+                for crumb in event["breadcrumbs"]["values"]:
+                    if isinstance(crumb["timestamp"], str):
+                        crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
 
-            event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+                event["breadcrumbs"]["values"].sort(
+                    key=lambda crumb: crumb["timestamp"]
+                )
         except Exception as err:
             logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
@@ -1559,6 +1576,10 @@ class Scope:
             self._extras.update(scope._extras)
         if scope._breadcrumbs:
             self._breadcrumbs.extend(scope._breadcrumbs)
+        if scope._n_breadcrumbs_truncated:
+            self._n_breadcrumbs_truncated = (
+                self._n_breadcrumbs_truncated + scope._n_breadcrumbs_truncated
+            )
         if scope._span:
             self._span = scope._span
         if scope._attachments:

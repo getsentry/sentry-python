@@ -6,6 +6,14 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
+    "aiohttp": {
+        "package": "aiohttp",
+        "deps": {
+            "*": ["pytest-aiohttp"],
+            ">=3.8": ["pytest-asyncio"],
+        },
+        "python": ">=3.7",
+    },
     "ariadne": {
         "package": "ariadne",
         "deps": {
@@ -29,12 +37,56 @@ TEST_SUITE_CONFIG = {
     "clickhouse_driver": {
         "package": "clickhouse-driver",
     },
+    "cohere": {
+        "package": "cohere",
+        "python": ">=3.9",
+    },
+    "django": {
+        "package": "django",
+        "deps": {
+            "*": [
+                "psycopg2-binary",
+                "djangorestframework",
+                "pytest-django",
+                "Werkzeug",
+            ],
+            ">=3.0": ["pytest-asyncio"],
+            ">=2.2,<3.1": ["six"],
+            "<3.3": [
+                "djangorestframework>=3.0,<4.0",
+                "Werkzeug<2.1.0",
+            ],
+            "<3.1": ["pytest-django<4.0"],
+            ">=2.0": ["channels[daphne]"],
+        },
+    },
     "dramatiq": {
         "package": "dramatiq",
     },
     "falcon": {
         "package": "falcon",
         "python": "<3.13",
+    },
+    "fastapi": {
+        "package": "fastapi",
+        "deps": {
+            "*": [
+                "httpx",
+                "pytest-asyncio",
+                "python-multipart",
+                "requests",
+                "anyio<4",
+            ],
+            # There's an incompatibility between FastAPI's TestClient, which is
+            # actually Starlette's TestClient, which is actually httpx's Client.
+            # httpx dropped a deprecated Client argument in 0.28.0, Starlette
+            # dropped it from its TestClient in 0.37.2, and FastAPI only pinned
+            # Starlette>=0.37.2 from version 0.110.1 onwards -- so for older
+            # FastAPI versions we use older httpx which still supports the
+            # deprecated argument.
+            "<0.110.1": ["httpx<0.28.0"],
+            "py3.6": ["aiocontextvars"],
+        },
     },
     "flask": {
         "package": "flask",
@@ -68,6 +120,13 @@ TEST_SUITE_CONFIG = {
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
+    },
+    "litestar": {
+        "package": "litestar",
+        "deps": {
+            "*": ["pytest-asyncio", "python-multipart", "requests", "cryptography"],
+            "<2.7": ["httpx<0.28"],
+        },
     },
     "loguru": {
         "package": "loguru",
@@ -111,7 +170,8 @@ TEST_SUITE_CONFIG = {
                 "jinja2",
                 "httpx",
             ],
-            "<0.37": ["httpx<0.28.0"],
+            # See the comment on FastAPI's httpx bound for more info
+            "<0.37.2": ["httpx<0.28.0"],
             "<0.15": ["jinja2<3.1"],
             "py3.6": ["aiocontextvars"],
         },
@@ -141,6 +201,7 @@ TEST_SUITE_CONFIG = {
         "package": "strawberry-graphql[fastapi,flask]",
         "deps": {
             "*": ["httpx"],
+            "<=0.262.5": ["pydantic<2.11"],
         },
     },
     "tornado": {

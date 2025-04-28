@@ -9,7 +9,6 @@ from collections import Counter
 import pytest
 from sentry_sdk.client import Client
 from sentry_sdk.utils import datetime_from_isoformat
-from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
 import sentry_sdk.scope
@@ -935,46 +934,100 @@ class TracingTestClass:
         return cls, arg
 
 
-def test_staticmethod_tracing(sentry_init):
-    test_staticmethod_name = "tests.test_basics.TracingTestClass.static"
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_staticmethod_class_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.static"}
+        ],
+    )
 
-    assert (
-        ".".join(
-            [
-                TracingTestClass.static.__module__,
-                TracingTestClass.static.__qualname__,
-            ]
-        )
-        == test_staticmethod_name
-    ), "The test static method was moved or renamed. Please update the name accordingly"
+    events = capture_events()
 
-    sentry_init(functions_to_trace=[{"qualified_name": test_staticmethod_name}])
+    with sentry_sdk.start_transaction(name="test"):
+        assert TracingTestClass.static(1) == 1
 
-    for instance_or_class in (TracingTestClass, TracingTestClass()):
-        with patch_start_tracing_child() as fake_start_child:
-            assert instance_or_class.static(1) == 1
-            assert fake_start_child.call_count == 1
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.static"
 
 
-def test_classmethod_tracing(sentry_init):
-    test_classmethod_name = "tests.test_basics.TracingTestClass.class_"
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_staticmethod_instance_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.static"}
+        ],
+    )
 
-    assert (
-        ".".join(
-            [
-                TracingTestClass.class_.__module__,
-                TracingTestClass.class_.__qualname__,
-            ]
-        )
-        == test_classmethod_name
-    ), "The test class method was moved or renamed. Please update the name accordingly"
+    events = capture_events()
 
-    sentry_init(functions_to_trace=[{"qualified_name": test_classmethod_name}])
+    with sentry_sdk.start_transaction(name="test"):
+        assert TracingTestClass().static(1) == 1
 
-    for instance_or_class in (TracingTestClass, TracingTestClass()):
-        with patch_start_tracing_child() as fake_start_child:
-            assert instance_or_class.class_(1) == (TracingTestClass, 1)
-            assert fake_start_child.call_count == 1
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.static"
+
+
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_classmethod_class_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
+        ],
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        assert TracingTestClass.class_(1) == (TracingTestClass, 1)
+
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.class_"
+
+
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_classmethod_instance_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
+        ],
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        assert TracingTestClass().class_(1) == (TracingTestClass, 1)
+
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.class_"
 
 
 def test_last_event_id(sentry_init):
@@ -1065,3 +1118,47 @@ def test_notes_safe_str(sentry_init, capture_events):
     (event,) = events
 
     assert event["exception"]["values"][0]["value"] == "aha!\nnote 1\nnote 3"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="this test appears to cause a segfault on Python < 3.11",
+)
+def test_stacktrace_big_recursion(sentry_init, capture_events):
+    """
+    Ensure that if the recursion limit is increased, the full stacktrace is not captured,
+    as it would take too long to process the entire stack trace.
+    Also, ensure that the capturing does not take too long.
+    """
+    sentry_init()
+    events = capture_events()
+
+    def recurse():
+        recurse()
+
+    old_recursion_limit = sys.getrecursionlimit()
+
+    try:
+        sys.setrecursionlimit(100_000)
+        recurse()
+    except RecursionError as e:
+        capture_start_time = time.perf_counter_ns()
+        sentry_sdk.capture_exception(e)
+        capture_end_time = time.perf_counter_ns()
+    finally:
+        sys.setrecursionlimit(old_recursion_limit)
+
+    (event,) = events
+
+    assert event["exception"]["values"][0]["stacktrace"] is None
+    assert event["_meta"] == {
+        "exception": {
+            "values": {"0": {"stacktrace": {"": {"rem": [["!config", "x"]]}}}}
+        }
+    }
+
+    # On my machine, it takes about 100-200ms to capture the exception,
+    # so this limit should be generous enough.
+    assert (
+        capture_end_time - capture_start_time < 10**9
+    ), "stacktrace capture took too long, check that frame limit is set correctly"
