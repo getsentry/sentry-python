@@ -304,10 +304,6 @@ class SentrySpanProcessor(SpanProcessor):
             "timestamp": convert_from_otel_timestamp(span.end_time),
         }  # type: Event
 
-        measurements = extract_span_attributes(span, SentrySpanAttribute.MEASUREMENT)
-        if measurements:
-            common_json["measurements"] = measurements
-
         tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
         if tags:
             common_json["tags"] = tags

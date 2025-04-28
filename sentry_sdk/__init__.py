@@ -36,7 +36,6 @@ __all__ = [  # noqa
     "set_context",
     "set_extra",
     "set_level",
-    "set_measurement",
     "set_tag",
     "set_tags",
     "set_user",

@@ -309,15 +309,7 @@ def extract_span_attributes(span, namespace):
     for attr, value in (span.attributes or {}).items():
         if attr.startswith(namespace):
             key = attr[len(namespace) + 1 :]
-
-            if namespace == SentrySpanAttribute.MEASUREMENT:
-                value = cast("tuple[str, str]", value)
-                extracted_attrs[key] = {
-                    "value": float(value[0]),
-                    "unit": value[1],
-                }
-            else:
-                extracted_attrs[key] = value
+            extracted_attrs[key] = value
 
     return extracted_attrs
 

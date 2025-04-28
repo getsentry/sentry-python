@@ -59,7 +59,6 @@ __all__ = [
     "set_context",
     "set_extra",
     "set_level",
-    "set_measurement",
     "set_tag",
     "set_tags",
     "set_user",
@@ -285,13 +284,6 @@ def start_transaction(
         span=transaction,
         **kwargs,
     )
-
-
-def set_measurement(name, value, unit=""):
-    # type: (str, float, sentry_sdk._types.MeasurementUnit) -> None
-    transaction = get_current_scope().root_span
-    if transaction is not None:
-        transaction.set_measurement(name, value, unit)
 
 
 def get_current_span(scope=None):

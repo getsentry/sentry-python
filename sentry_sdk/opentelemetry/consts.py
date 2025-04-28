@@ -26,7 +26,6 @@ class SentrySpanAttribute:
     DESCRIPTION = "sentry.description"
     OP = "sentry.op"
     ORIGIN = "sentry.origin"
-    MEASUREMENT = "sentry.measurement"
     TAG = "sentry.tag"
     NAME = "sentry.name"
     SOURCE = "sentry.source"
