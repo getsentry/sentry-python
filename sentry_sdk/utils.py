@@ -869,7 +869,8 @@ def exceptions_from_error(
         # This would lead to an infinite loop, so we skip the causing exception
         # in this case. (because it is the same as the base_exception above)
         if (
-            isinstance(causing_exception, ExceptionGroup)
+            BaseExceptionGroup is not None
+            and isinstance(causing_exception, BaseExceptionGroup)
             and len(causing_exception.exceptions) == 1
             and causing_exception.exceptions[0] == exc_value
         ):
