@@ -45,6 +45,11 @@ if TYPE_CHECKING:
 
 DEFAULT_MAX_SPANS = 1000
 
+# Span attributes internal to the SDK that should be omitted from the final payload
+IGNORE_SPAN_ATTRIBUTES = [
+    "flag.count",
+]
+
 
 class SentrySpanProcessor(SpanProcessor):
     """
@@ -289,8 +294,11 @@ class SentrySpanProcessor(SpanProcessor):
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id
 
-        if span.attributes:
-            span_json["data"] = dict(span.attributes)
+        if getattr(span, "attributes", {}):
+            span_json["data"] = {}
+            for key, value in span.attributes.items():
+                if key not in IGNORE_SPAN_ATTRIBUTES:
+                    span_json["data"][key] = value
 
         return span_json
 
