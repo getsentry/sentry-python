@@ -389,7 +389,7 @@ def start_transaction(
 def set_measurement(name, value, unit=""):
     # type: (str, float, MeasurementUnit) -> None
     """
-    .. deprecated:: 2.21.0
+    .. deprecated:: 2.28.0
         This function is deprecated and will be removed in the next major release.
     """
     transaction = get_current_scope().transaction

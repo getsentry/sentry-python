@@ -613,6 +613,11 @@ class Span:
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
+        """
+        .. deprecated:: 2.28.0
+            This function is deprecated and will be removed in the next major release.
+        """
+
         warnings.warn(
             "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
             DeprecationWarning,
@@ -1066,6 +1071,11 @@ class Transaction(Span):
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
+        """
+        .. deprecated:: 2.28.0
+            This function is deprecated and will be removed in the next major release.
+        """
+
         warnings.warn(
             "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
             DeprecationWarning,
