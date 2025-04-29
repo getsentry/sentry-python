@@ -323,6 +323,48 @@ def test_set_meaurement_public_api(sentry_init, capture_events):
     assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
 
 
+def test_set_measurement_deprecated(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+
+    with start_transaction(name="measuring stuff") as trx:
+        with pytest.warns(DeprecationWarning):
+            set_measurement("metric.foo", 123)
+
+        with pytest.warns(DeprecationWarning):
+            trx.set_measurement("metric.bar", 456)
+
+        with start_span(op="measuring span") as span:
+            with pytest.warns(DeprecationWarning):
+                span.set_measurement("metric.baz", 420.69, unit="custom")
+
+
+def test_set_meaurement_compared_to_set_data(sentry_init, capture_events):
+    """
+    This is just a test to see the difference
+    between measurements and data in the resulting event payload.
+    """
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with start_transaction(name="measuring stuff") as transaction:
+        transaction.set_measurement("metric.foo", 123)
+        transaction.set_data("metric.bar", 456)
+
+        with start_span(op="measuring span") as span:
+            span.set_measurement("metric.baz", 420.69, unit="custom")
+            span.set_data("metric.qux", 789)
+
+    (event,) = events
+    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
+    assert event["contexts"]["trace"]["data"]["metric.bar"] == 456
+    assert event["spans"][0]["measurements"]["metric.baz"] == {
+        "value": 420.69,
+        "unit": "custom",
+    }
+    assert event["spans"][0]["data"]["metric.qux"] == 789
+
+
 @pytest.mark.parametrize(
     "trace_propagation_targets,url,expected_propagation_decision",
     [
