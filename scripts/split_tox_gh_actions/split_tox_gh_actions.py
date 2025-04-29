@@ -58,6 +58,7 @@ GROUPS = {
         "anthropic",
         "cohere",
         "langchain",
+        "langchain-notiktoken",
         "openai",
         "huggingface_hub",
     ],
