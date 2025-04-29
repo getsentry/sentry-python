@@ -18,8 +18,9 @@ TEST_SUITE_CONFIG = {
         "package": "anthropic",
         "deps": {
             "*": ["pytest-asyncio"],
-            "<0.29": ["httpx<0.28.0"],
+            "<0.50": ["httpx<0.28.0"],
         },
+        "python": ">=3.8",
     },
     "ariadne": {
         "package": "ariadne",
