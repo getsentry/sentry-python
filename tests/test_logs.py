@@ -346,7 +346,6 @@ def test_logging_errors(sentry_init, capture_envelopes):
     error_event_2 = envelopes[1].items[0].payload.json
     assert error_event_2["level"] == "error"
 
-    print(envelopes)
     logs = envelopes_to_logs(envelopes)
     assert logs[0]["severity_text"] == "error"
     assert "sentry.message.template" not in logs[0]["attributes"]
@@ -362,6 +361,36 @@ def test_logging_errors(sentry_init, capture_envelopes):
     assert "code.line.number" in logs[1]["attributes"]
 
     assert len(logs) == 2
+
+
+def test_log_strips_project_root(sentry_init, capture_envelopes):
+    """
+    The python logger should strip project roots from the log record path
+    """
+    sentry_init(
+        _experiments={"enable_logs": True},
+        project_root="/custom/test",
+    )
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.handle(
+        logging.LogRecord(
+            name="test-logger",
+            level=logging.WARN,
+            pathname="/custom/test/blah/path.py",
+            lineno=123,
+            msg="This is a test log with a custom pathname",
+            args=(),
+            exc_info=None,
+        )
+    )
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 1
+    attrs = logs[0]["attributes"]
+    assert attrs["code.file.path"] == "blah/path.py"
 
 
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):

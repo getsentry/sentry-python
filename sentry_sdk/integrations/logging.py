@@ -375,7 +375,7 @@ class SentryLogsHandler(_BaseHandler):
         if record.lineno:
             attrs["code.line.number"] = record.lineno
         if record.pathname:
-            if record.pathname.startswith(project_root):
+            if project_root is not None and record.pathname.startswith(project_root):
                 attrs["code.file.path"] = record.pathname[len(project_root) + 1 :]
             else:
                 attrs["code.file.path"] = record.pathname
