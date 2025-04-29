@@ -178,8 +178,8 @@ def test_sampling_traces_sampler_boolean(sentry_init, capture_envelopes):
 @pytest.mark.parametrize(
     "traces_sample_rate, expected_num_of_envelopes",
     [
-        # special case for testing, do not pass any traces_sample_rate to init() (the default traces_sample_rate=0 will be used)
-        (USE_DEFAULT_TRACES_SAMPLE_RATE, 1),
+        # special case for testing, do not pass any traces_sample_rate to init() (the default traces_sample_rate=None will be used)
+        (USE_DEFAULT_TRACES_SAMPLE_RATE, 0),
         # traces_sample_rate=None means do not create new traces, and also do not continue incoming traces. So, no envelopes at all.
         (None, 0),
         # traces_sample_rate=0 means do not create new traces (0% of the requests), but continue incoming traces. So envelopes will be created only if there is an incoming trace.
@@ -229,9 +229,9 @@ def test_sampling_parent_sampled(
 @pytest.mark.parametrize(
     "traces_sample_rate, upstream_sampled, expected_num_of_envelopes",
     [
-        # special case for testing, do not pass any traces_sample_rate to init() (the default traces_sample_rate=0 will be used)
+        # special case for testing, do not pass any traces_sample_rate to init() (the default traces_sample_rate=None will be used)
         (USE_DEFAULT_TRACES_SAMPLE_RATE, 0, 0),
-        (USE_DEFAULT_TRACES_SAMPLE_RATE, 1, 1),
+        (USE_DEFAULT_TRACES_SAMPLE_RATE, 1, 0),
         # traces_sample_rate=None means do not create new traces, and also do not continue incoming traces. So, no envelopes at all.
         (None, 0, 0),
         (None, 1, 0),
