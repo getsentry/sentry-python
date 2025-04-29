@@ -14,6 +14,13 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.7",
     },
+    "anthropic": {
+        "package": "anthropic",
+        "deps": {
+            "*": ["pytest-asyncio"],
+            "<0.29": ["httpx<0.28.0"],
+        },
+    },
     "ariadne": {
         "package": "ariadne",
         "deps": {
