@@ -126,6 +126,33 @@ TEST_SUITE_CONFIG = {
     "huggingface_hub": {
         "package": "huggingface_hub",
     },
+    # Langchain
+    # langchain-v0.1: openai~=1.0.0
+    # langchain-v0.1: langchain~=0.1.11
+    # langchain-v0.1: tiktoken~=0.6.0
+    # langchain-v0.1: httpx<0.28.0
+    # langchain-v0.3: langchain~=0.3.0
+    # langchain-v0.3: langchain-community
+    # langchain-v0.3: tiktoken
+    # langchain-v0.3: openai
+    # langchain-{latest,notiktoken}: langchain
+    # langchain-{latest,notiktoken}: langchain-openai
+    # langchain-{latest,notiktoken}: openai>=1.6.1
+    # langchain-latest: tiktoken~=0.6.0
+    "langchain": {
+        "package": "langchain",
+        "deps": {
+            "*": ["openai", "tiktoken"],
+            "<0.2": ["httpx<0.28.0"],
+            ">0.2": ["langchain-community"],
+        },
+    },
+    "langchain-notiktoken": {
+        "package": "langchain",
+        "deps": {
+            "*": ["langchain-openai"],
+        },
+    },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
