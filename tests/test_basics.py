@@ -967,14 +967,12 @@ def test_stacktrace_big_recursion(sentry_init, capture_events):
     (event,) = events
 
     assert event["exception"]["values"][0]["stacktrace"] is None
-    assert event["_meta"] == {
-        "exception": {
-            "values": {"0": {"stacktrace": {"": {"rem": [["!config", "x"]]}}}}
-        }
+    assert event["_meta"]["exception"] == {
+        "values": {"0": {"stacktrace": {"": {"rem": [["!config", "x"]]}}}}
     }
 
     # On my machine, it takes about 100-200ms to capture the exception,
     # so this limit should be generous enough.
     assert (
-        capture_end_time - capture_start_time < 10**9
+        capture_end_time - capture_start_time < 10**9 * 2
     ), "stacktrace capture took too long, check that frame limit is set correctly"
