@@ -10,7 +10,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
+import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -714,3 +716,32 @@ def test_app_host(sentry_init, capture_events, transaction_style):
         assert event["transaction"] == "/subapp"
     else:
         assert event["transaction"].endswith("subapp_route")
+
+
+@pytest.mark.asyncio
+async def test_feature_flags(sentry_init, capture_events):
+    sentry_init(integrations=[StarletteIntegration(), FastApiIntegration()])
+
+    events = capture_events()
+
+    app = FastAPI()
+
+    @app.get("/error")
+    async def _error():
+        add_feature_flag("hello", False)
+
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
+                raise ValueError("something is wrong!")
+
+    try:
+        client = TestClient(app)
+        client.get("/error")
+    except ValueError:
+        pass
+
+    assert events[0]["contexts"]["flags"] == {
+        "values": [
+            {"flag": "hello", "result": False},
+        ]
+    }
