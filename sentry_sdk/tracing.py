@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -632,6 +633,16 @@ class Span:
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
+        """
+        .. deprecated:: 2.28.0
+            This function is deprecated and will be removed in the next major release.
+        """
+
+        warnings.warn(
+            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_thread(self, thread_id, thread_name):
@@ -1080,6 +1091,16 @@ class Transaction(Span):
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
+        """
+        .. deprecated:: 2.28.0
+            This function is deprecated and will be removed in the next major release.
+        """
+
+        warnings.warn(
+            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key, value):
@@ -1218,10 +1239,8 @@ class Transaction(Span):
             self.sampled = False
             return
 
-        # Now we roll the dice. self._sample_rand is inclusive of 0, but not of 1,
-        # so strict < is safe here. In case sample_rate is a boolean, cast it
-        # to a float (True becomes 1.0 and False becomes 0.0)
-        self.sampled = self._sample_rand < self.sample_rate
+        # Now we roll the dice.
+        self.sampled = self._sample_rand < Decimal.from_float(self.sample_rate)
 
         if self.sampled:
             logger.debug(

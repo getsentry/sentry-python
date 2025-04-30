@@ -6,6 +6,22 @@
 # See scripts/populate_tox/README.md for more info on the format and examples.
 
 TEST_SUITE_CONFIG = {
+    "aiohttp": {
+        "package": "aiohttp",
+        "deps": {
+            "*": ["pytest-aiohttp"],
+            ">=3.8": ["pytest-asyncio"],
+        },
+        "python": ">=3.7",
+    },
+    "anthropic": {
+        "package": "anthropic",
+        "deps": {
+            "*": ["pytest-asyncio"],
+            "<0.50": ["httpx<0.28.0"],
+        },
+        "python": ">=3.8",
+    },
     "ariadne": {
         "package": "ariadne",
         "deps": {
