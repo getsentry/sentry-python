@@ -47,11 +47,17 @@ async def test_featureflags_integration_spans_async(sentry_init, capture_events)
     except ValueError as e:
         sentry_sdk.capture_exception(e)
 
-    assert events[0]["contexts"]["flags"] == {
-        "values": [
-            {"flag": "hello", "result": False},
-        ]
-    }
+    found = False
+    for event in events:
+        if "exception" in event.keys():
+            assert event["contexts"]["flags"] == {
+                "values": [
+                    {"flag": "hello", "result": False},
+                ]
+            }
+            found = True
+
+    assert found, "No event with exception found"
 
 
 def test_featureflags_integration_spans_sync(sentry_init, capture_events):
@@ -69,11 +75,17 @@ def test_featureflags_integration_spans_sync(sentry_init, capture_events):
     except ValueError as e:
         sentry_sdk.capture_exception(e)
 
-    assert events[0]["contexts"]["flags"] == {
-        "values": [
-            {"flag": "hello", "result": False},
-        ]
-    }
+    found = False
+    for event in events:
+        if "exception" in event.keys():
+            assert event["contexts"]["flags"] == {
+                "values": [
+                    {"flag": "hello", "result": False},
+                ]
+            }
+            found = True
+
+    assert found, "No event with exception found"
 
 
 def test_featureflags_integration_threaded(
