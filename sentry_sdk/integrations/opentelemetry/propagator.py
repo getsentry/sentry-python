@@ -28,6 +28,7 @@ from sentry_sdk.integrations.opentelemetry.span_processor import (
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
+    W3C_TRACE_HEADER_NAME,
 )
 from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
 
@@ -103,6 +104,7 @@ class SentryPropagator(TextMapPropagator):
             return
 
         setter.set(carrier, SENTRY_TRACE_HEADER_NAME, sentry_span.to_traceparent())
+        setter.set(carrier, W3C_TRACE_HEADER_NAME, sentry_span.to_w3c_traceparent())
 
         if sentry_span.containing_transaction:
             baggage = sentry_span.containing_transaction.get_baggage()
@@ -114,4 +116,4 @@ class SentryPropagator(TextMapPropagator):
     @property
     def fields(self):
         # type: () -> Set[str]
-        return {SENTRY_TRACE_HEADER_NAME, BAGGAGE_HEADER_NAME}
+        return {SENTRY_TRACE_HEADER_NAME, BAGGAGE_HEADER_NAME, W3C_TRACE_HEADER_NAME}
