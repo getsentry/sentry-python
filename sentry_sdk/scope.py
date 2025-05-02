@@ -505,11 +505,7 @@ class Scope:
 
         # If this scope has a propagation context, return traceparent from there
         if self._propagation_context is not None:
-            traceparent = "%s-%s" % (
-                self._propagation_context.trace_id,
-                self._propagation_context.span_id,
-            )
-            return traceparent
+            return self._propagation_context.to_traceparent()
 
         # Fall back to isolation scope's traceparent. It always has one
         return self.get_isolation_scope().get_traceparent()
