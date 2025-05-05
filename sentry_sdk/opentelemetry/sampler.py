@@ -234,7 +234,7 @@ class SentrySampler(Sampler):
                     )
             else:
                 logger.debug(
-                    f"[Tracing] Ignoring sampled param for non-root span {name}"
+                    f"[Tracing.Sampler] Ignoring sampled param for non-root span {name}"
                 )
 
         # Check if there is a traces_sampler
@@ -264,7 +264,7 @@ class SentrySampler(Sampler):
         # If the sample rate is invalid, drop the span
         if not is_valid_sample_rate(sample_rate, source=self.__class__.__name__):
             logger.warning(
-                f"[Tracing] Discarding {name} because of invalid sample rate."
+                f"[Tracing.Sampler] Discarding {name} because of invalid sample rate."
             )
             return dropped_result(parent_span_context, attributes)
 
@@ -279,6 +279,11 @@ class SentrySampler(Sampler):
         sampled = sample_rand < Decimal.from_float(sample_rate)
 
         if sampled:
+            if is_root_span:
+                logger.debug(
+                    f"[Tracing.Sampler] Sampled #{name} with sample_rate: {sample_rate} and sample_rand: {sample_rand}"
+                )
+
             return sampled_result(
                 parent_span_context,
                 attributes,
@@ -286,6 +291,11 @@ class SentrySampler(Sampler):
                 sample_rand=None if sample_rand == parent_sample_rand else sample_rand,
             )
         else:
+            if is_root_span:
+                logger.debug(
+                    f"[Tracing.Sampler] Dropped #{name} with sample_rate: {sample_rate} and sample_rand: {sample_rand}"
+                )
+
             return dropped_result(
                 parent_span_context,
                 attributes,
