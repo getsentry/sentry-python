@@ -720,7 +720,10 @@ def test_app_host(sentry_init, capture_events, transaction_style):
 
 @pytest.mark.asyncio
 async def test_feature_flags(sentry_init, capture_events):
-    sentry_init(integrations=[StarletteIntegration(), FastApiIntegration()])
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
 
     events = capture_events()
 
@@ -740,8 +743,14 @@ async def test_feature_flags(sentry_init, capture_events):
     except ValueError:
         pass
 
-    assert events[0]["contexts"]["flags"] == {
-        "values": [
-            {"flag": "hello", "result": False},
-        ]
-    }
+    found = False
+    for event in events:
+        if "exception" in event.keys():
+            assert event["contexts"]["flags"] == {
+                "values": [
+                    {"flag": "hello", "result": False},
+                ]
+            }
+            found = True
+
+    assert found, "No event with exception found"
