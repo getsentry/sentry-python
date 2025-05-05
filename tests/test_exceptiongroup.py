@@ -1,4 +1,5 @@
 import sys
+from unittest import mock
 import pytest
 
 from sentry_sdk.utils import event_from_exception
@@ -315,3 +316,240 @@ def test_simple_exception():
 
     exception_values = event["exception"]["values"]
     assert exception_values == expected_exception_values
+
+
+@minimum_python_311
+def test_exceptiongroup_recursion():
+    exception_group = None
+
+    my_error = RuntimeError("my error")
+    try:
+        try:
+            raise my_error
+        except RuntimeError:
+            raise ExceptionGroup(
+                "my_group",
+                [my_error],
+            )
+    except ExceptionGroup as e:
+        exception_group = e
+
+    (event, _) = event_from_exception(
+        exception_group,
+        client_options={
+            "include_local_variables": True,
+            "include_source_context": True,
+            "max_value_length": 1024,
+        },
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    values = event["exception"]["values"]
+
+    # For this test the stacktrace and the module is not important
+    for x in values:
+        if "stacktrace" in x:
+            del x["stacktrace"]
+        if "module" in x:
+            del x["module"]
+
+    # One ExceptionGroup,
+    # then the RuntimeError in the ExceptionGroup,
+    # and the original RuntimeError that was raised.
+    assert len(values) == 3
+
+    expected_values = [
+        {
+            "mechanism": {
+                "exception_id": 2,
+                "handled": False,
+                "parent_id": 0,
+                "source": "exceptions[0]",
+                "type": "chained",
+            },
+            "type": "RuntimeError",
+            "value": "my error",
+        },
+        {
+            "mechanism": {
+                "exception_id": 1,
+                "handled": False,
+                "parent_id": 0,
+                "source": "__context__",
+                "type": "chained",
+            },
+            "type": "RuntimeError",
+            "value": "my error",
+        },
+        {
+            "mechanism": {
+                "exception_id": 0,
+                "handled": False,
+                "is_exception_group": True,
+                "type": "test_suite",
+            },
+            "type": "ExceptionGroup",
+            "value": "my_group",
+        },
+    ]
+
+    assert values == expected_values
+
+
+@minimum_python_311
+def test_exceptiongroup_recursion_multiple_levels():
+    error = None
+
+    my_error = RuntimeError("my error")
+    my_error_2 = RuntimeError("my error 2")
+    try:
+        try:
+            raise my_error
+        except RuntimeError:
+            try:
+                raise ExceptionGroup(
+                    "my_group",
+                    [my_error_2],
+                )
+            except ExceptionGroup:
+                raise my_error
+
+    except RuntimeError as e:
+        error = e
+
+    (event, _) = event_from_exception(
+        error,
+        client_options={
+            "include_local_variables": True,
+            "include_source_context": True,
+            "max_value_length": 1024,
+        },
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    values = event["exception"]["values"]
+
+    # For this test the stacktrace and the module is not important
+    for x in values:
+        if "stacktrace" in x:
+            del x["stacktrace"]
+        if "module" in x:
+            del x["module"]
+
+    # One ExceptionGroup,
+    # then the RuntimeError in the ExceptionGroup,
+    # and the original RuntimeError that was raised.
+    assert len(values) == 3
+
+    expected_values = [
+        {
+            "mechanism": {
+                "type": "chained",
+                "handled": False,
+                "exception_id": 2,
+                "source": "exceptions[0]",
+                "parent_id": 1,
+            },
+            "type": "RuntimeError",
+            "value": "my error 2",
+        },
+        {
+            "mechanism": {
+                "type": "chained",
+                "handled": False,
+                "exception_id": 1,
+                "source": "__context__",
+                "parent_id": 0,
+                "is_exception_group": True,
+            },
+            "type": "ExceptionGroup",
+            "value": "my_group",
+        },
+        {
+            "mechanism": {
+                "type": "test_suite",
+                "handled": False,
+                "exception_id": 0,
+            },
+            "type": "RuntimeError",
+            "value": "my error",
+        },
+    ]
+
+    assert values == expected_values
+
+
+@minimum_python_311
+def test_too_many_exceptions():
+    with mock.patch("sentry_sdk.utils.MAX_EXCEPTIONS", 3):
+        error = None
+        try:
+            try:
+                raise RuntimeError("my error 1")
+            except RuntimeError:
+                try:
+                    raise RuntimeError("my error 2")
+                except RuntimeError:
+                    try:
+                        raise RuntimeError("my error 3")
+                    except RuntimeError:
+                        raise RuntimeError("my error 4")
+        except RuntimeError as e:
+            error = e
+
+        (event, _) = event_from_exception(
+            error,
+            client_options={
+                "include_local_variables": True,
+                "include_source_context": True,
+                "max_value_length": 1024,
+            },
+            mechanism={"type": "test_suite", "handled": False},
+        )
+
+    values = event["exception"]["values"]
+
+    # For this test the stacktrace and the module is not important
+    for x in values:
+        if "stacktrace" in x:
+            del x["stacktrace"]
+        if "module" in x:
+            del x["module"]
+
+    assert len(values) == 3
+
+    expected_values = [
+        {
+            "mechanism": {
+                "type": "chained",
+                "handled": False,
+                "exception_id": 2,
+                "source": "__context__",
+                "parent_id": 1,
+            },
+            "type": "RuntimeError",
+            "value": "my error 2",
+        },
+        {
+            "mechanism": {
+                "type": "chained",
+                "handled": False,
+                "exception_id": 1,
+                "source": "__context__",
+                "parent_id": 0,
+            },
+            "type": "RuntimeError",
+            "value": "my error 3",
+        },
+        {
+            "mechanism": {
+                "type": "test_suite",
+                "handled": False,
+                "exception_id": 0,
+            },
+            "type": "RuntimeError",
+            "value": "my error 4",
+        },
+    ]
+
+    assert values == expected_values
