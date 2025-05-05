@@ -16,6 +16,7 @@ __all__ = [  # noqa
     "integrations",
     # From sentry_sdk.api
     "init",
+    "add_attachment",
     "add_breadcrumb",
     "capture_event",
     "capture_exception",

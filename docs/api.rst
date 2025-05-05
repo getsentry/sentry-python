@@ -25,6 +25,7 @@ Capturing Data
 Enriching Events
 ================
 
+.. autofunction:: sentry_sdk.api.add_attachment
 .. autofunction:: sentry_sdk.api.add_breadcrumb
 .. autofunction:: sentry_sdk.api.set_context
 .. autofunction:: sentry_sdk.api.set_extra
