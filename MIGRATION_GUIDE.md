@@ -93,7 +93,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
     | full URL       | `url.full`                      |
     | `headers`      | `http.request.header.{header}`  |
 
-  -The RQ integration doesn't add the `rq_job` object anymore. Instead, the individual properties of the job and the queue, if available, are accessible as follows:
+  - The RQ integration doesn't add the `rq_job` object anymore. Instead, the individual properties of the job and the queue, if available, are accessible as follows:
 
     | RQ property     | Sampling context key         | Example                |
     | --------------- | ---------------------------- | ---------------------- |
