@@ -432,6 +432,21 @@ class PropagationContext:
         # type: (str) -> None
         self._span_id = value
 
+    def to_traceparent(self):
+        # type: () -> str
+        if self.parent_sampled is True:
+            sampled = "1"
+        elif self.parent_sampled is False:
+            sampled = "0"
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
+
     def update(self, other_dict):
         # type: (Dict[str, Any]) -> None
         """
