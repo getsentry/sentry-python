@@ -6,6 +6,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ### New Features
 
+- Added `add_attachment()` as a top level API, so you can do now: `sentry_sdk.add_attachment(...)` (up until now it was only available on the `Scope`)
+
 ### Changed
 
 - The SDK now supports Python 3.7 and higher.
