@@ -158,9 +158,10 @@ be expressed like so:
 
 Sometimes we want to test a single integration against two different sets of
 dependencies. For example, `langchain` should be tested both with and without
-`tiktoken`. In that case, add the variant as its own entry in `TEST_SUITE_CONFIG`
-and link it from the base variant by referencing its name in `variants` of the
-original variant:
+`tiktoken`. In that case:
+
+- add the variant as its own entry in `TEST_SUITE_CONFIG`
+- link it from the base variant via the `variants` key
 
 ```python
 {
