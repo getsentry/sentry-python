@@ -19,42 +19,44 @@ minimum_python_37 = pytest.mark.skipif(
 
 
 def otel_attributes_to_dict(otel_attrs):
-    # type: (List[Mapping[str, Any]]) -> Mapping[str, Any]
+    # type: (Mapping[str, Any]) -> Mapping[str, Any]
     def _convert_attr(attr):
         # type: (Mapping[str, Union[str, float, bool]]) -> Any
-        if "boolValue" in attr:
-            return bool(attr["boolValue"])
-        if "doubleValue" in attr:
-            return float(attr["doubleValue"])
-        if "intValue" in attr:
-            return int(attr["intValue"])
-        if attr["stringValue"].startswith("{"):
+        if attr["type"] == "boolean":
+            return attr["value"]
+        if attr["type"] == "double":
+            return attr["value"]
+        if attr["type"] == "integer":
+            return attr["value"]
+        if attr["value"].startswith("{"):
             try:
                 return json.loads(attr["stringValue"])
             except ValueError:
                 pass
-        return str(attr["stringValue"])
+        return str(attr["value"])
 
-    return {item["key"]: _convert_attr(item["value"]) for item in otel_attrs}
+    return {k: _convert_attr(v) for (k, v) in otel_attrs.items()}
 
 
 def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
     res = []  # type: List[Log]
     for envelope in envelopes:
         for item in envelope.items:
-            if item.type == "otel_log":
-                log_json = item.payload.json
-                log = {
-                    "severity_text": log_json["severityText"],
-                    "severity_number": log_json["severityNumber"],
-                    "body": log_json["body"]["stringValue"],
-                    "attributes": otel_attributes_to_dict(log_json["attributes"]),
-                    "time_unix_nano": int(log_json["timeUnixNano"]),
-                    "trace_id": None,
-                }  # type: Log
-                if "traceId" in log_json:
-                    log["trace_id"] = log_json["traceId"]
-                res.append(log)
+            if item.type == "log":
+                for log_json in item.payload.json["items"]:
+                    log = {
+                        "severity_text": log_json["attributes"]["sentry.severity_text"][
+                            "value"
+                        ],
+                        "severity_number": int(
+                            log_json["attributes"]["sentry.severity_number"]["value"]
+                        ),
+                        "body": log_json["body"],
+                        "attributes": otel_attributes_to_dict(log_json["attributes"]),
+                        "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
+                        "trace_id": log_json["trace_id"],
+                    }  # type: Log
+                    res.append(log)
     return res
 
 
@@ -344,7 +346,6 @@ def test_logging_errors(sentry_init, capture_envelopes):
     error_event_2 = envelopes[1].items[0].payload.json
     assert error_event_2["level"] == "error"
 
-    print(envelopes)
     logs = envelopes_to_logs(envelopes)
     assert logs[0]["severity_text"] == "error"
     assert "sentry.message.template" not in logs[0]["attributes"]
@@ -360,6 +361,36 @@ def test_logging_errors(sentry_init, capture_envelopes):
     assert "code.line.number" in logs[1]["attributes"]
 
     assert len(logs) == 2
+
+
+def test_log_strips_project_root(sentry_init, capture_envelopes):
+    """
+    The python logger should strip project roots from the log record path
+    """
+    sentry_init(
+        _experiments={"enable_logs": True},
+        project_root="/custom/test",
+    )
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.handle(
+        logging.LogRecord(
+            name="test-logger",
+            level=logging.WARN,
+            pathname="/custom/test/blah/path.py",
+            lineno=123,
+            msg="This is a test log with a custom pathname",
+            args=(),
+            exc_info=None,
+        )
+    )
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 1
+    attrs = logs[0]["attributes"]
+    assert attrs["code.file.path"] == "blah/path.py"
 
 
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
