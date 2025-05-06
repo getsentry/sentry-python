@@ -156,18 +156,6 @@ TEST_SUITE_CONFIG = {
     "loguru": {
         "package": "loguru",
     },
-    # openai: pytest-asyncio
-    # openai-v1.0: openai~=1.0.0
-    # openai-v1.0: tiktoken
-    # openai-v1.0: httpx<0.28.0
-    # openai-v1.22: openai~=1.22.0
-    # openai-v1.22: tiktoken
-    # openai-v1.22: httpx<0.28.0
-    # openai-v1.55: openai~=1.55.0
-    # openai-v1.55: tiktoken
-    # openai-latest: openai
-    # openai-latest: tiktoken~=0.6.0
-    # openai-notiktoken: openai
     "openai": {
         "package": "openai",
         "deps": {
@@ -175,6 +163,7 @@ TEST_SUITE_CONFIG = {
             "<1.23": ["httpx<0.28.0"],
         },
         "variants": ["openai-notiktoken"],
+        "python": ">=3.9",
     },
     "openai-notiktoken": {
         "package": "openai",
