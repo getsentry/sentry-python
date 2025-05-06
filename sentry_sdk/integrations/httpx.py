@@ -9,6 +9,7 @@ from sentry_sdk.utils import (
     http_client_status_to_breadcrumb_level,
     logger,
     parse_url,
+    set_thread_info_from_span,
 )
 
 from typing import TYPE_CHECKING
@@ -65,6 +66,8 @@ def _install_httpx_client():
             data = {
                 SPANDATA.HTTP_METHOD: request.method,
             }
+            set_thread_info_from_span(data, span)
+
             if parsed_url is not None:
                 data["url"] = parsed_url.url
                 data[SPANDATA.HTTP_QUERY] = parsed_url.query

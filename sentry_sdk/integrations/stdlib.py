@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
     logger,
     safe_repr,
     parse_url,
+    set_thread_info_from_span,
 )
 
 from typing import TYPE_CHECKING
@@ -102,6 +103,8 @@ def _install_httplib():
         data = {
             SPANDATA.HTTP_METHOD: method,
         }
+        set_thread_info_from_span(data, span)
+
         if parsed_url is not None:
             data["url"] = parsed_url.url
             data[SPANDATA.HTTP_QUERY] = parsed_url.query
@@ -256,8 +259,8 @@ def _install_subprocess():
                 thread_id, thread_name = get_current_thread_meta()
                 breadcrumb_data = {
                     "subprocess.pid": self.pid,
-                    "thread.id": thread_id,
-                    "thread.name": thread_name,
+                    SPANDATA.THREAD_ID: thread_id,
+                    SPANDATA.THREAD_NAME: thread_name,
                 }
                 if cwd:
                     breadcrumb_data["subprocess.cwd"] = cwd

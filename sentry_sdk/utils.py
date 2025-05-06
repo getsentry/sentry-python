@@ -29,6 +29,7 @@ from sentry_sdk.consts import (
     DEFAULT_ADD_FULL_STACK,
     DEFAULT_MAX_STACK_FRAMES,
     DEFAULT_MAX_VALUE_LENGTH,
+    SPANDATA,
     EndpointType,
 )
 from sentry_sdk._types import Annotated, AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
@@ -1941,3 +1942,11 @@ def http_client_status_to_breadcrumb_level(status_code):
             return "warning"
 
     return "info"
+
+
+def set_thread_info_from_span(data, span):
+    # type: (Dict[str, Any], sentry_sdk.tracing.Span) -> None
+    if span.get_attribute(SPANDATA.THREAD_ID) is not None:
+        data[SPANDATA.THREAD_ID] = span.get_attribute(SPANDATA.THREAD_ID)
+        if span.get_attribute(SPANDATA.THREAD_NAME) is not None:
+            data[SPANDATA.THREAD_NAME] = span.get_attribute(SPANDATA.THREAD_NAME)
