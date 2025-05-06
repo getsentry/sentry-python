@@ -156,6 +156,22 @@ TEST_SUITE_CONFIG = {
     "loguru": {
         "package": "loguru",
     },
+    "openai": {
+        "package": "openai",
+        "deps": {
+            "*": ["tiktoken", "pytest-asyncio"],
+            "<1.23": ["httpx<0.28.0"],
+        },
+        "variants": ["openai-notiktoken"],
+    },
+    "openai-notiktoken": {
+        "package": "openai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+            "<1.23": ["httpx<0.28.0"],
+        },
+        "python": ">=3.9",
+    },
     "openfeature": {
         "package": "openfeature-sdk",
     },
