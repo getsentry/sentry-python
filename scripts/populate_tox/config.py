@@ -151,7 +151,8 @@ TEST_SUITE_CONFIG = {
     "langchain-notiktoken": {
         "package": "langchain",
         "deps": {
-            "*": ["langchain-openai"],
+            "*": ["openai"],
+            "<0.2": ["httpx<0.28.0"],
             ">0.2": ["langchain-community"],
         },
     },
