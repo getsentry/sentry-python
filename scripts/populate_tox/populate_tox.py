@@ -74,8 +74,6 @@ IGNORE = {
     "chalice",
     "gcp",
     "httpx",
-    "openai",
-    "openai_notiktoken",
     "pure_eval",
     "quart",
     "ray",
