@@ -156,7 +156,7 @@ be expressed like so:
 
 ### `variants`
 
-Sometimes we want to test a single integration against two different sets of
+You might want to test a single integration against two different sets of
 dependencies. For example, `langchain` should be tested both with and without
 `tiktoken`. In that case:
 
@@ -175,8 +175,9 @@ dependencies. For example, `langchain` should be tested both with and without
 }
 ```
 
-This will result in both `langchain` and `langchain-notiktoken` being run under
-the Langchain CI workflow.
+Both `langchain` and `langchain-notiktoken` will be run as part of the Langchain
+CI workflow.
+
 
 ## How-Tos
 
