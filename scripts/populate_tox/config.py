@@ -152,6 +152,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "deps": {
             "*": ["langchain-openai"],
+            ">0.2": ["langchain-community"],
         },
     },
     "launchdarkly": {
