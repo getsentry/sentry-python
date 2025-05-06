@@ -1,3 +1,4 @@
+import contextlib
 import os
 import json
 import subprocess
@@ -1496,3 +1497,66 @@ def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_
 def test_enable_tracing_deprecated(sentry_init, enable_tracing):
     with pytest.warns(DeprecationWarning):
         sentry_init(enable_tracing=enable_tracing)
+
+
+def make_options_transport_cls():
+    """Make an options transport class that captures the options passed to it."""
+    # We need a unique class for each test so that the options are not
+    # shared between tests.
+
+    class OptionsTransport(Transport):
+        """Transport that captures the options passed to it."""
+
+        def __init__(self, options):
+            super().__init__(options)
+            type(self).options = options
+
+        def capture_envelope(self, _):
+            pass
+
+    return OptionsTransport
+
+
+@contextlib.contextmanager
+def clear_env_var(name):
+    """Helper to clear the a given environment variable,
+    and restore it to its original value on exit."""
+    old_value = os.environ.pop(name, None)
+
+    try:
+        yield
+    finally:
+        if old_value is not None:
+            os.environ[name] = old_value
+        elif name in os.environ:
+            del os.environ[name]
+
+
+@pytest.mark.parametrize(
+    ("env_value", "arg_value", "expected_value"),
+    [
+        (None, None, False),  # default
+        ("0", None, False),  # env var false
+        ("1", None, True),  # env var true
+        (None, False, False),  # arg false
+        (None, True, True),  # arg true
+        # Argument overrides environment variable
+        ("0", True, True),  # env false, arg true
+        ("1", False, False),  # env true, arg false
+    ],
+)
+def test_keep_alive(env_value, arg_value, expected_value):
+    transport_cls = make_options_transport_cls()
+    keep_alive_kwarg = {} if arg_value is None else {"keep_alive": arg_value}
+
+    with clear_env_var("SENTRY_KEEP_ALIVE"):
+        if env_value is not None:
+            os.environ["SENTRY_KEEP_ALIVE"] = env_value
+
+        sentry_sdk.init(
+            dsn="http://foo@sentry.io/123",
+            transport=transport_cls,
+            **keep_alive_kwarg,
+        )
+
+    assert transport_cls.options["keep_alive"] is expected_value
