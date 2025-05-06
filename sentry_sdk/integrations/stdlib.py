@@ -107,6 +107,11 @@ def _install_httplib():
             data[SPANDATA.HTTP_QUERY] = parsed_url.query
             data[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
+        if span.get_attribute(SPANDATA.THREAD_ID) is not None:
+            data[SPANDATA.THREAD_ID] = span.get_attribute(SPANDATA.THREAD_ID)
+            if span.get_attribute(SPANDATA.THREAD_NAME) is not None:
+                data[SPANDATA.THREAD_NAME] = span.get_attribute(SPANDATA.THREAD_NAME)
+
         for key, value in data.items():
             span.set_attribute(key, value)
 

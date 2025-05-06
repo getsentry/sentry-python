@@ -247,6 +247,8 @@ class Span:
                 if status is not None:
                     self.set_status(status)
 
+                self.update_active_thread()
+
     def __eq__(self, other):
         # type: (object) -> bool
         if not isinstance(other, Span):
