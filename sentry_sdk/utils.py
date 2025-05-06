@@ -37,7 +37,6 @@ from sentry_sdk._types import Annotated, AnnotatedValue, SENSITIVE_DATA_SUBSTITU
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -1946,7 +1945,7 @@ def http_client_status_to_breadcrumb_level(status_code):
 
 
 def set_thread_info_from_span(data, span):
-    # type: (Dict[str, Any], Span) -> None
+    # type: (Dict[str, Any], "sentry_sdk.tracing.Span") -> None
     if span.get_attribute(SPANDATA.THREAD_ID) is not None:
         data[SPANDATA.THREAD_ID] = span.get_attribute(SPANDATA.THREAD_ID)
         if span.get_attribute(SPANDATA.THREAD_NAME) is not None:
