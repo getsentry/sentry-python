@@ -143,7 +143,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "deps": {
             "*": ["openai", "tiktoken"],
-            "<0.2": ["httpx<0.28.0"],
+            "<0.2": ["httpx<0.28.0", "openai~=1.0.0"],
             ">0.2": ["langchain-community"],
         },
     },
