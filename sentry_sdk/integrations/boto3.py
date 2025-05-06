@@ -70,7 +70,6 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     data = {
         SPANDATA.HTTP_METHOD: request.method,
     }
-
     with capture_internal_exceptions():
         parsed_url = parse_url(request.url, sanitize=False)
         data["aws.request.url"] = parsed_url.url
