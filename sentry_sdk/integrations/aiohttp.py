@@ -34,6 +34,7 @@ from sentry_sdk.utils import (
     parse_url,
     parse_version,
     reraise,
+    set_thread_info_from_span,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -241,6 +242,8 @@ def create_trace_config():
         data = {
             SPANDATA.HTTP_METHOD: method,
         }
+        set_thread_info_from_span(data, span)
+
         if parsed_url is not None:
             data["url"] = parsed_url.url
             data[SPANDATA.HTTP_QUERY] = parsed_url.query

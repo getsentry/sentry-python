@@ -8,6 +8,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     parse_url,
     parse_version,
+    set_thread_info_from_span,
 )
 
 from typing import TYPE_CHECKING
@@ -70,6 +71,8 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     data = {
         SPANDATA.HTTP_METHOD: request.method,
     }
+    set_thread_info_from_span(data, span)
+
     with capture_internal_exceptions():
         parsed_url = parse_url(request.url, sanitize=False)
         data["aws.request.url"] = parsed_url.url
