@@ -133,14 +133,14 @@ TEST_SUITE_CONFIG = {
             "<0.2": ["httpx<0.28.0"],
             ">0.2": ["langchain-community"],
         },
-        "variants": ["langchain-notiktoken"],
+        "variants": ["langchain_notiktoken"],
     },
-    "langchain-notiktoken": {
+    "langchain_notiktoken": {
         "package": "langchain",
         "deps": {
             "*": ["openai"],
             "<0.2": ["httpx<0.28.0"],
-            ">0.2": ["langchain-community"],
+            ">0.2": ["langchain_community"],
         },
     },
     "launchdarkly": {
