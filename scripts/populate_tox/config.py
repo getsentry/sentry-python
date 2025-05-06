@@ -146,6 +146,7 @@ TEST_SUITE_CONFIG = {
             "<0.2": ["httpx<0.28.0", "openai~=1.0.0"],
             ">0.2": ["langchain-community"],
         },
+        "variants": ["langchain-notiktoken"],
     },
     "langchain-notiktoken": {
         "package": "langchain",

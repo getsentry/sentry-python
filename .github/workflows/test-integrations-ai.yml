@@ -62,10 +62,6 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-latest"
-      - name: Test langchain-notiktoken latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-notiktoken-latest"
       - name: Test openai latest
         run: |
           set -x # print commands that are executed
@@ -141,10 +137,6 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain"
-      - name: Test langchain-notiktoken pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain-notiktoken"
       - name: Test openai pinned
         run: |
           set -x # print commands that are executed
