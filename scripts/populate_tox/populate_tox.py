@@ -74,8 +74,6 @@ IGNORE = {
     "chalice",
     "gcp",
     "httpx",
-    "langchain",
-    "langchain_notiktoken",
     "openai",
     "openai_notiktoken",
     "pure_eval",
@@ -647,6 +645,17 @@ def main(fail_on_changes: bool = False) -> None:
                         "releases": test_releases,
                     }
                 )
+
+                variants = TEST_SUITE_CONFIG[integration].get("variants") or []
+                for variant in variants:
+                    packages[group].append(
+                        {
+                            "name": variant,
+                            "package": package,
+                            "extra": extra,
+                            "releases": test_releases,
+                        }
+                    )
 
     if fail_on_changes:
         old_file_hash = get_file_hash()

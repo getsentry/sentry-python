@@ -46,6 +46,7 @@ integration_name: {
      },
      "python": python_version_specifier,
      "include": package_version_specifier,
+     "variants": another_integration_name,
 }
 ```
 
@@ -152,6 +153,30 @@ be expressed like so:
     ...
 }
 ```
+
+### `variants`
+
+You might want to test a single integration against two different sets of
+dependencies. For example, `langchain` should be tested both with and without
+`tiktoken`. In that case:
+
+- add the variant as its own entry in `TEST_SUITE_CONFIG`
+- link it from the base variant via the `variants` key
+
+```python
+{
+    "langchain": {
+        "variants": ["langchain-notiktoken"],
+        ...
+    },
+    "langchain-notiktoken": {
+        ...
+    }
+}
+```
+
+Both `langchain` and `langchain-notiktoken` will be run as part of the Langchain
+CI workflow.
 
 
 ## How-Tos
