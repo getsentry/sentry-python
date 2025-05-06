@@ -163,7 +163,6 @@ TEST_SUITE_CONFIG = {
             "<1.23": ["httpx<0.28.0"],
         },
         "variants": ["openai-notiktoken"],
-        "python": ">=3.9",
     },
     "openai-notiktoken": {
         "package": "openai",
@@ -171,6 +170,7 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
             "<1.23": ["httpx<0.28.0"],
         },
+        "python": ">=3.9",
     },
     "openfeature": {
         "package": "openfeature-sdk",
