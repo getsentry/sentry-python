@@ -3,3 +3,4 @@ shibuya
 sphinx<8.2
 sphinx-autodoc-typehints[type_comments]>=1.8.0
 typing-extensions
+snowballstemmer<3.0
