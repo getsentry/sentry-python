@@ -225,46 +225,55 @@ class SPANDATA:
 
     AI_DOCUMENTS = "ai.documents"
     """
+
     Example:
     """
 
     AI_SEARCH_QUERIES = "ai.search_queries"
     """
+
     Example:
     """
 
     AI_SEARCH_RESULTS = "ai.search_results"
     """
+
     Example:
     """
 
     AI_GENERATION_ID = "ai.generation_id"
     """
+
     Example:
     """
 
     AI_SEARCH_REQUIRED = "ai.is_search_required"
     """
+
     Example:
     """
 
     AI_FINISH_REASON = "ai.finish_reason"
     """
+
     Example:
     """
 
     AI_PIPELINE_NAME = "ai.pipeline.name"
     """
+
     Example:
     """
 
     AI_TEXTS = "ai.texts"
     """
+
     Example:
     """
 
     AI_WARNINGS = "ai.warnings"
     """
+
     Example:
     """
 
