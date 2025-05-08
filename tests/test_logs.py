@@ -393,6 +393,27 @@ def test_log_strips_project_root(sentry_init, capture_envelopes):
     assert attrs["code.file.path"] == "blah/path.py"
 
 
+def test_extra_data(sentry_init, capture_envelopes):
+    """
+    The python logger should be able to log extra data
+    """
+    sentry_init(_experiments={"enable_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning(
+        "log #%d",
+        1,
+        extra={"foo": "bar", "numeric": 42, "more_complex": {"nested": "data"}},
+    )
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    assert logs[0]["attributes"]["foo"] == "bar"
+    assert logs[0]["attributes"]["numeric"] == 42
+    assert logs[0]["attributes"]["more_complex"] == '{"nested": "data"}'
+
+
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     """
     If you log >100 logs, it should automatically trigger a flush.
