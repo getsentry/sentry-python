@@ -187,7 +187,7 @@ class SPANDATA:
     For an AI model call, the format of the response
     """
 
-    AI_LOGIT_BIAS = "ai.response_format"
+    AI_LOGIT_BIAS = "ai.logit_bias"
     """
     For an AI model call, the logit bias
     """
