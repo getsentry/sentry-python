@@ -219,20 +219,21 @@ class SPANDATA:
 
     AI_CITATIONS = "ai.citations"
     """
+
     Example:
     """
 
-    AI_DOCUMENTS = ("ai.documents",)
-    """
-    Example:
-    """
-
-    AI_SEARCH_QUERIES = ("ai.search_queries",)
+    AI_DOCUMENTS = "ai.documents"
     """
     Example:
     """
 
-    AI_SEARCH_RESULTS = ("ai.search_results",)
+    AI_SEARCH_QUERIES = "ai.search_queries"
+    """
+    Example:
+    """
+
+    AI_SEARCH_RESULTS = "ai.search_results"
     """
     Example:
     """
