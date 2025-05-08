@@ -30,7 +30,7 @@ def otel_attributes_to_dict(otel_attrs):
             return attr["value"]
         if attr["value"].startswith("{"):
             try:
-                return json.loads(attr["stringValue"])
+                return json.loads(attr["value"])
             except ValueError:
                 pass
         return str(attr["value"])
@@ -393,9 +393,9 @@ def test_log_strips_project_root(sentry_init, capture_envelopes):
     assert attrs["code.file.path"] == "blah/path.py"
 
 
-def test_extra_data(sentry_init, capture_envelopes):
+def test_logger_with_all_attributes(sentry_init, capture_envelopes):
     """
-    The python logger should be able to log extra data
+    The python logger should be able to log all attributes, including extra data.
     """
     sentry_init(_experiments={"enable_logs": True})
     envelopes = capture_envelopes()
@@ -409,9 +409,60 @@ def test_extra_data(sentry_init, capture_envelopes):
     get_client().flush()
 
     logs = envelopes_to_logs(envelopes)
-    assert logs[0]["attributes"]["foo"] == "bar"
-    assert logs[0]["attributes"]["numeric"] == 42
-    assert logs[0]["attributes"]["more_complex"] == '{"nested": "data"}'
+
+    attributes = logs[0]["attributes"]
+
+    assert "process.pid" in attributes
+    assert isinstance(attributes["process.pid"], int)
+    del attributes["process.pid"]
+
+    assert "sentry.release" in attributes
+    assert isinstance(attributes["sentry.release"], str)
+    del attributes["sentry.release"]
+
+    assert "server.address" in attributes
+    assert isinstance(attributes["server.address"], str)
+    del attributes["server.address"]
+
+    assert "thread.id" in attributes
+    assert isinstance(attributes["thread.id"], int)
+    del attributes["thread.id"]
+
+    assert "code.file.path" in attributes
+    assert isinstance(attributes["code.file.path"], str)
+    del attributes["code.file.path"]
+
+    assert "code.function.name" in attributes
+    assert isinstance(attributes["code.function.name"], str)
+    del attributes["code.function.name"]
+
+    assert "code.line.number" in attributes
+    assert isinstance(attributes["code.line.number"], int)
+    del attributes["code.line.number"]
+
+    assert "process.executable.name" in attributes
+    assert isinstance(attributes["process.executable.name"], str)
+    del attributes["process.executable.name"]
+
+    assert "thread.name" in attributes
+    assert isinstance(attributes["thread.name"], str)
+    del attributes["thread.name"]
+
+    # Assert on the remaining non-dynamic attributes.
+    assert attributes == {
+        "foo": "bar",
+        "numeric": 42,
+        "more_complex": "{'nested': 'data'}",
+        "logger.name": "test-logger",
+        "sentry.origin": "auto.logger.log",
+        "sentry.message.template": "log #%d",
+        "sentry.message.parameters.0": 1,
+        "sentry.environment": "production",
+        "sentry.sdk.name": "sentry.python",
+        "sentry.sdk.version": VERSION,
+        "sentry.severity_number": 13,
+        "sentry.severity_text": "warn",
+    }
 
 
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
