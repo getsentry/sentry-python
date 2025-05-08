@@ -6,7 +6,7 @@
 _Bad software is everywhere, and we're tired of it. Sentry is on a mission to help developers write better software faster, so we can get back to enjoying technology. If you want to join us
 [<kbd>**Check out our open positions**</kbd>](https://sentry.io/careers/)_.
 
-[![Discord](https://img.shields.io/discord/621778831602221064?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb)](https://discord.gg/wdNEHETs87)
+[![Discord](https://img.shields.io/discord/621778831602221064?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb)](https://discord.com/invite/Ww9hbqr)
 [![Twitter Follow](https://img.shields.io/twitter/follow/getsentry?label=@getsentry&style=social)](https://twitter.com/intent/follow?screen_name=getsentry)
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 <img src="https://img.shields.io/badge/python-3.7 | 3.8 | 3.9 | 3.10 | 3.11 | 3.12 | 3.13-blue.svg" alt="python">
@@ -106,7 +106,7 @@ If you encounter issues or need help setting up or configuring the SDK, don't he
 Here are all resources to help you make the most of Sentry:
 
 - [Documentation](https://docs.sentry.io/platforms/python/) - Official documentation to get started.
-- [Discord](https://img.shields.io/discord/621778831602221064) - Join our Discord community.
+- [Discord](https://discord.com/invite/Ww9hbqr) - Join our Discord community.
 - [X/Twitter](https://twitter.com/intent/follow?screen_name=getsentry) -  Follow us on X (Twitter) for updates.
 - [Stack Overflow](https://stackoverflow.com/questions/tagged/sentry) - Questions and answers related to Sentry.
 
