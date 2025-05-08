@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.0.0a1
+
+### Various fixes & improvements
+
+- CI fixes (#3152) by @sl0thentr0py
+- Update tox, remove redis-latest (#3152) by @sl0thentr0py
+- Update version in setup.py (#3152) by @sl0thentr0py
+- Update version (#3152) by @sl0thentr0py
+- Add thread info to HTTP breadcrumbs (#4368) by @sl0thentr0py
+- tests: Regular tox update (#4367) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 2.0.2 to 2.0.6 (#4358) by @dependabot
+- Put feature flags on isolation scope (#4363) by @antonpirker
+- Add top level API for `add_atttachment`. (#4360) by @sl0thentr0py
+- Fix FastAPI recursive exceptions (#4334) by @sl0thentr0py
+- Respect parent_sampled decision in propagation_context sentry-trace header (#4356) by @sl0thentr0py
+- Add logger.debug for sampler decisions for root spans (#4355) by @sl0thentr0py
+- Fix feature flags in potel (#4353) by @sl0thentr0py
+- Fix migration guide formatting (#3152) by @sl0thentr0py
+- tests: bump test timeout for recursion stacktrace extract to 2s (#4351) by @booxter
+- feat(ourlogs): canonicalize paths from the logger integration (#4336) by @colin-sentry
+- chore(ourlogs): Use new transport (#4317) by @colin-sentry
+- tests: fix test_stacktrace_big_recursion failure due to argv (#4346) by @booxter
+- tests: Move anthropic under toxgen (#4348) by @sentrivana
+- Deprecate `set_measurement()` API. (#3934) by @antonpirker
+- tests: Update tox.ini (#4347) by @sentrivana
+- Traces sample rate default change (#4335) by @sl0thentr0py
+- Introduce underscore span attributes (#4331) by @sl0thentr0py
+- Add migration note about SentrySpanProcessor and SentryPropagator (#3152) by @sl0thentr0py
+
+_Plus 236 more_
+
 ## 2.27.0
 
 ### Various fixes & improvements
