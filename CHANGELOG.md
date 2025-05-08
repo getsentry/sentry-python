@@ -2,34 +2,24 @@
 
 ## 3.0.0a1
 
-### Various fixes & improvements
+We're excited to announce that version 3.0 of the Sentry Python SDK is now
+available. This release is the result of a long-term effort to use OpenTelemetry
+under the hood for tracing. This switch opens the door for us to leverage the
+full power of OpenTelemetry, so stay tuned for more integrations and features
+in future releases.
 
-- CI fixes (#3152) by @sl0thentr0py
-- Update tox, remove redis-latest (#3152) by @sl0thentr0py
-- Update version in setup.py (#3152) by @sl0thentr0py
-- Update version (#3152) by @sl0thentr0py
-- Add thread info to HTTP breadcrumbs (#4368) by @sl0thentr0py
-- tests: Regular tox update (#4367) by @sentrivana
-- build(deps): bump actions/create-github-app-token from 2.0.2 to 2.0.6 (#4358) by @dependabot
-- Put feature flags on isolation scope (#4363) by @antonpirker
-- Add top level API for `add_atttachment`. (#4360) by @sl0thentr0py
-- Fix FastAPI recursive exceptions (#4334) by @sl0thentr0py
-- Respect parent_sampled decision in propagation_context sentry-trace header (#4356) by @sl0thentr0py
-- Add logger.debug for sampler decisions for root spans (#4355) by @sl0thentr0py
-- Fix feature flags in potel (#4353) by @sl0thentr0py
-- Fix migration guide formatting (#3152) by @sl0thentr0py
-- tests: bump test timeout for recursion stacktrace extract to 2s (#4351) by @booxter
-- feat(ourlogs): canonicalize paths from the logger integration (#4336) by @colin-sentry
-- chore(ourlogs): Use new transport (#4317) by @colin-sentry
-- tests: fix test_stacktrace_big_recursion failure due to argv (#4346) by @booxter
-- tests: Move anthropic under toxgen (#4348) by @sentrivana
-- Deprecate `set_measurement()` API. (#3934) by @antonpirker
-- tests: Update tox.ini (#4347) by @sentrivana
-- Traces sample rate default change (#4335) by @sl0thentr0py
-- Introduce underscore span attributes (#4331) by @sl0thentr0py
-- Add migration note about SentrySpanProcessor and SentryPropagator (#3152) by @sl0thentr0py
+Looking to upgrade from Sentry SDK 2.x to 3.x? See the
+[full list of changes](MIGRATION_GUIDE.md) for a comprehensive overview
+of what's changed. Looking for a more digestible summary? See the
+[migration guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+with the most common migration patterns.
 
-_Plus 236 more_
+⚠️ This is a pre-release. If you feel like taking it for a spin, we'd be grateful
+for your feedback. How was the migration? Is everything working as expected? Is
+*nothing* working as expected? Something in between? Please let us know
+[on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
+[on Discord](https://discord.gg/wdNEHETs87).
+
 
 ## 2.27.0
 
