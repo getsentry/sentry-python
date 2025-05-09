@@ -355,9 +355,7 @@ class SentryLogsHandler(_BaseHandler):
         scope = sentry_sdk.get_current_scope()
         otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
         project_root = client.options["project_root"]
-        attrs = self._extra_from_record(
-            record
-        )  # type: dict[str, str | bool | float | int]
+        attrs = self._extra_from_record(record)  # type: Any
         attrs["sentry.origin"] = "auto.logger.log"
         if isinstance(record.msg, str):
             attrs["sentry.message.template"] = record.msg
