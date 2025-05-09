@@ -97,7 +97,7 @@ def _wrap_text_generation(f):
                 if should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span,
-                        "ai.responses",
+                        SPANDATA.AI_RESPONSES,
                         [res],
                     )
                 span.__exit__(None, None, None)
@@ -107,7 +107,7 @@ def _wrap_text_generation(f):
                 if should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span,
-                        "ai.responses",
+                        SPANDATA.AI_RESPONSES,
                         [res.generated_text],
                     )
                 if res.details is not None and res.details.generated_tokens > 0:
