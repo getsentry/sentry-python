@@ -10,25 +10,22 @@ from copy import deepcopy
 from functools import partial
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SOURCE_FOR_STYLE, TransactionSource
 
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
+    _get_query,
     _get_request_data,
     _get_url,
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    nullcontext,
+    _request_headers_to_span_attributes,
 )
 from sentry_sdk.sessions import track_session
-from sentry_sdk.tracing import (
-    SOURCE_FOR_STYLE,
-    TransactionSource,
-)
 from sentry_sdk.utils import (
     ContextVar,
+    capture_internal_exceptions,
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -36,7 +33,6 @@ from sentry_sdk.utils import (
     transaction_from_function,
     _get_installed_modules,
 )
-from sentry_sdk.tracing import Transaction
 
 from typing import TYPE_CHECKING
 
@@ -55,6 +51,14 @@ _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+
+ASGI_SCOPE_PROPERTY_TO_ATTRIBUTE = {
+    "http_version": "network.protocol.version",
+    "method": "http.request.method",
+    "path": "url.path",
+    "scheme": "url.scheme",
+    "type": "network.protocol.name",
+}
 
 
 def _capture_exception(exc, mechanism_type="asgi"):
@@ -100,7 +104,7 @@ class SentryAsgiMiddleware:
         unsafe_context_data=False,  # type: bool
         transaction_style="endpoint",  # type: str
         mechanism_type="asgi",  # type: str
-        span_origin="manual",  # type: str
+        span_origin=None,  # type: Optional[str]
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: Tuple[str, ...]
     ):
         # type: (...) -> None
@@ -157,24 +161,40 @@ class SentryAsgiMiddleware:
         # type: (Any, Any, Any) -> Any
         return await self._run_app(scope, receive, send, asgi_version=3)
 
+    async def _run_original_app(self, scope, receive, send, asgi_version):
+        # type: (Any, Any, Any, Any, int) -> Any
+        try:
+            if asgi_version == 2:
+                return await self.app(scope)(receive, send)
+            else:
+                return await self.app(scope, receive, send)
+
+        except Exception as exc:
+            _capture_exception(exc, mechanism_type=self.mechanism_type)
+            raise exc from None
+
     async def _run_app(self, scope, receive, send, asgi_version):
         # type: (Any, Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         is_lifespan = scope["type"] == "lifespan"
         if is_recursive_asgi_middleware or is_lifespan:
-            try:
-                if asgi_version == 2:
-                    return await self.app(scope)(receive, send)
-                else:
-                    return await self.app(scope, receive, send)
-
-            except Exception as exc:
-                _capture_exception(exc, mechanism_type=self.mechanism_type)
-                raise exc from None
+            return await self._run_original_app(scope, receive, send, asgi_version)
 
         _asgi_middleware_applied.set(True)
         try:
             with sentry_sdk.isolation_scope() as sentry_scope:
+                (
+                    transaction_name,
+                    transaction_source,
+                ) = self._get_transaction_name_and_source(
+                    self.transaction_style,
+                    scope,
+                )
+                sentry_scope.set_transaction_name(
+                    transaction_name,
+                    source=transaction_source,
+                )
+
                 with track_session(sentry_scope, session_mode="request"):
                     sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
@@ -182,82 +202,47 @@ class SentryAsgiMiddleware:
                     sentry_scope.add_event_processor(processor)
 
                     ty = scope["type"]
-                    (
-                        transaction_name,
-                        transaction_source,
-                    ) = self._get_transaction_name_and_source(
-                        self.transaction_style,
-                        scope,
-                    )
 
                     method = scope.get("method", "").upper()
-                    transaction = None
-                    if ty in ("http", "websocket"):
-                        if ty == "websocket" or method in self.http_methods_to_capture:
-                            transaction = continue_trace(
-                                _get_headers(scope),
-                                op="{}.server".format(ty),
-                                name=transaction_name,
-                                source=transaction_source,
-                                origin=self.span_origin,
-                            )
-                            logger.debug(
-                                "[ASGI] Created transaction (continuing trace): %s",
-                                transaction,
-                            )
-                    else:
-                        transaction = Transaction(
-                            op=OP.HTTP_SERVER,
+                    should_trace = ty == "websocket" or (
+                        ty == "http" and method in self.http_methods_to_capture
+                    )
+                    if not should_trace:
+                        return await self._run_original_app(
+                            scope, receive, send, asgi_version
+                        )
+
+                    with sentry_sdk.continue_trace(_get_headers(scope)):
+                        with sentry_sdk.start_span(
+                            op=(
+                                OP.WEBSOCKET_SERVER
+                                if ty == "websocket"
+                                else OP.HTTP_SERVER
+                            ),
                             name=transaction_name,
                             source=transaction_source,
                             origin=self.span_origin,
-                        )
-                        logger.debug(
-                            "[ASGI] Created transaction (new): %s", transaction
-                        )
-
-                    if transaction:
-                        transaction.set_tag("asgi.type", ty)
-                        logger.debug(
-                            "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
-                            transaction.name,
-                            transaction.source,
-                        )
-
-                    with (
-                        sentry_sdk.start_transaction(
-                            transaction,
-                            custom_sampling_context={"asgi_scope": scope},
-                        )
-                        if transaction is not None
-                        else nullcontext()
-                    ):
-                        logger.debug("[ASGI] Started transaction: %s", transaction)
-                        try:
+                            attributes=_prepopulate_attributes(scope),
+                        ) as span:
+                            if span is not None:
+                                logger.debug("[ASGI] Started transaction: %s", span)
+                                span.set_tag("asgi.type", ty)
 
                             async def _sentry_wrapped_send(event):
                                 # type: (Dict[str, Any]) -> Any
-                                if transaction is not None:
-                                    is_http_response = (
-                                        event.get("type") == "http.response.start"
-                                        and "status" in event
-                                    )
-                                    if is_http_response:
-                                        transaction.set_http_status(event["status"])
+                                is_http_response = (
+                                    event.get("type") == "http.response.start"
+                                    and span is not None
+                                    and "status" in event
+                                )
+                                if is_http_response:
+                                    span.set_http_status(event["status"])
 
                                 return await send(event)
 
-                            if asgi_version == 2:
-                                return await self.app(scope)(
-                                    receive, _sentry_wrapped_send
-                                )
-                            else:
-                                return await self.app(
-                                    scope, receive, _sentry_wrapped_send
-                                )
-                        except Exception as exc:
-                            _capture_exception(exc, mechanism_type=self.mechanism_type)
-                            raise exc from None
+                            return await self._run_original_app(
+                                scope, receive, _sentry_wrapped_send, asgi_version
+                            )
         finally:
             _asgi_middleware_applied.set(False)
 
@@ -336,3 +321,37 @@ class SentryAsgiMiddleware:
             return name, source
 
         return name, source
+
+
+def _prepopulate_attributes(scope):
+    # type: (Any) -> dict[str, Any]
+    """Unpack ASGI scope into serializable OTel attributes."""
+    scope = scope or {}
+
+    attributes = {}
+    for attr, key in ASGI_SCOPE_PROPERTY_TO_ATTRIBUTE.items():
+        if scope.get(attr):
+            attributes[key] = scope[attr]
+
+    for attr in ("client", "server"):
+        if scope.get(attr):
+            try:
+                host, port = scope[attr]
+                attributes[f"{attr}.address"] = host
+                if port is not None:
+                    attributes[f"{attr}.port"] = port
+            except Exception:
+                pass
+
+    with capture_internal_exceptions():
+        full_url = _get_url(scope)
+        query = _get_query(scope)
+        if query:
+            attributes["url.query"] = query
+            full_url = f"{full_url}?{query}"
+
+        attributes["url.full"] = full_url
+
+    attributes.update(_request_headers_to_span_attributes(_get_headers(scope)))
+
+    return attributes
