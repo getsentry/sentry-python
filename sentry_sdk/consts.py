@@ -251,6 +251,24 @@ class SPANDATA:
     Example: "qa-pipeline"
     """
 
+    AI_PROMPT_TOKENS_USED = "ai.prompt_tokens.used"
+    """
+    The number of input prompt tokens used by the model.
+    Example: 10
+    """
+
+    AI_COMPLETION_TOKENS_USED = "ai.completion_tokens.used"
+    """
+    The number of output completion tokens used by the model.
+    Example: 10
+    """
+
+    AI_TOTAL_TOKENS_USED = "ai.total_tokens.used"
+    """
+    The total number of tokens (input + output) used by the request to the model.
+    Example: 20
+    """
+
     AI_TEXTS = "ai.texts"
     """
     Raw text inputs provided to the model.

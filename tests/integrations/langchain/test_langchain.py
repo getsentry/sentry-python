@@ -181,13 +181,13 @@ def test_langchain_agent(
     assert len(list(x for x in tx["spans"] if x["op"] == "ai.run.langchain")) > 0
 
     if use_unknown_llm_type:
-        assert "ai.prompt_tokens.used" in chat_spans[0]["data"]
-        assert "ai.total_tokens.used" in chat_spans[0]["data"]
+        assert SPANDATA.AI_PROMPT_TOKENS_USED in chat_spans[0]["data"]
+        assert SPANDATA.AI_TOTAL_TOKENS_USED in chat_spans[0]["data"]
     else:
         # important: to avoid double counting, we do *not* measure
         # tokens used if we have an explicit integration (e.g. OpenAI)
-        assert "ai.prompt_tokens.used" not in chat_spans[0]["data"]
-        assert "ai.total_tokens.used" not in chat_spans[0]["data"]
+        assert SPANDATA.AI_PROMPT_TOKENS_USED not in chat_spans[0]["data"]
+        assert SPANDATA.AI_TOTAL_TOKENS_USED not in chat_spans[0]["data"]
 
     if send_default_pii and include_prompts:
         assert (
