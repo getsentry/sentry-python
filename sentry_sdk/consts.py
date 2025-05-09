@@ -204,7 +204,6 @@ class SPANDATA:
     Minimize pre-processing done to the prompt sent to the LLM.
     Example: true
     """
-
     AI_RESPONSES = "ai.responses"
     """
     The responses to an AI model call. Always as a list.
@@ -219,62 +218,62 @@ class SPANDATA:
 
     AI_CITATIONS = "ai.citations"
     """
-
-    Example:
+    References or sources cited by the AI model in its response.
+    Example: ["Smith et al. 2020", "Jones 2019"]
     """
 
     AI_DOCUMENTS = "ai.documents"
     """
-
-    Example:
+    Documents or content chunks used as context for the AI model.
+    Example: ["doc1.txt", "doc2.pdf"]
     """
 
     AI_SEARCH_QUERIES = "ai.search_queries"
     """
-
-    Example:
+    Queries used to search for relevant context or documents.
+    Example: ["climate change effects", "renewable energy"]
     """
 
     AI_SEARCH_RESULTS = "ai.search_results"
     """
-
-    Example:
+    Results returned from search queries for context.
+    Example: ["Result 1", "Result 2"]
     """
 
     AI_GENERATION_ID = "ai.generation_id"
     """
-
-    Example:
+    Unique identifier for the completion.
+    Example: "gen_123abc"
     """
 
     AI_SEARCH_REQUIRED = "ai.is_search_required"
     """
-
-    Example:
+    Boolean indicating if the model needs to perform a search.
+    Example: true
     """
 
     AI_FINISH_REASON = "ai.finish_reason"
     """
-
-    Example:
+    The reason why the model stopped generating.
+    Example: "length"
     """
 
     AI_PIPELINE_NAME = "ai.pipeline.name"
     """
-
-    Example:
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
     """
 
     AI_TEXTS = "ai.texts"
     """
-
-    Example:
+    Raw text inputs provided to the model.
+    Example: ["What is machine learning?"]
     """
 
     AI_WARNINGS = "ai.warnings"
     """
-
-    Example:
+    Warning messages generated during model execution.
+    Example: ["Token limit exceeded"]
     """
 
     DB_NAME = "db.name"
