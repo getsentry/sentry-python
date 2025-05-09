@@ -75,7 +75,7 @@ def test_nonstreaming_chat_completion(
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
     if details_arg:
-        assert span["data"]["ai.total_tokens.used"] == 10
+        assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 10
 
 
 @pytest.mark.parametrize(
@@ -134,7 +134,7 @@ def test_streaming_chat_completion(
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
     if details_arg:
-        assert span["data"]["ai.total_tokens.used"] == 10
+        assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 10
 
 
 def test_bad_chat_completion(sentry_init, capture_events):

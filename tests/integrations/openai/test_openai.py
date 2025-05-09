@@ -90,9 +90,9 @@ def test_nonstreaming_chat_completion(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"]["ai.completion_tokens.used"] == 10
-    assert span["data"]["ai.prompt_tokens.used"] == 20
-    assert span["data"]["ai.total_tokens.used"] == 30
+    assert span["data"][SPANDATA.AI_COMPLETION_TOKENS_USED] == 10
+    assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 20
+    assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 30
 
 
 @pytest.mark.asyncio
@@ -132,9 +132,9 @@ async def test_nonstreaming_chat_completion_async(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"]["ai.completion_tokens.used"] == 10
-    assert span["data"]["ai.prompt_tokens.used"] == 20
-    assert span["data"]["ai.total_tokens.used"] == 30
+    assert span["data"][SPANDATA.AI_COMPLETION_TOKENS_USED] == 10
+    assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 20
+    assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 30
 
 
 def tiktoken_encoding_if_installed():
@@ -228,9 +228,9 @@ def test_streaming_chat_completion(
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
-        assert span["data"]["ai.completion_tokens.used"] == 2
-        assert span["data"]["ai.prompt_tokens.used"] == 1
-        assert span["data"]["ai.total_tokens.used"] == 3
+        assert span["data"][SPANDATA.AI_COMPLETION_TOKENS_USED] == 2
+        assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 1
+        assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 3
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
@@ -324,9 +324,9 @@ async def test_streaming_chat_completion_async(
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
-        assert span["data"]["ai.completion_tokens.used"] == 2
-        assert span["data"]["ai.prompt_tokens.used"] == 1
-        assert span["data"]["ai.total_tokens.used"] == 3
+        assert span["data"][SPANDATA.AI_COMPLETION_TOKENS_USED] == 2
+        assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 1
+        assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 3
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
@@ -410,8 +410,8 @@ def test_embeddings_create(
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens.used"] == 20
-    assert span["data"]["ai.total_tokens.used"] == 30
+    assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 20
+    assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 30
 
 
 @pytest.mark.asyncio
@@ -458,8 +458,8 @@ async def test_embeddings_create_async(
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
 
-    assert span["data"]["ai.prompt_tokens.used"] == 20
-    assert span["data"]["ai.total_tokens.used"] == 30
+    assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 20
+    assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 30
 
 
 @pytest.mark.forked
