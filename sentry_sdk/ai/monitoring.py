@@ -1,6 +1,7 @@
 import inspect
 from functools import wraps
 
+from sentry_sdk.consts import SPANDATA
 import sentry_sdk.utils
 from sentry_sdk import start_span
 from sentry_sdk.tracing import Span
@@ -41,7 +42,7 @@ def ai_track(description, **span_kwargs):
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_attribute(k, v)
                 if curr_pipeline:
-                    span.set_attribute("ai.pipeline.name", curr_pipeline)
+                    span.set_attribute(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
                     return f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -72,7 +73,7 @@ def ai_track(description, **span_kwargs):
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_attribute(k, v)
                 if curr_pipeline:
-                    span.set_attribute("ai.pipeline.name", curr_pipeline)
+                    span.set_attribute(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
                     return await f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -104,7 +105,7 @@ def record_token_usage(
     # type: (Span, Optional[int], Optional[int], Optional[int]) -> None
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
-        span.set_attribute("ai.pipeline.name", ai_pipeline_name)
+        span.set_attribute(SPANDATA.AI_PIPELINE_NAME, ai_pipeline_name)
     if prompt_tokens is not None:
         span.set_attribute("ai.prompt_tokens.used", prompt_tokens)
     if completion_tokens is not None:

@@ -5,6 +5,7 @@ import pytest
 from cohere import Client, ChatMessage
 
 from sentry_sdk import start_span
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.cohere import CohereIntegration
 
 from unittest import mock  # python 3.3 and above
@@ -53,16 +54,16 @@ def test_nonstreaming_chat(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "ai.chat_completions.create.cohere"
-    assert span["data"]["ai.model_id"] == "some-model"
+    assert span["data"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     if send_default_pii and include_prompts:
-        input_messages = json.loads(span["data"]["ai.input_messages"])
+        input_messages = json.loads(span["data"][SPANDATA.AI_INPUT_MESSAGES])
         assert "some context" in input_messages[0]["content"]
         assert "hello" in input_messages[1]["content"]
-        assert "the model response" in span["data"]["ai.responses"]
+        assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
     else:
-        assert "ai.input_messages" not in span["data"]
-        assert "ai.responses" not in span["data"]
+        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
+        assert SPANDATA.AI_RESPONSES not in span["data"]
 
     assert span["data"]["ai.completion_tokens.used"] == 10
     assert span["data"]["ai.prompt_tokens.used"] == 20
@@ -125,16 +126,16 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "ai.chat_completions.create.cohere"
-    assert span["data"]["ai.model_id"] == "some-model"
+    assert span["data"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     if send_default_pii and include_prompts:
-        input_messages = json.loads(span["data"]["ai.input_messages"])
+        input_messages = json.loads(span["data"][SPANDATA.AI_INPUT_MESSAGES])
         assert "some context" in input_messages[0]["content"]
         assert "hello" in input_messages[1]["content"]
-        assert "the model response" in span["data"]["ai.responses"]
+        assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
     else:
-        assert "ai.input_messages" not in span["data"]
-        assert "ai.responses" not in span["data"]
+        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
+        assert SPANDATA.AI_RESPONSES not in span["data"]
 
     assert span["data"]["ai.completion_tokens.used"] == 10
     assert span["data"]["ai.prompt_tokens.used"] == 20
@@ -196,9 +197,9 @@ def test_embed(sentry_init, capture_events, send_default_pii, include_prompts):
     span = tx["spans"][0]
     assert span["op"] == "ai.embeddings.create.cohere"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"]
+        assert "hello" in span["data"][SPANDATA.AI_INPUT_MESSAGES]
     else:
-        assert "ai.input_messages" not in span["data"]
+        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
 
     assert span["data"]["ai.prompt_tokens.used"] == 10
     assert span["data"]["ai.total_tokens.used"] == 10

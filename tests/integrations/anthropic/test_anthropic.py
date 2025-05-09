@@ -130,7 +130,7 @@ def test_nonstreaming_create_message(
     assert span["data"]["ai.prompt_tokens.used"] == 10
     assert span["data"]["ai.completion_tokens.used"] == 20
     assert span["data"]["ai.total_tokens.used"] == 30
-    assert span["data"]["ai.streaming"] is False
+    assert span["data"][SPANDATA.AI_STREAMING] is False
 
 
 @pytest.mark.asyncio
@@ -200,7 +200,7 @@ async def test_nonstreaming_create_message_async(
     assert span["data"]["ai.prompt_tokens.used"] == 10
     assert span["data"]["ai.completion_tokens.used"] == 20
     assert span["data"]["ai.total_tokens.used"] == 30
-    assert span["data"]["ai.streaming"] is False
+    assert span["data"][SPANDATA.AI_STREAMING] is False
 
 
 @pytest.mark.parametrize(
@@ -302,7 +302,7 @@ def test_streaming_create_message(
     assert span["data"]["ai.prompt_tokens.used"] == 10
     assert span["data"]["ai.completion_tokens.used"] == 30
     assert span["data"]["ai.total_tokens.used"] == 40
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.AI_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -407,7 +407,7 @@ async def test_streaming_create_message_async(
     assert span["data"]["ai.prompt_tokens.used"] == 10
     assert span["data"]["ai.completion_tokens.used"] == 30
     assert span["data"]["ai.total_tokens.used"] == 40
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.AI_STREAMING] is True
 
 
 @pytest.mark.skipif(
@@ -539,7 +539,7 @@ def test_streaming_create_message_with_input_json_delta(
     assert span["data"]["ai.prompt_tokens.used"] == 366
     assert span["data"]["ai.completion_tokens.used"] == 51
     assert span["data"]["ai.total_tokens.used"] == 417
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.AI_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -678,7 +678,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"]["ai.prompt_tokens.used"] == 366
     assert span["data"]["ai.completion_tokens.used"] == 51
     assert span["data"]["ai.total_tokens.used"] == 417
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.AI_STREAMING] is True
 
 
 @pytest.mark.forked
@@ -830,7 +830,7 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init, capture_events):
     assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
         [{"type": "text", "text": "{'test': 'data','more': 'json'}"}]
     )
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.AI_STREAMING] is True
     assert span["data"]["ai.prompt_tokens.used"] == 10
     assert span["data"]["ai.completion_tokens.used"] == 20
     assert span["data"]["ai.total_tokens.used"] == 30
