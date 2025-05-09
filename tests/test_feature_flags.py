@@ -31,6 +31,63 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
     }
 
 
+@pytest.mark.asyncio
+async def test_featureflags_integration_spans_async(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    add_feature_flag("hello", False)
+
+    try:
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
+                raise ValueError("something wrong!")
+    except ValueError as e:
+        sentry_sdk.capture_exception(e)
+
+    found = False
+    for event in events:
+        if "exception" in event.keys():
+            assert event["contexts"]["flags"] == {
+                "values": [
+                    {"flag": "hello", "result": False},
+                ]
+            }
+            found = True
+
+    assert found, "No event with exception found"
+
+
+def test_featureflags_integration_spans_sync(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    add_feature_flag("hello", False)
+
+    try:
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
+                raise ValueError("something wrong!")
+    except ValueError as e:
+        sentry_sdk.capture_exception(e)
+
+    found = False
+    for event in events:
+        if "exception" in event.keys():
+            assert event["contexts"]["flags"] == {
+                "values": [
+                    {"flag": "hello", "result": False},
+                ]
+            }
+            found = True
+
+    assert found, "No event with exception found"
+
+
 def test_featureflags_integration_threaded(
     sentry_init, capture_events, uninstall_integration
 ):

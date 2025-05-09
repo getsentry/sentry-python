@@ -3,6 +3,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from sentry_sdk.consts import SPANDATA
+
 try:
     # Langchain >= 0.2
     from langchain_openai import ChatOpenAI
@@ -189,23 +191,23 @@ def test_langchain_agent(
     if send_default_pii and include_prompts:
         assert (
             "You are very powerful"
-            in chat_spans[0]["data"]["ai.input_messages"][0]["content"]
+            in chat_spans[0]["data"][SPANDATA.AI_INPUT_MESSAGES][0]["content"]
         )
-        assert "5" in chat_spans[0]["data"]["ai.responses"]
-        assert "word" in tool_exec_span["data"]["ai.input_messages"]
-        assert 5 == int(tool_exec_span["data"]["ai.responses"])
+        assert "5" in chat_spans[0]["data"][SPANDATA.AI_RESPONSES]
+        assert "word" in tool_exec_span["data"][SPANDATA.AI_INPUT_MESSAGES]
+        assert 5 == int(tool_exec_span["data"][SPANDATA.AI_RESPONSES])
         assert (
             "You are very powerful"
-            in chat_spans[1]["data"]["ai.input_messages"][0]["content"]
+            in chat_spans[1]["data"][SPANDATA.AI_INPUT_MESSAGES][0]["content"]
         )
-        assert "5" in chat_spans[1]["data"]["ai.responses"]
+        assert "5" in chat_spans[1]["data"][SPANDATA.AI_RESPONSES]
     else:
-        assert "ai.input_messages" not in chat_spans[0].get("data", {})
-        assert "ai.responses" not in chat_spans[0].get("data", {})
-        assert "ai.input_messages" not in chat_spans[1].get("data", {})
-        assert "ai.responses" not in chat_spans[1].get("data", {})
-        assert "ai.input_messages" not in tool_exec_span.get("data", {})
-        assert "ai.responses" not in tool_exec_span.get("data", {})
+        assert SPANDATA.AI_INPUT_MESSAGES not in chat_spans[0].get("data", {})
+        assert SPANDATA.AI_RESPONSES not in chat_spans[0].get("data", {})
+        assert SPANDATA.AI_INPUT_MESSAGES not in chat_spans[1].get("data", {})
+        assert SPANDATA.AI_RESPONSES not in chat_spans[1].get("data", {})
+        assert SPANDATA.AI_INPUT_MESSAGES not in tool_exec_span.get("data", {})
+        assert SPANDATA.AI_RESPONSES not in tool_exec_span.get("data", {})
 
 
 def test_langchain_error(sentry_init, capture_events):

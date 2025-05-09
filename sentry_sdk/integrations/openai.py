@@ -155,7 +155,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(
                     span,
-                    "ai.responses",
+                    SPANDATA.AI_RESPONSES,
                     list(map(lambda x: x.message, res.choices)),
                 )
             _calculate_chat_completion_usage(
@@ -329,15 +329,15 @@ def _new_embeddings_create_common(f, *args, **kwargs):
             should_send_default_pii() and integration.include_prompts
         ):
             if isinstance(kwargs["input"], str):
-                set_data_normalized(span, "ai.input_messages", [kwargs["input"]])
+                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, [kwargs["input"]])
             elif (
                 isinstance(kwargs["input"], list)
                 and len(kwargs["input"]) > 0
                 and isinstance(kwargs["input"][0], str)
             ):
-                set_data_normalized(span, "ai.input_messages", kwargs["input"])
+                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, kwargs["input"])
         if "model" in kwargs:
-            set_data_normalized(span, "ai.model_id", kwargs["model"])
+            set_data_normalized(span, SPANDATA.AI_MODEL_ID, kwargs["model"])
 
         response = yield f, args, kwargs
 
