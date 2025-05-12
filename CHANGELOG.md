@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.28.0
+
+### Various fixes & improvements
+
+- fix(logs): Forward `extra` from logger as attributes (#4374) by @AbhiPrasad
+- fix(logs): Canonicalize paths from the logger integration (#4336) by @colin-sentry
+- fix(logs): Use new transport (#4317) by @colin-sentry
+- fix: Deprecate `set_measurement()` API. (#3934) by @antonpirker
+- fix: Put feature flags on isolation scope (#4363) by @antonpirker
+- fix: Make use of `SPANDATA` consistent (#4373) by @antonpirker
+- fix: Discord link (#4371) by @sentrivana
+- tests: Pin snowballstemmer for now (#4372) by @sentrivana
+- tests: Regular tox update (#4367) by @sentrivana
+- tests: Bump test timeout for recursion stacktrace extract to 2s (#4351) by @booxter
+- tests: Fix test_stacktrace_big_recursion failure due to argv (#4346) by @booxter
+- tests: Move anthropic under toxgen (#4348) by @sentrivana
+- tests: Update tox.ini (#4347) by @sentrivana
+- chore: Update GH issue templates for Linear compatibility (#4328) by @stephanie-anderson
+- chore: Bump actions/create-github-app-token from 2.0.2 to 2.0.6 (#4358) by @dependabot
+
 ## 2.27.0
 
 ### Various fixes & improvements
