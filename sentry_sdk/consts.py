@@ -79,7 +79,7 @@ if TYPE_CHECKING:
             ],
             "metric_code_locations": Optional[bool],
             "enable_logs": Optional[bool],
-            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]]
+            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
         },
         total=False,
     )
