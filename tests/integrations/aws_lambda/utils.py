@@ -239,7 +239,7 @@ class SentryServerForTesting:
     A simple Sentry.io style server that accepts envelopes and stores them in a list.
     """
 
-    def __init__(self, host="0.0.0.0", port=9999, log_level="warning"):
+    def __init__(self, host="127.0.0.1", port=9999, log_level="warning"):
         self.envelopes = []
         self.host = host
         self.port = port
