@@ -2,8 +2,6 @@ import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sentry_sdk._types import Log
-
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
 
@@ -48,6 +46,7 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        Log,
         MeasurementUnit,
         ProfilerMode,
         TracesSampler,
