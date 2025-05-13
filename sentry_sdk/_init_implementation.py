@@ -1,6 +1,7 @@
 import warnings
 
 from typing import TYPE_CHECKING
+from sentry_sdk.utils import logger
 
 import sentry_sdk
 
@@ -59,6 +60,7 @@ def _init(*args, **kwargs):
 
     This takes the same arguments as the client constructor.
     """
+    logger.warning("[DEBUG] sentry_sdk init")
     client = sentry_sdk.Client(*args, **kwargs)
     sentry_sdk.get_global_scope().set_client(client)
     _check_python_deprecations()

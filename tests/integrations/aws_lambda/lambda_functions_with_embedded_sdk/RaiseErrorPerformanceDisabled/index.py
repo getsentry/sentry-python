@@ -10,6 +10,8 @@ sentry_sdk.init(
     debug=True,
 )
 
+print("[DEBUG] Hello")
+
 
 def handler(event, context):
     raise Exception("Oh!")
