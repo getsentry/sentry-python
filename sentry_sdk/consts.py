@@ -1,5 +1,4 @@
 import itertools
-
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -79,6 +78,7 @@ if TYPE_CHECKING:
             ],
             "metric_code_locations": Optional[bool],
             "enable_logs": Optional[bool],
+            "before_send_log": Optional[Callable],
         },
         total=False,
     )
