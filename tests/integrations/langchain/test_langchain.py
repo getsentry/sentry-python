@@ -160,6 +160,7 @@ def test_langchain_agent(
         model_name="gpt-3.5-turbo",
         temperature=0,
         openai_api_key="badkey",
+        streaming=True,
     )
     agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
@@ -234,6 +235,7 @@ def test_langchain_error(sentry_init, capture_events):
         model_name="gpt-3.5-turbo",
         temperature=0,
         openai_api_key="badkey",
+        streaming=True,
     )
     agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
@@ -329,6 +331,7 @@ def test_span_origin(sentry_init, capture_events):
         model_name="gpt-3.5-turbo",
         temperature=0,
         openai_api_key="badkey",
+        streaming=True,
     )
     agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
