@@ -2,6 +2,8 @@ import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from sentry_sdk._types import Log
+
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
 
@@ -78,7 +80,7 @@ if TYPE_CHECKING:
             ],
             "metric_code_locations": Optional[bool],
             "enable_logs": Optional[bool],
-            "before_send_log": Optional[Callable],
+            "before_send_log": Optional[Callable[[Log], Optional[Log]]],
         },
         total=False,
     )
