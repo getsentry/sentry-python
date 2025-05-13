@@ -25,7 +25,7 @@ def sentry_init_with_reset(sentry_init):
     from sentry_sdk.integrations import _processed_integrations
 
     yield lambda: sentry_init(integrations=[SparkIntegration()])
-    _processed_integrations.remove("spark")
+    _processed_integrations.discard("spark")
 
 
 @pytest.fixture(scope="function")
