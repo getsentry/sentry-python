@@ -7,6 +7,7 @@ sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     traces_sample_rate=None,  # this is the default, just added for clarity
     integrations=[AwsLambdaIntegration()],
+    debug=True,
 )
 
 

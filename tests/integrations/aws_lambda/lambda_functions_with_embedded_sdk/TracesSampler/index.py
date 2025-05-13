@@ -32,6 +32,7 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
     traces_sampler=trace_sampler,
     integrations=[AwsLambdaIntegration()],
+    debug=True,
 )
 
 
