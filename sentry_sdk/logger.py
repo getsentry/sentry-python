@@ -18,7 +18,7 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     if "attributes" in kwargs:
         attrs.update(kwargs.pop("attributes"))
     for k, v in kwargs.items():
-        attrs[f"sentry.message.parameters.{k}"] = v
+        attrs[f"sentry.message.parameter.{k}"] = v
 
     attrs = {
         k: (
