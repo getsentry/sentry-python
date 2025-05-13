@@ -186,7 +186,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
         assert logs[0]["attributes"][k] == v
     assert logs[0]["attributes"]["sentry.environment"] == "production"
     assert "sentry.release" in logs[0]["attributes"]
-    assert logs[0]["attributes"]["sentry.message.parameters.my_var"] == "some value"
+    assert logs[0]["attributes"]["sentry.message.parameter.my_var"] == "some value"
     assert logs[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
     assert logs[0]["attributes"]["sentry.sdk.name"].startswith("sentry.python")
     assert logs[0]["attributes"]["sentry.sdk.version"] == VERSION
@@ -214,23 +214,23 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     logs = envelopes_to_logs(envelopes)
 
     assert logs[0]["body"] == "The recorded value was '1'"
-    assert logs[0]["attributes"]["sentry.message.parameters.int_var"] == 1
+    assert logs[0]["attributes"]["sentry.message.parameter.int_var"] == 1
 
     assert logs[1]["body"] == "The recorded value was '2.0'"
-    assert logs[1]["attributes"]["sentry.message.parameters.float_var"] == 2.0
+    assert logs[1]["attributes"]["sentry.message.parameter.float_var"] == 2.0
 
     assert logs[2]["body"] == "The recorded value was 'False'"
-    assert logs[2]["attributes"]["sentry.message.parameters.bool_var"] is False
+    assert logs[2]["attributes"]["sentry.message.parameter.bool_var"] is False
 
     assert logs[3]["body"] == "The recorded value was 'some string value'"
     assert (
-        logs[3]["attributes"]["sentry.message.parameters.string_var"]
+        logs[3]["attributes"]["sentry.message.parameter.string_var"]
         == "some string value"
     )
 
     assert logs[4]["body"] == "The recorded error was 'some error'"
     assert (
-        logs[4]["attributes"]["sentry.message.parameters.error"]
+        logs[4]["attributes"]["sentry.message.parameter.error"]
         == "Exception('some error')"
     )
 
@@ -287,8 +287,8 @@ def test_logger_integration_warning(sentry_init, capture_envelopes):
     assert "code.line.number" in attrs
     assert attrs["logger.name"] == "test-logger"
     assert attrs["sentry.environment"] == "production"
-    assert attrs["sentry.message.parameters.0"] == "1"
-    assert attrs["sentry.message.parameters.1"] == "2"
+    assert attrs["sentry.message.parameter.0"] == "1"
+    assert attrs["sentry.message.parameter.1"] == "2"
     assert attrs["sentry.origin"] == "auto.logger.log"
     assert logs[0]["severity_number"] == 13
     assert logs[0]["severity_text"] == "warn"
@@ -349,14 +349,13 @@ def test_logging_errors(sentry_init, capture_envelopes):
     logs = envelopes_to_logs(envelopes)
     assert logs[0]["severity_text"] == "error"
     assert "sentry.message.template" not in logs[0]["attributes"]
-    assert "sentry.message.parameters.0" not in logs[0]["attributes"]
+    assert "sentry.message.parameter.0" not in logs[0]["attributes"]
     assert "code.line.number" in logs[0]["attributes"]
 
     assert logs[1]["severity_text"] == "error"
     assert logs[1]["attributes"]["sentry.message.template"] == "error is %s"
     assert (
-        logs[1]["attributes"]["sentry.message.parameters.0"]
-        == "Exception('test exc 2')"
+        logs[1]["attributes"]["sentry.message.parameter.0"] == "Exception('test exc 2')"
     )
     assert "code.line.number" in logs[1]["attributes"]
 
@@ -456,7 +455,7 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
         "logger.name": "test-logger",
         "sentry.origin": "auto.logger.log",
         "sentry.message.template": "log #%d",
-        "sentry.message.parameters.0": 1,
+        "sentry.message.parameter.0": 1,
         "sentry.environment": "production",
         "sentry.sdk.name": "sentry.python",
         "sentry.sdk.version": VERSION,
