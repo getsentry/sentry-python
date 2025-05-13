@@ -204,7 +204,6 @@ class BaseHttpTransport(Transport):
 
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
-        print("[DEBUG] setting up a BaseHttpTransport")
         self.options = options  # type: Dict[str, Any]
         self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
@@ -560,8 +559,6 @@ class BaseHttpTransport(Transport):
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
-        print("[DEBUG] capture_envelope in BaseHttpTransport")
-
         def send_envelope_wrapper():
             # type: () -> None
             with capture_internal_exceptions():
