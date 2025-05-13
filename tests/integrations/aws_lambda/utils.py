@@ -27,7 +27,6 @@ LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR = (
 )
 LAMBDA_FUNCTION_TIMEOUT = 10
 SAM_PORT = 3001
-TEST_SERVER_PORT = 8000
 
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 
@@ -102,7 +101,7 @@ class LocalLambdaStack(Stack):
             },
         )
 
-        dsn = f"http://123@{get_host_ip()}:{TEST_SERVER_PORT}/0"  # noqa: E231
+        dsn = f"http://123@{get_host_ip()}:9999/0"  # noqa: E231
         print("[LocalLambdaStack] Using Sentry DSN: %s" % dsn)
 
         print(
@@ -240,7 +239,7 @@ class SentryServerForTesting:
     A simple Sentry.io style server that accepts envelopes and stores them in a list.
     """
 
-    def __init__(self, host="127.0.0.1", port=TEST_SERVER_PORT, log_level="warning"):
+    def __init__(self, host="0.0.0.0", port=9999, log_level="warning"):
         self.envelopes = []
         self.host = host
         self.port = port
