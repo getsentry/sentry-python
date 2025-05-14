@@ -362,7 +362,7 @@ class SentryLogsHandler(_BaseHandler):
         if record.args is not None:
             if isinstance(record.args, tuple):
                 for i, arg in enumerate(record.args):
-                    attrs[f"sentry.message.parameters.{i}"] = (
+                    attrs[f"sentry.message.parameter.{i}"] = (
                         arg
                         if isinstance(arg, str)
                         or isinstance(arg, float)
