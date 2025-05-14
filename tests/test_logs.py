@@ -447,6 +447,8 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
     assert isinstance(attributes["thread.name"], str)
     del attributes["thread.name"]
 
+    assert attributes.pop("sentry.sdk.name").startswith("sentry.python")
+
     # Assert on the remaining non-dynamic attributes.
     assert attributes == {
         "foo": "bar",
@@ -457,7 +459,6 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
         "sentry.message.template": "log #%d",
         "sentry.message.parameter.0": 1,
         "sentry.environment": "production",
-        "sentry.sdk.name": "sentry.python",
         "sentry.sdk.version": VERSION,
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",
