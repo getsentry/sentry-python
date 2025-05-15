@@ -1,5 +1,4 @@
 import itertools
-
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -47,6 +46,7 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        Log,
         MeasurementUnit,
         ProfilerMode,
         TracesSampler,
@@ -79,6 +79,7 @@ if TYPE_CHECKING:
             ],
             "metric_code_locations": Optional[bool],
             "enable_logs": Optional[bool],
+            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
         },
         total=False,
     )
