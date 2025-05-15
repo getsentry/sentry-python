@@ -61,53 +61,70 @@ def _normalize_distribution_name(name):
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
+isoformat_inputs_and_datetime_outputs = (
+    (
+        "2021-01-01T00:00:00.000000Z",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),  # UTC time
+    (
+        "2021-01-01T00:00:00.000000",
+        datetime(2021, 1, 1).astimezone(timezone.utc),
+    ),  # No TZ -- assume local but convert to UTC
+    (
+        "2021-01-01T00:00:00Z",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),  # UTC - No milliseconds
+    (
+        "2021-01-01T00:00:00.000000+00:00",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000-00:00",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000+0000",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000-0000",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2020-12-31T00:00:00.000000+02:00",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
+    ),  # UTC+2 time
+    (
+        "2020-12-31T00:00:00.000000-0200",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+    ),  # UTC-2 time
+    (
+        "2020-12-31T00:00:00-0200",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+    ),  # UTC-2 time - no milliseconds
+)
+
+
 @pytest.mark.parametrize(
     ("input_str", "expected_output"),
-    (
-        (
-            "2021-01-01T00:00:00.000000Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC time
-        (
-            "2021-01-01T00:00:00.000000",
-            datetime(2021, 1, 1).astimezone(timezone.utc),
-        ),  # No TZ -- assume local but convert to UTC
-        (
-            "2021-01-01T00:00:00Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC - No milliseconds
-        (
-            "2021-01-01T00:00:00.000000+00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000+0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2020-12-31T00:00:00.000000+02:00",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
-        ),  # UTC+2 time
-        (
-            "2020-12-31T00:00:00.000000-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time
-        (
-            "2020-12-31T00:00:00-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time - no milliseconds
-    ),
+    isoformat_inputs_and_datetime_outputs,
 )
 def test_datetime_from_isoformat(input_str, expected_output):
     assert datetime_from_isoformat(input_str) == expected_output, input_str
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_output"),
+    isoformat_inputs_and_datetime_outputs,
+)
+def test_datetime_from_isoformat_with_py_36_or_lower(input_str, expected_output):
+    """
+    `fromisoformat` was added in Python version 3.7
+    """
+    with mock.patch("sentry_sdk.utils.datetime") as datetime_mocked:
+        datetime_mocked.fromisoformat.side_effect = AttributeError()
+        datetime_mocked.strptime = datetime.strptime
+        assert datetime_from_isoformat(input_str) == expected_output, input_str
 
 
 @pytest.mark.parametrize(
