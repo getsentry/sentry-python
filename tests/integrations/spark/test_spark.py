@@ -10,7 +10,7 @@ from sentry_sdk.integrations.spark.spark_driver import (
 )
 from sentry_sdk.integrations.spark.spark_worker import SparkWorkerIntegration
 
-from pyspark import SparkContext
+from pyspark import SparkConf, SparkContext
 
 from py4j.protocol import Py4JJavaError
 
@@ -25,12 +25,13 @@ def sentry_init_with_reset(sentry_init):
     from sentry_sdk.integrations import _processed_integrations
 
     yield lambda: sentry_init(integrations=[SparkIntegration()])
-    _processed_integrations.remove("spark")
+    _processed_integrations.discard("spark")
 
 
 @pytest.fixture(scope="function")
 def create_spark_context():
-    yield lambda: SparkContext(appName="Testing123")
+    conf = SparkConf().set("spark.driver.bindAddress", "127.0.0.1")
+    yield lambda: SparkContext(conf=conf, appName="Testing123")
     SparkContext._active_spark_context.stop()
 
 
