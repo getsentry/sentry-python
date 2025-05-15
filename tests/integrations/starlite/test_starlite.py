@@ -3,8 +3,8 @@ import functools
 
 import pytest
 
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlite import StarliteIntegration
+from sentry_sdk_alpha import capture_message
+from sentry_sdk_alpha.integrations.starlite import StarliteIntegration
 from tests.conftest import ApproxDict
 
 from typing import Any, Dict

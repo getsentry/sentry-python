@@ -1,10 +1,10 @@
 import sys
 import logging
 
-from sentry_sdk import capture_exception, capture_event, start_span
-from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.utils import event_from_exception
-from sentry_sdk.scrubber import EventScrubber
+from sentry_sdk_alpha import capture_exception, capture_event, start_span
+from sentry_sdk_alpha.integrations.logging import LoggingIntegration
+from sentry_sdk_alpha.utils import event_from_exception
+from sentry_sdk_alpha.scrubber import EventScrubber
 from tests.conftest import ApproxDict
 
 

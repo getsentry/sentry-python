@@ -4,10 +4,10 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
-from sentry_sdk import start_span, capture_exception
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME
-from sentry_sdk.utils import logger
+import sentry_sdk_alpha
+from sentry_sdk_alpha import start_span, capture_exception
+from sentry_sdk_alpha.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME
+from sentry_sdk_alpha.utils import logger
 
 
 def test_sampling_decided_only_for_root_spans(sentry_init):
@@ -59,7 +59,7 @@ def test_uses_traces_sample_rate_correctly(
 ):
     sentry_init(traces_sample_rate=traces_sample_rate)
 
-    with sentry_sdk.continue_trace(
+    with sentry_sdk_alpha.continue_trace(
         {
             BAGGAGE_HEADER_NAME: "sentry-sample_rand=0.500000,sentry-trace_id=397f36434d07b20135324b2e6ae70c77",
             SENTRY_TRACE_HEADER_NAME: "397f36434d07b20135324b2e6ae70c77-1234567890abcdef",
@@ -80,7 +80,7 @@ def test_uses_traces_sampler_return_value_correctly(
 ):
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
-    with sentry_sdk.continue_trace(
+    with sentry_sdk_alpha.continue_trace(
         {
             BAGGAGE_HEADER_NAME: "sentry-sample_rand=0.500000,sentry-trace_id=397f36434d07b20135324b2e6ae70c77",
             SENTRY_TRACE_HEADER_NAME: "397f36434d07b20135324b2e6ae70c77-1234567890abcdef",
@@ -149,8 +149,8 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
         )
     )
 
-    with sentry_sdk.continue_trace({"sentry-trace": sentry_trace_header}):
-        with sentry_sdk.start_span(name="dogpark") as span:
+    with sentry_sdk_alpha.continue_trace({"sentry-trace": sentry_trace_header}):
+        with sentry_sdk_alpha.start_span(name="dogpark") as span:
             pass
 
     assert span.sampled is not parent_sampling_decision
@@ -185,7 +185,7 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined(
         )
     )
     with mock.patch.object(random, "random", return_value=mock_random_value):
-        with sentry_sdk.continue_trace({"sentry-trace": sentry_trace_header}):
+        with sentry_sdk_alpha.continue_trace({"sentry-trace": sentry_trace_header}):
             with start_span(name="dogpark") as span:
                 assert span.sampled is parent_sampling_decision
 
@@ -206,8 +206,8 @@ def test_passes_parent_sampling_decision_in_sampling_context(
         )
     )
 
-    with sentry_sdk.continue_trace({"sentry-trace": sentry_trace_header}):
-        with sentry_sdk.start_span(name="dogpark"):
+    with sentry_sdk_alpha.continue_trace({"sentry-trace": sentry_trace_header}):
+        with sentry_sdk_alpha.start_span(name="dogpark"):
             pass
 
 
@@ -339,6 +339,6 @@ def test_profiles_sampler_gets_sampling_context(sentry_init, parent_sampling_dec
     sentry_trace = "12312012123120121231201212312012-1121201211212012-{}".format(
         int(parent_sampling_decision)
     )
-    with sentry_sdk.continue_trace({"sentry-trace": sentry_trace}):
-        with sentry_sdk.start_span(name="dogpark", op="op"):
+    with sentry_sdk_alpha.continue_trace({"sentry-trace": sentry_trace}):
+        with sentry_sdk_alpha.start_span(name="dogpark", op="op"):
             pass

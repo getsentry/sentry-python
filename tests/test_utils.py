@@ -6,11 +6,11 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
-from sentry_sdk._compat import PY38
-from sentry_sdk.integrations import Integration
-from sentry_sdk._queue import Queue
-from sentry_sdk.utils import (
+import sentry_sdk_alpha
+from sentry_sdk_alpha._compat import PY38
+from sentry_sdk_alpha.integrations import Integration
+from sentry_sdk_alpha._queue import Queue
+from sentry_sdk_alpha.utils import (
     Components,
     Dsn,
     datetime_from_isoformat,
@@ -530,8 +530,8 @@ def mock_client_with_dsn_netloc():
     """
     Returns a mocked Client with a DSN netloc of "abcd1234.ingest.sentry.io".
     """
-    mock_client = mock.Mock(spec=sentry_sdk.Client)
-    mock_client.transport = mock.Mock(spec=sentry_sdk.Transport)
+    mock_client = mock.Mock(spec=sentry_sdk_alpha.Client)
+    mock_client.transport = mock.Mock(spec=sentry_sdk_alpha.Transport)
     mock_client.transport.parsed_dsn = mock.Mock(spec=Dsn)
 
     mock_client.transport.parsed_dsn.netloc = "abcd1234.ingest.sentry.io"
@@ -991,7 +991,7 @@ def test_qualname_from_function_inner_function():
     def test_function(): ...
 
     assert (
-        sentry_sdk.utils.qualname_from_function(test_function)
+        sentry_sdk_alpha.utils.qualname_from_function(test_function)
         == "tests.test_utils.test_qualname_from_function_inner_function.<locals>.test_function"
     )
 
@@ -1002,6 +1002,6 @@ def test_qualname_from_function_none_name():
     test_function.__module__ = None
 
     assert (
-        sentry_sdk.utils.qualname_from_function(test_function)
+        sentry_sdk_alpha.utils.qualname_from_function(test_function)
         == "test_qualname_from_function_none_name.<locals>.test_function"
     )

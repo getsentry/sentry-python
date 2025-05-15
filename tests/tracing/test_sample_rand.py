@@ -4,8 +4,8 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME
+import sentry_sdk_alpha
+from sentry_sdk_alpha.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME
 
 
 @pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
@@ -22,7 +22,7 @@ def test_deterministic_sampled(sentry_init, capture_events, sample_rate, sample_
     with mock.patch(
         "sentry_sdk.tracing_utils.Random.uniform", return_value=sample_rand
     ):
-        with sentry_sdk.start_span() as root_span:
+        with sentry_sdk_alpha.start_span() as root_span:
             assert (
                 root_span.get_baggage().sentry_items["sample_rand"]
                 == f"{sample_rand:.6f}"  # noqa: E231
@@ -47,10 +47,10 @@ def test_transaction_uses_incoming_sample_rand(
     baggage = f"sentry-sample_rand={sample_rand:.6f},sentry-trace_id=771a43a4192642f0b136d5159a501700"  # noqa: E231
     sentry_trace = "771a43a4192642f0b136d5159a501700-1234567890abcdef"
 
-    with sentry_sdk.continue_trace(
+    with sentry_sdk_alpha.continue_trace(
         {BAGGAGE_HEADER_NAME: baggage, SENTRY_TRACE_HEADER_NAME: sentry_trace}
     ):
-        with sentry_sdk.start_span() as root_span:
+        with sentry_sdk_alpha.start_span() as root_span:
             assert (
                 root_span.get_baggage().sentry_items["sample_rand"]
                 == f"{sample_rand:.6f}"  # noqa: E231
@@ -81,7 +81,7 @@ def test_decimal_context(sentry_init, capture_events):
         with mock.patch(
             "sentry_sdk.tracing_utils.Random.uniform", return_value=0.123456789
         ):
-            with sentry_sdk.start_span() as root_span:
+            with sentry_sdk_alpha.start_span() as root_span:
                 assert root_span.get_baggage().sentry_items["sample_rand"] == "0.123456"
     finally:
         decimal.getcontext().prec = old_prec
@@ -113,10 +113,10 @@ def test_unexpected_incoming_sample_rand_precision(
     baggage = f"sentry-sample_rand={incoming_sample_rand},sentry-trace_id=771a43a4192642f0b136d5159a501700"  # noqa: E231
     sentry_trace = "771a43a4192642f0b136d5159a501700-1234567890abcdef"
 
-    with sentry_sdk.continue_trace(
+    with sentry_sdk_alpha.continue_trace(
         {BAGGAGE_HEADER_NAME: baggage, SENTRY_TRACE_HEADER_NAME: sentry_trace}
     ):
-        with sentry_sdk.start_span() as root_span:
+        with sentry_sdk_alpha.start_span() as root_span:
             assert (
                 root_span.get_baggage().sentry_items["sample_rand"]
                 == expected_sample_rand
@@ -136,10 +136,10 @@ def test_invalid_incoming_sample_rand(sentry_init, incoming_sample_rand):
     baggage = f"sentry-sample_rand={incoming_sample_rand},sentry-trace_id=771a43a4192642f0b136d5159a501700"  # noqa: E231
     sentry_trace = "771a43a4192642f0b136d5159a501700-1234567890abcdef"
 
-    with sentry_sdk.continue_trace(
+    with sentry_sdk_alpha.continue_trace(
         {BAGGAGE_HEADER_NAME: baggage, SENTRY_TRACE_HEADER_NAME: sentry_trace}
     ):
-        with sentry_sdk.start_span():
+        with sentry_sdk_alpha.start_span():
             pass
 
     # The behavior here is undefined since we got a broken incoming trace,
@@ -164,10 +164,10 @@ def test_invalid_incoming_sampled_and_sample_rate(sentry_init, incoming):
     )
     sentry_trace = f"771a43a4192642f0b136d5159a501700-1234567890abcdef-{1 if sampled == 'true' else 0}"
 
-    with sentry_sdk.continue_trace(
+    with sentry_sdk_alpha.continue_trace(
         {BAGGAGE_HEADER_NAME: baggage, SENTRY_TRACE_HEADER_NAME: sentry_trace}
     ):
-        with sentry_sdk.start_span():
+        with sentry_sdk_alpha.start_span():
             pass
 
     # The behavior here is undefined since we got a broken incoming trace,

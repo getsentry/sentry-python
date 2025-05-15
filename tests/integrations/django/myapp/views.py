@@ -50,8 +50,8 @@ except ImportError:
     pass
 
 
-import sentry_sdk
-from sentry_sdk import capture_message
+import sentry_sdk_alpha
+from sentry_sdk_alpha import capture_message
 
 
 @csrf_exempt
@@ -111,7 +111,7 @@ def read_body_and_view_exc(request):
 
 @csrf_exempt
 def message(request):
-    sentry_sdk.capture_message("hi")
+    sentry_sdk_alpha.capture_message("hi")
     return HttpResponse("ok")
 
 
@@ -148,7 +148,7 @@ class ClassBasedView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
     def head(self, *args, **kwargs):
-        sentry_sdk.capture_message("hi")
+        sentry_sdk_alpha.capture_message("hi")
         return HttpResponse("")
 
     def post(self, *args, **kwargs):
@@ -157,13 +157,13 @@ class ClassBasedView(ListView):
 
 @csrf_exempt
 def post_echo(request):
-    sentry_sdk.capture_message("hi")
+    sentry_sdk_alpha.capture_message("hi")
     return HttpResponse(request.body)
 
 
 @csrf_exempt
 def handler404(*args, **kwargs):
-    sentry_sdk.capture_message("not found", level="error")
+    sentry_sdk_alpha.capture_message("not found", level="error")
     return HttpResponseNotFound("404")
 
 
@@ -196,13 +196,13 @@ def template_test2(request, *args, **kwargs):
 
 @csrf_exempt
 def template_test3(request, *args, **kwargs):
-    traceparent = sentry_sdk.get_current_scope().get_traceparent()
+    traceparent = sentry_sdk_alpha.get_current_scope().get_traceparent()
     if traceparent is None:
-        traceparent = sentry_sdk.get_isolation_scope().get_traceparent()
+        traceparent = sentry_sdk_alpha.get_isolation_scope().get_traceparent()
 
-    baggage = sentry_sdk.get_current_scope().get_baggage()
+    baggage = sentry_sdk_alpha.get_current_scope().get_baggage()
     if baggage is None:
-        baggage = sentry_sdk.get_isolation_scope().get_baggage()
+        baggage = sentry_sdk_alpha.get_isolation_scope().get_baggage()
 
     capture_message(traceparent + "\n" + baggage.serialize())
     return render(request, "trace_meta.html", {})
@@ -243,7 +243,7 @@ def thread_ids_sync(*args, **kwargs):
 
 
 async def async_message(request):
-    sentry_sdk.capture_message("hi")
+    sentry_sdk_alpha.capture_message("hi")
     return HttpResponse("ok")
 
 
@@ -267,7 +267,7 @@ async def thread_ids_async(request):
 
 
 async def post_echo_async(request):
-    sentry_sdk.capture_message("hi")
+    sentry_sdk_alpha.capture_message("hi")
     return HttpResponse(request.body)
 
 

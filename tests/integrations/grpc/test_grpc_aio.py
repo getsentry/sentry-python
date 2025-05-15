@@ -3,11 +3,11 @@ import asyncio
 import grpc
 import pytest
 import pytest_asyncio
-import sentry_sdk
+import sentry_sdk_alpha
 
-from sentry_sdk import start_span
-from sentry_sdk.consts import OP
-from sentry_sdk.integrations.grpc import GRPCIntegration
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.consts import OP
+from sentry_sdk_alpha.integrations.grpc import GRPCIntegration
 from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
@@ -103,7 +103,7 @@ async def test_grpc_server_continues_transaction(
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
 
-    with sentry_sdk.start_span() as root_span:
+    with sentry_sdk_alpha.start_span() as root_span:
         metadata = (
             (
                 "baggage",

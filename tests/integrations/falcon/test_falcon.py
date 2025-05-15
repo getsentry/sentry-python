@@ -4,10 +4,10 @@ import pytest
 
 import falcon
 import falcon.testing
-import sentry_sdk
-from sentry_sdk.integrations.falcon import FalconIntegration
-from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.utils import parse_version
+import sentry_sdk_alpha
+from sentry_sdk_alpha.integrations.falcon import FalconIntegration
+from sentry_sdk_alpha.integrations.logging import LoggingIntegration
+from sentry_sdk_alpha.utils import parse_version
 
 
 try:
@@ -26,12 +26,12 @@ def make_app(sentry_init):
     def inner():
         class MessageResource:
             def on_get(self, req, resp):
-                sentry_sdk.capture_message("hi")
+                sentry_sdk_alpha.capture_message("hi")
                 resp.media = "hi"
 
         class MessageByIdResource:
             def on_get(self, req, resp, message_id):
-                sentry_sdk.capture_message("hi")
+                sentry_sdk_alpha.capture_message("hi")
                 resp.media = "hi"
 
         class CustomError(Exception):
@@ -214,7 +214,7 @@ def test_falcon_large_json_request(sentry_init, capture_events):
     class Resource:
         def on_post(self, req, resp):
             assert req.media == data
-            sentry_sdk.capture_message("hi")
+            sentry_sdk_alpha.capture_message("hi")
             resp.media = "ok"
 
     app = falcon.API()
@@ -240,7 +240,7 @@ def test_falcon_empty_json_request(sentry_init, capture_events, data):
     class Resource:
         def on_post(self, req, resp):
             assert req.media == data
-            sentry_sdk.capture_message("hi")
+            sentry_sdk_alpha.capture_message("hi")
             resp.media = "ok"
 
     app = falcon.API()
@@ -261,7 +261,7 @@ def test_falcon_raw_data_request(sentry_init, capture_events):
 
     class Resource:
         def on_post(self, req, resp):
-            sentry_sdk.capture_message("hi")
+            sentry_sdk_alpha.capture_message("hi")
             resp.media = "ok"
 
     app = falcon.API()
@@ -315,7 +315,7 @@ def test_500(sentry_init):
     app.add_route("/", Resource())
 
     def http500_handler(ex, req, resp, params):
-        sentry_sdk.capture_exception(ex)
+        sentry_sdk_alpha.capture_exception(ex)
         resp.media = {"message": "Sentry error."}
 
     app.add_error_handler(Exception, http500_handler)
@@ -379,17 +379,17 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
-    sentry_sdk.get_isolation_scope().set_tag("request_data", False)
+    sentry_sdk_alpha.get_isolation_scope().set_tag("request_data", False)
 
     app = falcon.API()
 
     class Resource:
         def on_get(self, req, resp):
-            sentry_sdk.get_isolation_scope().set_tag("request_data", True)
+            sentry_sdk_alpha.get_isolation_scope().set_tag("request_data", True)
 
             def generator():
                 for row in range(1000):
-                    assert sentry_sdk.get_isolation_scope()._tags["request_data"]
+                    assert sentry_sdk_alpha.get_isolation_scope()._tags["request_data"]
 
                     yield (str(row) + "\n").encode()
 
@@ -403,7 +403,7 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     expected_response = "".join(str(row) + "\n" for row in range(1000))
     assert response.text == expected_response
     assert not events
-    assert not sentry_sdk.get_isolation_scope()._tags["request_data"]
+    assert not sentry_sdk_alpha.get_isolation_scope()._tags["request_data"]
 
 
 @pytest.mark.skipif(
@@ -475,7 +475,7 @@ def test_falcon_request_media(sentry_init):
         def process_request(self, _req, _resp):
             # This capture message forces Falcon event processors to run
             # before the request handler runs
-            sentry_sdk.capture_message("Processing request")
+            sentry_sdk_alpha.capture_message("Processing request")
 
     class RequestMediaResource:
         def on_post(self, req, _):

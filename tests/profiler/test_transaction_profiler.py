@@ -9,21 +9,21 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import start_span
-from sentry_sdk.profiler.transaction_profiler import (
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.profiler.transaction_profiler import (
     GeventScheduler,
     Profile,
     Scheduler,
     ThreadScheduler,
     setup_profiler,
 )
-from sentry_sdk.profiler.utils import (
+from sentry_sdk_alpha.profiler.utils import (
     extract_frame,
     extract_stack,
     frame_id,
     get_frame_name,
 )
-from sentry_sdk._lru_cache import LRUCache
+from sentry_sdk_alpha._lru_cache import LRUCache
 
 try:
     import gevent

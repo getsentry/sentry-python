@@ -5,14 +5,14 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
-from sentry_sdk import (
+import sentry_sdk_alpha
+from sentry_sdk_alpha import (
     set_tag,
     capture_message,
     capture_exception,
 )
-from sentry_sdk.integrations.logging import LoggingIntegration
-import sentry_sdk.integrations.quart as quart_sentry
+from sentry_sdk_alpha.integrations.logging import LoggingIntegration
+import sentry_sdk_alpha.integrations.quart as quart_sentry
 
 
 def quart_app_factory():
@@ -432,15 +432,15 @@ async def test_does_not_leak_scope(sentry_init, capture_events):
     app = quart_app_factory()
     events = capture_events()
 
-    sentry_sdk.get_isolation_scope().set_tag("request_data", False)
+    sentry_sdk_alpha.get_isolation_scope().set_tag("request_data", False)
 
     @app.route("/")
     async def index():
-        sentry_sdk.get_isolation_scope().set_tag("request_data", True)
+        sentry_sdk_alpha.get_isolation_scope().set_tag("request_data", True)
 
         async def generate():
             for row in range(1000):
-                assert sentry_sdk.get_isolation_scope()._tags["request_data"]
+                assert sentry_sdk_alpha.get_isolation_scope()._tags["request_data"]
 
                 yield str(row) + "\n"
 
@@ -452,7 +452,7 @@ async def test_does_not_leak_scope(sentry_init, capture_events):
         str(row) + "\n" for row in range(1000)
     )
     assert not events
-    assert not sentry_sdk.get_isolation_scope()._tags["request_data"]
+    assert not sentry_sdk_alpha.get_isolation_scope()._tags["request_data"]
 
 
 @pytest.mark.asyncio

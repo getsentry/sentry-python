@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sentry_sdk.integrations.cloud_resource_context import (
+from sentry_sdk_alpha.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
 )
@@ -105,7 +105,7 @@ except TypeError:
 
 
 def test_is_aws_http_error():
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -120,7 +120,7 @@ def test_is_aws_http_error():
 
 
 def test_is_aws_ok():
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -140,7 +140,7 @@ def test_is_aws_ok():
 
 
 def test_is_aw_exception():
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -187,7 +187,7 @@ def test_is_aw_exception():
     ],
 )
 def test_get_aws_context(http_status, response_data, expected_context):
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -202,7 +202,7 @@ def test_get_aws_context(http_status, response_data, expected_context):
 
 
 def test_is_gcp_http_error():
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -217,7 +217,7 @@ def test_is_gcp_http_error():
 
 
 def test_is_gcp_ok():
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -232,7 +232,7 @@ def test_is_gcp_ok():
 
 
 def test_is_gcp_exception():
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -276,7 +276,7 @@ def test_is_gcp_exception():
     ],
 )
 def test_get_gcp_context(http_status, response_data, expected_context):
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -302,7 +302,7 @@ def test_get_gcp_context(http_status, response_data, expected_context):
     ],
 )
 def test_get_cloud_provider(is_aws, is_gcp, expected_provider):
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -322,7 +322,7 @@ def test_get_cloud_provider(is_aws, is_gcp, expected_provider):
     ],
 )
 def test_get_cloud_resource_context_unsupported_providers(cloud_provider):
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -341,7 +341,7 @@ def test_get_cloud_resource_context_unsupported_providers(cloud_provider):
     ],
 )
 def test_get_cloud_resource_context_supported_providers(cloud_provider):
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 
@@ -370,7 +370,7 @@ def test_get_cloud_resource_context_supported_providers(cloud_provider):
 def test_setup_once(
     cloud_provider, cloud_resource_context, warning_called, set_context_called
 ):
-    from sentry_sdk.integrations.cloud_resource_context import (
+    from sentry_sdk_alpha.integrations.cloud_resource_context import (
         CloudResourceContextIntegration,
     )
 

@@ -3,10 +3,10 @@ from unittest import mock
 import pytest
 import rediscluster
 
-from sentry_sdk import capture_message
-from sentry_sdk.api import start_span
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk_alpha import capture_message
+from sentry_sdk_alpha.api import start_span
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
 
 

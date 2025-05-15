@@ -1,7 +1,7 @@
 import socket
 
-from sentry_sdk import start_span
-from sentry_sdk.integrations.socket import SocketIntegration
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.integrations.socket import SocketIntegration
 from tests.conftest import ApproxDict
 
 

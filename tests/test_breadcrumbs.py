@@ -1,6 +1,6 @@
 from unittest import mock
 
-import sentry_sdk
+import sentry_sdk_alpha
 
 
 def test_breadcrumbs(sentry_init, capture_events):
@@ -25,26 +25,28 @@ def test_breadcrumbs(sentry_init, capture_events):
         },
     }
 
-    with sentry_sdk.start_span(name="trx-breadcrumbs"):
-        sentry_sdk.add_breadcrumb(message="breadcrumb0", **add_breadcrumbs_kwargs)
+    with sentry_sdk_alpha.start_span(name="trx-breadcrumbs"):
+        sentry_sdk_alpha.add_breadcrumb(message="breadcrumb0", **add_breadcrumbs_kwargs)
 
-        with sentry_sdk.start_span(name="span1", op="function"):
-            sentry_sdk.add_breadcrumb(message="breadcrumb1", **add_breadcrumbs_kwargs)
+        with sentry_sdk_alpha.start_span(name="span1", op="function"):
+            sentry_sdk_alpha.add_breadcrumb(
+                message="breadcrumb1", **add_breadcrumbs_kwargs
+            )
 
-            with sentry_sdk.start_span(name="span2", op="function"):
-                sentry_sdk.add_breadcrumb(
+            with sentry_sdk_alpha.start_span(name="span2", op="function"):
+                sentry_sdk_alpha.add_breadcrumb(
                     message="breadcrumb2", **add_breadcrumbs_kwargs
                 )
 
-                with sentry_sdk.start_span(name="span3", op="function"):
-                    sentry_sdk.add_breadcrumb(
+                with sentry_sdk_alpha.start_span(name="span3", op="function"):
+                    sentry_sdk_alpha.add_breadcrumb(
                         message="breadcrumb3", **add_breadcrumbs_kwargs
                     )
 
                     try:
                         1 / 0
                     except ZeroDivisionError as ex:
-                        sentry_sdk.capture_exception(ex)
+                        sentry_sdk_alpha.capture_exception(ex)
 
     assert len(events) == 2
     error = events[0]

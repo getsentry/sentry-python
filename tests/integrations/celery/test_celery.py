@@ -8,13 +8,13 @@ from celery.bin import worker
 from celery.app.task import Task
 from opentelemetry import trace as otel_trace, context
 
-import sentry_sdk
-from sentry_sdk import get_current_span
-from sentry_sdk.integrations.celery import (
+import sentry_sdk_alpha
+from sentry_sdk_alpha import get_current_span
+from sentry_sdk_alpha.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
 )
-from sentry_sdk.integrations.celery.beat import _get_headers
+from sentry_sdk_alpha.integrations.celery.beat import _get_headers
 from tests.conftest import ApproxDict
 
 
@@ -128,7 +128,7 @@ def test_simple_with_performance(capture_events, init_celery, celery_invocation)
         foo = 42  # noqa
         return x / y
 
-    with sentry_sdk.start_span(op="unit test transaction") as root_span:
+    with sentry_sdk_alpha.start_span(op="unit test transaction") as root_span:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
@@ -157,7 +157,7 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
         foo = 42  # noqa
         return x / y
 
-    scope = sentry_sdk.get_isolation_scope()
+    scope = sentry_sdk_alpha.get_isolation_scope()
 
     celery_invocation(dummy_task, 1, 2)
     _, expected_context = celery_invocation(dummy_task, 1, 0)
@@ -194,7 +194,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
 
     events = capture_events()
 
-    with sentry_sdk.start_span(name="submission") as root_span:
+    with sentry_sdk_alpha.start_span(name="submission") as root_span:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     if task_fails:
@@ -260,14 +260,14 @@ def test_no_stackoverflows(celery):
 
     @celery.task(name="dummy_task")
     def dummy_task():
-        sentry_sdk.get_isolation_scope().set_tag("foo", "bar")
+        sentry_sdk_alpha.get_isolation_scope().set_tag("foo", "bar")
         results.append(42)
 
     for _ in range(10000):
         dummy_task.delay()
 
     assert results == [42] * 10000
-    assert not sentry_sdk.get_isolation_scope()._tags
+    assert not sentry_sdk_alpha.get_isolation_scope()._tags
 
 
 def test_simple_no_propagation(capture_events, init_celery):
@@ -278,7 +278,7 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with sentry_sdk.start_span(name="task") as root_span:
+    with sentry_sdk_alpha.start_span(name="task") as root_span:
         dummy_task.delay()
 
     (event,) = events
@@ -353,7 +353,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
         runs.append(1)
         1 / 0
 
-    with sentry_sdk.start_span(name="submit_celery"):
+    with sentry_sdk_alpha.start_span(name="submit_celery"):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
@@ -472,7 +472,7 @@ def test_abstract_task(capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with sentry_sdk.start_span(name="celery"):
+    with sentry_sdk_alpha.start_span(name="celery"):
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
@@ -514,7 +514,7 @@ def test_baggage_propagation(init_celery):
         return _get_headers(self)
 
     with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
-        with sentry_sdk.start_span(name="task") as root_span:
+        with sentry_sdk_alpha.start_span(name="task") as root_span:
             result = dummy_task.apply_async(
                 args=(1, 0),
                 headers={"baggage": "custom=value"},
@@ -562,7 +562,7 @@ def test_sentry_propagate_traces_override(init_celery):
         trace_id = get_current_span().trace_id
         return trace_id
 
-    with sentry_sdk.start_span(name="task") as root_span:
+    with sentry_sdk_alpha.start_span(name="task") as root_span:
         root_span_trace_id = root_span.trace_id
 
         # should propagate trace
@@ -732,7 +732,7 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
     @celery.task()
     def task(): ...
 
-    with sentry_sdk.start_span(name="task"):
+    with sentry_sdk_alpha.start_span(name="task"):
         task.apply_async()
 
     (event,) = events
@@ -795,7 +795,7 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
     @celery.task()
     def task(): ...
 
-    with sentry_sdk.start_span(name="custom_transaction"):
+    with sentry_sdk_alpha.start_span(name="custom_transaction"):
         task.apply_async()
 
     (event,) = events
@@ -821,7 +821,7 @@ def test_send_task_wrapped(
 
     events = capture_events()
 
-    with sentry_sdk.start_span(name="custom_transaction"):
+    with sentry_sdk_alpha.start_span(name="custom_transaction"):
         celery.send_task("very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"})
 
     (call,) = patched_send_task.call_args_list  # We should have exactly one call

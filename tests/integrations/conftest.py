@@ -1,12 +1,12 @@
 import pytest
-import sentry_sdk
+import sentry_sdk_alpha
 
 
 @pytest.fixture
 def capture_exceptions(monkeypatch):
     def inner():
         errors = set()
-        old_capture_event_scope = sentry_sdk.Scope.capture_event
+        old_capture_event_scope = sentry_sdk_alpha.Scope.capture_event
 
         def capture_event_scope(self, event, hint=None, scope=None):
             if hint:
@@ -15,7 +15,9 @@ def capture_exceptions(monkeypatch):
                     errors.add(error)
             return old_capture_event_scope(self, event, hint=hint, scope=scope)
 
-        monkeypatch.setattr(sentry_sdk.Scope, "capture_event", capture_event_scope)
+        monkeypatch.setattr(
+            sentry_sdk_alpha.Scope, "capture_event", capture_event_scope
+        )
 
         return errors
 

@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from sentry_sdk.tracing_utils import Baggage, PropagationContext
+from sentry_sdk_alpha.tracing_utils import Baggage, PropagationContext
 
 
 SAMPLED_FLAG = {

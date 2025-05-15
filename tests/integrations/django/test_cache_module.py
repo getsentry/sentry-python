@@ -11,9 +11,9 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.django.caching import _get_span_description
+import sentry_sdk_alpha
+from sentry_sdk_alpha.integrations.django import DjangoIntegration
+from sentry_sdk_alpha.integrations.django.caching import _get_span_description
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
@@ -530,7 +530,7 @@ def test_cache_spans_get_many(
 
     from django.core.cache import cache
 
-    with sentry_sdk.start_span(name="caches"):
+    with sentry_sdk_alpha.start_span(name="caches"):
         cache.get_many([f"S{id}", f"S{id+1}"])
         cache.set(f"S{id}", "Sensitive1")
         cache.get_many([f"S{id}", f"S{id+1}"])
@@ -574,7 +574,7 @@ def test_cache_spans_set_many(
 
     from django.core.cache import cache
 
-    with sentry_sdk.start_span(name="caches"):
+    with sentry_sdk_alpha.start_span(name="caches"):
         cache.set_many({f"S{id}": "Sensitive1", f"S{id+1}": "Sensitive2"})
         cache.get(f"S{id}")
 

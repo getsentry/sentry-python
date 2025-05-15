@@ -5,7 +5,7 @@ import sys
 import tempfile
 from typing import TYPE_CHECKING
 
-from sentry_sdk.consts import VERSION as SDK_VERSION
+from sentry_sdk_alpha.consts import VERSION as SDK_VERSION
 
 if TYPE_CHECKING:
     from typing import Optional

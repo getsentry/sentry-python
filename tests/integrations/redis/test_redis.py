@@ -3,9 +3,9 @@ from unittest import mock
 import pytest
 from fakeredis import FakeStrictRedis
 
-import sentry_sdk
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.redis import RedisIntegration
+import sentry_sdk_alpha
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.integrations.redis import RedisIntegration
 
 
 MOCK_CONNECTION_POOL = mock.MagicMock()
@@ -23,7 +23,7 @@ def test_basic(sentry_init, capture_events):
     connection = FakeStrictRedis()
 
     connection.get("foobar")
-    sentry_sdk.capture_message("hi")
+    sentry_sdk_alpha.capture_message("hi")
 
     (event,) = events
     (crumb,) = event["breadcrumbs"]["values"]
@@ -60,7 +60,7 @@ def test_redis_pipeline(
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         pipeline = connection.pipeline(transaction=is_transaction)
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -94,7 +94,7 @@ def test_sensitive_data(sentry_init, capture_events, render_span_tree):
         events = capture_events()
 
         connection = FakeStrictRedis()
-        with sentry_sdk.start_span():
+        with sentry_sdk_alpha.start_span():
             connection.get(
                 "this is super secret"
             )  # because fakeredis does not support AUTH we use GET instead
@@ -117,7 +117,7 @@ def test_pii_data_redacted(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         connection.set("somekey1", "my secret string1")
         connection.set("somekey2", "my secret string2")
         connection.get("somekey2")
@@ -145,7 +145,7 @@ def test_pii_data_sent(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         connection.set("somekey1", "my secret string1")
         connection.set("somekey2", "my secret string2")
         connection.get("somekey2")
@@ -173,7 +173,7 @@ def test_data_truncation(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         long_string = "a" * 100000
         connection.set("somekey1", long_string)
         short_string = "b" * 10
@@ -199,7 +199,7 @@ def test_data_truncation_custom(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         long_string = "a" * 100000
         connection.set("somekey1", long_string)
         short_string = "b" * 10
@@ -230,7 +230,7 @@ def test_breadcrumbs(sentry_init, capture_events):
     short_string = "b" * 10
     connection.set("somekey2", short_string)
 
-    sentry_sdk.capture_message("hi")
+    sentry_sdk_alpha.capture_message("hi")
 
     (event,) = events
     crumbs = event["breadcrumbs"]["values"]
@@ -268,7 +268,7 @@ def test_db_connection_attributes_client(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
         connection.get("foobar")
 
@@ -290,7 +290,7 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
         pipeline = connection.pipeline(transaction=False)
         pipeline.get("foo")
@@ -317,7 +317,7 @@ def test_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span(name="custom_transaction"):
+    with sentry_sdk_alpha.start_span(name="custom_transaction"):
         # default case
         connection.set("somekey", "somevalue")
 

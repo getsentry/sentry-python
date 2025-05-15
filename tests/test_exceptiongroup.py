@@ -2,7 +2,7 @@ import sys
 from unittest import mock
 import pytest
 
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk_alpha.utils import event_from_exception
 
 
 try:

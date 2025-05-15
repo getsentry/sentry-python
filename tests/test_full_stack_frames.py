@@ -1,4 +1,4 @@
-import sentry_sdk
+import sentry_sdk_alpha
 
 
 def test_full_stack_frames_default(sentry_init, capture_events):
@@ -9,7 +9,7 @@ def test_full_stack_frames_default(sentry_init, capture_events):
         try:
             bar()
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            sentry_sdk_alpha.capture_exception(e)
 
     def bar():
         raise Exception("This is a test exception")
@@ -34,7 +34,7 @@ def test_full_stack_frames_enabled(sentry_init, capture_events):
         try:
             bar()
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            sentry_sdk_alpha.capture_exception(e)
 
     def bar():
         raise Exception("This is a test exception")
@@ -62,7 +62,7 @@ def test_full_stack_frames_enabled_truncated(sentry_init, capture_events):
         try:
             bar()
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            sentry_sdk_alpha.capture_exception(e)
 
     def bar():
         raise Exception("This is a test exception")
@@ -88,7 +88,7 @@ def test_full_stack_frames_default_no_truncation_happening(sentry_init, capture_
         try:
             bar()
         except Exception as e:
-            sentry_sdk.capture_exception(e)
+            sentry_sdk_alpha.capture_exception(e)
 
     def bar():
         raise Exception("This is a test exception")

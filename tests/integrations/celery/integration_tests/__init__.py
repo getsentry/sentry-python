@@ -6,7 +6,7 @@ import time
 
 from celery.beat import Scheduler
 
-from sentry_sdk.utils import logger
+from sentry_sdk_alpha.utils import logger
 
 
 class ImmediateScheduler(Scheduler):

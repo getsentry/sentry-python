@@ -2,7 +2,11 @@ import re
 
 import pytest
 
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH, MAX_DATABAG_DEPTH, serialize
+from sentry_sdk_alpha.serializer import (
+    MAX_DATABAG_BREADTH,
+    MAX_DATABAG_DEPTH,
+    serialize,
+)
 
 try:
     from hypothesis import given

@@ -4,10 +4,10 @@ from unittest import mock
 import httpx
 import pytest
 
-import sentry_sdk
-from sentry_sdk import capture_message, start_span
-from sentry_sdk.consts import MATCH_ALL, SPANDATA
-from sentry_sdk.integrations.httpx import HttpxIntegration
+import sentry_sdk_alpha
+from sentry_sdk_alpha import capture_message, start_span
+from sentry_sdk_alpha.consts import MATCH_ALL, SPANDATA
+from sentry_sdk_alpha.integrations.httpx import HttpxIntegration
 from tests.conftest import ApproxDict, SortedBaggage
 
 
@@ -333,7 +333,7 @@ def test_option_trace_propagation_targets(
         integrations=[HttpxIntegration()],
     )
 
-    with sentry_sdk.start_span():  # Must be in a root span to propagate headers
+    with sentry_sdk_alpha.start_span():  # Must be in a root span to propagate headers
         if asyncio.iscoroutinefunction(httpx_client.get):
             asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
         else:
@@ -361,7 +361,7 @@ def test_propagates_twp_outside_root_span(sentry_init, httpx_mock):
 
     request_headers = httpx_mock.get_request().headers
     assert "sentry-trace" in request_headers
-    assert request_headers["sentry-trace"] == sentry_sdk.get_traceparent()
+    assert request_headers["sentry-trace"] == sentry_sdk_alpha.get_traceparent()
 
 
 @pytest.mark.tests_internal_exceptions

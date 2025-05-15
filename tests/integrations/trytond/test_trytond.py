@@ -12,7 +12,7 @@ from trytond.wsgi import app as trytond_app
 
 from werkzeug.test import Client
 
-from sentry_sdk.integrations.trytond import TrytondWSGIIntegration
+from sentry_sdk_alpha.integrations.trytond import TrytondWSGIIntegration
 from tests.conftest import unpack_werkzeug_response
 
 

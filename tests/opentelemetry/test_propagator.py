@@ -5,12 +5,12 @@ import pytest
 from opentelemetry.trace.propagation import get_current_span
 from opentelemetry.propagators.textmap import DefaultSetter
 
-import sentry_sdk
-from sentry_sdk.opentelemetry.consts import (
+import sentry_sdk_alpha
+from sentry_sdk_alpha.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
-from sentry_sdk.opentelemetry import SentryPropagator
+from sentry_sdk_alpha.opentelemetry import SentryPropagator
 from tests.conftest import SortedBaggage
 
 
@@ -145,8 +145,8 @@ def test_inject_continue_trace(sentry_init):
         "sentry_sdk.tracing_utils.Random.uniform",
         return_value=0.001111,
     ):
-        with sentry_sdk.continue_trace(incoming_headers):
-            with sentry_sdk.start_span(name="foo") as span:
+        with sentry_sdk_alpha.continue_trace(incoming_headers):
+            with sentry_sdk_alpha.start_span(name="foo") as span:
                 SentryPropagator().inject(carrier, setter=setter)
                 assert carrier["sentry-trace"] == f"{trace_id}-{span.span_id}-1"
                 assert carrier["baggage"] == SortedBaggage(expected_baggage)
@@ -175,8 +175,8 @@ def test_inject_continue_trace_incoming_sample_rand(sentry_init):
         "HTTP_BAGGAGE": baggage,
     }
 
-    with sentry_sdk.continue_trace(incoming_headers):
-        with sentry_sdk.start_span(name="foo") as span:
+    with sentry_sdk_alpha.continue_trace(incoming_headers):
+        with sentry_sdk_alpha.start_span(name="foo") as span:
             SentryPropagator().inject(carrier, setter=setter)
             assert carrier["sentry-trace"] == f"{trace_id}-{span.span_id}-1"
             assert carrier["baggage"] == SortedBaggage(baggage)
@@ -202,7 +202,7 @@ def test_inject_head_sdk(sentry_init):
         "sentry_sdk.tracing_utils.Random.uniform",
         return_value=0.111111,
     ):
-        with sentry_sdk.start_span(name="foo") as span:
+        with sentry_sdk_alpha.start_span(name="foo") as span:
             SentryPropagator().inject(carrier, setter=setter)
             assert carrier["sentry-trace"] == f"{span.trace_id}-{span.span_id}-1"
             assert carrier["baggage"] == SortedBaggage(

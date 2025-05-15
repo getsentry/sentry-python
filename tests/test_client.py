@@ -10,8 +10,8 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
-from sentry_sdk import (
+import sentry_sdk_alpha
+from sentry_sdk_alpha import (
     Client,
     add_breadcrumb,
     capture_message,
@@ -19,19 +19,19 @@ from sentry_sdk import (
     capture_event,
     set_tag,
 )
-from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
-from sentry_sdk.utils import capture_internal_exception
-from sentry_sdk.integrations.executing import ExecutingIntegration
-from sentry_sdk.transport import Transport
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk_alpha.spotlight import DEFAULT_SPOTLIGHT_URL
+from sentry_sdk_alpha.utils import capture_internal_exception
+from sentry_sdk_alpha.integrations.executing import ExecutingIntegration
+from sentry_sdk_alpha.transport import Transport
+from sentry_sdk_alpha.serializer import MAX_DATABAG_BREADTH
+from sentry_sdk_alpha.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional, Union
-    from sentry_sdk._types import Event
+    from sentry_sdk_alpha._types import Event
 
 
 maximum_python_312 = pytest.mark.skipif(
@@ -676,7 +676,7 @@ def test_cyclic_data(sentry_init, capture_events):
     other_data = ""
     data["not_cyclic"] = other_data
     data["not_cyclic2"] = other_data
-    sentry_sdk.get_isolation_scope().set_extra("foo", data)
+    sentry_sdk_alpha.get_isolation_scope().set_extra("foo", data)
 
     capture_message("hi")
     (event,) = events
@@ -982,7 +982,7 @@ def test_init_string_types(dsn, sentry_init):
     # extra code
     sentry_init(dsn)
     assert (
-        sentry_sdk.get_client().dsn
+        sentry_sdk_alpha.get_client().dsn
         == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
     )
 
@@ -1121,7 +1121,7 @@ def test_spotlight_option(
     else:
         sentry_init(spotlight=client_option)
 
-    client = sentry_sdk.get_client()
+    client = sentry_sdk_alpha.get_client()
     url = client.spotlight.url if client.spotlight else None
     assert (
         url == spotlight_url_expected
@@ -1366,10 +1366,10 @@ class TestSpanClientReports:
         sentry_init(before_send_transaction=self.before_send)
         record_lost_event_calls = capture_record_lost_event_calls()
 
-        with sentry_sdk.isolation_scope() as scope:
+        with sentry_sdk_alpha.isolation_scope() as scope:
             scope.add_event_processor(self.event_processor)
             event = self.mock_transaction_event(self.span_count)
-            sentry_sdk.get_client().capture_event(event, scope=scope)
+            sentry_sdk_alpha.get_client().capture_event(event, scope=scope)
 
         # We use counters to ensure that the calls are made the expected number of times, disregarding order.
         assert Counter(record_lost_event_calls) == self.expected_record_lost_event_calls

@@ -4,9 +4,9 @@ from unittest import mock
 import pytest
 from werkzeug.test import Client
 
-import sentry_sdk
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+import sentry_sdk_alpha
+from sentry_sdk_alpha import capture_message
+from sentry_sdk_alpha.integrations.wsgi import SentryWsgiMiddleware
 
 
 @pytest.fixture
@@ -371,7 +371,7 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
 
     client.get("/dogs/are/great/")
 
-    sentry_sdk.flush()
+    sentry_sdk_alpha.flush()
 
     sess = envelopes[1]
     assert len(sess.items) == 1
@@ -408,7 +408,7 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     except ZeroDivisionError:
         pass
 
-    sentry_sdk.flush()
+    sentry_sdk_alpha.flush()
 
     count_item_types = Counter()
     for envelope in envelopes:

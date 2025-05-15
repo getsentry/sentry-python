@@ -1,8 +1,8 @@
 import pytest
 from loguru import logger
 
-import sentry_sdk
-from sentry_sdk.integrations.loguru import LoguruIntegration, LoggingLevels
+import sentry_sdk_alpha
+from sentry_sdk_alpha.integrations.loguru import LoguruIntegration, LoggingLevels
 
 logger.remove(0)  # don't print to console
 
@@ -55,7 +55,7 @@ def test_just_log(
     if not created_event:
         assert not events
 
-        breadcrumbs = sentry_sdk.get_isolation_scope()._breadcrumbs
+        breadcrumbs = sentry_sdk_alpha.get_isolation_scope()._breadcrumbs
         if (
             not disable_breadcrumbs and created_event is not None
         ):  # not None == not TRACE or DEBUG level
@@ -93,7 +93,7 @@ def test_breadcrumb_format(sentry_init, capture_events):
     logger.info("test")
     formatted_message = "test"
 
-    breadcrumbs = sentry_sdk.get_isolation_scope()._breadcrumbs
+    breadcrumbs = sentry_sdk_alpha.get_isolation_scope()._breadcrumbs
     (breadcrumb,) = breadcrumbs
     assert breadcrumb["message"] == formatted_message
 

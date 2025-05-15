@@ -1,4 +1,4 @@
-import sentry_sdk
+import sentry_sdk_alpha
 
 
 def test_span_processor_omits_underscore_attributes(sentry_init, capture_events):
@@ -6,8 +6,8 @@ def test_span_processor_omits_underscore_attributes(sentry_init, capture_events)
 
     events = capture_events()
 
-    with sentry_sdk.start_span():
-        with sentry_sdk.start_span() as span:
+    with sentry_sdk_alpha.start_span():
+        with sentry_sdk_alpha.start_span() as span:
             span.set_attribute("_internal", 47)
             span.set_attribute("noninternal", 23)
 

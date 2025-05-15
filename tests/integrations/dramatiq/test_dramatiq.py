@@ -4,8 +4,8 @@ import uuid
 import dramatiq
 from dramatiq.brokers.stub import StubBroker
 
-import sentry_sdk
-from sentry_sdk.integrations.dramatiq import DramatiqIntegration
+import sentry_sdk_alpha
+from sentry_sdk_alpha.integrations.dramatiq import DramatiqIntegration
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events
 
     @dramatiq.actor(max_retries=0)
     def dummy_actor(x, y):
-        sentry_sdk.capture_message("hi")
+        sentry_sdk_alpha.capture_message("hi")
         return x / y
 
     dummy_actor.send(1, 0)
@@ -109,7 +109,7 @@ def test_that_messages_are_captured(broker, worker, capture_events):
 
     @dramatiq.actor(max_retries=0)
     def dummy_actor():
-        sentry_sdk.capture_message("hi")
+        sentry_sdk_alpha.capture_message("hi")
 
     dummy_actor.send()
     broker.join(dummy_actor.queue_name)

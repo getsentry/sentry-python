@@ -3,7 +3,7 @@ from unittest import mock
 
 from opentelemetry import trace
 
-import sentry_sdk
+import sentry_sdk_alpha
 
 
 USE_DEFAULT_TRACES_SAMPLE_RATE = -1
@@ -38,14 +38,14 @@ def test_sampling_traces_sample_rate_0_or_100(
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_span(description="request a"):
-        with sentry_sdk.start_span(description="cache a"):
-            with sentry_sdk.start_span(description="db a"):
+    with sentry_sdk_alpha.start_span(description="request a"):
+        with sentry_sdk_alpha.start_span(description="cache a"):
+            with sentry_sdk_alpha.start_span(description="db a"):
                 ...
 
-    with sentry_sdk.start_span(description="request b"):
-        with sentry_sdk.start_span(description="cache b"):
-            with sentry_sdk.start_span(description="db b"):
+    with sentry_sdk_alpha.start_span(description="request b"):
+        with sentry_sdk_alpha.start_span(description="cache b"):
+            with sentry_sdk_alpha.start_span(description="db b"):
                 ...
 
     assert len(envelopes) == expected_num_of_envelopes
@@ -76,17 +76,17 @@ def test_sampling_traces_sample_rate_50(sentry_init, capture_envelopes):
     with mock.patch(
         "sentry_sdk.tracing_utils.Random.uniform", return_value=0.2
     ):  # drop
-        with sentry_sdk.start_span(description="request a"):
-            with sentry_sdk.start_span(description="cache a"):
-                with sentry_sdk.start_span(description="db a"):
+        with sentry_sdk_alpha.start_span(description="request a"):
+            with sentry_sdk_alpha.start_span(description="cache a"):
+                with sentry_sdk_alpha.start_span(description="db a"):
                     ...
 
     with mock.patch(
         "sentry_sdk.tracing_utils.Random.uniform", return_value=0.7
     ):  # keep
-        with sentry_sdk.start_span(description="request b"):
-            with sentry_sdk.start_span(description="cache b"):
-                with sentry_sdk.start_span(description="db b"):
+        with sentry_sdk_alpha.start_span(description="request b"):
+            with sentry_sdk_alpha.start_span(description="cache b"):
+                with sentry_sdk_alpha.start_span(description="db b"):
                     ...
 
     assert len(envelopes) == 1
@@ -112,24 +112,24 @@ def test_sampling_traces_sampler(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     # children inherit from root spans
-    with sentry_sdk.start_span(description="request a"):  # keep
-        with sentry_sdk.start_span(description="cache a"):
-            with sentry_sdk.start_span(description="db a"):
+    with sentry_sdk_alpha.start_span(description="request a"):  # keep
+        with sentry_sdk_alpha.start_span(description="cache a"):
+            with sentry_sdk_alpha.start_span(description="db a"):
                 ...
 
-    with sentry_sdk.start_span(description="request b"):  # drop
-        with sentry_sdk.start_span(description="cache b"):
-            with sentry_sdk.start_span(description="db b"):
+    with sentry_sdk_alpha.start_span(description="request b"):  # drop
+        with sentry_sdk_alpha.start_span(description="cache b"):
+            with sentry_sdk_alpha.start_span(description="db b"):
                 ...
 
-    with sentry_sdk.start_span(description="request c"):  # drop
-        with sentry_sdk.start_span(description="cache a c"):
-            with sentry_sdk.start_span(description="db a c"):
+    with sentry_sdk_alpha.start_span(description="request c"):  # drop
+        with sentry_sdk_alpha.start_span(description="cache a c"):
+            with sentry_sdk_alpha.start_span(description="db a c"):
                 ...
 
-    with sentry_sdk.start_span(description="new a c"):  # keep
-        with sentry_sdk.start_span(description="cache c"):
-            with sentry_sdk.start_span(description="db c"):
+    with sentry_sdk_alpha.start_span(description="new a c"):  # keep
+        with sentry_sdk_alpha.start_span(description="cache c"):
+            with sentry_sdk_alpha.start_span(description="db c"):
                 ...
 
     assert len(envelopes) == 2
@@ -157,14 +157,14 @@ def test_sampling_traces_sampler_boolean(sentry_init, capture_envelopes):
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_span(description="request a"):  # keep
-        with sentry_sdk.start_span(description="cache a"):
-            with sentry_sdk.start_span(description="db X"):
+    with sentry_sdk_alpha.start_span(description="request a"):  # keep
+        with sentry_sdk_alpha.start_span(description="cache a"):
+            with sentry_sdk_alpha.start_span(description="db X"):
                 ...
 
-    with sentry_sdk.start_span(description="request b"):  # drop
-        with sentry_sdk.start_span(description="cache b"):
-            with sentry_sdk.start_span(description="db b"):
+    with sentry_sdk_alpha.start_span(description="request b"):  # drop
+        with sentry_sdk_alpha.start_span(description="cache b"):
+            with sentry_sdk_alpha.start_span(description="db b"):
                 ...
 
     assert len(envelopes) == 1
@@ -206,10 +206,10 @@ def test_sampling_parent_sampled(
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
     }
-    with sentry_sdk.continue_trace(headers):
-        with sentry_sdk.start_span(description="request a"):
-            with sentry_sdk.start_span(description="cache a"):
-                with sentry_sdk.start_span(description="db X"):
+    with sentry_sdk_alpha.continue_trace(headers):
+        with sentry_sdk_alpha.start_span(description="request a"):
+            with sentry_sdk_alpha.start_span(description="cache a"):
+                with sentry_sdk_alpha.start_span(description="db X"):
                     ...
 
     assert len(envelopes) == expected_num_of_envelopes
@@ -262,10 +262,10 @@ def test_sampling_parent_dropped(
     headers = {
         "sentry-trace": f"771a43a4192642f0b136d5159a501700-1234567890abcdef-{upstream_sampled}",
     }
-    with sentry_sdk.continue_trace(headers):
-        with sentry_sdk.start_span(description="request a"):
-            with sentry_sdk.start_span(description="cache a"):
-                with sentry_sdk.start_span(description="db X"):
+    with sentry_sdk_alpha.continue_trace(headers):
+        with sentry_sdk_alpha.start_span(description="request a"):
+            with sentry_sdk_alpha.start_span(description="cache a"):
+                with sentry_sdk_alpha.start_span(description="db X"):
                     ...
 
     assert len(envelopes) == expected_num_of_envelopes
@@ -314,10 +314,10 @@ def test_sampling_parent_deferred(
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-",
     }
 
-    with sentry_sdk.continue_trace(headers):
-        with sentry_sdk.start_span(description="request a"):
-            with sentry_sdk.start_span(description="cache a"):
-                with sentry_sdk.start_span(description="db X"):
+    with sentry_sdk_alpha.continue_trace(headers):
+        with sentry_sdk_alpha.start_span(description="request a"):
+            with sentry_sdk_alpha.start_span(description="cache a"):
+                with sentry_sdk_alpha.start_span(description="db X"):
                     ...
 
     assert len(envelopes) == expected_num_of_envelopes

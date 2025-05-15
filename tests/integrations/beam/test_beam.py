@@ -3,7 +3,7 @@ import inspect
 
 import dill
 
-from sentry_sdk.integrations.beam import (
+from sentry_sdk_alpha.integrations.beam import (
     BeamIntegration,
     _wrap_task_call,
     _wrap_inspect_call,

@@ -21,17 +21,17 @@ try:
 except ImportError:
     eventlet = None
 
-import sentry_sdk
-import sentry_sdk.utils
-from sentry_sdk.envelope import Envelope
-from sentry_sdk.integrations import (  # noqa: F401
+import sentry_sdk_alpha
+import sentry_sdk_alpha.utils
+from sentry_sdk_alpha.envelope import Envelope
+from sentry_sdk_alpha.integrations import (  # noqa: F401
     _installed_integrations,
     _processed_integrations,
 )
-from sentry_sdk.profiler.transaction_profiler import teardown_profiler
-from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
-from sentry_sdk.transport import Transport
-from sentry_sdk.utils import reraise
+from sentry_sdk_alpha.profiler.transaction_profiler import teardown_profiler
+from sentry_sdk_alpha.profiler.continuous_profiler import teardown_continuous_profiler
+from sentry_sdk_alpha.transport import Transport
+from sentry_sdk_alpha.utils import reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -62,8 +62,8 @@ else:
     del pytest_benchmark
 
 
-from sentry_sdk import scope
-from sentry_sdk.opentelemetry.scope import (
+from sentry_sdk_alpha import scope
+from sentry_sdk_alpha.opentelemetry.scope import (
     setup_scope_context_management,
     setup_initial_scopes,
 )
@@ -97,7 +97,7 @@ def internal_exceptions(request):
         for e in errors:
             reraise(*e)
 
-    sentry_sdk.utils.capture_internal_exception = _capture_internal_exception
+    sentry_sdk_alpha.utils.capture_internal_exception = _capture_internal_exception
 
     return errors
 
@@ -201,8 +201,8 @@ def sentry_init(request):
     def inner(*a, **kw):
         setup_scope_context_management()
         kw.setdefault("transport", TestTransport())
-        client = sentry_sdk.Client(*a, **kw)
-        sentry_sdk.get_global_scope().set_client(client)
+        client = sentry_sdk_alpha.Client(*a, **kw)
+        sentry_sdk_alpha.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
@@ -210,12 +210,12 @@ def sentry_init(request):
         # fork)
         yield inner
     else:
-        old_client = sentry_sdk.get_global_scope().client
+        old_client = sentry_sdk_alpha.get_global_scope().client
         try:
-            sentry_sdk.get_current_scope().set_client(None)
+            sentry_sdk_alpha.get_current_scope().set_client(None)
             yield inner
         finally:
-            sentry_sdk.get_global_scope().set_client(old_client)
+            sentry_sdk_alpha.get_global_scope().set_client(old_client)
 
 
 class TestTransport(Transport):
@@ -231,7 +231,7 @@ class TestTransport(Transport):
 def capture_events(monkeypatch):
     def inner():
         events = []
-        test_client = sentry_sdk.get_client()
+        test_client = sentry_sdk_alpha.get_client()
         old_capture_envelope = test_client.transport.capture_envelope
 
         def append_event(envelope):
@@ -251,7 +251,7 @@ def capture_events(monkeypatch):
 def capture_envelopes(monkeypatch):
     def inner():
         envelopes = []
-        test_client = sentry_sdk.get_client()
+        test_client = sentry_sdk_alpha.get_client()
         old_capture_envelope = test_client.transport.capture_envelope
 
         def append_envelope(envelope):
@@ -269,7 +269,7 @@ def capture_envelopes(monkeypatch):
 def capture_record_lost_event_calls(monkeypatch):
     def inner():
         calls = []
-        test_client = sentry_sdk.get_client()
+        test_client = sentry_sdk_alpha.get_client()
 
         def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
             calls.append((reason, data_category, item, quantity))
@@ -291,7 +291,7 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         events_r = os.fdopen(events_r, "rb", 0)
         events_w = os.fdopen(events_w, "wb", 0)
 
-        test_client = sentry_sdk.get_client()
+        test_client = sentry_sdk_alpha.get_client()
 
         old_capture_envelope = test_client.transport.capture_envelope
 

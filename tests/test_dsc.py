@@ -12,8 +12,8 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
-import sentry_sdk.client
+import sentry_sdk_alpha
+import sentry_sdk_alpha.client
 
 
 def test_dsc_head_of_trace(sentry_init, capture_envelopes):
@@ -30,7 +30,7 @@ def test_dsc_head_of_trace(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     # We start a new root_span
-    with sentry_sdk.start_span(name="foo"):
+    with sentry_sdk_alpha.start_span(name="foo"):
         pass
 
     assert len(envelopes) == 1
@@ -98,8 +98,8 @@ def test_dsc_continuation_of_trace(sentry_init, capture_envelopes):
     }
 
     # We continue the incoming trace and start a new root span
-    with sentry_sdk.continue_trace(incoming_http_headers):
-        with sentry_sdk.start_span(name="foo"):
+    with sentry_sdk_alpha.continue_trace(incoming_http_headers):
+        with sentry_sdk_alpha.start_span(name="foo"):
             pass
 
     assert len(envelopes) == 1
@@ -176,8 +176,8 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
 
     # We continue the incoming trace and start a new transaction
     with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.125):
-        with sentry_sdk.continue_trace(incoming_http_headers):
-            with sentry_sdk.start_span(name="foo"):
+        with sentry_sdk_alpha.continue_trace(incoming_http_headers):
+            with sentry_sdk_alpha.start_span(name="foo"):
                 pass
 
     assert len(envelopes) == 1
@@ -405,8 +405,8 @@ def test_dsc_sample_rate_change(
 
     # We continue the incoming trace and start a new transaction
     with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.2):
-        with sentry_sdk.continue_trace(incoming_http_headers):
-            with sentry_sdk.start_span(name="foo"):
+        with sentry_sdk_alpha.continue_trace(incoming_http_headers):
+            with sentry_sdk_alpha.start_span(name="foo"):
                 pass
 
     if expected_sampled == "tracing-disabled-no-transactions-should-be-sent":
@@ -436,7 +436,7 @@ def test_dsc_issue(sentry_init, capture_envelopes):
     try:
         1 / 0
     except ZeroDivisionError as exp:
-        sentry_sdk.capture_exception(exp)
+        sentry_sdk_alpha.capture_exception(exp)
 
     assert len(envelopes) == 1
 
@@ -480,11 +480,11 @@ def test_dsc_issue_with_tracing(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     # We start a new root span and an error occurs
-    with sentry_sdk.start_span(name="foo"):
+    with sentry_sdk_alpha.start_span(name="foo"):
         try:
             1 / 0
         except ZeroDivisionError as exp:
-            sentry_sdk.capture_exception(exp)
+            sentry_sdk_alpha.capture_exception(exp)
 
     assert len(envelopes) == 2
 
@@ -566,13 +566,13 @@ def test_dsc_issue_twp(sentry_init, capture_envelopes, traces_sample_rate):
 
     # We continue the trace (meaning: saving the incoming trace information on the scope)
     # but in this test, we do not start a root span.
-    with sentry_sdk.continue_trace(incoming_http_headers):
+    with sentry_sdk_alpha.continue_trace(incoming_http_headers):
 
         # No root span is started, just an error is captured
         try:
             1 / 0
         except ZeroDivisionError as exp:
-            sentry_sdk.capture_exception(exp)
+            sentry_sdk_alpha.capture_exception(exp)
 
     assert len(envelopes) == 1
 

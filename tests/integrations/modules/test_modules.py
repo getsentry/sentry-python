@@ -1,13 +1,13 @@
-import sentry_sdk
+import sentry_sdk_alpha
 
-from sentry_sdk.integrations.modules import ModulesIntegration
+from sentry_sdk_alpha.integrations.modules import ModulesIntegration
 
 
 def test_basic(sentry_init, capture_events):
     sentry_init(integrations=[ModulesIntegration()])
     events = capture_events()
 
-    sentry_sdk.capture_exception(ValueError())
+    sentry_sdk_alpha.capture_exception(ValueError())
 
     (event,) = events
     assert "sentry-sdk" in event["modules"]

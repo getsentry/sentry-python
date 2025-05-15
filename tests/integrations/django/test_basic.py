@@ -20,19 +20,19 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-import sentry_sdk
-from sentry_sdk._compat import PY310
-from sentry_sdk import capture_message, capture_exception
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import (
+import sentry_sdk_alpha
+from sentry_sdk_alpha._compat import PY310
+from sentry_sdk_alpha import capture_message, capture_exception
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.integrations.django import (
     DjangoIntegration,
     DjangoRequestExtractor,
     _set_db_data,
 )
-from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
-from sentry_sdk.integrations.executing import ExecutingIntegration
-from sentry_sdk.profiler.utils import get_frame_name
-from sentry_sdk.tracing import Span
+from sentry_sdk_alpha.integrations.django.signals_handlers import _get_receiver_name
+from sentry_sdk_alpha.integrations.executing import ExecutingIntegration
+from sentry_sdk_alpha.profiler.utils import get_frame_name
+from sentry_sdk_alpha.tracing import Span
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.myapp.signals import myapp_custom_signal_silenced
@@ -366,7 +366,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     sql = connection.cursor()
 
-    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk_alpha.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(OperationalError):
         # table doesn't even exist
@@ -400,7 +400,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
-    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk_alpha.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(ProgrammingError):
         sql.execute(
@@ -465,7 +465,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
     sql = connections["postgres"].cursor()
 
-    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk_alpha.get_isolation_scope().clear_breadcrumbs()
 
     events = capture_events()
 
@@ -498,7 +498,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
-    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk_alpha.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(DataError):
         names = ["foo", "bar"]

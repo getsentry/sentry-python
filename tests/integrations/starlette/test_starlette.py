@@ -11,14 +11,14 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, get_baggage, get_traceparent
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.integrations.starlette import (
+from sentry_sdk_alpha import capture_message, get_baggage, get_traceparent
+from sentry_sdk_alpha.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk_alpha.integrations.logging import LoggingIntegration
+from sentry_sdk_alpha.integrations.starlette import (
     StarletteIntegration,
     StarletteRequestExtractor,
 )
-from sentry_sdk.utils import parse_version
+from sentry_sdk_alpha.utils import parse_version
 from tests.conftest import ApproxDict
 
 import starlette

@@ -9,9 +9,9 @@ from unittest import mock
 import django
 import pytest
 from channels.testing import HttpCommunicator
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
+from sentry_sdk_alpha import capture_message
+from sentry_sdk_alpha.integrations.django import DjangoIntegration
+from sentry_sdk_alpha.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
 
 try:

@@ -4,13 +4,13 @@ import pytest
 from opentelemetry.trace import SpanKind, Status, StatusCode
 from opentelemetry.version import __version__ as OTEL_VERSION
 
-from sentry_sdk.opentelemetry.utils import (
+from sentry_sdk_alpha.opentelemetry.utils import (
     extract_span_data,
     extract_span_status,
     span_data_for_db_query,
     span_data_for_http_method,
 )
-from sentry_sdk.utils import parse_version
+from sentry_sdk_alpha.utils import parse_version
 
 OTEL_VERSION = parse_version(OTEL_VERSION)
 

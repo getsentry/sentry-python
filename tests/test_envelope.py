@@ -1,7 +1,7 @@
-from sentry_sdk.envelope import Envelope
-from sentry_sdk.session import Session
-from sentry_sdk import capture_event
-import sentry_sdk.client
+from sentry_sdk_alpha.envelope import Envelope
+from sentry_sdk_alpha.session import Session
+from sentry_sdk_alpha import capture_event
+import sentry_sdk_alpha.client
 
 
 def generate_transaction_item():
@@ -80,7 +80,7 @@ def test_add_and_get_session():
 
 def test_envelope_headers(sentry_init, capture_envelopes, monkeypatch):
     monkeypatch.setattr(
-        sentry_sdk.client,
+        sentry_sdk_alpha.client,
         "format_timestamp",
         lambda x: "2012-11-21T12:31:12.415908Z",
     )

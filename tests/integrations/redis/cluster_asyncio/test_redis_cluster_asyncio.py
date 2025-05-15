@@ -1,8 +1,8 @@
 import pytest
 
-import sentry_sdk
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.redis import RedisIntegration
+import sentry_sdk_alpha
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
 
 from redis.asyncio import cluster
@@ -40,7 +40,7 @@ async def test_async_breadcrumb(sentry_init, capture_events):
     connection = cluster.RedisCluster(host="localhost", port=6379)
 
     await connection.get("foobar")
-    sentry_sdk.capture_message("hi")
+    sentry_sdk_alpha.capture_message("hi")
 
     (event,) = events
     (crumb,) = event["breadcrumbs"]["values"]
@@ -78,7 +78,7 @@ async def test_async_basic(sentry_init, capture_events, send_default_pii, descri
     events = capture_events()
 
     connection = cluster.RedisCluster(host="localhost", port=6379)
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         await connection.set("bar", 1)
 
     (event,) = events
@@ -120,7 +120,7 @@ async def test_async_redis_pipeline(
     events = capture_events()
 
     connection = cluster.RedisCluster(host="localhost", port=6379)
-    with sentry_sdk.start_span():
+    with sentry_sdk_alpha.start_span():
         pipeline = connection.pipeline()
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -156,7 +156,7 @@ async def test_async_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     connection = cluster.RedisCluster(host="localhost", port=6379)
-    with sentry_sdk.start_span(name="custom_transaction"):
+    with sentry_sdk_alpha.start_span(name="custom_transaction"):
         # default case
         await connection.set("somekey", "somevalue")
 

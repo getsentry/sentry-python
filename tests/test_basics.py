@@ -8,9 +8,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-import sentry_sdk
-import sentry_sdk.scope
-from sentry_sdk import (
+import sentry_sdk_alpha
+import sentry_sdk_alpha.scope
+from sentry_sdk_alpha import (
     get_client,
     capture_event,
     capture_exception,
@@ -21,17 +21,17 @@ from sentry_sdk import (
     isolation_scope,
     new_scope,
 )
-from sentry_sdk.integrations import (
+from sentry_sdk_alpha.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
     _DEFAULT_INTEGRATIONS,
     DidNotEnable,
     Integration,
     setup_integrations,
 )
-from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import datetime_from_isoformat, get_sdk_name, reraise
+from sentry_sdk_alpha.integrations.logging import LoggingIntegration
+from sentry_sdk_alpha.integrations.stdlib import StdlibIntegration
+from sentry_sdk_alpha.scope import add_global_event_processor
+from sentry_sdk_alpha.utils import datetime_from_isoformat, get_sdk_name, reraise
 
 
 class NoOpIntegration(Integration):
@@ -60,7 +60,9 @@ def test_processors(sentry_init, capture_events):
         event["exception"]["values"][0]["value"] += " whatever"
         return event
 
-    sentry_sdk.get_isolation_scope().add_error_processor(error_processor, ValueError)
+    sentry_sdk_alpha.get_isolation_scope().add_error_processor(
+        error_processor, ValueError
+    )
 
     try:
         raise ValueError("aha!")
@@ -219,7 +221,7 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     events = capture_events()
 
     monkeypatch.setattr(
-        sentry_sdk.get_client().transport, "record_lost_event", record_lost_event
+        sentry_sdk_alpha.get_client().transport, "record_lost_event", record_lost_event
     )
 
     def do_this():
@@ -289,7 +291,7 @@ def test_breadcrumbs(sentry_init, capture_events):
             category="auth", message="Authenticated user %s" % i, level="info"
         )
 
-    sentry_sdk.get_isolation_scope().clear()
+    sentry_sdk_alpha.get_isolation_scope().clear()
 
     capture_exception(ValueError())
     (event,) = events
@@ -372,7 +374,7 @@ def test_attachments(sentry_init, capture_envelopes):
 
     this_file = os.path.abspath(__file__.rstrip("c"))
 
-    scope = sentry_sdk.get_isolation_scope()
+    scope = sentry_sdk_alpha.get_isolation_scope()
     scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
     scope.add_attachment(path=this_file)
 
@@ -406,7 +408,7 @@ def test_attachments_graceful_failure(
     sentry_init()
     envelopes = capture_envelopes()
 
-    sentry_sdk.get_isolation_scope().add_attachment(path="non_existent")
+    sentry_sdk_alpha.get_isolation_scope().add_attachment(path="non_existent")
     capture_exception(ValueError())
 
     (envelope,) = envelopes
@@ -582,11 +584,11 @@ def test_event_processor_drop_records_client_report(
     record_lost_event_calls = capture_record_lost_event_calls()
 
     # Ensure full idempotency by restoring the original global event processors list object, not just a copy.
-    old_processors = sentry_sdk.scope.global_event_processors
+    old_processors = sentry_sdk_alpha.scope.global_event_processors
 
     try:
-        sentry_sdk.scope.global_event_processors = (
-            sentry_sdk.scope.global_event_processors.copy()
+        sentry_sdk_alpha.scope.global_event_processors = (
+            sentry_sdk_alpha.scope.global_event_processors.copy()
         )
 
         @add_global_event_processor
@@ -610,7 +612,7 @@ def test_event_processor_drop_records_client_report(
         )
 
     finally:
-        sentry_sdk.scope.global_event_processors = old_processors
+        sentry_sdk_alpha.scope.global_event_processors = old_processors
 
 
 @pytest.mark.parametrize(
@@ -781,7 +783,7 @@ def test_staticmethod_class_tracing(sentry_init, capture_events):
 
     events = capture_events()
 
-    with sentry_sdk.start_span(name="test"):
+    with sentry_sdk_alpha.start_span(name="test"):
         assert TracingTestClass.static(1) == 1
 
     (event,) = events
@@ -805,7 +807,7 @@ def test_staticmethod_instance_tracing(sentry_init, capture_events):
 
     events = capture_events()
 
-    with sentry_sdk.start_span(name="test"):
+    with sentry_sdk_alpha.start_span(name="test"):
         assert TracingTestClass().static(1) == 1
 
     (event,) = events
@@ -829,7 +831,7 @@ def test_classmethod_class_tracing(sentry_init, capture_events):
 
     events = capture_events()
 
-    with sentry_sdk.start_span(name="test"):
+    with sentry_sdk_alpha.start_span(name="test"):
         assert TracingTestClass.class_(1) == (TracingTestClass, 1)
 
     (event,) = events
@@ -853,7 +855,7 @@ def test_classmethod_instance_tracing(sentry_init, capture_events):
 
     events = capture_events()
 
-    with sentry_sdk.start_span(name="test"):
+    with sentry_sdk_alpha.start_span(name="test"):
         assert TracingTestClass().class_(1) == (TracingTestClass, 1)
 
     (event,) = events
@@ -959,7 +961,7 @@ def test_stacktrace_big_recursion(sentry_init, capture_events):
         recurse()
     except RecursionError as e:
         capture_start_time = time.perf_counter_ns()
-        sentry_sdk.capture_exception(e)
+        sentry_sdk_alpha.capture_exception(e)
         capture_end_time = time.perf_counter_ns()
     finally:
         sys.setrecursionlimit(old_recursion_limit)

@@ -5,10 +5,10 @@ import pytest
 import fakeredis
 from fakeredis import FakeStrictRedis
 
-from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
-from sentry_sdk.utils import parse_version
-import sentry_sdk
+from sentry_sdk_alpha.integrations.redis import RedisIntegration
+from sentry_sdk_alpha.integrations.redis.utils import _get_safe_key, _key_as_string
+from sentry_sdk_alpha.utils import parse_version
+import sentry_sdk_alpha
 
 
 FAKEREDIS_VERSION = parse_version(fakeredis.__version__)
@@ -24,7 +24,7 @@ def test_no_cache_basic(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span(name="cache"):
+    with sentry_sdk_alpha.start_span(name="cache"):
         connection.get("mycachekey")
 
     (event,) = events
@@ -49,7 +49,7 @@ def test_cache_basic(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span(name="cache"):
+    with sentry_sdk_alpha.start_span(name="cache"):
         connection.hget("mycachekey", "myfield")
         connection.get("mycachekey")
         connection.set("mycachekey1", "bla")
@@ -87,7 +87,7 @@ def test_cache_keys(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span(name="cache"):
+    with sentry_sdk_alpha.start_span(name="cache"):
         connection.get("somethingelse")
         connection.get("blub")
         connection.get("blubkeything")
@@ -120,7 +120,7 @@ def test_cache_data(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis(host="mycacheserver.io", port=6378)
-    with sentry_sdk.start_span(name="cache"):
+    with sentry_sdk_alpha.start_span(name="cache"):
         connection.get("mycachekey")
         connection.set("mycachekey", "事实胜于雄辩")
         connection.get("mycachekey")
@@ -203,7 +203,7 @@ def test_cache_prefixes(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeStrictRedis()
-    with sentry_sdk.start_span(name="cache"):
+    with sentry_sdk_alpha.start_span(name="cache"):
         connection.mget("yes", "no")
         connection.mget("no", 1, "yes")
         connection.mget("no", "yes.1", "yes.2")

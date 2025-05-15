@@ -3,11 +3,11 @@ from fastapi.testclient import TestClient
 from flask import Flask, request, jsonify
 from graphene import ObjectType, String, Schema
 
-from sentry_sdk.consts import OP
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.flask import FlaskIntegration
-from sentry_sdk.integrations.graphene import GrapheneIntegration
-from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk_alpha.consts import OP
+from sentry_sdk_alpha.integrations.fastapi import FastApiIntegration
+from sentry_sdk_alpha.integrations.flask import FlaskIntegration
+from sentry_sdk_alpha.integrations.graphene import GrapheneIntegration
+from sentry_sdk_alpha.integrations.starlette import StarletteIntegration
 
 
 class Query(ObjectType):

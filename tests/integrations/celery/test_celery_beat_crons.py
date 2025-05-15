@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 from celery.schedules import crontab, schedule
 
-from sentry_sdk.crons import MonitorStatus
-from sentry_sdk.integrations.celery.beat import (
+from sentry_sdk_alpha.crons import MonitorStatus
+from sentry_sdk_alpha.integrations.celery.beat import (
     _get_headers,
     _get_monitor_config,
     _patch_beat_apply_entry,
@@ -15,7 +15,7 @@ from sentry_sdk.integrations.celery.beat import (
     crons_task_retry,
     crons_task_success,
 )
-from sentry_sdk.integrations.celery.utils import _get_humanized_interval
+from sentry_sdk_alpha.integrations.celery.utils import _get_humanized_interval
 
 
 def test_get_headers():

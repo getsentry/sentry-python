@@ -6,9 +6,9 @@ import sys
 
 import pytest
 
-import sentry_sdk
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.threading import ThreadingIntegration
+import sentry_sdk_alpha
+from sentry_sdk_alpha import capture_message
+from sentry_sdk_alpha.integrations.threading import ThreadingIntegration
 
 original_start = Thread.start
 original_run = Thread.run
@@ -46,7 +46,7 @@ def test_propagates_scope(sentry_init, capture_events, propagate_scope):
     events = capture_events()
 
     def stage1():
-        sentry_sdk.get_isolation_scope().set_tag("stage1", "true")
+        sentry_sdk_alpha.get_isolation_scope().set_tag("stage1", "true")
 
         t = Thread(target=stage2)
         t.start()
@@ -82,16 +82,18 @@ def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scop
     events = capture_events()
 
     def double(number):
-        with sentry_sdk.start_span(op="task", name=str(number), only_if_parent=True):
+        with sentry_sdk_alpha.start_span(
+            op="task", name=str(number), only_if_parent=True
+        ):
             return number * 2
 
-    with sentry_sdk.start_span(name="test_handles_threadpool"):
+    with sentry_sdk_alpha.start_span(name="test_handles_threadpool"):
         with futures.ThreadPoolExecutor(max_workers=1) as executor:
             tasks = [executor.submit(double, number) for number in [1, 2, 3, 4]]
             for future in futures.as_completed(tasks):
                 print("Getting future value!", future.result())
 
-    sentry_sdk.flush()
+    sentry_sdk_alpha.flush()
 
     if propagate_scope:
         assert len(events) == 1
@@ -187,20 +189,20 @@ def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
         integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
     )
 
-    sentry_sdk.set_tag("initial_tag", "initial_value")
-    initial_iso_scope = sentry_sdk.get_isolation_scope()
+    sentry_sdk_alpha.set_tag("initial_tag", "initial_value")
+    initial_iso_scope = sentry_sdk_alpha.get_isolation_scope()
 
     def do_some_work():
         # check if we have the initial scope data propagated into the thread
         if propagate_scope:
-            assert sentry_sdk.get_isolation_scope()._tags == {
+            assert sentry_sdk_alpha.get_isolation_scope()._tags == {
                 "initial_tag": "initial_value"
             }
         else:
-            assert sentry_sdk.get_isolation_scope()._tags == {}
+            assert sentry_sdk_alpha.get_isolation_scope()._tags == {}
 
         # change data in isolation scope in thread
-        sentry_sdk.set_tag("thread_tag", "thread_value")
+        sentry_sdk_alpha.set_tag("thread_tag", "thread_value")
 
     t = Thread(target=do_some_work)
     t.start()
@@ -227,16 +229,16 @@ def test_spans_from_multiple_threads(
     events = capture_events()
 
     def do_some_work(number):
-        with sentry_sdk.start_span(
+        with sentry_sdk_alpha.start_span(
             op=f"inner-run-{number}", name=f"Thread: child-{number}"
         ):
             pass
 
     threads = []
 
-    with sentry_sdk.start_span(op="outer-trx"):
+    with sentry_sdk_alpha.start_span(op="outer-trx"):
         for number in range(2):
-            with sentry_sdk.start_span(
+            with sentry_sdk_alpha.start_span(
                 op=f"outer-submit-{number}", name="Thread: main"
             ):
                 t = Thread(target=do_some_work, args=(number,))

@@ -8,7 +8,7 @@ where we need to compute it because it is missing.
 
 from unittest import mock
 
-import sentry_sdk
+import sentry_sdk_alpha
 
 
 def test_continue_trace_with_sample_rand(sentry_init):
@@ -22,8 +22,8 @@ def test_continue_trace_with_sample_rand(sentry_init):
         "baggage": "sentry-sample_rand=0.1,sentry-sample_rate=0.5",
     }
 
-    with sentry_sdk.continue_trace(headers):
-        with sentry_sdk.start_span(name="root-span") as root_span:
+    with sentry_sdk_alpha.continue_trace(headers):
+        with sentry_sdk_alpha.start_span(name="root-span") as root_span:
             assert root_span.get_baggage().sentry_items["sample_rand"] == "0.1"
 
 
@@ -39,6 +39,6 @@ def test_continue_trace_missing_sample_rand(sentry_init):
     }
 
     with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
-        with sentry_sdk.continue_trace(headers):
-            with sentry_sdk.start_span(name="root-span") as root_span:
+        with sentry_sdk_alpha.continue_trace(headers):
+            with sentry_sdk_alpha.start_span(name="root-span") as root_span:
                 assert root_span.get_baggage().sentry_items["sample_rand"] == "0.500000"

@@ -23,7 +23,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import requests
 from jinja2 import Environment, FileSystemLoader
-from sentry_sdk.integrations import _MIN_VERSIONS
+from sentry_sdk_alpha.integrations import _MIN_VERSIONS
 
 from config import TEST_SUITE_CONFIG
 from split_tox_gh_actions.split_tox_gh_actions import GROUPS

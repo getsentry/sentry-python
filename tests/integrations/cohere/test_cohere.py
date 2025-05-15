@@ -4,9 +4,9 @@ import httpx
 import pytest
 from cohere import Client, ChatMessage
 
-from sentry_sdk import start_span
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.cohere import CohereIntegration
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.integrations.cohere import CohereIntegration
 
 from unittest import mock  # python 3.3 and above
 from httpx import Client as HTTPXClient

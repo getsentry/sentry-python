@@ -7,9 +7,9 @@ from huggingface_hub import (
 )
 from huggingface_hub.errors import OverloadedError
 
-from sentry_sdk import start_span
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.integrations.huggingface_hub import HuggingfaceHubIntegration
 
 
 def mock_client_post(client, post_mock):

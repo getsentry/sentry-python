@@ -9,10 +9,10 @@ from ldclient.config import Config
 from ldclient.context import Context
 from ldclient.integrations.test_data import TestData
 
-import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
-from sentry_sdk import start_span, start_transaction
+import sentry_sdk_alpha
+from sentry_sdk_alpha.integrations import DidNotEnable
+from sentry_sdk_alpha.integrations.launchdarkly import LaunchDarklyIntegration
+from sentry_sdk_alpha import start_span, start_transaction
 from tests.conftest import ApproxDict
 
 
@@ -46,7 +46,7 @@ def test_launchdarkly_integration(
     client.variation("other", Context.create("user2", "user"), False)
 
     events = capture_events()
-    sentry_sdk.capture_exception(Exception("something wrong!"))
+    sentry_sdk_alpha.capture_exception(Exception("something wrong!"))
 
     assert len(events) == 1
     assert events[0]["contexts"]["flags"] == {
@@ -81,11 +81,11 @@ def test_launchdarkly_integration_threaded(
     def task(flag_key):
         # Creates a new isolation scope for the thread.
         # This means the evaluations in each task are captured separately.
-        with sentry_sdk.isolation_scope():
+        with sentry_sdk_alpha.isolation_scope():
             client.variation(flag_key, context, False)
             # use a tag to identify to identify events later on
-            sentry_sdk.set_tag("task_id", flag_key)
-            sentry_sdk.capture_exception(Exception("something wrong!"))
+            sentry_sdk_alpha.set_tag("task_id", flag_key)
+            sentry_sdk_alpha.capture_exception(Exception("something wrong!"))
 
     # Capture an eval before we split isolation scopes.
     client.variation("hello", context, False)
@@ -94,8 +94,8 @@ def test_launchdarkly_integration_threaded(
         pool.map(task, ["world", "other"])
 
     # Capture error in original scope
-    sentry_sdk.set_tag("task_id", "0")
-    sentry_sdk.capture_exception(Exception("something wrong!"))
+    sentry_sdk_alpha.set_tag("task_id", "0")
+    sentry_sdk_alpha.capture_exception(Exception("something wrong!"))
 
     assert len(events) == 3
     events.sort(key=lambda e: e["tags"]["task_id"])
@@ -145,11 +145,11 @@ def test_launchdarkly_integration_asyncio(
     events = capture_events()
 
     async def task(flag_key):
-        with sentry_sdk.isolation_scope():
+        with sentry_sdk_alpha.isolation_scope():
             client.variation(flag_key, context, False)
             # use a tag to identify to identify events later on
-            sentry_sdk.set_tag("task_id", flag_key)
-            sentry_sdk.capture_exception(Exception("something wrong!"))
+            sentry_sdk_alpha.set_tag("task_id", flag_key)
+            sentry_sdk_alpha.capture_exception(Exception("something wrong!"))
 
     async def runner():
         return asyncio.gather(task("world"), task("other"))
@@ -160,8 +160,8 @@ def test_launchdarkly_integration_asyncio(
     asyncio.run(runner())
 
     # Capture error in original scope
-    sentry_sdk.set_tag("task_id", "0")
-    sentry_sdk.capture_exception(Exception("something wrong!"))
+    sentry_sdk_alpha.set_tag("task_id", "0")
+    sentry_sdk_alpha.capture_exception(Exception("something wrong!"))
 
     assert len(events) == 3
     events.sort(key=lambda e: e["tags"]["task_id"])

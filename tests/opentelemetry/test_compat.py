@@ -1,5 +1,5 @@
-import sentry_sdk
-from sentry_sdk.tracing import Transaction
+import sentry_sdk_alpha
+from sentry_sdk_alpha.tracing import Transaction
 
 
 def test_transaction_name_span_description_compat(
@@ -10,11 +10,11 @@ def test_transaction_name_span_description_compat(
 
     events = capture_events()
 
-    with sentry_sdk.start_span(
+    with sentry_sdk_alpha.start_span(
         name="trx-name",
         op="trx-op",
     ) as trx:
-        with sentry_sdk.start_span(
+        with sentry_sdk_alpha.start_span(
             description="span-desc",
             op="span-op",
         ) as spn:
@@ -63,7 +63,7 @@ def test_start_transaction_compat(
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(
+    with sentry_sdk_alpha.start_transaction(
         name="trx-name",
         op="trx-op",
     ):
@@ -88,7 +88,7 @@ def test_start_transaction_with_explicit_transaction_compat(
 
     transaction = Transaction(name="trx-name", op="trx-op")
 
-    with sentry_sdk.start_transaction(transaction=transaction):
+    with sentry_sdk_alpha.start_transaction(transaction=transaction):
         pass
 
     transaction = events[0]

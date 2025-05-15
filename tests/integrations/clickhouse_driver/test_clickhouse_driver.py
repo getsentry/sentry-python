@@ -8,8 +8,8 @@ docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=2
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 
-from sentry_sdk import start_span, capture_message
-from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
+from sentry_sdk_alpha import start_span, capture_message
+from sentry_sdk_alpha.integrations.clickhouse_driver import ClickhouseDriverIntegration
 from tests.conftest import ApproxDict
 
 EXPECT_PARAMS_IN_SELECT = True

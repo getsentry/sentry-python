@@ -12,10 +12,10 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 
 # We shouldn't access settings while setting up integrations. Initialize SDK
 # here to provoke any errors that might occur.
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
+import sentry_sdk_alpha
+from sentry_sdk_alpha.integrations.django import DjangoIntegration
 
-sentry_sdk.init(integrations=[DjangoIntegration()])
+sentry_sdk_alpha.init(integrations=[DjangoIntegration()])
 
 import os
 
@@ -130,7 +130,7 @@ try:
         ),
     }
 except (ImportError, KeyError):
-    from sentry_sdk.utils import logger
+    from sentry_sdk_alpha.utils import logger
 
     logger.warning("No psycopg2 found, testing with SQLite.")
 

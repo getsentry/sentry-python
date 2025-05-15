@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk_alpha.consts import SPANDATA
 
 try:
     # Langchain >= 0.2
@@ -16,8 +16,8 @@ from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessageChunk
 from langchain_core.outputs import ChatGenerationChunk
 
-from sentry_sdk import start_span
-from sentry_sdk.integrations.langchain import LangchainIntegration
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.integrations.langchain import LangchainIntegration
 from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 

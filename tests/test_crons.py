@@ -3,39 +3,39 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
+import sentry_sdk_alpha
 
-from sentry_sdk.crons import capture_checkin
+from sentry_sdk_alpha.crons import capture_checkin
 
 
-@sentry_sdk.monitor(monitor_slug="abc123")
+@sentry_sdk_alpha.monitor(monitor_slug="abc123")
 def _hello_world(name):
     return "Hello, {}".format(name)
 
 
-@sentry_sdk.monitor(monitor_slug="def456")
+@sentry_sdk_alpha.monitor(monitor_slug="def456")
 def _break_world(name):
     1 / 0
     return "Hello, {}".format(name)
 
 
 def _hello_world_contextmanager(name):
-    with sentry_sdk.monitor(monitor_slug="abc123"):
+    with sentry_sdk_alpha.monitor(monitor_slug="abc123"):
         return "Hello, {}".format(name)
 
 
 def _break_world_contextmanager(name):
-    with sentry_sdk.monitor(monitor_slug="def456"):
+    with sentry_sdk_alpha.monitor(monitor_slug="def456"):
         1 / 0
         return "Hello, {}".format(name)
 
 
-@sentry_sdk.monitor(monitor_slug="abc123")
+@sentry_sdk_alpha.monitor(monitor_slug="abc123")
 async def _hello_world_async(name):
     return "Hello, {}".format(name)
 
 
-@sentry_sdk.monitor(monitor_slug="def456")
+@sentry_sdk_alpha.monitor(monitor_slug="def456")
 async def _break_world_async(name):
     1 / 0
     return "Hello, {}".format(name)
@@ -46,24 +46,24 @@ async def my_coroutine():
 
 
 async def _hello_world_contextmanager_async(name):
-    with sentry_sdk.monitor(monitor_slug="abc123"):
+    with sentry_sdk_alpha.monitor(monitor_slug="abc123"):
         await my_coroutine()
         return "Hello, {}".format(name)
 
 
 async def _break_world_contextmanager_async(name):
-    with sentry_sdk.monitor(monitor_slug="def456"):
+    with sentry_sdk_alpha.monitor(monitor_slug="def456"):
         await my_coroutine()
         1 / 0
         return "Hello, {}".format(name)
 
 
-@sentry_sdk.monitor(monitor_slug="ghi789", monitor_config=None)
+@sentry_sdk_alpha.monitor(monitor_slug="ghi789", monitor_config=None)
 def _no_monitor_config():
     return
 
 
-@sentry_sdk.monitor(
+@sentry_sdk_alpha.monitor(
     monitor_slug="ghi789",
     monitor_config={
         "schedule": {"type": "crontab", "value": "0 0 * * *"},
@@ -335,11 +335,11 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
     ]
 
     # Add some data to the scope
-    sentry_sdk.add_breadcrumb(message="test breadcrumb")
-    sentry_sdk.set_context("test_context", {"test_key": "test_value"})
-    sentry_sdk.set_extra("test_extra", "test_value")
-    sentry_sdk.set_level("warning")
-    sentry_sdk.set_tag("test_tag", "test_value")
+    sentry_sdk_alpha.add_breadcrumb(message="test breadcrumb")
+    sentry_sdk_alpha.set_context("test_context", {"test_key": "test_value"})
+    sentry_sdk_alpha.set_extra("test_extra", "test_value")
+    sentry_sdk_alpha.set_level("warning")
+    sentry_sdk_alpha.set_tag("test_tag", "test_value")
 
     capture_checkin(
         monitor_slug="abc123",

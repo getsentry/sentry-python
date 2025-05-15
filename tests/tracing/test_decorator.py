@@ -3,9 +3,9 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk.tracing import trace
-from sentry_sdk.tracing_utils import start_child_span_decorator
-from sentry_sdk.utils import logger
+from sentry_sdk_alpha.tracing import trace
+from sentry_sdk_alpha.tracing_utils import start_child_span_decorator
+from sentry_sdk_alpha.utils import logger
 from tests.conftest import patch_start_tracing_child
 
 

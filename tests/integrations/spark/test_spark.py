@@ -2,13 +2,13 @@ import pytest
 import sys
 from unittest.mock import patch
 
-from sentry_sdk.integrations.spark.spark_driver import (
+from sentry_sdk_alpha.integrations.spark.spark_driver import (
     _set_app_properties,
     _start_sentry_listener,
     SentryListener,
     SparkIntegration,
 )
-from sentry_sdk.integrations.spark.spark_worker import SparkWorkerIntegration
+from sentry_sdk_alpha.integrations.spark.spark_worker import SparkWorkerIntegration
 
 from pyspark import SparkContext
 
@@ -22,7 +22,7 @@ from py4j.protocol import Py4JJavaError
 
 @pytest.fixture(scope="function")
 def sentry_init_with_reset(sentry_init):
-    from sentry_sdk.integrations import _processed_integrations
+    from sentry_sdk_alpha.integrations import _processed_integrations
 
     yield lambda: sentry_init(integrations=[SparkIntegration()])
     _processed_integrations.remove("spark")

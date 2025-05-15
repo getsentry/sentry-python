@@ -4,9 +4,9 @@ import pytest
 
 from unittest import mock
 
-from sentry_sdk.integrations.celery import _update_celery_task_headers
-import sentry_sdk
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk_alpha.integrations.celery import _update_celery_task_headers
+import sentry_sdk_alpha
+from sentry_sdk_alpha.tracing_utils import Baggage
 from tests.conftest import SortedBaggage
 
 
@@ -76,8 +76,8 @@ def test_span_with_transaction(sentry_init):
     headers = {}
     monitor_beat_tasks = False
 
-    with sentry_sdk.start_span(name="test_transaction") as transaction:
-        with sentry_sdk.start_span(op="test_span") as span:
+    with sentry_sdk_alpha.start_span(name="test_transaction") as transaction:
+        with sentry_sdk_alpha.start_span(op="test_span") as span:
             outgoing_headers = _update_celery_task_headers(
                 headers, span, monitor_beat_tasks
             )
@@ -99,8 +99,8 @@ def test_span_with_transaction_custom_headers(sentry_init):
         "sentry-trace": SENTRY_TRACE_VALUE,
     }
 
-    with sentry_sdk.start_span(name="test_transaction") as transaction:
-        with sentry_sdk.start_span(op="test_span") as span:
+    with sentry_sdk_alpha.start_span(name="test_transaction") as transaction:
+        with sentry_sdk_alpha.start_span(op="test_span") as span:
             outgoing_headers = _update_celery_task_headers(headers, span, False)
 
             assert outgoing_headers["sentry-trace"] == span.to_traceparent()
@@ -141,7 +141,7 @@ def test_celery_trace_propagation_default(sentry_init, monitor_beat_tasks):
     headers = {}
     span = None
 
-    scope = sentry_sdk.get_isolation_scope()
+    scope = sentry_sdk_alpha.get_isolation_scope()
 
     outgoing_headers = _update_celery_task_headers(headers, span, monitor_beat_tasks)
 
@@ -177,7 +177,7 @@ def test_celery_trace_propagation_traces_sample_rate(
     headers = {}
     span = None
 
-    scope = sentry_sdk.get_isolation_scope()
+    scope = sentry_sdk_alpha.get_isolation_scope()
 
     outgoing_headers = _update_celery_task_headers(headers, span, monitor_beat_tasks)
 

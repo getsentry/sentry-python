@@ -5,7 +5,7 @@ from gql import gql
 from gql import Client
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
-from sentry_sdk.integrations.gql import GQLIntegration
+from sentry_sdk_alpha.integrations.gql import GQLIntegration
 
 
 @responses.activate

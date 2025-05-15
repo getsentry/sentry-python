@@ -3,8 +3,8 @@ from unittest import mock
 import boto3
 import pytest
 
-import sentry_sdk
-from sentry_sdk.integrations.boto3 import Boto3Integration
+import sentry_sdk_alpha
+from sentry_sdk_alpha.integrations.boto3 import Boto3Integration
 from tests.conftest import ApproxDict
 from tests.integrations.boto3 import read_fixture
 from tests.integrations.boto3.aws_mock import MockResponse
@@ -21,7 +21,7 @@ def test_basic(sentry_init, capture_events):
     events = capture_events()
 
     s3 = session.resource("s3")
-    with sentry_sdk.start_span() as transaction, MockResponse(
+    with sentry_sdk_alpha.start_span() as transaction, MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         bucket = s3.Bucket("bucket")
@@ -45,7 +45,7 @@ def test_breadcrumb(sentry_init, capture_events):
 
     try:
         s3 = session.resource("s3")
-        with sentry_sdk.start_span(), MockResponse(
+        with sentry_sdk_alpha.start_span(), MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
             bucket = s3.Bucket("bucket")
@@ -53,7 +53,7 @@ def test_breadcrumb(sentry_init, capture_events):
             [obj for obj in bucket.objects.all()]
             1 / 0
     except Exception as e:
-        sentry_sdk.capture_exception(e)
+        sentry_sdk_alpha.capture_exception(e)
 
     (_, event) = events
     crumb = event["breadcrumbs"]["values"][0]
@@ -75,7 +75,7 @@ def test_streaming(sentry_init, capture_events):
     events = capture_events()
 
     s3 = session.resource("s3")
-    with sentry_sdk.start_span() as transaction, MockResponse(
+    with sentry_sdk_alpha.start_span() as transaction, MockResponse(
         s3.meta.client, 200, {}, b"hello"
     ):
         obj = s3.Bucket("bucket").Object("foo.pdf")
@@ -113,7 +113,7 @@ def test_streaming_close(sentry_init, capture_events):
     events = capture_events()
 
     s3 = session.resource("s3")
-    with sentry_sdk.start_span() as transaction, MockResponse(
+    with sentry_sdk_alpha.start_span() as transaction, MockResponse(
         s3.meta.client, 200, {}, b"hello"
     ):
         obj = s3.Bucket("bucket").Object("foo.pdf")
@@ -142,7 +142,7 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
         "sentry_sdk.integrations.boto3.parse_url",
         side_effect=ValueError,
     ):
-        with sentry_sdk.start_span() as transaction, MockResponse(
+        with sentry_sdk_alpha.start_span() as transaction, MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
             bucket = s3.Bucket("bucket")
@@ -170,7 +170,7 @@ def test_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     s3 = session.resource("s3")
-    with sentry_sdk.start_span(), MockResponse(
+    with sentry_sdk_alpha.start_span(), MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         bucket = s3.Bucket("bucket")

@@ -20,7 +20,7 @@ if django.VERSION < (1, 9):
 else:
     included_url_conf = ((re_path(r"^foo/bar/(?P<param>[\w]+)", lambda x: ""),), "")
 
-from sentry_sdk.integrations.django.transactions import RavenResolver
+from sentry_sdk_alpha.integrations.django.transactions import RavenResolver
 from tests.integrations.django.myapp.wsgi import application  # noqa: F401
 
 

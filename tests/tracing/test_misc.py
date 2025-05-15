@@ -1,11 +1,11 @@
 import pytest
 from unittest.mock import MagicMock
 
-import sentry_sdk
-from sentry_sdk import start_span, get_current_scope
-from sentry_sdk.consts import MATCH_ALL
-from sentry_sdk.tracing_utils import should_propagate_trace
-from sentry_sdk.utils import Dsn
+import sentry_sdk_alpha
+from sentry_sdk_alpha import start_span, get_current_scope
+from sentry_sdk_alpha.consts import MATCH_ALL
+from sentry_sdk_alpha.tracing_utils import should_propagate_trace
+from sentry_sdk_alpha.utils import Dsn
 from tests.conftest import ApproxDict
 
 
@@ -82,7 +82,7 @@ def test_root_span_data(sentry_init, capture_events):
     events = capture_events()
 
     with start_span(name="test-root-span"):
-        root_span = sentry_sdk.get_current_span()
+        root_span = sentry_sdk_alpha.get_current_span()
         root_span.set_attribute("foo", "bar")
         with start_span(op="test-span") as span:
             span.set_attribute("spanfoo", "spanbar")
@@ -190,7 +190,7 @@ def test_should_propagate_trace_to_sentry(
         traces_sample_rate=1.0,
     )
 
-    client = sentry_sdk.get_client()
+    client = sentry_sdk_alpha.get_client()
     client.transport.parsed_dsn = Dsn(dsn)
 
     assert should_propagate_trace(client, url) == expected_propagation_decision

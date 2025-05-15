@@ -1,6 +1,6 @@
 import pytest
 import requests
-import sentry_sdk
+import sentry_sdk_alpha
 from http.client import HTTPConnection
 
 USE_DEFAULT_TRACES_SAMPLE_RATE = -1
@@ -69,8 +69,8 @@ def test_no_incoming_trace_and_trace_propagation_targets_matching(
 
     NO_INCOMING_HEADERS = {}  # noqa: N806
 
-    with sentry_sdk.continue_trace(NO_INCOMING_HEADERS):
-        with sentry_sdk.start_span(op="test", name="test"):
+    with sentry_sdk_alpha.continue_trace(NO_INCOMING_HEADERS):
+        with sentry_sdk_alpha.start_span(op="test", name="test"):
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
@@ -120,8 +120,8 @@ def test_no_incoming_trace_and_trace_propagation_targets_not_matching(
 
     NO_INCOMING_HEADERS = {}  # noqa: N806
 
-    with sentry_sdk.continue_trace(NO_INCOMING_HEADERS):
-        with sentry_sdk.start_span(op="test", name="test"):
+    with sentry_sdk_alpha.continue_trace(NO_INCOMING_HEADERS):
+        with sentry_sdk_alpha.start_span(op="test", name="test"):
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
@@ -185,8 +185,8 @@ def test_with_incoming_trace_and_trace_propagation_targets_matching(
             "baggage"
         ] += f',sentry-sampled={"true" if incoming_parent_sampled == "1" else "false"}'  # noqa: E231
 
-    with sentry_sdk.continue_trace(incoming_headers):
-        with sentry_sdk.start_span(op="test", name="test"):
+    with sentry_sdk_alpha.continue_trace(incoming_headers):
+        with sentry_sdk_alpha.start_span(op="test", name="test"):
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
@@ -263,8 +263,8 @@ def test_with_incoming_trace_and_trace_propagation_targets_not_matching(
             "baggage"
         ] += f',sentry-sampled={"true" if incoming_parent_sampled == "1" else "false"}'  # noqa: E231
 
-    with sentry_sdk.continue_trace(incoming_headers):
-        with sentry_sdk.start_span(op="test", name="test"):
+    with sentry_sdk_alpha.continue_trace(incoming_headers):
+        with sentry_sdk_alpha.start_span(op="test", name="test"):
             requests.get("http://example.com")
 
     # CHECK if performance data (a transaction/span) is sent to Sentry

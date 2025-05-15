@@ -6,9 +6,9 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
-from sentry_sdk import start_span
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.openai import (
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.integrations.openai import (
     OpenAIIntegration,
     _calculate_chat_completion_usage,
 )

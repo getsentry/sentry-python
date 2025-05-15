@@ -4,8 +4,8 @@ import functools
 from litestar.exceptions import HTTPException
 import pytest
 
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.litestar import LitestarIntegration
+from sentry_sdk_alpha import capture_message
+from sentry_sdk_alpha.integrations.litestar import LitestarIntegration
 from tests.conftest import ApproxDict
 
 from typing import Any

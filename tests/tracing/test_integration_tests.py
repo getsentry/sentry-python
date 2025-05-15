@@ -4,14 +4,14 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
-from sentry_sdk import (
+import sentry_sdk_alpha
+from sentry_sdk_alpha import (
     capture_message,
     continue_trace,
     start_span,
 )
-from sentry_sdk.consts import SPANSTATUS
-from sentry_sdk.transport import Transport
+from sentry_sdk_alpha.consts import SPANSTATUS
+from sentry_sdk_alpha.transport import Transport
 from tests.conftest import SortedBaggage
 
 
@@ -82,7 +82,7 @@ def test_continue_trace(sentry_init, capture_envelopes, sample_rate):  # noqa:N8
 
             # change the transaction name from "WRONG" to make sure the change
             # is reflected in the final data
-            sentry_sdk.get_current_scope().set_transaction_name("ho")
+            sentry_sdk_alpha.get_current_scope().set_transaction_name("ho")
             # to show that the captured message will be tagged with the trace id
             # (since it happens while the transaction is open)
             capture_message("hello")
@@ -216,7 +216,7 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
         with start_span(name="Head SDK tx") as root_span:
             with start_span(op="foo", name="foodesc") as current_span:
                 span = current_span
-                meta = sentry_sdk.get_current_scope().trace_propagation_meta()
+                meta = sentry_sdk_alpha.get_current_scope().trace_propagation_meta()
 
     ind = meta.find(">") + 1
     sentry_trace, baggage = meta[:ind], meta[ind:]

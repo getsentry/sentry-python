@@ -20,10 +20,10 @@ import pytest_asyncio
 from asyncpg import connect, Connection
 from freezegun import freeze_time
 
-from sentry_sdk import capture_message, start_span
-from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk_alpha import capture_message, start_span
+from sentry_sdk_alpha.integrations.asyncpg import AsyncPGIntegration
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
 
 

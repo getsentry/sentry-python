@@ -6,9 +6,14 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, start_span, continue_trace, isolation_scope
-from sentry_sdk.consts import MATCH_ALL, SPANDATA
-from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_sdk_alpha import (
+    capture_message,
+    start_span,
+    continue_trace,
+    isolation_scope,
+)
+from sentry_sdk_alpha.consts import MATCH_ALL, SPANDATA
+from sentry_sdk_alpha.integrations.stdlib import StdlibIntegration
 
 from tests.conftest import ApproxDict, SortedBaggage, create_mock_http_server
 

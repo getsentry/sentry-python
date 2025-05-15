@@ -7,8 +7,8 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_exception, capture_message, start_span
-from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_sdk_alpha import capture_exception, capture_message, start_span
+from sentry_sdk_alpha.integrations.stdlib import StdlibIntegration
 from tests.conftest import ApproxDict
 
 

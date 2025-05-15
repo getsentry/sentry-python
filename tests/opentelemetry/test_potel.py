@@ -1,8 +1,8 @@
 import pytest
 from opentelemetry import trace
 
-import sentry_sdk
-from sentry_sdk.consts import SPANSTATUS
+import sentry_sdk_alpha
+from sentry_sdk_alpha.consts import SPANSTATUS
 from tests.conftest import ApproxDict
 
 
@@ -101,7 +101,7 @@ def test_children_span_nesting_started_with_otel_only(capture_envelopes):
 def test_root_span_transaction_payload_started_with_sentry_only(capture_envelopes):
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_span(description="request"):
+    with sentry_sdk_alpha.start_span(description="request"):
         pass
 
     (envelope,) = envelopes
@@ -133,8 +133,8 @@ def test_root_span_transaction_payload_started_with_sentry_only(capture_envelope
 def test_child_span_payload_started_with_sentry_only(capture_envelopes):
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_span(description="request"):
-        with sentry_sdk.start_span(description="db"):
+    with sentry_sdk_alpha.start_span(description="request"):
+        with sentry_sdk_alpha.start_span(description="db"):
             pass
 
     (envelope,) = envelopes
@@ -156,11 +156,11 @@ def test_child_span_payload_started_with_sentry_only(capture_envelopes):
 def test_children_span_nesting_started_with_sentry_only(capture_envelopes):
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_span(description="request"):
-        with sentry_sdk.start_span(description="db"):
-            with sentry_sdk.start_span(description="redis"):
+    with sentry_sdk_alpha.start_span(description="request"):
+        with sentry_sdk_alpha.start_span(description="db"):
+            with sentry_sdk_alpha.start_span(description="redis"):
                 pass
-        with sentry_sdk.start_span(description="http"):
+        with sentry_sdk_alpha.start_span(description="http"):
             pass
 
     (envelope,) = envelopes
@@ -184,9 +184,9 @@ def test_children_span_nesting_started_with_sentry_only(capture_envelopes):
 def test_children_span_nesting_mixed(capture_envelopes):
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_span(description="request"):
+    with sentry_sdk_alpha.start_span(description="request"):
         with tracer.start_as_current_span("db"):
-            with sentry_sdk.start_span(description="redis"):
+            with sentry_sdk_alpha.start_span(description="redis"):
                 pass
         with tracer.start_as_current_span("http"):
             pass
@@ -228,9 +228,9 @@ def test_span_attributes_in_data_started_with_otel(capture_envelopes):
 def test_span_data_started_with_sentry(capture_envelopes):
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_span(op="http", description="request") as request_span:
+    with sentry_sdk_alpha.start_span(op="http", description="request") as request_span:
         request_span.set_attribute("foo", "bar")
-        with sentry_sdk.start_span(op="db", description="statement") as db_span:
+        with sentry_sdk_alpha.start_span(op="db", description="statement") as db_span:
             db_span.set_attribute("baz", 42)
 
     (envelope,) = envelopes
@@ -258,9 +258,9 @@ def test_span_data_started_with_sentry(capture_envelopes):
 def test_transaction_tags_started_with_otel(capture_envelopes):
     envelopes = capture_envelopes()
 
-    sentry_sdk.set_tag("tag.global", 99)
+    sentry_sdk_alpha.set_tag("tag.global", 99)
     with tracer.start_as_current_span("request"):
-        sentry_sdk.set_tag("tag.inner", "foo")
+        sentry_sdk_alpha.set_tag("tag.inner", "foo")
 
     (envelope,) = envelopes
     (item,) = envelope.items
@@ -272,9 +272,9 @@ def test_transaction_tags_started_with_otel(capture_envelopes):
 def test_transaction_tags_started_with_sentry(capture_envelopes):
     envelopes = capture_envelopes()
 
-    sentry_sdk.set_tag("tag.global", 99)
-    with sentry_sdk.start_span(description="request"):
-        sentry_sdk.set_tag("tag.inner", "foo")
+    sentry_sdk_alpha.set_tag("tag.global", 99)
+    with sentry_sdk_alpha.start_span(description="request"):
+        sentry_sdk_alpha.set_tag("tag.inner", "foo")
 
     (envelope,) = envelopes
     (item,) = envelope.items
@@ -286,13 +286,13 @@ def test_transaction_tags_started_with_sentry(capture_envelopes):
 def test_multiple_transaction_tags_isolation_scope_started_with_otel(capture_envelopes):
     envelopes = capture_envelopes()
 
-    sentry_sdk.set_tag("tag.global", 99)
-    with sentry_sdk.isolation_scope():
+    sentry_sdk_alpha.set_tag("tag.global", 99)
+    with sentry_sdk_alpha.isolation_scope():
         with tracer.start_as_current_span("request a"):
-            sentry_sdk.set_tag("tag.inner.a", "a")
-    with sentry_sdk.isolation_scope():
+            sentry_sdk_alpha.set_tag("tag.inner.a", "a")
+    with sentry_sdk_alpha.isolation_scope():
         with tracer.start_as_current_span("request b"):
-            sentry_sdk.set_tag("tag.inner.b", "b")
+            sentry_sdk_alpha.set_tag("tag.inner.b", "b")
 
     (payload_a, payload_b) = [envelope.items[0].payload.json for envelope in envelopes]
 
@@ -305,13 +305,13 @@ def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
 ):
     envelopes = capture_envelopes()
 
-    sentry_sdk.set_tag("tag.global", 99)
-    with sentry_sdk.isolation_scope():
-        with sentry_sdk.start_span(description="request a"):
-            sentry_sdk.set_tag("tag.inner.a", "a")
-    with sentry_sdk.isolation_scope():
-        with sentry_sdk.start_span(description="request b"):
-            sentry_sdk.set_tag("tag.inner.b", "b")
+    sentry_sdk_alpha.set_tag("tag.global", 99)
+    with sentry_sdk_alpha.isolation_scope():
+        with sentry_sdk_alpha.start_span(description="request a"):
+            sentry_sdk_alpha.set_tag("tag.inner.a", "a")
+    with sentry_sdk_alpha.isolation_scope():
+        with sentry_sdk_alpha.start_span(description="request b"):
+            sentry_sdk_alpha.set_tag("tag.inner.b", "b")
 
     (payload_a, payload_b) = [envelope.items[0].payload.json for envelope in envelopes]
 
@@ -320,16 +320,16 @@ def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
 
 
 def test_potel_span_root_span_references():
-    with sentry_sdk.start_span(description="request") as request_span:
+    with sentry_sdk_alpha.start_span(description="request") as request_span:
         assert request_span.is_root_span
         assert request_span.root_span == request_span
-        with sentry_sdk.start_span(description="db") as db_span:
+        with sentry_sdk_alpha.start_span(description="db") as db_span:
             assert not db_span.is_root_span
             assert db_span.root_span == request_span
-            with sentry_sdk.start_span(description="redis") as redis_span:
+            with sentry_sdk_alpha.start_span(description="redis") as redis_span:
                 assert not redis_span.is_root_span
                 assert redis_span.root_span == request_span
-        with sentry_sdk.start_span(description="http") as http_span:
+        with sentry_sdk_alpha.start_span(description="http") as http_span:
             assert not http_span.is_root_span
             assert http_span.root_span == request_span
 
@@ -359,7 +359,7 @@ def test_potel_span_root_span_references():
     ],
 )
 def test_potel_span_status(status_in, status_out):
-    span = sentry_sdk.start_span(name="test")
+    span = sentry_sdk_alpha.start_span(name="test")
     if status_in is not None:
         span.set_status(status_in)
 

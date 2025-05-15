@@ -4,7 +4,7 @@ import os
 import pytest
 
 
-from sentry_sdk.utils import (
+from sentry_sdk_alpha.utils import (
     BadDsn,
     Dsn,
     safe_repr,
@@ -17,7 +17,7 @@ from sentry_sdk.utils import (
     strip_string,
     AnnotatedValue,
 )
-from sentry_sdk.consts import EndpointType
+from sentry_sdk_alpha.consts import EndpointType
 
 
 try:
@@ -76,9 +76,11 @@ def test_filename():
 
     assert x("os", os.__file__) == "os.py"
 
-    import sentry_sdk.utils
+    import sentry_sdk_alpha.utils
 
-    assert x("sentry_sdk.utils", sentry_sdk.utils.__file__) == "sentry_sdk/utils.py"
+    assert (
+        x("sentry_sdk.utils", sentry_sdk_alpha.utils.__file__) == "sentry_sdk/utils.py"
+    )
 
 
 @pytest.mark.parametrize(

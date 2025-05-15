@@ -1,8 +1,8 @@
 from collections import Counter
 from unittest import mock
 
-import sentry_sdk
-from sentry_sdk.transport import Transport
+import sentry_sdk_alpha
+from sentry_sdk_alpha.transport import Transport
 
 
 class HealthyTestTransport(Transport):
@@ -24,13 +24,13 @@ def test_no_monitor_if_disabled(sentry_init):
         enable_backpressure_handling=False,
     )
 
-    assert sentry_sdk.get_client().monitor is None
+    assert sentry_sdk_alpha.get_client().monitor is None
 
 
 def test_monitor_if_enabled(sentry_init):
     sentry_init(transport=HealthyTestTransport())
 
-    monitor = sentry_sdk.get_client().monitor
+    monitor = sentry_sdk_alpha.get_client().monitor
     assert monitor is not None
     assert monitor._thread is None
 
@@ -43,7 +43,7 @@ def test_monitor_if_enabled(sentry_init):
 def test_monitor_unhealthy(sentry_init):
     sentry_init(transport=UnhealthyTestTransport())
 
-    monitor = sentry_sdk.get_client().monitor
+    monitor = sentry_sdk_alpha.get_client().monitor
     monitor.interval = 0.1
 
     assert monitor.is_healthy() is True
@@ -66,7 +66,7 @@ def test_root_span_uses_downsample_rate(
 
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    monitor = sentry_sdk.get_client().monitor
+    monitor = sentry_sdk_alpha.get_client().monitor
     monitor.interval = 0.1
 
     assert monitor.is_healthy() is True
@@ -76,10 +76,10 @@ def test_root_span_uses_downsample_rate(
 
     # make sure we don't sample the root span
     with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.75):
-        with sentry_sdk.start_span(name="foobar") as root_span:
-            with sentry_sdk.start_span(name="foospan"):
-                with sentry_sdk.start_span(name="foospan2"):
-                    with sentry_sdk.start_span(name="foospan3"):
+        with sentry_sdk_alpha.start_span(name="foobar") as root_span:
+            with sentry_sdk_alpha.start_span(name="foospan"):
+                with sentry_sdk_alpha.start_span(name="foospan2"):
+                    with sentry_sdk_alpha.start_span(name="foospan3"):
                         ...
 
             assert root_span.sampled is False
@@ -113,7 +113,7 @@ def test_monitor_no_thread_on_shutdown_no_errors(sentry_init):
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        monitor = sentry_sdk.get_client().monitor
+        monitor = sentry_sdk_alpha.get_client().monitor
         assert monitor is not None
         assert monitor._thread is None
         monitor.run()

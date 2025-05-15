@@ -4,9 +4,9 @@ import pytest
 
 import ray
 
-import sentry_sdk
-from sentry_sdk.envelope import Envelope
-from sentry_sdk.integrations.ray import RayIntegration
+import sentry_sdk_alpha
+from sentry_sdk_alpha.envelope import Envelope
+from sentry_sdk_alpha.integrations.ray import RayIntegration
 from tests.conftest import TestTransport
 
 
@@ -32,7 +32,7 @@ def setup_sentry_with_logging_transport():
 
 
 def setup_sentry(transport=None):
-    sentry_sdk.init(
+    sentry_sdk_alpha.init(
         integrations=[RayIntegration()],
         transport=RayTestTransport() if transport is None else transport,
         traces_sample_rate=1.0,
@@ -72,15 +72,15 @@ def test_tracing_in_ray_tasks():
     # Setup ray task
     @ray.remote
     def example_task():
-        with sentry_sdk.start_span(op="task", name="example task step"):
+        with sentry_sdk_alpha.start_span(op="task", name="example task step"):
             ...
 
-        return sentry_sdk.get_client().transport.envelopes
+        return sentry_sdk_alpha.get_client().transport.envelopes
 
-    with sentry_sdk.start_span(op="test", name="ray client root span"):
+    with sentry_sdk_alpha.start_span(op="test", name="ray client root span"):
         worker_envelopes = ray.get(example_task.remote())
 
-    client_envelope = sentry_sdk.get_client().transport.envelopes[0]
+    client_envelope = sentry_sdk_alpha.get_client().transport.envelopes[0]
     client_root_span = client_envelope.get_transaction_event()
     assert client_root_span["transaction"] == "ray client root span"
     assert client_root_span["transaction_info"] == {"source": "custom"}
@@ -132,7 +132,7 @@ def test_errors_in_ray_tasks():
     def example_task():
         1 / 0
 
-    with sentry_sdk.start_span(op="test", name="ray client root span"):
+    with sentry_sdk_alpha.start_span(op="test", name="ray client root span"):
         with pytest.raises(ZeroDivisionError):
             future = example_task.remote()
             ray.get(future)
@@ -167,18 +167,18 @@ def test_tracing_in_ray_actors():
             self.n = 0
 
         def increment(self):
-            with sentry_sdk.start_span(
+            with sentry_sdk_alpha.start_span(
                 op="test", name="custom span in actor execution", only_if_parent=True
             ):
                 self.n += 1
 
-            return sentry_sdk.get_client().transport.envelopes
+            return sentry_sdk_alpha.get_client().transport.envelopes
 
-    with sentry_sdk.start_span(op="test", name="ray client root span"):
+    with sentry_sdk_alpha.start_span(op="test", name="ray client root span"):
         counter = Counter.remote()
         worker_envelopes = ray.get(counter.increment.remote())
 
-    client_envelope = sentry_sdk.get_client().transport.envelopes[0]
+    client_envelope = sentry_sdk_alpha.get_client().transport.envelopes[0]
     client_root_span = client_envelope.get_transaction_event()
 
     # Spans for submitting the actor task are not created (actors are not supported yet)
@@ -206,14 +206,14 @@ def test_errors_in_ray_actors():
             self.n = 0
 
         def increment(self):
-            with sentry_sdk.start_span(
+            with sentry_sdk_alpha.start_span(
                 op="test", name="custom span in actor execution", only_if_parent=True
             ):
                 1 / 0
 
-            return sentry_sdk.get_client().transport.envelopes
+            return sentry_sdk_alpha.get_client().transport.envelopes
 
-    with sentry_sdk.start_span(op="test", name="ray client root span"):
+    with sentry_sdk_alpha.start_span(op="test", name="ray client root span"):
         with pytest.raises(ZeroDivisionError):
             counter = Counter.remote()
             future = counter.increment.remote()

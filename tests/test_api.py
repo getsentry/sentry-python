@@ -2,7 +2,7 @@ import pytest
 
 from unittest import mock
 
-from sentry_sdk import (
+from sentry_sdk_alpha import (
     capture_exception,
     continue_trace,
     get_baggage,
@@ -17,7 +17,7 @@ from sentry_sdk import (
     get_isolation_scope,
 )
 
-from sentry_sdk.client import Client, NonRecordingClient
+from sentry_sdk_alpha.client import Client, NonRecordingClient
 from tests.conftest import SortedBaggage
 
 

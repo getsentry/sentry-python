@@ -1,11 +1,11 @@
 from collections import Counter
 
 import pytest
-import sentry_sdk
-from sentry_sdk import capture_message
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.integrations._asgi_common import _get_ip, _get_headers
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
+import sentry_sdk_alpha
+from sentry_sdk_alpha import capture_message
+from sentry_sdk_alpha.tracing import TransactionSource
+from sentry_sdk_alpha.integrations._asgi_common import _get_ip, _get_headers
+from sentry_sdk_alpha.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 
 from async_asgi_testclient import TestClient
 
@@ -130,7 +130,7 @@ def asgi3_ws_app():
 @pytest.fixture
 def asgi3_custom_transaction_app():
     async def app(scope, receive, send):
-        sentry_sdk.get_current_scope().set_transaction_name(
+        sentry_sdk_alpha.get_current_scope().set_transaction_name(
             "foobar", source=TransactionSource.CUSTOM
         )
         await send(
@@ -397,7 +397,7 @@ async def test_auto_session_tracking_with_aggregates(
             scope["route"] = "/trigger/error"
             await client.get("/trigger/error")
 
-    sentry_sdk.flush()
+    sentry_sdk_alpha.flush()
 
     count_item_types = Counter()
     for envelope in envelopes:

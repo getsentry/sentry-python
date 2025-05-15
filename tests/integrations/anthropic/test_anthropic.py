@@ -20,8 +20,11 @@ from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
-from sentry_sdk.integrations.anthropic import _add_ai_data_to_span, _collect_ai_data
-from sentry_sdk.utils import _serialize_span_attribute, package_version
+from sentry_sdk_alpha.integrations.anthropic import (
+    _add_ai_data_to_span,
+    _collect_ai_data,
+)
+from sentry_sdk_alpha.utils import _serialize_span_attribute, package_version
 
 try:
     from anthropic.types import InputJSONDelta
@@ -44,9 +47,9 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk import start_span
-from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.anthropic import AnthropicIntegration
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.consts import OP, SPANDATA
+from sentry_sdk_alpha.integrations.anthropic import AnthropicIntegration
 
 ANTHROPIC_VERSION = package_version("anthropic")
 EXAMPLE_MESSAGE = Message(

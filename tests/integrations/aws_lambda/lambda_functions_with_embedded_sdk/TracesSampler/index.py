@@ -1,7 +1,7 @@
 import json
 import os
-import sentry_sdk
-from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+import sentry_sdk_alpha
+from sentry_sdk_alpha.integrations.aws_lambda import AwsLambdaIntegration
 
 # Global variables to store sampling context for verification
 sampling_context_data = None
@@ -15,7 +15,7 @@ def trace_sampler(sampling_context):
     return 1.0  # Always sample
 
 
-sentry_sdk.init(
+sentry_sdk_alpha.init(
     dsn=os.environ.get("SENTRY_DSN"),
     traces_sample_rate=1.0,
     traces_sampler=trace_sampler,

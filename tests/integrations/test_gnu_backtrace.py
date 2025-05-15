@@ -1,7 +1,7 @@
 import pytest
 
-from sentry_sdk import capture_exception
-from sentry_sdk.integrations.gnu_backtrace import GnuBacktraceIntegration
+from sentry_sdk_alpha import capture_exception
+from sentry_sdk_alpha.integrations.gnu_backtrace import GnuBacktraceIntegration
 
 LINES = r"""
 0. clickhouse-server(StackTrace::StackTrace()+0x16) [0x99d31a6]

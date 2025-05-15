@@ -2,7 +2,7 @@ import pytest
 
 from werkzeug.test import Client
 
-from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk_alpha.integrations.django import DjangoIntegration
 from tests.conftest import werkzeug_set_cookie
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator

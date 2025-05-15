@@ -16,10 +16,10 @@ except ImportError:
 from freezegun import freeze_time
 from werkzeug.test import Client
 
-from sentry_sdk import start_span
-from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk_alpha import start_span
+from sentry_sdk_alpha.consts import SPANDATA
+from sentry_sdk_alpha.integrations.django import DjangoIntegration
+from sentry_sdk_alpha.tracing_utils import record_sql_queries
 
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
