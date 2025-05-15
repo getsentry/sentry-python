@@ -646,6 +646,17 @@ def test_get_error_message(error, expected_result):
     assert get_error_message(exc_value) == expected_result(exc_value)
 
 
+def test_safe_str_fails():
+    class ExplodingStr:
+        def __str__(self):
+            raise Exception
+
+    obj = ExplodingStr()
+    result = safe_str(obj)
+
+    assert result == repr(obj)
+
+
 def test_installed_modules():
     try:
         from importlib.metadata import distributions, version
