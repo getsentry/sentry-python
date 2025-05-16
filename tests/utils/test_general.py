@@ -121,6 +121,21 @@ def test_parse_invalid_dsn(dsn):
 
 
 @pytest.mark.parametrize(
+    "dsn,error_message",
+    [
+        ("foo://barbaz@sentry.io", "Unsupported scheme 'foo'"),
+        ("https://foobar@", "Missing hostname"),
+        ("https://@sentry.io", "Missing public key"),
+    ],
+)
+def test_dsn_validations(dsn, error_message):
+    with pytest.raises(BadDsn) as e:
+        dsn = Dsn(dsn)
+
+    assert str(e.value) == error_message
+
+
+@pytest.mark.parametrize(
     "frame,in_app_include,in_app_exclude,project_root,resulting_frame",
     [
         [
