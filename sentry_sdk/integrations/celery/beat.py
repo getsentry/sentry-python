@@ -202,12 +202,12 @@ def _patch_beat_apply_entry():
     Scheduler.apply_entry = _wrap_beat_scheduler(Scheduler.apply_entry)
 
 
-def _patch_redbeat_maybe_due():
+def _patch_redbeat_apply_async():
     # type: () -> None
     if RedBeatScheduler is None:
         return
 
-    RedBeatScheduler.maybe_due = _wrap_beat_scheduler(RedBeatScheduler.maybe_due)
+    RedBeatScheduler.apply_async = _wrap_beat_scheduler(RedBeatScheduler.apply_async)
 
 
 def _setup_celery_beat_signals(monitor_beat_tasks):
