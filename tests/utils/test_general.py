@@ -578,6 +578,17 @@ def test_failed_base64_conversion(input):
                 value="é...", metadata={"len": 8, "rem": [["!limit", "x", 2, 5]]}
             ),
         ],
+        [
+            "\udfff\udfff\udfff\udfff\udfff\udfff",
+            5,
+            AnnotatedValue(
+                value="\udfff\udfff...",
+                metadata={
+                    "len": 6,
+                    "rem": [["!limit", "x", 5 - 3, 5]],
+                },
+            ),
+        ],
     ],
 )
 def test_strip_string(input, max_length, result):
