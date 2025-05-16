@@ -29,8 +29,8 @@ LOGGING_TO_EVENT_LEVEL = {
     logging.NOTSET: "notset",
     logging.DEBUG: "debug",
     logging.INFO: "info",
-    logging.WARN: "warning",  # WARN is same a WARNING
-    logging.WARNING: "warning",
+    logging.WARN: "warn",
+    logging.WARNING: "warn",  # WARNING is same as WARN
     logging.ERROR: "error",
     logging.FATAL: "fatal",
     logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
