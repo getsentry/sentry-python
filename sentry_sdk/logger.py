@@ -51,6 +51,6 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
 trace = functools.partial(_capture_log, "trace", 1)
 debug = functools.partial(_capture_log, "debug", 5)
 info = functools.partial(_capture_log, "info", 9)
-warning = functools.partial(_capture_log, "warning", 13)
+warning = functools.partial(_capture_log, "warn", 13)
 error = functools.partial(_capture_log, "error", 17)
 fatal = functools.partial(_capture_log, "fatal", 21)
