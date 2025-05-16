@@ -121,6 +121,21 @@ def test_parse_invalid_dsn(dsn):
 
 
 @pytest.mark.parametrize(
+    "dsn,error_message",
+    [
+        ("foo://barbaz@sentry.io", "Unsupported scheme 'foo'"),
+        ("https://foobar@", "Missing hostname"),
+        ("https://@sentry.io", "Missing public key"),
+    ],
+)
+def test_dsn_validations(dsn, error_message):
+    with pytest.raises(BadDsn) as e:
+        dsn = Dsn(dsn)
+
+    assert str(e.value) == error_message
+
+
+@pytest.mark.parametrize(
     "frame,in_app_include,in_app_exclude,project_root,resulting_frame",
     [
         [
@@ -576,6 +591,17 @@ def test_failed_base64_conversion(input):
             5,
             AnnotatedValue(
                 value="é...", metadata={"len": 8, "rem": [["!limit", "x", 2, 5]]}
+            ),
+        ],
+        [
+            "\udfff\udfff\udfff\udfff\udfff\udfff",
+            5,
+            AnnotatedValue(
+                value="\udfff\udfff...",
+                metadata={
+                    "len": 6,
+                    "rem": [["!limit", "x", 5 - 3, 5]],
+                },
             ),
         ],
     ],
