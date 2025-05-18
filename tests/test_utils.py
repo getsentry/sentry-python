@@ -741,6 +741,20 @@ def test_default_release_empty_string():
     assert release is None
 
 
+def test_get_default_release_sentry_release_env(monkeypatch):
+    monkeypatch.setenv("SENTRY_RELEASE", "sentry-env-release")
+    assert get_default_release() == "sentry-env-release"
+
+
+def test_get_default_release_other_release_env(monkeypatch):
+    monkeypatch.setenv("SOURCE_VERSION", "other-env-release")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "other-env-release"
+
+
 def test_ensure_integration_enabled_integration_enabled(sentry_init):
     def original_function():
         return "original"
