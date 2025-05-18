@@ -32,6 +32,7 @@ from sentry_sdk.utils import (
     _get_installed_modules,
     _generate_installed_modules,
     ensure_integration_enabled,
+    to_string,
 )
 
 
@@ -1001,3 +1002,13 @@ def test_qualname_from_function_none_name():
         sentry_sdk.utils.qualname_from_function(test_function)
         == "test_qualname_from_function_none_name.<locals>.test_function"
     )
+
+
+def test_to_string_unicode_decode_error():
+    class BadStr:
+        def __str__(self):
+            raise UnicodeDecodeError("utf-8", b"", 0, 1, "reason")
+
+    obj = BadStr()
+    result = to_string(obj)
+    assert result == repr(obj)[1:-1]
