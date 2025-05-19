@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.29.1
+
+### Various fixes & improvements
+
+- fix(logs): send `severity_text`: `warn` instead of `warning` (#4396) by @lcian
+
 ## 2.29.0
 
 ### Various fixes & improvements
