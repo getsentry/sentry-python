@@ -54,7 +54,7 @@ def test_just_log(
     formatted_message = (
         " | "
         + "{:9}".format(level.name.upper())
-        + "| tests.integrations.loguru.test_loguru:test_just_log:53 - test"
+        + "| tests.integrations.loguru.test_loguru:test_just_log:52 - test"
     )
 
     if not created_event:
