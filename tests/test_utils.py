@@ -35,6 +35,7 @@ from sentry_sdk.utils import (
     to_string,
     exc_info_from_error,
     get_lines_from_file,
+    package_version,
 )
 
 
@@ -1072,3 +1073,7 @@ def test_get_lines_from_file_handle_linecache_errors():
     with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
         result = get_lines_from_file("filename", 10)
         assert result == expected_result
+
+
+def test_package_version_is_none():
+    assert package_version("non_existent_package") is None
