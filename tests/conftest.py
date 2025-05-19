@@ -2,6 +2,8 @@ import json
 import os
 import socket
 import warnings
+from opentelemetry import trace as otel_trace
+from opentelemetry.util._once import Once
 from threading import Thread
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -79,6 +81,12 @@ def clean_scopes():
     scope._current_scope.set(None)
 
     setup_initial_scopes()
+
+
+def clean_tracer(autouse=True):
+    """Reset TracerProvider so that we can set it up from scratch."""
+    otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
+    otel_trace._TRACER_PROVIDER = None
 
 
 @pytest.fixture(autouse=True)
