@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Optional, Tuple, Any
+    from typing import Optional, Any
 
 try:
     import loguru
@@ -43,15 +43,15 @@ SENTRY_LEVEL_FROM_LOGURU_LEVEL = {
 
 DEFAULT_LEVEL = LoggingLevels.INFO.value
 DEFAULT_EVENT_LEVEL = LoggingLevels.ERROR.value
-# We need to save the handlers to be able to remove them later
-# in tests (they call `LoguruIntegration.__init__` multiple times,
-# and we can't use `setup_once` because it's called before
-# than we get configuration).
-_ADDED_HANDLERS = (None, None)  # type: Tuple[Optional[int], Optional[int]]
 
 
 class LoguruIntegration(Integration):
     identifier = "loguru"
+
+    level = DEFAULT_LEVEL
+    event_level = DEFAULT_EVENT_LEVEL
+    breadcrumb_format = DEFAULT_FORMAT
+    event_format = DEFAULT_FORMAT
 
     def __init__(
         self,
@@ -61,36 +61,27 @@ class LoguruIntegration(Integration):
         event_format=DEFAULT_FORMAT,
     ):
         # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction) -> None
-        global _ADDED_HANDLERS
-        breadcrumb_handler, event_handler = _ADDED_HANDLERS
-
-        if breadcrumb_handler is not None:
-            logger.remove(breadcrumb_handler)
-            breadcrumb_handler = None
-        if event_handler is not None:
-            logger.remove(event_handler)
-            event_handler = None
-
-        if level is not None:
-            breadcrumb_handler = logger.add(
-                LoguruBreadcrumbHandler(level=level),
-                level=level,
-                format=breadcrumb_format,
-            )
-
-        if event_level is not None:
-            event_handler = logger.add(
-                LoguruEventHandler(level=event_level),
-                level=event_level,
-                format=event_format,
-            )
-
-        _ADDED_HANDLERS = (breadcrumb_handler, event_handler)
+        LoguruIntegration.level = level
+        LoguruIntegration.event_level = event_level
+        LoguruIntegration.breadcrumb_format = breadcrumb_format
+        LoguruIntegration.event_format = event_format
 
     @staticmethod
     def setup_once():
         # type: () -> None
-        pass  # we do everything in __init__
+        if LoguruIntegration.level is not None:
+            logger.add(
+                LoguruBreadcrumbHandler(level=LoguruIntegration.level),
+                level=LoguruIntegration.level,
+                format=LoguruIntegration.breadcrumb_format,
+            )
+
+        if LoguruIntegration.event_level is not None:
+            logger.add(
+                LoguruEventHandler(level=LoguruIntegration.event_level),
+                level=LoguruIntegration.event_level,
+                format=LoguruIntegration.event_format,
+            )
 
 
 class _LoguruBaseHandler(_BaseHandler):

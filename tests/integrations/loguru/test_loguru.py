@@ -32,7 +32,12 @@ def test_just_log(
     expected_sentry_level,
     disable_breadcrumbs,
     disable_events,
+    uninstall_integration,
+    request,
 ):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
     sentry_init(
         integrations=[
             LoguruIntegration(
@@ -49,7 +54,7 @@ def test_just_log(
     formatted_message = (
         " | "
         + "{:9}".format(level.name.upper())
-        + "| tests.integrations.loguru.test_loguru:test_just_log:47 - test"
+        + "| tests.integrations.loguru.test_loguru:test_just_log:53 - test"
     )
 
     if not created_event:
@@ -78,7 +83,10 @@ def test_just_log(
     assert event["logentry"]["message"][23:] == formatted_message
 
 
-def test_breadcrumb_format(sentry_init, capture_events):
+def test_breadcrumb_format(sentry_init, capture_events, uninstall_integration, request):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
     sentry_init(
         integrations=[
             LoguruIntegration(
@@ -98,7 +106,10 @@ def test_breadcrumb_format(sentry_init, capture_events):
     assert breadcrumb["message"] == formatted_message
 
 
-def test_event_format(sentry_init, capture_events):
+def test_event_format(sentry_init, capture_events, uninstall_integration, request):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
     sentry_init(
         integrations=[
             LoguruIntegration(
