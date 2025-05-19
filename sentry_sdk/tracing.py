@@ -188,7 +188,7 @@ class Span:
         If otel_span is passed explicitly, just acts as a proxy.
 
         If span is passed explicitly, use it. The only purpose of this param
-        if backwards compatibility with start_transaction(transaction=...).
+        is backwards compatibility with start_transaction(transaction=...).
 
         If only_if_parent is True, just return an INVALID_SPAN
         and avoid instrumentation if there's no active parent span.
