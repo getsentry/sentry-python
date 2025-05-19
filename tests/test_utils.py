@@ -33,6 +33,7 @@ from sentry_sdk.utils import (
     _generate_installed_modules,
     ensure_integration_enabled,
     to_string,
+    exc_info_from_error,
 )
 
 
@@ -1026,3 +1027,13 @@ def test_to_string_unicode_decode_error():
     obj = BadStr()
     result = to_string(obj)
     assert result == repr(obj)[1:-1]
+
+
+def test_exc_info_from_error_dont_get_an_exc():
+    class NotAnException:
+        pass
+
+    with pytest.raises(ValueError) as exc:
+        exc_info_from_error(NotAnException())
+
+    assert "Expected Exception object to report, got <class" in str(exc.value)
