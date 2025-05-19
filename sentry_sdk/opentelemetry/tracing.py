@@ -1,7 +1,6 @@
 from opentelemetry import trace
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.sdk.trace import TracerProvider, Span, ReadableSpan
-from opentelemetry.trace import _TRACER_PROVIDER_SET_ONCE
 
 from sentry_sdk.opentelemetry import (
     SentryPropagator,
@@ -33,6 +32,8 @@ def setup_sentry_tracing():
 
     # TracerProvider can only be set once. If we're the first ones setting it,
     # there's no issue. If it already exists, we need to patch it.
+    from opentelemetry.trace import _TRACER_PROVIDER_SET_ONCE
+
     if _TRACER_PROVIDER_SET_ONCE._done:
         logger.debug("[Tracing] Detected an existing TracerProvider, patching")
         tracer_provider = trace.get_tracer_provider()

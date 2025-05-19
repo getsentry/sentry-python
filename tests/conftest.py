@@ -75,7 +75,8 @@ def clean_scopes():
     setup_initial_scopes()
 
 
-def clean_tracer(autouse=True):
+@pytest.fixture(autouse=True)
+def clean_tracer():
     """Reset TracerProvider so that we can set it up from scratch."""
     otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
     otel_trace._TRACER_PROVIDER = None
