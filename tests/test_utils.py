@@ -34,6 +34,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     to_string,
     exc_info_from_error,
+    get_lines_from_file,
 )
 
 
@@ -1037,3 +1038,31 @@ def test_exc_info_from_error_dont_get_an_exc():
         exc_info_from_error(NotAnException())
 
     assert "Expected Exception object to report, got <class" in str(exc.value)
+
+
+def test_get_lines_from_file_handle_linecache_errors():
+    expected_result = ([], None, [])
+
+    class Loader:
+        @staticmethod
+        def get_source(module):
+            raise IOError("something went wrong")
+
+    result = get_lines_from_file("filename", 10, loader=Loader())
+    assert result == expected_result
+
+    with mock.patch(
+        "sentry_sdk.utils.linecache.getlines",
+        side_effect=OSError("something went wrong"),
+    ):
+        result = get_lines_from_file("filename", 10)
+        assert result == expected_result
+
+    lines = ["line1", "line2", "line3"]
+
+    def fake_getlines(filename):
+        return lines
+
+    with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
+        result = get_lines_from_file("filename", 10)
+        assert result == expected_result
