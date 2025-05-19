@@ -366,6 +366,12 @@ def test_sanitize_url_and_split(url, expected_result):
     assert sanitized_url.fragment == expected_result.fragment
 
 
+def test_sanitize_url_remove_authority_is_false():
+    url = "https://usr:pwd@example.com"
+    sanitized_url = sanitize_url(url, remove_authority=False)
+    assert sanitized_url == url
+
+
 @pytest.mark.parametrize(
     ("url", "sanitize", "expected_url", "expected_query", "expected_fragment"),
     [
