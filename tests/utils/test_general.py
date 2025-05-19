@@ -74,11 +74,24 @@ def test_filename():
 
     assert x("bogus", "bogus") == "bogus"
 
+    assert x("bogus", "bogus.pyc") == "bogus.py"
+
     assert x("os", os.__file__) == "os.py"
+
+    assert x("foo.bar", "path/to/foo/bar.py") == "path/to/foo/bar.py"
 
     import sentry_sdk.utils
 
     assert x("sentry_sdk.utils", sentry_sdk.utils.__file__) == "sentry_sdk/utils.py"
+
+
+def test_filename_module_file_is_none():
+    class DummyModule:
+        __file__ = None
+
+    os.sys.modules["foo"] = DummyModule()
+
+    assert filename_for_module("foo.bar", "path/to/foo/bar.py") == "path/to/foo/bar.py"
 
 
 @pytest.mark.parametrize(
