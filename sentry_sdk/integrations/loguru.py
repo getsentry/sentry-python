@@ -48,8 +48,8 @@ DEFAULT_EVENT_LEVEL = LoggingLevels.ERROR.value
 class LoguruIntegration(Integration):
     identifier = "loguru"
 
-    level = DEFAULT_LEVEL
-    event_level = DEFAULT_EVENT_LEVEL
+    level = DEFAULT_LEVEL  # type: Optional[int]
+    event_level = DEFAULT_EVENT_LEVEL  # type: Optional[int]
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
 
