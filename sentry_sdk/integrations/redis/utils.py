@@ -12,8 +12,7 @@ from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, List, Optional, Sequence
-    from redis.cluster import PipelineCommand
+    from typing import Any, Optional, Sequence
     from sentry_sdk.tracing import Span
 
 
@@ -111,17 +110,14 @@ def _set_pipeline_data(
     is_cluster,
     get_command_args_fn,
     is_transaction,
-    command_stack,
-    command_queue=None,
+    commands_seq,
 ):
-    # type: (Span, bool, Any, bool, Sequence[Any], Optional[List[PipelineCommand]]) -> None
+    # type: (Span, bool, Any, bool, Sequence[Any]) -> None
     span.set_tag("redis.is_cluster", is_cluster)
     span.set_tag("redis.transaction", is_transaction)
 
-    command_seq = command_stack or command_queue or []
-
     commands = []
-    for i, arg in enumerate(command_seq):
+    for i, arg in enumerate(commands_seq):
         if i >= _MAX_NUM_COMMANDS:
             break
 
@@ -131,7 +127,7 @@ def _set_pipeline_data(
     span.set_data(
         "redis.commands",
         {
-            "count": len(command_seq),
+            "count": len(commands_seq),
             "first_ten": commands,
         },
     )
