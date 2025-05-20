@@ -106,14 +106,18 @@ def _parse_rediscluster_command(command):
 
 
 def _set_pipeline_data(
-    span, is_cluster, get_command_args_fn, is_transaction, command_stack
+    span,
+    is_cluster,
+    get_command_args_fn,
+    is_transaction,
+    commands_seq,
 ):
     # type: (Span, bool, Any, bool, Sequence[Any]) -> None
     span.set_tag("redis.is_cluster", is_cluster)
     span.set_tag("redis.transaction", is_transaction)
 
     commands = []
-    for i, arg in enumerate(command_stack):
+    for i, arg in enumerate(commands_seq):
         if i >= _MAX_NUM_COMMANDS:
             break
 
@@ -123,7 +127,7 @@ def _set_pipeline_data(
     span.set_data(
         "redis.commands",
         {
-            "count": len(command_stack),
+            "count": len(commands_seq),
             "first_ten": commands,
         },
     )
