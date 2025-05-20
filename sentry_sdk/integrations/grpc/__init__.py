@@ -6,6 +6,7 @@ from grpc.aio import Channel as AsyncChannel
 from grpc.aio import Server as AsyncServer
 
 from sentry_sdk.integrations import Integration
+from sentry_sdk.utils import parse_version
 
 from .client import ClientInterceptor
 from .server import ServerInterceptor
@@ -128,6 +129,17 @@ def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServe
     ) -> Server:
         server_interceptor = AsyncServerInterceptor()
         interceptors = [server_interceptor, *(interceptors or [])]
+
+        try:
+            # We prefer interceptors as a list because of compatibility with
+            # opentelemetry https://github.com/getsentry/sentry-python/issues/4389
+            # However, prior to grpc 1.42.0, only tuples were accepted, so we
+            # have no choice there.
+            if parse_version(grpc.__version__) < (1, 42, 0):
+                interceptors = tuple(interceptors)
+        except Exception:
+            pass
+
         return func(*args, interceptors=interceptors, **kwargs)  # type: ignore
 
     return patched_aio_server  # type: ignore
