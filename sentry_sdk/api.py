@@ -354,6 +354,13 @@ def start_span(
     **kwargs,  # type: Any
 ):
     # type: (...) -> Span
+    if kwargs.pop("scope", None) is not None:
+        warnings.warn(
+            "The `scope` parameter is deprecated, and its value is ignored.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     return get_current_scope().start_span(**kwargs)
 
 

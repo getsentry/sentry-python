@@ -123,7 +123,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         span_data = self.span_map[run_id]
         if not span_data:
             return
-        sentry_sdk.capture_exception(error, span_data.span.scope)
+        sentry_sdk.capture_exception(error)
         span_data.span.__exit__(None, None, None)
         del self.span_map[run_id]
 

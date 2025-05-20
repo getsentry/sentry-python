@@ -281,6 +281,7 @@ class Span:
         "name",
         "_flags",
         "_flags_capacity",
+        "scope_manager",
     )
 
     def __init__(
@@ -301,6 +302,24 @@ class Span:
         name=None,  # type: Optional[str]
     ):
         # type: (...) -> None
+        if hub is not None:
+            warnings.warn(
+                "The `hub` parameter is deprecated, and its value is ignored.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        del hub
+
+        if scope is not None:
+            warnings.warn(
+                "The `scope` parameter is deprecated, and its value is ignored.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        del scope
+
         self.trace_id = trace_id or uuid.uuid4().hex
         self.span_id = span_id or uuid.uuid4().hex[16:]
         self.parent_span_id = parent_span_id
@@ -309,8 +328,6 @@ class Span:
         self.op = op
         self.description = name or description
         self.status = status
-        self.hub = hub  # backwards compatibility
-        self.scope = scope
         self.origin = origin
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
@@ -319,14 +336,9 @@ class Span:
         self._flags = {}  # type: Dict[str, bool]
         self._flags_capacity = 10
 
-        if hub is not None:
-            warnings.warn(
-                "The `hub` parameter is deprecated. Please use `scope` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-            self.scope = self.scope or hub.scope
+        # Backwards compatibility: allow these values to be get and set (but we don't use them)
+        self.hub = None  # type: Optional[sentry_sdk.Hub]
+        self.scope = None  # type: Optional[sentry_sdk.Scope]
 
         if start_timestamp is None:
             start_timestamp = datetime.now(timezone.utc)
@@ -381,21 +393,19 @@ class Span:
 
     def __enter__(self):
         # type: () -> Span
-        scope = self.scope or sentry_sdk.get_current_scope()
-        old_span = scope.span
+        self.scope_manager = sentry_sdk.new_scope()
+        scope = self.scope_manager.__enter__()
         scope.span = self
-        self._context_manager_state = (scope, old_span)
         return self
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        if value is not None and should_be_treated_as_error(ty, value):
-            self.set_status(SPANSTATUS.INTERNAL_ERROR)
-
-        scope, old_span = self._context_manager_state
-        del self._context_manager_state
-        self.finish(scope)
-        scope.span = old_span
+        try:
+            if value is not None and should_be_treated_as_error(ty, value):
+                self.set_status(SPANSTATUS.INTERNAL_ERROR)
+            self.finish()
+        finally:
+            self.scope_manager.__exit__(ty, value, tb)
 
     @property
     def containing_transaction(self):
@@ -425,6 +435,13 @@ class Span:
         if kwargs.get("description") is not None:
             warnings.warn(
                 "The `description` parameter is deprecated. Please use `name` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if kwargs.pop("scope", None) is not None:
+            warnings.warn(
+                "The `scope` parameter is deprecated, and its value is ignored.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -684,7 +701,7 @@ class Span:
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
-        scope = scope or sentry_sdk.get_current_scope()
+        scope = sentry_sdk.get_current_scope()
         maybe_create_breadcrumbs_from_span(scope, self)
 
         return None
@@ -819,6 +836,13 @@ class Transaction(Span):
     ):
         # type: (...) -> None
 
+        if kwargs.pop("scope", None) is not None:
+            warnings.warn(
+                "The `scope` parameter is deprecated, and its value is ignored.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         super().__init__(**kwargs)
 
         self.name = name
@@ -906,39 +930,6 @@ class Transaction(Span):
         # reference.
         return self
 
-    def _get_scope_from_finish_args(
-        self,
-        scope_arg,  # type: Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]
-        hub_arg,  # type: Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]
-    ):
-        # type: (...) -> Optional[sentry_sdk.Scope]
-        """
-        Logic to get the scope from the arguments passed to finish. This
-        function exists for backwards compatibility with the old finish.
-
-        TODO: Remove this function in the next major version.
-        """
-        scope_or_hub = scope_arg
-        if hub_arg is not None:
-            warnings.warn(
-                "The `hub` parameter is deprecated. Please use the `scope` parameter, instead.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-
-            scope_or_hub = hub_arg
-
-        if isinstance(scope_or_hub, sentry_sdk.Hub):
-            warnings.warn(
-                "Passing a Hub to finish is deprecated. Please pass a Scope, instead.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-
-            return scope_or_hub.scope
-
-        return scope_or_hub
-
     def finish(
         self,
         scope=None,  # type: Optional[sentry_sdk.Scope]
@@ -961,17 +952,28 @@ class Transaction(Span):
         :return: The event ID if the transaction was sent to Sentry,
             otherwise None.
         """
+        if hub is not None:
+            warnings.warn(
+                "The `hub` parameter is deprecated, and its value is ignored.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        del hub
+
+        if scope is not None:
+            warnings.warn(
+                "The `scope` parameter is deprecated, and its value is ignored.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        del scope
+
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
             return None
 
-        # For backwards compatibility, we must handle the case where `scope`
-        # or `hub` could both either be a `Scope` or a `Hub`.
-        scope = self._get_scope_from_finish_args(
-            scope, hub
-        )  # type: Optional[sentry_sdk.Scope]
-
-        scope = scope or self.scope or sentry_sdk.get_current_scope()
         client = sentry_sdk.get_client()
 
         if not client.is_active():
@@ -1008,7 +1010,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        super().finish(scope, end_timestamp)
+        super().finish(end_timestamp=end_timestamp)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -1067,7 +1069,7 @@ class Transaction(Span):
             if metrics_summary:
                 event["_metrics_summary"] = metrics_summary
 
-        return scope.capture_event(event)
+        return sentry_sdk.capture_event(event)
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None

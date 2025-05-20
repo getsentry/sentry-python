@@ -1122,32 +1122,36 @@ class Scope:
                 stacklevel=2,
             )
 
-        with new_scope():
-            kwargs.setdefault("scope", self)
+        if kwargs.pop("scope", None) is not None:
+            warnings.warn(
+                "The `scope` parameter is deprecated, and its value is ignored.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
-            client = self.get_client()
+        client = self.get_client()
 
-            configuration_instrumenter = client.options["instrumenter"]
+        configuration_instrumenter = client.options["instrumenter"]
 
-            if instrumenter != configuration_instrumenter:
-                return NoOpSpan()
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
 
-            # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
+        # get current span or transaction
+        span = self.span or self.get_isolation_scope().span
 
-            if span is None:
-                # New spans get the `trace_id` from the scope
-                if "trace_id" not in kwargs:
-                    propagation_context = self.get_active_propagation_context()
-                    if propagation_context is not None:
-                        kwargs["trace_id"] = propagation_context.trace_id
+        if span is None:
+            # New spans get the `trace_id` from the scope
+            if "trace_id" not in kwargs:
+                propagation_context = self.get_active_propagation_context()
+                if propagation_context is not None:
+                    kwargs["trace_id"] = propagation_context.trace_id
 
-                span = Span(**kwargs)
-            else:
-                # Children take `trace_id`` from the parent span.
-                span = span.start_child(**kwargs)
+            span = Span(**kwargs)
+        else:
+            # Children take `trace_id`` from the parent span.
+            span = span.start_child(**kwargs)
 
-            return span
+        return span
 
     def continue_trace(
         self, environ_or_headers, op=None, name=None, source=None, origin="manual"

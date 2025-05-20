@@ -449,9 +449,8 @@ def test_should_propagate_trace_to_sentry(
 def test_start_transaction_updates_scope_name_source(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
-    scope = sentry_sdk.get_current_scope()
-
     with start_transaction(name="foobar", source="route"):
+        scope = sentry_sdk.get_current_scope()
         assert scope._transaction == "foobar"
         assert scope._transaction_info == {"source": "route"}
 

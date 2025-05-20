@@ -1,5 +1,3 @@
-import warnings
-
 import pytest
 
 import sentry_sdk
@@ -52,8 +50,7 @@ def test_passing_hub_object_to_scope_transaction_finish(suppress_deprecation_war
         transaction.finish(hub)
 
 
-def test_no_warnings_scope_to_transaction_finish():
+def test_warning_scope_to_transaction_finish():
     transaction = sentry_sdk.tracing.Transaction()
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
+    with pytest.warns(DeprecationWarning):
         transaction.finish(sentry_sdk.Scope())
