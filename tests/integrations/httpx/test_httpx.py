@@ -30,14 +30,20 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
         events = capture_events()
 
         if asyncio.iscoroutinefunction(httpx_client.get):
+
+            async def get_response_and_capture_message():
+                response = await httpx_client.get(url)
+                capture_message("Testing!")
+                return response
+
             response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url)
+                get_response_and_capture_message()
             )
         else:
             response = httpx_client.get(url)
+            capture_message("Testing!")
 
         assert response.status_code == 200
-        capture_message("Testing!")
 
         (event,) = events
 
@@ -84,14 +90,20 @@ def test_crumb_capture_client_error(
         events = capture_events()
 
         if asyncio.iscoroutinefunction(httpx_client.get):
+
+            async def get_response_and_capture_message():
+                response = await httpx_client.get(url)
+                capture_message("Testing!")
+                return response
+
             response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url)
+                get_response_and_capture_message()
             )
         else:
             response = httpx_client.get(url)
+            capture_message("Testing!")
 
         assert response.status_code == status_code
-        capture_message("Testing!")
 
         (event,) = events
 

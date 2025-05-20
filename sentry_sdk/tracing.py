@@ -701,8 +701,7 @@ class Span:
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
-        scope = sentry_sdk.get_current_scope()
-        maybe_create_breadcrumbs_from_span(scope, self)
+        maybe_create_breadcrumbs_from_span(self)
 
         return None
 
