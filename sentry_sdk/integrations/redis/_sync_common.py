@@ -43,11 +43,9 @@ def patch_redis_pipeline(
         ) as span:
             with capture_internal_exceptions():
                 command_seq = None
-                if getattr(self, "_execution_strategy", None) and getattr(
-                    self._execution_strategy, "command_queue", None
-                ):
+                try:
                     command_seq = self._execution_strategy.command_queue
-                else:
+                except AttributeError:
                     command_seq = self.command_stack
 
                 set_db_data_fn(span, self)
