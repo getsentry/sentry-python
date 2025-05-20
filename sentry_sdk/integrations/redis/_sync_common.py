@@ -42,6 +42,12 @@ def patch_redis_pipeline(
             origin=SPAN_ORIGIN,
         ) as span:
             with capture_internal_exceptions():
+                command_queue = None
+                if getattr(self, "_execution_strategy", None) and getattr(
+                    self._execution_strategy, "command_queue", None
+                ):
+                    command_queue = self._execution_strategy.command_queue
+
                 set_db_data_fn(span, self)
                 _set_pipeline_data(
                     span,
@@ -49,6 +55,7 @@ def patch_redis_pipeline(
                     get_command_args_fn,
                     False if is_cluster else self.transaction,
                     self.command_stack,
+                    command_queue,
                 )
 
             return old_execute(self, *args, **kwargs)
