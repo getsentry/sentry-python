@@ -578,7 +578,7 @@ class ClientConstructor:
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         max_request_body_size="medium",  # type: str
         socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
-        keep_alive=False,  # type: bool
+        keep_alive=None,  # type: Optional[bool]
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=None,  # type: Optional[bool]
@@ -1026,4 +1026,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.28.0"
+VERSION = "2.29.1"
