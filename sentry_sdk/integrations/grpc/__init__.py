@@ -42,6 +42,8 @@ else:
 
 P = ParamSpec("P")
 
+GRPC_VERSION = parse_version(grpc.__version__)
+
 
 def _wrap_channel_sync(func: Callable[P, Channel]) -> Callable[P, Channel]:
     "Wrapper for synchronous secure and insecure channel."
@@ -135,7 +137,7 @@ def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServe
             # opentelemetry https://github.com/getsentry/sentry-python/issues/4389
             # However, prior to grpc 1.42.0, only tuples were accepted, so we
             # have no choice there.
-            if parse_version(grpc.__version__) < (1, 42, 0):
+            if GRPC_VERSION is not None and GRPC_VERSION < (1, 42, 0):
                 interceptors = tuple(interceptors)
         except Exception:
             pass
