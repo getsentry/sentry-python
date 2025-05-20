@@ -127,7 +127,7 @@ def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServe
         **kwargs: P.kwargs,
     ) -> Server:
         server_interceptor = AsyncServerInterceptor()
-        interceptors = (server_interceptor, *(interceptors or []))
+        interceptors = [server_interceptor, *(interceptors or [])]
         return func(*args, interceptors=interceptors, **kwargs)  # type: ignore
 
     return patched_aio_server  # type: ignore
