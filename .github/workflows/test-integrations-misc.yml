@@ -87,7 +87,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.2
+        uses: codecov/codecov-action@v5.4.3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
