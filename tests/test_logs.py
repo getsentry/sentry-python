@@ -30,7 +30,7 @@ def otel_attributes_to_dict(otel_attrs):
             return attr["value"]
         if attr["value"].startswith("{"):
             try:
-                return json.loads(attr["stringValue"])
+                return json.loads(attr["value"])
             except ValueError:
                 pass
         return str(attr["value"])
@@ -102,7 +102,7 @@ def test_logs_basics(sentry_init, capture_envelopes):
     assert logs[2].get("severity_text") == "info"
     assert logs[2].get("severity_number") == 9
 
-    assert logs[3].get("severity_text") == "warning"
+    assert logs[3].get("severity_text") == "warn"
     assert logs[3].get("severity_number") == 13
 
     assert logs[4].get("severity_text") == "error"
@@ -155,7 +155,7 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
     assert logs[0]["severity_text"] == "trace"
     assert logs[1]["severity_text"] == "debug"
     assert logs[2]["severity_text"] == "info"
-    assert logs[3]["severity_text"] == "warning"
+    assert logs[3]["severity_text"] == "warn"
     assert before_log_called[0]
 
 
@@ -186,7 +186,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
         assert logs[0]["attributes"][k] == v
     assert logs[0]["attributes"]["sentry.environment"] == "production"
     assert "sentry.release" in logs[0]["attributes"]
-    assert logs[0]["attributes"]["sentry.message.parameters.my_var"] == "some value"
+    assert logs[0]["attributes"]["sentry.message.parameter.my_var"] == "some value"
     assert logs[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
     assert logs[0]["attributes"]["sentry.sdk.name"].startswith("sentry.python")
     assert logs[0]["attributes"]["sentry.sdk.version"] == VERSION
@@ -214,23 +214,23 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     logs = envelopes_to_logs(envelopes)
 
     assert logs[0]["body"] == "The recorded value was '1'"
-    assert logs[0]["attributes"]["sentry.message.parameters.int_var"] == 1
+    assert logs[0]["attributes"]["sentry.message.parameter.int_var"] == 1
 
     assert logs[1]["body"] == "The recorded value was '2.0'"
-    assert logs[1]["attributes"]["sentry.message.parameters.float_var"] == 2.0
+    assert logs[1]["attributes"]["sentry.message.parameter.float_var"] == 2.0
 
     assert logs[2]["body"] == "The recorded value was 'False'"
-    assert logs[2]["attributes"]["sentry.message.parameters.bool_var"] is False
+    assert logs[2]["attributes"]["sentry.message.parameter.bool_var"] is False
 
     assert logs[3]["body"] == "The recorded value was 'some string value'"
     assert (
-        logs[3]["attributes"]["sentry.message.parameters.string_var"]
+        logs[3]["attributes"]["sentry.message.parameter.string_var"]
         == "some string value"
     )
 
     assert logs[4]["body"] == "The recorded error was 'some error'"
     assert (
-        logs[4]["attributes"]["sentry.message.parameters.error"]
+        logs[4]["attributes"]["sentry.message.parameter.error"]
         == "Exception('some error')"
     )
 
@@ -287,8 +287,8 @@ def test_logger_integration_warning(sentry_init, capture_envelopes):
     assert "code.line.number" in attrs
     assert attrs["logger.name"] == "test-logger"
     assert attrs["sentry.environment"] == "production"
-    assert attrs["sentry.message.parameters.0"] == "1"
-    assert attrs["sentry.message.parameters.1"] == "2"
+    assert attrs["sentry.message.parameter.0"] == "1"
+    assert attrs["sentry.message.parameter.1"] == "2"
     assert attrs["sentry.origin"] == "auto.logger.log"
     assert logs[0]["severity_number"] == 13
     assert logs[0]["severity_text"] == "warn"
@@ -352,14 +352,13 @@ def test_logging_errors(sentry_init, capture_envelopes):
     logs = envelopes_to_logs(envelopes)
     assert logs[0]["severity_text"] == "error"
     assert "sentry.message.template" not in logs[0]["attributes"]
-    assert "sentry.message.parameters.0" not in logs[0]["attributes"]
+    assert "sentry.message.parameter.0" not in logs[0]["attributes"]
     assert "code.line.number" in logs[0]["attributes"]
 
     assert logs[1]["severity_text"] == "error"
     assert logs[1]["attributes"]["sentry.message.template"] == "error is %s"
     assert (
-        logs[1]["attributes"]["sentry.message.parameters.0"]
-        == "Exception('test exc 2')"
+        logs[1]["attributes"]["sentry.message.parameter.0"] == "Exception('test exc 2')"
     )
     assert "code.line.number" in logs[1]["attributes"]
 
@@ -394,6 +393,79 @@ def test_log_strips_project_root(sentry_init, capture_envelopes):
     assert len(logs) == 1
     attrs = logs[0]["attributes"]
     assert attrs["code.file.path"] == "blah/path.py"
+
+
+def test_logger_with_all_attributes(sentry_init, capture_envelopes):
+    """
+    The python logger should be able to log all attributes, including extra data.
+    """
+    sentry_init(_experiments={"enable_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning(
+        "log #%d",
+        1,
+        extra={"foo": "bar", "numeric": 42, "more_complex": {"nested": "data"}},
+    )
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    attributes = logs[0]["attributes"]
+
+    assert "process.pid" in attributes
+    assert isinstance(attributes["process.pid"], int)
+    del attributes["process.pid"]
+
+    assert "sentry.release" in attributes
+    assert isinstance(attributes["sentry.release"], str)
+    del attributes["sentry.release"]
+
+    assert "server.address" in attributes
+    assert isinstance(attributes["server.address"], str)
+    del attributes["server.address"]
+
+    assert "thread.id" in attributes
+    assert isinstance(attributes["thread.id"], int)
+    del attributes["thread.id"]
+
+    assert "code.file.path" in attributes
+    assert isinstance(attributes["code.file.path"], str)
+    del attributes["code.file.path"]
+
+    assert "code.function.name" in attributes
+    assert isinstance(attributes["code.function.name"], str)
+    del attributes["code.function.name"]
+
+    assert "code.line.number" in attributes
+    assert isinstance(attributes["code.line.number"], int)
+    del attributes["code.line.number"]
+
+    assert "process.executable.name" in attributes
+    assert isinstance(attributes["process.executable.name"], str)
+    del attributes["process.executable.name"]
+
+    assert "thread.name" in attributes
+    assert isinstance(attributes["thread.name"], str)
+    del attributes["thread.name"]
+
+    assert attributes.pop("sentry.sdk.name").startswith("sentry.python")
+
+    # Assert on the remaining non-dynamic attributes.
+    assert attributes == {
+        "foo": "bar",
+        "numeric": 42,
+        "more_complex": "{'nested': 'data'}",
+        "logger.name": "test-logger",
+        "sentry.origin": "auto.logger.log",
+        "sentry.message.template": "log #%d",
+        "sentry.message.parameter.0": 1,
+        "sentry.environment": "production",
+        "sentry.sdk.version": VERSION,
+        "sentry.severity_number": 13,
+        "sentry.severity_text": "warn",
+    }
 
 
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):

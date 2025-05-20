@@ -20,6 +20,43 @@ for your feedback. How was the migration? Is everything working as expected? Is
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
 [on Discord](https://discord.gg/wdNEHETs87).
 
+## 2.29.1
+
+### Various fixes & improvements
+
+- fix(logs): send `severity_text`: `warn` instead of `warning` (#4396) by @lcian
+
+## 2.29.0
+
+### Various fixes & improvements
+
+- fix(loguru): Move integration setup from `__init__` to `setup_once` (#4399) by @sentrivana
+- feat: Allow configuring `keep_alive` via environment variable (#4366) by @szokeasaurusrex
+- fix(celery): Do not send extra check-in (#4395) by @sentrivana
+- fix(typing): Add before_send_log to Experiments (#4383) by @sentrivana
+- ci: Fix pyspark test suite (#4382) by @sentrivana
+- fix(logs): Make `sentry.message.parameters` singular as per spec (#4387) by @AbhiPrasad
+- apidocs: Remove snowballstemmer pin (#4379) by @sentrivana
+
+## 2.28.0
+
+### Various fixes & improvements
+
+- fix(logs): Forward `extra` from logger as attributes (#4374) by @AbhiPrasad
+- fix(logs): Canonicalize paths from the logger integration (#4336) by @colin-sentry
+- fix(logs): Use new transport (#4317) by @colin-sentry
+- fix: Deprecate `set_measurement()` API. (#3934) by @antonpirker
+- fix: Put feature flags on isolation scope (#4363) by @antonpirker
+- fix: Make use of `SPANDATA` consistent (#4373) by @antonpirker
+- fix: Discord link (#4371) by @sentrivana
+- tests: Pin snowballstemmer for now (#4372) by @sentrivana
+- tests: Regular tox update (#4367) by @sentrivana
+- tests: Bump test timeout for recursion stacktrace extract to 2s (#4351) by @booxter
+- tests: Fix test_stacktrace_big_recursion failure due to argv (#4346) by @booxter
+- tests: Move anthropic under toxgen (#4348) by @sentrivana
+- tests: Update tox.ini (#4347) by @sentrivana
+- chore: Update GH issue templates for Linear compatibility (#4328) by @stephanie-anderson
+- chore: Bump actions/create-github-app-token from 2.0.2 to 2.0.6 (#4358) by @dependabot
 
 ## 2.27.0
 

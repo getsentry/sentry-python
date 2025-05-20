@@ -133,6 +133,11 @@ def _get_options(*args, **kwargs):
         )
         rv["socket_options"] = None
 
+    if rv["keep_alive"] is None:
+        rv["keep_alive"] = (
+            env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
+        )
+
     return rv
 
 
