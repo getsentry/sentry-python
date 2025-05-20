@@ -1,9 +1,10 @@
 import json
+import re
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk import start_transaction, capture_message
+from sentry_sdk import start_span, capture_message
 from sentry_sdk.integrations.tornado import TornadoIntegration
 
 from tornado.web import RequestHandler, Application, HTTPError
@@ -116,7 +117,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
     events = capture_events()
     client = tornado_testcase(Application([(r"/hi", handler)]))
 
-    with start_transaction(name="client") as span:
+    with start_span(name="client") as span:
         pass
 
     response = client.fetch(
@@ -134,7 +135,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
     assert client_tx["transaction"] == "client"
     assert client_tx["transaction_info"] == {
         "source": "custom"
-    }  # because this is just the start_transaction() above.
+    }  # because this is just the start_span() above.
 
     if server_error is not None:
         assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
@@ -450,3 +451,30 @@ def test_span_origin(tornado_testcase, sentry_init, capture_events):
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.tornado"
+
+
+def test_attributes_in_traces_sampler(tornado_testcase, sentry_init):
+    def traces_sampler(sampling_context):
+        assert sampling_context["url.query"] == "foo=bar"
+        assert sampling_context["url.path"] == "/hi"
+        assert sampling_context["url.scheme"] == "http"
+        assert re.match(
+            r"http:\/\/127\.0\.0\.1:[0-9]{4,5}\/hi\?foo=bar",
+            sampling_context["url.full"],
+        )
+        assert sampling_context["http.request.method"] == "GET"
+        assert sampling_context["server.address"] == "127.0.0.1"
+        assert sampling_context["server.port"].isnumeric()
+        assert sampling_context["network.protocol.name"] == "HTTP"
+        assert sampling_context["network.protocol.version"] == "1.1"
+        assert sampling_context["http.request.header.custom-header"] == "Custom Value"
+
+        return True
+
+    sentry_init(
+        integrations=[TornadoIntegration],
+        traces_sampler=traces_sampler,
+    )
+
+    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
+    client.fetch("/hi?foo=bar", headers={"Custom-Header": "Custom Value"})

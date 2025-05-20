@@ -31,6 +31,7 @@ def test_trace_decorator():
         assert result2 == "return_of_sync_function"
 
 
+@pytest.mark.forked
 def test_trace_decorator_no_trx():
     with patch_start_tracing_child(fake_transaction_is_none=True):
         with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:

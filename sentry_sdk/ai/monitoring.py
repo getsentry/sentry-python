@@ -34,13 +34,15 @@ def ai_track(description, **span_kwargs):
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
-            with start_span(name=description, op=op, **span_kwargs) as span:
+            with start_span(
+                name=description, op=op, only_if_parent=True, **span_kwargs
+            ) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
                     span.set_tag(k, v)
                 for k, v in kwargs.pop("sentry_data", {}).items():
-                    span.set_data(k, v)
+                    span.set_attribute(k, v)
                 if curr_pipeline:
-                    span.set_data(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_attribute(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
                     return f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -63,13 +65,15 @@ def ai_track(description, **span_kwargs):
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
-            with start_span(name=description, op=op, **span_kwargs) as span:
+            with start_span(
+                name=description, op=op, only_if_parent=True, **span_kwargs
+            ) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
                     span.set_tag(k, v)
                 for k, v in kwargs.pop("sentry_data", {}).items():
-                    span.set_data(k, v)
+                    span.set_attribute(k, v)
                 if curr_pipeline:
-                    span.set_data(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_attribute(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
                     return await f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -101,11 +105,11 @@ def record_token_usage(
     # type: (Span, Optional[int], Optional[int], Optional[int]) -> None
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
-        span.set_data(SPANDATA.AI_PIPELINE_NAME, ai_pipeline_name)
+        span.set_attribute(SPANDATA.AI_PIPELINE_NAME, ai_pipeline_name)
     if prompt_tokens is not None:
-        span.set_measurement("ai_prompt_tokens_used", value=prompt_tokens)
+        span.set_attribute(SPANDATA.AI_PROMPT_TOKENS_USED, prompt_tokens)
     if completion_tokens is not None:
-        span.set_measurement("ai_completion_tokens_used", value=completion_tokens)
+        span.set_attribute(SPANDATA.AI_COMPLETION_TOKENS_USED, completion_tokens)
     if (
         total_tokens is None
         and prompt_tokens is not None
@@ -113,4 +117,4 @@ def record_token_usage(
     ):
         total_tokens = prompt_tokens + completion_tokens
     if total_tokens is not None:
-        span.set_measurement("ai_total_tokens_used", total_tokens)
+        span.set_attribute(SPANDATA.AI_TOTAL_TOKENS_USED, total_tokens)

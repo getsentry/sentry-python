@@ -3,11 +3,11 @@ import inspect
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.consts import SOURCE_FOR_STYLE
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -122,8 +122,8 @@ def patch_scaffold_route():
                 def _sentry_func(*args, **kwargs):
                     # type: (*Any, **Any) -> Any
                     current_scope = sentry_sdk.get_current_scope()
-                    if current_scope.transaction is not None:
-                        current_scope.transaction.update_active_thread()
+                    if current_scope.root_span is not None:
+                        current_scope.root_span.update_active_thread()
 
                     sentry_scope = sentry_sdk.get_isolation_scope()
                     if sentry_scope.profile is not None:

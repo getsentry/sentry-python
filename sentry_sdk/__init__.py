@@ -1,4 +1,6 @@
-from sentry_sdk.scope import Scope
+# TODO-neel scope switch
+# TODO-neel avoid duplication between api and __init__
+from sentry_sdk.opentelemetry.scope import PotelScope as Scope
 from sentry_sdk.transport import Transport, HttpTransport
 from sentry_sdk.client import Client
 
@@ -7,7 +9,6 @@ from sentry_sdk.api import *  # noqa
 from sentry_sdk.consts import VERSION  # noqa
 
 __all__ = [  # noqa
-    "Hub",
     "Scope",
     "Client",
     "Transport",
@@ -20,7 +21,6 @@ __all__ = [  # noqa
     "capture_event",
     "capture_exception",
     "capture_message",
-    "configure_scope",
     "continue_trace",
     "flush",
     "get_baggage",
@@ -34,11 +34,9 @@ __all__ = [  # noqa
     "isolation_scope",
     "last_event_id",
     "new_scope",
-    "push_scope",
     "set_context",
     "set_extra",
     "set_level",
-    "set_measurement",
     "set_tag",
     "set_tags",
     "set_user",
@@ -54,6 +52,3 @@ from sentry_sdk.debug import init_debug_support
 
 init_debug_support()
 del init_debug_support
-
-# circular imports
-from sentry_sdk.hub import Hub

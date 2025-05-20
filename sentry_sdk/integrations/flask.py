@@ -1,4 +1,5 @@
 import sentry_sdk
+from sentry_sdk.consts import SOURCE_FOR_STYLE
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -6,7 +7,6 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
