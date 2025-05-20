@@ -102,7 +102,7 @@ def test_logs_basics(sentry_init, capture_envelopes):
     assert logs[2].get("severity_text") == "info"
     assert logs[2].get("severity_number") == 9
 
-    assert logs[3].get("severity_text") == "warning"
+    assert logs[3].get("severity_text") == "warn"
     assert logs[3].get("severity_number") == 13
 
     assert logs[4].get("severity_text") == "error"
@@ -155,7 +155,7 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
     assert logs[0]["severity_text"] == "trace"
     assert logs[1]["severity_text"] == "debug"
     assert logs[2]["severity_text"] == "info"
-    assert logs[3]["severity_text"] == "warning"
+    assert logs[3]["severity_text"] == "warn"
     assert before_log_called[0]
 
 

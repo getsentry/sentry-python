@@ -10,7 +10,7 @@ from sentry_sdk.integrations.celery.beat import (
     _get_headers,
     _get_monitor_config,
     _patch_beat_apply_entry,
-    _patch_redbeat_maybe_due,
+    _patch_redbeat_apply_async,
     crons_task_failure,
     crons_task_retry,
     crons_task_success,
@@ -454,10 +454,10 @@ def test_exclude_redbeat_tasks_option(
     """
     Test excluding Celery RedBeat tasks from automatic instrumentation.
     """
-    fake_maybe_due = MagicMock()
+    fake_apply_async = MagicMock()
 
     fake_redbeat_scheduler = MagicMock()
-    fake_redbeat_scheduler.maybe_due = fake_maybe_due
+    fake_redbeat_scheduler.apply_async = fake_apply_async
 
     fake_integration = MagicMock()
     fake_integration.exclude_beat_tasks = exclude_beat_tasks
@@ -481,17 +481,19 @@ def test_exclude_redbeat_tasks_option(
                 "sentry_sdk.integrations.celery.beat._get_monitor_config",
                 fake_get_monitor_config,
             ) as _get_monitor_config:
-                # Mimic CeleryIntegration patching of RedBeatScheduler.maybe_due()
-                _patch_redbeat_maybe_due()
+                # Mimic CeleryIntegration patching of RedBeatScheduler.apply_async()
+                _patch_redbeat_apply_async()
                 # Mimic Celery RedBeat calling a task from the RedBeat schedule
-                RedBeatScheduler.maybe_due(fake_redbeat_scheduler, fake_schedule_entry)
+                RedBeatScheduler.apply_async(
+                    fake_redbeat_scheduler, fake_schedule_entry
+                )
 
                 if task_in_excluded_beat_tasks:
                     # Only the original RedBeatScheduler.maybe_due() is called, _get_monitor_config is NOT called.
-                    assert fake_maybe_due.call_count == 1
+                    assert fake_apply_async.call_count == 1
                     _get_monitor_config.assert_not_called()
 
                 else:
                     # The original RedBeatScheduler.maybe_due() is called, AND _get_monitor_config is called.
-                    assert fake_maybe_due.call_count == 1
+                    assert fake_apply_async.call_count == 1
                     assert _get_monitor_config.call_count == 1

@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.29.1
+
+### Various fixes & improvements
+
+- fix(logs): send `severity_text`: `warn` instead of `warning` (#4396) by @lcian
+
+## 2.29.0
+
+### Various fixes & improvements
+
+- fix(loguru): Move integration setup from `__init__` to `setup_once` (#4399) by @sentrivana
+- feat: Allow configuring `keep_alive` via environment variable (#4366) by @szokeasaurusrex
+- fix(celery): Do not send extra check-in (#4395) by @sentrivana
+- fix(typing): Add before_send_log to Experiments (#4383) by @sentrivana
+- ci: Fix pyspark test suite (#4382) by @sentrivana
+- fix(logs): Make `sentry.message.parameters` singular as per spec (#4387) by @AbhiPrasad
+- apidocs: Remove snowballstemmer pin (#4379) by @sentrivana
+
 ## 2.28.0
 
 ### Various fixes & improvements
