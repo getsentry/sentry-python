@@ -130,7 +130,10 @@ def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServe
         **kwargs: P.kwargs,
     ) -> Server:
         server_interceptor = AsyncServerInterceptor()
-        interceptors = [server_interceptor, *(interceptors or [])]
+        interceptors = [
+            server_interceptor,
+            *(interceptors or []),
+        ]  # type: Sequence[grpc.ServerInterceptor]
 
         try:
             # We prefer interceptors as a list because of compatibility with
