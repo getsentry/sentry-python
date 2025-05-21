@@ -1,4 +1,7 @@
 import asyncio
+import sys
+
+
 import pytest
 import sentry_sdk
 
@@ -16,6 +19,10 @@ async def parent_task():
         return parent_span, spans
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 7),
+    reason="python 3.6 lacks proper contextvar support. Contextvars are needed to prevent scope bleed in async context",
+)
 @pytest.mark.asyncio
 async def test_concurrent_spans_are_children():
     sentry_sdk.init(
