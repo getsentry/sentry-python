@@ -230,6 +230,18 @@ def test_ignore_logger(sentry_init, capture_events):
     assert not events
 
 
+def test_ignore_logger_whitespace_padding(sentry_init, capture_events):
+    """Here we test insensitivity to whitespace padding of ignored loggers"""
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    ignore_logger("testfoo")
+
+    padded_logger = logging.getLogger("       testfoo   ")
+    padded_logger.error("hi")
+    assert not events
+
+
 def test_ignore_logger_wildcard(sentry_init, capture_events):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
