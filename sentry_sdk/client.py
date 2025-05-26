@@ -405,6 +405,8 @@ class _Client(BaseClient):
 
             patch_readable_span()
             setup_sentry_tracing()
+
+            logger.debug("[Tracing] Finished setting up OpenTelemetry")
         finally:
             _client_init_debug.set(old_debug)
 
