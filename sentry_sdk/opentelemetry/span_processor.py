@@ -71,6 +71,7 @@ class SentrySpanProcessor(SpanProcessor):
             return
 
         self._add_root_span(span, get_current_span(parent_context))
+        self._add_origin(span)
         self._start_profile(span)
 
     def on_end(self, span):
@@ -96,6 +97,13 @@ class SentrySpanProcessor(SpanProcessor):
     def force_flush(self, timeout_millis=30000):
         # type: (int) -> bool
         return True
+
+    def _add_origin(self, span):
+        # type: (Span) -> None
+        if span.instrumentation_scope and span.instrumentation_scope.name:
+            span.set_attribute(
+                SentrySpanAttribute.ORIGIN, span.instrumentation_scope.name
+            )
 
     def _add_root_span(self, span, parent_span):
         # type: (Span, AbstractSpan) -> None
