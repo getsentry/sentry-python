@@ -1,6 +1,5 @@
 import gc
-import tracemalloc
-import linecache
+from pympler.classtracker import ClassTracker
 
 import sentry_sdk
 from sentry_sdk.consts import SOURCE_FOR_STYLE
@@ -52,16 +51,14 @@ except ImportError:
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
+from opentelemetry.sdk.trace import Span
+from opentelemetry.context.context import Context
 
-TRACEMALLOC_FILTERS = (
-    tracemalloc.Filter(True, "*sentry_sdk/tracing*"),
-    tracemalloc.Filter(True, "*sentry_sdk/opentelemetry*"),
-    # tracemalloc.Filter(True, "*opentelemetry*"),
-)
-
-tracemalloc.start()
-snapshot = tracemalloc.take_snapshot().filter_traces(TRACEMALLOC_FILTERS)
-
+tracker = ClassTracker()
+tracker.track_class(Span)
+tracker.track_class(Context)
+tracker.create_snapshot()
+tracker.stats.print_summary()
 
 class FlaskIntegration(Integration):
     identifier = "flask"
@@ -107,7 +104,6 @@ class FlaskIntegration(Integration):
 
         old_app = Flask.__call__
 
-        @track_memory
         def sentry_patched_wsgi_app(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
             if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
@@ -124,7 +120,14 @@ class FlaskIntegration(Integration):
                     else DEFAULT_HTTP_METHODS_TO_CAPTURE
                 ),
             )
-            return middleware(environ, start_response)
+            rv = middleware(environ, start_response)
+
+            gc.collect()
+            global tracker
+            tracker.create_snapshot()
+            tracker.stats.print_summary()
+
+            return rv
 
         Flask.__call__ = sentry_patched_wsgi_app
 
@@ -288,52 +291,3 @@ def _add_user_to_event(event):
             user_info.setdefault("username", user.username)
         except Exception:
             pass
-
-
-def display_top(snapshot, key_type='lineno', limit=20):
-    snapshot = snapshot.filter_traces((
-        tracemalloc.Filter(True, "*sentry_sdk/opentelemetry/span_processor*"),
-        tracemalloc.Filter(True, "*opentelemetry*"),
-    ))
-    top_stats = snapshot.statistics(key_type)
-
-    print("Top %s lines" % limit)
-    for index, stat in enumerate(top_stats[:limit], 1):
-        frame = stat.traceback[0]
-        print("#%s: %s:%s: %.1f KiB"
-              % (index, frame.filename, frame.lineno, stat.size / 1024))
-        line = linecache.getline(frame.filename, frame.lineno).strip()
-        if line:
-            print('    %s' % line)
-
-    other = top_stats[limit:]
-    if other:
-        size = sum(stat.size for stat in other)
-        print("%s other: %.1f KiB" % (len(other), size / 1024))
-    total = sum(stat.size for stat in top_stats)
-    print("Total allocated size: %.1f KiB" % (total / 1024))
-
-
-def track_memory(func):
-    def wrapper(*args, **kwargs):
-        global snapshot
-        result = func(*args, **kwargs)
-
-        gc.collect()
-        snapshot2 = tracemalloc.take_snapshot().filter_traces(TRACEMALLOC_FILTERS)
-        top_stats = snapshot2.compare_to(snapshot, "lineno", True) 
-
-        print("[ Top 10 differences ]")
-        for index, stat in enumerate(top_stats[:10], 1):
-            frame = stat.traceback[0]
-
-            print("#%s: %s:%s: %.1f KiB"
-                  % (index, frame.filename, frame.lineno, stat.size / 1024))
-            line = linecache.getline(frame.filename, frame.lineno).strip()
-            if line:
-                print('    %s' % line)
-            # print(stat)
-
-        return result
-    return wrapper
-
