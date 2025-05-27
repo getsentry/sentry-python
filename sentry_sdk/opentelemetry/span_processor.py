@@ -29,6 +29,7 @@ from sentry_sdk.opentelemetry.utils import (
     get_profile_context,
     get_sentry_meta,
     set_sentry_meta,
+    delete_sentry_meta,
 )
 from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
@@ -173,6 +174,7 @@ class SentrySpanProcessor(SpanProcessor):
         # TODO-neel-potel sort and cutoff max spans
 
         sentry_sdk.capture_event(transaction_event)
+        self._cleanup_references([span] + collected_spans)
 
     def _append_child_span(self, span):
         # type: (ReadableSpan) -> None
@@ -253,7 +255,6 @@ class SentrySpanProcessor(SpanProcessor):
             profile.__exit__(None, None, None)
             if profile.valid():
                 event["profile"] = profile
-                set_sentry_meta(span, "profile", None)
 
         return event
 
@@ -313,6 +314,11 @@ class SentrySpanProcessor(SpanProcessor):
             common_json["tags"] = tags
 
         return common_json
+
+    def _cleanup_references(self, spans):
+        # type: (List[ReadableSpan]) -> None
+        for span in spans:
+            delete_sentry_meta(span)
 
     def _log_debug_info(self):
         # type: () -> None
