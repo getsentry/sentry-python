@@ -3,14 +3,13 @@ import functools
 import time
 from typing import Any
 
-from sentry_sdk import get_client, get_current_scope
+from sentry_sdk import get_client
 from sentry_sdk.utils import safe_repr
 
 
 def _capture_log(severity_text, severity_number, template, **kwargs):
     # type: (str, int, str, **Any) -> None
     client = get_client()
-    scope = get_current_scope()
 
     attrs = {
         "sentry.message.template": template,
@@ -36,7 +35,6 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
 
     # noinspection PyProtectedMember
     client._capture_experimental_log(
-        scope,
         {
             "severity_text": severity_text,
             "severity_number": severity_number,
