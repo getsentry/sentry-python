@@ -104,7 +104,7 @@ class LayerBuilder:
             os.path.join(self.base_dir, self.out_zip_filename),
             os.path.abspath(DIST_PATH),
         )
-
+)DropdownMenuItem onClick={() => setTheme("light")}>
 
 def build_packaged_zip(base_dir=None, make_dist=False, out_zip_filename=None):
     if base_dir is None:
