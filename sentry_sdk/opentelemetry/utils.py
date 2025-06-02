@@ -464,6 +464,14 @@ def set_sentry_meta(span, key, value):
     span._sentry_meta = sentry_meta  # type: ignore[union-attr]
 
 
+def delete_sentry_meta(span):
+    # type: (Union[AbstractSpan, ReadableSpan]) -> None
+    try:
+        del span._sentry_meta  # type: ignore[union-attr]
+    except AttributeError:
+        pass
+
+
 def get_profile_context(span):
     # type: (ReadableSpan) -> Optional[dict[str, str]]
     if not span.attributes:
