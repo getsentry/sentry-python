@@ -48,7 +48,7 @@ def patch_redis_async_pipeline(
                     if is_cluster:
                         command_seq = self._command_stack
                     else:
-                        self.command_stack
+                        command_seq = self.command_stack
 
                 set_db_data_fn(span, self)
                 _set_pipeline_data(
