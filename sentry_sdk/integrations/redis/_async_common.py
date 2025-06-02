@@ -42,7 +42,7 @@ def patch_redis_async_pipeline(
         ) as span:
             with capture_internal_exceptions():
                 try:
-                    command_seq = self._execution_strategy.command_queue
+                    command_seq = self._execution_strategy._command_queue
                 except AttributeError:
                     if is_cluster:
                         command_seq = self._command_stack
