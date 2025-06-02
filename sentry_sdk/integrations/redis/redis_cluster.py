@@ -43,8 +43,8 @@ def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_insta
             # recognize it - see
             # https://github.com/redis/redis-py/blame/v5.0.0/redis/asyncio/cluster.py#L1386
             client = (
-                async_redis_cluster_pipeline_instance._client
-            )  # type:ignore[attr-defined]
+                async_redis_cluster_pipeline_instance._client  # type: ignore[attr-defined]
+            )
 
         _set_async_cluster_db_data(
             span,
