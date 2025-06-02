@@ -53,7 +53,10 @@ def _patch_ray_remote():
             return old_remote(f, *args, **kwargs)
 
         def wrapper(user_f):
+            # type: (Callable[..., Any]) -> Any
+            @functools.wraps(user_f)
             def new_func(*f_args, _tracing=None, **f_kwargs):
+                # type: (Any, Optional[dict[str, Any]], Any) -> Any
                 _check_sentry_initialized()
 
                 transaction = sentry_sdk.continue_trace(
@@ -116,7 +119,7 @@ def _patch_ray_remote():
         else:
             return wrapper
 
-    ray.remote = new_remote
+    ray.remote = new_remote  # type: ignore[assignment]
 
 
 def _capture_exception(exc_info, **kwargs):
