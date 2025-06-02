@@ -4,6 +4,7 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import (
     BreadcrumbHandler,
     EventHandler,
+    SentryLogsHandler,
     _BaseHandler,
 )
 
@@ -59,12 +60,14 @@ class LoguruIntegration(Integration):
         event_level=DEFAULT_EVENT_LEVEL,
         breadcrumb_format=DEFAULT_FORMAT,
         event_format=DEFAULT_FORMAT,
+        sentry_logs_level=DEFAULT_LEVEL,
     ):
-        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction) -> None
+        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction, Optional[int]) -> None
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
         LoguruIntegration.breadcrumb_format = breadcrumb_format
         LoguruIntegration.event_format = event_format
+        LoguruIntegration.sentry_logs_level = sentry_logs_level
 
     @staticmethod
     def setup_once():
@@ -82,6 +85,9 @@ class LoguruIntegration(Integration):
                 level=LoguruIntegration.event_level,
                 format=LoguruIntegration.event_format,
             )
+
+        if LoguruIntegration.sentry_logs_level is not None:
+            logger.add(SentryLogsHandler(level=LoguruIntegration.sentry_logs_level))
 
 
 class _LoguruBaseHandler(_BaseHandler):
