@@ -41,13 +41,22 @@ def patch_redis_async_pipeline(
             origin=SPAN_ORIGIN,
         ) as span:
             with capture_internal_exceptions():
+                command_seq = None
+                try:
+                    command_seq = self._execution_strategy.command_queue
+                except AttributeError:
+                    if is_cluster:
+                        command_seq = self._command_stack
+                    else:
+                        self.command_stack
+
                 set_db_data_fn(span, self)
                 _set_pipeline_data(
                     span,
                     is_cluster,
                     get_command_args_fn,
                     False if is_cluster else self.is_transaction,
-                    self._command_stack if is_cluster else self.command_stack,
+                    command_seq,
                 )
 
             return await old_execute(self, *args, **kwargs)
