@@ -41,7 +41,6 @@ def patch_redis_async_pipeline(
             origin=SPAN_ORIGIN,
         ) as span:
             with capture_internal_exceptions():
-                command_seq = None
                 try:
                     command_seq = self._execution_strategy.command_queue
                 except AttributeError:
