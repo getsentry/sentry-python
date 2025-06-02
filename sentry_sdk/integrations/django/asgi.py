@@ -237,9 +237,9 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
             middleware_span = _check_middleware_span(old_method=f)
 
             if middleware_span is None:
-                return await f(*args, **kwargs)
+                return await f(*args, **kwargs)  # type: ignore
 
             with middleware_span:
-                return await f(*args, **kwargs)
+                return await f(*args, **kwargs)  # type: ignore
 
     return SentryASGIMixin
