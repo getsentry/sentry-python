@@ -59,7 +59,9 @@ def read_error_from_log(job_id):
 
 
 @pytest.mark.forked
-@pytest.mark.parametrize("task_options", [{}, {"num_cpus": 0}])
+@pytest.mark.parametrize(
+    "task_options", [{}, {"num_cpus": 0, "memory": 1024 * 1024 * 10}]
+)
 def test_tracing_in_ray_tasks(task_options):
     setup_sentry()
 

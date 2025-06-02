@@ -14,7 +14,7 @@ from sentry_sdk.utils import (
 )
 
 try:
-    import ray  # type: ignore[import-not-found]
+    import ray
 except ImportError:
     raise DidNotEnable("Ray not installed.")
 import functools
@@ -54,7 +54,6 @@ def _patch_ray_remote():
 
         def wrapper(user_f):
             # type: (Callable[..., Any]) -> Any
-            @functools.wraps(user_f)
             def new_func(*f_args, _tracing=None, **f_kwargs):
                 # type: (Any, Optional[dict[str, Any]], Any) -> Any
                 _check_sentry_initialized()
