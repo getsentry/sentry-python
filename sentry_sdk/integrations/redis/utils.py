@@ -147,7 +147,7 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
-def _get_pipeline_data(is_cluster, get_command_args_fn, is_transaction, command_stack):
+def _get_pipeline_data(is_cluster, get_command_args_fn, is_transaction, command_seq):
     # type: (bool, Any, bool, Sequence[Any]) -> dict[str, Any]
     data = {
         "redis.is_cluster": is_cluster,
@@ -155,14 +155,14 @@ def _get_pipeline_data(is_cluster, get_command_args_fn, is_transaction, command_
     }  # type: dict[str, Any]
 
     commands = []
-    for i, arg in enumerate(command_stack):
+    for i, arg in enumerate(command_seq):
         if i >= _MAX_NUM_COMMANDS:
             break
 
         command = get_command_args_fn(arg)
         commands.append(_get_safe_command(command[0], command[1:]))
 
-    data["redis.commands.count"] = len(command_stack)
+    data["redis.commands.count"] = len(command_seq)
     data["redis.commands.first_ten"] = commands
 
     return data

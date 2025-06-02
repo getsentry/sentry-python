@@ -6,11 +6,6 @@ from unittest import mock
 
 import pytest
 
-try:
-    import pytest_asyncio
-except ImportError:
-    pytest_asyncio = None
-
 from aiohttp import web, ClientSession
 from aiohttp.client import ServerDisconnectedError
 from aiohttp.web_exceptions import (
@@ -24,14 +19,6 @@ from aiohttp.web_exceptions import (
 from sentry_sdk import capture_message, start_span
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 from tests.conftest import ApproxDict
-
-
-if pytest_asyncio is None:
-    # `loop` was deprecated in `pytest-aiohttp`
-    # in favor of `event_loop` from `pytest-asyncio`
-    @pytest.fixture
-    def event_loop(loop):
-        yield loop
 
 
 @pytest.mark.asyncio
@@ -495,7 +482,7 @@ async def test_trace_from_headers_if_performance_disabled(
 
 @pytest.mark.asyncio
 async def test_crumb_capture(
-    sentry_init, aiohttp_raw_server, aiohttp_client, event_loop, capture_events
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
 ):
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
@@ -551,7 +538,6 @@ async def test_crumb_capture_client_error(
     sentry_init,
     aiohttp_raw_server,
     aiohttp_client,
-    event_loop,
     capture_events,
     status_code,
     level,

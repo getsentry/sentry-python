@@ -129,7 +129,7 @@ if TYPE_CHECKING:
             "contexts": dict[str, dict[str, object]],
             "dist": str,
             "duration": Optional[float],
-            "environment": str,
+            "environment": Optional[str],
             "errors": list[dict[str, Any]],  # TODO: We can expand on this type
             "event_id": str,
             "exception": dict[
@@ -146,7 +146,7 @@ if TYPE_CHECKING:
             "monitor_slug": Optional[str],
             "platform": Literal["python"],
             "profile": object,  # Should be sentry_sdk.profiler.Profile, but we can't import that here due to circular imports
-            "release": str,
+            "release": Optional[str],
             "request": dict[str, object],
             "sdk": Mapping[str, object],
             "server_name": str,

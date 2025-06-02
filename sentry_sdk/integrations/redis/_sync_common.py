@@ -44,12 +44,17 @@ def patch_redis_pipeline(
             only_if_parent=True,
         ) as span:
             with capture_internal_exceptions():
+                try:
+                    command_seq = self._execution_strategy.command_queue
+                except AttributeError:
+                    command_seq = self.command_stack
+
                 span_data = get_db_data_fn(self)
                 pipeline_data = _get_pipeline_data(
                     is_cluster=is_cluster,
                     get_command_args_fn=get_command_args_fn,
                     is_transaction=False if is_cluster else self.transaction,
-                    command_stack=self.command_stack,
+                    command_seq=command_seq,
                 )
                 _update_span(span, span_data, pipeline_data)
                 _create_breadcrumb("redis.pipeline.execute", span_data, pipeline_data)

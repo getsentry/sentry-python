@@ -3,7 +3,7 @@ import urllib
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from typing import Any
@@ -37,8 +37,7 @@ def _get_url(asgi_scope, default_scheme=None, host=None):
     """
     Extract URL from the ASGI scope, without also including the querystring.
     """
-    scheme = asgi_scope.get("scheme", default_scheme)
-
+    scheme = cast(str, asgi_scope.get("scheme", default_scheme))
     server = asgi_scope.get("server", None)
     path = asgi_scope.get("root_path", "") + asgi_scope.get("path", "")
 
