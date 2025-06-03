@@ -30,6 +30,9 @@ if django.VERSION >= (3, 0):
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
 @pytest.mark.forked
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
 async def test_basic(sentry_init, capture_events, application):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -655,6 +658,9 @@ async def test_async_view(sentry_init, capture_events, application):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
 async def test_transaction_http_method_default(
     sentry_init, capture_events, application
 ):
@@ -687,6 +693,9 @@ async def test_transaction_http_method_default(
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
 async def test_transaction_http_method_custom(sentry_init, capture_events, application):
     sentry_init(
         integrations=[
