@@ -732,12 +732,6 @@ class Scope:
         """Get current tracing span."""
         return self._span
 
-    @span.setter
-    def span(self, span):
-        # type: (Optional[Span]) -> None
-        """Set current tracing span."""
-        self._span = span
-
     @property
     def profile(self):
         # type: () -> Optional[Profile]

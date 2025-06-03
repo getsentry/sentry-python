@@ -100,9 +100,9 @@ class CeleryIntegration(Integration):
 def _set_status(status):
     # type: (str) -> None
     with capture_internal_exceptions():
-        scope = sentry_sdk.get_current_scope()
-        if scope.span is not None:
-            scope.span.set_status(status)
+        span = sentry_sdk.get_current_span()
+        if span is not None:
+            span.set_status(status)
 
 
 def _capture_exception(task, exc_info):

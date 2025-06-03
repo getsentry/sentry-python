@@ -1,10 +1,12 @@
 from typing import cast, TYPE_CHECKING
 
-from opentelemetry.trace import set_span_in_context
+from opentelemetry.trace import get_current_span, set_span_in_context
+from opentelemetry.trace.span import INVALID_SPAN
 from opentelemetry.context import Context, get_value, set_value
 from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
 
 import sentry_sdk
+from sentry_sdk.tracing import Span
 from sentry_sdk.opentelemetry.consts import (
     SENTRY_SCOPES_KEY,
     SENTRY_FORK_ISOLATION_SCOPE_KEY,
@@ -59,6 +61,12 @@ class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
 
         else:
             new_scope = current_scope.fork()
+
+            # carry forward a wrapped span reference since the otel context is always the
+            # source of truth for the active span
+            current_span = get_current_span(context)
+            if current_span != INVALID_SPAN:
+                new_scope._span = Span(otel_span=get_current_span(context))
 
         if should_use_isolation_scope:
             new_isolation_scope = should_use_isolation_scope

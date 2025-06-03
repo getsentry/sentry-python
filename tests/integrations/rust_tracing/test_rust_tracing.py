@@ -176,7 +176,7 @@ def test_nested_on_new_span_on_close(sentry_init, capture_events):
     assert "version" not in second_span_data
 
 
-def test_on_new_span_without_transaction(sentry_init):
+def test_no_spans_without_transaction(sentry_init):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_on_new_span_without_transaction", rust_tracing.set_layer_impl
@@ -185,11 +185,9 @@ def test_on_new_span_without_transaction(sentry_init):
 
     assert sentry_sdk.get_current_span() is None
 
-    # Should still create a span hierarchy, it just will not be under a txn
     rust_tracing.new_span(RustTracingLevel.Info, 3)
     current_span = sentry_sdk.get_current_span()
-    assert current_span is not None
-    assert current_span.root_span is None
+    assert current_span is None
 
 
 def test_on_event_exception(sentry_init, capture_events):
