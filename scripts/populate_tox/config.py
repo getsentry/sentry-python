@@ -54,18 +54,18 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": [
                 "psycopg2-binary",
+                "pytest-asyncio",
                 "djangorestframework",
                 "pytest-django",
                 "Werkzeug",
             ],
-            ">=3.0": ["pytest-asyncio"],
+            ">=2.0": ["channels[daphne]"],
             ">=2.2,<3.1": ["six"],
             "<3.3": [
                 "djangorestframework>=3.0,<4.0",
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
-            ">=2.0": ["channels[daphne]"],
         },
     },
     "dramatiq": {
