@@ -178,6 +178,7 @@ jobs:
           set -x # print commands that are executed
           echo "java home $JAVA_HOME"
           java --version
+          update-alternatives --list java
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-spark"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
