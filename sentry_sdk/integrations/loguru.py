@@ -1,11 +1,13 @@
 import enum
 
+import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import (
     BreadcrumbHandler,
     EventHandler,
     SentryLogsHandler,
     _BaseHandler,
+    _python_level_to_otel,
 )
 
 from typing import TYPE_CHECKING
@@ -124,8 +126,54 @@ class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
     pass
 
 
-class LoguruSentryLogsHandler(_LoguruBaseHandler, SentryLogsHandler):
+def _loguru_level_to_otel(record_level):
+    # type: (int) -> Tuple[int, str]
+    for py_level, otel_severity_number, otel_severity_text in [
+        (50, 21, "fatal"),
+        (40, 17, "error"),
+        (30, 13, "warn"),
+        (25, 11, "info"),  # Loguru's success
+        (20, 9, "info"),
+        (10, 5, "debug"),
+        (5, 1, "trace"),
+    ]:
+        if record_level >= py_level:
+            return otel_severity_number, otel_severity_text
+    return 0, "default"
+
+
+class LoguruSentryLogsHandler(_LoguruBaseHandler):
     """Modified version of :class:`sentry_sdk.integrations.logging.SentryLogsHandler` to use loguru's level names."""
+    def emit(self, record):
+        client = sentry_sdk.get_client()
+
+        if not client.is_active():
+            return
+
+        if not client.options["_experiments"].get("enable_logs", False):
+            return
+
+        print('rec', record)
+        print('strofrec', str(record))
+
+        self._capture_log_from_record(client, record)
+
     def _capture_log_from_record(self, client, record):
         # type: (BaseClient, LogRecord)
-        return super()._capture_log_from_record(client, record)
+        scope = sentry_sdk.get_current_scope()
+
+        otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
+
+        attrs = {}
+
+        client._capture_experimental_log(
+            scope,
+            {
+                "severity_text": otel_severity_text,
+                "severity_number": otel_severity_number,
+                "body": record.msg,
+                "attributes": attrs,
+                "time_unix_nano": int(record.created * 1e9),
+                "trace_id": None,
+            },
+        )
