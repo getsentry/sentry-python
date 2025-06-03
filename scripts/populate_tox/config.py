@@ -139,6 +139,9 @@ TEST_SUITE_CONFIG = {
     "loguru": {
         "package": "loguru",
     },
+    "openai_agents": {
+        "package": "openai-agents",
+    },
     "openfeature": {
         "package": "openfeature-sdk",
     },
