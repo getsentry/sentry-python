@@ -133,6 +133,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
