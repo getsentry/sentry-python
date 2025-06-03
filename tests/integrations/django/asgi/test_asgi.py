@@ -582,6 +582,9 @@ async def test_asgi_request_body(
         "asyncio.iscoroutinefunction has been replaced in 3.12 by inspect.iscoroutinefunction"
     ),
 )
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
 async def test_asgi_mixin_iscoroutinefunction_before_3_12():
     sentry_asgi_mixin = _asgi_middleware_mixin_factory(lambda: None)
 
@@ -639,6 +642,9 @@ def test_asgi_mixin_iscoroutinefunction_when_not_async_after_3_12():
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
 async def test_async_view(sentry_init, capture_events, application):
     sentry_init(
         integrations=[DjangoIntegration()],
