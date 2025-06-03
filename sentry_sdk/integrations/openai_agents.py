@@ -50,9 +50,7 @@ class SentryRunHooks(RunHooks):
         print(
             f"### {self.event_counter}: Agent '{agent.name}' ended with output {output}. Usage: {self._usage_to_str(context.usage)}"
         )
-        print(self.agent_span)
         if self.agent_span:
-            print(f"Span exit agent: {self.agent_span}")
             self.agent_span.__exit__(None, None, None)
             self.agent_span = None
 
@@ -75,7 +73,6 @@ class SentryRunHooks(RunHooks):
             f"### {self.event_counter}: Tool {tool.name} ended with result {result}. Usage: {self._usage_to_str(context.usage)}"
         )
         if self.tool_span:
-            print(f"Span exit tool: {self.tool_span}")
             self.tool_span.__exit__(None, None, None)
             self.tool_span = None
 
@@ -87,15 +84,11 @@ class SentryRunHooks(RunHooks):
             f"### {self.event_counter}: Handoff from '{from_agent.name}' to '{to_agent.name}'. Usage: {self._usage_to_str(context.usage)}"
         )
         if self.agent_span:
-            span = self.agent_span.start_child(
-                op="gen_ai.handoff", description=f"{from_agent.name} -> {to_agent.name}"
-            )
-            print(f"Span enter handoff: {span}")
-            span.__enter__()
-            print(f"Span exit handoff: {span}")
-            span.__exit__(None, None, None)
+            with self.agent_span.start_child(
+                op="gen_ai.handoff", description=f"{from_agent.name} > {to_agent.name}"
+            ):
+                pass
 
-            print(f"Span exit agent: {self.agent_span}")
             self.agent_span.__exit__(None, None, None)
             self.agent_span = None
 
