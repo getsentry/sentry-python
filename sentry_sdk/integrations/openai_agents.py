@@ -1,5 +1,3 @@
-import sys
-
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import event_from_exception
@@ -7,7 +5,6 @@ from sentry_sdk.utils import event_from_exception
 from typing import Any
 
 try:
-    import agents
     from agents import (
         Agent,
         RunContextWrapper,
@@ -15,9 +12,6 @@ try:
         Tool,
         Usage,
     )
-    from agents.tracing.setup import TraceProvider
-    from agents.tracing.spans import Span, TSpanData
-    from agents.tracing.traces import Trace
 
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
@@ -31,48 +25,6 @@ def _capture_exception(exc):
         mechanism={"type": OpenAIAgentsIntegration.identifier, "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
-
-
-class SentryTraceProvider:
-    def __init__(self, original: TraceProvider):
-        self.original = original
-
-    def create_trace(
-        self,
-        name: str,
-        trace_id: str | None = None,
-        disabled: bool = False,
-        **kwargs: Any,
-    ) -> Trace:
-        print(f"[SentryTraceProvider] create_trace: {name}")
-        trace = self.original.create_trace(
-            name, trace_id=trace_id, disabled=disabled, **kwargs
-        )
-        return trace
-
-    def create_span(
-        self,
-        span_data: TSpanData,
-        span_id: str | None = None,
-        parent: Trace | Span[Any] | None = None,
-        disabled: bool = False,
-    ) -> Span[TSpanData]:
-        print(f"[SentryTraceProvider] create_span: {span_data}")
-        span = self.original.create_span(span_data, span_id, parent, disabled)
-
-        # current_span = Scope.get_current_span()
-        # current_trace = Scope.get_current_trace()
-
-        # sentry_span = sentry_sdk.start_span(
-        #     op=AGENTS_TO_OP[span_data.__class__.__name__],
-        #     name=AGENTS_TO_NAME[span_data.__class__.__name__],
-        #     attributes=span_data.export()
-        # )
-        # sentry_span.finish()
-        return span
-
-    def __getattr__(self, item: Any) -> Any:
-        return getattr(self.original, item)
 
 
 class SentryRunHooks(RunHooks):
@@ -148,22 +100,6 @@ class SentryRunHooks(RunHooks):
             self.agent_span = None
 
 
-def _patch_tracer_provider():
-    # Monkey path trace provider of openai-agents
-    name = "GLOBAL_TRACE_PROVIDER"
-    original = getattr(agents.tracing, name)
-    already_wrapped = isinstance(original, SentryTraceProvider)
-    if not already_wrapped:
-        wrapper = SentryTraceProvider(original)
-        for module_name, mod in sys.modules.items():
-            if module_name.startswith("agents"):
-                try:
-                    if getattr(mod, name, None) is original:
-                        setattr(mod, name, wrapper)
-                except Exception:  # pragma: no cover
-                    pass
-
-
 class OpenAIAgentsIntegration(Integration):
     identifier = "openai_agents"
     origin = f"auto.ai.{identifier}"
@@ -174,6 +110,4 @@ class OpenAIAgentsIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        # _patch_tracer_provider()
-
         pass
