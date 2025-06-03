@@ -51,6 +51,7 @@ else:
 # When changing this, update __all__ in __init__.py too
 __all__ = [
     "init",
+    "add_attachment",
     "add_breadcrumb",
     "capture_event",
     "capture_exception",
@@ -182,6 +183,20 @@ def capture_exception(
 ):
     # type: (...) -> Optional[str]
     return get_current_scope().capture_exception(error, scope=scope, **scope_kwargs)
+
+
+@scopemethod
+def add_attachment(
+    bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
+    filename=None,  # type: Optional[str]
+    path=None,  # type: Optional[str]
+    content_type=None,  # type: Optional[str]
+    add_to_transactions=False,  # type: bool
+):
+    # type: (...) -> None
+    return get_isolation_scope().add_attachment(
+        bytes, filename, path, content_type, add_to_transactions
+    )
 
 
 @scopemethod
@@ -388,6 +403,10 @@ def start_transaction(
 
 def set_measurement(name, value, unit=""):
     # type: (str, float, MeasurementUnit) -> None
+    """
+    .. deprecated:: 2.28.0
+        This function is deprecated and will be removed in the next major release.
+    """
     transaction = get_current_scope().transaction
     if transaction is not None:
         transaction.set_measurement(name, value, unit)

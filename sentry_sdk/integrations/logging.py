@@ -1,4 +1,5 @@
 import logging
+import sys
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 
@@ -248,29 +249,25 @@ class EventHandler(_BaseHandler):
             event["level"] = level  # type: ignore[typeddict-item]
         event["logger"] = record.name
 
-        # Log records from `warnings` module as separate issues
-        record_captured_from_warnings_module = (
-            record.name == "py.warnings" and record.msg == "%s"
-        )
-        if record_captured_from_warnings_module:
-            # use the actual message and not "%s" as the message
-            # this prevents grouping all warnings under one "%s" issue
-            msg = record.args[0]  # type: ignore
-
-            event["logentry"] = {
-                "message": msg,
-                "params": (),
-            }
-
+        if (
+            sys.version_info < (3, 11)
+            and record.name == "py.warnings"
+            and record.msg == "%s"
+        ):
+            # warnings module on Python 3.10 and below sets record.msg to "%s"
+            # and record.args[0] to the actual warning message.
+            # This was fixed in https://github.com/python/cpython/pull/30975.
+            message = record.args[0]
+            params = ()
         else:
-            event["logentry"] = {
-                "message": to_string(record.msg),
-                "params": (
-                    tuple(str(arg) if arg is None else arg for arg in record.args)
-                    if record.args
-                    else ()
-                ),
-            }
+            message = record.msg
+            params = record.args
+
+        event["logentry"] = {
+            "message": to_string(message),
+            "formatted": record.getMessage(),
+            "params": params,
+        }
 
         event["extra"] = self._extra_from_record(record)
 
@@ -351,20 +348,21 @@ class SentryLogsHandler(_BaseHandler):
             if not client.options["_experiments"].get("enable_logs", False):
                 return
 
-            SentryLogsHandler._capture_log_from_record(client, record)
+            self._capture_log_from_record(client, record)
 
-    @staticmethod
-    def _capture_log_from_record(client, record):
+    def _capture_log_from_record(self, client, record):
         # type: (BaseClient, LogRecord) -> None
         scope = sentry_sdk.get_current_scope()
         otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
-        attrs = {}  # type: dict[str, str | bool | float | int]
+        project_root = client.options["project_root"]
+        attrs = self._extra_from_record(record)  # type: Any
+        attrs["sentry.origin"] = "auto.logger.log"
         if isinstance(record.msg, str):
             attrs["sentry.message.template"] = record.msg
         if record.args is not None:
             if isinstance(record.args, tuple):
                 for i, arg in enumerate(record.args):
-                    attrs[f"sentry.message.parameters.{i}"] = (
+                    attrs[f"sentry.message.parameter.{i}"] = (
                         arg
                         if isinstance(arg, str)
                         or isinstance(arg, float)
@@ -375,7 +373,10 @@ class SentryLogsHandler(_BaseHandler):
         if record.lineno:
             attrs["code.line.number"] = record.lineno
         if record.pathname:
-            attrs["code.file.path"] = record.pathname
+            if project_root is not None and record.pathname.startswith(project_root):
+                attrs["code.file.path"] = record.pathname[len(project_root) + 1 :]
+            else:
+                attrs["code.file.path"] = record.pathname
         if record.funcName:
             attrs["code.function.name"] = record.funcName
 

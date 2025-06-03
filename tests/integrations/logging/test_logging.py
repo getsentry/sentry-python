@@ -26,6 +26,7 @@ def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
     assert event["level"] == "fatal"
     assert not event["logentry"]["params"]
     assert event["logentry"]["message"] == "LOL"
+    assert event["logentry"]["formatted"] == "LOL"
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"]["values"])
 
 
@@ -112,6 +113,7 @@ def test_logging_level(sentry_init, capture_events):
     (event,) = events
     assert event["level"] == "error"
     assert event["logentry"]["message"] == "hi"
+    assert event["logentry"]["formatted"] == "hi"
 
     del events[:]
 
@@ -152,6 +154,7 @@ def test_custom_log_level_names(sentry_init, capture_events):
         assert events
         assert events[0]["level"] == sentry_level
         assert events[0]["logentry"]["message"] == "Trying level %s"
+        assert events[0]["logentry"]["formatted"] == f"Trying level {logging_level}"
         assert events[0]["logentry"]["params"] == [logging_level]
 
         del events[:]
@@ -177,6 +180,7 @@ def test_logging_filters(sentry_init, capture_events):
 
     (event,) = events
     assert event["logentry"]["message"] == "hi"
+    assert event["logentry"]["formatted"] == "hi"
 
 
 def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
@@ -198,10 +202,16 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
     assert events[0]["level"] == "warning"
     # Captured warnings start with the path where the warning was raised
     assert "UserWarning: first" in events[0]["logentry"]["message"]
+    assert "UserWarning: first" in events[0]["logentry"]["formatted"]
+    # For warnings, the message and formatted message are the same
+    assert events[0]["logentry"]["message"] == events[0]["logentry"]["formatted"]
     assert events[0]["logentry"]["params"] == []
 
     assert events[1]["level"] == "warning"
     assert "UserWarning: second" in events[1]["logentry"]["message"]
+    assert "UserWarning: second" in events[1]["logentry"]["formatted"]
+    # For warnings, the message and formatted message are the same
+    assert events[1]["logentry"]["message"] == events[1]["logentry"]["formatted"]
     assert events[1]["logentry"]["params"] == []
 
     # Using recwarn suppresses the "third" warning in the test output
@@ -234,3 +244,42 @@ def test_ignore_logger_wildcard(sentry_init, capture_events):
 
     (event,) = events
     assert event["logentry"]["message"] == "hi"
+    assert event["logentry"]["formatted"] == "hi"
+
+
+def test_logging_dictionary_interpolation(sentry_init, capture_events):
+    """Here we test an entire dictionary being interpolated into the log message."""
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.error("this is a log with a dictionary %s", {"foo": "bar"})
+
+    (event,) = events
+    assert event["logentry"]["message"] == "this is a log with a dictionary %s"
+    assert (
+        event["logentry"]["formatted"]
+        == "this is a log with a dictionary {'foo': 'bar'}"
+    )
+    assert event["logentry"]["params"] == {"foo": "bar"}
+
+
+def test_logging_dictionary_args(sentry_init, capture_events):
+    """Here we test items from a dictionary being interpolated into the log message."""
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.error(
+        "the value of foo is %(foo)s, and the value of bar is %(bar)s",
+        {"foo": "bar", "bar": "baz"},
+    )
+
+    (event,) = events
+    assert (
+        event["logentry"]["message"]
+        == "the value of foo is %(foo)s, and the value of bar is %(bar)s"
+    )
+    assert (
+        event["logentry"]["formatted"]
+        == "the value of foo is bar, and the value of bar is baz"
+    )
+    assert event["logentry"]["params"] == {"foo": "bar", "bar": "baz"}

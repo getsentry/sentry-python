@@ -1,5 +1,4 @@
 import itertools
-
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -47,6 +46,7 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        Log,
         MeasurementUnit,
         ProfilerMode,
         TracesSampler,
@@ -79,6 +79,7 @@ if TYPE_CHECKING:
             ],
             "metric_code_locations": Optional[bool],
             "enable_logs": Optional[bool],
+            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
         },
         total=False,
     )
@@ -187,7 +188,7 @@ class SPANDATA:
     For an AI model call, the format of the response
     """
 
-    AI_LOGIT_BIAS = "ai.response_format"
+    AI_LOGIT_BIAS = "ai.logit_bias"
     """
     For an AI model call, the logit bias
     """
@@ -204,7 +205,6 @@ class SPANDATA:
     Minimize pre-processing done to the prompt sent to the LLM.
     Example: true
     """
-
     AI_RESPONSES = "ai.responses"
     """
     The responses to an AI model call. Always as a list.
@@ -215,6 +215,66 @@ class SPANDATA:
     """
     The seed, ideally models given the same seed and same other parameters will produce the exact same output.
     Example: 123.45
+    """
+
+    AI_CITATIONS = "ai.citations"
+    """
+    References or sources cited by the AI model in its response.
+    Example: ["Smith et al. 2020", "Jones 2019"]
+    """
+
+    AI_DOCUMENTS = "ai.documents"
+    """
+    Documents or content chunks used as context for the AI model.
+    Example: ["doc1.txt", "doc2.pdf"]
+    """
+
+    AI_SEARCH_QUERIES = "ai.search_queries"
+    """
+    Queries used to search for relevant context or documents.
+    Example: ["climate change effects", "renewable energy"]
+    """
+
+    AI_SEARCH_RESULTS = "ai.search_results"
+    """
+    Results returned from search queries for context.
+    Example: ["Result 1", "Result 2"]
+    """
+
+    AI_GENERATION_ID = "ai.generation_id"
+    """
+    Unique identifier for the completion.
+    Example: "gen_123abc"
+    """
+
+    AI_SEARCH_REQUIRED = "ai.is_search_required"
+    """
+    Boolean indicating if the model needs to perform a search.
+    Example: true
+    """
+
+    AI_FINISH_REASON = "ai.finish_reason"
+    """
+    The reason why the model stopped generating.
+    Example: "length"
+    """
+
+    AI_PIPELINE_NAME = "ai.pipeline.name"
+    """
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
+    """
+
+    AI_TEXTS = "ai.texts"
+    """
+    Raw text inputs provided to the model.
+    Example: ["What is machine learning?"]
+    """
+
+    AI_WARNINGS = "ai.warnings"
+    """
+    Warning messages generated during model execution.
+    Example: ["Token limit exceeded"]
     """
 
     DB_NAME = "db.name"
@@ -518,7 +578,7 @@ class ClientConstructor:
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         max_request_body_size="medium",  # type: str
         socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
-        keep_alive=False,  # type: bool
+        keep_alive=None,  # type: Optional[bool]
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=None,  # type: Optional[bool]
@@ -966,4 +1026,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.25.1"
+VERSION = "2.29.1"

@@ -74,11 +74,24 @@ def test_filename():
 
     assert x("bogus", "bogus") == "bogus"
 
+    assert x("bogus", "bogus.pyc") == "bogus.py"
+
     assert x("os", os.__file__) == "os.py"
+
+    assert x("foo.bar", "path/to/foo/bar.py") == "path/to/foo/bar.py"
 
     import sentry_sdk.utils
 
     assert x("sentry_sdk.utils", sentry_sdk.utils.__file__) == "sentry_sdk/utils.py"
+
+
+def test_filename_module_file_is_none():
+    class DummyModule:
+        __file__ = None
+
+    os.sys.modules["foo"] = DummyModule()
+
+    assert filename_for_module("foo.bar", "path/to/foo/bar.py") == "path/to/foo/bar.py"
 
 
 @pytest.mark.parametrize(
@@ -118,6 +131,21 @@ def test_parse_dsn_paths(given, expected_envelope):
 def test_parse_invalid_dsn(dsn):
     with pytest.raises(BadDsn):
         dsn = Dsn(dsn)
+
+
+@pytest.mark.parametrize(
+    "dsn,error_message",
+    [
+        ("foo://barbaz@sentry.io", "Unsupported scheme 'foo'"),
+        ("https://foobar@", "Missing hostname"),
+        ("https://@sentry.io", "Missing public key"),
+    ],
+)
+def test_dsn_validations(dsn, error_message):
+    with pytest.raises(BadDsn) as e:
+        dsn = Dsn(dsn)
+
+    assert str(e.value) == error_message
 
 
 @pytest.mark.parametrize(
@@ -576,6 +604,17 @@ def test_failed_base64_conversion(input):
             5,
             AnnotatedValue(
                 value="é...", metadata={"len": 8, "rem": [["!limit", "x", 2, 5]]}
+            ),
+        ],
+        [
+            "\udfff\udfff\udfff\udfff\udfff\udfff",
+            5,
+            AnnotatedValue(
+                value="\udfff\udfff...",
+                metadata={
+                    "len": 6,
+                    "rem": [["!limit", "x", 5 - 3, 5]],
+                },
             ),
         ],
     ],

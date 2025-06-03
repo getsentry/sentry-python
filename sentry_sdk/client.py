@@ -27,6 +27,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
+    SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -109,7 +110,7 @@ def _get_options(*args, **kwargs):
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
     if rv["debug"] is None:
-        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG", "False"), strict=True)
+        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG"), strict=True) or False
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -140,6 +141,11 @@ def _get_options(*args, **kwargs):
             "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
         )
         rv["socket_options"] = None
+
+    if rv["keep_alive"] is None:
+        rv["keep_alive"] = (
+            env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
+        )
 
     if rv["enable_tracing"] is not None:
         warnings.warn(
@@ -893,6 +899,13 @@ class _Client(BaseClient):
         if not logs_enabled:
             return
         isolation_scope = current_scope.get_isolation_scope()
+
+        log["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
+        log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
+
+        server_name = self.options.get("server_name")
+        if server_name is not None and SPANDATA.SERVER_ADDRESS not in log["attributes"]:
+            log["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
 
         environment = self.options.get("environment")
         if environment is not None and "sentry.environment" not in log["attributes"]:

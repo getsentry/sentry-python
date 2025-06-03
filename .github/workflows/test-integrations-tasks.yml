@@ -46,6 +46,11 @@ jobs:
           allow-prereleases: true
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -97,7 +102,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.0
+        uses: codecov/codecov-action@v5.4.3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -135,6 +140,11 @@ jobs:
           allow-prereleases: true
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -186,7 +196,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.0
+        uses: codecov/codecov-action@v5.4.3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

@@ -7,6 +7,8 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.feature_flags import add_feature_flag, FlagBuffer
+from sentry_sdk import start_span, start_transaction
+from tests.conftest import ApproxDict
 
 
 def test_featureflags_integration(sentry_init, capture_events, uninstall_integration):
@@ -27,6 +29,63 @@ def test_featureflags_integration(sentry_init, capture_events, uninstall_integra
             {"flag": "other", "result": False},
         ]
     }
+
+
+@pytest.mark.asyncio
+async def test_featureflags_integration_spans_async(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    add_feature_flag("hello", False)
+
+    try:
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
+                raise ValueError("something wrong!")
+    except ValueError as e:
+        sentry_sdk.capture_exception(e)
+
+    found = False
+    for event in events:
+        if "exception" in event.keys():
+            assert event["contexts"]["flags"] == {
+                "values": [
+                    {"flag": "hello", "result": False},
+                ]
+            }
+            found = True
+
+    assert found, "No event with exception found"
+
+
+def test_featureflags_integration_spans_sync(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    add_feature_flag("hello", False)
+
+    try:
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
+                raise ValueError("something wrong!")
+    except ValueError as e:
+        sentry_sdk.capture_exception(e)
+
+    found = False
+    for event in events:
+        if "exception" in event.keys():
+            assert event["contexts"]["flags"] == {
+                "values": [
+                    {"flag": "hello", "result": False},
+                ]
+            }
+            found = True
+
+    assert found, "No event with exception found"
 
 
 def test_featureflags_integration_threaded(
@@ -220,3 +279,40 @@ def test_flag_buffer_concurrent_access():
     # shared resource. When deepcopying we should have exclusive access to the underlying
     # memory.
     assert error_occurred is False
+
+
+def test_flag_limit(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with start_transaction(name="hi"):
+        with start_span(op="foo", name="bar"):
+            add_feature_flag("0", True)
+            add_feature_flag("1", True)
+            add_feature_flag("2", True)
+            add_feature_flag("3", True)
+            add_feature_flag("4", True)
+            add_feature_flag("5", True)
+            add_feature_flag("6", True)
+            add_feature_flag("7", True)
+            add_feature_flag("8", True)
+            add_feature_flag("9", True)
+            add_feature_flag("10", True)
+
+    (event,) = events
+    assert event["spans"][0]["data"] == ApproxDict(
+        {
+            "flag.evaluation.0": True,
+            "flag.evaluation.1": True,
+            "flag.evaluation.2": True,
+            "flag.evaluation.3": True,
+            "flag.evaluation.4": True,
+            "flag.evaluation.5": True,
+            "flag.evaluation.6": True,
+            "flag.evaluation.7": True,
+            "flag.evaluation.8": True,
+            "flag.evaluation.9": True,
+        }
+    )
+    assert "flag.evaluation.10" not in event["spans"][0]["data"]

@@ -1,5 +1,93 @@
 # Changelog
 
+## 2.29.1
+
+### Various fixes & improvements
+
+- fix(logs): send `severity_text`: `warn` instead of `warning` (#4396) by @lcian
+
+## 2.29.0
+
+### Various fixes & improvements
+
+- fix(loguru): Move integration setup from `__init__` to `setup_once` (#4399) by @sentrivana
+- feat: Allow configuring `keep_alive` via environment variable (#4366) by @szokeasaurusrex
+- fix(celery): Do not send extra check-in (#4395) by @sentrivana
+- fix(typing): Add before_send_log to Experiments (#4383) by @sentrivana
+- ci: Fix pyspark test suite (#4382) by @sentrivana
+- fix(logs): Make `sentry.message.parameters` singular as per spec (#4387) by @AbhiPrasad
+- apidocs: Remove snowballstemmer pin (#4379) by @sentrivana
+
+## 2.28.0
+
+### Various fixes & improvements
+
+- fix(logs): Forward `extra` from logger as attributes (#4374) by @AbhiPrasad
+- fix(logs): Canonicalize paths from the logger integration (#4336) by @colin-sentry
+- fix(logs): Use new transport (#4317) by @colin-sentry
+- fix: Deprecate `set_measurement()` API. (#3934) by @antonpirker
+- fix: Put feature flags on isolation scope (#4363) by @antonpirker
+- fix: Make use of `SPANDATA` consistent (#4373) by @antonpirker
+- fix: Discord link (#4371) by @sentrivana
+- tests: Pin snowballstemmer for now (#4372) by @sentrivana
+- tests: Regular tox update (#4367) by @sentrivana
+- tests: Bump test timeout for recursion stacktrace extract to 2s (#4351) by @booxter
+- tests: Fix test_stacktrace_big_recursion failure due to argv (#4346) by @booxter
+- tests: Move anthropic under toxgen (#4348) by @sentrivana
+- tests: Update tox.ini (#4347) by @sentrivana
+- chore: Update GH issue templates for Linear compatibility (#4328) by @stephanie-anderson
+- chore: Bump actions/create-github-app-token from 2.0.2 to 2.0.6 (#4358) by @dependabot
+
+## 2.27.0
+
+### Various fixes & improvements
+
+- fix: Make sure to use the default decimal context in our code (#4231) by @antonpirker
+- fix(integrations): ASGI integration not capture transactions in Websocket (#4293) by @guodong000
+- feat(typing): Make all relevant types public (#4315) by @antonpirker
+- feat(spans): Record flag evaluations as span attributes (#4280) by @cmanallen
+- test(logs): Avoid failure when running with integrations enabled (#4316) by @rominf
+- tests: Remove unused code and rerun (#4313) by @sentrivana
+- tests: Add cohere to toxgen (#4304) by @sentrivana
+- tests: Migrate fastapi to toxgen (#4302) by @sentrivana
+- tests: Add huggingface_hub to toxgen (#4299) by @sentrivana
+- tests: Add huey to toxgen (#4298) by @sentrivana
+- tests: Update tox.ini (#4297) by @sentrivana
+- tests: Move aiohttp under toxgen (#4319) by @sentrivana
+- tests: Fix version picking in toxgen (#4323) by @sentrivana
+- build(deps): bump codecov/codecov-action from 5.4.0 to 5.4.2 (#4318) by @dependabot
+
+## 2.26.1
+
+### Various fixes & improvements
+
+- fix(threading): Data leak in ThreadingIntegration between threads (#4281) by @antonpirker
+- fix(logging): Clarify separate warnings case is for Python <3.11 (#4296) by @szokeasaurusrex
+- fix(logging): Add formatted message to log events (#4292) by @szokeasaurusrex
+- fix(logging): Send raw logging parameters (#4291) by @szokeasaurusrex
+- fix: Revert "chore: Deprecate `same_process_as_parent` (#4244)" (#4290) by @sentrivana
+
+## 2.26.0
+
+### Various fixes & improvements
+
+- fix(debug): Do not consider parent loggers for debug logging (#4286) by @szokeasaurusrex
+- test(tracing): Simplify static/classmethod tracing tests (#4278) by @szokeasaurusrex
+- feat(transport): Add a timeout (#4252) by @sentrivana
+- meta: Change CODEOWNERS back to Python SDK owners (#4269) by @sentrivana
+- feat(logs): Add sdk name and version as log attributes (#4262) by @AbhiPrasad
+- feat(logs): Add server.address to logs (#4257) by @AbhiPrasad
+- chore: Deprecate `same_process_as_parent` (#4244) by @sentrivana
+- feat(logs): Add sentry.origin attribute for log handler (#4250) by @AbhiPrasad
+- feat(tests): Add optional cutoff to toxgen (#4243) by @sentrivana
+- toxgen: Retry & fail if we fail to fetch PyPI data (#4251) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 1.12.0 to 2.0.2 (#4248) by @dependabot
+- Trying to prevent the grpc setup from being flaky (#4233) by @antonpirker
+- feat(breadcrumbs): add `_meta` information for truncation of breadcrumbs (#4007) by @shellmayr
+- tests: Move django under toxgen (#4238) by @sentrivana
+- fix: Handle JSONDecodeError gracefully in StarletteRequestExtractor (#4226) by @moodix
+- fix(asyncio): Remove shutdown handler (#4237) by @sentrivana
+
 ## 2.25.1
 
 ### Various fixes & improvements

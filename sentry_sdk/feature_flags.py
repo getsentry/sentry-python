@@ -64,5 +64,9 @@ def add_feature_flag(flag, result):
     Records a flag and its value to be sent on subsequent error events.
     We recommend you do this on flag evaluations. Flags are buffered per Sentry scope.
     """
-    flags = sentry_sdk.get_current_scope().flags
+    flags = sentry_sdk.get_isolation_scope().flags
     flags.set(flag, result)
+
+    span = sentry_sdk.get_current_span()
+    if span:
+        span.set_flag(f"flag.evaluation.{flag}", result)

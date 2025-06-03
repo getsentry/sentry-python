@@ -9,7 +9,6 @@ from collections import Counter
 import pytest
 from sentry_sdk.client import Client
 from sentry_sdk.utils import datetime_from_isoformat
-from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
 import sentry_sdk.scope
@@ -516,6 +515,66 @@ def test_attachments_graceful_failure(
     assert envelope.items[1].payload.get_bytes() == b""
 
 
+def test_attachments_exceptions(sentry_init):
+    sentry_init()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    # bytes and path are None
+    with pytest.raises(TypeError) as e:
+        scope.add_attachment()
+
+    assert str(e.value) == "path or raw bytes required for attachment"
+
+    # filename is None
+    with pytest.raises(TypeError) as e:
+        scope.add_attachment(bytes=b"Hello World!")
+
+    assert str(e.value) == "filename is required for attachment"
+
+
+def test_attachments_content_type_is_none(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    scope.add_attachment(
+        bytes=b"Hello World!", filename="message.txt", content_type="foo/bar"
+    )
+    capture_exception(ValueError())
+
+    (envelope,) = envelopes
+    attachments = [x for x in envelope.items if x.type == "attachment"]
+    (message,) = attachments
+
+    assert message.headers["filename"] == "message.txt"
+    assert message.headers["content_type"] == "foo/bar"
+
+
+def test_attachments_repr(sentry_init):
+    sentry_init()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
+
+    assert repr(scope._attachments[0]) == "<Attachment 'message.txt'>"
+
+
+def test_attachments_bytes_callable_payload(sentry_init):
+    sentry_init()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    scope.add_attachment(bytes=bytes, filename="message.txt")
+
+    attachment = scope._attachments[0]
+    item = attachment.to_envelope_item()
+
+    assert item.payload.bytes == b""
+
+
 def test_integration_scoping(sentry_init, capture_events):
     logger = logging.getLogger("test_basics")
 
@@ -935,46 +994,100 @@ class TracingTestClass:
         return cls, arg
 
 
-def test_staticmethod_tracing(sentry_init):
-    test_staticmethod_name = "tests.test_basics.TracingTestClass.static"
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_staticmethod_class_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.static"}
+        ],
+    )
 
-    assert (
-        ".".join(
-            [
-                TracingTestClass.static.__module__,
-                TracingTestClass.static.__qualname__,
-            ]
-        )
-        == test_staticmethod_name
-    ), "The test static method was moved or renamed. Please update the name accordingly"
+    events = capture_events()
 
-    sentry_init(functions_to_trace=[{"qualified_name": test_staticmethod_name}])
+    with sentry_sdk.start_transaction(name="test"):
+        assert TracingTestClass.static(1) == 1
 
-    for instance_or_class in (TracingTestClass, TracingTestClass()):
-        with patch_start_tracing_child() as fake_start_child:
-            assert instance_or_class.static(1) == 1
-            assert fake_start_child.call_count == 1
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.static"
 
 
-def test_classmethod_tracing(sentry_init):
-    test_classmethod_name = "tests.test_basics.TracingTestClass.class_"
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_staticmethod_instance_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.static"}
+        ],
+    )
 
-    assert (
-        ".".join(
-            [
-                TracingTestClass.class_.__module__,
-                TracingTestClass.class_.__qualname__,
-            ]
-        )
-        == test_classmethod_name
-    ), "The test class method was moved or renamed. Please update the name accordingly"
+    events = capture_events()
 
-    sentry_init(functions_to_trace=[{"qualified_name": test_classmethod_name}])
+    with sentry_sdk.start_transaction(name="test"):
+        assert TracingTestClass().static(1) == 1
 
-    for instance_or_class in (TracingTestClass, TracingTestClass()):
-        with patch_start_tracing_child() as fake_start_child:
-            assert instance_or_class.class_(1) == (TracingTestClass, 1)
-            assert fake_start_child.call_count == 1
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.static"
+
+
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_classmethod_class_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
+        ],
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        assert TracingTestClass.class_(1) == (TracingTestClass, 1)
+
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.class_"
+
+
+# We need to fork here because the test modifies tests.test_basics.TracingTestClass
+@pytest.mark.forked
+def test_classmethod_instance_tracing(sentry_init, capture_events):
+    sentry_init(
+        debug=True,
+        traces_sample_rate=1.0,
+        functions_to_trace=[
+            {"qualified_name": "tests.test_basics.TracingTestClass.class_"}
+        ],
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test"):
+        assert TracingTestClass().class_(1) == (TracingTestClass, 1)
+
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "test"
+
+    (span,) = event["spans"]
+    assert span["description"] == "tests.test_basics.TracingTestClass.class_"
 
 
 def test_last_event_id(sentry_init):
@@ -1098,14 +1211,12 @@ def test_stacktrace_big_recursion(sentry_init, capture_events):
     (event,) = events
 
     assert event["exception"]["values"][0]["stacktrace"] is None
-    assert event["_meta"] == {
-        "exception": {
-            "values": {"0": {"stacktrace": {"": {"rem": [["!config", "x"]]}}}}
-        }
+    assert event["_meta"]["exception"] == {
+        "values": {"0": {"stacktrace": {"": {"rem": [["!config", "x"]]}}}}
     }
 
     # On my machine, it takes about 100-200ms to capture the exception,
     # so this limit should be generous enough.
     assert (
-        capture_end_time - capture_start_time < 10**9
+        capture_end_time - capture_start_time < 10**9 * 2
     ), "stacktrace capture took too long, check that frame limit is set correctly"

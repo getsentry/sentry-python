@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -278,6 +279,8 @@ class Span:
         "scope",
         "origin",
         "name",
+        "_flags",
+        "_flags_capacity",
     )
 
     def __init__(
@@ -313,6 +316,8 @@ class Span:
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
+        self._flags = {}  # type: Dict[str, bool]
+        self._flags_capacity = 10
 
         if hub is not None:
             warnings.warn(
@@ -597,12 +602,27 @@ class Span:
         # type: (str, Any) -> None
         self._data[key] = value
 
+    def set_flag(self, flag, result):
+        # type: (str, bool) -> None
+        if len(self._flags) < self._flags_capacity:
+            self._flags[flag] = result
+
     def set_status(self, value):
         # type: (str) -> None
         self.status = value
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
+        """
+        .. deprecated:: 2.28.0
+            This function is deprecated and will be removed in the next major release.
+        """
+
+        warnings.warn(
+            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_thread(self, thread_id, thread_name):
@@ -700,7 +720,9 @@ class Span:
         if tags:
             rv["tags"] = tags
 
-        data = self._data
+        data = {}
+        data.update(self._flags)
+        data.update(self._data)
         if data:
             rv["data"] = data
 
@@ -1049,6 +1071,16 @@ class Transaction(Span):
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
+        """
+        .. deprecated:: 2.28.0
+            This function is deprecated and will be removed in the next major release.
+        """
+
+        warnings.warn(
+            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key, value):
@@ -1187,10 +1219,8 @@ class Transaction(Span):
             self.sampled = False
             return
 
-        # Now we roll the dice. self._sample_rand is inclusive of 0, but not of 1,
-        # so strict < is safe here. In case sample_rate is a boolean, cast it
-        # to a float (True becomes 1.0 and False becomes 0.0)
-        self.sampled = self._sample_rand < self.sample_rate
+        # Now we roll the dice.
+        self.sampled = self._sample_rand < Decimal.from_float(self.sample_rate)
 
         if self.sampled:
             logger.debug(
