@@ -87,10 +87,23 @@ class LoguruIntegration(Integration):
             )
 
         if LoguruIntegration.sentry_logs_level is not None:
-            logger.add(SentryLogsHandler(level=LoguruIntegration.sentry_logs_level))
+            logger.add(
+                LoguruSentryLogsHandler(level=LoguruIntegration.sentry_logs_level),
+                level=LoguruIntegration.sentry_logs_level,
+                format=LoguruIntegration.event_format,
+            )
 
 
 class _LoguruBaseHandler(_BaseHandler):
+    def __init__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        if kwargs.get("level"):
+            kwargs["level"] = SENTRY_LEVEL_FROM_LOGURU_LEVEL.get(
+                kwargs.get("level", ""), DEFAULT_LEVEL
+            )
+
+        super().__init__(*args, **kwargs)
+
     def _logging_to_event_level(self, record):
         # type: (LogRecord) -> str
         try:
@@ -103,25 +116,16 @@ class _LoguruBaseHandler(_BaseHandler):
 
 class LoguruEventHandler(_LoguruBaseHandler, EventHandler):
     """Modified version of :class:`sentry_sdk.integrations.logging.EventHandler` to use loguru's level names."""
-
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        if kwargs.get("level"):
-            kwargs["level"] = SENTRY_LEVEL_FROM_LOGURU_LEVEL.get(
-                kwargs.get("level", ""), DEFAULT_LEVEL
-            )
-
-        super().__init__(*args, **kwargs)
+    pass
 
 
 class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
     """Modified version of :class:`sentry_sdk.integrations.logging.BreadcrumbHandler` to use loguru's level names."""
+    pass
 
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        if kwargs.get("level"):
-            kwargs["level"] = SENTRY_LEVEL_FROM_LOGURU_LEVEL.get(
-                kwargs.get("level", ""), DEFAULT_LEVEL
-            )
 
-        super().__init__(*args, **kwargs)
+class LoguruSentryLogsHandler(_LoguruBaseHandler, SentryLogsHandler):
+    """Modified version of :class:`sentry_sdk.integrations.logging.SentryLogsHandler` to use loguru's level names."""
+    def _capture_log_from_record(self, client, record):
+        # type: (BaseClient, LogRecord)
+        return super()._capture_log_from_record(client, record)

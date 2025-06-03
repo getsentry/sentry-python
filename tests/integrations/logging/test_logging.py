@@ -3,7 +3,10 @@ import warnings
 
 import pytest
 
+from sentry_sdk import get_client
+from sentry_sdk.consts import VERSION
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
+from tests.test_logs import envelopes_to_logs
 
 other_logger = logging.getLogger("testfoo")
 logger = logging.getLogger(__name__)
@@ -283,3 +286,200 @@ def test_logging_dictionary_args(sentry_init, capture_events):
         == "the value of foo is bar, and the value of bar is baz"
     )
     assert event["logentry"]["params"] == {"foo": "bar", "bar": "baz"}
+
+
+@minimum_python_37
+def test_sentry_logs_warning(sentry_init, capture_envelopes):
+    """
+    The python logger module should create 'warn' sentry logs if the flag is on.
+    """
+    sentry_init(_experiments={"enable_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("this is %s a template %s", "1", "2")
+
+    get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+    attrs = logs[0]["attributes"]
+    assert attrs["sentry.message.template"] == "this is %s a template %s"
+    assert "code.file.path" in attrs
+    assert "code.line.number" in attrs
+    assert attrs["logger.name"] == "test-logger"
+    assert attrs["sentry.environment"] == "production"
+    assert attrs["sentry.message.parameter.0"] == "1"
+    assert attrs["sentry.message.parameter.1"] == "2"
+    assert attrs["sentry.origin"] == "auto.logger.log"
+    assert logs[0]["severity_number"] == 13
+    assert logs[0]["severity_text"] == "warn"
+
+
+@minimum_python_37
+def test_sentry_logs_debug(sentry_init, capture_envelopes):
+    """
+    The python logger module should not create 'debug' sentry logs if the flag is on by default
+    """
+    sentry_init(_experiments={"enable_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.debug("this is %s a template %s", "1", "2")
+    get_client().flush()
+
+    assert len(envelopes) == 0
+
+
+@minimum_python_37
+def test_no_log_infinite_loop(sentry_init, capture_envelopes):
+    """
+    If 'debug' mode is true, and you set a low log level in the logging integration, there should be no infinite loops.
+    """
+    sentry_init(
+        _experiments={"enable_logs": True},
+        integrations=[LoggingIntegration(sentry_logs_level=logging.DEBUG)],
+        debug=True,
+    )
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.debug("this is %s a template %s", "1", "2")
+    get_client().flush()
+
+    assert len(envelopes) == 1
+
+
+@minimum_python_37
+def test_logging_errors(sentry_init, capture_envelopes):
+    """
+    The python logger module should be able to log errors without erroring
+    """
+    sentry_init(_experiments={"enable_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.error(Exception("test exc 1"))
+    python_logger.error("error is %s", Exception("test exc 2"))
+    get_client().flush()
+
+    error_event_1 = envelopes[0].items[0].payload.json
+    assert error_event_1["level"] == "error"
+    error_event_2 = envelopes[1].items[0].payload.json
+    assert error_event_2["level"] == "error"
+
+    logs = envelopes_to_logs(envelopes)
+    assert logs[0]["severity_text"] == "error"
+    assert "sentry.message.template" not in logs[0]["attributes"]
+    assert "sentry.message.parameter.0" not in logs[0]["attributes"]
+    assert "code.line.number" in logs[0]["attributes"]
+
+    assert logs[1]["severity_text"] == "error"
+    assert logs[1]["attributes"]["sentry.message.template"] == "error is %s"
+    assert (
+        logs[1]["attributes"]["sentry.message.parameter.0"] == "Exception('test exc 2')"
+    )
+    assert "code.line.number" in logs[1]["attributes"]
+
+    assert len(logs) == 2
+
+
+def test_log_strips_project_root(sentry_init, capture_envelopes):
+    """
+    The python logger should strip project roots from the log record path
+    """
+    sentry_init(
+        _experiments={"enable_logs": True},
+        project_root="/custom/test",
+    )
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.handle(
+        logging.LogRecord(
+            name="test-logger",
+            level=logging.WARN,
+            pathname="/custom/test/blah/path.py",
+            lineno=123,
+            msg="This is a test log with a custom pathname",
+            args=(),
+            exc_info=None,
+        )
+    )
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 1
+    attrs = logs[0]["attributes"]
+    assert attrs["code.file.path"] == "blah/path.py"
+
+
+def test_logger_with_all_attributes(sentry_init, capture_envelopes):
+    """
+    The python logger should be able to log all attributes, including extra data.
+    """
+    sentry_init(_experiments={"enable_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning(
+        "log #%d",
+        1,
+        extra={"foo": "bar", "numeric": 42, "more_complex": {"nested": "data"}},
+    )
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    attributes = logs[0]["attributes"]
+
+    assert "process.pid" in attributes
+    assert isinstance(attributes["process.pid"], int)
+    del attributes["process.pid"]
+
+    assert "sentry.release" in attributes
+    assert isinstance(attributes["sentry.release"], str)
+    del attributes["sentry.release"]
+
+    assert "server.address" in attributes
+    assert isinstance(attributes["server.address"], str)
+    del attributes["server.address"]
+
+    assert "thread.id" in attributes
+    assert isinstance(attributes["thread.id"], int)
+    del attributes["thread.id"]
+
+    assert "code.file.path" in attributes
+    assert isinstance(attributes["code.file.path"], str)
+    del attributes["code.file.path"]
+
+    assert "code.function.name" in attributes
+    assert isinstance(attributes["code.function.name"], str)
+    del attributes["code.function.name"]
+
+    assert "code.line.number" in attributes
+    assert isinstance(attributes["code.line.number"], int)
+    del attributes["code.line.number"]
+
+    assert "process.executable.name" in attributes
+    assert isinstance(attributes["process.executable.name"], str)
+    del attributes["process.executable.name"]
+
+    assert "thread.name" in attributes
+    assert isinstance(attributes["thread.name"], str)
+    del attributes["thread.name"]
+
+    assert attributes.pop("sentry.sdk.name").startswith("sentry.python")
+
+    # Assert on the remaining non-dynamic attributes.
+    assert attributes == {
+        "foo": "bar",
+        "numeric": 42,
+        "more_complex": "{'nested': 'data'}",
+        "logger.name": "test-logger",
+        "sentry.origin": "auto.logger.log",
+        "sentry.message.template": "log #%d",
+        "sentry.message.parameter.0": 1,
+        "sentry.environment": "production",
+        "sentry.sdk.version": VERSION,
+        "sentry.severity_number": 13,
+        "sentry.severity_text": "warn",
+    }

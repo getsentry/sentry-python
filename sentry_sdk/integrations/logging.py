@@ -364,10 +364,7 @@ class SentryLogsHandler(_BaseHandler):
                 for i, arg in enumerate(record.args):
                     attrs[f"sentry.message.parameter.{i}"] = (
                         arg
-                        if isinstance(arg, str)
-                        or isinstance(arg, float)
-                        or isinstance(arg, int)
-                        or isinstance(arg, bool)
+                        if isinstance(arg, (str, float, int, bool))
                         else safe_repr(arg)
                     )
         if record.lineno:
