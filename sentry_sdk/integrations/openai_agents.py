@@ -41,7 +41,6 @@ class SentryRunHooks(RunHooks):
         )
         span = sentry_sdk.start_span(op="gen_ai.agent_start", description=agent.name)
         span.__enter__()
-        self.agent_span = span
 
     async def on_agent_end(
         self, context: RunContextWrapper, agent: Agent, output: Any
@@ -50,9 +49,9 @@ class SentryRunHooks(RunHooks):
         print(
             f"### {self.event_counter}: Agent '{agent.name}' ended with output {output}. Usage: {self._usage_to_str(context.usage)}"
         )
-        if self.agent_span:
-            self.agent_span.__exit__(None, None, None)
-            self.agent_span = None
+        current_span = sentry_sdk.get_current_span()
+        if current_span:
+            current_span.__exit__(None, None, None)
 
     async def on_tool_start(
         self, context: RunContextWrapper, agent: Agent, tool: Tool
@@ -63,7 +62,6 @@ class SentryRunHooks(RunHooks):
         )
         span = sentry_sdk.start_span(op="gen_ai.tool_start", description=tool.name)
         span.__enter__()
-        self.tool_span = span
 
     async def on_tool_end(
         self, context: RunContextWrapper, agent: Agent, tool: Tool, result: str
@@ -72,9 +70,9 @@ class SentryRunHooks(RunHooks):
         print(
             f"### {self.event_counter}: Tool {tool.name} ended with result {result}. Usage: {self._usage_to_str(context.usage)}"
         )
-        if self.tool_span:
-            self.tool_span.__exit__(None, None, None)
-            self.tool_span = None
+        current_span = sentry_sdk.get_current_span()
+        if current_span:
+            current_span.__exit__(None, None, None)
 
     async def on_handoff(
         self, context: RunContextWrapper, from_agent: Agent, to_agent: Agent
@@ -83,14 +81,13 @@ class SentryRunHooks(RunHooks):
         print(
             f"### {self.event_counter}: Handoff from '{from_agent.name}' to '{to_agent.name}'. Usage: {self._usage_to_str(context.usage)}"
         )
-        if self.agent_span:
-            with self.agent_span.start_child(
+        current_span = sentry_sdk.get_current_span()
+        if current_span:
+            with current_span.start_child(
                 op="gen_ai.handoff", description=f"{from_agent.name} > {to_agent.name}"
             ):
                 pass
-
-            self.agent_span.__exit__(None, None, None)
-            self.agent_span = None
+            current_span.__exit__(None, None, None)
 
 
 class OpenAIAgentsIntegration(Integration):
