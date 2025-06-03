@@ -91,7 +91,7 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
         # type: (Exception) -> None
         """Avoid catching exceptions from request handlers.
 
-        Those exceptions are already han in Litestar.after_exception handler.
+        Those exceptions are already handled in Litestar.after_exception handler.
         We still catch exceptions from application lifespan handlers.
         """
         pass
