@@ -460,3 +460,31 @@ def test_configurable_status_codes_middleware(
     client.get("/error")
 
     assert len(events) == int(expected_error)
+
+
+def test_catch_non_http_exceptions_in_middleware(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(integrations=[LitestarIntegration()])
+
+    events = capture_events()
+
+    def create_raising_middleware(app):
+        async def raising_middleware(scope, receive, send):
+            raise RuntimeError("Too Hot")
+
+        return raising_middleware
+
+    @get("/error")
+    async def error() -> None: ...
+
+    app = Litestar([error], middleware=[create_raising_middleware])
+    client = TestClient(app)
+
+    try:
+        client.get("/error")
+    except RuntimeError:
+        pass
+
+    assert len(events) == 1
