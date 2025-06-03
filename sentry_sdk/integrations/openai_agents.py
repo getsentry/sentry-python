@@ -37,12 +37,18 @@ def _capture_exception(exc):
 class SentryRunHooks(RunHooks):
     def _usage_to_str(self, usage):
         # type: (Usage) -> str
-        return f"{usage.requests} requests, {usage.input_tokens} input tokens, {usage.output_tokens} output tokens, {usage.total_tokens} total tokens"
+        return (
+            f"{usage.requests} requests, "
+            f"{usage.input_tokens} input tokens, "
+            f"{usage.output_tokens} output tokens, "
+            f"{usage.total_tokens} total tokens"
+        )
 
     async def on_agent_start(self, context, agent):
         # type: (RunContextWrapper, Agent) -> None
         print(
-            f"### Agent {agent.name} started. Usage: {self._usage_to_str(context.usage)}"
+            f"### Agent {agent.name} started. "
+            f"Usage: {self._usage_to_str(context.usage)}"
         )
         span = sentry_sdk.start_span(op="gen_ai.agent_start", description=agent.name)
         span.__enter__()
@@ -50,7 +56,8 @@ class SentryRunHooks(RunHooks):
     async def on_agent_end(self, context, agent, output):
         # type: (RunContextWrapper, Agent, Any) -> None
         print(
-            f"### Agent '{agent.name}' ended with output {output}. Usage: {self._usage_to_str(context.usage)}"
+            f"### Agent '{agent.name}' ended with output {output}. "
+            f"Usage: {self._usage_to_str(context.usage)}"
         )
         current_span = sentry_sdk.get_current_span()
         if current_span:
@@ -59,7 +66,8 @@ class SentryRunHooks(RunHooks):
     async def on_tool_start(self, context, agent, tool):
         # type: (RunContextWrapper, Agent, Tool) -> None
         print(
-            f"### Tool {tool.name} started. Usage: {self._usage_to_str(context.usage)}"
+            f"### Tool {tool.name} started. "
+            f"Usage: {self._usage_to_str(context.usage)}"
         )
         span = sentry_sdk.start_span(op="gen_ai.tool_start", description=tool.name)
         span.__enter__()
@@ -67,7 +75,8 @@ class SentryRunHooks(RunHooks):
     async def on_tool_end(self, context, agent, tool, result):
         # type: (RunContextWrapper, Agent, Tool, str) -> None
         print(
-            f"### Tool {tool.name} ended with result {result}. Usage: {self._usage_to_str(context.usage)}"
+            f"### Tool {tool.name} ended with result {result}. "
+            f"Usage: {self._usage_to_str(context.usage)}"
         )
         current_span = sentry_sdk.get_current_span()
         if current_span:
@@ -76,7 +85,8 @@ class SentryRunHooks(RunHooks):
     async def on_handoff(self, context, from_agent, to_agent):
         # type: (RunContextWrapper, Agent, Agent) -> None
         print(
-            f"### Handoff from '{from_agent.name}' to '{to_agent.name}'. Usage: {self._usage_to_str(context.usage)}"
+            f"### Handoff from '{from_agent.name}' to '{to_agent.name}'. "
+            f"Usage: {self._usage_to_str(context.usage)}"
         )
         current_span = sentry_sdk.get_current_span()
         if current_span:
@@ -109,8 +119,9 @@ def _create_hook_wrapper(original_hook, sentry_hook):
 def _wrap_hooks(hooks):
     # type: (RunHooks) -> RunHooks
     """
-    Our integration uses RunHooks to create spans. This function will either enable our SentryRunHooks
-    or if the users has given custom RunHooks wrap them so the Sentry hooks and the users hooks are both called
+    Our integration uses RunHooks to create spans. This function will either
+    enable our SentryRunHooks or if the users has given custom RunHooks wrap
+    them so the Sentry hooks and the users hooks are both called
     """
     sentry_hooks = SentryRunHooks()
 
