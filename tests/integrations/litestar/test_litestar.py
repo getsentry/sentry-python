@@ -488,3 +488,6 @@ def test_catch_non_http_exceptions_in_middleware(
         pass
 
     assert len(events) == 1
+    event_exception = events[0]["exception"]["values"][0]
+    assert event_exception["type"] == "RuntimeError"
+    assert event_exception["value"] == "Too Hot"
