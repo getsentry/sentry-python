@@ -163,6 +163,10 @@ TEST_SUITE_CONFIG = {
     "spark": {
         "package": "pyspark",
         "python": ">=3.8",
+        # XXX: spark 4.0.0 needs a different java version installed
+        # need to find a way to activate different java versions for <4.0
+        # and >=4.0
+        "include": "!=4.0.0",
     },
     "sqlalchemy": {
         "package": "sqlalchemy",
