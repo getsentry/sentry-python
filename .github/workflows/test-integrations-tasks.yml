@@ -83,6 +83,8 @@ jobs:
       - name: Test spark latest
         run: |
           set -x # print commands that are executed
+          echo "java home $JAVA_HOME"
+          java --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-spark-latest"
       - name: Generate coverage XML (Python 3.6)
         if: ${{ !cancelled() && matrix.python-version == '3.6' }}
