@@ -748,32 +748,36 @@ def _hello_world(word):
 
 
 def test_functions_to_trace(sentry_init, capture_events):
-    functions_to_trace = [
-        {"qualified_name": "tests.test_basics._hello_world"},
-        {"qualified_name": "time.sleep"},
-    ]
+    original_sleep = time.sleep
+    try:
+        functions_to_trace = [
+            {"qualified_name": "tests.test_basics._hello_world"},
+            {"qualified_name": "time.sleep"},
+        ]
 
-    sentry_init(
-        traces_sample_rate=1.0,
-        functions_to_trace=functions_to_trace,
-    )
+        sentry_init(
+            traces_sample_rate=1.0,
+            functions_to_trace=functions_to_trace,
+        )
 
-    events = capture_events()
+        events = capture_events()
 
-    with start_span(name="something"):
-        time.sleep(0)
+        with start_span(name="something"):
+            time.sleep(0)
 
-        for word in ["World", "You"]:
-            _hello_world(word)
+            for word in ["World", "You"]:
+                _hello_world(word)
 
-    assert len(events) == 1
+        assert len(events) == 1
 
-    (event,) = events
+        (event,) = events
 
-    assert len(event["spans"]) == 3
-    assert event["spans"][0]["description"] == "time.sleep"
-    assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
-    assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
+        assert len(event["spans"]) == 3
+        assert event["spans"][0]["description"] == "time.sleep"
+        assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
+        assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
+    finally:
+        time.sleep = original_sleep
 
 
 class WorldGreeter:

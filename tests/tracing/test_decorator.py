@@ -3,10 +3,9 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk.tracing import trace
-from sentry_sdk.tracing_utils import start_child_span_decorator
 from sentry_sdk.utils import logger
-from tests.conftest import patch_start_tracing_child
 
 
 def my_example_function():
@@ -17,68 +16,80 @@ async def my_async_example_function():
     return "return_of_async_function"
 
 
-@pytest.mark.forked
-def test_trace_decorator():
-    with patch_start_tracing_child() as fake_start_child:
+def test_trace_decorator(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with sentry_sdk.start_span(name="test"):
         result = my_example_function()
-        fake_start_child.assert_not_called()
         assert result == "return_of_sync_function"
 
-        result2 = start_child_span_decorator(my_example_function)()
-        fake_start_child.assert_called_once_with(
-            op="function", name="test_decorator.my_example_function"
-        )
+        result2 = trace(my_example_function)()
         assert result2 == "return_of_sync_function"
 
-
-@pytest.mark.forked
-def test_trace_decorator_no_trx():
-    with patch_start_tracing_child(fake_transaction_is_none=True):
-        with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
-            result = my_example_function()
-            fake_debug.assert_not_called()
-            assert result == "return_of_sync_function"
-
-            result2 = start_child_span_decorator(my_example_function)()
-            fake_debug.assert_called_once_with(
-                "Cannot create a child span for %s. "
-                "Please start a Sentry transaction before calling this function.",
-                "test_decorator.my_example_function",
-            )
-            assert result2 == "return_of_sync_function"
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["op"] == "function"
+    assert span["description"] == "test_decorator.my_example_function"
 
 
-@pytest.mark.forked
+def test_trace_decorator_no_trx(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
+        result = my_example_function()
+        assert result == "return_of_sync_function"
+        fake_debug.assert_not_called()
+
+        result2 = trace(my_example_function)()
+        assert result2 == "return_of_sync_function"
+        fake_debug.assert_called_once_with(
+            "Cannot create a child span for %s. "
+            "Please start a Sentry transaction before calling this function.",
+            "test_decorator.my_example_function",
+        )
+
+    assert len(events) == 0
+
+
 @pytest.mark.asyncio
-async def test_trace_decorator_async():
-    with patch_start_tracing_child() as fake_start_child:
+async def test_trace_decorator_async(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with sentry_sdk.start_span(name="test"):
         result = await my_async_example_function()
-        fake_start_child.assert_not_called()
         assert result == "return_of_async_function"
 
-        result2 = await start_child_span_decorator(my_async_example_function)()
-        fake_start_child.assert_called_once_with(
-            op="function",
-            name="test_decorator.my_async_example_function",
+        result2 = await trace(my_async_example_function)()
+        assert result2 == "return_of_async_function"
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["op"] == "function"
+    assert span["description"] == "test_decorator.my_async_example_function"
+
+
+@pytest.mark.asyncio
+async def test_trace_decorator_async_no_trx(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
+        result = await my_async_example_function()
+        fake_debug.assert_not_called()
+        assert result == "return_of_async_function"
+
+        result2 = await trace(my_async_example_function)()
+        fake_debug.assert_called_once_with(
+            "Cannot create a child span for %s. "
+            "Please start a Sentry transaction before calling this function.",
+            "test_decorator.my_async_example_function",
         )
         assert result2 == "return_of_async_function"
 
-
-@pytest.mark.asyncio
-async def test_trace_decorator_async_no_trx():
-    with patch_start_tracing_child(fake_transaction_is_none=True):
-        with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
-            result = await my_async_example_function()
-            fake_debug.assert_not_called()
-            assert result == "return_of_async_function"
-
-            result2 = await start_child_span_decorator(my_async_example_function)()
-            fake_debug.assert_called_once_with(
-                "Cannot create a child span for %s. "
-                "Please start a Sentry transaction before calling this function.",
-                "test_decorator.my_async_example_function",
-            )
-            assert result2 == "return_of_async_function"
+    assert len(events) == 0
 
 
 def test_functions_to_trace_signature_unchanged_sync(sentry_init):
