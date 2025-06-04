@@ -152,6 +152,7 @@ deps =
     # for justification of the upper bound on pytest
     py3.7-gevent: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
+    gevent: pytest-asyncio
 
     # === Integrations ===
 
@@ -332,6 +333,7 @@ setenv =
 
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
     py3.12-django: PIP_CONSTRAINT=constraints.txt
+    spark-v{3.0.3,3.5.6}: JAVA_HOME=/usr/lib/jvm/temurin-11-jdk-amd64
 
     common: TESTPATH=tests
     gevent: TESTPATH=tests

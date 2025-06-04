@@ -41,6 +41,7 @@
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
+
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
         uses: getsentry/action-clickhouse-in-ci@v1.6
@@ -49,6 +50,14 @@
       {% if needs_redis %}
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
+      {% endif %}
+
+      {% if needs_java %}
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
       {% endif %}
 
       - name: Setup Test Env

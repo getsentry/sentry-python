@@ -29,6 +29,7 @@ relay
 pip-wheel-metadata
 .mypy_cache
 .vscode/
+toxgen.venv
 
 # for running AWS Lambda tests using AWS SAM
 sam.template.yaml

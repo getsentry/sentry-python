@@ -39,6 +39,11 @@ jobs:
           allow-prereleases: true
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -115,6 +120,11 @@ jobs:
           allow-prereleases: true
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
