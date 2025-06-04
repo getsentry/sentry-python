@@ -132,6 +132,10 @@ def _set_agent_data(agent):
     'tool_use_behavior': 'run_llm_again',
     'tools': []}
     """
+    span.set_data(
+        "gen_ai.system", "openai"
+    )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
+
     span.set_data("gen_ai.agent.name", agent.name)
 
     if agent.model_settings.max_tokens:
