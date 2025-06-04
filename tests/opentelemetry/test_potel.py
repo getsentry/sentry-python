@@ -11,10 +11,7 @@ tracer = trace.get_tracer(__name__)
 
 @pytest.fixture(autouse=True)
 def sentry_init_potel(sentry_init):
-    sentry_init(
-        traces_sample_rate=1.0,
-        _experiments={"otel_powered_performance": True},
-    )
+    sentry_init(traces_sample_rate=1.0)
 
 
 def test_root_span_transaction_payload_started_with_otel_only(capture_envelopes):

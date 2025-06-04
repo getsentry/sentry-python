@@ -15,7 +15,6 @@ from opentelemetry.trace.status import Status, StatusCode
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.version import __version__ as otel_version
 
-import sentry_sdk
 from sentry_sdk.consts import (
     DEFAULT_SPAN_NAME,
     DEFAULT_SPAN_ORIGIN,
@@ -279,10 +278,6 @@ class Span:
         ctx = otel_trace.set_span_in_context(self._otel_span)
         # set as the implicit current context
         self._ctx_token = context.attach(ctx)
-
-        # get the new scope that was forked on context.attach
-        self.scope = sentry_sdk.get_current_scope()
-        self.scope.span = self
 
         return self
 
