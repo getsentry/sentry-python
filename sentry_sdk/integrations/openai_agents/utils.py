@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
+    from agents import Usage
 
 try:
     import agents
@@ -27,6 +28,16 @@ def _capture_exception(exc):
         mechanism={"type": "openai_agents", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
+
+
+def _usage_to_str(usage):
+    # type: (Usage) -> str
+    return (
+        f"{usage.requests} requests, "
+        f"{usage.input_tokens} input tokens, "
+        f"{usage.output_tokens} output tokens, "
+        f"{usage.total_tokens} total tokens"
+    )
 
 
 def _get_start_span_function():
