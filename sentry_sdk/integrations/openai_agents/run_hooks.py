@@ -3,6 +3,9 @@ from sentry_sdk.integrations import DidNotEnable
 
 from typing import TYPE_CHECKING
 
+from .utils import _set_agent_data
+
+
 if TYPE_CHECKING:
     from typing import Any
 
@@ -39,6 +42,7 @@ class SentryRunHooks(RunHooks):
             op="gen_ai.invoke_agent", name=f"invoke_agent {agent.name}"
         )
         span.__enter__()
+        _set_agent_data(agent)
 
     async def on_agent_end(self, context, agent, output):
         # type: (RunContextWrapper, Agent, Any) -> None
@@ -60,6 +64,7 @@ class SentryRunHooks(RunHooks):
             op="gen_ai.execute_tool", name=f"execute_tool {tool.name}"
         )
         span.__enter__()
+        _set_agent_data(agent)
 
     async def on_tool_end(self, context, agent, tool, result):
         # type: (RunContextWrapper, Agent, Tool, str) -> None
