@@ -50,7 +50,9 @@ class SentryRunHooks(RunHooks):
             f"### Agent {agent.name} started. "
             f"Usage: {self._usage_to_str(context.usage)}"
         )
-        span = sentry_sdk.start_span(op="gen_ai.agent_start", description=agent.name)
+        span = sentry_sdk.start_span(
+            op="gen_ai.invoke_agent", name=f"invoke_agent {agent.name}"
+        )
         span.__enter__()
 
     async def on_agent_end(self, context, agent, output):
@@ -69,7 +71,9 @@ class SentryRunHooks(RunHooks):
             f"### Tool {tool.name} started. "
             f"Usage: {self._usage_to_str(context.usage)}"
         )
-        span = sentry_sdk.start_span(op="gen_ai.tool_start", description=tool.name)
+        span = sentry_sdk.start_span(
+            op="gen_ai.execute_tool", name=f"execute_tool {tool.name}"
+        )
         span.__enter__()
 
     async def on_tool_end(self, context, agent, tool, result):
@@ -91,13 +95,14 @@ class SentryRunHooks(RunHooks):
         current_span = sentry_sdk.get_current_span()
         if current_span:
             with current_span.start_child(
-                op="gen_ai.handoff", description=f"{from_agent.name} > {to_agent.name}"
+                op="gen_ai.handoff",
+                name=f"handoff from {from_agent.name} to {to_agent.name}",
             ):
                 pass
             current_span.__exit__(None, None, None)
 
 
-def _get_span_function():
+def _get_start_span_function():
     # type: () -> Callable
     current_span = sentry_sdk.get_current_span()
     is_transaction = (
@@ -161,7 +166,7 @@ def _create_run_wrapper(original_func):
     async def async_wrapper(cls, *args, **kwargs):
         # type: (agents.Runner, *Any, **Any) -> Any
         agent = args[0]
-        with _get_span_function()(name=agent.name):
+        with _get_start_span_function()(name=f"{agent.name} workflow"):
             kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
             result = await original_func(*args, **kwargs)
             return result
@@ -171,7 +176,7 @@ def _create_run_wrapper(original_func):
     def sync_wrapper(cls, *args, **kwargs):
         # type: (agents.Runner, *Any, **Any) -> Any
         agent = args[0]
-        with _get_span_function()(name=agent.name):
+        with _get_start_span_function()(name=f"{agent.name} workflow"):
             kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
             result = original_func(*args, **kwargs)
             return result
