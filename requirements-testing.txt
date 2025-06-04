@@ -14,5 +14,6 @@ pysocks
 socksio
 httpcore[http2]
 setuptools
+freezegun
 Brotli
 docker

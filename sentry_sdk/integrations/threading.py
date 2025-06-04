@@ -4,12 +4,12 @@ from functools import wraps
 from threading import Thread, current_thread
 
 import sentry_sdk
+from sentry_sdk import Scope
+from sentry_sdk.scope import ScopeType
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (
     event_from_exception,
     capture_internal_exceptions,
-    logger,
     reraise,
 )
 
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import TypeVar
     from typing import Callable
-    from typing import Optional
 
     from sentry_sdk._types import ExcInfo
 
@@ -29,21 +28,9 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(self, propagate_hub=None, propagate_scope=True):
-        # type: (Optional[bool], bool) -> None
-        if propagate_hub is not None:
-            logger.warning(
-                "Deprecated: propagate_hub is deprecated. This will be removed in the future."
-            )
-
-        # Note: propagate_hub did not have any effect on propagation of scope data
-        # scope data was always propagated no matter what the value of propagate_hub was
-        # This is why the default for propagate_scope is True
-
+    def __init__(self, propagate_scope=True):
+        # type: (bool) -> None
         self.propagate_scope = propagate_scope
-
-        if propagate_hub is not None:
-            self.propagate_scope = propagate_hub
 
     @staticmethod
     def setup_once():
@@ -89,8 +76,8 @@ class ThreadingIntegration(Integration):
                     isolation_scope = sentry_sdk.get_isolation_scope().fork()
                     current_scope = sentry_sdk.get_current_scope().fork()
             else:
-                isolation_scope = None
-                current_scope = None
+                isolation_scope = Scope(ty=ScopeType.ISOLATION)
+                current_scope = Scope(ty=ScopeType.CURRENT)
 
             # Patching instance methods in `start()` creates a reference cycle if
             # done in a naive way. See
@@ -112,7 +99,7 @@ class ThreadingIntegration(Integration):
 
 
 def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
-    # type: (Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope], F) -> F
+    # type: (sentry_sdk.Scope, sentry_sdk.Scope, F) -> F
     @wraps(old_run_func)
     def run(*a, **kw):
         # type: (*Any, **Any) -> Any
@@ -124,12 +111,9 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
             except Exception:
                 reraise(*_capture_exception())
 
-        if isolation_scope_to_use is not None and current_scope_to_use is not None:
-            with use_isolation_scope(isolation_scope_to_use):
-                with use_scope(current_scope_to_use):
-                    return _run_old_run_func()
-        else:
-            return _run_old_run_func()
+        with sentry_sdk.use_isolation_scope(isolation_scope_to_use):
+            with sentry_sdk.use_scope(current_scope_to_use):
+                return _run_old_run_func()
 
     return run  # type: ignore
 

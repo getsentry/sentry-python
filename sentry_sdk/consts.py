@@ -47,12 +47,9 @@ if TYPE_CHECKING:
         EventProcessor,
         Hint,
         Log,
-        MeasurementUnit,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
-        MetricTags,
-        MetricValue,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -73,11 +70,6 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
-            "enable_metrics": Optional[bool],
-            "before_emit_metric": Optional[
-                Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
-            ],
-            "metric_code_locations": Optional[bool],
             "enable_logs": Optional[bool],
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
         },
@@ -95,11 +87,6 @@ FALSE_VALUES = [
     "n",
     "0",
 ]
-
-
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
 
 
 class SPANDATA:
@@ -175,7 +162,7 @@ class SPANDATA:
 
     AI_TOOL_CALLS = "ai.tool_calls"
     """
-    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    For an AI model call, the function that was called.
     """
 
     AI_TOOLS = "ai.tools"
@@ -263,6 +250,24 @@ class SPANDATA:
     """
     Name of the AI pipeline or chain being executed.
     Example: "qa-pipeline"
+    """
+
+    AI_PROMPT_TOKENS_USED = "ai.prompt_tokens.used"
+    """
+    The number of input prompt tokens used by the model.
+    Example: 10
+    """
+
+    AI_COMPLETION_TOKENS_USED = "ai.completion_tokens.used"
+    """
+    The number of output completion tokens used by the model.
+    Example: 10
+    """
+
+    AI_TOTAL_TOKENS_USED = "ai.total_tokens.used"
+    """
+    The total number of tokens (input + output) used by the request to the model.
+    Example: 20
     """
 
     AI_TEXTS = "ai.texts"
@@ -551,6 +556,46 @@ class OP:
     SOCKET_DNS = "socket.dns"
 
 
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+
+DEFAULT_SPAN_ORIGIN = "manual"
+DEFAULT_SPAN_NAME = "<unlabeled span>"
+
+
+# Transaction source
+# see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
+class TransactionSource(str, Enum):
+    COMPONENT = "component"
+    CUSTOM = "custom"
+    ROUTE = "route"
+    TASK = "task"
+    URL = "url"
+    VIEW = "view"
+
+    def __str__(self):
+        # type: () -> str
+        return self.value
+
+
+# These are typically high cardinality and the server hates them
+LOW_QUALITY_TRANSACTION_SOURCES = [
+    TransactionSource.URL,
+]
+
+SOURCE_FOR_STYLE = {
+    "endpoint": TransactionSource.COMPONENT,
+    "function_name": TransactionSource.COMPONENT,
+    "handler_name": TransactionSource.COMPONENT,
+    "method_and_path_pattern": TransactionSource.ROUTE,
+    "path": TransactionSource.URL,
+    "route_name": TransactionSource.COMPONENT,
+    "route_pattern": TransactionSource.ROUTE,
+    "uri_template": TransactionSource.ROUTE,
+    "url": TransactionSource.ROUTE,
+}
+
+
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor:
@@ -584,7 +629,6 @@ class ClientConstructor:
         debug=None,  # type: Optional[bool]
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
-        propagate_traces=True,  # type: bool
         traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
         profiles_sample_rate=None,  # type: Optional[float]
@@ -598,10 +642,8 @@ class ClientConstructor:
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
         proxy_headers=None,  # type: Optional[Dict[str, str]]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
-        enable_tracing=None,  # type: Optional[bool]
         include_local_variables=True,  # type: Optional[bool]
         include_source_context=True,  # type: Optional[bool]
         trace_propagation_targets=[  # noqa: B006
@@ -990,11 +1032,6 @@ class ClientConstructor:
 
         :param profile_session_sample_rate:
 
-
-        :param enable_tracing:
-
-        :param propagate_traces:
-
         :param auto_session_tracking:
 
         :param spotlight:
@@ -1026,4 +1063,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.29.1"
+VERSION = "3.0.0a1"

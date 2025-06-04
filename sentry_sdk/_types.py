@@ -107,9 +107,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Mapping
-    from typing import NotRequired
     from typing import Optional
-    from typing import Tuple
     from typing import Type
     from typing_extensions import Literal, TypedDict
 
@@ -120,45 +118,6 @@ if TYPE_CHECKING:
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
-
-    DurationUnit = Literal[
-        "nanosecond",
-        "microsecond",
-        "millisecond",
-        "second",
-        "minute",
-        "hour",
-        "day",
-        "week",
-    ]
-
-    InformationUnit = Literal[
-        "bit",
-        "byte",
-        "kilobyte",
-        "kibibyte",
-        "megabyte",
-        "mebibyte",
-        "gigabyte",
-        "gibibyte",
-        "terabyte",
-        "tebibyte",
-        "petabyte",
-        "pebibyte",
-        "exabyte",
-        "exbibyte",
-    ]
-
-    FractionUnit = Literal["ratio", "percent"]
-    MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
-
-    MeasurementValue = TypedDict(
-        "MeasurementValue",
-        {
-            "value": float,
-            "unit": NotRequired[Optional[MeasurementUnit]],
-        },
-    )
 
     Event = TypedDict(
         "Event",
@@ -181,7 +140,6 @@ if TYPE_CHECKING:
             "level": LogLevelStr,
             "logentry": Mapping[str, object],
             "logger": str,
-            "measurements": dict[str, MeasurementValue],
             "message": str,
             "modules": dict[str, str],
             "monitor_config": Mapping[str, object],
@@ -210,7 +168,6 @@ if TYPE_CHECKING:
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
             "_dropped_spans": int,
-            "_metrics_summary": dict[str, object],
         },
         total=False,
     )
@@ -266,7 +223,6 @@ if TYPE_CHECKING:
         "internal",
         "profile",
         "profile_chunk",
-        "metric_bucket",
         "monitor",
         "span",
         "log",
@@ -275,26 +231,6 @@ if TYPE_CHECKING:
 
     ContinuousProfilerMode = Literal["thread", "gevent", "unknown"]
     ProfilerMode = Union[ContinuousProfilerMode, Literal["sleep"]]
-
-    # Type of the metric.
-    MetricType = Literal["d", "s", "g", "c"]
-
-    # Value of the metric.
-    MetricValue = Union[int, float, str]
-
-    # Internal representation of tags as a tuple of tuples (this is done in order to allow for the same key to exist
-    # multiple times).
-    MetricTagsInternal = Tuple[Tuple[str, str], ...]
-
-    # External representation of tags as a dictionary.
-    MetricTagValue = Union[str, int, float, None]
-    MetricTags = Mapping[str, MetricTagValue]
-
-    # Value inside the generator for the metric value.
-    FlushedMetricValue = Union[int, float]
-
-    BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
-    MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]
 
     MonitorConfigScheduleType = Literal["crontab", "interval"]
     MonitorConfigScheduleUnit = Literal[
@@ -331,3 +267,5 @@ if TYPE_CHECKING:
     )
 
     HttpStatusCodeRange = Union[int, Container[int]]
+
+    OtelExtractedSpanData = tuple[str, str, Optional[str], Optional[int], Optional[str]]

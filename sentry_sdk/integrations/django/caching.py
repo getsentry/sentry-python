@@ -54,27 +54,28 @@ def _patch_cache_method(cache, method_name, address, port):
             op=op,
             name=description,
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
             value = original_method(*args, **kwargs)
 
             with capture_internal_exceptions():
                 if address is not None:
-                    span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
+                    span.set_attribute(SPANDATA.NETWORK_PEER_ADDRESS, address)
 
                 if port is not None:
-                    span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
+                    span.set_attribute(SPANDATA.NETWORK_PEER_PORT, port)
 
                 key = _get_safe_key(method_name, args, kwargs)
                 if key is not None:
-                    span.set_data(SPANDATA.CACHE_KEY, key)
+                    span.set_attribute(SPANDATA.CACHE_KEY, key)
 
                 item_size = None
                 if is_get_operation:
                     if value:
                         item_size = len(str(value))
-                        span.set_data(SPANDATA.CACHE_HIT, True)
+                        span.set_attribute(SPANDATA.CACHE_HIT, True)
                     else:
-                        span.set_data(SPANDATA.CACHE_HIT, False)
+                        span.set_attribute(SPANDATA.CACHE_HIT, False)
                 else:  # TODO: We don't handle `get_or_set` which we should
                     arg_count = len(args)
                     if arg_count >= 2:
@@ -85,7 +86,7 @@ def _patch_cache_method(cache, method_name, address, port):
                         item_size = len(str(args[0]))
 
                 if item_size is not None:
-                    span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
+                    span.set_attribute(SPANDATA.CACHE_ITEM_SIZE, item_size)
 
             return value
 
@@ -133,22 +134,10 @@ def _get_address_port(settings):
     return address, int(port) if port is not None else None
 
 
-def should_enable_cache_spans():
-    # type: () -> bool
-    from sentry_sdk.integrations.django import DjangoIntegration
-
-    client = sentry_sdk.get_client()
-    integration = client.get_integration(DjangoIntegration)
-    from django.conf import settings
-
-    return integration is not None and (
-        (client.spotlight is not None and settings.DEBUG is True)
-        or integration.cache_spans is True
-    )
-
-
 def patch_caching():
     # type: () -> None
+    from sentry_sdk.integrations.django import DjangoIntegration
+
     if not hasattr(CacheHandler, "_sentry_patched"):
         if DJANGO_VERSION < (3, 2):
             original_get_item = CacheHandler.__getitem__
@@ -158,7 +147,8 @@ def patch_caching():
                 # type: (CacheHandler, str) -> Any
                 cache = original_get_item(self, alias)
 
-                if should_enable_cache_spans():
+                integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+                if integration is not None and integration.cache_spans:
                     from django.conf import settings
 
                     address, port = _get_address_port(
@@ -180,7 +170,8 @@ def patch_caching():
                 # type: (CacheHandler, str) -> Any
                 cache = original_create_connection(self, alias)
 
-                if should_enable_cache_spans():
+                integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+                if integration is not None and integration.cache_spans:
                     address, port = _get_address_port(self.settings[alias or "default"])
 
                     _patch_cache(cache, address, port)

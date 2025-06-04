@@ -3,9 +3,7 @@ import os
 import socket
 import warnings
 from threading import Thread
-from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from unittest import mock
 
 import pytest
 import jsonschema
@@ -25,22 +23,15 @@ import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import (  # noqa: F401
-    _DEFAULT_INTEGRATIONS,
     _installed_integrations,
     _processed_integrations,
 )
-from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.profiler.transaction_profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from typing import Optional
-    from collections.abc import Iterator
 
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
@@ -64,6 +55,10 @@ else:
 
 
 from sentry_sdk import scope
+from sentry_sdk.opentelemetry.scope import (
+    setup_scope_context_management,
+    setup_initial_scopes,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -74,6 +69,8 @@ def clean_scopes():
     scope._global_scope = None
     scope._isolation_scope.set(None)
     scope._current_scope.set(None)
+
+    setup_initial_scopes()
 
 
 @pytest.fixture(autouse=True)
@@ -174,13 +171,8 @@ def reset_integrations():
     with a clean slate to ensure monkeypatching works well,
     but this also means some other stuff will be monkeypatched twice.
     """
-    global _DEFAULT_INTEGRATIONS, _processed_integrations
-    try:
-        _DEFAULT_INTEGRATIONS.remove(
-            "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-        )
-    except ValueError:
-        pass
+    global _installed_integrations, _processed_integrations
+
     _processed_integrations.clear()
     _installed_integrations.clear()
 
@@ -199,6 +191,7 @@ def uninstall_integration():
 @pytest.fixture
 def sentry_init(request):
     def inner(*a, **kw):
+        setup_scope_context_management()
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
         sentry_sdk.get_global_scope().set_client(client)
@@ -636,23 +629,6 @@ def werkzeug_set_cookie(client, servername, key, value):
         client.set_cookie(key, value)
 
 
-@contextmanager
-def patch_start_tracing_child(fake_transaction_is_none=False):
-    # type: (bool) -> Iterator[Optional[mock.MagicMock]]
-    if not fake_transaction_is_none:
-        fake_transaction = mock.MagicMock()
-        fake_start_child = mock.MagicMock()
-        fake_transaction.start_child = fake_start_child
-    else:
-        fake_transaction = None
-        fake_start_child = None
-
-    with mock.patch(
-        "sentry_sdk.tracing_utils.get_current_span", return_value=fake_transaction
-    ):
-        yield fake_start_child
-
-
 class ApproxDict(dict):
     def __eq__(self, other):
         # For an ApproxDict to equal another dict, the other dict just needs to contain
@@ -660,6 +636,17 @@ class ApproxDict(dict):
         #
         # The other dict may contain additional keys with any value.
         return all(key in other and other[key] == value for key, value in self.items())
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class SortedBaggage:
+    def __init__(self, baggage):
+        self.baggage = baggage
+
+    def __eq__(self, other):
+        return sorted(self.baggage.split(",")) == sorted(other.split(","))
 
     def __ne__(self, other):
         return not self.__eq__(other)

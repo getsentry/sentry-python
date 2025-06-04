@@ -31,16 +31,17 @@ class ClientInterceptor(
             op=OP.GRPC_CLIENT,
             name="unary unary call to %s" % method,
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         ) as span:
-            span.set_data("type", "unary unary")
-            span.set_data("method", method)
+            span.set_attribute("type", "unary unary")
+            span.set_attribute("method", method)
 
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
             )
 
             response = continuation(client_call_details, request)
-            span.set_data("code", response.code().name)
+            span.set_attribute("code", response.code().name)
 
             return response
 
@@ -52,9 +53,10 @@ class ClientInterceptor(
             op=OP.GRPC_CLIENT,
             name="unary stream call to %s" % method,
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         ) as span:
-            span.set_data("type", "unary stream")
-            span.set_data("method", method)
+            span.set_attribute("type", "unary stream")
+            span.set_attribute("method", method)
 
             client_call_details = self._update_client_call_details_metadata_from_scope(
                 client_call_details
@@ -64,7 +66,7 @@ class ClientInterceptor(
                 client_call_details, request
             )  # type: UnaryStreamCall
             # Setting code on unary-stream leads to execution getting stuck
-            # span.set_data("code", response.code().name)
+            # span.set_attribute("code", response.code().name)
 
             return response
 

@@ -61,10 +61,13 @@ def _patch_create_connection():
             op=OP.SOCKET_CONNECTION,
             name=_get_span_description(address[0], address[1]),
             origin=SocketIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data("address", address)
-            span.set_data("timeout", timeout)
-            span.set_data("source_address", source_address)
+            host, port = address
+            span.set_attribute("address.host", host)
+            span.set_attribute("address.port", port)
+            span.set_attribute("timeout", timeout)
+            span.set_attribute("source_address", source_address)
 
             return real_create_connection(
                 address=address, timeout=timeout, source_address=source_address
@@ -87,9 +90,10 @@ def _patch_getaddrinfo():
             op=OP.SOCKET_DNS,
             name=_get_span_description(host, port),
             origin=SocketIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data("host", host)
-            span.set_data("port", port)
+            span.set_attribute("host", host)
+            span.set_attribute("port", port)
 
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
