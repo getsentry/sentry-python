@@ -16,6 +16,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
 - You can no longer change the sampled status of a span with `span.sampled = False` after starting it.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
+- The `sentry_sdk.Scope()` constructor no longer accepts a `client` parameter.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - `Span.finish()` no longer returns the `event_id` if the event is sent to sentry.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
@@ -31,6 +32,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The integration for Python `logging` module does not send Sentry issues by default anymore when calling `logging.error()`, `logging.critical()` or `logging.exception()`. If you want to preserve the old behavior use `sentry_sdk.init(integrations=[LoggingIntegration(event_level="ERROR")])`.
 - The `SentrySpanProcessor` and `SentryPropagator` are exported from `sentry_sdk.opentelemetry` instead of `sentry_sdk.integrations.opentelemetry`.
 - The integration-specific content of the `sampling_context` argument of `traces_sampler` and `profiles_sampler` now looks different.
+
   - The Celery integration doesn't add the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
 
     | Dictionary keys        | Sampling context key        | Example                        |
@@ -132,7 +134,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
     | `gcp_event.method`                | `http.request.method`          |
     | `gcp_event.query_string`          | `url.query`                    |
     | `gcp_event.headers`               | `http.request.header.{header}` |
-
 
 ### Removed
 
