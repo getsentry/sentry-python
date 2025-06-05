@@ -145,6 +145,9 @@ class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
 
 
 def loguru_sentry_logs_handler(message):
+    # This is intentionally a callable sink instead of a standard logging handler
+    # since like this we get direct access to message.record
+
     client = sentry_sdk.get_client()
 
     if not client.is_active():
