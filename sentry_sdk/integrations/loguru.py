@@ -1,4 +1,5 @@
 import enum
+import functools
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -20,6 +21,7 @@ try:
     import loguru
     from loguru import logger
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
+    from loguru._logger import Logger
 except ImportError:
     raise DidNotEnable("LOGURU is not installed")
 
@@ -89,11 +91,24 @@ class LoguruIntegration(Integration):
             )
 
         if LoguruIntegration.sentry_logs_level is not None:
-            logger.add(
-                LoguruSentryLogsHandler(level=LoguruIntegration.sentry_logs_level),
-                level=LoguruIntegration.sentry_logs_level,
-                format=LoguruIntegration.event_format,
-            )
+            #logger.add(
+            #    LoguruSentryLogsHandler(level=LoguruIntegration.sentry_logs_level),
+            #    level=LoguruIntegration.sentry_logs_level,
+            #    format=LoguruIntegration.event_format,
+            #)
+
+            original_log = Logger._log
+
+            @functools.wraps(original_log)
+            def _sentry_patched_log(self, *args, **kwargs):
+                print('hello from senry patched')
+                log_args = args[4]
+                if log_args:
+                    pass
+                result = original_log(self, *args, **kwargs)
+                return result
+
+            Logger._log = _sentry_patched_log
 
 
 class _LoguruBaseHandler(_BaseHandler):
