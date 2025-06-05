@@ -460,27 +460,136 @@ class SPANDATA:
 
     # OpenAI Agents specific constants
     GEN_AI_SYSTEM = "gen_ai.system"
+    """
+    The name of the AI system being used.
+    Example: "openai"
+    """
+
     GEN_AI_AGENT_NAME = "gen_ai.agent.name"
+    """
+    The name of the agent being used.
+    Example: "ResearchAssistant"
+    """
+
     GEN_AI_REQUEST_MAX_TOKENS = "gen_ai.request.max_tokens"
+    """
+    The maximum number of tokens to generate in the response.
+    Example: 2048
+    """
+
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
+    """
+    The model identifier being used for the request.
+    Example: "gpt-4-turbo-preview"
+    """
+
     GEN_AI_REQUEST_PRESENCE_PENALTY = "gen_ai.request.presence_penalty"
+    """
+    The presence penalty parameter used to reduce repetitiveness of generated tokens.
+    Example: 0.1
+    """
+
     GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
+    """
+    The temperature parameter used to control randomness in the output.
+    Example: 0.7
+    """
+
     GEN_AI_REQUEST_TOP_P = "gen_ai.request.top_p"
+    """
+    The top_p parameter used to control diversity via nucleus sampling.
+    Example: 1.0
+    """
+
     GEN_AI_REQUEST_FREQUENCY_PENALTY = "gen_ai.request.frequency_penalty"
+    """
+    The frequency penalty parameter used to reduce repetitiveness of generated tokens.
+    Example: 0.1
+    """
+
     GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
+    """
+    The name of the operation being performed.
+    Example: "chat"
+    """
+
     GEN_AI_TOOL_NAME = "gen_ai.tool.name"
+    """
+    The name of the tool being used.
+    Example: "web_search"
+    """
+
     GEN_AI_TOOL_DESCRIPTION = "gen_ai.tool.description"
+    """
+    The description of the tool being used.
+    Example: "Searches the web for current information about a topic"
+    """
+
     GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
+    """
+    The type of tool being used.
+    Example: "function"
+    """
+
     GEN_AI_SYSTEM_MESSAGE = "gen_ai.system.message"
+    """
+    The system instructions passed to the model.
+    Example: "You are a helpful assistant"
+    """
+
     GEN_AI_USER_MESSAGE = "gen_ai.user.message"
+    """
+    The user message passed to the model.
+    Example: "What's the weather in Paris?"
+    """
+
     GEN_AI_ASSISTANT_MESSAGE = "gen_ai.assistant.message"
+    """
+    The assistant message passed to the model.
+    Example: "get_weather tool call"
+    """
+
     GEN_AI_TOOL_MESSAGE = "gen_ai.tool.message"
+    """
+    The response from a tool or function call passed to the model.
+    Example: "rainy, 57°F"
+    """
+
     GEN_AI_CHOICE = "gen_ai.choice"
+    """
+    The model's response message.
+    Example: "The weather in Paris is rainy and overcast, with temperatures around 57°F"
+    """
+
     GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
+    """
+    The number of tokens in the input.
+    Example: 150
+    """
+
     GEN_AI_USAGE_INPUT_TOKENS_CACHED = "gen_ai.usage.input_tokens.cached"
+    """
+    The number of cached tokens in the input.
+    Example: 50
+    """
+
     GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+    """
+    The number of tokens in the output.
+    Example: 250
+    """
+
     GEN_AI_USAGE_OUTPUT_TOKENS_REASONING = "gen_ai.usage.output_tokens.reasoning"
+    """
+    The number of tokens used for reasoning in the output.
+    Example: 75
+    """
+
     GEN_AI_USAGE_TOTAL_TOKENS = "gen_ai.usage.total_tokens"
+    """
+    The total number of tokens used (input + output).
+    Example: 400
+    """
 
 
 class SPANSTATUS:
