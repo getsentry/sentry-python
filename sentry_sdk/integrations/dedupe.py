@@ -62,11 +62,11 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            event_hash = DedupeIntegration._get_event_hash(event)
-            if integration._last_seen.get(None) == event_hash:
+            exc = exc_info[1]
+            if integration._last_seen.get(None) == id(exc):
                 return None
 
-            integration._last_seen.set(event_hash)
+            integration._last_seen.set(id(exc))
             return event
 
     @staticmethod
