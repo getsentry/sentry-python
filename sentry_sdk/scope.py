@@ -172,8 +172,8 @@ class Scope:
         "_flags",
     )
 
-    def __init__(self, ty=None, client=None):
-        # type: (Optional[ScopeType], Optional[sentry_sdk.Client]) -> None
+    def __init__(self, ty=None):
+        # type: (Optional[ScopeType]) -> None
         self._type = ty
 
         self._event_processors = []  # type: List[EventProcessor]
@@ -184,9 +184,6 @@ class Scope:
         self._n_breadcrumbs_truncated = 0  # type: int
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
-
-        if client is not None:
-            self.set_client(client)
 
         self.clear()
 
