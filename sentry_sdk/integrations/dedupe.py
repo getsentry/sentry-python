@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.utils import ContextVar
+from sentry_sdk.utils import ContextVar, iter_event_stacktraces
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
@@ -64,13 +64,11 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            exc = exc_info[1]
-            exc_hash = DedupeIntegration._get_exception_hash(exc)
-
-            if integration._last_seen.get(None) == exc_hash:
+            event_hash = hash(iter_event_stacktraces(event))
+            if integration._last_seen.get(None) == event_hash:
                 return None
 
-            integration._last_seen.set(exc_hash)
+            integration._last_seen.set(event_hash)
             return event
 
     @staticmethod
