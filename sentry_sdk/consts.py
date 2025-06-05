@@ -630,6 +630,10 @@ class OP:
     FUNCTION = "function"
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
+    GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
+    GEN_AI_HANDOFF = "gen_ai.handoff"
+    GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
     GRAPHQL_EXECUTE = "graphql.execute"
     GRAPHQL_MUTATION = "graphql.mutation"
     GRAPHQL_PARSE = "graphql.parse"
@@ -682,12 +686,6 @@ class OP:
     WEBSOCKET_SERVER = "websocket.server"
     SOCKET_CONNECTION = "socket.connection"
     SOCKET_DNS = "socket.dns"
-
-    # OpenAI Agents specific operations
-    GEN_AI_CHAT = "gen_ai.chat"
-    GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
-    GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
-    GEN_AI_HANDOFF = "gen_ai.handoff"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
