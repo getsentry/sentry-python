@@ -370,8 +370,9 @@ def test_logging_errors(sentry_init, capture_envelopes):
 
     assert logs[1]["severity_text"] == "error"
     assert logs[1]["attributes"]["sentry.message.template"] == "error is %s"
-    assert (
-        logs[1]["attributes"]["sentry.message.parameter.0"] == "Exception('test exc 2')"
+    assert logs[1]["attributes"]["sentry.message.parameter.0"] in (
+        "Exception('test exc 2')",
+        "Exception('test exc 2',)",  # py3.6
     )
     assert "code.line.number" in logs[1]["attributes"]
 
