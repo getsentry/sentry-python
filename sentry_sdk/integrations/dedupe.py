@@ -32,18 +32,20 @@ class DedupeIntegration(Integration):
         exc_type = type(exc).__name__
         exc_message = str(exc)
 
-        # Get the first frame of the traceback if it exists
+        # Get the full stacktrace
+        stacktrace = []
         if hasattr(exc, "__traceback__") and exc.__traceback__:
-            frame = exc.__traceback__.tb_frame
-            filename = frame.f_code.co_filename
-            lineno = frame.f_lineno
-            func_name = frame.f_code.co_name
-            location = f"{filename}:{lineno}:{func_name}"  # noqa: E231
-        else:
-            location = None
+            tb = exc.__traceback__
+            while tb:
+                frame = tb.tb_frame
+                filename = frame.f_code.co_filename
+                lineno = tb.tb_lineno
+                func_name = frame.f_code.co_name
+                stacktrace.append((filename, lineno, func_name))
+                tb = tb.tb_next
 
         # Create a tuple of the essential information and hash it
-        return hash((exc_type, exc_message, location))
+        return hash((exc_type, exc_message, tuple(stacktrace)))
 
     @staticmethod
     def setup_once():
