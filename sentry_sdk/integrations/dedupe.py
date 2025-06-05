@@ -35,11 +35,11 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            exc = exc_info[1]
-            if integration._last_seen.get(None) == id(exc):
+            exc_id = id(exc_info[1])
+            if integration._last_seen.get(None) == exc_id:
                 return None
 
-            integration._last_seen.set(id(exc))
+            integration._last_seen.set(exc_id)
             return event
 
     @staticmethod
