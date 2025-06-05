@@ -19,6 +19,33 @@ class DedupeIntegration(Integration):
         self._last_seen = ContextVar("last-seen")
 
     @staticmethod
+    def _get_exception_hash(exc):
+        # type: (Exception) -> int
+        """
+        Create a memory-efficient hash for an exception.
+
+        Instead of storing the entire exception object, we store just enough
+        information to identify it uniquely. This avoids keeping the traceback
+        and local variables in memory.
+        """
+        # Get the exception type name and message
+        exc_type = type(exc).__name__
+        exc_message = str(exc)
+
+        # Get the first frame of the traceback if it exists
+        if hasattr(exc, "__traceback__") and exc.__traceback__:
+            frame = exc.__traceback__.tb_frame
+            filename = frame.f_code.co_filename
+            lineno = frame.f_lineno
+            func_name = frame.f_code.co_name
+            location = f"{filename}:{lineno}:{func_name}"  # noqa: E231
+        else:
+            location = None
+
+        # Create a tuple of the essential information and hash it
+        return hash((exc_type, exc_message, location))
+
+    @staticmethod
     def setup_once():
         # type: () -> None
         @add_global_event_processor
@@ -36,9 +63,12 @@ class DedupeIntegration(Integration):
                 return event
 
             exc = exc_info[1]
-            if integration._last_seen.get(None) is exc:
+            exc_hash = DedupeIntegration._get_exception_hash(exc)
+
+            if integration._last_seen.get(None) == exc_hash:
                 return None
-            integration._last_seen.set(exc)
+
+            integration._last_seen.set(exc_hash)
             return event
 
     @staticmethod
