@@ -8,6 +8,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
 import warnings
 
+import sentry_sdk
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -215,8 +216,8 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def _capture_experimental_log(self, scope, log):
-        # type: (Scope, Log) -> None
+    def _capture_experimental_log(self, log):
+        # type: (Log) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -893,12 +894,14 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_experimental_log(self, current_scope, log):
-        # type: (Scope, Log) -> None
+    def _capture_experimental_log(self, log):
+        # type: (Log) -> None
         logs_enabled = self.options["_experiments"].get("enable_logs", False)
         if not logs_enabled:
             return
-        isolation_scope = current_scope.get_isolation_scope()
+
+        current_scope = sentry_sdk.get_current_scope()
+        isolation_scope = sentry_sdk.get_isolation_scope()
 
         log["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
         log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
