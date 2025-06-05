@@ -288,7 +288,6 @@ def test_logging_dictionary_args(sentry_init, capture_events):
     assert event["logentry"]["params"] == {"foo": "bar", "bar": "baz"}
 
 
-@minimum_python_37
 def test_sentry_logs_warning(sentry_init, capture_envelopes):
     """
     The python logger module should create 'warn' sentry logs if the flag is on.
@@ -314,7 +313,6 @@ def test_sentry_logs_warning(sentry_init, capture_envelopes):
     assert logs[0]["severity_text"] == "warn"
 
 
-@minimum_python_37
 def test_sentry_logs_debug(sentry_init, capture_envelopes):
     """
     The python logger module should not create 'debug' sentry logs if the flag is on by default
@@ -329,7 +327,6 @@ def test_sentry_logs_debug(sentry_init, capture_envelopes):
     assert len(envelopes) == 0
 
 
-@minimum_python_37
 def test_no_log_infinite_loop(sentry_init, capture_envelopes):
     """
     If 'debug' mode is true, and you set a low log level in the logging integration, there should be no infinite loops.
@@ -348,7 +345,6 @@ def test_no_log_infinite_loop(sentry_init, capture_envelopes):
     assert len(envelopes) == 1
 
 
-@minimum_python_37
 def test_logging_errors(sentry_init, capture_envelopes):
     """
     The python logger module should be able to log errors without erroring
