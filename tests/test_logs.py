@@ -286,6 +286,49 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     raise AssertionError("200 logs were never flushed after five seconds")
 
 
+def test_user_attributes(sentry_init, capture_envelopes):
+    """User attributes are sent if send_default_pii is True."""
+    sentry_init(send_default_pii=True, _experiments={"enable_logs": True})
+
+    sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("Hello, world!")
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    (log,) = logs
+
+    # Check that all expected user attributes are present.
+    assert log["attributes"].items() >= {
+        ("user.id", "1"),
+        ("user.email", "test@example.com"),
+        ("user.name", "test"),
+    }
+
+
+def test_user_attributes_no_pii(sentry_init, capture_envelopes):
+    """Ensure no user attributes are sent if send_default_pii is False."""
+    sentry_init(_experiments={"enable_logs": True})
+
+    sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("Hello, world!")
+
+    get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    (log,) = logs
+    assert "user.id" not in log["attributes"]
+    assert "user.email" not in log["attributes"]
+    assert "user.name" not in log["attributes"]
+
+
 @minimum_python_37
 def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     """

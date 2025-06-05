@@ -352,7 +352,6 @@ class SentryLogsHandler(_BaseHandler):
 
     def _capture_log_from_record(self, client, record):
         # type: (BaseClient, LogRecord) -> None
-        scope = sentry_sdk.get_current_scope()
         otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
         project_root = client.options["project_root"]
         attrs = self._extra_from_record(record)  # type: Any
@@ -391,7 +390,6 @@ class SentryLogsHandler(_BaseHandler):
 
         # noinspection PyProtectedMember
         client._capture_experimental_log(
-            scope,
             {
                 "severity_text": otel_severity_text,
                 "severity_number": otel_severity_number,
