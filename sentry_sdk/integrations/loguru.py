@@ -6,7 +6,6 @@ from sentry_sdk.integrations.logging import (
     BreadcrumbHandler,
     EventHandler,
     _BaseHandler,
-    _python_level_to_otel,
 )
 
 from typing import TYPE_CHECKING
@@ -166,7 +165,7 @@ def loguru_sentry_logs_handler(message):
     if record["level"].no < LoguruIntegration.sentry_logs_level:
         return
 
-    otel_severity_number, otel_severity_text = _python_level_to_otel(record["level"].no)
+    otel_severity_number, otel_severity_text = _loguru_level_to_otel(record["level"].no)
 
     attrs = {"sentry.origin": "auto.logger.loguru"}  # type: dict[str, Any]
 
