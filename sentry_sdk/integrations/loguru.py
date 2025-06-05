@@ -172,7 +172,7 @@ def loguru_sentry_logs_handler(message):
     project_root = client.options["project_root"]
     if record.get("file"):
         if project_root is not None and record["file"].path.startswith(project_root):
-            attrs["code.file.path"] = record["file"].path
+            attrs["code.file.path"] = record["file"].path[len(project_root) + 1 :]
         else:
             attrs["code.file.path"] = record["file"].path
 
