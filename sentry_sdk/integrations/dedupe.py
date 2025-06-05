@@ -19,33 +19,6 @@ class DedupeIntegration(Integration):
         self._last_seen = ContextVar("last-seen")
 
     @staticmethod
-    def _get_event_hash(event):
-        # type: (Event) -> int
-        """
-        Create a memory-efficient hash for an event.
-
-        Instead of storing the entire exception object, we store just enough
-        information to identify it uniquely. This avoids keeping the traceback
-        and local variables in memory.
-        """
-        try:
-            stacktrace = event["exception"]["values"][0].get("stacktrace")
-        except KeyError:
-            stacktrace = None
-
-        event_hash = hash(
-            (
-                event["exception"]["values"][0]["type"],
-                event["exception"]["values"][0]["value"],
-                stacktrace["frames"][-1]["filename"] if stacktrace else None,
-                stacktrace["frames"][-1]["function"] if stacktrace else None,
-                stacktrace["frames"][-1]["lineno"] if stacktrace else None,
-            )
-        )
-
-        return event_hash
-
-    @staticmethod
     def setup_once():
         # type: () -> None
         @add_global_event_processor
