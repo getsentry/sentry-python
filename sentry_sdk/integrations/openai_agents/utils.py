@@ -160,8 +160,6 @@ def _set_agent_data(agent):
             "gen_ai.request.frequency_penalty", agent.model_settings.frequency_penalty
         )
 
-    # span.set_data("", )
-
 
 def _create_run_wrapper(original_func):
     # type: (Callable) -> Callable
@@ -197,3 +195,28 @@ def _create_run_wrapper(original_func):
             return result
 
     return async_wrapper if is_async else sync_wrapper
+
+
+def _create_get_model_wrapper(original_get_model):
+    """
+    Wraps the get_response method of the model to create a AI client span.
+    """
+    from .spans import ai_client_span, finish_ai_client_span
+
+    @classmethod
+    @wraps(original_get_model)
+    def wrapped_get_model(cls, agent, run_config):
+        model = original_get_model(agent, run_config)
+        original_get_response = model.get_response
+
+        @wraps(original_get_response)
+        async def wrapped_get_response(*args, **kwargs):
+            with ai_client_span(agent, model, run_config, kwargs):
+                result = await original_get_response(*args, **kwargs)
+                finish_ai_client_span(agent, model, run_config, kwargs, result)
+            return result
+
+        model.get_response = wrapped_get_response
+        return model
+
+    return wrapped_get_model

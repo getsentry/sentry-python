@@ -1,5 +1,9 @@
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations.openai_agents.utils import _create_run_wrapper
+from sentry_sdk.integrations.openai_agents.utils import (
+    _create_run_wrapper,
+    _create_get_model_wrapper,
+)
+
 
 try:
     import agents
@@ -15,6 +19,10 @@ def _patch_runner():
     agents.Runner.run_streamed = _create_run_wrapper(agents.Runner.run_streamed)
 
 
+def _patch_model():
+    agents.Runner._get_model = _create_get_model_wrapper(agents.Runner._get_model)
+
+
 class OpenAIAgentsIntegration(Integration):
     identifier = "openai_agents"
     origin = f"auto.ai.{identifier}"
@@ -23,3 +31,4 @@ class OpenAIAgentsIntegration(Integration):
     def setup_once():
         # type: () -> None
         _patch_runner()
+        _patch_model()
