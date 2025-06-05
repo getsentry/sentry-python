@@ -9,7 +9,6 @@ import sentry_sdk
 import sentry_sdk.logger
 from sentry_sdk import get_client
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.types import Log
 from sentry_sdk.consts import SPANDATA, VERSION
 
