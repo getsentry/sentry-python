@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.utils import ContextVar, iter_event_stacktraces
+from sentry_sdk.utils import ContextVar
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
@@ -19,33 +19,26 @@ class DedupeIntegration(Integration):
         self._last_seen = ContextVar("last-seen")
 
     @staticmethod
-    def _get_exception_hash(exc):
-        # type: (Exception) -> int
+    def _get_event_hash(event):
+        # type: (Event) -> int
         """
-        Create a memory-efficient hash for an exception.
+        Create a memory-efficient hash for an event.
 
         Instead of storing the entire exception object, we store just enough
         information to identify it uniquely. This avoids keeping the traceback
         and local variables in memory.
         """
-        # Get the exception type name and message
-        exc_type = type(exc).__name__
-        exc_message = str(exc)
+        event_hash = hash(
+            (
+                event["exception"]["values"][0]["type"],
+                event["exception"]["values"][0]["value"],
+                event["exception"]["values"][0]["stacktrace"]["frames"][-1]["filename"],
+                event["exception"]["values"][0]["stacktrace"]["frames"][-1]["function"],
+                event["exception"]["values"][0]["stacktrace"]["frames"][-1]["lineno"],
+            )
+        )
 
-        # Get the full stacktrace
-        stacktrace = []
-        if hasattr(exc, "__traceback__") and exc.__traceback__:
-            tb = exc.__traceback__
-            while tb:
-                frame = tb.tb_frame
-                filename = frame.f_code.co_filename
-                lineno = tb.tb_lineno
-                func_name = frame.f_code.co_name
-                stacktrace.append((filename, lineno, func_name))
-                tb = tb.tb_next
-
-        # Create a tuple of the essential information and hash it
-        return hash((exc_type, exc_message, tuple(stacktrace)))
+        return event_hash
 
     @staticmethod
     def setup_once():
@@ -64,7 +57,7 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            event_hash = hash(iter_event_stacktraces(event))
+            event_hash = DedupeIntegration._get_event_hash(event)
             if integration._last_seen.get(None) == event_hash:
                 return None
 
