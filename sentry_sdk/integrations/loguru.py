@@ -13,12 +13,15 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Optional, Any, Tuple
+    from typing import Any, Tuple
 
 try:
     import loguru
     from loguru import logger
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
+
+    if TYPE_CHECKING:
+        from loguru import Message
 except ImportError:
     raise DidNotEnable("LOGURU is not installed")
 
@@ -68,10 +71,11 @@ def _loguru_level_to_otel(record_level):
 class LoguruIntegration(Integration):
     identifier = "loguru"
 
-    level = DEFAULT_LEVEL  # type: Optional[int]
-    event_level = DEFAULT_EVENT_LEVEL  # type: Optional[int]
+    level = DEFAULT_LEVEL  # type: int
+    event_level = DEFAULT_EVENT_LEVEL  # type: int
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
+    sentry_logs_level = DEFAULT_LEVEL  # type: int
 
     def __init__(
         self,
@@ -81,7 +85,7 @@ class LoguruIntegration(Integration):
         event_format=DEFAULT_FORMAT,
         sentry_logs_level=DEFAULT_LEVEL,
     ):
-        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction, Optional[int]) -> None
+        # type: (int, int, str | loguru.FormatFunction, str | loguru.FormatFunction, int) -> None
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
         LoguruIntegration.breadcrumb_format = breadcrumb_format
@@ -145,6 +149,7 @@ class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
 
 
 def loguru_sentry_logs_handler(message):
+    # type: (Message) -> None
     # This is intentionally a callable sink instead of a standard logging handler
     # since like this we get direct access to message.record
 
@@ -165,9 +170,7 @@ def loguru_sentry_logs_handler(message):
 
     otel_severity_number, otel_severity_text = _python_level_to_otel(record["level"].no)
 
-    attrs = {
-        "sentry.origin": "auto.logger.loguru",
-    }
+    attrs = {"sentry.origin": "auto.logger.loguru"}  # type: dict[str, Any]
 
     project_root = client.options["project_root"]
     if record.get("file"):
