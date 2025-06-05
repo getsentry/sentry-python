@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.integrations.openai_agents.utils import _usage_to_str
+from sentry_sdk.consts import OP, SPANDATA
 
 from typing import TYPE_CHECKING
 
@@ -16,9 +17,9 @@ def handoff_span(context, from_agent, to_agent):
     current_span = sentry_sdk.get_current_span()
     if current_span:
         with current_span.start_child(
-            op="gen_ai.handoff",
+            op=OP.GEN_AI_HANDOFF,
             name=f"handoff from {from_agent.name} to {to_agent.name}",
         ) as span:
-            span.set_data("gen_ai.operation.name", "handoff")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "handoff")
 
         current_span.__exit__(None, None, None)

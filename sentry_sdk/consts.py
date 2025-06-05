@@ -458,6 +458,30 @@ class SPANDATA:
     Example: "5249fbada8d5416482c2f6e47e337372"
     """
 
+    # OpenAI Agents specific constants
+    GEN_AI_SYSTEM = "gen_ai.system"
+    GEN_AI_AGENT_NAME = "gen_ai.agent.name"
+    GEN_AI_REQUEST_MAX_TOKENS = "gen_ai.request.max_tokens"
+    GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
+    GEN_AI_REQUEST_PRESENCE_PENALTY = "gen_ai.request.presence_penalty"
+    GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
+    GEN_AI_REQUEST_TOP_P = "gen_ai.request.top_p"
+    GEN_AI_REQUEST_FREQUENCY_PENALTY = "gen_ai.request.frequency_penalty"
+    GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
+    GEN_AI_TOOL_NAME = "gen_ai.tool.name"
+    GEN_AI_TOOL_DESCRIPTION = "gen_ai.tool.description"
+    GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
+    GEN_AI_SYSTEM_MESSAGE = "gen_ai.system.message"
+    GEN_AI_USER_MESSAGE = "gen_ai.user.message"
+    GEN_AI_ASSISTANT_MESSAGE = "gen_ai.assistant.message"
+    GEN_AI_TOOL_MESSAGE = "gen_ai.tool.message"
+    GEN_AI_CHOICE = "gen_ai.choice"
+    GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
+    GEN_AI_USAGE_INPUT_TOKENS_CACHED = "gen_ai.usage.input_tokens.cached"
+    GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+    GEN_AI_USAGE_OUTPUT_TOKENS_REASONING = "gen_ai.usage.output_tokens.reasoning"
+    GEN_AI_USAGE_TOTAL_TOKENS = "gen_ai.usage.total_tokens"
+
 
 class SPANSTATUS:
     """
@@ -549,6 +573,12 @@ class OP:
     WEBSOCKET_SERVER = "websocket.server"
     SOCKET_CONNECTION = "socket.connection"
     SOCKET_DNS = "socket.dns"
+
+    # OpenAI Agents specific operations
+    GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
+    GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
+    GEN_AI_HANDOFF = "gen_ai.handoff"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`

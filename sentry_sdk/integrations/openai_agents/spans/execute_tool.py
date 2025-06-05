@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.integrations.openai_agents.utils import _set_agent_data, _usage_to_str
+from sentry_sdk.consts import OP, SPANDATA
 
 from typing import TYPE_CHECKING
 
@@ -12,16 +13,16 @@ def execute_tool_span(context, agent, tool):
 
     print(f"### Tool {tool.name} started. " f"Usage: {_usage_to_str(context.usage)}")
     span = sentry_sdk.start_span(
-        op="gen_ai.execute_tool", name=f"execute_tool {tool.name}"
+        op=OP.GEN_AI_EXECUTE_TOOL, name=f"execute_tool {tool.name}"
     )
     span.__enter__()
 
-    span.set_data("gen_ai.operation.name", "execute_tool")
-    span.set_data("gen_ai.tool.name", tool.name)
-    span.set_data("gen_ai.tool.description", tool.description)
+    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
+    span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
+    span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
 
     if tool.__class__.__name__ == "FunctionTool":
-        span.set_data("gen_ai.tool.type", "function")
+        span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
 
     _set_agent_data(agent)
 

@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.integrations.openai_agents.utils import _usage_to_str, _set_agent_data
+from sentry_sdk.consts import OP, SPANDATA
 
 from typing import TYPE_CHECKING
 
@@ -12,11 +13,11 @@ def invoke_agent_span(context, agent):
     # type: (RunContextWrapper, Agent) -> None
     print(f"### Agent {agent.name} started. " f"Usage: {_usage_to_str(context.usage)}")
     span = sentry_sdk.start_span(
-        op="gen_ai.invoke_agent", name=f"invoke_agent {agent.name}"
+        op=OP.GEN_AI_INVOKE_AGENT, name=f"invoke_agent {agent.name}"
     )
     span.__enter__()
 
-    span.set_data("gen_ai.operation.name", "invoke_agent")
+    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
     _set_agent_data(agent)
 

@@ -4,6 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import event_from_exception
+from sentry_sdk.consts import SPANDATA
 
 from typing import TYPE_CHECKING
 
@@ -133,31 +134,37 @@ def _set_agent_data(agent):
     'tools': []}
     """
     span.set_data(
-        "gen_ai.system", "openai"
+        SPANDATA.GEN_AI_SYSTEM, "openai"
     )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
 
-    span.set_data("gen_ai.agent.name", agent.name)
+    span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent.name)
 
     if agent.model_settings.max_tokens:
-        span.set_data("gen_ai.request.max_tokens", agent.model_settings.max_tokens)
+        span.set_data(
+            SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, agent.model_settings.max_tokens
+        )
 
     if agent.model:
-        span.set_data("gen_ai.request.model", agent.model)
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, agent.model)
 
     if agent.model_settings.presence_penalty:
         span.set_data(
-            "gen_ai.request.presence_penalty", agent.model_settings.presence_penalty
+            SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+            agent.model_settings.presence_penalty,
         )
 
     if agent.model_settings.temperature:
-        span.set_data("gen_ai.request.temperature", agent.model_settings.temperature)
+        span.set_data(
+            SPANDATA.GEN_AI_REQUEST_TEMPERATURE, agent.model_settings.temperature
+        )
 
     if agent.model_settings.top_p:
-        span.set_data("gen_ai.request.top_p", agent.model_settings.top_p)
+        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, agent.model_settings.top_p)
 
     if agent.model_settings.frequency_penalty:
         span.set_data(
-            "gen_ai.request.frequency_penalty", agent.model_settings.frequency_penalty
+            SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+            agent.model_settings.frequency_penalty,
         )
 
 

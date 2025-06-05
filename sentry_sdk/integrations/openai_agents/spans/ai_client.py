@@ -1,4 +1,5 @@
 import sentry_sdk
+from sentry_sdk.consts import OP, SPANDATA
 
 from ..utils import _set_agent_data
 
@@ -42,7 +43,7 @@ def ai_client_span(agent, model, run_config, get_response_kwargs):
     """
     # TODO-anton: implement other types of operations
     return sentry_sdk.start_span(
-        op="gen_ai.chat",
+        op=OP.GEN_AI_CHAT,
         description=f"*chat* (TODO: remove hardcoded stuff) {agent.model}",
     )
 
@@ -54,26 +55,27 @@ def finish_ai_client_span(agent, model, run_config, get_response_kwargs, result)
 
     if get_response_kwargs.get("system_instructions"):
         span.set_data(
-            "gen_ai.system.message", get_response_kwargs.get("system_instructions")
+            SPANDATA.GEN_AI_SYSTEM_MESSAGE,
+            get_response_kwargs.get("system_instructions"),
         )
 
     for message in get_response_kwargs.get("input", []):
         if message.get("role") == "user":
-            span.set_data("gen_ai.user.message", message.get("content"))
+            span.set_data(SPANDATA.GEN_AI_USER_MESSAGE, message.get("content"))
             break
 
     for index, message in enumerate(result.output):
         span.set_data(f"output.{index}", message)
         # if message.get("type") == "function_call":
 
-    span.set_data("gen_ai.usage.input_tokens", result.usage.input_tokens)
+    span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, result.usage.input_tokens)
     span.set_data(
-        "gen_ai.usage.input_tokens.cached",
+        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
         result.usage.input_tokens_details.cached_tokens,
     )
-    span.set_data("gen_ai.usage.output_tokens", result.usage.output_tokens)
+    span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, result.usage.output_tokens)
     span.set_data(
-        "gen_ai.usage.output_tokens.reasoning",
+        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
         result.usage.output_tokens_details.reasoning_tokens,
     )
-    span.set_data("gen_ai.usage.total_tokens", result.usage.total_tokens)
+    span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, result.usage.total_tokens)
