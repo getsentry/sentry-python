@@ -28,13 +28,18 @@ class DedupeIntegration(Integration):
         information to identify it uniquely. This avoids keeping the traceback
         and local variables in memory.
         """
+        try:
+            stacktrace = event["exception"]["values"][0].get("stacktrace")
+        except KeyError:
+            stacktrace = None
+
         event_hash = hash(
             (
                 event["exception"]["values"][0]["type"],
                 event["exception"]["values"][0]["value"],
-                event["exception"]["values"][0]["stacktrace"]["frames"][-1]["filename"],
-                event["exception"]["values"][0]["stacktrace"]["frames"][-1]["function"],
-                event["exception"]["values"][0]["stacktrace"]["frames"][-1]["lineno"],
+                stacktrace["frames"][-1]["filename"] if stacktrace else None,
+                stacktrace["frames"][-1]["function"] if stacktrace else None,
+                stacktrace["frames"][-1]["lineno"] if stacktrace else None,
             )
         )
 
