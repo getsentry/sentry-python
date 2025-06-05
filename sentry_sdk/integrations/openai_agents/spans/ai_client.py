@@ -4,8 +4,6 @@ from ..utils import _set_agent_data
 
 
 def ai_client_span(agent, model, run_config, get_response_kwargs):
-    # import ipdb; ipdb.set_trace()
-
     """
     https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/#inference
 
@@ -41,7 +39,6 @@ def ai_client_span(agent, model, run_config, get_response_kwargs):
 
     OUTPUT:
     gen_ai.choice
-
     """
     # TODO-anton: implement other types of operations
     return sentry_sdk.start_span(
@@ -52,8 +49,8 @@ def ai_client_span(agent, model, run_config, get_response_kwargs):
 
 def finish_ai_client_span(agent, model, run_config, get_response_kwargs, result):
     _set_agent_data(agent)
+
     span = sentry_sdk.get_current_span()
-    # import ipdb; ipdb.set_trace()
 
     if get_response_kwargs.get("system_instructions"):
         span.set_data(
@@ -68,3 +65,15 @@ def finish_ai_client_span(agent, model, run_config, get_response_kwargs, result)
     for index, message in enumerate(result.output):
         span.set_data(f"output.{index}", message)
         # if message.get("type") == "function_call":
+
+    span.set_data("gen_ai.usage.input_tokens", result.usage.input_tokens)
+    span.set_data(
+        "gen_ai.usage.input_tokens.cached",
+        result.usage.input_tokens_details.cached_tokens,
+    )
+    span.set_data("gen_ai.usage.output_tokens", result.usage.output_tokens)
+    span.set_data(
+        "gen_ai.usage.output_tokens.reasoning",
+        result.usage.output_tokens_details.reasoning_tokens,
+    )
+    span.set_data("gen_ai.usage.total_tokens", result.usage.total_tokens)
