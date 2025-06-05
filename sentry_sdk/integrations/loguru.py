@@ -166,8 +166,6 @@ def loguru_sentry_logs_handler(message):
     if record["level"].no < LoguruIntegration.sentry_logs_level:
         return
 
-    scope = sentry_sdk.get_current_scope()
-
     otel_severity_number, otel_severity_text = _python_level_to_otel(record["level"].no)
 
     attrs = {"sentry.origin": "auto.logger.loguru"}  # type: dict[str, Any]
@@ -200,7 +198,6 @@ def loguru_sentry_logs_handler(message):
         attrs["sentry.message.template"] = record["message"]
 
     client._capture_experimental_log(
-        scope,
         {
             "severity_text": otel_severity_text,
             "severity_number": otel_severity_number,
@@ -208,5 +205,5 @@ def loguru_sentry_logs_handler(message):
             "attributes": attrs,
             "time_unix_nano": int(record["time"].timestamp() * 1e9),
             "trace_id": None,
-        },
+        }
     )
