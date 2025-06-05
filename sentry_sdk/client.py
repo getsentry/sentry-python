@@ -927,6 +927,21 @@ class _Client(BaseClient):
             elif propagation_context is not None:
                 log["trace_id"] = propagation_context.trace_id
 
+        # The user, if present, is always set on the isolation scope.
+        if self.should_send_default_pii() and isolation_scope._user is not None:
+            for log_attribute, user_attribute in (
+                ("user.id", "id"),
+                ("user.name", "username"),
+                ("user.email", "email"),
+            ):
+                if (
+                    user_attribute in isolation_scope._user
+                    and log_attribute not in log["attributes"]
+                ):
+                    log["attributes"][log_attribute] = isolation_scope._user[
+                        user_attribute
+                    ]
+
         # If debug is enabled, log the log to the console
         debug = self.options.get("debug", False)
         if debug:
