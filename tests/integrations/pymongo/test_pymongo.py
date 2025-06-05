@@ -130,7 +130,7 @@ def test_breadcrumbs(
         assert "1" in crumb["message"]
     else:
         assert "1" not in crumb["message"]
-    assert crumb["type"] == "db.query"
+    assert crumb["type"] == "query"
     assert crumb["data"] == {
         "db.name": "test_db",
         "db.system": "mongodb",
