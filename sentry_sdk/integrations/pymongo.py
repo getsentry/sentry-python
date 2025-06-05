@@ -158,7 +158,7 @@ class CommandTracer(monitoring.CommandListener):
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
-                    message=query, category="query", type=OP.DB_QUERY, data=data
+                    message=query, category="query", type="query", data=data
                 )
 
             for key, value in data.items():

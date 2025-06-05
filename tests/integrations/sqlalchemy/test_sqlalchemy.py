@@ -136,18 +136,18 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
         render_span_tree(event)
         == """\
 - op="test_transaction": description=null
-  - op="db": description="SAVEPOINT sa_savepoint_1"
-  - op="db": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
-  - op="db": description="RELEASE SAVEPOINT sa_savepoint_1"
-  - op="db": description="SAVEPOINT sa_savepoint_2"
-  - op="db": description="INSERT INTO person (id, name) VALUES (?, ?)"
-  - op="db": description="ROLLBACK TO SAVEPOINT sa_savepoint_2"
-  - op="db": description="SAVEPOINT sa_savepoint_3"
-  - op="db": description="INSERT INTO person (id, name) VALUES (?, ?)"
-  - op="db": description="ROLLBACK TO SAVEPOINT sa_savepoint_3"
-  - op="db": description="SAVEPOINT sa_savepoint_4"
-  - op="db": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
-  - op="db": description="RELEASE SAVEPOINT sa_savepoint_4"\
+  - op="db.query": description="SAVEPOINT sa_savepoint_1"
+  - op="db.query": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
+  - op="db.query": description="RELEASE SAVEPOINT sa_savepoint_1"
+  - op="db.query": description="SAVEPOINT sa_savepoint_2"
+  - op="db.query": description="INSERT INTO person (id, name) VALUES (?, ?)"
+  - op="db.query": description="ROLLBACK TO SAVEPOINT sa_savepoint_2"
+  - op="db.query": description="SAVEPOINT sa_savepoint_3"
+  - op="db.query": description="INSERT INTO person (id, name) VALUES (?, ?)"
+  - op="db.query": description="ROLLBACK TO SAVEPOINT sa_savepoint_3"
+  - op="db.query": description="SAVEPOINT sa_savepoint_4"
+  - op="db.query": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
+  - op="db.query": description="RELEASE SAVEPOINT sa_savepoint_4"\
 """
     )
 
@@ -328,7 +328,7 @@ def test_query_source_disabled(sentry_init, capture_events):
     (event,) = events
 
     for span in event["spans"]:
-        if span.get("op") == "db" and span.get("description").startswith(
+        if span.get("op") == "db.query" and span.get("description").startswith(
             "SELECT person"
         ):
             data = span.get("data", {})
@@ -380,7 +380,7 @@ def test_query_source_enabled(sentry_init, capture_events, enable_db_query_sourc
     (event,) = events
 
     for span in event["spans"]:
-        if span.get("op") == "db" and span.get("description").startswith(
+        if span.get("op") == "db.query" and span.get("description").startswith(
             "SELECT person"
         ):
             data = span.get("data", {})
@@ -427,7 +427,7 @@ def test_query_source(sentry_init, capture_events):
     (event,) = events
 
     for span in event["spans"]:
-        if span.get("op") == "db" and span.get("description").startswith(
+        if span.get("op") == "db.query" and span.get("description").startswith(
             "SELECT person"
         ):
             data = span.get("data", {})
@@ -498,7 +498,7 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
     (event,) = events
 
     for span in event["spans"]:
-        if span.get("op") == "db" and span.get("description").startswith(
+        if span.get("op") == "db.query" and span.get("description").startswith(
             "SELECT person"
         ):
             data = span.get("data", {})
@@ -575,7 +575,7 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
     (event,) = events
 
     for span in event["spans"]:
-        if span.get("op") == "db" and span.get("description").startswith(
+        if span.get("op") == "db.query" and span.get("description").startswith(
             "SELECT person"
         ):
             data = span.get("data", {})
@@ -637,7 +637,7 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
     (event,) = events
 
     for span in event["spans"]:
-        if span.get("op") == "db" and span.get("description").startswith(
+        if span.get("op") == "db.query" and span.get("description").startswith(
             "SELECT person"
         ):
             data = span.get("data", {})
