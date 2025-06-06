@@ -163,7 +163,7 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
             return await f(*args, **kwargs)
 
         with sentry_sdk.start_span(
-            op=OP.DB,
+            op=OP.DB_QUERY,
             name="connect",
             origin=AsyncPGIntegration.origin,
             only_if_parent=True,

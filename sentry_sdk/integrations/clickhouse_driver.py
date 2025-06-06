@@ -85,7 +85,7 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
         params = args[3] if len(args) > 3 else kwargs.get("params")
 
         span = sentry_sdk.start_span(
-            op=OP.DB,
+            op=OP.DB_QUERY,
             name=query,
             origin=ClickhouseDriverIntegration.origin,
             only_if_parent=True,
