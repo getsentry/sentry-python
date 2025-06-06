@@ -42,10 +42,14 @@ def ai_client_span(agent, model, run_config, get_response_kwargs):
     gen_ai.choice
     """
     # TODO-anton: implement other types of operations
-    return sentry_sdk.start_span(
+    span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
         description=f"*chat* (TODO: remove hardcoded stuff) {agent.model}",
     )
+    # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
+    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+
+    return span
 
 
 def finish_ai_client_span(agent, model, run_config, get_response_kwargs, result):
@@ -64,10 +68,6 @@ def finish_ai_client_span(agent, model, run_config, get_response_kwargs, result)
             span.set_data(SPANDATA.GEN_AI_USER_MESSAGE, message.get("content"))
             break
 
-    for index, message in enumerate(result.output):
-        span.set_data(f"output.{index}", message)
-        # if message.get("type") == "function_call":
-
     span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, result.usage.input_tokens)
     span.set_data(
         SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
@@ -79,3 +79,11 @@ def finish_ai_client_span(agent, model, run_config, get_response_kwargs, result)
         result.usage.output_tokens_details.reasoning_tokens,
     )
     span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, result.usage.total_tokens)
+
+    output = [item.to_json() for item in result.output]
+    span.set_data(SPANDATA.GEN_AI_CHOICE, output)
+
+    # TODO-anton: for debugging, remove this
+    for index, message in enumerate(result.output):
+        span.set_data(f"DEBUG.output.{index}", message)
+        # if message.get("type") == "function_call":
