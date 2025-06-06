@@ -70,8 +70,8 @@ def _loguru_level_to_otel(record_level):
 class LoguruIntegration(Integration):
     identifier = "loguru"
 
-    level = DEFAULT_LEVEL  # type: int
-    event_level = DEFAULT_EVENT_LEVEL  # type: int
+    level = DEFAULT_LEVEL  # type: Optional[int]
+    event_level = DEFAULT_EVENT_LEVEL  # type: Optional[int]
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
     sentry_logs_level = DEFAULT_LEVEL  # type: Optional[int]
@@ -84,7 +84,7 @@ class LoguruIntegration(Integration):
         event_format=DEFAULT_FORMAT,
         sentry_logs_level=DEFAULT_LEVEL,
     ):
-        # type: (int, int, str | loguru.FormatFunction, str | loguru.FormatFunction, int) -> None
+        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction, int) -> None
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
         LoguruIntegration.breadcrumb_format = breadcrumb_format
