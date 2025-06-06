@@ -149,8 +149,6 @@ def test_sentry_logs_warning(
     logs = envelopes_to_logs(envelopes)
 
     attrs = logs[0]["attributes"]
-    # no access to pre-formatted message atm, so template is already filled in
-    assert attrs["sentry.message.template"] == "this is just a template"
     assert "code.file.path" in attrs
     assert "code.line.number" in attrs
     assert attrs["logger.name"] == "tests.integrations.loguru.test_loguru"
@@ -299,11 +297,9 @@ def test_logging_errors(sentry_init, capture_envelopes, uninstall_integration, r
 
     logs = envelopes_to_logs(envelopes)
     assert logs[0]["severity_text"] == "error"
-    assert logs[0]["attributes"]["sentry.message.template"] == "test exc 1"
     assert "code.line.number" in logs[0]["attributes"]
 
     assert logs[1]["severity_text"] == "error"
-    assert logs[1]["attributes"]["sentry.message.template"] == "error is %s"
     assert "code.line.number" in logs[1]["attributes"]
 
     assert len(logs) == 2
@@ -416,7 +412,6 @@ def test_logger_with_all_attributes(
     assert attributes == {
         "logger.name": "tests.integrations.loguru.test_loguru",
         "sentry.origin": "auto.logger.loguru",
-        "sentry.message.template": "log #1",
         "sentry.environment": "production",
         "sentry.sdk.version": VERSION,
         "sentry.severity_number": 13,

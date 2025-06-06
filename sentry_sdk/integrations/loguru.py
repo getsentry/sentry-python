@@ -195,9 +195,6 @@ def loguru_sentry_logs_handler(message):
     if record.get("name"):
         attrs["logger.name"] = record["name"]
 
-    if record["message"]:
-        attrs["sentry.message.template"] = record["message"]
-
     client._capture_experimental_log(
         {
             "severity_text": otel_severity_text,
