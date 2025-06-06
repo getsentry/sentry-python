@@ -1,6 +1,7 @@
 import sentry_sdk
-from sentry_sdk.integrations.openai_agents.utils import _usage_to_str, _set_agent_data
 from sentry_sdk.consts import OP, SPANDATA
+
+from ..utils import _set_agent_data, _usage_to_str
 
 from typing import TYPE_CHECKING
 
@@ -19,7 +20,9 @@ def invoke_agent_span(context, agent):
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
-    _set_agent_data(agent)
+    _set_agent_data(span, agent)
+
+    return span
 
 
 def update_invoke_agent_span(context, agent, output):

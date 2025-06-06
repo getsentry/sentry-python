@@ -1,6 +1,8 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
+from ..utils import _set_agent_data
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -31,7 +33,4 @@ def execute_tool_span(tool, *args, **kwargs):
 
 def update_execute_tool_span(span, agent, result):
     # type: (Span, agents.Agent, Any) -> None
-    from sentry_sdk.integrations.openai_agents.utils import _set_agent_data
-
-    _set_agent_data(agent)
-    pass
+    _set_agent_data(span, agent)

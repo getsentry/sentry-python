@@ -23,10 +23,8 @@ def ai_client_span(agent, model, run_config, get_response_kwargs):
     return span
 
 
-def update_ai_client_span(agent, model, run_config, get_response_kwargs, result):
-    _set_agent_data(agent)
-
-    span = sentry_sdk.get_current_span()
+def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, result):
+    _set_agent_data(span, agent)
 
     if get_response_kwargs.get("system_instructions"):
         span.set_data(

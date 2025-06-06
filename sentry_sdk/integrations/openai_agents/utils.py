@@ -94,44 +94,8 @@ def _wrap_hooks(hooks):
     return wrapped_hooks()
 
 
-def _set_agent_data(agent):
-    # type: (agents.Agent) -> None
-    span = sentry_sdk.get_current_span()
-
-    """
-    Thats the Agent object:
-    {'handoff_description': None,
-    'handoffs': [],
-    'hooks': None,
-    'input_guardrails': [],
-    'instructions': 'You are a helpful research assistant. Given a query, come up '
-                    'with a set of web searches to perform to best answer the '
-                    'query. Output between 5 and 20 terms to query for.',
-    'mcp_config': {},
-    'mcp_servers': [],
-    'model': 'gpt-4o',
-    'model_settings': ModelSettings(temperature=None,
-                                    top_p=None,
-                                    frequency_penalty=None,
-                                    presence_penalty=None,
-                                    tool_choice=None,
-                                    parallel_tool_calls=None,
-                                    truncation=None,
-                                    max_tokens=None,
-                                    reasoning=None,
-                                    metadata=None,
-                                    store=None,
-                                    include_usage=None,
-                                    extra_query=None,
-                                    extra_body=None,
-                                    extra_headers=None),
-    'name': 'PlannerAgent',
-    'output_guardrails': [],
-    'output_type': <class '__main__.WebSearchPlan'>,
-    'reset_tool_choice': True,
-    'tool_use_behavior': 'run_llm_again',
-    'tools': []}
-    """
+def _set_agent_data(span, agent):
+    # type: (sentry_sdk.Span, agents.Agent) -> None
     span.set_data(
         SPANDATA.GEN_AI_SYSTEM, "openai"
     )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
