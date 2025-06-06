@@ -21,9 +21,8 @@ def execute_tool_span(tool, *args, **kwargs):
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
     span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
 
-    # Set tool input
     input = args[1]
-    span.set_data("XXX.gen_ai.tool_input", input)
+    span.set_data("gen_ai.tool.input", input)
 
     if tool.__class__.__name__ == "FunctionTool":
         span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
@@ -31,6 +30,7 @@ def execute_tool_span(tool, *args, **kwargs):
     return span
 
 
-def update_execute_tool_span(span, agent, result):
-    # type: (Span, agents.Agent, Any) -> None
+def update_execute_tool_span(span, agent, tool, result):
+    # type: (Span, agents.Agent, agents.Tool, Any) -> None
     _set_agent_data(span, agent)
+    span.set_data("gen_ai.tool.output", result)
