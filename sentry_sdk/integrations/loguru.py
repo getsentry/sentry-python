@@ -162,8 +162,8 @@ def loguru_sentry_logs_handler(message):
     record = message.record
 
     if (
-        LoguruIntegration.sentry_logs_level is not None
-        and record["level"].no < LoguruIntegration.sentry_logs_level
+        LoguruIntegration.sentry_logs_level is None
+        or record["level"].no < LoguruIntegration.sentry_logs_level
     ):
         return
 
