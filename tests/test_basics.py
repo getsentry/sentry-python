@@ -220,13 +220,7 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
             crumb["data"] = {"foo": "bar"}
             return crumb
 
-    from sentry_sdk.integrations.dedupe import DedupeIntegration
-
-    sentry_init(
-        before_send=before_send,
-        before_breadcrumb=before_breadcrumb,
-        disabled_integrations=[DedupeIntegration],
-    )
+    sentry_init(before_send=before_send, before_breadcrumb=before_breadcrumb)
     events = capture_events()
 
     monkeypatch.setattr(
