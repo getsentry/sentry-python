@@ -209,7 +209,7 @@ def test_sentry_log_levels(
     assert logs[3]["severity_text"] == "fatal"
 
 
-def test_turn_off_sentry_logs(
+def test_disable_loguru_logs(
     sentry_init, capture_envelopes, uninstall_integration, request
 ):
     uninstall_integration("loguru")
@@ -218,6 +218,30 @@ def test_turn_off_sentry_logs(
     sentry_init(
         integrations=[LoguruIntegration(sentry_logs_level=None)],
         _experiments={"enable_logs": True},
+    )
+    envelopes = capture_envelopes()
+
+    logger.trace("this is a log")
+    logger.debug("this is a log")
+    logger.info("this is a log")
+    logger.success("this is a log")
+    logger.warning("this is a log")
+    logger.error("this is a log")
+    logger.critical("this is a log")
+
+    sentry_sdk.get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 0
+
+
+def test_disable_sentry_logs(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(
+        _experiments={"enable_logs": False},
     )
     envelopes = capture_envelopes()
 
@@ -288,9 +312,6 @@ def test_logging_errors(sentry_init, capture_envelopes, uninstall_integration, r
 def test_log_strips_project_root(
     sentry_init, capture_envelopes, uninstall_integration, request
 ):
-    """
-    The python logger should strip project roots from the log record path
-    """
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
