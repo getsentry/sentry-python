@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Any, Tuple
+    from typing import Any, Optional, Tuple
 
 try:
     import loguru
@@ -74,7 +74,7 @@ class LoguruIntegration(Integration):
     event_level = DEFAULT_EVENT_LEVEL  # type: int
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
-    sentry_logs_level = DEFAULT_LEVEL  # type: int
+    sentry_logs_level = DEFAULT_LEVEL  # type: Optional[int]
 
     def __init__(
         self,
@@ -162,7 +162,10 @@ def loguru_sentry_logs_handler(message):
 
     record = message.record
 
-    if record["level"].no < LoguruIntegration.sentry_logs_level:
+    if (
+        LoguruIntegration.sentry_logs_level is not None
+        and record["level"].no < LoguruIntegration.sentry_logs_level
+    ):
         return
 
     otel_severity_number, otel_severity_text = _loguru_level_to_otel(record["level"].no)

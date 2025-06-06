@@ -137,7 +137,6 @@ def test_event_format(sentry_init, capture_events, uninstall_integration, reques
 def test_sentry_logs_warning(
     sentry_init, capture_envelopes, uninstall_integration, request
 ):
-    """We should capture warning logs."""
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
@@ -164,7 +163,6 @@ def test_sentry_logs_warning(
 def test_sentry_logs_debug(
     sentry_init, capture_envelopes, uninstall_integration, request
 ):
-    """We don't capture debug logs by default."""
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
@@ -175,6 +173,65 @@ def test_sentry_logs_debug(
     sentry_sdk.get_client().flush()
 
     assert len(envelopes) == 0
+
+
+def test_sentry_log_levels(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(
+        integrations=[LoguruIntegration(sentry_logs_level=LoggingLevels.SUCCESS)],
+        _experiments={"enable_logs": True},
+    )
+    envelopes = capture_envelopes()
+
+    logger.trace("this is a log")
+    logger.debug("this is a log")
+    logger.info("this is a log")
+    logger.success("this is a log")
+    logger.warning("this is a log")
+    logger.error("this is a log")
+    logger.critical("this is a log")
+
+    sentry_sdk.get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 4
+
+    assert logs[0]["severity_number"] == 11
+    assert logs[0]["severity_text"] == "info"
+    assert logs[1]["severity_number"] == 13
+    assert logs[1]["severity_text"] == "warn"
+    assert logs[2]["severity_number"] == 17
+    assert logs[2]["severity_text"] == "error"
+    assert logs[3]["severity_number"] == 21
+    assert logs[3]["severity_text"] == "fatal"
+
+
+def test_turn_off_sentry_logs(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(
+        integrations=[LoguruIntegration(sentry_logs_level=None)],
+        _experiments={"enable_logs": True},
+    )
+    envelopes = capture_envelopes()
+
+    logger.trace("this is a log")
+    logger.debug("this is a log")
+    logger.info("this is a log")
+    logger.success("this is a log")
+    logger.warning("this is a log")
+    logger.error("this is a log")
+    logger.critical("this is a log")
+
+    sentry_sdk.get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 0
 
 
 def test_no_log_infinite_loop(
