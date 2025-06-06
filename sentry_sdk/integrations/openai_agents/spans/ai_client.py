@@ -51,8 +51,3 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
 
     output = [item.to_json() for item in result.output]
     span.set_data(SPANDATA.GEN_AI_CHOICE, output)
-
-    # TODO-anton: for debugging, remove this
-    for index, message in enumerate(result.output):
-        span.set_data(f"DEBUG.output.{index}", message)
-        # if message.get("type") == "function_call":
