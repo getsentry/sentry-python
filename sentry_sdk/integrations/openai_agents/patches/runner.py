@@ -33,11 +33,10 @@ def _create_run_wrapper(original_func):
         agent = args[0]
         with agent_workflow_span(agent) as span:
             kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
-
             result = await original_func(*args, **kwargs)
             update_agent_workflow_span(span, agent, result)
 
-            return result
+        return result
 
     @classmethod
     @wraps(original_func)
@@ -46,10 +45,9 @@ def _create_run_wrapper(original_func):
         agent = args[0]
         with agent_workflow_span(agent) as span:
             kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
-
             result = original_func(*args, **kwargs)
             update_agent_workflow_span(span, agent, result)
 
-            return result
+        return result
 
     return async_wrapper if is_async else sync_wrapper

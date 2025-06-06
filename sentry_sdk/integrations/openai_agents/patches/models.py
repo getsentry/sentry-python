@@ -29,6 +29,7 @@ def _create_get_model_wrapper(original_get_model):
             with ai_client_span(agent, model, run_config, kwargs) as span:
                 result = await original_get_response(*args, **kwargs)
                 update_ai_client_span(span, agent, model, run_config, kwargs, result)
+
             return result
 
         model.get_response = wrapped_get_response

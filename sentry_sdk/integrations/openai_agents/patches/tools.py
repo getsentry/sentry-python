@@ -45,7 +45,8 @@ def _create_get_all_tools_wrapper(original_get_all_tools):
                     with execute_tool_span(current_tool, *args, **kwargs) as span:
                         result = await current_on_invoke(*args, **kwargs)
                         update_execute_tool_span(span, agent, result)
-                        return result
+
+                    return result
 
                 return sentry_wrapped_on_invoke_tool
 
