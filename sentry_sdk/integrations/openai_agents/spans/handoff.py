@@ -5,11 +5,11 @@ from sentry_sdk.consts import OP, SPANDATA
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agents import Agent, RunContextWrapper
+    import agents
 
 
 def handoff_span(context, from_agent, to_agent):
-    # type: (RunContextWrapper, Agent, Agent) -> None
+    # type: (agents.RunContextWrapper, agents.Agent, agents.Agent) -> None
     print(
         f"### Handoff from '{from_agent.name}' to '{to_agent.name}'. "
         f"Usage: {_usage_to_str(context.usage)}"

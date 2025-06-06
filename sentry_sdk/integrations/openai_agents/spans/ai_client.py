@@ -3,44 +3,15 @@ from sentry_sdk.consts import OP, SPANDATA
 
 from ..utils import _set_agent_data
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agents import Agent, Model, RunConfig
+    from sentry_sdk import Span
+
 
 def ai_client_span(agent, model, run_config, get_response_kwargs):
-    """
-    https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/#inference
-
-    gen_ai.operation.name # chat|generate_content|text_completion|embeddings
-    gen_ai.system
-    gen_ai.conversation.id
-    gen_ai.output.type
-    gen_ai.request.choice.count
-    gen_ai.request.model
-    gen_ai.request.seed
-    gen_ai.request.frequency_penalty
-    gen_ai.request.max_tokens
-    gen_ai.request.presence_penalty
-    gen_ai.request.stop_sequences
-    gen_ai.request.temperature
-    gen_ai.request.top_k
-    gen_ai.request.top_p
-    gen_ai.response.finish_reasons
-    gen_ai.response.id
-    gen_ai.response.model
-    gen_ai.usage.input_tokens
-    gen_ai.usage.output_tokens
-    server.address
-    server.port
-    error.type
-
-
-    INPUT:
-    gen_ai.system.message
-    gen_ai.user.message
-    gen_ai.assistant.message
-    gen_ai.tool.message (response from tool call as input)
-
-    OUTPUT:
-    gen_ai.choice
-    """
+    # type: (Agent, Model, RunConfig, dict) -> Span
     # TODO-anton: implement other types of operations
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
@@ -52,7 +23,7 @@ def ai_client_span(agent, model, run_config, get_response_kwargs):
     return span
 
 
-def finish_ai_client_span(agent, model, run_config, get_response_kwargs, result):
+def update_ai_client_span(agent, model, run_config, get_response_kwargs, result):
     _set_agent_data(agent)
 
     span = sentry_sdk.get_current_span()

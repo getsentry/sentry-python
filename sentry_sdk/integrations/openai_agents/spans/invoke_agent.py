@@ -5,12 +5,12 @@ from sentry_sdk.consts import OP, SPANDATA
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import agents
     from typing import Any
-    from agents import Agent, RunContextWrapper
 
 
 def invoke_agent_span(context, agent):
-    # type: (RunContextWrapper, Agent) -> None
+    # type: (agents.RunContextWrapper, agents.Agent) -> None
     print(f"### Agent {agent.name} started. " f"Usage: {_usage_to_str(context.usage)}")
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_INVOKE_AGENT, name=f"invoke_agent {agent.name}"
@@ -22,8 +22,8 @@ def invoke_agent_span(context, agent):
     _set_agent_data(agent)
 
 
-def finish_invoke_agent_span(context, agent, output):
-    # type: (RunContextWrapper, Agent, Any) -> None
+def update_invoke_agent_span(context, agent, output):
+    # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
     print(
         f"### Agent '{agent.name}' ended with output {output}. "
         f"Usage: {_usage_to_str(context.usage)}"

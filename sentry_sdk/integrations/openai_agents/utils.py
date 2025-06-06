@@ -1,4 +1,3 @@
-import asyncio
 from functools import wraps
 
 import sentry_sdk
@@ -166,64 +165,3 @@ def _set_agent_data(agent):
             SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
             agent.model_settings.frequency_penalty,
         )
-
-
-def _create_run_wrapper(original_func):
-    # type: (Callable) -> Callable
-    """
-    Wraps the run methods of the Runner class to create a root span for the agent runs.
-    """
-    is_async = asyncio.iscoroutinefunction(original_func)
-
-    @classmethod
-    @wraps(original_func)
-    async def async_wrapper(cls, *args, **kwargs):
-        # type: (agents.Runner, *Any, **Any) -> Any
-        agent = args[0]
-        with _get_start_span_function()(name=f"{agent.name} workflow"):
-            kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
-            _set_agent_data(agent)
-
-            result = await original_func(*args, **kwargs)
-
-            return result
-
-    @classmethod
-    @wraps(original_func)
-    def sync_wrapper(cls, *args, **kwargs):
-        # type: (agents.Runner, *Any, **Any) -> Any
-        agent = args[0]
-        with _get_start_span_function()(name=f"{agent.name} workflow"):
-            kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
-            _set_agent_data(agent)
-
-            result = original_func(*args, **kwargs)
-
-            return result
-
-    return async_wrapper if is_async else sync_wrapper
-
-
-def _create_get_model_wrapper(original_get_model):
-    """
-    Wraps the get_response method of the model to create a AI client span.
-    """
-    from .spans import ai_client_span, finish_ai_client_span
-
-    @classmethod
-    @wraps(original_get_model)
-    def wrapped_get_model(cls, agent, run_config):
-        model = original_get_model(agent, run_config)
-        original_get_response = model.get_response
-
-        @wraps(original_get_response)
-        async def wrapped_get_response(*args, **kwargs):
-            with ai_client_span(agent, model, run_config, kwargs):
-                result = await original_get_response(*args, **kwargs)
-                finish_ai_client_span(agent, model, run_config, kwargs, result)
-            return result
-
-        model.get_response = wrapped_get_response
-        return model
-
-    return wrapped_get_model

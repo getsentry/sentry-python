@@ -1,9 +1,10 @@
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations.openai_agents.utils import (
-    _create_run_wrapper,
-    _create_get_model_wrapper,
-)
 
+from .patches import (
+    _create_get_model_wrapper,
+    _create_get_all_tools_wrapper,
+    _create_run_wrapper,
+)
 
 try:
     import agents
@@ -20,7 +21,15 @@ def _patch_runner():
 
 
 def _patch_model():
+    # type: () -> None
     agents.Runner._get_model = _create_get_model_wrapper(agents.Runner._get_model)
+
+
+def _patch_tools():
+    # type: () -> None
+    agents.Runner._get_all_tools = _create_get_all_tools_wrapper(
+        agents.Runner._get_all_tools
+    )
 
 
 class OpenAIAgentsIntegration(Integration):
@@ -30,5 +39,6 @@ class OpenAIAgentsIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        _patch_runner()
+        _patch_tools()
         _patch_model()
+        _patch_runner()
