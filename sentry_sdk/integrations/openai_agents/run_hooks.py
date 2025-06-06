@@ -27,7 +27,8 @@ except ImportError:
 
 
 class SentryRunHooks(RunHooks):
-    async def on_agent_start(self, context: RunContextWrapper, agent: Agent) -> None:
+    async def on_agent_start(self, context, agent) -> None:
+        # type: (RunContextWrapper, Agent) -> None
         invoke_agent_span(context, agent)
 
     async def on_agent_end(self, context, agent, output):

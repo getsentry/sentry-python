@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 def execute_tool_span(context, agent, tool):
     # type: (RunContextWrapper, Agent, Tool) -> None
-
     print(f"### Tool {tool.name} started. " f"Usage: {_usage_to_str(context.usage)}")
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_EXECUTE_TOOL, name=f"execute_tool {tool.name}"
