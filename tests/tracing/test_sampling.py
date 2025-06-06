@@ -218,7 +218,7 @@ def test_passes_attributes_from_start_span_to_traces_sampler(
     sentry_init(traces_sampler=traces_sampler)
 
     with start_span(attributes={"dogs": "yes", "cats": "maybe"}):
-        traces_sampler.assert_any_call(
+        traces_sampler.assert_called_once_with(
             DictionaryContaining({"dogs": "yes", "cats": "maybe"})
         )
 
