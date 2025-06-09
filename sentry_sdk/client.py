@@ -931,7 +931,7 @@ class _Client(BaseClient):
                 log["trace_id"] = propagation_context.trace_id
 
         # The user, if present, is always set on the isolation scope.
-        if self.should_send_default_pii() and isolation_scope._user is not None:
+        if isolation_scope._user is not None:
             for log_attribute, user_attribute in (
                 ("user.id", "id"),
                 ("user.name", "username"),
