@@ -7,6 +7,7 @@ from sentry_sdk.integrations.logging import (
     EventHandler,
     _BaseHandler,
 )
+from sentry_sdk.logger import _log_level_to_otel
 
 from typing import TYPE_CHECKING
 
@@ -49,22 +50,16 @@ SENTRY_LEVEL_FROM_LOGURU_LEVEL = {
     "CRITICAL": "CRITICAL",
 }
 
-
-def _loguru_level_to_otel(record_level):
-    # type: (int) -> tuple[int, str]
-    for py_level, otel_severity_number, otel_severity_text in [
-        (LoggingLevels.CRITICAL, 21, "fatal"),
-        (LoggingLevels.ERROR, 17, "error"),
-        (LoggingLevels.WARNING, 13, "warn"),
-        (LoggingLevels.SUCCESS, 11, "info"),
-        (LoggingLevels.INFO, 9, "info"),
-        (LoggingLevels.DEBUG, 5, "debug"),
-        (LoggingLevels.TRACE, 1, "trace"),
-    ]:
-        if record_level >= py_level:
-            return otel_severity_number, otel_severity_text
-
-    return 0, "default"
+# Map Loguru level numbers to corresponding OTel level numbers
+SEVERITY_TO_OTEL_SEVERITY = {
+    LoggingLevels.CRITICAL: 21,  # fatal
+    LoggingLevels.ERROR: 17,  # error
+    LoggingLevels.WARNING: 13,  # warn
+    LoggingLevels.SUCCESS: 11,  # info
+    LoggingLevels.INFO: 9,  # info
+    LoggingLevels.DEBUG: 5,  # debug
+    LoggingLevels.TRACE: 1,  # trace
+}
 
 
 class LoguruIntegration(Integration):
@@ -167,7 +162,9 @@ def loguru_sentry_logs_handler(message):
     ):
         return
 
-    otel_severity_number, otel_severity_text = _loguru_level_to_otel(record["level"].no)
+    otel_severity_number, otel_severity_text = _log_level_to_otel(
+        record["level"].no, SEVERITY_TO_OTEL_SEVERITY
+    )
 
     attrs = {"sentry.origin": "auto.logger.loguru"}  # type: dict[str, Any]
 

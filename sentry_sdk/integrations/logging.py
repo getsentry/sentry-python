@@ -5,6 +5,7 @@ from fnmatch import fnmatch
 
 import sentry_sdk
 from sentry_sdk.client import BaseClient
+from sentry_sdk.logger import _log_level_to_otel
 from sentry_sdk.utils import (
     safe_repr,
     to_string,
@@ -14,7 +15,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -35,6 +36,16 @@ LOGGING_TO_EVENT_LEVEL = {
     logging.FATAL: "fatal",
     logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
 }
+
+# Map logging level numbers to corresponding OTel level numbers
+SEVERITY_TO_OTEL_SEVERITY = {
+    logging.CRITICAL: 21,  # fatal
+    logging.ERROR: 17,  # error
+    logging.WARNING: 13,  # warn
+    logging.INFO: 9,  # info
+    logging.DEBUG: 5,  # debug
+}
+
 
 # Capturing events from those loggers causes recursion errors. We cannot allow
 # the user to unconditionally create events from those loggers under any
@@ -312,21 +323,6 @@ class BreadcrumbHandler(_BaseHandler):
         }
 
 
-def _python_level_to_otel(record_level):
-    # type: (int) -> Tuple[int, str]
-    for py_level, otel_severity_number, otel_severity_text in [
-        (50, 21, "fatal"),
-        (40, 17, "error"),
-        (30, 13, "warn"),
-        (20, 9, "info"),
-        (10, 5, "debug"),
-        (5, 1, "trace"),
-    ]:
-        if record_level >= py_level:
-            return otel_severity_number, otel_severity_text
-    return 0, "default"
-
-
 class SentryLogsHandler(_BaseHandler):
     """
     A logging handler that records Sentry logs for each Python log record.
@@ -352,7 +348,9 @@ class SentryLogsHandler(_BaseHandler):
 
     def _capture_log_from_record(self, client, record):
         # type: (BaseClient, LogRecord) -> None
-        otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
+        otel_severity_number, otel_severity_text = _log_level_to_otel(
+            record.levelno, SEVERITY_TO_OTEL_SEVERITY
+        )
         project_root = client.options["project_root"]
         attrs = self._extra_from_record(record)  # type: Any
         attrs["sentry.origin"] = "auto.logger.log"
