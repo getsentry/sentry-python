@@ -354,6 +354,55 @@ def test_log_strips_project_root(
     assert attrs["code.file.path"] == "blah/path.py"
 
 
+def test_log_keeps_full_path_if_not_in_project_root(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(
+        _experiments={"enable_logs": True},
+        project_root="/custom/test",
+    )
+    envelopes = capture_envelopes()
+
+    class FakeMessage:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        @property
+        def record(self):
+            return {
+                "elapsed": MagicMock(),
+                "exception": None,
+                "file": RecordFile(name="app.py", path="/blah/path.py"),
+                "function": "<module>",
+                "level": RecordLevel(name="ERROR", no=20, icon=""),
+                "line": 35,
+                "message": "some message",
+                "module": "app",
+                "name": "__main__",
+                "process": MagicMock(),
+                "thread": MagicMock(),
+                "time": MagicMock(),
+                "extra": MagicMock(),
+            }
+
+        @record.setter
+        def record(self, val):
+            pass
+
+    with patch("loguru._handler.Message", FakeMessage):
+        logger.error("some message")
+
+    sentry_sdk.get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+    assert len(logs) == 1
+    attrs = logs[0]["attributes"]
+    assert attrs["code.file.path"] == "/blah/path.py"
+
+
 def test_logger_with_all_attributes(
     sentry_init, capture_envelopes, uninstall_integration, request
 ):
