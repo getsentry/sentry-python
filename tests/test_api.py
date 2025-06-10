@@ -13,35 +13,11 @@ from sentry_sdk import (
     start_span,
     set_tags,
     get_global_scope,
-    get_current_scope,
     get_isolation_scope,
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
 from tests.conftest import SortedBaggage
-
-
-@pytest.mark.forked
-def test_get_current_span():
-    fake_scope = mock.MagicMock()
-    fake_scope.span = mock.MagicMock()
-    assert get_current_span(fake_scope) == fake_scope.span
-
-    fake_scope.span = None
-    assert get_current_span(fake_scope) is None
-
-
-@pytest.mark.forked
-def test_get_current_span_current_scope(sentry_init):
-    sentry_init()
-
-    assert get_current_span() is None
-
-    scope = get_current_scope()
-    fake_span = mock.MagicMock()
-    scope.span = fake_span
-
-    assert get_current_span() == fake_span
 
 
 @pytest.mark.forked

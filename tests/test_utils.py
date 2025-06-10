@@ -33,6 +33,10 @@ from sentry_sdk.utils import (
     _generate_installed_modules,
     ensure_integration_enabled,
     _serialize_span_attribute,
+    to_string,
+    exc_info_from_error,
+    get_lines_from_file,
+    package_version,
 )
 
 
@@ -60,6 +64,58 @@ def _normalize_distribution_name(name):
     for more details.
     """
     return re.sub(r"[-_.]+", "-", name).lower()
+
+
+isoformat_inputs_and_datetime_outputs = (
+    (
+        "2021-01-01T00:00:00.000000Z",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),  # UTC time
+    (
+        "2021-01-01T00:00:00.000000",
+        datetime(2021, 1, 1).astimezone(timezone.utc),
+    ),  # No TZ -- assume local but convert to UTC
+    (
+        "2021-01-01T00:00:00Z",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),  # UTC - No milliseconds
+    (
+        "2021-01-01T00:00:00.000000+00:00",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000-00:00",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000+0000",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000-0000",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2020-12-31T00:00:00.000000+02:00",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
+    ),  # UTC+2 time
+    (
+        "2020-12-31T00:00:00.000000-0200",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+    ),  # UTC-2 time
+    (
+        "2020-12-31T00:00:00-0200",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+    ),  # UTC-2 time - no milliseconds
+)
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_output"),
+    isoformat_inputs_and_datetime_outputs,
+)
+def test_datetime_from_isoformat(input_str, expected_output):
+    assert datetime_from_isoformat(input_str) == expected_output, input_str
 
 
 @pytest.mark.parametrize(
@@ -296,6 +352,12 @@ def test_sanitize_url_and_split(url, expected_result):
     assert sanitized_url.query == expected_result.query
     assert sanitized_url.path == expected_result.path
     assert sanitized_url.fragment == expected_result.fragment
+
+
+def test_sanitize_url_remove_authority_is_false():
+    url = "https://usr:pwd@example.com"
+    sanitized_url = sanitize_url(url, remove_authority=False)
+    assert sanitized_url == url
 
 
 @pytest.mark.parametrize(
@@ -581,6 +643,17 @@ def test_get_error_message(error, expected_result):
     assert get_error_message(exc_value) == expected_result(exc_value)
 
 
+def test_safe_str_fails():
+    class ExplodingStr:
+        def __str__(self):
+            raise Exception
+
+    obj = ExplodingStr()
+    result = safe_str(obj)
+
+    assert result == repr(obj)
+
+
 def test_installed_modules():
     try:
         from importlib.metadata import distributions, version
@@ -662,6 +735,20 @@ def test_default_release_empty_string():
         release = get_default_release()
 
     assert release is None
+
+
+def test_get_default_release_sentry_release_env(monkeypatch):
+    monkeypatch.setenv("SENTRY_RELEASE", "sentry-env-release")
+    assert get_default_release() == "sentry-env-release"
+
+
+def test_get_default_release_other_release_env(monkeypatch):
+    monkeypatch.setenv("SOURCE_VERSION", "other-env-release")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "other-env-release"
 
 
 def test_ensure_integration_enabled_integration_enabled(sentry_init):
@@ -938,55 +1025,6 @@ def test_serialize_span_attribute(value, result):
     assert _serialize_span_attribute(value) == result
 
 
-@pytest.mark.parametrize(
-    ("input_str", "expected_output"),
-    (
-        (
-            "2021-01-01T00:00:00.000000Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC time
-        (
-            "2021-01-01T00:00:00.000000",
-            datetime(2021, 1, 1, tzinfo=datetime.now().astimezone().tzinfo),
-        ),  # No TZ -- assume UTC
-        (
-            "2021-01-01T00:00:00Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC - No milliseconds
-        (
-            "2021-01-01T00:00:00.000000+00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000+0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2020-12-31T00:00:00.000000+02:00",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
-        ),  # UTC+2 time
-        (
-            "2020-12-31T00:00:00.000000-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time
-        (
-            "2020-12-31T00:00:00-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time - no milliseconds
-    ),
-)
-def test_datetime_from_isoformat(input_str, expected_output):
-    assert datetime_from_isoformat(input_str) == expected_output, input_str
-
-
 def test_qualname_from_function_inner_function():
     def test_function(): ...
 
@@ -1005,3 +1043,55 @@ def test_qualname_from_function_none_name():
         sentry_sdk.utils.qualname_from_function(test_function)
         == "test_qualname_from_function_none_name.<locals>.test_function"
     )
+
+
+def test_to_string_unicode_decode_error():
+    class BadStr:
+        def __str__(self):
+            raise UnicodeDecodeError("utf-8", b"", 0, 1, "reason")
+
+    obj = BadStr()
+    result = to_string(obj)
+    assert result == repr(obj)[1:-1]
+
+
+def test_exc_info_from_error_dont_get_an_exc():
+    class NotAnException:
+        pass
+
+    with pytest.raises(ValueError) as exc:
+        exc_info_from_error(NotAnException())
+
+    assert "Expected Exception object to report, got <class" in str(exc.value)
+
+
+def test_get_lines_from_file_handle_linecache_errors():
+    expected_result = ([], None, [])
+
+    class Loader:
+        @staticmethod
+        def get_source(module):
+            raise IOError("something went wrong")
+
+    result = get_lines_from_file("filename", 10, loader=Loader())
+    assert result == expected_result
+
+    with mock.patch(
+        "sentry_sdk.utils.linecache.getlines",
+        side_effect=OSError("something went wrong"),
+    ):
+        result = get_lines_from_file("filename", 10)
+        assert result == expected_result
+
+    lines = ["line1", "line2", "line3"]
+
+    def fake_getlines(filename):
+        return lines
+
+    with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
+        result = get_lines_from_file("filename", 10)
+        assert result == expected_result
+
+
+def test_package_version_is_none():
+    assert package_version("non_existent_package") is None

@@ -8,7 +8,7 @@ from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA, BAGGAGE_HEADER_NAME
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
-    _patch_redbeat_maybe_due,
+    _patch_redbeat_apply_async,
     _setup_celery_beat_signals,
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
@@ -72,7 +72,7 @@ class CeleryIntegration(Integration):
         self.exclude_beat_tasks = exclude_beat_tasks
 
         _patch_beat_apply_entry()
-        _patch_redbeat_maybe_due()
+        _patch_redbeat_apply_async()
         _setup_celery_beat_signals(monitor_beat_tasks)
 
     @staticmethod
@@ -100,9 +100,9 @@ class CeleryIntegration(Integration):
 def _set_status(status):
     # type: (str) -> None
     with capture_internal_exceptions():
-        scope = sentry_sdk.get_current_scope()
-        if scope.span is not None:
-            scope.span.set_status(status)
+        span = sentry_sdk.get_current_span()
+        if span is not None:
+            span.set_status(status)
 
 
 def _capture_exception(task, exc_info):

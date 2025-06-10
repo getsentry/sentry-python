@@ -47,6 +47,10 @@ FRAMEWORKS_NEEDING_DOCKER = {
     "aws_lambda",
 }
 
+FRAMEWORKS_NEEDING_JAVA = {
+    "spark",
+}
+
 # Frameworks grouped here will be tested together to not hog all GitHub runners.
 # If you add or remove a group, make sure to git rm the generated YAML file as
 # well.
@@ -288,6 +292,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "needs_docker": bool(set(frameworks) & FRAMEWORKS_NEEDING_DOCKER),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
         "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
+        "needs_java": bool(set(frameworks) & FRAMEWORKS_NEEDING_JAVA),
         "py_versions": {
             category: [f'"{version}"' for version in _normalize_py_versions(versions)]
             for category, versions in py_versions.items()

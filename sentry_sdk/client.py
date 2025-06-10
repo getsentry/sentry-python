@@ -107,7 +107,7 @@ def _get_options(*args, **kwargs):
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
     if rv["debug"] is None:
-        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG", "False"), strict=True)
+        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG"), strict=True) or False
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -132,6 +132,11 @@ def _get_options(*args, **kwargs):
             "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
         )
         rv["socket_options"] = None
+
+    if rv["keep_alive"] is None:
+        rv["keep_alive"] = (
+            env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
+        )
 
     return rv
 
@@ -400,6 +405,8 @@ class _Client(BaseClient):
 
             patch_readable_span()
             setup_sentry_tracing()
+
+            logger.debug("[Tracing] Finished setting up OpenTelemetry")
         finally:
             _client_init_debug.set(old_debug)
 

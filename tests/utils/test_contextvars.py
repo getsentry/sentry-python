@@ -1,10 +1,10 @@
 import pytest
 import random
 import time
+from unittest import mock
 
 
-@pytest.mark.forked
-def test_leaks(maybe_monkeypatched_threading):
+def _run_contextvar_threaded_test():
     import threading
 
     # Need to explicitly call _get_contextvars because the SDK has already
@@ -39,3 +39,14 @@ def test_leaks(maybe_monkeypatched_threading):
         t.join()
 
     assert len(success) == 20
+
+
+@pytest.mark.forked
+def test_leaks(maybe_monkeypatched_threading):
+    _run_contextvar_threaded_test()
+
+
+@pytest.mark.forked
+@mock.patch("sentry_sdk.utils._is_contextvars_broken", return_value=True)
+def test_leaks_when_is_contextvars_broken_is_false(maybe_monkeypatched_threading):
+    _run_contextvar_threaded_test()

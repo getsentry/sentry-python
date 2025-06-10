@@ -5,9 +5,7 @@ import warnings
 from opentelemetry import trace as otel_trace
 from opentelemetry.util._once import Once
 from threading import Thread
-from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from unittest import mock
 
 import pytest
 import jsonschema
@@ -36,12 +34,6 @@ from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from typing import Optional
-    from collections.abc import Iterator
 
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
@@ -644,23 +636,6 @@ def werkzeug_set_cookie(client, servername, key, value):
         client.set_cookie(servername, key, value)
     except TypeError:
         client.set_cookie(key, value)
-
-
-@contextmanager
-def patch_start_tracing_child(fake_transaction_is_none=False):
-    # type: (bool) -> Iterator[Optional[mock.MagicMock]]
-    if not fake_transaction_is_none:
-        fake_transaction = mock.MagicMock()
-        fake_start_child = mock.MagicMock()
-        fake_transaction.start_child = fake_start_child
-    else:
-        fake_transaction = None
-        fake_start_child = None
-
-    with mock.patch(
-        "sentry_sdk.tracing_utils.get_current_span", return_value=fake_transaction
-    ):
-        yield fake_start_child
 
 
 class ApproxDict(dict):

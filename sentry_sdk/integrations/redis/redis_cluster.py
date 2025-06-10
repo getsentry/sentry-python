@@ -37,11 +37,17 @@ def _get_async_cluster_db_data(async_redis_cluster_instance):
 def _get_async_cluster_pipeline_db_data(async_redis_cluster_pipeline_instance):
     # type: (AsyncClusterPipeline[Any]) -> dict[str, Any]
     with capture_internal_exceptions():
-        return _get_async_cluster_db_data(
-            # the AsyncClusterPipeline has always had a `_client` attr but it is private so potentially problematic and mypy
-            # does not recognize it - see https://github.com/redis/redis-py/blame/v5.0.0/redis/asyncio/cluster.py#L1386
-            async_redis_cluster_pipeline_instance._client,  # type: ignore[attr-defined]
-        )
+        client = getattr(async_redis_cluster_pipeline_instance, "cluster_client", None)
+        if client is None:
+            # In older redis-py versions, the AsyncClusterPipeline had a `_client`
+            # attr but it is private so potentially problematic and mypy does not
+            # recognize it - see
+            # https://github.com/redis/redis-py/blame/v5.0.0/redis/asyncio/cluster.py#L1386
+            client = (
+                async_redis_cluster_pipeline_instance._client  # type: ignore[attr-defined]
+            )
+
+        return _get_async_cluster_db_data(client)
 
 
 def _get_cluster_db_data(redis_cluster_instance):

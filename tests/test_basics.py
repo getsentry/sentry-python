@@ -414,6 +414,66 @@ def test_attachments_graceful_failure(
     assert envelope.items[1].payload.get_bytes() == b""
 
 
+def test_attachments_exceptions(sentry_init):
+    sentry_init()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    # bytes and path are None
+    with pytest.raises(TypeError) as e:
+        scope.add_attachment()
+
+    assert str(e.value) == "path or raw bytes required for attachment"
+
+    # filename is None
+    with pytest.raises(TypeError) as e:
+        scope.add_attachment(bytes=b"Hello World!")
+
+    assert str(e.value) == "filename is required for attachment"
+
+
+def test_attachments_content_type_is_none(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    scope.add_attachment(
+        bytes=b"Hello World!", filename="message.txt", content_type="foo/bar"
+    )
+    capture_exception(ValueError())
+
+    (envelope,) = envelopes
+    attachments = [x for x in envelope.items if x.type == "attachment"]
+    (message,) = attachments
+
+    assert message.headers["filename"] == "message.txt"
+    assert message.headers["content_type"] == "foo/bar"
+
+
+def test_attachments_repr(sentry_init):
+    sentry_init()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
+
+    assert repr(scope._attachments[0]) == "<Attachment 'message.txt'>"
+
+
+def test_attachments_bytes_callable_payload(sentry_init):
+    sentry_init()
+
+    scope = sentry_sdk.get_isolation_scope()
+
+    scope.add_attachment(bytes=bytes, filename="message.txt")
+
+    attachment = scope._attachments[0]
+    item = attachment.to_envelope_item()
+
+    assert item.payload.bytes == b""
+
+
 def test_integration_scoping(sentry_init, capture_events):
     logger = logging.getLogger("test_basics")
 
@@ -688,32 +748,36 @@ def _hello_world(word):
 
 
 def test_functions_to_trace(sentry_init, capture_events):
-    functions_to_trace = [
-        {"qualified_name": "tests.test_basics._hello_world"},
-        {"qualified_name": "time.sleep"},
-    ]
+    original_sleep = time.sleep
+    try:
+        functions_to_trace = [
+            {"qualified_name": "tests.test_basics._hello_world"},
+            {"qualified_name": "time.sleep"},
+        ]
 
-    sentry_init(
-        traces_sample_rate=1.0,
-        functions_to_trace=functions_to_trace,
-    )
+        sentry_init(
+            traces_sample_rate=1.0,
+            functions_to_trace=functions_to_trace,
+        )
 
-    events = capture_events()
+        events = capture_events()
 
-    with start_span(name="something"):
-        time.sleep(0)
+        with start_span(name="something"):
+            time.sleep(0)
 
-        for word in ["World", "You"]:
-            _hello_world(word)
+            for word in ["World", "You"]:
+                _hello_world(word)
 
-    assert len(events) == 1
+        assert len(events) == 1
 
-    (event,) = events
+        (event,) = events
 
-    assert len(event["spans"]) == 3
-    assert event["spans"][0]["description"] == "time.sleep"
-    assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
-    assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
+        assert len(event["spans"]) == 3
+        assert event["spans"][0]["description"] == "time.sleep"
+        assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
+        assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
+    finally:
+        time.sleep = original_sleep
 
 
 class WorldGreeter:

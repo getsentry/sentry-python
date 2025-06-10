@@ -729,9 +729,10 @@ def start_child_span_decorator(func):
                 )
                 return await func(*args, **kwargs)
 
-            with span.start_child(
+            with sentry_sdk.start_span(
                 op=OP.FUNCTION,
                 name=qualname_from_function(func),
+                only_if_parent=True,
             ):
                 return await func(*args, **kwargs)
 
@@ -757,9 +758,10 @@ def start_child_span_decorator(func):
                 )
                 return func(*args, **kwargs)
 
-            with span.start_child(
+            with sentry_sdk.start_span(
                 op=OP.FUNCTION,
                 name=qualname_from_function(func),
+                only_if_parent=True,
             ):
                 return func(*args, **kwargs)
 

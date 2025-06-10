@@ -1,5 +1,4 @@
 import itertools
-
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -47,6 +46,7 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        Log,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
@@ -71,6 +71,7 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "enable_logs": Optional[bool],
+            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
         },
         total=False,
     )
@@ -622,7 +623,7 @@ class ClientConstructor:
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         max_request_body_size="medium",  # type: str
         socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
-        keep_alive=False,  # type: bool
+        keep_alive=None,  # type: Optional[bool]
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=None,  # type: Optional[bool]

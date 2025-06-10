@@ -216,7 +216,8 @@ def test_scope_client():
     assert scope.client.__class__ == NonRecordingClient
 
     custom_client = Client()
-    scope = Scope(ty="test_more", client=custom_client)
+    scope = Scope(ty="test_more")
+    scope.set_client(custom_client)
     assert scope._type == "test_more"
     assert scope.client is not None
     assert scope.client.__class__ == Client
