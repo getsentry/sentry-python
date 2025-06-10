@@ -8,6 +8,7 @@ from sentry_sdk.utils import safe_repr
 
 OTEL_RANGES = [
     # ((severity level range), severity text)
+    # https://opentelemetry.io/docs/specs/otel/logs/data-model
     ((1, 4), "trace"),
     ((5, 8), "debug"),
     ((9, 12), "info"),
@@ -65,6 +66,7 @@ fatal = functools.partial(_capture_log, "fatal", 21)
 
 
 def _otel_severity_text(otel_severity_number):
+    # type: (int) -> str
     for (lower, upper), severity in OTEL_RANGES:
         if lower <= otel_severity_number <= upper:
             return severity
@@ -73,7 +75,7 @@ def _otel_severity_text(otel_severity_number):
 
 
 def _log_level_to_otel(level, mapping):
-    # type: (int, dict[int, int]) -> tuple[int, str]
+    # type: (int, dict[Any, int]) -> tuple[int, str]
     for py_level, otel_severity_number in sorted(mapping.items(), reverse=True):
         if level >= py_level:
             return otel_severity_number, _otel_severity_text(otel_severity_number)

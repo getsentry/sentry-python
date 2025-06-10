@@ -69,7 +69,7 @@ class LoguruIntegration(Integration):
     event_level = DEFAULT_EVENT_LEVEL  # type: Optional[int]
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
-    sentry_logs_level = DEFAULT_LEVEL  # type: Optional[LoggingLevels]
+    sentry_logs_level = DEFAULT_LEVEL  # type: Optional[int]
 
     def __init__(
         self,
@@ -79,7 +79,7 @@ class LoguruIntegration(Integration):
         event_format=DEFAULT_FORMAT,
         sentry_logs_level=DEFAULT_LEVEL,
     ):
-        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction, Optional[LoggingLevels]) -> None
+        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction, Optional[int]) -> None
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
         LoguruIntegration.breadcrumb_format = breadcrumb_format
