@@ -119,7 +119,10 @@ class LoggingIntegration(Integration):
                 # the integration.  Otherwise we have a high chance of getting
                 # into a recursion error when the integration is resolved
                 # (this also is slower).
-                if ignored_loggers is not None and record.name not in ignored_loggers:
+                if (
+                    ignored_loggers is not None
+                    and record.name.strip() not in ignored_loggers
+                ):
                     integration = sentry_sdk.get_client().get_integration(
                         LoggingIntegration
                     )
@@ -164,7 +167,7 @@ class _BaseHandler(logging.Handler):
         # type: (LogRecord) -> bool
         """Prevents ignored loggers from recording"""
         for logger in _IGNORED_LOGGERS:
-            if fnmatch(record.name, logger):
+            if fnmatch(record.name.strip(), logger):
                 return False
         return True
 
