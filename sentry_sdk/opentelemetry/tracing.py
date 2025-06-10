@@ -36,12 +36,12 @@ def setup_sentry_tracing():
     if _TRACER_PROVIDER is not None:
         logger.debug("[Tracing] Detected an existing TracerProvider, patching")
         tracer_provider = trace.get_tracer_provider()
-        tracer_provider.sampler = SentrySampler()
+        tracer_provider.sampler = SentrySampler()  # type: ignore[attr-defined]
 
     else:
         logger.debug("[Tracing] No TracerProvider set, creating a new one")
         tracer_provider = TracerProvider(sampler=SentrySampler())
         trace.set_tracer_provider(tracer_provider)
 
-    tracer_provider.add_span_processor(SentrySpanProcessor())
+    tracer_provider.add_span_processor(SentrySpanProcessor())  # type: ignore[attr-defined]
     set_global_textmap(SentryPropagator())
