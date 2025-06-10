@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Any, Optional, Tuple
+    from typing import Any, Optional
 
 try:
     import loguru
@@ -51,7 +51,7 @@ SENTRY_LEVEL_FROM_LOGURU_LEVEL = {
 
 
 def _loguru_level_to_otel(record_level):
-    # type: (int) -> Tuple[int, str]
+    # type: (int) -> tuple[int, str]
     for py_level, otel_severity_number, otel_severity_text in [
         (LoggingLevels.CRITICAL, 21, "fatal"),
         (LoggingLevels.ERROR, 17, "error"),
@@ -74,7 +74,7 @@ class LoguruIntegration(Integration):
     event_level = DEFAULT_EVENT_LEVEL  # type: Optional[int]
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
-    sentry_logs_level = DEFAULT_LEVEL  # type: Optional[int]
+    sentry_logs_level = DEFAULT_LEVEL  # type: Optional[LoggingLevels]
 
     def __init__(
         self,
@@ -84,7 +84,7 @@ class LoguruIntegration(Integration):
         event_format=DEFAULT_FORMAT,
         sentry_logs_level=DEFAULT_LEVEL,
     ):
-        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction, Optional[int]) -> None
+        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction, Optional[LoggingLevels]) -> None
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
         LoguruIntegration.breadcrumb_format = breadcrumb_format
