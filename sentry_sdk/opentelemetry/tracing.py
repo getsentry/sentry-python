@@ -45,7 +45,7 @@ def setup_sentry_tracing():
 
     try:
         existing_span_processors = (
-            tracer_provider._active_span_processor._span_processors
+            tracer_provider._active_span_processor._span_processors  # type: ignore[attr-defined]
         )
     except Exception:
         existing_span_processors = []
