@@ -3,7 +3,11 @@ import os
 import socket
 import warnings
 from opentelemetry import trace as otel_trace
-from opentelemetry.util._once import Once
+
+try:
+    from opentelemetry.util._once import Once
+except ImportError:
+    Once = None
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -78,7 +82,8 @@ def clean_scopes():
 @pytest.fixture(autouse=True)
 def clean_tracer():
     """Reset TracerProvider so that we can set it up from scratch."""
-    otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
+    if Once is not None:
+        otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
     otel_trace._TRACER_PROVIDER = None
 
 
