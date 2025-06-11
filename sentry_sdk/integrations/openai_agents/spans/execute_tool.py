@@ -21,6 +21,10 @@ def execute_tool_span(tool, *args, **kwargs):
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
     span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
 
+    # Deprecated name just for first iteration.
+    # TODO-anton: remove this if the Sentry.io UI is using GEN_AI_TOOL_NAME
+    span.set_data("ai.toolCall.name", tool.name)
+
     input = args[1]
     span.set_data("gen_ai.tool.input", input)
 

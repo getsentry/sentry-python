@@ -32,6 +32,10 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
             get_response_kwargs.get("system_instructions"),
         )
 
+    # Deprecated name just for first iteration.
+    # TODO-anton: define how to set input message and document in sentry-conventions.
+    span.set_data("ai.prompt.messages", get_response_kwargs.get("input", []))
+
     for message in get_response_kwargs.get("input", []):
         if message.get("role") == "user":
             span.set_data(SPANDATA.GEN_AI_USER_MESSAGE, message.get("content"))
@@ -48,6 +52,15 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
         result.usage.output_tokens_details.reasoning_tokens,
     )
     span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, result.usage.total_tokens)
+
+    # Deprecated name just for first iteration.
+    # TODO-anton: define how to set tool response messages and document in sentry-conventions.
+    tool_calls = [
+        item.to_json()
+        for item in result.output
+        if item.__class__.__name__ == "ResponseFunctionToolCall"
+    ]
+    span.set_data("ai.response.toolCalls", tool_calls)
 
     output = [item.to_json() for item in result.output]
     span.set_data(SPANDATA.GEN_AI_CHOICE, output)

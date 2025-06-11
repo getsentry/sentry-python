@@ -110,6 +110,10 @@ def _set_agent_data(span, agent):
     if agent.model:
         span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, agent.model)
 
+        # Deprecated name just for first iteration.
+        # TODO-anton: remove this if the Sentry.io UI is using GEN_AI_REQUEST_MODEL
+        span.set_data("ai.model.id", agent.model)
+
     if agent.model_settings.presence_penalty:
         span.set_data(
             SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
