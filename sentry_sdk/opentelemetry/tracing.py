@@ -43,5 +43,17 @@ def setup_sentry_tracing():
         tracer_provider = TracerProvider(sampler=SentrySampler())
         trace.set_tracer_provider(tracer_provider)
 
-    tracer_provider.add_span_processor(SentrySpanProcessor())  # type: ignore[attr-defined]
+    try:
+        existing_span_processors = (
+            tracer_provider._active_span_processor._span_processors
+        )
+    except Exception:
+        existing_span_processors = []
+
+    for span_processor in existing_span_processors:
+        if isinstance(span_processor, SentrySpanProcessor):
+            break
+    else:
+        tracer_provider.add_span_processor(SentrySpanProcessor())  # type: ignore[attr-defined]
+
     set_global_textmap(SentryPropagator())
