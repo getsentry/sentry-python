@@ -37,6 +37,7 @@ from sentry_sdk.profiler.continuous_profiler import (
     try_profile_lifecycle_trace_start,
 )
 from sentry_sdk.profiler.transaction_profiler import Profile
+from sentry_sdk.utils import safe_str
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -311,7 +312,9 @@ class SentrySpanProcessor(SpanProcessor):
 
         tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
         if tags:
-            common_json["tags"] = tags
+            common_json["tags"] = {
+                tag: safe_str(tag_value) for tag, tag_value in tags.items()
+            }
 
         return common_json
 

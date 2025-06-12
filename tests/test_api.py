@@ -14,6 +14,7 @@ from sentry_sdk import (
     set_tags,
     get_global_scope,
     get_isolation_scope,
+    set_tag,
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
@@ -158,3 +159,54 @@ def test_set_tags(sentry_init, capture_events):
         "tag2": "updated",
         "tag3": "new",
     }, "Updating tags with empty dict changed tags"
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "expected"),
+    [
+        ("int", 123, "123"),
+        ("float", 123.456, "123.456"),
+        ("bool", True, "True"),
+        ("none", None, "None"),
+        ("list", [1, 2, 3], "[1, 2, 3]"),
+    ],
+)
+def test_set_tag_converts_to_string(sentry_init, capture_events, key, value, expected):
+    """Test that the api.set_tag function converts values to strings."""
+    sentry_init()
+    events = capture_events()
+
+    set_tag(key, value)
+    raise_and_capture()
+
+    (event,) = events
+    tags = event.get("tags", {})
+
+    assert tags[key] == expected
+
+
+def test_set_tags_converts_to_string(sentry_init, capture_events):
+    """Test that the api.set_tags function converts values to strings."""
+    sentry_init()
+    events = capture_events()
+
+    set_tags(
+        {
+            "int": 456,
+            "float": 789.012,
+            "bool": False,
+            "tuple": (1, 2, 3),
+            "string": "already_string",
+        }
+    )
+
+    raise_and_capture()
+
+    (*_, event) = events
+    tags = event.get("tags", {})
+
+    assert tags["int"] == "456"
+    assert tags["float"] == "789.012"
+    assert tags["bool"] == "False"
+    assert tags["tuple"] == "(1, 2, 3)"
+    assert tags["string"] == "already_string"
