@@ -870,7 +870,8 @@ class Scope:
         This method only modifies tag keys in the `tags` mapping passed to the method.
         `scope.set_tags({})` is, therefore, a no-op.
 
-        :param tags: A mapping of tag keys to tag values to set. Values will be converted to strings.
+        :param tags: A mapping of tag keys to tag values to set. Values will be
+        converted to strings.
         """
         for key, value in tags.items():
             self.set_tag(key, value)

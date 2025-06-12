@@ -190,28 +190,28 @@ def test_set_tags(sentry_init, capture_events):
     }, "Updating tags with empty dict changed tags"
 
 
-def test_set_tag_converts_to_string(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    ("key", "value", "expected"),
+    [
+        ("int", 123, "123"),
+        ("float", 123.456, "123.456"),
+        ("bool", True, "True"),
+        ("none", None, "None"),
+        ("list", [1, 2, 3], "[1, 2, 3]"),
+    ],
+)
+def test_set_tag_converts_to_string(sentry_init, capture_events, key, value, expected):
     """Test that the api.set_tag function converts values to strings."""
     sentry_init()
     events = capture_events()
 
-    # Test various types
-    set_tag("int", 123)
-    set_tag("float", 123.456)
-    set_tag("bool", True)
-    set_tag("none", None)
-    set_tag("list", [1, 2, 3])
-    
+    set_tag(key, value)
     raise_and_capture()
-    
-    (*_, event) = events
+
+    (event,) = events
     tags = event.get("tags", {})
-    
-    assert tags["int"] == "123"
-    assert tags["float"] == "123.456"
-    assert tags["bool"] == "True"
-    assert tags["none"] == "None"
-    assert tags["list"] == "[1, 2, 3]"
+
+    assert tags[key] == expected
 
 
 def test_set_tags_converts_to_string(sentry_init, capture_events):
@@ -219,19 +219,21 @@ def test_set_tags_converts_to_string(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    set_tags({
-        "int": 456,
-        "float": 789.012,
-        "bool": False,
-        "tuple": (1, 2, 3),
-        "string": "already_string",
-    })
-    
+    set_tags(
+        {
+            "int": 456,
+            "float": 789.012,
+            "bool": False,
+            "tuple": (1, 2, 3),
+            "string": "already_string",
+        }
+    )
+
     raise_and_capture()
-    
+
     (*_, event) = events
     tags = event.get("tags", {})
-    
+
     assert tags["int"] == "456"
     assert tags["float"] == "789.012"
     assert tags["bool"] == "False"

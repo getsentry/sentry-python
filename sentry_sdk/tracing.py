@@ -1270,7 +1270,16 @@ class NoOpSpan(Span):
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        self._tags[key] = safe_str(value)
+        pass
+
+    def set_data(self, key, value):
+        # type: (str, Any) -> None
+        pass
+
+    def set_status(self, value):
+        # type: (str) -> None
+        pass
+
     def set_http_status(self, http_status):
         # type: (int) -> None
         pass
