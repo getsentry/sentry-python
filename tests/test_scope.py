@@ -905,3 +905,107 @@ def test_last_event_id_cleared(sentry_init):
     Scope.get_isolation_scope().clear()
 
     assert Scope.last_event_id() is None, "last_event_id should be cleared"
+
+
+def test_set_tag_converts_to_string():
+    """Test that set_tag converts various types to strings."""
+    scope = Scope()
+    
+    # Test various types
+    test_cases = [
+        ("int", 123, "123"),
+        ("float", 123.456, "123.456"),
+        ("bool_true", True, "True"),
+        ("bool_false", False, "False"),
+        ("none", None, "None"),
+        ("list", [1, 2, 3], "[1, 2, 3]"),
+        ("dict", {"key": "value"}, "{'key': 'value'}"),
+        ("already_string", "test", "test"),
+    ]
+    
+    for key, value, expected in test_cases:
+        scope.set_tag(key, value)
+        
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+    
+    for key, value, expected in test_cases:
+        assert tags[key] == expected, f"Tag {key} was not converted properly"
+
+
+def test_set_tags_converts_to_string():
+    """Test that set_tags converts all values to strings."""
+    scope = Scope()
+    
+    scope.set_tags({
+        "int": 123,
+        "float": 123.456,
+        "bool": True,
+        "none": None,
+        "list": [1, 2, 3],
+        "string": "test",
+    })
+    
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+    
+    assert tags["int"] == "123"
+    assert tags["float"] == "123.456"
+    assert tags["bool"] == "True"
+    assert tags["none"] == "None"
+    assert tags["list"] == "[1, 2, 3]"
+    assert tags["string"] == "test"
+
+
+def test_set_tag_handles_conversion_failure():
+    """Test that set_tag handles objects that fail to convert to string."""
+    scope = Scope()
+    
+    # Create an object that raises an exception when str() is called
+    class BadObject:
+        def __str__(self):
+            raise Exception("Cannot convert to string")
+    
+    bad_obj = BadObject()
+    
+    # This should not raise an exception
+    scope.set_tag("bad_object", bad_obj)
+    
+    # The tag should not be set
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+    
+    assert "bad_object" not in tags, "Tag with failed conversion should not be set"
+    
+    # Other tags should still work
+    scope.set_tag("good_tag", "value")
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+    
+    assert tags["good_tag"] == "value"
+
+
+def test_set_tags_handles_conversion_failure():
+    """Test that set_tags handles objects that fail to convert to string."""
+    scope = Scope()
+    
+    # Create an object that raises an exception when str() is called
+    class BadObject:
+        def __str__(self):
+            raise Exception("Cannot convert to string")
+    
+    bad_obj = BadObject()
+    
+    # This should not raise an exception and should set the convertible tags
+    scope.set_tags({
+        "good_tag1": "value1",
+        "bad_tag": bad_obj,
+        "good_tag2": 123,
+    })
+    
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+    
+    assert tags["good_tag1"] == "value1"
+    assert "bad_tag" not in tags
+    assert tags["good_tag2"] == "123"

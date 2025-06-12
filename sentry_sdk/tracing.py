@@ -596,7 +596,18 @@ class Span:
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        self._tags[key] = value
+        try:
+            # Convert value to string
+            str_value = str(value)
+            self._tags[key] = str_value
+        except Exception:
+            # If conversion fails, don't set the tag
+            # Log the issue for debugging
+            logger.debug(
+                "Failed to convert tag value to string for key '%s' with value '%r'",
+                key,
+                value,
+            )
 
     def set_data(self, key, value):
         # type: (str, Any) -> None

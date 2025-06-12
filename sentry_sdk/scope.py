@@ -850,9 +850,21 @@ class Scope:
 
         :param key: Key of the tag to set.
 
-        :param value: Value of the tag to set.
+        :param value: Value of the tag to set. Will be converted to string.
         """
-        self._tags[key] = value
+        try:
+            # Convert value to string
+            str_value = str(value)
+            self._tags[key] = str_value
+        except Exception:
+            # If conversion fails, don't set the tag
+            # Log the issue for debugging
+            logger = logging.getLogger("sentry_sdk.errors")
+            logger.debug(
+                "Failed to convert tag value to string for key '%s' with value '%r'",
+                key,
+                value,
+            )
 
     def set_tags(self, tags):
         # type: (Mapping[str, object]) -> None
@@ -869,9 +881,10 @@ class Scope:
         This method only modifies tag keys in the `tags` mapping passed to the method.
         `scope.set_tags({})` is, therefore, a no-op.
 
-        :param tags: A mapping of tag keys to tag values to set.
+        :param tags: A mapping of tag keys to tag values to set. Values will be converted to strings.
         """
-        self._tags.update(tags)
+        for key, value in tags.items():
+            self.set_tag(key, value)
 
     def remove_tag(self, key):
         # type: (str) -> None
