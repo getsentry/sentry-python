@@ -89,12 +89,9 @@ class WatchedSpan:
 class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     """Base callback handler that can be used to handle callbacks from langchain."""
 
-    span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
-
-    max_span_map_size = 0
-
     def __init__(self, max_span_map_size, include_prompts, tiktoken_encoding_name=None):
         # type: (int, bool, Optional[str]) -> None
+        self.span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
 
