@@ -111,9 +111,13 @@ def _get_address_port(settings):
     # type: (dict[str, Any]) -> tuple[Optional[str], Optional[int]]
     location = settings.get("LOCATION")
 
-    # TODO: location can also be an array of locations
-    #       see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
-    #       GitHub issue: https://github.com/getsentry/sentry-python/issues/3062
+    # Handle array of locations (e.g., for Redis replication or Memcached clusters)
+    # For now, we use the first location (primary server)
+    if isinstance(location, (list, tuple)):
+        if not location:
+            return None, None
+        location = location[0]
+    
     if not isinstance(location, str):
         return None, None
 
