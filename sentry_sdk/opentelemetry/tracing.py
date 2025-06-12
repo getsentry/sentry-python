@@ -35,7 +35,7 @@ def setup_sentry_tracing():
 
     if _TRACER_PROVIDER is not None:
         logger.debug("[Tracing] Detected an existing TracerProvider, patching")
-        tracer_provider = trace.get_tracer_provider()
+        tracer_provider = _TRACER_PROVIDER
         tracer_provider.sampler = SentrySampler()  # type: ignore[attr-defined]
 
     else:
