@@ -30,6 +30,8 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
     if system_instructions:
         span.set_data(SPANDATA.GEN_AI_SYSTEM_MESSAGE, system_instructions)
 
+    # LLM Request INPUT
+
     # "system" messages have a content of type string.
     prompt_messages = []
     if system_instructions:
@@ -66,6 +68,8 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
             span.set_data(SPANDATA.GEN_AI_USER_MESSAGE, message.get("content"))
             break
 
+    # LLM Request USAGE
+
     span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, result.usage.input_tokens)
     span.set_data(
         SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
@@ -78,19 +82,28 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
     )
     span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, result.usage.total_tokens)
 
-    # Deprecated name just for first iteration.
-    # TODO-anton: define how to set tool response messages and document in sentry-conventions.
-    assistant_responses = [
-        item.to_json()
-        for item in result.output
-        if item.__class__.__name__ == "ResponseFunctionToolCall"
-    ]
-    if len(assistant_responses) > 0:
-        span.set_data("ai.response.toolCalls", assistant_responses)
-
-    output = [item.to_json() for item in result.output]
-    span.set_data(SPANDATA.GEN_AI_CHOICE, output)
+    # LLM Response OUTPUT
 
     # Deprecated name just for first iteration.
     # TODO-anton: define how to set tool response messages and document in sentry-conventions.
-    span.set_data("ai.response.text", output)
+
+    output_messages = {
+        "response": [],
+        "tool": [],
+    }
+    for output in result.output:
+        if output.type == "function_call":
+            output_messages["tool"].append(output.to_json())
+        elif output.type == "message":
+            for output_message in output.content:
+                output_messages["response"].append(output_message.to_json())
+
+    if len(output_messages["tool"]) > 0:
+        span.set_data("ai.response.toolCalls", output_messages["tool"])
+
+    if len(output_messages["response"]) > 0:
+        span.set_data(SPANDATA.GEN_AI_CHOICE, output_messages["response"])
+
+        # Deprecated name just for first iteration.
+        # TODO-anton: define how to set tool response messages and document in sentry-conventions.
+        span.set_data("ai.response.text", output_messages["response"])
