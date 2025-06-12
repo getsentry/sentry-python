@@ -17,7 +17,10 @@ from langchain_core.messages import BaseMessage, AIMessageChunk
 from langchain_core.outputs import ChatGenerationChunk
 
 from sentry_sdk import start_transaction
-from sentry_sdk.integrations.langchain import LangchainIntegration
+from sentry_sdk.integrations.langchain import (
+    LangchainIntegration,
+    SentryLangchainCallback,
+)
 from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
@@ -342,3 +345,22 @@ def test_span_origin(sentry_init, capture_events):
     assert event["contexts"]["trace"]["origin"] == "manual"
     for span in event["spans"]:
         assert span["origin"] == "auto.ai.langchain"
+
+
+def test_span_map_is_instance_variable():
+    """Test that each SentryLangchainCallback instance has its own span_map."""
+    # Create two separate callback instances
+    callback1 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+    callback2 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    # Verify they have different span_map instances
+    assert (
+        callback1.span_map is not callback2.span_map
+    ), "span_map should be an instance variable, not shared between instances"
+
+
+def test_span_map_not_class_attribute():
+    """Test that span_map is not accessible as a class attribute."""
+    # This should raise AttributeError if span_map is properly an instance variable
+    with pytest.raises(AttributeError):
+        SentryLangchainCallback.span_map
