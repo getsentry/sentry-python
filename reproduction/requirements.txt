@@ -1,0 +1,13 @@
+# Core dependencies for reproducing the issue
+langchain-core==0.3.55
+sentry-sdk==2.27.0
+
+# Dependencies of langchain-core (installed automatically)
+# Listed here for completeness:
+# - langsmith
+# - tenacity
+# - jsonpatch
+# - PyYAML
+# - packaging
+# - typing-extensions
+# - pydantic
