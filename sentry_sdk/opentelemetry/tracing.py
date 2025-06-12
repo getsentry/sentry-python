@@ -7,6 +7,7 @@ from sentry_sdk.opentelemetry import (
     SentrySampler,
     SentrySpanProcessor,
 )
+from sentry_sdk.utils import logger
 
 
 def patch_readable_span():
@@ -28,8 +29,31 @@ def patch_readable_span():
 
 def setup_sentry_tracing():
     # type: () -> None
-    provider = TracerProvider(sampler=SentrySampler())
-    provider.add_span_processor(SentrySpanProcessor())
-    trace.set_tracer_provider(provider)
+    # TracerProvider can only be set once. If we're the first ones setting it,
+    # there's no issue. If it already exists, we need to patch it.
+    from opentelemetry.trace import _TRACER_PROVIDER
+
+    if _TRACER_PROVIDER is not None:
+        logger.debug("[Tracing] Detected an existing TracerProvider, patching")
+        tracer_provider = _TRACER_PROVIDER
+        tracer_provider.sampler = SentrySampler()  # type: ignore[attr-defined]
+
+    else:
+        logger.debug("[Tracing] No TracerProvider set, creating a new one")
+        tracer_provider = TracerProvider(sampler=SentrySampler())
+        trace.set_tracer_provider(tracer_provider)
+
+    try:
+        existing_span_processors = (
+            tracer_provider._active_span_processor._span_processors  # type: ignore[attr-defined]
+        )
+    except Exception:
+        existing_span_processors = []
+
+    for span_processor in existing_span_processors:
+        if isinstance(span_processor, SentrySpanProcessor):
+            break
+    else:
+        tracer_provider.add_span_processor(SentrySpanProcessor())  # type: ignore[attr-defined]
 
     set_global_textmap(SentryPropagator())
