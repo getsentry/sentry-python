@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
     should_be_treated_as_error,
+    safe_str,
 )
 
 from typing import TYPE_CHECKING
@@ -596,18 +597,7 @@ class Span:
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        try:
-            # Convert value to string
-            str_value = str(value)
-            self._tags[key] = str_value
-        except Exception:
-            # If conversion fails, don't set the tag
-            # Log the issue for debugging
-            logger.debug(
-                "Failed to convert tag value to string for key '%s' with value '%r'",
-                key,
-                value,
-            )
+        self._tags[key] = safe_str(value)
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
@@ -1280,16 +1270,7 @@ class NoOpSpan(Span):
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        pass
-
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
-        pass
-
-    def set_status(self, value):
-        # type: (str) -> None
-        pass
-
+        self._tags[key] = safe_str(value)
     def set_http_status(self, http_status):
         # type: (int) -> None
         pass

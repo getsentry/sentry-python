@@ -42,6 +42,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     exc_info_from_error,
     logger,
+    safe_str,
 )
 
 import typing
@@ -852,19 +853,7 @@ class Scope:
 
         :param value: Value of the tag to set. Will be converted to string.
         """
-        try:
-            # Convert value to string
-            str_value = str(value)
-            self._tags[key] = str_value
-        except Exception:
-            # If conversion fails, don't set the tag
-            # Log the issue for debugging
-            logger = logging.getLogger("sentry_sdk.errors")
-            logger.debug(
-                "Failed to convert tag value to string for key '%s' with value '%r'",
-                key,
-                value,
-            )
+        self._tags[key] = safe_str(value)
 
     def set_tags(self, tags):
         # type: (Mapping[str, object]) -> None
