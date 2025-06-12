@@ -18,7 +18,7 @@ with the most common migration patterns.
 for your feedback. How was the migration? Is everything working as expected? Is
 *nothing* working as expected? Something in between? Please let us know
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
-[on Discord](https://discord.gg/wdNEHETs87).
+[on Discord](https://discord.com/invite/Ww9hbqr).
 
 ## 2.30.0
 
