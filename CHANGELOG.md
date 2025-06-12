@@ -2,34 +2,23 @@
 
 ## 3.0.0a2
 
-### Various fixes & improvements
+We're excited to announce that version 3.0 of the Sentry Python SDK is now
+available. This release is the result of a long-term effort to use OpenTelemetry
+under the hood for tracing. This switch opens the door for us to leverage the
+full power of OpenTelemetry, so stay tuned for more integrations and features
+in future releases.
 
-- Fix Discord link in changelog (#3152) by @sl0thentr0py
-- Update CHANGELOG.md (719efd5c) by @sentrivana
-- release: 2.30.0 (949c4e81) by @getsentry-bot
-- Patch `TracerProvider` if it already exists (#4455) by @sl0thentr0py
-- test: Assert `traces_sampler` called once (#4450) by @sl0thentr0py
-- feat(loguru): Sentry logs for Loguru (#4445) by @sentrivana
-- fix(logs): Don't gate user behind `send_default_pii` (#4453) by @AbhiPrasad
-- fix(logging): Strip log `record.name` for more robust matching (#4411) by @romaingd-spi
-- Migrate to modern threading interface (#4452) by @emmanuel-ferdman
-- feat(scope): Remove `client` parameter (#4449) by @sl0thentr0py
-- Add span activate and deactivate apis (#4447) by @sl0thentr0py
-- ref: Remove `_capture_experimental_log` `scope` parameter (#4424) by @szokeasaurusrex
-- feat(logs): Add user attributes to logs (#4423) by @szokeasaurusrex
-- Remove `scope.span =` setter and make sure `scope.span` reference is correct in context manager regardless of source of span (#4439) by @sl0thentr0py
-- Update trace decorator to not use start_child (#4440) by @sl0thentr0py
-- tests: Regenerate tox.ini & fix CI (#4435) by @sentrivana
-- Cleanup meta references on flush (#4420) by @sl0thentr0py
-- fix: fix ARQ integration error (#4427) (#4428) by @ninoseki
-- Fix CI, adapt to new redis-py release (#4431) by @sentrivana
-- Add otel debug log for setup (#3152) by @sl0thentr0py
-- fix(grpc): Fix AttributeError when instrumenting with OTel (#4405) by @sentrivana
-- fix(redis): Use `command_queue` instead of `command_stack` if available (#4404) by @sentrivana
-- tests: Regenerate toxgen (#4403) by @sentrivana
-- fix: Handle invalid `SENTRY_DEBUG` values properly (#4400) by @szokeasaurusrex
+Looking to upgrade from Sentry SDK 2.x to 3.x? See the
+[full list of changes](MIGRATION_GUIDE.md) for a comprehensive overview
+of what's changed. Looking for a more digestible summary? See the
+[migration guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+with the most common migration patterns.
 
-_Plus 20 more_
+⚠️ This is a pre-release. If you feel like taking it for a spin, we'd be grateful
+for your feedback. How was the migration? Is everything working as expected? Is
+*nothing* working as expected? Something in between? Please let us know
+[on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
+[on Discord](https://discord.com/invite/Ww9hbqr).
 
 ## 3.0.0a1
 
