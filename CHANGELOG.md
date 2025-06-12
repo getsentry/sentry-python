@@ -142,7 +142,7 @@ for your feedback. How was the migration? Is everything working as expected? Is
   sentry_sdk.init(
     dsn="...",
     _experiments={
-        "enable_sentry_logs": True
+        "enable_logs": True
     }
     integrations=[
       LoggingIntegration(sentry_logs_level=logging.ERROR),
