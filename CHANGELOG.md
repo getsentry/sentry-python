@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.30.0
+
+### Various fixes & improvements
+
+- feat(loguru): Sentry logs for Loguru (#4445) by @sentrivana
+- fix(logs): Don't gate user behind `send_default_pii` (#4453) by @AbhiPrasad
+- fix(logging): Strip log `record.name` for more robust matching (#4411) by @romaingd-spi
+- Migrate to modern threading interface (#4452) by @emmanuel-ferdman
+- ref: Remove `_capture_experimental_log` `scope` parameter (#4424) by @szokeasaurusrex
+- feat(logs): Add user attributes to logs (#4423) by @szokeasaurusrex
+- tests: Regenerate tox.ini & fix CI (#4435) by @sentrivana
+- fix: fix ARQ integration error (#4427) (#4428) by @ninoseki
+- Fix CI, adapt to new redis-py release (#4431) by @sentrivana
+- fix(grpc): Fix AttributeError when instrumenting with OTel (#4405) by @sentrivana
+- fix(redis): Use `command_queue` instead of `command_stack` if available (#4404) by @sentrivana
+- tests: Regenerate toxgen (#4403) by @sentrivana
+- fix: Handle invalid `SENTRY_DEBUG` values properly (#4400) by @szokeasaurusrex
+- build(deps): bump codecov/codecov-action from 5.4.2 to 5.4.3 (#4397) by @dependabot
+- Increase test coverage (#4393) by @mgaligniana
+- tests(logs): avoid failures when running with integrations enabled (#4388) by @rominf
+
 ## 2.29.1
 
 ### Various fixes & improvements
