@@ -10,4 +10,4 @@ sentry-sdk==2.27.0
 # - PyYAML
 # - packaging
 # - typing-extensions
-# - pydantic
+# - pydantic 
