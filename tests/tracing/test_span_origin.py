@@ -1,3 +1,4 @@
+import pytest
 from sentry_sdk import start_span
 
 
@@ -36,3 +37,128 @@ def test_span_origin_custom(sentry_init, capture_events):
 
     assert second_transaction["contexts"]["trace"]["origin"] == "ho.ho2.ho3"
     assert second_transaction["spans"][0]["origin"] == "baz.baz2.baz3"
+
+
+@pytest.mark.parametrize("disabled_origins", [None, [], "noop"])
+def test_disabled_span_origins_empty_config(
+    sentry_init, capture_events, disabled_origins
+):
+    """Test that when disabled_span_origins is None or empty, all spans are allowed."""
+    if disabled_origins in (None, []):
+        sentry_init(traces_sample_rate=1.0, disabled_span_origins=disabled_origins)
+    elif disabled_origins == "noop":
+        sentry_init(
+            traces_sample_rate=1.0,
+            # default is None
+        )
+
+    events = capture_events()
+
+    with start_span(name="span1"):
+        pass
+    with start_span(name="span2", origin="auto.http.requests"):
+        pass
+    with start_span(name="span3", origin="auto.db.postgres"):
+        pass
+
+    assert len(events) == 3
+
+
+@pytest.mark.parametrize(
+    "disabled_origins,origins,expected_events_count,expected_allowed_origins",
+    [
+        # Regexes
+        (
+            [r"auto\.http\..*", r"auto\.db\..*"],
+            [
+                "auto.http.requests",
+                "auto.db.sqlite",
+                "manual",
+            ],
+            1,
+            ["manual"],
+        ),
+        # Substring matching
+        (
+            ["http"],
+            [
+                "auto.http.requests",
+                "http.client",
+                "my.http.integration",
+                "manual",
+                "auto.db.postgres",
+            ],
+            2,
+            ["manual", "auto.db.postgres"],
+        ),
+        # Mix and match
+        (
+            ["manual", r"auto\.http\..*", "db"],
+            [
+                "manual",
+                "auto.http.requests",
+                "auto.db.postgres",
+                "auto.grpc.server",
+            ],
+            1,
+            ["auto.grpc.server"],
+        ),
+    ],
+)
+def test_disabled_span_origins_filtering(
+    sentry_init,
+    capture_events,
+    disabled_origins,
+    origins,
+    expected_events_count,
+    expected_allowed_origins,
+):
+    """Test disabled_span_origins with various pattern configurations."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        disabled_span_origins=disabled_origins,
+    )
+
+    events = capture_events()
+
+    for origin in origins:
+        with start_span(name="span", origin=origin):
+            pass
+
+    # Check total events captured
+    assert len(events) == expected_events_count
+
+    # Check that only expected origins were captured
+    if expected_events_count > 0:
+        captured_origins = {event["contexts"]["trace"]["origin"] for event in events}
+        assert captured_origins == set(expected_allowed_origins)
+
+
+def test_disabled_span_origins_with_child_spans(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, disabled_span_origins=[r"auto\.http\..*"])
+    events = capture_events()
+
+    with start_span(name="parent", origin="manual"):
+        with start_span(name="http-child", origin="auto.http.requests"):
+            pass
+        with start_span(name="db-child", origin="auto.db.postgres"):
+            pass
+
+    assert len(events) == 1
+    assert events[0]["contexts"]["trace"]["origin"] == "manual"
+    assert len(events[0]["spans"]) == 1
+    assert events[0]["spans"][0]["origin"] == "auto.db.postgres"
+
+
+def test_disabled_span_origin_parent_with_child_spans(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, disabled_span_origins=[r"auto\.http\..*"])
+    events = capture_events()
+
+    with start_span(name="parent", origin="auto.http.requests"):
+        with start_span(
+            name="db-child", origin="auto.db.postgres", only_if_parent=True
+        ):
+            # Note: without only_if_parent, the child span would be promoted to a transaction
+            pass
+
+    assert len(events) == 0

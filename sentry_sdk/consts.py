@@ -649,6 +649,7 @@ class ClientConstructor:
         trace_propagation_targets=[  # noqa: B006
             MATCH_ALL
         ],  # type: Optional[Sequence[str]]
+        disabled_span_origins=None,  # type: Optional[Sequence[str]]
         functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
@@ -979,6 +980,19 @@ class ClientConstructor:
 
             If `trace_propagation_targets` is not provided, trace data is attached to every outgoing request from the
             instrumented client.
+
+        :param disabled_span_origins: An optional list of strings or regex patterns to disable span creation.
+
+            When a span's origin would match any of the provided regex patterns, the span will not be created.
+
+            This can be useful to disable automatic span creation from specific integrations without disabling the
+            entire integration.
+
+            The option may contain a list of strings or regex against which the span origins are matched.
+            String entries do not have to be full matches, meaning a span origin is matched when it _contains_
+            a string provided through the option.
+
+            If `disabled_span_origins` is not provided, all spans will be created normally.
 
         :param functions_to_trace: An optional list of functions that should be set up for tracing.
 

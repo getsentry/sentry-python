@@ -37,7 +37,10 @@ from sentry_sdk.opentelemetry.utils import (
     get_sentry_meta,
     serialize_trace_state,
 )
-from sentry_sdk.tracing_utils import get_span_status_from_http_code
+from sentry_sdk.tracing_utils import (
+    get_span_status_from_http_code,
+    is_span_origin_disabled,
+)
 from sentry_sdk.utils import (
     _serialize_span_attribute,
     get_current_thread_meta,
@@ -205,10 +208,12 @@ class Span:
                     not parent_span_context.is_valid or parent_span_context.is_remote
                 )
 
+            if not skip_span and is_span_origin_disabled(origin):
+                skip_span = True
+
             if skip_span:
                 self._otel_span = INVALID_SPAN
             else:
-
                 if start_timestamp is not None:
                     # OTel timestamps have nanosecond precision
                     start_timestamp = convert_to_otel_timestamp(start_timestamp)
