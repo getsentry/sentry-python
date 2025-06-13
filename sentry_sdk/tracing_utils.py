@@ -689,6 +689,22 @@ def should_propagate_trace(client, url):
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
+def is_span_origin_disabled(origin):
+    # type: (Optional[str]) -> bool
+    """
+    Check if spans with this origin should be ignored.
+    """
+    if origin is None:
+        return False
+
+    client = sentry_sdk.get_client()
+    disabled_span_origins = client.options.get("disabled_span_origins")
+    if not disabled_span_origins:
+        return False
+
+    return match_regex_list(origin, disabled_span_origins, substring_matching=True)
+
+
 def normalize_incoming_data(incoming_data):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     """
