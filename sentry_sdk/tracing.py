@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
     should_be_treated_as_error,
+    safe_str,
 )
 
 from typing import TYPE_CHECKING
@@ -596,7 +597,7 @@ class Span:
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        self._tags[key] = value
+        self._tags[key] = safe_str(value)
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
