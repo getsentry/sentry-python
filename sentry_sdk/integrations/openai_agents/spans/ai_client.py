@@ -30,11 +30,6 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
     if system_instructions:
         span.set_data(SPANDATA.GEN_AI_SYSTEM_MESSAGE, system_instructions)
 
-    # Available tools
-    span.set_data(
-        "gen_ai.request.available_tools", [vars(tool) for tool in agent.tools]
-    )
-
     # LLM Request INPUT
 
     # "system" messages have a content of type string.

@@ -133,3 +133,8 @@ def _set_agent_data(span, agent):
             SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
             agent.model_settings.frequency_penalty,
         )
+
+    if len(agent.tools) > 0:
+        span.set_data(
+            "gen_ai.request.available_tools", [vars(tool) for tool in agent.tools]
+        )
