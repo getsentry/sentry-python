@@ -685,13 +685,13 @@ class _Client(BaseClient):
             return False
 
         error = exc_info[0]
-        error_type_name = get_type_name(exc_info[0])
-        error_full_name = "%s.%s" % (exc_info[0].__module__, error_type_name)
 
         for ignored_error in self.options["ignore_errors"]:
             # String types are matched against the type name in the
             # exception only
             if isinstance(ignored_error, str):
+                error_type_name = get_type_name(exc_info[0])
+                error_full_name = "%s.%s" % (exc_info[0].__module__, error_type_name)
                 if ignored_error == error_full_name or ignored_error == error_type_name:
                     return True
             else:
