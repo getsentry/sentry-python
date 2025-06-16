@@ -389,7 +389,9 @@ def test_does_not_leak_scope(sentry_init, capture_events):
 
             def generator():
                 for row in range(1000):
-                    assert sentry_sdk.get_isolation_scope()._tags["request_data"] == "True"
+                    assert (
+                        sentry_sdk.get_isolation_scope()._tags["request_data"] == "True"
+                    )
 
                     yield (str(row) + "\n").encode()
 
