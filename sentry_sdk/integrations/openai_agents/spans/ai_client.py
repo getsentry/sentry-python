@@ -1,7 +1,7 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
-from ..utils import _set_agent_data
+from ..utils import _set_agent_data, _set_input_data, _set_usage_data
 
 from typing import TYPE_CHECKING
 
@@ -26,56 +26,11 @@ def ai_client_span(agent, model, run_config, get_response_kwargs):
 def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, result):
     _set_agent_data(span, agent)
 
-    # LLM Request INPUT
+    _set_usage_data(span, result.usage)
 
-    prompt_messages = []
-
-    system_instructions = get_response_kwargs.get("system_instructions")
-    if system_instructions:
-        prompt_messages.append({"role": "system", "content": system_instructions})
-
-    # "user", "assistant", "tool" messages have a content of type array of objects.
-    other_messages = {
-        "user": [],
-        "assistant": [],
-        "tool": [],
-    }
-    for message in get_response_kwargs.get("input", []):
-        if "role" in message:
-            other_messages[message.get("role")].append(
-                {"type": "text", "text": message.get("content")}
-            )
-        else:
-            if message.get("type") == "function_call":
-                other_messages["assistant"].append(message)
-            elif message.get("type") == "function_call_output":
-                other_messages["tool"].append(message)
-
-    for role, messages in other_messages.items():
-        if len(messages) > 0:
-            prompt_messages.append({"role": role, "content": messages})
-
-    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt_messages)
-
-    # LLM Request USAGE
-
-    span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, result.usage.input_tokens)
-    span.set_data(
-        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
-        result.usage.input_tokens_details.cached_tokens,
-    )
-    span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, result.usage.output_tokens)
-    span.set_data(
-        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
-        result.usage.output_tokens_details.reasoning_tokens,
-    )
-    span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, result.usage.total_tokens)
+    _set_input_data(span, get_response_kwargs)
 
     # LLM Response OUTPUT
-
-    # Deprecated name just for first iteration.
-    # TODO-anton: define how to set tool response messages and document in sentry-conventions.
-
     output_messages = {
         "response": [],
         "tool": [],

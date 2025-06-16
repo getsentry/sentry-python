@@ -135,3 +135,49 @@ def _set_agent_data(span, agent):
             SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             [vars(tool) for tool in agent.tools],
         )
+
+
+def _set_usage_data(span, usage):
+    # type: (sentry_sdk.Span, Usage) -> None
+    span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
+    span.set_data(
+        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+        usage.input_tokens_details.cached_tokens,
+    )
+    span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, usage.output_tokens)
+    span.set_data(
+        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+        usage.output_tokens_details.reasoning_tokens,
+    )
+    span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
+
+
+def _set_input_data(span, get_response_kwargs):
+    # type: (sentry_sdk.Span, dict[str, Any]) -> None
+    messages_by_role = {
+        "system": [],
+        "user": [],
+        "assistant": [],
+        "tool": [],
+    }
+    system_instructions = get_response_kwargs.get("system_instructions")
+    if system_instructions:
+        messages_by_role["system"].append({"type": "text", "text": system_instructions})
+
+    for message in get_response_kwargs.get("input", []):
+        if "role" in message:
+            messages_by_role[message.get("role")].append(
+                {"type": "text", "text": message.get("content")}
+            )
+        else:
+            if message.get("type") == "function_call":
+                messages_by_role["assistant"].append(message)
+            elif message.get("type") == "function_call_output":
+                messages_by_role["tool"].append(message)
+
+    request_messages = []
+    for role, messages in messages_by_role.items():
+        if len(messages) > 0:
+            messages.append({"role": role, "content": messages_by_role})
+
+    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages)
