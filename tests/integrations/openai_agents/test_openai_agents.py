@@ -40,9 +40,14 @@ def mock_model_response(mock_usage):
     return ModelResponse(
         output=[
             ResponseOutputMessage(
+                id="msg_123",
+                type="message",
+                status="completed",
                 content=[
                     ResponseOutputText(
-                        text="Hello, how can I help you?", type="text", annotations={}
+                        text="Hello, how can I help you?",
+                        type="output_text",
+                        annotations=[],
                     )
                 ],
                 role="assistant",
@@ -57,6 +62,10 @@ def mock_model_response(mock_usage):
 def mock_tool_call():
     return ResponseFunctionToolCall(
         id="call_123",
+        call_id="call_123",
+        name="test_tool",
+        type="function_call",
+        arguments='{"arg1": "value1"}',
         function=MagicMock(name="test_tool", arguments='{"arg1": "value1"}'),
     )
 
@@ -211,12 +220,15 @@ async def test_error_handling(sentry_init, capture_events, mock_agent):
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="test_transaction"):
+    with sentry_sdk.start_transaction(name="test_transaction") as transaction:
         with patch("agents.Runner.run", new_callable=AsyncMock) as mock_run:
             mock_run.side_effect = AgentsException("Test error")
 
             with pytest.raises(AgentsException):
                 await agents.Runner.run(mock_agent, "Test input")
+
+            # Ensure the transaction is finished and error is captured
+            transaction.finish()
 
     (transaction,) = events
     spans = transaction["spans"]
