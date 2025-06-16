@@ -141,6 +141,9 @@ TEST_SUITE_CONFIG = {
     },
     "openai_agents": {
         "package": "openai-agents",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
     },
     "openfeature": {
         "package": "openfeature-sdk",
