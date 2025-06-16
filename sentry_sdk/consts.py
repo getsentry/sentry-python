@@ -981,7 +981,7 @@ class ClientConstructor:
             If `trace_propagation_targets` is not provided, trace data is attached to every outgoing request from the
             instrumented client.
 
-        :param exclude_span_origins: An optional list of strings or regex patterns to exclude span creation based
+        :param exclude_span_origins: An optional list of strings or regex patterns to disable span creation based
             on span origin. When a span's origin would match any of the provided patterns, the span will not be
             created.
 

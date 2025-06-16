@@ -689,7 +689,7 @@ def should_propagate_trace(client, url):
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
-def _is_span_origin_disabled(origin):
+def _is_span_origin_excluded(origin):
     # type: (Optional[str]) -> bool
     """
     Check if spans with this origin should be ignored based on the `exclude_span_origins` option.
