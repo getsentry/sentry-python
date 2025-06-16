@@ -1,4 +1,5 @@
 import pytest
+import sentry_sdk
 from sentry_sdk.tracing import Span
 
 
@@ -74,3 +75,39 @@ def test_span_set_tag_handles_broken_repr():
     tags = span_json.get("tags", {})
 
     assert tags["bad_object"] == "<broken repr>"
+
+
+@pytest.mark.parametrize(
+    ("tag_key", "tag_value", "expected_value"),
+    [
+        ("int_tag", 42, "42"),
+        ("float_tag", 3.14159, "3.14159"),
+        ("bool_tag_true", True, "True"),
+        ("bool_tag_false", False, "False"),
+        ("none_tag", None, "None"),
+        ("list_tag", [1, "two", 3.0], "[1, 'two', 3.0]"),
+        (
+            "dict_tag",
+            {"nested": "value", "count": 123},
+            "{'nested': 'value', 'count': 123}",
+        ),
+        ("string_tag", "already_string", "already_string"),
+    ],
+)
+def test_transaction_finish_serializes_tags(
+    sentry_init, capture_events, tag_key, tag_value, expected_value
+):
+    """Test that Transaction.finish() properly serializes transaction tags to strings."""
+    # Create a transaction with span recording enabled
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(
+        name="test_transaction", sampled=True
+    ) as transaction:
+        transaction.set_tag(tag_key, tag_value)
+
+    (event,) = events
+    tags = event.get("tags", {})
+
+    assert tags[tag_key] == expected_value

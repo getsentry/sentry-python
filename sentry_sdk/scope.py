@@ -851,9 +851,9 @@ class Scope:
 
         :param key: Key of the tag to set.
 
-        :param value: Value of the tag to set. Will be converted to string.
+        :param value: Value of the tag to set.
         """
-        self._tags[key] = safe_str(value)
+        self._tags[key] = value
 
     def set_tags(self, tags):
         # type: (Mapping[str, object]) -> None
@@ -870,11 +870,9 @@ class Scope:
         This method only modifies tag keys in the `tags` mapping passed to the method.
         `scope.set_tags({})` is, therefore, a no-op.
 
-        :param tags: A mapping of tag keys to tag values to set. Values will be
-            converted to strings.
+        :param tags: A mapping of tag keys to tag values to set.
         """
-        for key, value in tags.items():
-            self.set_tag(key, value)
+        self._tags.update(tags)
 
     def remove_tag(self, key):
         # type: (str) -> None
@@ -1424,7 +1422,9 @@ class Scope:
     def _apply_tags_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._tags:
-            event.setdefault("tags", {}).update(self._tags)
+            event.setdefault("tags", {}).update(
+                {k: safe_str(v) for k, v in self._tags.items()}
+            )
 
     def _apply_contexts_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None

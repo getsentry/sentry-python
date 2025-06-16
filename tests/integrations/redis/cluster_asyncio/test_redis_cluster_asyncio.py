@@ -53,7 +53,7 @@ async def test_async_breadcrumb(sentry_init, capture_events):
                 "db.operation": "GET",
                 "redis.key": "foobar",
                 "redis.command": "GET",
-                "redis.is_cluster": "True",
+                "redis.is_cluster": True,
             }
         ),
         "timestamp": crumb["timestamp"],

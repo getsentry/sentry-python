@@ -240,7 +240,7 @@ def test_concurrency(sentry_init, app):
         await asyncio.sleep(random.random())
 
         scope = sentry_sdk.get_isolation_scope()
-        assert scope._tags["i"] == str(i)
+        assert scope._tags["i"] == i
 
         return response.text("ok")
 

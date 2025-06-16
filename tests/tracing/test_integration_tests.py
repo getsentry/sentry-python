@@ -14,7 +14,7 @@ from sentry_sdk import (
 )
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport
-from sentry_sdk.tracing import Span, Transaction
+from sentry_sdk.tracing import Transaction
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
@@ -225,21 +225,11 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     }
 
 
-class WeakSpan(Span):
-    """Variant of span that supports weak references"""
-
-    __slots__ = ("__weakref__",)
-
-
-@mock.patch("sentry_sdk.tracing.Span", WeakSpan)
 @pytest.mark.parametrize(
     "args,expected_refcount",
     [({"traces_sample_rate": 1.0}, 100), ({"traces_sample_rate": 0.0}, 0)],
 )
 def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
-    """
-    Span objects should not be stored for unsampled transactions.
-    """
     sentry_init(**args)
 
     references = weakref.WeakSet()
@@ -247,8 +237,15 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
     with start_transaction(name="hi"):
         for i in range(100):
             with start_span(op="helloworld", name="hi {}".format(i)) as span:
-                references.add(span)
+
+                def foo():
+                    pass
+
+                references.add(foo)
+                span.set_tag("foo", foo)
                 pass
+
+        del foo
         del span
 
         # required only for pypy (cpython frees immediately)
