@@ -121,10 +121,8 @@ def test_exclude_span_origins_patterns(
         with start_span(name="span", origin=origin):
             pass
 
-    # Check total events captured
     assert len(events) == expected_events_count
 
-    # Check that only expected origins were captured
     if expected_events_count > 0:
         captured_origins = {event["contexts"]["trace"]["origin"] for event in events}
         assert captured_origins == set(expected_allowed_origins)
