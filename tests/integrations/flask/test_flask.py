@@ -677,7 +677,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
 
         def generate():
             for row in range(1000):
-                assert sentry_sdk.get_isolation_scope()._tags["request_data"]
+                assert sentry_sdk.get_isolation_scope()._tags["request_data"] == "True"
 
                 yield str(row) + "\n"
 
@@ -688,7 +688,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     assert response.data.decode() == "".join(str(row) + "\n" for row in range(1000))
     assert not events
 
-    assert not sentry_sdk.get_isolation_scope()._tags["request_data"]
+    assert sentry_sdk.get_isolation_scope()._tags["request_data"] == "False"
 
 
 def test_scoped_test_client(sentry_init, app):
