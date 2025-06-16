@@ -178,6 +178,31 @@ def _set_input_data(span, get_response_kwargs):
     request_messages = []
     for role, messages in messages_by_role.items():
         if len(messages) > 0:
-            messages.append({"role": role, "content": messages_by_role})
+            request_messages.append({"role": role, "content": messages})
 
     span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages)
+
+
+def _set_output_data(span, result):
+    # type: (sentry_sdk.Span, Any) -> None
+    output_messages = {
+        "response": [],
+        "tool": [],
+    }
+
+    for output in result.output:
+        if output.type == "function_call":
+            output_messages["tool"].append(output.dict())
+        elif output.type == "message":
+            for output_message in output.content:
+                output_messages["response"].append(output_message.to_json())
+
+    if len(output_messages["tool"]) > 0:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, output_messages["tool"])
+
+    if len(output_messages["response"]) > 0:
+        span.set_data(SPANDATA.GEN_AI_CHOICE, output_messages["response"])
+
+        # Deprecated name just for first iteration.
+        # TODO-anton: define how to set tool response messages and document in sentry-conventions.
+        span.set_data("gen_ai.response.text", output_messages["response"])
