@@ -402,21 +402,16 @@ def test_with_isolation_scope_data():
 
         assert isolation_scope_in._tags == {"before_isolation_scope": "1"}
         assert current_scope_in._tags == {"before_current_scope": "1"}
-        assert scope._tags == {"before_isolation_scope": "1", "in_with_scope": "1"}
+        assert scope._tags == {"before_isolation_scope": "1"}
 
         scope.set_tag("in_with_scope", 1)
 
         assert isolation_scope_in._tags == {
             "before_isolation_scope": "1",
             "in_with_scope": "1",
-            "in_with_isolation_scope": "1",
         }
         assert current_scope_in._tags == {"before_current_scope": "1"}
-        assert scope._tags == {
-            "before_isolation_scope": "1",
-            "in_with_scope": "1",
-            "in_with_isolation_scope": "1",
-        }
+        assert scope._tags == {"before_isolation_scope": "1", "in_with_scope": "1"}
 
         isolation_scope_in.set_tag("in_with_isolation_scope", 1)
 
@@ -526,7 +521,10 @@ def test_with_use_isolation_scope_data():
             "in_with_scope": "1",
         }
         assert current_scope_in._tags == {"before_current_scope": "1"}
-        assert scope._tags == {"before_custom_isolation_scope": "1", "in_with_scope": "1"}
+        assert scope._tags == {
+            "before_custom_isolation_scope": "1",
+            "in_with_scope": "1",
+        }
 
         isolation_scope_in.set_tag("in_with_isolation_scope", 1)
 
@@ -551,7 +549,6 @@ def test_with_use_isolation_scope_data():
         }
         assert current_scope_in._tags == {
             "before_current_scope": "1",
-            "in_with_scope": "1",
             "in_with_current_scope": "1",
         }
         assert scope._tags == {
@@ -642,7 +639,10 @@ def test_with_new_scope_data():
         scope.set_tag("in_with_scope", 1)
 
         assert isolation_scope_in._tags == {"before_isolation_scope": "1"}
-        assert current_scope_in._tags == {"before_current_scope": "1", "in_with_scope": "1"}
+        assert current_scope_in._tags == {
+            "before_current_scope": "1",
+            "in_with_scope": "1",
+        }
         assert scope._tags == {"before_current_scope": "1", "in_with_scope": "1"}
 
         isolation_scope_in.set_tag("in_with_isolation_scope", 1)
@@ -651,7 +651,10 @@ def test_with_new_scope_data():
             "before_isolation_scope": "1",
             "in_with_isolation_scope": "1",
         }
-        assert current_scope_in._tags == {"before_current_scope": "1", "in_with_scope": "1"}
+        assert current_scope_in._tags == {
+            "before_current_scope": "1",
+            "in_with_scope": "1",
+        }
         assert scope._tags == {"before_current_scope": "1", "in_with_scope": "1"}
 
         current_scope_in.set_tag("in_with_current_scope", 1)
@@ -818,7 +821,11 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
     (envelope,) = envelopes
     transaction = envelope.items[0].get_transaction_event()
 
-    assert transaction["tags"] == {"isolation_scope1": "1", "current_scope2": "1", "trx": "1"}
+    assert transaction["tags"] == {
+        "isolation_scope1": "1",
+        "current_scope2": "1",
+        "trx": "1",
+    }
     assert transaction["spans"][0]["tags"] == {"a": "1"}
     assert transaction["spans"][1]["tags"] == {"b": "1"}
 
