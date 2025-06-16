@@ -208,6 +208,7 @@ class Span:
                     not parent_span_context.is_valid or parent_span_context.is_remote
                 )
 
+            origin = origin or DEFAULT_SPAN_ORIGIN
             if not skip_span and _is_span_origin_excluded(origin):
                 skip_span = True
 
@@ -244,7 +245,7 @@ class Span:
                     attributes=attributes,
                 )
 
-                self.origin = origin or DEFAULT_SPAN_ORIGIN
+                self.origin = origin
                 self.description = description
                 self.name = span_name
 
