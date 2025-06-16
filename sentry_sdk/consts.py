@@ -360,12 +360,6 @@ class SPANDATA:
     Example: "ResearchAssistant"
     """
 
-    GEN_AI_ASSISTANT_MESSAGE = "gen_ai.assistant.message"
-    """
-    The assistant message passed to the model.
-    Example: "get_weather tool call"
-    """
-
     GEN_AI_CHOICE = "gen_ai.choice"
     """
     The model's response message.
@@ -420,22 +414,10 @@ class SPANDATA:
     Example: "openai"
     """
 
-    GEN_AI_SYSTEM_MESSAGE = "gen_ai.system.message"
-    """
-    The system instructions passed to the model.
-    Example: "You are a helpful assistant"
-    """
-
     GEN_AI_TOOL_DESCRIPTION = "gen_ai.tool.description"
     """
     The description of the tool being used.
     Example: "Searches the web for current information about a topic"
-    """
-
-    GEN_AI_TOOL_MESSAGE = "gen_ai.tool.message"
-    """
-    The response from a tool or function call passed to the model.
-    Example: "rainy, 57°F"
     """
 
     GEN_AI_TOOL_NAME = "gen_ai.tool.name"

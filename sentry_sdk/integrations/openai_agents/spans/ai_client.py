@@ -26,14 +26,11 @@ def ai_client_span(agent, model, run_config, get_response_kwargs):
 def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, result):
     _set_agent_data(span, agent)
 
-    system_instructions = get_response_kwargs.get("system_instructions")
-    if system_instructions:
-        span.set_data(SPANDATA.GEN_AI_SYSTEM_MESSAGE, system_instructions)
-
     # LLM Request INPUT
 
-    # "system" messages have a content of type string.
     prompt_messages = []
+
+    system_instructions = get_response_kwargs.get("system_instructions")
     if system_instructions:
         prompt_messages.append({"role": "system", "content": system_instructions})
 
@@ -62,11 +59,6 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
     # TODO-anton: define how to set input message and document in sentry-conventions.
     span.set_data("ai.prompt.format", "messages")
     span.set_data("gen_ai.request.messages", prompt_messages)
-
-    for message in get_response_kwargs.get("input", []):
-        if message.get("role") == "user":
-            span.set_data(SPANDATA.GEN_AI_USER_MESSAGE, message.get("content"))
-            break
 
     # LLM Request USAGE
 
