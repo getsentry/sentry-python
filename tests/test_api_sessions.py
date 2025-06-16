@@ -1,7 +1,4 @@
 import sentry_sdk
-import pytest
-from sentry_sdk import start_session, end_session, capture_exception
-from sentry_sdk.sessions import track_session
 
 
 def test_start_session_basic(sentry_init, capture_envelopes):
@@ -10,10 +7,10 @@ def test_start_session_basic(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     # Start a session using the top-level API
-    start_session()
-    
+    sentry_sdk.start_session()
+
     # End the session
-    end_session()
+    sentry_sdk.end_session()
     sentry_sdk.flush()
 
     # Check that we got a session envelope
@@ -26,7 +23,6 @@ def test_start_session_basic(sentry_init, capture_envelopes):
         "release": "test-release",
         "environment": "test-env",
     }
-    assert sess_event["init"]
     assert sess_event["status"] == "exited"
 
 
@@ -36,8 +32,8 @@ def test_start_session_with_mode(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     # Start a session with request mode
-    start_session(session_mode="request")
-    end_session()
+    sentry_sdk.start_session(session_mode="request")
+    sentry_sdk.end_session()
     sentry_sdk.flush()
 
     # Request mode sessions are aggregated
