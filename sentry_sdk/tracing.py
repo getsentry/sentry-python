@@ -39,7 +39,7 @@ from sentry_sdk.opentelemetry.utils import (
 )
 from sentry_sdk.tracing_utils import (
     get_span_status_from_http_code,
-    is_span_origin_disabled,
+    _is_span_origin_disabled,
 )
 from sentry_sdk.utils import (
     _serialize_span_attribute,
@@ -208,7 +208,7 @@ class Span:
                     not parent_span_context.is_valid or parent_span_context.is_remote
                 )
 
-            if not skip_span and is_span_origin_disabled(origin):
+            if not skip_span and _is_span_origin_disabled(origin):
                 skip_span = True
 
             if skip_span:

@@ -39,14 +39,11 @@ def test_span_origin_custom(sentry_init, capture_events):
     assert second_transaction["spans"][0]["origin"] == "baz.baz2.baz3"
 
 
-@pytest.mark.parametrize("disabled_origins", [None, [], "noop"])
-def test_disabled_span_origins_empty_config(
-    sentry_init, capture_events, disabled_origins
-):
-    """Test that when disabled_span_origins is None or empty, all spans are allowed."""
-    if disabled_origins in (None, []):
-        sentry_init(traces_sample_rate=1.0, disabled_span_origins=disabled_origins)
-    elif disabled_origins == "noop":
+@pytest.mark.parametrize("excluded_origins", [None, [], "noop"])
+def test_exclude_span_origins_empty(sentry_init, capture_events, excluded_origins):
+    if excluded_origins in (None, []):
+        sentry_init(traces_sample_rate=1.0, exclude_span_origins=excluded_origins)
+    elif excluded_origins == "noop":
         sentry_init(
             traces_sample_rate=1.0,
             # default is None
@@ -65,7 +62,7 @@ def test_disabled_span_origins_empty_config(
 
 
 @pytest.mark.parametrize(
-    "disabled_origins,origins,expected_events_count,expected_allowed_origins",
+    "excluded_origins,origins,expected_events_count,expected_allowed_origins",
     [
         # Regexes
         (
@@ -105,18 +102,17 @@ def test_disabled_span_origins_empty_config(
         ),
     ],
 )
-def test_disabled_span_origins_filtering(
+def test_exclude_span_origins_patterns(
     sentry_init,
     capture_events,
-    disabled_origins,
+    excluded_origins,
     origins,
     expected_events_count,
     expected_allowed_origins,
 ):
-    """Test disabled_span_origins with various pattern configurations."""
     sentry_init(
         traces_sample_rate=1.0,
-        disabled_span_origins=disabled_origins,
+        exclude_span_origins=excluded_origins,
     )
 
     events = capture_events()
@@ -134,8 +130,8 @@ def test_disabled_span_origins_filtering(
         assert captured_origins == set(expected_allowed_origins)
 
 
-def test_disabled_span_origins_with_child_spans(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0, disabled_span_origins=[r"auto\.http\..*"])
+def test_exclude_span_origins_with_child_spans(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, exclude_span_origins=[r"auto\.http\..*"])
     events = capture_events()
 
     with start_span(name="parent", origin="manual"):
@@ -150,8 +146,8 @@ def test_disabled_span_origins_with_child_spans(sentry_init, capture_events):
     assert events[0]["spans"][0]["origin"] == "auto.db.postgres"
 
 
-def test_disabled_span_origin_parent_with_child_spans(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0, disabled_span_origins=[r"auto\.http\..*"])
+def test_exclude_span_origins_parent_with_child_spans(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, exclude_span_origins=[r"auto\.http\..*"])
     events = capture_events()
 
     with start_span(name="parent", origin="auto.http.requests"):
