@@ -35,9 +35,9 @@ def test_configure_scope_sdk1(sentry_init, capture_events):
     (event_a, event_b, event_z) = events
 
     # Check against the results the same code returned in SDK 1.x
-    assert event_a["tags"] == {"A": 1}
-    assert event_b["tags"] == {"A": 1, "B1": 1, "B2": 1}
-    assert event_z["tags"] == {"A": 1, "B1": 1, "B2": 1, "Z": 1}
+    assert event_a["tags"] == {"A": "1"}
+    assert event_b["tags"] == {"A": "1", "B1": "1", "B2": "1"}
+    assert event_z["tags"] == {"A": "1", "B1": "1", "B2": "1", "Z": "1"}
 
 
 def test_push_scope_sdk1(sentry_init, capture_events):
@@ -64,9 +64,9 @@ def test_push_scope_sdk1(sentry_init, capture_events):
     (event_a, event_b, event_z) = events
 
     # Check against the results the same code returned in SDK 1.x
-    assert event_a["tags"] == {"A": 1}
-    assert event_b["tags"] == {"A": 1, "B1": 1, "B2": 1}
-    assert event_z["tags"] == {"A": 1, "Z": 1}
+    assert event_a["tags"] == {"A": "1"}
+    assert event_b["tags"] == {"A": "1", "B1": "1", "B2": "1"}
+    assert event_z["tags"] == {"A": "1", "Z": "1"}
 
 
 def test_with_hub_sdk1(sentry_init, capture_events):
@@ -93,9 +93,9 @@ def test_with_hub_sdk1(sentry_init, capture_events):
     (event_a, event_b, event_z) = events
 
     # Check against the results the same code returned in SDK 1.x
-    assert event_a["tags"] == {"A": 1}
-    assert event_b["tags"] == {"A": 1, "B1": 1, "B2": 1}
-    assert event_z["tags"] == {"A": 1, "B1": 1, "B2": 1, "Z": 1}
+    assert event_a["tags"] == {"A": "1"}
+    assert event_b["tags"] == {"A": "1", "B1": "1", "B2": "1"}
+    assert event_z["tags"] == {"A": "1", "B1": "1", "B2": "1", "Z": "1"}
 
 
 def test_with_hub_configure_scope_sdk1(sentry_init, capture_events):
@@ -127,17 +127,17 @@ def test_with_hub_configure_scope_sdk1(sentry_init, capture_events):
     (event_a, event_b, event_c, event_z) = events
 
     # Check against the results the same code returned in SDK 1.x
-    assert event_a["tags"] == {"A": 1}
-    assert event_b["tags"] == {"A": 1, "B1": 1, "B2": 1, "B3": 1, "B4": 1}
-    assert event_c["tags"] == {"A": 1, "B1": 1, "B2": 1, "B3": 1, "B4": 1, "B5": 1}
+    assert event_a["tags"] == {"A": "1"}
+    assert event_b["tags"] == {"A": "1", "B1": "1", "B2": "1", "B3": "1", "B4": "1"}
+    assert event_c["tags"] == {"A": "1", "B1": "1", "B2": "1", "B3": "1", "B4": "1", "B5": "1"}
     assert event_z["tags"] == {
-        "A": 1,
-        "B1": 1,
-        "B2": 1,
-        "B3": 1,
-        "B4": 1,
-        "B5": 1,
-        "Z": 1,
+        "A": "1",
+        "B1": "1",
+        "B2": "1",
+        "B3": "1",
+        "B4": "1",
+        "B5": "1",
+        "Z": "1",
     }
 
 
@@ -170,10 +170,10 @@ def test_with_hub_push_scope_sdk1(sentry_init, capture_events):
     (event_a, event_b, event_c, event_z) = events
 
     # Check against the results the same code returned in SDK 1.x
-    assert event_a["tags"] == {"A": 1}
-    assert event_b["tags"] == {"A": 1, "B1": 1, "B2": 1, "B3": 1, "B4": 1}
-    assert event_c["tags"] == {"A": 1, "B1": 1, "B5": 1}
-    assert event_z["tags"] == {"A": 1, "B1": 1, "B5": 1, "Z": 1}
+    assert event_a["tags"] == {"A": "1"}
+    assert event_b["tags"] == {"A": "1", "B1": "1", "B2": "1", "B3": "1", "B4": "1"}
+    assert event_c["tags"] == {"A": "1", "B1": "1", "B5": "1"}
+    assert event_z["tags"] == {"A": "1", "B1": "1", "B5": "1", "Z": "1"}
 
 
 def test_with_cloned_hub_sdk1(sentry_init, capture_events):
@@ -200,9 +200,9 @@ def test_with_cloned_hub_sdk1(sentry_init, capture_events):
     (event_a, event_b, event_z) = events
 
     # Check against the results the same code returned in SDK 1.x
-    assert event_a["tags"] == {"A": 1}
-    assert event_b["tags"] == {"A": 1, "B1": 1, "B2": 1}
-    assert event_z["tags"] == {"A": 1, "Z": 1}
+    assert event_a["tags"] == {"A": "1"}
+    assert event_b["tags"] == {"A": "1", "B1": "1", "B2": "1"}
+    assert event_z["tags"] == {"A": "1", "Z": "1"}
 
 
 def test_with_cloned_hub_configure_scope_sdk1(sentry_init, capture_events):
@@ -234,10 +234,10 @@ def test_with_cloned_hub_configure_scope_sdk1(sentry_init, capture_events):
     (event_a, event_b, event_c, event_z) = events
 
     # Check against the results the same code returned in SDK 1.x
-    assert event_a["tags"] == {"A": 1}
-    assert event_b["tags"] == {"A": 1, "B1": 1, "B2": 1, "B3": 1, "B4": 1}
-    assert event_c["tags"] == {"A": 1, "B1": 1, "B2": 1, "B3": 1, "B4": 1, "B5": 1}
-    assert event_z["tags"] == {"A": 1, "Z": 1}
+    assert event_a["tags"] == {"A": "1"}
+    assert event_b["tags"] == {"A": "1", "B1": "1", "B2": "1", "B3": "1", "B4": "1"}
+    assert event_c["tags"] == {"A": "1", "B1": "1", "B2": "1", "B3": "1", "B4": "1", "B5": "1"}
+    assert event_z["tags"] == {"A": "1", "Z": "1"}
 
 
 def test_with_cloned_hub_push_scope_sdk1(sentry_init, capture_events):
@@ -269,7 +269,7 @@ def test_with_cloned_hub_push_scope_sdk1(sentry_init, capture_events):
     (event_a, event_b, event_c, event_z) = events
 
     # Check against the results the same code returned in SDK 1.x
-    assert event_a["tags"] == {"A": 1}
-    assert event_b["tags"] == {"A": 1, "B1": 1, "B2": 1, "B3": 1, "B4": 1}
-    assert event_c["tags"] == {"A": 1, "B1": 1, "B5": 1}
-    assert event_z["tags"] == {"A": 1, "Z": 1}
+    assert event_a["tags"] == {"A": "1"}
+    assert event_b["tags"] == {"A": "1", "B1": "1", "B2": "1", "B3": "1", "B4": "1"}
+    assert event_c["tags"] == {"A": "1", "B1": "1", "B5": "1"}
+    assert event_z["tags"] == {"A": "1", "Z": "1"}
