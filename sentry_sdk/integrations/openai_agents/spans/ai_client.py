@@ -93,7 +93,7 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
     }
     for output in result.output:
         if output.type == "function_call":
-            output_messages["tool"].append(output.to_json())
+            output_messages["tool"].append(output.dict())
         elif output.type == "message":
             for output_message in output.content:
                 output_messages["response"].append(output_message.to_json())
