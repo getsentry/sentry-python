@@ -28,7 +28,7 @@ async def test_async_basic(sentry_init, capture_events):
             "db.operation": "GET",
             "redis.key": "foobar",
             "redis.command": "GET",
-            "redis.is_cluster": False,
+            "redis.is_cluster": "False",
         },
         "timestamp": crumb["timestamp"],
         "type": "redis",
@@ -80,8 +80,8 @@ async def test_async_redis_pipeline(
         }
     )
     assert span["tags"] == {
-        "redis.transaction": is_transaction,
-        "redis.is_cluster": False,
+        "redis.transaction": str(is_transaction),
+        "redis.is_cluster": "False",
     }
 
 

@@ -53,7 +53,7 @@ async def test_async_breadcrumb(sentry_init, capture_events):
                 "db.operation": "GET",
                 "redis.key": "foobar",
                 "redis.command": "GET",
-                "redis.is_cluster": True,
+                "redis.is_cluster": "True",
             }
         ),
         "timestamp": crumb["timestamp"],
@@ -94,7 +94,7 @@ async def test_async_basic(sentry_init, capture_events, send_default_pii, descri
         }
     )
     assert span["tags"] == {
-        "redis.is_cluster": True,
+        "redis.is_cluster": "True",
         "db.operation": "SET",
         "redis.command": "SET",
         "redis.key": "bar",
@@ -144,8 +144,8 @@ async def test_async_redis_pipeline(
         }
     )
     assert span["tags"] == {
-        "redis.transaction": False,
-        "redis.is_cluster": True,
+        "redis.transaction": "False",
+        "redis.is_cluster": "True",
     }
 
 

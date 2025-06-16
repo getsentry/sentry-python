@@ -325,10 +325,10 @@ def test_non_dict_event(
     assert transaction_event["request"] == request_data
 
     if batch_size > 1:
-        assert error_event["tags"]["batch_size"] == batch_size
-        assert error_event["tags"]["batch_request"] is True
-        assert transaction_event["tags"]["batch_size"] == batch_size
-        assert transaction_event["tags"]["batch_request"] is True
+        assert error_event["tags"]["batch_size"] == str(batch_size)
+        assert error_event["tags"]["batch_request"] == "True"
+        assert transaction_event["tags"]["batch_size"] == str(batch_size)
+        assert transaction_event["tags"]["batch_request"] == "True"
 
 
 def test_request_data(lambda_client, test_environment):
