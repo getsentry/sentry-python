@@ -21,12 +21,8 @@ def execute_tool_span(tool, *args, **kwargs):
     span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
     span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
 
-    # Deprecated name just for first iteration.
-    # TODO-anton: remove this if the Sentry.io UI is using GEN_AI_TOOL_NAME
-    span.set_data("ai.toolCall.name", tool.name)
-
     input = args[1]
-    span.set_data("gen_ai.tool.input", input)
+    span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, input)
 
     if tool.__class__.__name__ == "FunctionTool":
         span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
@@ -37,4 +33,4 @@ def execute_tool_span(tool, *args, **kwargs):
 def update_execute_tool_span(span, agent, tool, result):
     # type: (Span, agents.Agent, agents.Tool, Any) -> None
     _set_agent_data(span, agent)
-    span.set_data("gen_ai.tool.output", result)
+    span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, result)

@@ -110,10 +110,6 @@ def _set_agent_data(span, agent):
     if agent.model:
         span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, agent.model)
 
-        # Deprecated name just for first iteration.
-        # TODO-anton: remove this if the Sentry.io UI is using GEN_AI_REQUEST_MODEL
-        span.set_data("ai.model.id", agent.model)
-
     if agent.model_settings.presence_penalty:
         span.set_data(
             SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
@@ -136,5 +132,6 @@ def _set_agent_data(span, agent):
 
     if len(agent.tools) > 0:
         span.set_data(
-            "gen_ai.request.available_tools", [vars(tool) for tool in agent.tools]
+            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            [vars(tool) for tool in agent.tools],
         )

@@ -372,6 +372,18 @@ class SPANDATA:
     Example: "chat"
     """
 
+    GEN_AI_RESPONSE_TOOL_CALLS = "gen_ai.response.tool_calls"
+    """
+    The tool calls in the model's response.
+    Example: [{"name": "get_weather", "arguments": {"location": "Paris"}}]
+    """
+
+    GEN_AI_REQUEST_AVAILABLE_TOOLS = "gen_ai.request.available_tools"
+    """
+    The available tools for the model.
+    Example: [{"name": "get_weather", "description": "Get the weather for a given location"}, {"name": "get_news", "description": "Get the news for a given topic"}]
+    """
+
     GEN_AI_REQUEST_FREQUENCY_PENALTY = "gen_ai.request.frequency_penalty"
     """
     The frequency penalty parameter used to reduce repetitiveness of generated tokens.
@@ -382,6 +394,12 @@ class SPANDATA:
     """
     The maximum number of tokens to generate in the response.
     Example: 2048
+    """
+
+    GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
+    """
+    The messages passed to the model. The "content" can be a string or an array of objects.
+    Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
     """
 
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
@@ -420,10 +438,22 @@ class SPANDATA:
     Example: "Searches the web for current information about a topic"
     """
 
+    GEN_AI_TOOL_INPUT = "gen_ai.tool.input"
+    """
+    The input of the tool being used.
+    Example: {"location": "Paris"}
+    """
+
     GEN_AI_TOOL_NAME = "gen_ai.tool.name"
     """
     The name of the tool being used.
     Example: "web_search"
+    """
+
+    GEN_AI_TOOL_OUTPUT = "gen_ai.tool.output"
+    """
+    The output of the tool being used.
+    Example: "rainy, 57°F"
     """
 
     GEN_AI_TOOL_TYPE = "gen_ai.tool.type"

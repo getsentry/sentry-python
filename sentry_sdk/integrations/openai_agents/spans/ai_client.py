@@ -55,10 +55,7 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
         if len(messages) > 0:
             prompt_messages.append({"role": role, "content": messages})
 
-    # Deprecated name just for first iteration.
-    # TODO-anton: define how to set input message and document in sentry-conventions.
-    span.set_data("ai.prompt.format", "messages")
-    span.set_data("gen_ai.request.messages", prompt_messages)
+    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt_messages)
 
     # LLM Request USAGE
 
@@ -91,7 +88,7 @@ def update_ai_client_span(span, agent, model, run_config, get_response_kwargs, r
                 output_messages["response"].append(output_message.to_json())
 
     if len(output_messages["tool"]) > 0:
-        span.set_data("gen_ai.response.tool_calls", output_messages["tool"])
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, output_messages["tool"])
 
     if len(output_messages["response"]) > 0:
         span.set_data(SPANDATA.GEN_AI_CHOICE, output_messages["response"])
