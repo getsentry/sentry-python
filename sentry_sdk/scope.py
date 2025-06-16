@@ -871,7 +871,7 @@ class Scope:
         `scope.set_tags({})` is, therefore, a no-op.
 
         :param tags: A mapping of tag keys to tag values to set. Values will be
-        converted to strings.
+            converted to strings.
         """
         for key, value in tags.items():
             self.set_tag(key, value)
