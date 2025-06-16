@@ -62,7 +62,7 @@ def test_exclude_span_origins_empty(sentry_init, capture_events, excluded_origin
 
 
 @pytest.mark.parametrize(
-    "excluded_origins,origins,expected_events_count,expected_allowed_origins",
+    "excluded_origins,origins,expected_allowed_origins",
     [
         # Regexes
         (
@@ -72,7 +72,6 @@ def test_exclude_span_origins_empty(sentry_init, capture_events, excluded_origin
                 "auto.db.sqlite",
                 "manual",
             ],
-            1,
             ["manual"],
         ),
         # Substring matching
@@ -85,7 +84,6 @@ def test_exclude_span_origins_empty(sentry_init, capture_events, excluded_origin
                 "manual",
                 "auto.db.postgres",
             ],
-            2,
             ["manual", "auto.db.postgres"],
         ),
         # Mix and match
@@ -97,7 +95,6 @@ def test_exclude_span_origins_empty(sentry_init, capture_events, excluded_origin
                 "auto.db.postgres",
                 "auto.grpc.server",
             ],
-            1,
             ["auto.grpc.server"],
         ),
     ],
@@ -107,7 +104,6 @@ def test_exclude_span_origins_patterns(
     capture_events,
     excluded_origins,
     origins,
-    expected_events_count,
     expected_allowed_origins,
 ):
     sentry_init(
@@ -121,9 +117,9 @@ def test_exclude_span_origins_patterns(
         with start_span(name="span", origin=origin):
             pass
 
-    assert len(events) == expected_events_count
+    assert len(events) == len(expected_allowed_origins)
 
-    if expected_events_count > 0:
+    if len(expected_allowed_origins) > 0:
         captured_origins = {event["contexts"]["trace"]["origin"] for event in events}
         assert captured_origins == set(expected_allowed_origins)
 
