@@ -1,9 +1,10 @@
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.utils import event_from_exception
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import event_from_exception
 
 from typing import TYPE_CHECKING
 
@@ -154,6 +155,9 @@ def _set_usage_data(span, usage):
 
 def _set_input_data(span, get_response_kwargs):
     # type: (sentry_sdk.Span, dict[str, Any]) -> None
+    if not should_send_default_pii():
+        return
+
     messages_by_role = {
         "system": [],
         "user": [],
@@ -185,6 +189,9 @@ def _set_input_data(span, get_response_kwargs):
 
 def _set_output_data(span, result):
     # type: (sentry_sdk.Span, Any) -> None
+    if not should_send_default_pii():
+        return
+
     output_messages = {
         "response": [],
         "tool": [],

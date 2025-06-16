@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.scope import should_send_default_pii
 
 from ..utils import _set_agent_data
 
@@ -18,14 +19,16 @@ def execute_tool_span(tool, *args, **kwargs):
     )
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
-    span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
-    span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
-
-    input = args[1]
-    span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, input)
 
     if tool.__class__.__name__ == "FunctionTool":
         span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
+
+    span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
+    span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
+
+    if should_send_default_pii():
+        input = args[1]
+        span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, input)
 
     return span
 
@@ -33,4 +36,6 @@ def execute_tool_span(tool, *args, **kwargs):
 def update_execute_tool_span(span, agent, tool, result):
     # type: (Span, agents.Agent, agents.Tool, Any) -> None
     _set_agent_data(span, agent)
-    span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
+
+    if should_send_default_pii():
+        span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
