@@ -14,14 +14,12 @@ class UnleashIntegration(Integration):
     identifier = "unleash"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         # Wrap and patch evaluation methods (class methods)
         old_is_enabled = UnleashClient.is_enabled
 
         @wraps(old_is_enabled)
-        def sentry_is_enabled(self, feature, *args, **kwargs):
-            # type: (UnleashClient, str, *Any, **Any) -> Any
+        def sentry_is_enabled(self: UnleashClient, feature: str, *args: Any, **kwargs: Any) -> Any:
             enabled = old_is_enabled(self, feature, *args, **kwargs)
 
             # We have no way of knowing what type of unleash feature this is, so we have to treat
