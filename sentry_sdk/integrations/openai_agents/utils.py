@@ -31,16 +31,6 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _usage_to_str(usage):
-    # type: (Usage) -> str
-    return (
-        f"{usage.requests} requests, "
-        f"{usage.input_tokens} input tokens, "
-        f"{usage.output_tokens} output tokens, "
-        f"{usage.total_tokens} total tokens"
-    )
-
-
 def _get_start_span_function():
     # type: () -> Callable
     current_span = sentry_sdk.get_current_span()
