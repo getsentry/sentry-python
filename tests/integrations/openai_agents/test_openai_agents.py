@@ -1,3 +1,4 @@
+from unittest import mock
 import pytest
 from unittest.mock import MagicMock, patch
 import os
@@ -198,19 +199,10 @@ async def test_agent_invocation_span(
 @pytest.mark.asyncio
 async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     """Test tool execution span creation."""
-    sentry_init(
-        integrations=[OpenAIAgentsIntegration()],
-        traces_sample_rate=1.0,
-    )
 
-    events = capture_events()
-
-    # Create a simple test tool
-    from agents import function_tool
-
-    @function_tool
+    @agents.function_tool
     def simple_test_tool(message: str) -> str:
-        """A simple test tool that returns a message."""
+        """A simple tool"""
         return f"Tool executed with: {message}"
 
     # Create agent with the tool
@@ -221,8 +213,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
         ) as mock_get_response:
             # Create a mock response that includes tool calls
-            from agents.items import ResponseFunctionToolCall
-
             tool_call = ResponseFunctionToolCall(
                 id="call_123",
                 call_id="call_123",
@@ -269,44 +259,164 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
             # Return different responses on successive calls
             mock_get_response.side_effect = [tool_response, final_response]
 
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+            )
+
+            events = capture_events()
+
             with sentry_sdk.start_transaction(name="test_transaction"):
                 await agents.Runner.run(
                     agent_with_tool, "Please use the simple test tool"
                 )
 
-    # Verify spans were created
-    assert len(events) > 0
-    transaction = events[0]
-    spans = transaction.get("spans", [])
+    (transaction,) = events
+    spans = transaction["spans"]
+    (
+        agent_workflow_span,
+        agent_span,
+        ai_client_span1,
+        tool_span,
+        ai_client_span2,
+    ) = spans
 
-    # Should have workflow span
-    workflow_spans = [
-        span for span in spans if "workflow" in span.get("description", "")
+    available_tools = [
+        {
+            "name": "simple_test_tool",
+            "description": "A simple tool",
+            "params_json_schema": {
+                "properties": {"message": {"title": "Message", "type": "string"}},
+                "required": ["message"],
+                "title": "simple_test_tool_args",
+                "type": "object",
+                "additionalProperties": False,
+            },
+            "on_invoke_tool": mock.ANY,
+            "strict_json_schema": True,
+            "is_enabled": True,
+        }
     ]
-    assert len(workflow_spans) > 0
 
-    # Should have AI client spans
-    ai_spans = [span for span in spans if span.get("op") == "llm.request"]
-    assert len(ai_spans) > 0
+    assert agent_workflow_span["description"] == "test_agent workflow"
 
-    # Look for tool execution spans
-    tool_spans = [span for span in spans if span.get("op") == "agent.tool"]
-    assert len(tool_spans) > 0
+    assert agent_span["description"] == "invoke_agent test_agent"
+    assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+    assert agent_span["data"]["gen_ai.request.available_tools"] == available_tools
+    assert agent_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert agent_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert agent_span["data"]["gen_ai.request.top_p"] == 1.0
+    assert agent_span["data"]["gen_ai.system"] == "openai"
 
-    tool_span = tool_spans[0]
-    tool_data = tool_span.get("data", {})
-    assert tool_data.get("gen_ai.tool.name") == "simple_test_tool"
+    assert ai_client_span1["description"] == "chat gpt-4"
+    assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span1["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span1["data"]["gen_ai.request.available_tools"] == available_tools
+    assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span1["data"]["gen_ai.request.messages"] == [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": "You are a helpful test assistant."}],
+        },
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "Please use the simple test tool"}],
+        },
+    ]
+    assert ai_client_span1["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span1["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span1["data"]["gen_ai.request.top_p"] == 1.0
+    assert ai_client_span1["data"]["gen_ai.usage.input_tokens"] == 10
+    assert ai_client_span1["data"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
+    assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
+    assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
+    assert ai_client_span1["data"]["gen_ai.response.tool_calls"] == [
+        {
+            "arguments": '{"message": "hello"}',
+            "call_id": "call_123",
+            "name": "simple_test_tool",
+            "type": "function_call",
+            "id": "call_123",
+            "status": None,
+            "function": mock.ANY,
+        }
+    ]
+
+    assert tool_span["description"] == "execute_tool simple_test_tool"
+    assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
+    assert tool_span["data"]["gen_ai.request.available_tools"] == available_tools
+    assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert tool_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert tool_span["data"]["gen_ai.request.top_p"] == 1.0
+    assert tool_span["data"]["gen_ai.system"] == "openai"
+    assert tool_span["data"]["gen_ai.tool.description"] == "A simple tool"
+    assert tool_span["data"]["gen_ai.tool.input"] == '{"message": "hello"}'
+    assert tool_span["data"]["gen_ai.tool.name"] == "simple_test_tool"
+    assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
+    assert tool_span["data"]["gen_ai.tool.type"] == "function"
+
+    assert ai_client_span2["description"] == "chat gpt-4"
+    assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span2["data"]["gen_ai.request.available_tools"] == available_tools
+    assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span2["data"]["gen_ai.request.messages"] == [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": "You are a helpful test assistant."}],
+        },
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "Please use the simple test tool"}],
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "arguments": '{"message": "hello"}',
+                    "call_id": "call_123",
+                    "name": "simple_test_tool",
+                    "type": "function_call",
+                    "id": "call_123",
+                    "function": mock.ANY,
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "content": [
+                {
+                    "call_id": "call_123",
+                    "output": "Tool executed with: hello",
+                    "type": "function_call_output",
+                }
+            ],
+        },
+    ]
+    assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
+    assert ai_client_span2["data"]["gen_ai.response.text"] == [
+        "Task completed using the tool"
+    ]
+    assert ai_client_span2["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span2["data"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert ai_client_span2["data"]["gen_ai.usage.input_tokens"] == 15
+    assert ai_client_span2["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
+    assert ai_client_span2["data"]["gen_ai.usage.output_tokens"] == 10
+    assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
 
 
 @pytest.mark.asyncio
 async def test_error_handling(sentry_init, capture_events, test_agent):
     """Test error handling in agent execution."""
-    sentry_init(
-        integrations=[OpenAIAgentsIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    events = capture_events()
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
@@ -315,24 +425,46 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
             # Make the model call fail
             mock_get_response.side_effect = Exception("Model Error")
 
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
             with sentry_sdk.start_transaction(name="test_transaction"):
                 with pytest.raises(Exception, match="Model Error"):
                     await agents.Runner.run(test_agent, "Test input")
 
     # Verify spans were created even with errors
-    if events:
-        transaction = events[0]
-        spans = transaction.get("spans", [])
+    (transaction,) = events
+    spans = transaction["spans"]
 
-        # Should have workflow span
-        workflow_spans = [
-            span for span in spans if "workflow" in span.get("description", "")
-        ]
-        assert len(workflow_spans) > 0
+    # Should have workflow span and invoke agent span at minimum
+    assert len(spans) >= 2
 
-        # Check for error spans
-        error_spans = [span for span in spans if span.get("status") == "internal_error"]
-        assert len(error_spans) > 0
+    # Check workflow span
+    workflow_spans = [
+        span for span in spans if "workflow" in span.get("description", "")
+    ]
+    assert len(workflow_spans) == 1
+    workflow_span = workflow_spans[0]
+    assert workflow_span["description"] == "test_agent workflow"
+
+    # Check invoke agent span
+    invoke_spans = [
+        span for span in spans if span.get("description", "").startswith("invoke_agent")
+    ]
+    assert len(invoke_spans) == 1
+    invoke_span = invoke_spans[0]
+    assert invoke_span["description"] == "invoke_agent test_agent"
+    assert invoke_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+    assert invoke_span["data"]["gen_ai.system"] == "openai"
+    assert invoke_span["data"]["gen_ai.agent.name"] == "test_agent"
+
+    # Check for error spans
+    error_spans = [span for span in spans if span.get("status") == "internal_error"]
+    assert len(error_spans) >= 1
 
 
 @pytest.mark.asyncio
@@ -340,12 +472,6 @@ async def test_integration_with_hooks(
     sentry_init, capture_events, test_agent, mock_model_response
 ):
     """Test that the integration properly wraps hooks."""
-    sentry_init(
-        integrations=[OpenAIAgentsIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    events = capture_events()
 
     # Create a simple hook to test with
     hook_calls = []
@@ -365,6 +491,13 @@ async def test_integration_with_hooks(
         ) as mock_get_response:
             mock_get_response.return_value = mock_model_response
 
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
             with sentry_sdk.start_transaction(name="test_transaction"):
                 await agents.Runner.run(test_agent, "Test input", hooks=TestHooks())
 
@@ -373,11 +506,26 @@ async def test_integration_with_hooks(
     assert "end" in hook_calls
 
     # Verify spans were still created
-    assert len(events) > 0
-    transaction = events[0]
-    spans = transaction.get("spans", [])
+    (transaction,) = events
+    spans = transaction["spans"]
+    agent_workflow_span, invoke_agent_span, ai_client_span = spans
 
-    workflow_spans = [
-        span for span in spans if "workflow" in span.get("description", "")
-    ]
-    assert len(workflow_spans) > 0
+    assert agent_workflow_span["description"] == "test_agent workflow"
+
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+    assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+    assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
