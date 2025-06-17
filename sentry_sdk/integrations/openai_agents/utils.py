@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import partial, wraps
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
@@ -47,7 +47,13 @@ def _get_start_span_function():
     is_transaction = (
         current_span is not None and current_span.containing_transaction == current_span
     )
-    return sentry_sdk.start_span if is_transaction else sentry_sdk.start_transaction
+    start_span_function = (
+        sentry_sdk.start_span if is_transaction else sentry_sdk.start_transaction
+    )
+    return partial(
+        start_span_function,
+        origin=sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration.origin,
+    )
 
 
 def _create_hook_wrapper(original_hook, sentry_hook):

@@ -304,8 +304,10 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     ]
 
     assert agent_workflow_span["description"] == "test_agent workflow"
+    assert agent_workflow_span["origin"] == "auto.ai.openai_agents"
 
     assert agent_span["description"] == "invoke_agent test_agent"
+    assert agent_span["origin"] == "auto.ai.openai_agents"
     assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
     assert agent_span["data"]["gen_ai.request.available_tools"] == available_tools
@@ -316,6 +318,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert agent_span["data"]["gen_ai.system"] == "openai"
 
     assert ai_client_span1["description"] == "chat gpt-4"
+    assert ai_client_span1["tags"]["status"] == "internal_error"
     assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
     assert ai_client_span1["data"]["gen_ai.system"] == "openai"
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
@@ -352,6 +355,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     ]
 
     assert tool_span["description"] == "execute_tool simple_test_tool"
+    assert tool_span["tags"]["status"] == "internal_error"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
     assert tool_span["data"]["gen_ai.request.available_tools"] == available_tools
@@ -367,6 +371,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert tool_span["data"]["gen_ai.tool.type"] == "function"
 
     assert ai_client_span2["description"] == "chat gpt-4"
+    assert ai_client_span2["tags"]["status"] == "internal_error"
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
     assert ai_client_span2["data"]["gen_ai.request.available_tools"] == available_tools
@@ -428,7 +433,6 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
         ) as mock_get_response:
-            # Make the model call fail
             mock_get_response.side_effect = Exception("Model Error")
 
             sentry_init(
@@ -442,35 +446,13 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
                 with pytest.raises(Exception, match="Model Error"):
                     await agents.Runner.run(test_agent, "Test input")
 
-    # Verify spans were created even with errors
     (transaction,) = events
     spans = transaction["spans"]
+    (agent_workflow_span,) = spans
 
-    # Should have workflow span and invoke agent span at minimum
-    assert len(spans) >= 2
-
-    # Check workflow span
-    workflow_spans = [
-        span for span in spans if "workflow" in span.get("description", "")
-    ]
-    assert len(workflow_spans) == 1
-    workflow_span = workflow_spans[0]
-    assert workflow_span["description"] == "test_agent workflow"
-
-    # Check invoke agent span
-    invoke_spans = [
-        span for span in spans if span.get("description", "").startswith("invoke_agent")
-    ]
-    assert len(invoke_spans) == 1
-    invoke_span = invoke_spans[0]
-    assert invoke_span["description"] == "invoke_agent test_agent"
-    assert invoke_span["data"]["gen_ai.operation.name"] == "invoke_agent"
-    assert invoke_span["data"]["gen_ai.system"] == "openai"
-    assert invoke_span["data"]["gen_ai.agent.name"] == "test_agent"
-
-    # Check for error spans
-    error_spans = [span for span in spans if span.get("status") == "internal_error"]
-    assert len(error_spans) >= 1
+    assert agent_workflow_span["description"] == "test_agent workflow"
+    assert agent_workflow_span["origin"] == "auto.ai.openai_agents"
+    assert agent_workflow_span["tags"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio

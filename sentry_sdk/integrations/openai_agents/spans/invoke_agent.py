@@ -1,7 +1,7 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
-from ..utils import _set_agent_data
+from ..utils import _get_start_span_function, _set_agent_data
 
 from typing import TYPE_CHECKING
 
@@ -12,8 +12,9 @@ if TYPE_CHECKING:
 
 def invoke_agent_span(context, agent):
     # type: (agents.RunContextWrapper, agents.Agent) -> None
-    span = sentry_sdk.start_span(
-        op=OP.GEN_AI_INVOKE_AGENT, name=f"invoke_agent {agent.name}"
+    span = _get_start_span_function()(
+        op=OP.GEN_AI_INVOKE_AGENT,
+        name=f"invoke_agent {agent.name}",
     )
     span.__enter__()
 
