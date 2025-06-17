@@ -32,8 +32,7 @@ class OpenAIIntegration(Integration):
     identifier = "openai"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True, tiktoken_encoding_name=None):
-        # type: (OpenAIIntegration, bool, Optional[str]) -> None
+    def __init__(self, include_prompts: bool = True, tiktoken_encoding_name: "Optional[str]" = None) -> None:
         self.include_prompts = include_prompts
 
         self.tiktoken_encoding = None
@@ -43,8 +42,7 @@ class OpenAIIntegration(Integration):
             self.tiktoken_encoding = tiktoken.get_encoding(tiktoken_encoding_name)
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         Completions.create = _wrap_chat_completion_create(Completions.create)
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
 
@@ -53,15 +51,13 @@ class OpenAIIntegration(Integration):
         )
         AsyncEmbeddings.create = _wrap_async_embeddings_create(AsyncEmbeddings.create)
 
-    def count_tokens(self, s):
-        # type: (OpenAIIntegration, str) -> int
+    def count_tokens(self, s: str) -> int:
         if self.tiktoken_encoding is not None:
             return len(self.tiktoken_encoding.encode_ordinary(s))
         return 0
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -71,12 +67,15 @@ def _capture_exception(exc):
 
 
 def _calculate_chat_completion_usage(
-    messages, response, span, streaming_message_responses, count_tokens
-):
-    # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
-    completion_tokens = 0  # type: Optional[int]
-    prompt_tokens = 0  # type: Optional[int]
-    total_tokens = 0  # type: Optional[int]
+    messages: "Iterable[ChatCompletionMessageParam]", 
+    response: "Any", 
+    span: "Span", 
+    streaming_message_responses: "Optional[List[str]]", 
+    count_tokens: "Callable[..., Any]"
+) -> None:
+    completion_tokens: "Optional[int]" = 0
+    prompt_tokens: "Optional[int]" = 0
+    total_tokens: "Optional[int]" = 0
     if hasattr(response, "usage"):
         if hasattr(response.usage, "completion_tokens") and isinstance(
             response.usage.completion_tokens, int
@@ -114,8 +113,7 @@ def _calculate_chat_completion_usage(
     record_token_usage(span, prompt_tokens, completion_tokens, total_tokens)
 
 
-def _new_chat_completion_common(f, *args, **kwargs):
-    # type: (Any, *Any, **Any) -> Any
+def _new_chat_completion_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
@@ -168,8 +166,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
 
             old_iterator = res._iterator
 
-            def new_iterator():
-                # type: () -> Iterator[ChatCompletionChunk]
+            def new_iterator() -> "Iterator[ChatCompletionChunk]":
                 with capture_internal_exceptions():
                     for x in old_iterator:
                         if hasattr(x, "choices"):
@@ -201,8 +198,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
                         )
                 span.__exit__(None, None, None)
 
-            async def new_iterator_async():
-                # type: () -> AsyncIterator[ChatCompletionChunk]
+            async def new_iterator_async() -> "AsyncIterator[ChatCompletionChunk]":
                 with capture_internal_exceptions():
                     async for x in old_iterator:
                         if hasattr(x, "choices"):
@@ -245,10 +241,8 @@ def _new_chat_completion_common(f, *args, **kwargs):
     return res
 
 
-def _wrap_chat_completion_create(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-    def _execute_sync(f, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+def _wrap_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
+    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_chat_completion_common(f, *args, **kwargs)
 
         try:
@@ -268,8 +262,7 @@ def _wrap_chat_completion_create(f):
             return e.value
 
     @wraps(f)
-    def _sentry_patched_create_sync(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _sentry_patched_create_sync(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None or "messages" not in kwargs:
             # no "messages" means invalid call (in all versions of openai), let it return error
@@ -280,10 +273,8 @@ def _wrap_chat_completion_create(f):
     return _sentry_patched_create_sync
 
 
-def _wrap_async_chat_completion_create(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-    async def _execute_async(f, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+def _wrap_async_chat_completion_create(f: "Callable[..., Any]") -> "Callable[..., Any]":
+    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_chat_completion_common(f, *args, **kwargs)
 
         try:
@@ -303,8 +294,7 @@ def _wrap_async_chat_completion_create(f):
             return e.value
 
     @wraps(f)
-    async def _sentry_patched_create_async(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    async def _sentry_patched_create_async(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None or "messages" not in kwargs:
             # no "messages" means invalid call (in all versions of openai), let it return error
@@ -315,8 +305,7 @@ def _wrap_async_chat_completion_create(f):
     return _sentry_patched_create_async
 
 
-def _new_embeddings_create_common(f, *args, **kwargs):
-    # type: (Any, *Any, **Any) -> Any
+def _new_embeddings_create_common(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
@@ -363,10 +352,8 @@ def _new_embeddings_create_common(f, *args, **kwargs):
         return response
 
 
-def _wrap_embeddings_create(f):
-    # type: (Any) -> Any
-    def _execute_sync(f, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+def _wrap_embeddings_create(f: "Any") -> "Any":
+    def _execute_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_embeddings_create_common(f, *args, **kwargs)
 
         try:
@@ -386,8 +373,7 @@ def _wrap_embeddings_create(f):
             return e.value
 
     @wraps(f)
-    def _sentry_patched_create_sync(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _sentry_patched_create_sync(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None:
             return f(*args, **kwargs)
@@ -397,10 +383,8 @@ def _wrap_embeddings_create(f):
     return _sentry_patched_create_sync
 
 
-def _wrap_async_embeddings_create(f):
-    # type: (Any) -> Any
-    async def _execute_async(f, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+def _wrap_async_embeddings_create(f: "Any") -> "Any":
+    async def _execute_async(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         gen = _new_embeddings_create_common(f, *args, **kwargs)
 
         try:
@@ -420,8 +404,7 @@ def _wrap_async_embeddings_create(f):
             return e.value
 
     @wraps(f)
-    async def _sentry_patched_create_async(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    async def _sentry_patched_create_async(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None:
             return await f(*args, **kwargs)
