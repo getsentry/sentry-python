@@ -6,7 +6,7 @@ from threading import Lock
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, TypedDict
+    from typing import Any, TypedDict
 
     FlagData = TypedDict("FlagData", {"flag": str, "result": bool})
 
@@ -15,7 +15,6 @@ DEFAULT_FLAG_CAPACITY = 100
 
 
 class FlagBuffer:
-    __slots__ = ("capacity", "lock", "__buffer")
 
     def __init__(self, capacity: int) -> None:
         self.capacity = capacity
@@ -52,24 +51,6 @@ class FlagBuffer:
 
         with self.lock:
             self.__buffer.set(flag, result)
-
-
-# According to the design, flag_name and flag_result are the only required fields
-# https://develop.sentry.dev/sdk/feature-flags/
-FlagData = Dict[str, Any]
-
-# Global flag buffer instance that's used by the SDK
-FLAG_BUFFER = FlagBuffer(100)
-
-
-def set_flag(flag: str, result: bool) -> None:
-    """
-    Sets a feature flag.
-
-    :param flag: The name of the feature flag.
-    :param result: The result of the flag evaluation.
-    """
-    FLAG_BUFFER.set(flag, result)
 
 
 def add_feature_flag(flag: str, result: bool) -> None:
