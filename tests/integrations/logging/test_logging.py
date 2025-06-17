@@ -545,3 +545,82 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",
     }
+
+
+def test_sentry_logs_named_parameters(sentry_init, capture_envelopes):
+    """
+    The python logger module should capture named parameters from dictionary arguments in Sentry logs.
+    """
+    sentry_init(_experiments={"enable_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.info(
+        "%(source)s call completed, %(input_tk)i input tk, %(output_tk)i output tk (model %(model)s, cost $%(cost).4f)",
+        {
+            "source": "test_source",
+            "input_tk": 100,
+            "output_tk": 50,
+            "model": "gpt-4",
+            "cost": 0.0234,
+        },
+    )
+
+    get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+
+    assert len(logs) == 1
+    attrs = logs[0]["attributes"]
+
+    # Check that the template is captured
+    assert (
+        attrs["sentry.message.template"]
+        == "%(source)s call completed, %(input_tk)i input tk, %(output_tk)i output tk (model %(model)s, cost $%(cost).4f)"
+    )
+
+    # Check that dictionary arguments are captured as named parameters
+    assert attrs["sentry.message.parameter.source"] == "test_source"
+    assert attrs["sentry.message.parameter.input_tk"] == 100
+    assert attrs["sentry.message.parameter.output_tk"] == 50
+    assert attrs["sentry.message.parameter.model"] == "gpt-4"
+    assert attrs["sentry.message.parameter.cost"] == 0.0234
+
+    # Check other standard attributes
+    assert attrs["logger.name"] == "test-logger"
+    assert attrs["sentry.origin"] == "auto.logger.log"
+    assert logs[0]["severity_number"] == 9  # info level
+    assert logs[0]["severity_text"] == "info"
+
+
+def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_envelopes):
+    """
+    The python logger module should handle complex values in named parameters using safe_repr.
+    """
+    sentry_init(_experiments={"enable_logs": True})
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    complex_object = {"nested": {"data": [1, 2, 3]}, "tuple": (4, 5, 6)}
+    python_logger.warning(
+        "Processing %(simple)s with %(complex)s data",
+        {
+            "simple": "simple_value",
+            "complex": complex_object,
+        },
+    )
+
+    get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+
+    assert len(logs) == 1
+    attrs = logs[0]["attributes"]
+
+    # Check that simple values are kept as-is
+    assert attrs["sentry.message.parameter.simple"] == "simple_value"
+
+    # Check that complex values are converted using safe_repr
+    assert "sentry.message.parameter.complex" in attrs
+    complex_param = attrs["sentry.message.parameter.complex"]
+    assert isinstance(complex_param, str)
+    assert "nested" in complex_param
+    assert "data" in complex_param
