@@ -77,8 +77,8 @@ def test_redis_pipeline(
         "first_ten": expected_first_ten,
     }
     assert span["tags"] == {
-        "redis.transaction": is_transaction,
-        "redis.is_cluster": False,
+        "redis.transaction": str(is_transaction),
+        "redis.is_cluster": "False",
     }
 
 

@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
     should_be_treated_as_error,
+    safe_str,
 )
 
 from typing import TYPE_CHECKING
@@ -313,7 +314,7 @@ class Span:
         self.scope = scope
         self.origin = origin
         self._measurements = {}  # type: Dict[str, MeasurementValue]
-        self._tags = {}  # type: MutableMapping[str, str]
+        self._tags = {}  # type: MutableMapping[str, object]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         self._flags = {}  # type: Dict[str, bool]
@@ -718,7 +719,7 @@ class Span:
 
         tags = self._tags
         if tags:
-            rv["tags"] = tags
+            rv["tags"] = {k: safe_str(v) for k, v in tags.items()}
 
         data = {}
         data.update(self._flags)
@@ -1045,7 +1046,7 @@ class Transaction(Span):
             "transaction": self.name,
             "transaction_info": {"source": self.source},
             "contexts": contexts,
-            "tags": self._tags,
+            "tags": {k: safe_str(v) for k, v in self._tags.items()},
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
