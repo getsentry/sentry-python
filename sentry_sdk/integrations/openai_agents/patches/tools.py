@@ -32,7 +32,7 @@ def _create_get_all_tools_wrapper(original_get_all_tools):
         wrapped_tools = []
         for tool in tools:
             # Wrap only the function tools (for now)
-            if not isinstance(tool, agents.Tool):
+            if tool.__class__.__name__ != "FunctionTool":
                 wrapped_tools.append(tool)
                 continue
 
