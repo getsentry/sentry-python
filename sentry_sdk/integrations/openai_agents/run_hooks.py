@@ -15,7 +15,7 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-class SentryRunHooks(agents.RunHooks):
+class SentryRunHooks(agents.RunHooks):  # type: ignore[misc]
     async def on_agent_start(self, context, agent):
         # type: (agents.RunContextWrapper, agents.Agent) -> None
         invoke_agent_span(context, agent)

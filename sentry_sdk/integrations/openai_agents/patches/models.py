@@ -22,7 +22,6 @@ def _create_get_model_wrapper(original_get_model):
     Wraps the agents.Runner._get_model method to wrap the get_response method of the model to create a AI client span.
     """
 
-    @classmethod
     @wraps(original_get_model)
     def wrapped_get_model(cls, agent, run_config):
         # type: (agents.Runner, agents.Agent, agents.RunConfig) -> agents.Model
