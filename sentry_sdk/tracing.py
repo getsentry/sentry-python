@@ -202,24 +202,23 @@ def get_span_status_from_http_code(http_status_code):
 
 
 class _SpanRecorder:
-    """Limits the number of spans recorded in a transaction."""
+    """Limits the number of spans recorded in a transaction.
+    
+    When a transaction has more spans than maxlen, additional spans 
+    are dropped and counted in dropped_spans.
+    """
 
     __slots__ = ("maxlen", "spans", "dropped_spans")
 
     def __init__(self, maxlen):
         # type: (int) -> None
-        # FIXME: this is `maxlen - 1` only to preserve historical behavior
-        # enforced by tests.
-        # Either this should be changed to `maxlen` or the JS SDK implementation
-        # should be changed to match a consistent interpretation of what maxlen
-        # limits: either transaction+spans or only child spans.
-        self.maxlen = maxlen - 1
+        self.maxlen = maxlen
         self.spans = []  # type: List[Span]
         self.dropped_spans = 0  # type: int
 
     def add(self, span):
         # type: (Span) -> None
-        if len(self.spans) > self.maxlen:
+        if len(self.spans) >= self.maxlen:
             span._span_recorder = None
             self.dropped_spans += 1
         else:
