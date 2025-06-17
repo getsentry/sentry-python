@@ -15,23 +15,18 @@ class LogBatcher:
     MAX_LOGS_BEFORE_FLUSH = 100
     FLUSH_WAIT_TIME = 5.0
 
-    def __init__(
-        self,
-        capture_func,  # type: Callable[[Envelope], None]
-    ):
-        # type: (...) -> None
-        self._log_buffer = []  # type: List[Log]
+    def __init__(self, capture_func: Callable[[Envelope], None]) -> None:
+        self._log_buffer: List["Log"] = []
         self._capture_func = capture_func
         self._running = True
         self._lock = threading.Lock()
 
-        self._flush_event = threading.Event()  # type: threading.Event
+        self._flush_event: threading.Event = threading.Event()
 
-        self._flusher = None  # type: Optional[threading.Thread]
-        self._flusher_pid = None  # type: Optional[int]
+        self._flusher: Optional[threading.Thread] = None
+        self._flusher_pid: Optional[int] = None
 
-    def _ensure_thread(self):
-        # type: (...) -> bool
+    def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
         This ensures that our process actually has that thread running.
         """
@@ -63,18 +58,13 @@ class LogBatcher:
 
         return True
 
-    def _flush_loop(self):
-        # type: (...) -> None
+    def _flush_loop(self) -> None:
         while self._running:
             self._flush_event.wait(self.FLUSH_WAIT_TIME + random.random())
             self._flush_event.clear()
             self._flush()
 
-    def add(
-        self,
-        log,  # type: Log
-    ):
-        # type: (...) -> None
+    def add(self, log: "Log") -> None:
         if not self._ensure_thread() or self._flusher is None:
             return None
 
@@ -83,8 +73,7 @@ class LogBatcher:
             if len(self._log_buffer) >= self.MAX_LOGS_BEFORE_FLUSH:
                 self._flush_event.set()
 
-    def kill(self):
-        # type: (...) -> None
+    def kill(self) -> None:
         if self._flusher is None:
             return
 
@@ -92,15 +81,12 @@ class LogBatcher:
         self._flush_event.set()
         self._flusher = None
 
-    def flush(self):
-        # type: (...) -> None
+    def flush(self) -> None:
         self._flush()
 
     @staticmethod
-    def _log_to_transport_format(log):
-        # type: (Log) -> Any
-        def format_attribute(val):
-            # type: (int | float | str | bool) -> Any
+    def _log_to_transport_format(log: "Log") -> Any:
+        def format_attribute(val: int | float | str | bool) -> Any:
             if isinstance(val, bool):
                 return {"value": val, "type": "boolean"}
             if isinstance(val, int):
@@ -128,8 +114,7 @@ class LogBatcher:
 
         return res
 
-    def _flush(self):
-        # type: (...) -> Optional[Envelope]
+    def _flush(self) -> Optional[Envelope]:
 
         envelope = Envelope(
             headers={"sent_at": format_timestamp(datetime.now(timezone.utc))}
