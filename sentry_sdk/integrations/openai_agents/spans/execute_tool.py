@@ -8,12 +8,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import agents
-    from sentry_sdk import Span
     from typing import Any
 
 
 def execute_tool_span(tool, *args, **kwargs):
-    # type: (agents.Tool, *Any, **Any) -> Span
+    # type: (agents.Tool, *Any, **Any) -> sentry_sdk.tracing.Span
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_EXECUTE_TOOL,
         name=f"execute_tool {tool.name}",
@@ -36,7 +35,7 @@ def execute_tool_span(tool, *args, **kwargs):
 
 
 def update_execute_tool_span(span, agent, tool, result):
-    # type: (Span, agents.Agent, agents.Tool, Any) -> None
+    # type: (sentry_sdk.tracing.Span, agents.Agent, agents.Tool, Any) -> None
     _set_agent_data(span, agent)
 
     if should_send_default_pii():

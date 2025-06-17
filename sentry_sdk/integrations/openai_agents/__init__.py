@@ -15,19 +15,19 @@ except ImportError:
 
 def _patch_runner():
     # type: () -> None
-    agents.Runner.run = _create_run_wrapper(agents.Runner.run)
-    agents.Runner.run_sync = _create_run_wrapper(agents.Runner.run_sync)
-    agents.Runner.run_streamed = _create_run_wrapper(agents.Runner.run_streamed)
+    agents.Runner.run = _create_run_wrapper(agents.Runner.run)  # type: ignore[method-assign]
+    agents.Runner.run_sync = _create_run_wrapper(agents.Runner.run_sync)  # type: ignore[method-assign]
+    agents.Runner.run_streamed = _create_run_wrapper(agents.Runner.run_streamed)  # type: ignore[method-assign]
 
 
 def _patch_model():
     # type: () -> None
-    agents.Runner._get_model = _create_get_model_wrapper(agents.Runner._get_model)
+    agents.Runner._get_model = _create_get_model_wrapper(agents.Runner._get_model)  # type: ignore[method-assign]
 
 
 def _patch_tools():
     # type: () -> None
-    agents.Runner._get_all_tools = _create_get_all_tools_wrapper(
+    agents.Runner._get_all_tools = _create_get_all_tools_wrapper(  # type: ignore[method-assign]
         agents.Runner._get_all_tools
     )
 

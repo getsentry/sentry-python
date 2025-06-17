@@ -32,7 +32,7 @@ def _capture_exception(exc):
 
 
 def _get_start_span_function():
-    # type: () -> Callable
+    # type: () -> Callable[..., Any]
     current_span = sentry_sdk.get_current_span()
     is_transaction = (
         current_span is not None and current_span.containing_transaction == current_span
@@ -41,7 +41,7 @@ def _get_start_span_function():
 
 
 def _create_hook_wrapper(original_hook, sentry_hook):
-    # type: (Callable, Callable) -> Callable
+    # type: (Callable[..., Any], Callable[..., Any]) -> Callable[..., Any]
     @wraps(original_hook)
     async def async_wrapper(*args, **kwargs):
         await sentry_hook(*args, **kwargs)
@@ -86,7 +86,7 @@ def _wrap_hooks(hooks):
 
 
 def _set_agent_data(span, agent):
-    # type: (sentry_sdk.Span, agents.Agent) -> None
+    # type: (sentry_sdk.tracing.Span, agents.Agent) -> None
     span.set_data(
         SPANDATA.GEN_AI_SYSTEM, "openai"
     )  # See footnote for  https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/#gen-ai-system for explanation why.
@@ -129,7 +129,7 @@ def _set_agent_data(span, agent):
 
 
 def _set_usage_data(span, usage):
-    # type: (sentry_sdk.Span, Usage) -> None
+    # type: (sentry_sdk.tracing.Span, Usage) -> None
     span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, usage.input_tokens)
     span.set_data(
         SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
@@ -144,7 +144,7 @@ def _set_usage_data(span, usage):
 
 
 def _set_input_data(span, get_response_kwargs):
-    # type: (sentry_sdk.Span, dict[str, Any]) -> None
+    # type: (sentry_sdk.tracing.Span, dict[str, Any]) -> None
     if not should_send_default_pii():
         return
 
@@ -178,7 +178,7 @@ def _set_input_data(span, get_response_kwargs):
 
 
 def _set_output_data(span, result):
-    # type: (sentry_sdk.Span, Any) -> None
+    # type: (sentry_sdk.tracing.Span, Any) -> None
     if not should_send_default_pii():
         return
 

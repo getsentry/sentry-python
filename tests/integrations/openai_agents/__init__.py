@@ -1,3 +1,3 @@
 import pytest
 
-pytest.importorskip("openai-agents")
+pytest.importorskip("agents")
