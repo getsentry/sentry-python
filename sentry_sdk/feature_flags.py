@@ -3,10 +3,10 @@ import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
 from threading import Lock
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import TypedDict
+    from typing import Any, Dict, TypedDict
 
     FlagData = TypedDict("FlagData", {"flag": str, "result": bool})
 
@@ -15,9 +15,9 @@ DEFAULT_FLAG_CAPACITY = 100
 
 
 class FlagBuffer:
+    __slots__ = ("capacity", "lock", "__buffer")
 
-    def __init__(self, capacity):
-        # type: (int) -> None
+    def __init__(self, capacity: int) -> None:
         self.capacity = capacity
         self.lock = Lock()
 
@@ -25,26 +25,22 @@ class FlagBuffer:
         # directly you're on your own!
         self.__buffer = LRUCache(capacity)
 
-    def clear(self):
-        # type: () -> None
+    def clear(self) -> None:
         self.__buffer = LRUCache(self.capacity)
 
-    def __deepcopy__(self, memo):
-        # type: (dict[int, Any]) -> FlagBuffer
+    def __deepcopy__(self, memo: dict[int, Any]) -> "FlagBuffer":
         with self.lock:
             buffer = FlagBuffer(self.capacity)
             buffer.__buffer = copy.deepcopy(self.__buffer, memo)
             return buffer
 
-    def get(self):
-        # type: () -> list[FlagData]
+    def get(self) -> list["FlagData"]:
         with self.lock:
             return [
                 {"flag": key, "result": value} for key, value in self.__buffer.get_all()
             ]
 
-    def set(self, flag, result):
-        # type: (str, bool) -> None
+    def set(self, flag: str, result: bool) -> None:
         if isinstance(result, FlagBuffer):
             # If someone were to insert `self` into `self` this would create a circular dependency
             # on the lock. This is of course a deadlock. However, this is far outside the expected
@@ -58,8 +54,25 @@ class FlagBuffer:
             self.__buffer.set(flag, result)
 
 
-def add_feature_flag(flag, result):
-    # type: (str, bool) -> None
+# According to the design, flag_name and flag_result are the only required fields
+# https://develop.sentry.dev/sdk/feature-flags/
+FlagData = Dict[str, Any]
+
+# Global flag buffer instance that's used by the SDK
+FLAG_BUFFER = FlagBuffer(100)
+
+
+def set_flag(flag: str, result: bool) -> None:
+    """
+    Sets a feature flag.
+
+    :param flag: The name of the feature flag.
+    :param result: The result of the flag evaluation.
+    """
+    FLAG_BUFFER.set(flag, result)
+
+
+def add_feature_flag(flag: str, result: bool) -> None:
     """
     Records a flag and its value to be sent on subsequent error events.
     We recommend you do this on flag evaluations. Flags are buffered per Sentry scope.

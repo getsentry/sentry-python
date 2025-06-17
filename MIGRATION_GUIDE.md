@@ -374,3 +374,274 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - Deprecated `sentry_sdk.transport.Transport.capture_event`. Please use `sentry_sdk.transport.Transport.capture_envelope`, instead.
 - Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
 - The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
+
+# Type Annotation Migration Guide
+
+This guide documents the migration of the Sentry Python SDK codebase from comment-based type annotations to inline type annotations according to [PEP 484](https://peps.python.org/pep-0484).
+
+## Overview
+
+The Sentry Python SDK codebase currently uses a mix of comment-based type annotations (the old style) and inline type annotations (PEP 484 style). This migration aims to standardize on inline type annotations throughout the codebase.
+
+## Migration Patterns
+
+### Function Signatures
+
+**Before (comment-based):**
+```python
+def _minute_trunc(ts):
+    # type: (datetime) -> datetime
+    return ts.replace(second=0, microsecond=0)
+
+def update(
+    self,
+    sid=None,  # type: Optional[Union[str, uuid.UUID]]
+    did=None,  # type: Optional[str]
+):
+    # type: (...) -> None
+    pass
+```
+
+**After (inline):**
+```python
+def _minute_trunc(ts: datetime) -> datetime:
+    return ts.replace(second=0, microsecond=0)
+
+def update(
+    self,
+    sid: Optional[Union[str, uuid.UUID]] = None,
+    did: Optional[str] = None,
+) -> None:
+    pass
+```
+
+### Variable Annotations
+
+**Before:**
+```python
+global_repr_processors = []  # type: List[ReprProcessor]
+self.did = None  # type: Optional[str]
+rv = {}  # type: Dict[str, Any]
+```
+
+**After:**
+```python
+global_repr_processors: List[ReprProcessor] = []
+self.did: Optional[str] = None
+rv: Dict[str, Any] = {}
+```
+
+### Method Signatures
+
+**Before:**
+```python
+def setup_once():  # type: () -> None
+    pass
+
+def error_handler(e):  # type: (Exception) -> None
+    pass
+```
+
+**After:**
+```python
+def setup_once() -> None:
+    pass
+
+def error_handler(e: Exception) -> None:
+    pass
+```
+
+## Migration Strategy
+
+### Phase 1: Core Files (✓ Completed)
+- `sentry_sdk/session.py` - Session management
+- `sentry_sdk/feature_flags.py` - Feature flag handling  
+- `sentry_sdk/integrations/trytond.py` - Tryton integration
+
+### Phase 2: Core SDK Files
+Files that need migration in priority order:
+
+1. **Core SDK modules:**
+   - `sentry_sdk/serializer.py`
+   - `sentry_sdk/monitor.py`
+   - `sentry_sdk/scrubber.py`
+   - `sentry_sdk/tracing.py`
+   - `sentry_sdk/_log_batcher.py`
+
+2. **Integration modules:**
+   - All files in `sentry_sdk/integrations/` with comment-based annotations
+
+3. **Test files:**
+   - Files in `tests/` directory (lower priority as they're not part of the public API)
+
+### Phase 3: Automated Migration
+Use the provided migration script for bulk conversion:
+
+```bash
+python scripts/migrate_type_annotations.py sentry_sdk/
+```
+
+## Migration Tools
+
+### Automated Migration Script
+
+A migration script has been created at `scripts/migrate_type_annotations.py` that can:
+
+1. **Analyze** the codebase to count type annotation patterns
+2. **Identify** files that need migration
+3. **Automatically migrate** simple cases
+4. **Report** on migration success/failure
+
+### Usage Example
+
+```bash
+# Analyze the current state
+python scripts/migrate_type_annotations.py sentry_sdk/
+
+# This will show:
+# - Total Python files
+# - Files with type comments
+# - Count of different annotation types
+# - List of files needing migration
+```
+
+## Manual Migration Guidelines
+
+### Complex Function Signatures
+
+For functions with complex signatures that the automated script can't handle:
+
+**Pattern to migrate:**
+```python
+def serialize(
+    event,  # type: Dict[str, Any]
+    **kwargs  # type: Any
+):
+    # type: (...) -> Dict[str, Any]
+```
+
+**Migrated version:**
+```python
+def serialize(
+    event: Dict[str, Any],
+    **kwargs: Any
+) -> Dict[str, Any]:
+```
+
+### Self and Cls Parameters
+
+Don't annotate `self` and `cls` parameters:
+
+**Correct:**
+```python
+def update(self, status: Optional[SessionStatus] = None) -> Any:
+    pass
+
+@classmethod
+def from_dict(cls, data: dict[int, Any]) -> "FlagBuffer":
+    pass
+```
+
+### Forward References
+
+Use string quotes for forward references:
+
+```python
+def __deepcopy__(self, memo: dict[int, Any]) -> "FlagBuffer":
+    pass
+```
+
+## Type Import Organization
+
+### TYPE_CHECKING Block
+
+Keep type imports organized in TYPE_CHECKING blocks:
+
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any, Dict, List, Optional, Union
+    from sentry_sdk._types import SessionStatus
+```
+
+### Runtime vs Type-only Imports
+
+- Use `TYPE_CHECKING` for imports only needed for type annotations
+- Import types used at runtime normally
+
+## Validation
+
+### Running Type Checkers
+
+After migration, validate with type checkers:
+
+```bash
+# Using mypy
+mypy sentry_sdk/
+
+# Using pyright
+pyright sentry_sdk/
+```
+
+### Testing
+
+Ensure all existing tests pass after migration:
+
+```bash
+pytest tests/
+```
+
+## Common Issues and Solutions
+
+### Import Errors
+
+**Issue:** `NameError: name 'Dict' is not defined`
+**Solution:** Add missing imports to the TYPE_CHECKING block
+
+### Forward Reference Issues
+
+**Issue:** `NameError: name 'ClassName' is not defined`
+**Solution:** Use string quotes: `-> "ClassName"`
+
+### Complex Generic Types
+
+**Issue:** Complex nested generic types
+**Solution:** Consider using type aliases:
+
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    NestedDict = Dict[str, Dict[str, Any]]
+
+def process_data(data: NestedDict) -> None:
+    pass
+```
+
+## Progress Tracking
+
+### Completed Files
+- ✅ `sentry_sdk/session.py`
+- ✅ `sentry_sdk/feature_flags.py`
+- ✅ `sentry_sdk/integrations/trytond.py`
+
+### Remaining Files with Type Comments
+Run the migration script to get current statistics:
+
+```bash
+python scripts/migrate_type_annotations.py . --stats-only
+```
+
+## Benefits of Migration
+
+1. **Better IDE Support:** Improved autocomplete and error detection
+2. **Consistency:** Unified annotation style across the codebase
+3. **Modern Python:** Following current Python type annotation best practices
+4. **Tool Compatibility:** Better support for modern type checking tools
+
+## References
+
+- [PEP 484 - Type Hints](https://peps.python.org/pep-0484)
+- [Python typing module documentation](https://docs.python.org/3/library/typing.html)
+- [mypy documentation](https://mypy.readthedocs.io/)
