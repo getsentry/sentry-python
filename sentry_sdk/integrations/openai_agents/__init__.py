@@ -4,6 +4,7 @@ from .patches import (
     _create_get_model_wrapper,
     _create_get_all_tools_wrapper,
     _create_run_wrapper,
+    _create_run_single_turn_wrapper,
 )
 
 try:
@@ -15,6 +16,7 @@ except ImportError:
 
 def _patch_runner():
     # type: () -> None
+    # Agent workflow spans
     agents.Runner.run = classmethod(
         _create_run_wrapper(agents.Runner.run),
     )
@@ -23,6 +25,11 @@ def _patch_runner():
     )
     agents.Runner.run_streamed = classmethod(
         _create_run_wrapper(agents.Runner.run_streamed),
+    )
+
+    # Agent invocation spans
+    agents.Runner._run_single_turn = classmethod(
+        _create_run_single_turn_wrapper(agents.Runner._run_single_turn),
     )
 
 

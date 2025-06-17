@@ -3,7 +3,6 @@ import pytest
 from unittest.mock import MagicMock, patch
 import os
 
-import sentry_sdk
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 
 import agents
@@ -95,17 +94,73 @@ async def test_agent_invocation_span(
 
             events = capture_events()
 
-            with sentry_sdk.start_transaction(name="test_transaction"):
-                result = await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
-                )
+            result = await agents.Runner.run(
+                test_agent, "Test input", run_config=test_run_config
+            )
 
-                assert result is not None
-                assert result.final_output == "Hello, how can I help you?"
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    invoke_agent_span, ai_client_span = spans
+
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+    assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+    assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+
+def test_agent_invocation_span_sync(
+    sentry_init, capture_events, test_agent, mock_model_response
+):
+    """
+    Test that the integration creates spans for agent invocations.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            result = agents.Runner.run_sync(
+                test_agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
 
     (transaction,) = events
     spans = transaction["spans"]
     agent_workflow_span, invoke_agent_span, ai_client_span = spans
+    # TODO: why is there a workflow span?
+
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert agent_workflow_span["description"] == "test_agent workflow"
 
@@ -201,17 +256,15 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
 
             events = capture_events()
 
-            with sentry_sdk.start_transaction(name="test_transaction"):
-                await agents.Runner.run(
-                    agent_with_tool,
-                    "Please use the simple test tool",
-                    run_config=test_run_config,
-                )
+            await agents.Runner.run(
+                agent_with_tool,
+                "Please use the simple test tool",
+                run_config=test_run_config,
+            )
 
     (transaction,) = events
     spans = transaction["spans"]
     (
-        agent_workflow_span,
         agent_span,
         ai_client_span1,
         tool_span,
@@ -235,8 +288,8 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         }
     ]
 
-    assert agent_workflow_span["description"] == "test_agent workflow"
-    assert agent_workflow_span["origin"] == "auto.ai.openai_agents"
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert agent_span["description"] == "invoke_agent test_agent"
     assert agent_span["origin"] == "auto.ai.openai_agents"
@@ -371,19 +424,21 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
             events = capture_events()
 
-            with sentry_sdk.start_transaction(name="test_transaction"):
-                with pytest.raises(Exception, match="Model Error"):
-                    await agents.Runner.run(
-                        test_agent, "Test input", run_config=test_run_config
-                    )
+            with pytest.raises(Exception, match="Model Error"):
+                await agents.Runner.run(
+                    test_agent, "Test input", run_config=test_run_config
+                )
 
     (transaction,) = events
     spans = transaction["spans"]
-    (agent_workflow_span, ai_client_span) = spans
+    (invoke_agent_span, ai_client_span) = spans
 
-    assert agent_workflow_span["description"] == "test_agent workflow"
-    assert agent_workflow_span["origin"] == "auto.ai.openai_agents"
-    assert agent_workflow_span["tags"]["status"] == "internal_error"
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert invoke_agent_span["origin"] == "auto.ai.openai_agents"
+    assert invoke_agent_span["tags"]["status"] == "internal_error"
 
     assert ai_client_span["description"] == "chat gpt-4"
     assert ai_client_span["origin"] == "auto.ai.openai_agents"

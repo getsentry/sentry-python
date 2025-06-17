@@ -11,14 +11,13 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def invoke_agent_span(context, agent):
-    # type: (agents.RunContextWrapper, agents.Agent) -> sentry_sdk.tracing.Span
+def invoke_agent_span(agent):
+    # type: (agents.Agent) -> sentry_sdk.tracing.Span
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_INVOKE_AGENT,
         name=f"invoke_agent {agent.name}",
         origin=SPAN_ORIGIN,
     )
-    span.__enter__()
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
@@ -27,8 +26,6 @@ def invoke_agent_span(context, agent):
     return span
 
 
-def update_invoke_agent_span(context, agent, output):
-    # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
-    current_span = sentry_sdk.get_current_span()
-    if current_span:
-        current_span.__exit__(None, None, None)
+def update_invoke_agent_span(span, agent, output):
+    # type: (sentry_sdk.tracing.span, agents.Agent, Any) -> None
+    pass
