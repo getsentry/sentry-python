@@ -1,3 +1,4 @@
+import itertools
 from collections import OrderedDict
 from functools import wraps
 
@@ -451,7 +452,14 @@ def _wrap_configure(f):
                 **kwargs,
             )
 
-        if not any(isinstance(cb, SentryLangchainCallback) for cb in callbacks_list):
+        inheritable_callbacks_list = (
+            inheritable_callbacks if isinstance(inheritable_callbacks, list) else []
+        )
+
+        if not any(
+            isinstance(cb, SentryLangchainCallback)
+            for cb in itertools.chain(callbacks_list, inheritable_callbacks_list)
+        ):
             # Avoid mutating the existing callbacks list
             callbacks_list = [
                 *callbacks_list,
