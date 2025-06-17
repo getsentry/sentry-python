@@ -38,13 +38,11 @@ class FastApiIntegration(StarletteIntegration):
     identifier = "fastapi"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         patch_get_request_handler()
 
 
-def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (sentry_sdk.Scope, str, Any) -> None
+def _set_transaction_name_and_source(scope: "sentry_sdk.Scope", transaction_style: str, request: Any) -> None:
     name = ""
 
     if transaction_style == "endpoint":
@@ -71,12 +69,10 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
     )
 
 
-def patch_get_request_handler():
-    # type: () -> None
+def patch_get_request_handler() -> None:
     old_get_request_handler = fastapi.routing.get_request_handler
 
-    def _sentry_get_request_handler(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _sentry_get_request_handler(*args: Any, **kwargs: Any) -> Any:
         dependant = kwargs.get("dependant")
         if (
             dependant
@@ -86,8 +82,7 @@ def patch_get_request_handler():
             old_call = dependant.call
 
             @wraps(old_call)
-            def _sentry_call(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
+            def _sentry_call(*args: Any, **kwargs: Any) -> Any:
                 current_scope = sentry_sdk.get_current_scope()
                 if current_scope.root_span is not None:
                     current_scope.root_span.update_active_thread()
@@ -102,8 +97,7 @@ def patch_get_request_handler():
 
         old_app = old_get_request_handler(*args, **kwargs)
 
-        async def _sentry_app(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
+        async def _sentry_app(*args: Any, **kwargs: Any) -> Any:
             integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
             if integration is None:
                 return await old_app(*args, **kwargs)
@@ -117,10 +111,8 @@ def patch_get_request_handler():
             extractor = StarletteRequestExtractor(request)
             info = await extractor.extract_request_info()
 
-            def _make_request_event_processor(req, integration):
-                # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
-                def event_processor(event, hint):
-                    # type: (Event, Dict[str, Any]) -> Event
+            def _make_request_event_processor(req: Any, integration: Any) -> "Callable[[Event, Dict[str, Any]], Event]":
+                def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
 
                     # Extract information from request
                     request_info = event.get("request", {})

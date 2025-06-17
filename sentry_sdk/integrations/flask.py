@@ -57,10 +57,9 @@ class FlaskIntegration(Integration):
 
     def __init__(
         self,
-        transaction_style="endpoint",  # type: str
-        http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: tuple[str, ...]
-    ):
-        # type: (...) -> None
+        transaction_style: str = "endpoint",
+        http_methods_to_capture: tuple[str, ...] = DEFAULT_HTTP_METHODS_TO_CAPTURE,
+    ) -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -70,8 +69,7 @@ class FlaskIntegration(Integration):
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         try:
             from quart import Quart  # type: ignore
 
@@ -93,8 +91,7 @@ class FlaskIntegration(Integration):
 
         old_app = Flask.__call__
 
-        def sentry_patched_wsgi_app(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
+        def sentry_patched_wsgi_app(self: Any, environ: "Dict[str, str]", start_response: "Callable[..., Any]") -> "_ScopedResponse":
             if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -114,8 +111,7 @@ class FlaskIntegration(Integration):
         Flask.__call__ = sentry_patched_wsgi_app
 
 
-def _add_sentry_trace(sender, template, context, **extra):
-    # type: (Flask, Any, Dict[str, Any], **Any) -> None
+def _add_sentry_trace(sender: Flask, template: Any, context: "Dict[str, Any]", **extra: Any) -> None:
     if "sentry_trace" in context:
         return
 
@@ -125,8 +121,7 @@ def _add_sentry_trace(sender, template, context, **extra):
     context["sentry_trace_meta"] = trace_meta
 
 
-def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (sentry_sdk.Scope, str, Request) -> None
+def _set_transaction_name_and_source(scope: "sentry_sdk.Scope", transaction_style: str, request: "Request") -> None:
     try:
         name_for_style = {
             "url": request.url_rule.rule,
@@ -140,8 +135,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-def _request_started(app, **kwargs):
-    # type: (Flask, **Any) -> None
+def _request_started(app: Flask, **kwargs: Any) -> None:
     integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
     if integration is None:
         return
@@ -160,47 +154,37 @@ def _request_started(app, **kwargs):
 
 
 class FlaskRequestExtractor(RequestExtractor):
-    def env(self):
-        # type: () -> Dict[str, str]
+    def env(self) -> "Dict[str, str]":
         return self.request.environ
 
-    def cookies(self):
-        # type: () -> Dict[Any, Any]
+    def cookies(self) -> "Dict[Any, Any]":
         return {
             k: v[0] if isinstance(v, list) and len(v) == 1 else v
             for k, v in self.request.cookies.items()
         }
 
-    def raw_data(self):
-        # type: () -> bytes
+    def raw_data(self) -> bytes:
         return self.request.get_data()
 
-    def form(self):
-        # type: () -> ImmutableMultiDict[str, Any]
+    def form(self) -> "ImmutableMultiDict[str, Any]":
         return self.request.form
 
-    def files(self):
-        # type: () -> ImmutableMultiDict[str, Any]
+    def files(self) -> "ImmutableMultiDict[str, Any]":
         return self.request.files
 
-    def is_json(self):
-        # type: () -> bool
+    def is_json(self) -> bool:
         return self.request.is_json
 
-    def json(self):
-        # type: () -> Any
+    def json(self) -> Any:
         return self.request.get_json(silent=True)
 
-    def size_of_file(self, file):
-        # type: (FileStorage) -> int
+    def size_of_file(self, file: "FileStorage") -> int:
         return file.content_length
 
 
-def _make_request_event_processor(app, request, integration):
-    # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
+def _make_request_event_processor(app: "Flask", request: "Callable[[], Request]", integration: "FlaskIntegration") -> "EventProcessor":
 
-    def inner(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+    def inner(event: "Event", hint: dict[str, Any]) -> "Event":
 
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
@@ -221,8 +205,7 @@ def _make_request_event_processor(app, request, integration):
 
 
 @ensure_integration_enabled(FlaskIntegration)
-def _capture_exception(sender, exception, **kwargs):
-    # type: (Flask, Union[ValueError, BaseException], **Any) -> None
+def _capture_exception(sender: "Flask", exception: "Union[ValueError, BaseException]", **kwargs: Any) -> None:
     event, hint = event_from_exception(
         exception,
         client_options=sentry_sdk.get_client().options,
@@ -232,8 +215,7 @@ def _capture_exception(sender, exception, **kwargs):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _add_user_to_event(event):
-    # type: (Event) -> None
+def _add_user_to_event(event: "Event") -> None:
     if flask_login is None:
         return
 

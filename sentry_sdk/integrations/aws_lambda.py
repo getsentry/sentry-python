@@ -54,11 +54,9 @@ CONTEXT_TO_ATTRIBUTES = {
 }
 
 
-def _wrap_init_error(init_error):
-    # type: (F) -> F
+def _wrap_init_error(init_error: "F") -> "F":
     @ensure_integration_enabled(AwsLambdaIntegration, init_error)
-    def sentry_init_error(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def sentry_init_error(*args: Any, **kwargs: Any) -> Any:
         client = sentry_sdk.get_client()
 
         with capture_internal_exceptions():
@@ -86,11 +84,9 @@ def _wrap_init_error(init_error):
     return sentry_init_error  # type: ignore
 
 
-def _wrap_handler(handler):
-    # type: (F) -> F
+def _wrap_handler(handler: "F") -> "F":
     @functools.wraps(handler)
-    def sentry_handler(aws_event, aws_context, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> Any
+    def sentry_handler(aws_event: Any, aws_context: Any, *args: Any, **kwargs: Any) -> Any:
 
         # Per https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html,
         # `event` here is *likely* a dictionary, but also might be a number of
@@ -192,8 +188,7 @@ def _wrap_handler(handler):
     return sentry_handler  # type: ignore
 
 
-def _drain_queue():
-    # type: () -> None
+def _drain_queue() -> None:
     with capture_internal_exceptions():
         client = sentry_sdk.get_client()
         integration = client.get_integration(AwsLambdaIntegration)
@@ -207,13 +202,11 @@ class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
     origin = f"auto.function.{identifier}"
 
-    def __init__(self, timeout_warning=False):
-        # type: (bool) -> None
+    def __init__(self, timeout_warning: bool = False) -> None:
         self.timeout_warning = timeout_warning
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
 
         lambda_bootstrap = get_lambda_bootstrap()
         if not lambda_bootstrap:
@@ -249,10 +242,8 @@ class AwsLambdaIntegration(Integration):
         # Patch the runtime client to drain the queue. This should work
         # even when the SDK is initialized inside of the handler
 
-        def _wrap_post_function(f):
-            # type: (F) -> F
-            def inner(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
+        def _wrap_post_function(f: "F") -> "F":
+            def inner(*args: Any, **kwargs: Any) -> Any:
                 _drain_queue()
                 return f(*args, **kwargs)
 
@@ -270,8 +261,7 @@ class AwsLambdaIntegration(Integration):
         )
 
 
-def get_lambda_bootstrap():
-    # type: () -> Optional[Any]
+def get_lambda_bootstrap() -> "Optional[Any]":
 
     # Python 3.7: If the bootstrap module is *already imported*, it is the
     # one we actually want to use (no idea what's in __main__)
@@ -307,12 +297,10 @@ def get_lambda_bootstrap():
         return None
 
 
-def _make_request_event_processor(aws_event, aws_context, configured_timeout):
-    # type: (Any, Any, Any) -> EventProcessor
+def _make_request_event_processor(aws_event: Any, aws_context: Any, configured_timeout: Any) -> "EventProcessor":
     start_time = datetime.now(timezone.utc)
 
-    def event_processor(sentry_event, hint, start_time=start_time):
-        # type: (Event, Hint, datetime) -> Optional[Event]
+    def event_processor(sentry_event: "Event", hint: "Hint", start_time: datetime = start_time) -> "Optional[Event]":
         remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
         exec_duration = configured_timeout - remaining_time_in_milis
 
@@ -375,8 +363,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
     return event_processor
 
 
-def _get_url(aws_event, aws_context):
-    # type: (Any, Any) -> str
+def _get_url(aws_event: Any, aws_context: Any) -> str:
     path = aws_event.get("path", None)
 
     headers = aws_event.get("headers")
@@ -392,8 +379,7 @@ def _get_url(aws_event, aws_context):
     return "awslambda:///{}".format(aws_context.function_name)
 
 
-def _get_cloudwatch_logs_url(aws_context, start_time):
-    # type: (Any, datetime) -> str
+def _get_cloudwatch_logs_url(aws_context: Any, start_time: datetime) -> str:
     """
     Generates a CloudWatchLogs console URL based on the context object
 
@@ -424,8 +410,7 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
     return url
 
 
-def _parse_formatted_traceback(formatted_tb):
-    # type: (list[str]) -> list[dict[str, Any]]
+def _parse_formatted_traceback(formatted_tb: list[str]) -> list[dict[str, Any]]:
     frames = []
     for frame in formatted_tb:
         match = re.match(r'File "(.+)", line (\d+), in (.+)', frame.strip())
@@ -446,8 +431,7 @@ def _parse_formatted_traceback(formatted_tb):
     return frames
 
 
-def _event_from_error_json(error_json):
-    # type: (dict[str, Any]) -> Event
+def _event_from_error_json(error_json: dict[str, Any]) -> "Event":
     """
     Converts the error JSON from AWS Lambda into a Sentry error event.
     This is not a full fletched event, but better than nothing.
@@ -455,7 +439,7 @@ def _event_from_error_json(error_json):
     This is an example of where AWS creates the error JSON:
     https://github.com/aws/aws-lambda-python-runtime-interface-client/blob/2.2.1/awslambdaric/bootstrap.py#L479
     """
-    event = {
+    event: "Event" = {
         "level": "error",
         "exception": {
             "values": [
@@ -474,13 +458,12 @@ def _event_from_error_json(error_json):
                 }
             ],
         },
-    }  # type: Event
+    }
 
     return event
 
 
-def _prepopulate_attributes(aws_event, aws_context):
-    # type: (Any, Any) -> dict[str, Any]
+def _prepopulate_attributes(aws_event: Any, aws_context: Any) -> dict[str, Any]:
     attributes = {
         "cloud.provider": "aws",
     }
@@ -498,19 +481,10 @@ def _prepopulate_attributes(aws_event, aws_context):
 
     url = _get_url(aws_event, aws_context)
     if url:
-        if aws_event.get("queryStringParameters"):
-            url += f"?{urlencode(aws_event['queryStringParameters'])}"
         attributes["url.full"] = url
 
-    headers = {}
-    if aws_event.get("headers") and isinstance(aws_event["headers"], dict):
-        headers = aws_event["headers"]
-
-    if headers.get("X-Forwarded-Proto"):
-        attributes["network.protocol.name"] = headers["X-Forwarded-Proto"]
-    if headers.get("Host"):
-        attributes["server.address"] = headers["Host"]
-
-    attributes.update(_request_headers_to_span_attributes(headers))
+    headers = aws_event.get("headers", {})
+    if headers and isinstance(headers, dict):
+        attributes.update(_request_headers_to_span_attributes(headers))
 
     return attributes
