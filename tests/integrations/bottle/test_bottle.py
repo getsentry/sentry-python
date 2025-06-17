@@ -12,8 +12,6 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
 
-import sentry_sdk.integrations.bottle as bottle_sentry
-
 
 @pytest.fixture(scope="function")
 def app(sentry_init):
@@ -46,7 +44,7 @@ def get_client(app):
 
 
 def test_has_context(sentry_init, app, capture_events, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
     events = capture_events()
 
     client = get_client()
@@ -77,11 +75,7 @@ def test_transaction_style(
     capture_events,
     get_client,
 ):
-    sentry_init(
-        integrations=[
-            bottle_sentry.BottleIntegration(transaction_style=transaction_style)
-        ]
-    )
+    sentry_init(integrations=[BottleIntegration(transaction_style=transaction_style)])
     events = capture_events()
 
     client = get_client()
@@ -100,7 +94,7 @@ def test_transaction_style(
 def test_errors(
     sentry_init, capture_exceptions, capture_events, app, debug, catchall, get_client
 ):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
 
     app.catchall = catchall
     set_debug(mode=debug)
@@ -127,7 +121,7 @@ def test_errors(
 
 
 def test_large_json_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
 
     data = {"foo": {"bar": "a" * 2000}}
 
@@ -157,7 +151,7 @@ def test_large_json_request(sentry_init, capture_events, app, get_client):
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
 
     @app.route("/", method="POST")
     def index():
@@ -180,7 +174,7 @@ def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
 
 
 def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
 
     data = {"foo": "a" * 2000}
 
@@ -209,9 +203,7 @@ def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
 def test_too_large_raw_request(
     sentry_init, input_char, capture_events, app, get_client
 ):
-    sentry_init(
-        integrations=[bottle_sentry.BottleIntegration()], max_request_body_size="small"
-    )
+    sentry_init(integrations=[BottleIntegration()], max_request_body_size="small")
 
     data = input_char * 2000
 
@@ -239,9 +231,7 @@ def test_too_large_raw_request(
 
 
 def test_files_and_form(sentry_init, capture_events, app, get_client):
-    sentry_init(
-        integrations=[bottle_sentry.BottleIntegration()], max_request_body_size="always"
-    )
+    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
 
@@ -278,9 +268,7 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
 def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, app, get_client
 ):
-    sentry_init(
-        integrations=[bottle_sentry.BottleIntegration()], max_request_body_size="always"
-    )
+    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
 
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
@@ -309,8 +297,8 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
 @pytest.mark.parametrize(
     "integrations",
     [
-        [bottle_sentry.BottleIntegration()],
-        [bottle_sentry.BottleIntegration(), LoggingIntegration(event_level="ERROR")],
+        [BottleIntegration()],
+        [BottleIntegration(), LoggingIntegration(event_level="ERROR")],
     ],
 )
 def test_errors_not_reported_twice(
@@ -324,23 +312,24 @@ def test_errors_not_reported_twice(
 
     @app.route("/")
     def index():
-        try:
-            1 / 0
-        except Exception as e:
-            logger.exception(e)
-            raise e
+        1 / 0
 
     events = capture_events()
 
     client = get_client()
+
     with pytest.raises(ZeroDivisionError):
-        client.get("/")
+        try:
+            client.get("/")
+        except ZeroDivisionError as e:
+            logger.exception(e)
+            raise e
 
     assert len(events) == 1
 
 
 def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
 
     app.catchall = False
 
@@ -367,7 +356,7 @@ def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client)
 
 
 def test_error_in_errorhandler(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
 
     set_debug(False)
     app.catchall = True
@@ -397,7 +386,7 @@ def test_error_in_errorhandler(sentry_init, capture_events, app, get_client):
 
 
 def test_bad_request_not_captured(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -412,7 +401,7 @@ def test_bad_request_not_captured(sentry_init, capture_events, app, get_client):
 
 
 def test_no_exception_on_redirect(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -436,7 +425,7 @@ def test_span_origin(
     capture_events,
 ):
     sentry_init(
-        integrations=[bottle_sentry.BottleIntegration()],
+        integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
     )
     events = capture_events()
