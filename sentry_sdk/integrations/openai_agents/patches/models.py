@@ -4,6 +4,11 @@ from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import ai_client_span, update_ai_client_span
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any, Callable
+
 
 try:
     import agents
@@ -12,6 +17,7 @@ except ImportError:
 
 
 def _create_get_model_wrapper(original_get_model):
+    # type: (Callable[..., Any]) -> Callable[..., Any]
     """
     Wraps the agents.Runner._get_model method to wrap the get_response method of the model to create a AI client span.
     """
@@ -26,6 +32,7 @@ def _create_get_model_wrapper(original_get_model):
 
         @wraps(original_get_response)
         async def wrapped_get_response(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
             with ai_client_span(agent, kwargs) as span:
                 result = await original_get_response(*args, **kwargs)
                 update_ai_client_span(span, agent, kwargs, result)

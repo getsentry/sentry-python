@@ -10,8 +10,7 @@ from ..utils import _wrap_hooks
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
+    from typing import Any, Callable
 
 try:
     import agents
@@ -20,7 +19,7 @@ except ImportError:
 
 
 def _create_run_wrapper(original_func):
-    # type: (Callable) -> Callable
+    # type: (Callable[..., Any]) -> Callable[..., Any]
     """
     Wraps the agents.Runner.run* methods to create a root span for the agent workflow runs.
     """

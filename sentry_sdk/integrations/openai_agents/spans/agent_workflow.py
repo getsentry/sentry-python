@@ -5,12 +5,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agents import Agent
-    from sentry_sdk import Span
     from typing import Any
 
 
 def agent_workflow_span(*args, **kwargs):
-    # type: (*Any, **Any) -> Span
+    # type: (*Any, **Any) -> sentry_sdk.tracing.Span
     agent = args[0]
     # Create a transaction or a span if an transaction is already active
     span = _get_start_span_function()(
@@ -22,5 +21,5 @@ def agent_workflow_span(*args, **kwargs):
 
 
 def update_agent_workflow_span(span, agent, result):
-    # type: (Span, Agent, Any) -> None
+    # type: (sentry_sdk.tracing.Span, Agent, Any) -> None
     pass

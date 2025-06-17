@@ -7,7 +7,7 @@ from ..spans import execute_tool_span, update_execute_tool_span
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Callable
 
 try:
     import agents
@@ -16,6 +16,7 @@ except ImportError:
 
 
 def _create_get_all_tools_wrapper(original_get_all_tools):
+    # type: (Callable[..., Any]) -> Callable[..., Any]
     """
     Wraps the agents.Runner._get_all_tools method of the Runner class to wrap all function tools with Sentry instrumentation.
     """
@@ -39,6 +40,7 @@ def _create_get_all_tools_wrapper(original_get_all_tools):
             original_on_invoke = tool.on_invoke_tool
 
             def create_wrapped_invoke(current_tool, current_on_invoke):
+                # type: (agents.Tool, Callable[..., Any]) -> Callable[..., Any]
                 @wraps(current_on_invoke)
                 async def sentry_wrapped_on_invoke_tool(*args, **kwargs):
                     # type: (*Any, **Any) -> Any

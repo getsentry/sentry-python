@@ -44,6 +44,7 @@ def _create_hook_wrapper(original_hook, sentry_hook):
     # type: (Callable[..., Any], Callable[..., Any]) -> Callable[..., Any]
     @wraps(original_hook)
     async def async_wrapper(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         await sentry_hook(*args, **kwargs)
         return await original_hook(*args, **kwargs)
 
@@ -153,7 +154,7 @@ def _set_input_data(span, get_response_kwargs):
         "user": [],
         "assistant": [],
         "tool": [],
-    }
+    }  # type: (dict[str, list[Any]])
     system_instructions = get_response_kwargs.get("system_instructions")
     if system_instructions:
         messages_by_role["system"].append({"type": "text", "text": system_instructions})
@@ -185,7 +186,7 @@ def _set_output_data(span, result):
     output_messages = {
         "response": [],
         "tool": [],
-    }
+    }  # type: (dict[str, list[Any]])
 
     for output in result.output:
         if output.type == "function_call":

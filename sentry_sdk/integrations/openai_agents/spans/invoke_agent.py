@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def invoke_agent_span(context, agent):
-    # type: (agents.RunContextWrapper, agents.Agent) -> None
+    # type: (agents.RunContextWrapper, agents.Agent) -> sentry_sdk.tracing.Span
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_INVOKE_AGENT,
         name=f"invoke_agent {agent.name}",
