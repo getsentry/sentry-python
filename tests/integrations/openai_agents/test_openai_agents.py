@@ -173,6 +173,10 @@ async def test_agent_invocation_span(
                 assert result is not None
                 assert result.final_output == "Hello, how can I help you?"
 
+    import ipdb
+
+    ipdb.set_trace()
+
     (transaction,) = events
     spans = transaction["spans"]
     agent_workflow_span, invoke_agent_span, ai_client_span = spans
