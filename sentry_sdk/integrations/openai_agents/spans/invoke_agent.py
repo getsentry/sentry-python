@@ -1,6 +1,7 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
+from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
 
 from typing import TYPE_CHECKING
@@ -15,7 +16,7 @@ def invoke_agent_span(context, agent):
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_INVOKE_AGENT,
         name=f"invoke_agent {agent.name}",
-        origin=sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration.origin,
+        origin=SPAN_ORIGIN,
     )
     span.__enter__()
 

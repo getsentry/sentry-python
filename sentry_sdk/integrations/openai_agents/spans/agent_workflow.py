@@ -1,4 +1,6 @@
 import sentry_sdk
+
+from ..consts import SPAN_ORIGIN
 from ..utils import _get_start_span_function
 
 from typing import TYPE_CHECKING
@@ -14,7 +16,7 @@ def agent_workflow_span(*args, **kwargs):
     # Create a transaction or a span if an transaction is already active
     span = _get_start_span_function()(
         name=f"{agent.name} workflow",
-        origin=sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration.origin,
+        origin=SPAN_ORIGIN,
     )
 
     return span

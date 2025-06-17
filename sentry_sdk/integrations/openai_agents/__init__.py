@@ -34,7 +34,6 @@ def _patch_tools():
 
 class OpenAIAgentsIntegration(Integration):
     identifier = "openai_agents"
-    origin = f"auto.ai.{identifier}"
 
     @staticmethod
     def setup_once():
