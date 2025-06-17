@@ -1,5 +1,3 @@
-from functools import wraps
-
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
@@ -15,7 +13,6 @@ if TYPE_CHECKING:
 
 try:
     import agents
-    from agents import RunHooks
 
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
@@ -38,52 +35,6 @@ def _get_start_span_function():
         current_span is not None and current_span.containing_transaction == current_span
     )
     return sentry_sdk.start_span if is_transaction else sentry_sdk.start_transaction
-
-
-def _create_hook_wrapper(original_hook, sentry_hook):
-    # type: (Callable[..., Any], Callable[..., Any]) -> Callable[..., Any]
-    @wraps(original_hook)
-    async def async_wrapper(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
-        await sentry_hook(*args, **kwargs)
-        return await original_hook(*args, **kwargs)
-
-    return async_wrapper
-
-
-def _wrap_hooks(hooks):
-    # type: (RunHooks) -> RunHooks
-    """
-    Our integration uses RunHooks to create spans. This function will either
-    enable our SentryRunHooks or if the users has given custom RunHooks wrap
-    them so the Sentry hooks and the users hooks are both called
-    """
-    from .run_hooks import SentryRunHooks
-
-    sentry_hooks = SentryRunHooks()
-
-    if hooks is None:
-        return sentry_hooks
-
-    wrapped_hooks = type("SentryWrappedHooks", (hooks.__class__,), {})
-
-    # Wrap all methods from RunHooks
-    for method_name in dir(RunHooks):
-        if method_name.startswith("on_"):
-            original_method = getattr(hooks, method_name)
-            # Only wrap if the method exists in SentryRunHooks
-            try:
-                sentry_method = getattr(sentry_hooks, method_name)
-                setattr(
-                    wrapped_hooks,
-                    method_name,
-                    _create_hook_wrapper(original_method, sentry_method),
-                )
-            except AttributeError:
-                # If method doesn't exist in SentryRunHooks, just use the original method
-                setattr(wrapped_hooks, method_name, original_method)
-
-    return wrapped_hooks()
 
 
 def _set_agent_data(span, agent):
