@@ -367,6 +367,13 @@ class SentryLogsHandler(_BaseHandler):
                         if isinstance(arg, (str, float, int, bool))
                         else safe_repr(arg)
                     )
+            elif isinstance(record.args, dict):
+                for key, value in record.args.items():
+                    attrs[f"sentry.message.parameter.{key}"] = (
+                        value
+                        if isinstance(value, (str, float, int, bool))
+                        else safe_repr(value)
+                    )
         if record.lineno:
             attrs["code.line.number"] = record.lineno
         if record.pathname:
