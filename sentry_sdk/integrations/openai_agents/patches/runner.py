@@ -46,12 +46,8 @@ def _create_run_wrapper(original_func):
     )
     def sync_wrapper(cls, *args, **kwargs):
         # type: (agents.Runner, *Any, **Any) -> Any
-        agent = args[0]
-        with agent_workflow_span(agent) as span:
-            result = original_func(*args, **kwargs)
-            update_agent_workflow_span(span, agent, result)
-
-        return result
+        # The sync version (.run_sync()) is just a wrapper around the async version (.run())
+        return original_func(*args, **kwargs)
 
     return async_wrapper if is_async else sync_wrapper
 

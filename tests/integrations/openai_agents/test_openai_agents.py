@@ -156,13 +156,10 @@ def test_agent_invocation_span_sync(
 
     (transaction,) = events
     spans = transaction["spans"]
-    agent_workflow_span, invoke_agent_span, ai_client_span = spans
-    # TODO: why is there a workflow span?
+    invoke_agent_span, ai_client_span = spans
 
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
-
-    assert agent_workflow_span["description"] == "test_agent workflow"
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
     assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"

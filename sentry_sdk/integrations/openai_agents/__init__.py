@@ -23,9 +23,7 @@ def _patch_runner():
     agents.Runner.run_sync = classmethod(
         _create_run_wrapper(agents.Runner.run_sync),
     )
-    agents.Runner.run_streamed = classmethod(
-        _create_run_wrapper(agents.Runner.run_streamed),
-    )
+    # TODO-anton: Also patch streaming runner: agents.Runner.run_streamed
 
     # Agent invocation spans
     agents.Runner._run_single_turn = classmethod(
