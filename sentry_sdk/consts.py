@@ -372,6 +372,12 @@ class SPANDATA:
     Example: "chat"
     """
 
+    GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
+    """
+    The model's response text messages.
+    Example: ["The weather in Paris is rainy and overcast, with temperatures around 57°F", "The weather in London is sunny and warm, with temperatures around 65°F"]
+    """
+
     GEN_AI_RESPONSE_TOOL_CALLS = "gen_ai.response.tool_calls"
     """
     The tool calls in the model's response.
