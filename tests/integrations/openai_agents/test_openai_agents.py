@@ -9,20 +9,17 @@ from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
 import agents
 from agents import (
     Agent,
-    RunResult,
     ModelResponse,
     Usage,
-    MessageOutputItem,
-    ToolCallItem,
-    ToolCallOutputItem,
     ModelSettings,
 )
 from agents.items import (
     ResponseOutputMessage,
     ResponseOutputText,
     ResponseFunctionToolCall,
-    FunctionCallOutput,
 )
+
+test_run_config = agents.RunConfig(tracing_disabled=True)
 
 
 @pytest.fixture
@@ -61,70 +58,6 @@ def mock_model_response(mock_usage):
 
 
 @pytest.fixture
-def mock_tool_call():
-    return ResponseFunctionToolCall(
-        id="call_123",
-        call_id="call_123",
-        name="test_tool",
-        type="function_call",
-        arguments='{"arg1": "value1"}',
-        function=MagicMock(name="test_tool", arguments='{"arg1": "value1"}'),
-    )
-
-
-@pytest.fixture
-def mock_tool_output():
-    return FunctionCallOutput(tool_call_id="call_123", output="Tool execution result")
-
-
-@pytest.fixture
-def mock_run_result(mock_model_response, mock_tool_call, mock_tool_output):
-    return RunResult(
-        input="Test input",
-        new_items=[
-            MessageOutputItem(
-                agent=MagicMock(),
-                raw_item=mock_model_response.output[0],
-                type="message_output_item",
-            ),
-            ToolCallItem(
-                agent=MagicMock(), raw_item=mock_tool_call, type="tool_call_item"
-            ),
-            ToolCallOutputItem(
-                agent=MagicMock(),
-                raw_item=mock_tool_output,
-                output="Tool execution result",
-                type="tool_call_output_item",
-            ),
-        ],
-        raw_responses=[mock_model_response],
-        final_output="Final result",
-        input_guardrail_results=[],
-        output_guardrail_results=[],
-        context_wrapper=MagicMock(),
-        _last_agent=MagicMock(),
-    )
-
-
-@pytest.fixture
-def mock_agent():
-    agent = MagicMock(spec=Agent)
-    agent.name = "test_agent"
-    agent.model = "gpt-4"
-    agent.model_settings = MagicMock(
-        max_tokens=100,
-        temperature=0.7,
-        top_p=1.0,
-        presence_penalty=0.0,
-        frequency_penalty=0.0,
-    )
-    agent.tools = []
-    agent.handoffs = []
-    agent.output_type = str
-    return agent
-
-
-@pytest.fixture
 def test_agent():
     """Create a real Agent instance for testing."""
     return Agent(
@@ -139,11 +72,6 @@ def test_agent():
             frequency_penalty=0.0,
         ),
     )
-
-
-def test_integration_initialization():
-    integration = OpenAIAgentsIntegration()
-    assert integration is not None
 
 
 @pytest.mark.asyncio
@@ -168,7 +96,9 @@ async def test_agent_invocation_span(
             events = capture_events()
 
             with sentry_sdk.start_transaction(name="test_transaction"):
-                result = await agents.Runner.run(test_agent, "Test input")
+                result = await agents.Runner.run(
+                    test_agent, "Test input", run_config=test_run_config
+                )
 
                 assert result is not None
                 assert result.final_output == "Hello, how can I help you?"
@@ -273,7 +203,9 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
 
             with sentry_sdk.start_transaction(name="test_transaction"):
                 await agents.Runner.run(
-                    agent_with_tool, "Please use the simple test tool"
+                    agent_with_tool,
+                    "Please use the simple test tool",
+                    run_config=test_run_config,
                 )
 
     (transaction,) = events
@@ -441,7 +373,9 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
             with sentry_sdk.start_transaction(name="test_transaction"):
                 with pytest.raises(Exception, match="Model Error"):
-                    await agents.Runner.run(test_agent, "Test input")
+                    await agents.Runner.run(
+                        test_agent, "Test input", run_config=test_run_config
+                    )
 
     (transaction,) = events
     spans = transaction["spans"]
