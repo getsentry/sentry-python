@@ -1,4 +1,5 @@
 from typing import List, Optional, Any, Iterator
+from unittest import mock
 from unittest.mock import Mock
 
 import pytest
@@ -12,12 +13,15 @@ except ImportError:
     # Langchain < 0.2
     from langchain_community.chat_models import ChatOpenAI
 
-from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.callbacks import BaseCallbackManager, CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessageChunk
 from langchain_core.outputs import ChatGenerationChunk
 
 from sentry_sdk import start_transaction
-from sentry_sdk.integrations.langchain import LangchainIntegration
+from sentry_sdk.integrations.langchain import (
+    LangchainIntegration,
+    SentryLangchainCallback,
+)
 from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
@@ -342,3 +346,131 @@ def test_span_origin(sentry_init, capture_events):
     assert event["contexts"]["trace"]["origin"] == "manual"
     for span in event["spans"]:
         assert span["origin"] == "auto.ai.langchain"
+
+
+def test_langchain_callback_manager(sentry_init):
+    sentry_init(
+        integrations=[LangchainIntegration()],
+        traces_sample_rate=1.0,
+    )
+    local_manager = BaseCallbackManager(handlers=[])
+
+    with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
+        mock_configure = mock_manager_module._configure
+
+        # Explicitly re-run setup_once, so that mock_manager_module._configure gets patched
+        LangchainIntegration.setup_once()
+
+        callback_manager_cls = Mock()
+
+        mock_manager_module._configure(
+            callback_manager_cls, local_callbacks=local_manager
+        )
+
+        assert mock_configure.call_count == 1
+
+        call_args = mock_configure.call_args
+        assert call_args.args[0] is callback_manager_cls
+
+        passed_manager = call_args.args[2]
+        assert passed_manager is not local_manager
+        assert local_manager.handlers == []
+
+        [handler] = passed_manager.handlers
+        assert isinstance(handler, SentryLangchainCallback)
+
+
+def test_langchain_callback_manager_with_sentry_callback(sentry_init):
+    sentry_init(
+        integrations=[LangchainIntegration()],
+        traces_sample_rate=1.0,
+    )
+    sentry_callback = SentryLangchainCallback(0, False)
+    local_manager = BaseCallbackManager(handlers=[sentry_callback])
+
+    with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
+        mock_configure = mock_manager_module._configure
+
+        # Explicitly re-run setup_once, so that mock_manager_module._configure gets patched
+        LangchainIntegration.setup_once()
+
+        callback_manager_cls = Mock()
+
+        mock_manager_module._configure(
+            callback_manager_cls, local_callbacks=local_manager
+        )
+
+        assert mock_configure.call_count == 1
+
+        call_args = mock_configure.call_args
+        assert call_args.args[0] is callback_manager_cls
+
+        passed_manager = call_args.args[2]
+        assert passed_manager is local_manager
+
+        [handler] = passed_manager.handlers
+        assert handler is sentry_callback
+
+
+def test_langchain_callback_list(sentry_init):
+    sentry_init(
+        integrations=[LangchainIntegration()],
+        traces_sample_rate=1.0,
+    )
+    local_callbacks = []
+
+    with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
+        mock_configure = mock_manager_module._configure
+
+        # Explicitly re-run setup_once, so that mock_manager_module._configure gets patched
+        LangchainIntegration.setup_once()
+
+        callback_manager_cls = Mock()
+
+        mock_manager_module._configure(
+            callback_manager_cls, local_callbacks=local_callbacks
+        )
+
+        assert mock_configure.call_count == 1
+
+        call_args = mock_configure.call_args
+        assert call_args.args[0] is callback_manager_cls
+
+        passed_callbacks = call_args.args[2]
+        assert passed_callbacks is not local_callbacks
+        assert local_callbacks == []
+
+        [handler] = passed_callbacks
+        assert isinstance(handler, SentryLangchainCallback)
+
+
+def test_langchain_callback_list_existing_callback(sentry_init):
+    sentry_init(
+        integrations=[LangchainIntegration()],
+        traces_sample_rate=1.0,
+    )
+    sentry_callback = SentryLangchainCallback(0, False)
+    local_callbacks = [sentry_callback]
+
+    with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
+        mock_configure = mock_manager_module._configure
+
+        # Explicitly re-run setup_once, so that mock_manager_module._configure gets patched
+        LangchainIntegration.setup_once()
+
+        callback_manager_cls = Mock()
+
+        mock_manager_module._configure(
+            callback_manager_cls, local_callbacks=local_callbacks
+        )
+
+        assert mock_configure.call_count == 1
+
+        call_args = mock_configure.call_args
+        assert call_args.args[0] is callback_manager_cls
+
+        passed_callbacks = call_args.args[2]
+        assert passed_callbacks is local_callbacks
+
+        [handler] = passed_callbacks
+        assert handler is sentry_callback

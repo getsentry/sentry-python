@@ -22,6 +22,7 @@ try:
     from langchain_core.callbacks import (
         manager,
         BaseCallbackHandler,
+        BaseCallbackManager,
         Callbacks,
     )
     from langchain_core.agents import AgentAction, AgentFinish
@@ -436,11 +437,42 @@ def _wrap_configure(f):
                 **kwargs,
             )
 
-        callbacks_list = local_callbacks or []
+        # Lambda for lazy initialization of the SentryLangchainCallback
+        sentry_handler_factory = lambda: SentryLangchainCallback(
+            integration.max_spans,
+            integration.include_prompts,
+            integration.tiktoken_encoding_name,
+        )
 
-        if isinstance(callbacks_list, BaseCallbackHandler):
-            callbacks_list = [callbacks_list]
-        elif not isinstance(callbacks_list, list):
+        local_callbacks = local_callbacks or []
+
+        # Handle each possible type of local_callbacks. For each type, we
+        # extract the list of callbacks to check for SentryLangchainCallback,
+        # and define a function that would add the SentryLangchainCallback
+        # to the existing callbacks list.
+        if isinstance(local_callbacks, BaseCallbackManager):
+            callbacks_list = local_callbacks.handlers
+
+            # For BaseCallbackManager, we want to copy the manager and add the
+            # SentryLangchainCallback to the copy.
+            def local_callbacks_with_sentry():
+                new_manager = local_callbacks.copy()
+                new_manager.handlers = [*new_manager.handlers, sentry_handler_factory()]
+                return new_manager
+
+        elif isinstance(local_callbacks, BaseCallbackHandler):
+            callbacks_list = [local_callbacks]
+
+            def local_callbacks_with_sentry():
+                return [local_callbacks, sentry_handler_factory()]
+
+        elif isinstance(local_callbacks, list):
+            callbacks_list = local_callbacks
+
+            def local_callbacks_with_sentry():
+                return [*local_callbacks, sentry_handler_factory()]
+
+        else:
             logger.debug("Unknown callback type: %s", callbacks_list)
             # Just proceed with original function call
             return f(
@@ -452,20 +484,12 @@ def _wrap_configure(f):
             )
 
         if not any(isinstance(cb, SentryLangchainCallback) for cb in callbacks_list):
-            # Avoid mutating the existing callbacks list
-            callbacks_list = [
-                *callbacks_list,
-                SentryLangchainCallback(
-                    integration.max_spans,
-                    integration.include_prompts,
-                    integration.tiktoken_encoding_name,
-                ),
-            ]
+            local_callbacks = local_callbacks_with_sentry()
 
         return f(
             callback_manager_cls,
             inheritable_callbacks,
-            callbacks_list,
+            local_callbacks,
             *args,
             **kwargs,
         )
