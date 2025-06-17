@@ -21,8 +21,11 @@ def _create_get_all_tools_wrapper(original_get_all_tools):
     Wraps the agents.Runner._get_all_tools method of the Runner class to wrap all function tools with Sentry instrumentation.
     """
 
-    @classmethod  # type: ignore[misc]
-    @wraps(original_get_all_tools)
+    @wraps(
+        original_get_all_tools.__func__
+        if hasattr(original_get_all_tools, "__func__")
+        else original_get_all_tools
+    )
     async def wrapped_get_all_tools(cls, agent, context_wrapper):
         # type: (agents.Runner, agents.Agent, agents.RunContextWrapper) -> list[agents.Tool]
 
