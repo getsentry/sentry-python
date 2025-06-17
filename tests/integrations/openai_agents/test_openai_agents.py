@@ -150,7 +150,9 @@ def test_integration_initialization():
 async def test_agent_invocation_span(
     sentry_init, capture_events, test_agent, mock_model_response
 ):
-    """Test that the integration creates spans for agent invocations."""
+    """
+    Test that the integration creates spans for agent invocations.
+    """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
@@ -198,7 +200,9 @@ async def test_agent_invocation_span(
 
 @pytest.mark.asyncio
 async def test_tool_execution_span(sentry_init, capture_events, test_agent):
-    """Test tool execution span creation."""
+    """
+    Test tool execution span creation.
+    """
 
     @agents.function_tool
     def simple_test_tool(message: str) -> str:
@@ -416,7 +420,9 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
 
 @pytest.mark.asyncio
 async def test_error_handling(sentry_init, capture_events, test_agent):
-    """Test error handling in agent execution."""
+    """
+    Test error handling in agent execution.
+    """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
@@ -471,7 +477,9 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 async def test_integration_with_hooks(
     sentry_init, capture_events, test_agent, mock_model_response
 ):
-    """Test that the integration properly wraps hooks."""
+    """
+    Test that the integration properly wraps hooks.
+    """
 
     # Create a simple hook to test with
     hook_calls = []
