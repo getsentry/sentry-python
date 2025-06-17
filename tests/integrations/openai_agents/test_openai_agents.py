@@ -117,6 +117,8 @@ def mock_agent():
         frequency_penalty=0.0,
     )
     agent.tools = []
+    agent.handoffs = []
+    agent.output_type = str
     return agent
 
 
@@ -133,11 +135,14 @@ async def test_agent_invocation_span(
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
     )
+
     events = capture_events()
 
     with sentry_sdk.start_transaction(name="test_transaction"):
-        with patch("agents.Runner.run", new_callable=AsyncMock) as mock_run:
-            mock_run.return_value = mock_run_result
+        with patch(
+            "sentry_sdk.integrations.openai_agents.patches.runner._create_run_wrapper"
+        ) as mock_run:
+            mock_run.return_value = AsyncMock(return_value=mock_run_result)
 
             await agents.Runner.run(mock_agent, "Test input")
 
@@ -156,7 +161,7 @@ async def test_agent_invocation_span(
 
 @pytest.mark.asyncio
 async def test_tool_execution_span(
-    sentry_init, capture_events, mock_agent, mock_run_result
+    sentry_init, capture_events, mock_agent, mock_run_result, mock_tool_call
 ):
     sentry_init(
         integrations=[OpenAIAgentsIntegration()],
@@ -166,8 +171,13 @@ async def test_tool_execution_span(
     events = capture_events()
 
     with sentry_sdk.start_transaction(name="test_transaction"):
-        with patch("agents.Runner.run", new_callable=AsyncMock) as mock_run:
-            mock_run.return_value = mock_run_result
+        with patch(
+            "sentry_sdk.integrations.openai_agents.patches.runner._create_run_wrapper"
+        ) as mock_run, patch(
+            "sentry_sdk.integrations.openai_agents.patches.tools._create_get_all_tools_wrapper"
+        ) as mock_tools:
+            mock_run.return_value = AsyncMock(return_value=mock_run_result)
+            mock_tools.return_value = AsyncMock(return_value=[mock_tool_call])
 
             await agents.Runner.run(mock_agent, "Test input")
 
@@ -194,8 +204,13 @@ async def test_llm_request_span(
     events = capture_events()
 
     with sentry_sdk.start_transaction(name="test_transaction"):
-        with patch("agents.Runner.run", new_callable=AsyncMock) as mock_run:
-            mock_run.return_value = mock_run_result
+        with patch(
+            "sentry_sdk.integrations.openai_agents.patches.runner._create_run_wrapper"
+        ) as mock_run, patch(
+            "sentry_sdk.integrations.openai_agents.patches.models._create_get_model_wrapper"
+        ) as mock_model:
+            mock_run.return_value = AsyncMock(return_value=mock_run_result)
+            mock_model.return_value = AsyncMock(return_value=mock_model_response)
 
             await agents.Runner.run(mock_agent, "Test input")
 
@@ -221,8 +236,10 @@ async def test_error_handling(sentry_init, capture_events, mock_agent):
     events = capture_events()
 
     with sentry_sdk.start_transaction(name="test_transaction") as transaction:
-        with patch("agents.Runner.run", new_callable=AsyncMock) as mock_run:
-            mock_run.side_effect = AgentsException("Test error")
+        with patch(
+            "sentry_sdk.integrations.openai_agents.patches.runner._create_run_wrapper"
+        ) as mock_run:
+            mock_run.return_value = AsyncMock(side_effect=AgentsException("Test error"))
 
             with pytest.raises(AgentsException):
                 await agents.Runner.run(mock_agent, "Test input")
