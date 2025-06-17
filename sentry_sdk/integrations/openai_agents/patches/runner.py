@@ -25,6 +25,7 @@ def _create_run_wrapper(original_func):
     """
     is_async = asyncio.iscoroutinefunction(original_func)
 
+    @classmethod  # type: ignore[misc]
     @wraps(original_func)
     async def async_wrapper(cls, *args, **kwargs):
         # type: (agents.Runner, *Any, **Any) -> Any
@@ -36,6 +37,7 @@ def _create_run_wrapper(original_func):
 
         return result
 
+    @classmethod  # type: ignore[misc]
     @wraps(original_func)
     def sync_wrapper(cls, *args, **kwargs):
         # type: (agents.Runner, *Any, **Any) -> Any
