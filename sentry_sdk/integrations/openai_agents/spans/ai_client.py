@@ -1,7 +1,7 @@
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
 from ..utils import (
-    _get_start_span_function,
     _set_agent_data,
     _set_input_data,
     _set_output_data,
@@ -19,9 +19,10 @@ if TYPE_CHECKING:
 def ai_client_span(agent, get_response_kwargs):
     # type: (Agent, dict[str, Any]) -> Span
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
-    span = _get_start_span_function()(
+    span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
         description=f"chat {agent.model}",
+        origin=sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration.origin,
     )
     # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")

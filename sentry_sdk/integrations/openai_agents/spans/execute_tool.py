@@ -1,7 +1,8 @@
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 
-from ..utils import _get_start_span_function, _set_agent_data
+from ..utils import _set_agent_data
 
 from typing import TYPE_CHECKING
 
@@ -13,9 +14,10 @@ if TYPE_CHECKING:
 
 def execute_tool_span(tool, *args, **kwargs):
     # type: (agents.Tool, *Any, **Any) -> Span
-    span = _get_start_span_function()(
+    span = sentry_sdk.start_span(
         op=OP.GEN_AI_EXECUTE_TOOL,
         name=f"execute_tool {tool.name}",
+        origin=sentry_sdk.integrations.openai_agents.OpenAIAgentsIntegration.origin,
     )
 
     span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")

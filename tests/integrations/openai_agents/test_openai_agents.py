@@ -173,10 +173,6 @@ async def test_agent_invocation_span(
                 assert result is not None
                 assert result.final_output == "Hello, how can I help you?"
 
-    import ipdb
-
-    ipdb.set_trace()
-
     (transaction,) = events
     spans = transaction["spans"]
     agent_workflow_span, invoke_agent_span, ai_client_span = spans
@@ -322,7 +318,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert agent_span["data"]["gen_ai.system"] == "openai"
 
     assert ai_client_span1["description"] == "chat gpt-4"
-    assert ai_client_span1["tags"]["status"] == "internal_error"
     assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
     assert ai_client_span1["data"]["gen_ai.system"] == "openai"
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
@@ -359,7 +354,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     ]
 
     assert tool_span["description"] == "execute_tool simple_test_tool"
-    assert tool_span["tags"]["status"] == "internal_error"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
     assert tool_span["data"]["gen_ai.request.available_tools"] == available_tools
@@ -375,7 +369,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert tool_span["data"]["gen_ai.tool.type"] == "function"
 
     assert ai_client_span2["description"] == "chat gpt-4"
-    assert ai_client_span2["tags"]["status"] == "internal_error"
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
     assert ai_client_span2["data"]["gen_ai.request.available_tools"] == available_tools
@@ -452,11 +445,15 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
     (transaction,) = events
     spans = transaction["spans"]
-    (agent_workflow_span,) = spans
+    (agent_workflow_span, ai_client_span) = spans
 
     assert agent_workflow_span["description"] == "test_agent workflow"
     assert agent_workflow_span["origin"] == "auto.ai.openai_agents"
     assert agent_workflow_span["tags"]["status"] == "internal_error"
+
+    assert ai_client_span["description"] == "chat gpt-4"
+    assert ai_client_span["origin"] == "auto.ai.openai_agents"
+    assert ai_client_span["tags"]["status"] == "internal_error"
 
 
 @pytest.mark.asyncio
