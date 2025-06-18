@@ -213,7 +213,7 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     if num_pools is not None:
         _experiments["transport_num_pools"] = num_pools
 
-    client = make_client(_experiments=_experiments)
+    client = make_client(_experiments=_experiments, http2=False)
 
     options = client.transport._get_pool_options()
     assert options["num_pools"] == expected_num_pools
@@ -254,20 +254,20 @@ def test_socket_options(make_client):
 
 
 def test_keep_alive_true(make_client):
-    client = make_client(keep_alive=True)
+    client = make_client(keep_alive=True, http2=False)
 
     options = client.transport._get_pool_options()
     assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
 
 
 def test_keep_alive_on_by_default(make_client):
-    client = make_client()
+    client = make_client(http2=False)
     options = client.transport._get_pool_options()
     assert "socket_options" not in options
 
 
 def test_default_timeout(make_client):
-    client = make_client()
+    client = make_client(http2=False)
 
     options = client.transport._get_pool_options()
     assert "timeout" in options
@@ -320,19 +320,20 @@ def test_socket_options_override_keep_alive(make_client):
         (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
     ]
 
-    client = make_client(socket_options=socket_options, keep_alive=False)
+    client = make_client(socket_options=socket_options, keep_alive=False, http2=False)
 
     options = client.transport._get_pool_options()
     assert options["socket_options"] == socket_options
 
 
-def test_socket_options_merge_with_keep_alive(make_client):
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_socket_options_merge_with_keep_alive_http2(make_client):
     socket_options = [
         (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
         (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
     ]
 
-    client = make_client(socket_options=socket_options, keep_alive=True)
+    client = make_client(socket_options=socket_options)
 
     options = client.transport._get_pool_options()
     try:
@@ -350,11 +351,46 @@ def test_socket_options_merge_with_keep_alive(make_client):
         ]
 
 
-def test_socket_options_override_defaults(make_client):
+def test_socket_options_merge_with_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=True, http2=False)
+
+    options = client.transport._get_pool_options()
+    try:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+    except AttributeError:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+
+
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_socket_options_override_defaults_http2(make_client):
     # If socket_options are set to [], this doesn't mean the user doesn't want
     # any custom socket_options, but rather that they want to disable the urllib3
     # socket option defaults, so we need to set this and not ignore it.
     client = make_client(socket_options=[])
+
+    options = client.transport._get_pool_options()
+    assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
+
+
+def test_socket_options_override_defaults(make_client):
+    # If socket_options are set to [], this doesn't mean the user doesn't want
+    # any custom socket_options, but rather that they want to disable the urllib3
+    # socket option defaults, so we need to set this and not ignore it.
+    client = make_client(http2=False, socket_options=[])
 
     options = client.transport._get_pool_options()
     assert options["socket_options"] == []

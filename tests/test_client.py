@@ -362,8 +362,8 @@ def test_proxy(monkeypatch, testcase, http2):
 def test_socks_proxy(testcase, http2):
     kwargs = {}
 
-    if not http2:
-        kwargs["http2"] = False
+    if http2:
+        kwargs["_experiments"] = {"transport_http2": True}
 
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
@@ -565,10 +565,10 @@ def test_capture_event_works(sentry_init):
 )
 def test_atexit(tmpdir, monkeypatch, num_messages, http2):
     if http2:
-        options = "http2=True"
+        options = '_experiments={"transport_http2": True}'
         transport = "Http2Transport"
     else:
-        options = "http2=False"
+        options = ""
         transport = "HttpTransport"
 
     app = tmpdir.join("app.py")

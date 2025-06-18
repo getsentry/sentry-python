@@ -806,7 +806,7 @@ def make_transport(options):
     # We default to using HTTP2 transport if the user also has the required h2
     # library installed (through the subclass check). The reason is h2 not being
     # available on py3.7 which we still support.
-    use_http2_transport = options.get("http2", True) and not issubclass(
+    use_http2_transport = options.get("http2") != False and not issubclass(
         Http2Transport, HttpTransport
     )
 

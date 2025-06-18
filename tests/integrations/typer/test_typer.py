@@ -26,7 +26,7 @@ def test_catch_exceptions(tmpdir):
         if event is not None:
             print(event)
 
-    transport.HttpTransport.capture_envelope = capture_envelope
+    transport.BaseHttpTransport.capture_envelope = capture_envelope
 
     init("http://foobar@localhost/123", integrations=[TyperIntegration()])
 
