@@ -70,20 +70,17 @@ class CohereIntegration(Integration):
     identifier = "cohere"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (CohereIntegration, bool) -> None
+    def __init__(self, include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
         Client.embed = _wrap_embed(Client.embed)
         BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc: "Any") -> None:
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -92,11 +89,8 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _wrap_chat(f, streaming):
-    # type: (Callable[..., Any], bool) -> Callable[..., Any]
-
-    def collect_chat_response_fields(span, res, include_pii):
-        # type: (Span, NonStreamedChatResponse, bool) -> None
+def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]":
+    def collect_chat_response_fields(span: "Span", res: "Any", include_pii: bool) -> None:
         if include_pii:
             if hasattr(res, "text"):
                 set_data_normalized(
@@ -130,8 +124,7 @@ def _wrap_chat(f, streaming):
                 set_data_normalized(span, SPANDATA.AI_WARNINGS, res.meta.warnings)
 
     @wraps(f)
-    def new_chat(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def new_chat(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(CohereIntegration)
 
         if (
@@ -185,9 +178,7 @@ def _wrap_chat(f, streaming):
             if streaming:
                 old_iterator = res
 
-                def new_iterator():
-                    # type: () -> Iterator[StreamedChatResponse]
-
+                def new_iterator() -> "Iterator[Any]":
                     with capture_internal_exceptions():
                         for x in old_iterator:
                             if isinstance(x, ChatStreamEndEvent) or isinstance(
@@ -220,12 +211,9 @@ def _wrap_chat(f, streaming):
     return new_chat
 
 
-def _wrap_embed(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
-
+def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
-    def new_embed(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def new_embed(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(CohereIntegration)
         if integration is None:
             return f(*args, **kwargs)

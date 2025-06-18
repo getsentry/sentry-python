@@ -38,17 +38,14 @@ class GnuBacktraceIntegration(Integration):
     identifier = "gnu_backtrace"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         @add_global_event_processor
-        def process_gnu_backtrace(event, hint):
-            # type: (Event, dict[str, Any]) -> Event
+        def process_gnu_backtrace(event: "Event", hint: "dict[str, Any]") -> "Event":
             with capture_internal_exceptions():
                 return _process_gnu_backtrace(event, hint)
 
 
-def _process_gnu_backtrace(event, hint):
-    # type: (Event, dict[str, Any]) -> Event
+def _process_gnu_backtrace(event: "Event", hint: "dict[str, Any]") -> "Event":
     if sentry_sdk.get_client().get_integration(GnuBacktraceIntegration) is None:
         return event
 
