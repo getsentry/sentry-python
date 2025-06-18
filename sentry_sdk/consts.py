@@ -69,7 +69,6 @@ if TYPE_CHECKING:
             "transport_compression_level": Optional[int],
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
-            "transport_http2": Optional[bool],
             "enable_logs": Optional[bool],
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
         },
@@ -662,6 +661,7 @@ class ClientConstructor:
         custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
         add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
         max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
+        http2=None,  # type: Optional[bool]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1023,6 +1023,8 @@ class ClientConstructor:
 
             This is relative to the tracing sample rate - e.g. `0.5` means 50% of sampled transactions will be
             profiled.
+
+        :param http2: Defaults to `True`, enables HTTP/2 support for the SDK.
 
         :param profiles_sampler:
 
