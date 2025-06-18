@@ -176,9 +176,6 @@ def _wrap_hooks(hooks):
     enable our SentryRunHooks or if the users has given custom RunHooks wrap
     them so the Sentry hooks and the users hooks are both called
     """
-    import ipdb
-
-    ipdb.set_trace()
     from .run_hooks import SentryRunHooks
 
     sentry_hooks = SentryRunHooks()
