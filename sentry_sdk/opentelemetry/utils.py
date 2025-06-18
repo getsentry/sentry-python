@@ -54,8 +54,7 @@ GRPC_ERROR_MAP = {
 }
 
 
-def is_sentry_span(span):
-    # type: (ReadableSpan) -> bool
+def is_sentry_span(span: "ReadableSpan") -> bool:
     """
     Break infinite loop:
     HTTP requests to Sentry are caught by OTel and send again to Sentry.
@@ -89,22 +88,19 @@ def is_sentry_span(span):
     return False
 
 
-def convert_from_otel_timestamp(time):
-    # type: (int) -> datetime
+def convert_from_otel_timestamp(time: int) -> datetime:
     """Convert an OTel nanosecond-level timestamp to a datetime."""
     return datetime.fromtimestamp(time / 1e9, timezone.utc)
 
 
-def convert_to_otel_timestamp(time):
-    # type: (Union[datetime, float]) -> int
+def convert_to_otel_timestamp(time: "Union[datetime, float]") -> int:
     """Convert a datetime to an OTel timestamp (with nanosecond precision)."""
     if isinstance(time, datetime):
         return int(time.timestamp() * 1e9)
     return int(time * 1e9)
 
 
-def extract_transaction_name_source(span):
-    # type: (ReadableSpan) -> tuple[Optional[str], Optional[str]]
+def extract_transaction_name_source(span: "ReadableSpan") -> "tuple[Optional[str], Optional[str]]":
     if not span.attributes:
         return (None, None)
     return (
@@ -113,8 +109,7 @@ def extract_transaction_name_source(span):
     )
 
 
-def extract_span_data(span):
-    # type: (ReadableSpan) -> OtelExtractedSpanData
+def extract_span_data(span: "ReadableSpan") -> "OtelExtractedSpanData":
     op = span.name
     description = span.name
     status, http_status = extract_span_status(span)
@@ -165,8 +160,7 @@ def extract_span_data(span):
     return (op, description, status, http_status, origin)
 
 
-def span_data_for_http_method(span):
-    # type: (ReadableSpan) -> OtelExtractedSpanData
+def span_data_for_http_method(span: "ReadableSpan") -> "OtelExtractedSpanData":
     span_attributes = span.attributes or {}
 
     op = cast("Optional[str]", span_attributes.get(SentrySpanAttribute.OP))
@@ -215,8 +209,7 @@ def span_data_for_http_method(span):
     return (op, description, status, http_status, origin)
 
 
-def span_data_for_db_query(span):
-    # type: (ReadableSpan) -> OtelExtractedSpanData
+def span_data_for_db_query(span: "ReadableSpan") -> "OtelExtractedSpanData":
     span_attributes = span.attributes or {}
 
     op = cast("str", span_attributes.get(SentrySpanAttribute.OP, OP.DB))
@@ -230,8 +223,7 @@ def span_data_for_db_query(span):
     return (op, description, None, None, origin)
 
 
-def extract_span_status(span):
-    # type: (ReadableSpan) -> tuple[Optional[str], Optional[int]]
+def extract_span_status(span: "ReadableSpan") -> "tuple[Optional[str], Optional[int]]":
     span_attributes = span.attributes or {}
     status = span.status or None
 
@@ -266,8 +258,7 @@ def extract_span_status(span):
         return (SPANSTATUS.UNKNOWN_ERROR, None)
 
 
-def infer_status_from_attributes(span_attributes):
-    # type: (Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]) -> tuple[Optional[str], Optional[int]]
+def infer_status_from_attributes(span_attributes: "Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]") -> "tuple[Optional[str], Optional[int]]":
     http_status = get_http_status_code(span_attributes)
 
     if http_status:
@@ -280,8 +271,7 @@ def infer_status_from_attributes(span_attributes):
     return (None, None)
 
 
-def get_http_status_code(span_attributes):
-    # type: (Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]) -> Optional[int]
+def get_http_status_code(span_attributes: "Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]") -> "Optional[int]":
     try:
         http_status = span_attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE)
     except AttributeError:
@@ -299,12 +289,11 @@ def get_http_status_code(span_attributes):
     return http_status
 
 
-def extract_span_attributes(span, namespace):
-    # type: (ReadableSpan, str) -> dict[str, Any]
+def extract_span_attributes(span: "ReadableSpan", namespace: str) -> "dict[str, Any]":
     """
     Extract Sentry-specific span attributes and make them look the way Sentry expects.
     """
-    extracted_attrs = {}  # type: dict[str, Any]
+    extracted_attrs: "dict[str, Any]" = {}
 
     for attr, value in (span.attributes or {}).items():
         if attr.startswith(namespace):
@@ -314,8 +303,7 @@ def extract_span_attributes(span, namespace):
     return extracted_attrs
 
 
-def get_trace_context(span, span_data=None):
-    # type: (ReadableSpan, Optional[OtelExtractedSpanData]) -> dict[str, Any]
+def get_trace_context(span: "ReadableSpan", span_data: "Optional[OtelExtractedSpanData]" = None) -> "dict[str, Any]":
     if not span.context:
         return {}
 
@@ -328,13 +316,13 @@ def get_trace_context(span, span_data=None):
 
     (op, _, status, _, origin) = span_data
 
-    trace_context = {
+    trace_context: "dict[str, Any]" = {
         "trace_id": trace_id,
         "span_id": span_id,
         "parent_span_id": parent_span_id,
         "op": op,
         "origin": origin or DEFAULT_SPAN_ORIGIN,
-    }  # type: dict[str, Any]
+    }
 
     if status:
         trace_context["status"] = status
@@ -350,8 +338,7 @@ def get_trace_context(span, span_data=None):
     return trace_context
 
 
-def trace_state_from_baggage(baggage):
-    # type: (Baggage) -> TraceState
+def trace_state_from_baggage(baggage: "Baggage") -> "TraceState":
     items = []
     for k, v in baggage.sentry_items.items():
         key = Baggage.SENTRY_PREFIX + quote(k)
@@ -360,13 +347,11 @@ def trace_state_from_baggage(baggage):
     return TraceState(items)
 
 
-def baggage_from_trace_state(trace_state):
-    # type: (TraceState) -> Baggage
+def baggage_from_trace_state(trace_state: "TraceState") -> "Baggage":
     return Baggage(dsc_from_trace_state(trace_state))
 
 
-def serialize_trace_state(trace_state):
-    # type: (TraceState) -> str
+def serialize_trace_state(trace_state: "TraceState") -> str:
     sentry_items = []
     for k, v in trace_state.items():
         if Baggage.SENTRY_PREFIX_REGEX.match(k):
@@ -374,8 +359,7 @@ def serialize_trace_state(trace_state):
     return ",".join(key + "=" + value for key, value in sentry_items)
 
 
-def dsc_from_trace_state(trace_state):
-    # type: (TraceState) -> dict[str, str]
+def dsc_from_trace_state(trace_state: "TraceState") -> "dict[str, str]":
     dsc = {}
     for k, v in trace_state.items():
         if Baggage.SENTRY_PREFIX_REGEX.match(k):
@@ -384,16 +368,14 @@ def dsc_from_trace_state(trace_state):
     return dsc
 
 
-def has_incoming_trace(trace_state):
-    # type: (TraceState) -> bool
+def has_incoming_trace(trace_state: "TraceState") -> bool:
     """
     The existence of a sentry-trace_id in the baggage implies we continued an upstream trace.
     """
     return (Baggage.SENTRY_PREFIX + "trace_id") in trace_state
 
 
-def get_trace_state(span):
-    # type: (Union[AbstractSpan, ReadableSpan]) -> TraceState
+def get_trace_state(span: "Union[AbstractSpan, ReadableSpan]") -> "TraceState":
     """
     Get the existing trace_state with sentry items
     or populate it if we are the head SDK.
@@ -451,29 +433,25 @@ def get_trace_state(span):
         return trace_state
 
 
-def get_sentry_meta(span, key):
-    # type: (Union[AbstractSpan, ReadableSpan], str) -> Any
+def get_sentry_meta(span: "Union[AbstractSpan, ReadableSpan]", key: str) -> "Any":
     sentry_meta = getattr(span, "_sentry_meta", None)
     return sentry_meta.get(key) if sentry_meta else None
 
 
-def set_sentry_meta(span, key, value):
-    # type: (Union[AbstractSpan, ReadableSpan], str, Any) -> None
+def set_sentry_meta(span: "Union[AbstractSpan, ReadableSpan]", key: str, value: "Any") -> None:
     sentry_meta = getattr(span, "_sentry_meta", {})
     sentry_meta[key] = value
     span._sentry_meta = sentry_meta  # type: ignore[union-attr]
 
 
-def delete_sentry_meta(span):
-    # type: (Union[AbstractSpan, ReadableSpan]) -> None
+def delete_sentry_meta(span: "Union[AbstractSpan, ReadableSpan]") -> None:
     try:
         del span._sentry_meta  # type: ignore[union-attr]
     except AttributeError:
         pass
 
 
-def get_profile_context(span):
-    # type: (ReadableSpan) -> Optional[dict[str, str]]
+def get_profile_context(span: "ReadableSpan") -> "Optional[dict[str, str]]":
     if not span.attributes:
         return None
 

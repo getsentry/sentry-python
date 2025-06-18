@@ -15,22 +15,17 @@ if TYPE_CHECKING:
 _ai_pipeline_name = ContextVar("ai_pipeline_name", default=None)
 
 
-def set_ai_pipeline_name(name):
-    # type: (Optional[str]) -> None
+def set_ai_pipeline_name(name: "Optional[str]") -> None:
     _ai_pipeline_name.set(name)
 
 
-def get_ai_pipeline_name():
-    # type: () -> Optional[str]
+def get_ai_pipeline_name() -> "Optional[str]":
     return _ai_pipeline_name.get()
 
 
-def ai_track(description, **span_kwargs):
-    # type: (str, Any) -> Callable[..., Any]
-    def decorator(f):
-        # type: (Callable[..., Any]) -> Callable[..., Any]
-        def sync_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+def ai_track(description: str, **span_kwargs: "Any") -> "Callable[..., Any]":
+    def decorator(f: "Callable[..., Any]") -> "Callable[..., Any]":
+        def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
@@ -60,8 +55,7 @@ def ai_track(description, **span_kwargs):
                         _ai_pipeline_name.set(None)
                     return res
 
-        async def async_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+        async def async_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
@@ -100,9 +94,8 @@ def ai_track(description, **span_kwargs):
 
 
 def record_token_usage(
-    span, prompt_tokens=None, completion_tokens=None, total_tokens=None
-):
-    # type: (Span, Optional[int], Optional[int], Optional[int]) -> None
+    span: Span, prompt_tokens: "Optional[int]" = None, completion_tokens: "Optional[int]" = None, total_tokens: "Optional[int]" = None
+) -> None:
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
         span.set_attribute(SPANDATA.AI_PIPELINE_NAME, ai_pipeline_name)

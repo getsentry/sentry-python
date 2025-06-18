@@ -99,7 +99,7 @@ try:
     from gevent.monkey import get_original
     from gevent.threadpool import ThreadPool as _ThreadPool
 
-    ThreadPool = _ThreadPool  # type: Optional[Type[_ThreadPool]]
+    ThreadPool: "Optional[Type[_ThreadPool]]" = _ThreadPool
     thread_sleep = get_original("time", "sleep")
 except ImportError:
     thread_sleep = time.sleep
@@ -107,7 +107,7 @@ except ImportError:
     ThreadPool = None
 
 
-_scheduler = None  # type: Optional[Scheduler]
+_scheduler: "Optional[Scheduler]" = None
 
 
 # The minimum number of unique samples that must exist in a profile to be
@@ -115,8 +115,7 @@ _scheduler = None  # type: Optional[Scheduler]
 PROFILE_MINIMUM_SAMPLES = 2
 
 
-def has_profiling_enabled(options):
-    # type: (Dict[str, Any]) -> bool
+def has_profiling_enabled(options: "Dict[str, Any]") -> bool:
     profiles_sampler = options["profiles_sampler"]
     if profiles_sampler is not None:
         return True
@@ -128,8 +127,7 @@ def has_profiling_enabled(options):
     return False
 
 
-def setup_profiler(options):
-    # type: (Dict[str, Any]) -> bool
+def setup_profiler(options: "Dict[str, Any]") -> bool:
     global _scheduler
 
     if _scheduler is not None:
@@ -172,9 +170,7 @@ def setup_profiler(options):
     return True
 
 
-def teardown_profiler():
-    # type: () -> None
-
+def teardown_profiler() -> None:
     global _scheduler
 
     if _scheduler is not None:
@@ -189,40 +185,38 @@ MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 class Profile:
     def __init__(
         self,
-        sampled,  # type: Optional[bool]
-        start_ns,  # type: int
-        scheduler=None,  # type: Optional[Scheduler]
-    ):
-        # type: (...) -> None
+        sampled: "Optional[bool]",
+        start_ns: int,
+        scheduler: "Optional[Scheduler]" = None,
+    ) -> None:
         self.scheduler = _scheduler if scheduler is None else scheduler
 
-        self.event_id = uuid.uuid4().hex  # type: str
+        self.event_id: str = uuid.uuid4().hex
 
-        self.sampled = sampled  # type: Optional[bool]
+        self.sampled: "Optional[bool]" = sampled
 
         # Various framework integrations are capable of overwriting the active thread id.
         # If it is set to `None` at the end of the profile, we fall back to the default.
-        self._default_active_thread_id = get_current_thread_meta()[0] or 0  # type: int
-        self.active_thread_id = None  # type: Optional[int]
+        self._default_active_thread_id: int = get_current_thread_meta()[0] or 0
+        self.active_thread_id: "Optional[int]" = None
 
         try:
-            self.start_ns = start_ns  # type: int
+            self.start_ns: int = start_ns
         except AttributeError:
             self.start_ns = 0
 
-        self.stop_ns = 0  # type: int
-        self.active = False  # type: bool
+        self.stop_ns: int = 0
+        self.active: bool = False
 
-        self.indexed_frames = {}  # type: Dict[FrameId, int]
-        self.indexed_stacks = {}  # type: Dict[StackId, int]
-        self.frames = []  # type: List[ProcessedFrame]
-        self.stacks = []  # type: List[ProcessedStack]
-        self.samples = []  # type: List[ProcessedSample]
+        self.indexed_frames: "Dict[FrameId, int]" = {}
+        self.indexed_stacks: "Dict[StackId, int]" = {}
+        self.frames: "List[ProcessedFrame]" = []
+        self.stacks: "List[ProcessedStack]" = []
+        self.samples: "List[ProcessedSample]" = []
 
         self.unique_samples = 0
 
-    def update_active_thread_id(self):
-        # type: () -> None
+    def update_active_thread_id(self) -> None:
         self.active_thread_id = get_current_thread_meta()[0]
         logger.debug(
             "[Profiling] updating active thread id to {tid}".format(
@@ -230,8 +224,7 @@ class Profile:
             )
         )
 
-    def _set_initial_sampling_decision(self, sampling_context):
-        # type: (SamplingContext) -> None
+    def _set_initial_sampling_decision(self, sampling_context: "SamplingContext") -> None:
         """
         Sets the profile's sampling decision according to the following
         precedence rules:
@@ -302,8 +295,7 @@ class Profile:
                 )
             )
 
-    def start(self):
-        # type: () -> None
+    def start(self) -> None:
         if not self.sampled or self.active:
             return
 
@@ -314,8 +306,7 @@ class Profile:
             self.start_ns = time.perf_counter_ns()
         self.scheduler.start_profiling(self)
 
-    def stop(self):
-        # type: () -> None
+    def stop(self) -> None:
         if not self.sampled or not self.active:
             return
 
@@ -324,8 +315,7 @@ class Profile:
         self.active = False
         self.stop_ns = time.perf_counter_ns()
 
-    def __enter__(self):
-        # type: () -> Profile
+    def __enter__(self) -> "Profile":
         scope = sentry_sdk.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
@@ -336,8 +326,7 @@ class Profile:
 
         return self
 
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+    def __exit__(self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]") -> None:
         self.stop()
 
         scope, old_profile = self._context_manager_state
@@ -345,8 +334,7 @@ class Profile:
 
         scope.profile = old_profile
 
-    def write(self, ts, sample):
-        # type: (int, ExtractedSample) -> None
+    def write(self, ts: int, sample: "ExtractedSample") -> None:
         if not self.active:
             return
 
@@ -389,18 +377,16 @@ class Profile:
                 # When this happens, we abandon the current sample as it's bad.
                 capture_internal_exception(sys.exc_info())
 
-    def process(self):
-        # type: () -> ProcessedProfile
-
+    def process(self) -> "ProcessedProfile":
         # This collects the thread metadata at the end of a profile. Doing it
         # this way means that any threads that terminate before the profile ends
         # will not have any metadata associated with it.
-        thread_metadata = {
+        thread_metadata: "Dict[str, ProcessedThreadMetadata]" = {
             str(thread.ident): {
                 "name": str(thread.name),
             }
             for thread in threading.enumerate()
-        }  # type: Dict[str, ProcessedThreadMetadata]
+        }
 
         return {
             "frames": self.frames,
@@ -409,8 +395,7 @@ class Profile:
             "thread_metadata": thread_metadata,
         }
 
-    def to_json(self, event_opt, options):
-        # type: (Event, Dict[str, Any]) -> Dict[str, Any]
+    def to_json(self, event_opt: "Event", options: "Dict[str, Any]") -> "Dict[str, Any]":
         profile = self.process()
 
         set_in_app_in_frames(
@@ -460,8 +445,7 @@ class Profile:
             ],
         }
 
-    def valid(self):
-        # type: () -> bool
+    def valid(self) -> bool:
         client = sentry_sdk.get_client()
         if not client.is_active():
             return False
@@ -488,39 +472,33 @@ class Profile:
 
 
 class Scheduler(ABC):
-    mode = "unknown"  # type: ProfilerMode
+    mode: "ProfilerMode" = "unknown"
 
-    def __init__(self, frequency):
-        # type: (int) -> None
+    def __init__(self, frequency: int) -> None:
         self.interval = 1.0 / frequency
 
         self.sampler = self.make_sampler()
 
         # cap the number of new profiles at any time so it does not grow infinitely
-        self.new_profiles = deque(maxlen=128)  # type: Deque[Profile]
-        self.active_profiles = set()  # type: Set[Profile]
+        self.new_profiles: "Deque[Profile]" = deque(maxlen=128)
+        self.active_profiles: "Set[Profile]" = set()
 
-    def __enter__(self):
-        # type: () -> Scheduler
+    def __enter__(self) -> "Scheduler":
         self.setup()
         return self
 
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+    def __exit__(self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]") -> None:
         self.teardown()
 
     @abstractmethod
-    def setup(self):
-        # type: () -> None
+    def setup(self) -> None:
         pass
 
     @abstractmethod
-    def teardown(self):
-        # type: () -> None
+    def teardown(self) -> None:
         pass
 
-    def ensure_running(self):
-        # type: () -> None
+    def ensure_running(self) -> None:
         """
         Ensure the scheduler is running. By default, this method is a no-op.
         The method should be overridden by any implementation for which it is
@@ -528,19 +506,16 @@ class Scheduler(ABC):
         """
         return None
 
-    def start_profiling(self, profile):
-        # type: (Profile) -> None
+    def start_profiling(self, profile: "Profile") -> None:
         self.ensure_running()
         self.new_profiles.append(profile)
 
-    def make_sampler(self):
-        # type: () -> Callable[..., None]
+    def make_sampler(self) -> "Callable[..., None]":
         cwd = os.getcwd()
 
         cache = LRUCache(max_size=256)
 
-        def _sample_stack(*args, **kwargs):
-            # type: (*Any, **Any) -> None
+        def _sample_stack(*args: "Any", **kwargs: "Any") -> None:
             """
             Take a sample of the stack on all the threads in the process.
             This should be called at a regular interval to collect samples.
@@ -611,32 +586,28 @@ class ThreadScheduler(Scheduler):
     the sampler at a regular interval.
     """
 
-    mode = "thread"  # type: ProfilerMode
+    mode: "ProfilerMode" = "thread"
     name = "sentry.profiler.ThreadScheduler"
 
-    def __init__(self, frequency):
-        # type: (int) -> None
+    def __init__(self, frequency: int) -> None:
         super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False
-        self.thread = None  # type: Optional[threading.Thread]
-        self.pid = None  # type: Optional[int]
+        self.thread: "Optional[threading.Thread]" = None
+        self.pid: "Optional[int]" = None
         self.lock = threading.Lock()
 
-    def setup(self):
-        # type: () -> None
+    def setup(self) -> None:
         pass
 
-    def teardown(self):
-        # type: () -> None
+    def teardown(self) -> None:
         if self.running:
             self.running = False
             if self.thread is not None:
                 self.thread.join()
 
-    def ensure_running(self):
-        # type: () -> None
+    def ensure_running(self) -> None:
         """
         Check that the profiler has an active thread to run in, and start one if
         that's not the case.
@@ -674,8 +645,7 @@ class ThreadScheduler(Scheduler):
                 self.thread = None
                 return
 
-    def run(self):
-        # type: () -> None
+    def run(self) -> None:
         last = time.perf_counter()
 
         while self.running:
@@ -707,12 +677,10 @@ class GeventScheduler(Scheduler):
        results in a sample containing only the sampler's code.
     """
 
-    mode = "gevent"  # type: ProfilerMode
+    mode: "ProfilerMode" = "gevent"
     name = "sentry.profiler.GeventScheduler"
 
-    def __init__(self, frequency):
-        # type: (int) -> None
-
+    def __init__(self, frequency: int) -> None:
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
@@ -720,27 +688,24 @@ class GeventScheduler(Scheduler):
 
         # used to signal to the thread that it should stop
         self.running = False
-        self.thread = None  # type: Optional[_ThreadPool]
-        self.pid = None  # type: Optional[int]
+        self.thread: "Optional[_ThreadPool]" = None
+        self.pid: "Optional[int]" = None
 
         # This intentionally uses the gevent patched threading.Lock.
         # The lock will be required when first trying to start profiles
         # as we need to spawn the profiler thread from the greenlets.
         self.lock = threading.Lock()
 
-    def setup(self):
-        # type: () -> None
+    def setup(self) -> None:
         pass
 
-    def teardown(self):
-        # type: () -> None
+    def teardown(self) -> None:
         if self.running:
             self.running = False
             if self.thread is not None:
                 self.thread.join()
 
-    def ensure_running(self):
-        # type: () -> None
+    def ensure_running(self) -> None:
         pid = os.getpid()
 
         # is running on the right process
@@ -767,8 +732,7 @@ class GeventScheduler(Scheduler):
                 self.thread = None
                 return
 
-    def run(self):
-        # type: () -> None
+    def run(self) -> None:
         last = time.perf_counter()
 
         while self.running:
