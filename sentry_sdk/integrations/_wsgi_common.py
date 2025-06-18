@@ -50,8 +50,7 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
 )
 
 
-def request_body_within_bounds(client, content_length):
-    # type: (Optional[sentry_sdk.client.BaseClient], int) -> bool
+def request_body_within_bounds(client: "Optional[Any]", content_length: int) -> bool:
     if client is None:
         return False
 
@@ -73,17 +72,15 @@ class RequestExtractor:
     # it. Only some child classes implement all methods that raise
     # NotImplementedError in this class.
 
-    def __init__(self, request):
-        # type: (Any) -> None
+    def __init__(self, request: "Any") -> None:
         self.request = request
 
-    def extract_into_event(self, event):
-        # type: (Event) -> None
+    def extract_into_event(self, event: "Event") -> None:
         client = sentry_sdk.get_client()
         if not client.is_active():
             return
 
-        data = None  # type: Optional[Union[AnnotatedValue, Dict[str, Any]]]
+        data: "Optional[Union[AnnotatedValue, Dict[str, Any]]]" = None
 
         content_length = self.content_length()
         request_info = event.get("request", {})
@@ -119,27 +116,22 @@ class RequestExtractor:
 
         event["request"] = deepcopy(request_info)
 
-    def content_length(self):
-        # type: () -> int
+    def content_length(self) -> int:
         try:
             return int(self.env().get("CONTENT_LENGTH", 0))
         except ValueError:
             return 0
 
-    def cookies(self):
-        # type: () -> MutableMapping[str, Any]
+    def cookies(self) -> "MutableMapping[str, Any]":
         raise NotImplementedError()
 
-    def raw_data(self):
-        # type: () -> Optional[Union[str, bytes]]
+    def raw_data(self) -> "Optional[Union[str, bytes]]":
         raise NotImplementedError()
 
-    def form(self):
-        # type: () -> Optional[Dict[str, Any]]
+    def form(self) -> "Optional[Dict[str, Any]]":
         raise NotImplementedError()
 
-    def parsed_body(self):
-        # type: () -> Optional[Dict[str, Any]]
+    def parsed_body(self) -> "Optional[Dict[str, Any]]":
         try:
             form = self.form()
         except Exception:
@@ -161,12 +153,10 @@ class RequestExtractor:
 
         return self.json()
 
-    def is_json(self):
-        # type: () -> bool
+    def is_json(self) -> bool:
         return _is_json_content_type(self.env().get("CONTENT_TYPE"))
 
-    def json(self):
-        # type: () -> Optional[Any]
+    def json(self) -> "Optional[Any]":
         try:
             if not self.is_json():
                 return None
@@ -190,21 +180,17 @@ class RequestExtractor:
 
         return None
 
-    def files(self):
-        # type: () -> Optional[Dict[str, Any]]
+    def files(self) -> "Optional[Dict[str, Any]]":
         raise NotImplementedError()
 
-    def size_of_file(self, file):
-        # type: (Any) -> int
+    def size_of_file(self, file: "Any") -> int:
         raise NotImplementedError()
 
-    def env(self):
-        # type: () -> Dict[str, Any]
+    def env(self) -> "Dict[str, Any]":
         raise NotImplementedError()
 
 
-def _is_json_content_type(ct):
-    # type: (Optional[str]) -> bool
+def _is_json_content_type(ct: "Optional[str]") -> bool:
     mt = (ct or "").split(";", 1)[0]
     return (
         mt == "application/json"
@@ -213,8 +199,7 @@ def _is_json_content_type(ct):
     )
 
 
-def _filter_headers(headers):
-    # type: (Mapping[str, str]) -> Mapping[str, Union[AnnotatedValue, str]]
+def _filter_headers(headers: "Mapping[str, str]") -> "Mapping[str, Union[AnnotatedValue, str]]":
     if should_send_default_pii():
         return headers
 
@@ -228,8 +213,7 @@ def _filter_headers(headers):
     }
 
 
-def _request_headers_to_span_attributes(headers):
-    # type: (dict[str, str]) -> dict[str, str]
+def _request_headers_to_span_attributes(headers: "dict[str, str]") -> "dict[str, str]":
     attributes = {}
 
     headers = _filter_headers(headers)

@@ -15,12 +15,11 @@ if TYPE_CHECKING:
     from sentry_sdk.utils import AnnotatedValue
 
 
-def _get_headers(asgi_scope):
-    # type: (Any) -> Dict[str, str]
+def _get_headers(asgi_scope: "Any") -> "Dict[str, str]":
     """
     Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
     """
-    headers = {}  # type: Dict[str, str]
+    headers: "Dict[str, str]" = {}
     for raw_key, raw_value in asgi_scope.get("headers", {}):
         key = raw_key.decode("latin-1")
         value = raw_value.decode("latin-1")
@@ -32,8 +31,7 @@ def _get_headers(asgi_scope):
     return headers
 
 
-def _get_url(asgi_scope, default_scheme=None, host=None):
-    # type: (Dict[str, Any], Optional[Literal["ws", "http"]], Optional[Union[AnnotatedValue, str]]) -> str
+def _get_url(asgi_scope: "Dict[str, Any]", default_scheme: "Optional[Literal['ws', 'http']]" = None, host: "Optional[Union[AnnotatedValue, str]]" = None) -> str:
     """
     Extract URL from the ASGI scope, without also including the querystring.
     """
@@ -53,8 +51,7 @@ def _get_url(asgi_scope, default_scheme=None, host=None):
     return path
 
 
-def _get_query(asgi_scope):
-    # type: (Any) -> Any
+def _get_query(asgi_scope: "Any") -> "Any":
     """
     Extract querystring from the ASGI scope, in the format that the Sentry protocol expects.
     """
@@ -64,8 +61,7 @@ def _get_query(asgi_scope):
     return urllib.parse.unquote(qs.decode("latin-1"))
 
 
-def _get_ip(asgi_scope):
-    # type: (Any) -> str
+def _get_ip(asgi_scope: "Any") -> str:
     """
     Extract IP Address from the ASGI scope based on request headers with fallback to scope client.
     """
@@ -83,12 +79,11 @@ def _get_ip(asgi_scope):
     return asgi_scope.get("client")[0]
 
 
-def _get_request_data(asgi_scope):
-    # type: (Any) -> Dict[str, Any]
+def _get_request_data(asgi_scope: "Any") -> "Dict[str, Any]":
     """
     Returns data related to the HTTP request from the ASGI scope.
     """
-    request_data = {}  # type: Dict[str, Any]
+    request_data: "Dict[str, Any]" = {}
     ty = asgi_scope["type"]
     if ty in ("http", "websocket"):
         request_data["method"] = asgi_scope.get("method")

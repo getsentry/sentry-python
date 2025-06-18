@@ -28,13 +28,11 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(self, propagate_scope=True):
-        # type: (bool) -> None
+    def __init__(self, propagate_scope: bool = True) -> None:
         self.propagate_scope = propagate_scope
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         old_start = Thread.start
 
         try:
@@ -47,8 +45,7 @@ class ThreadingIntegration(Integration):
             channels_version = None
 
         @wraps(old_start)
-        def sentry_start(self, *a, **kw):
-            # type: (Thread, *Any, **Any) -> Any
+        def sentry_start(self: Thread, *a: "Any", **kw: "Any") -> "Any":
             integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
             if integration is None:
                 return old_start(self, *a, **kw)
@@ -98,13 +95,10 @@ class ThreadingIntegration(Integration):
         Thread.start = sentry_start  # type: ignore
 
 
-def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
-    # type: (sentry_sdk.Scope, sentry_sdk.Scope, F) -> F
+def _wrap_run(isolation_scope_to_use: "sentry_sdk.Scope", current_scope_to_use: "sentry_sdk.Scope", old_run_func: "F") -> "F":
     @wraps(old_run_func)
-    def run(*a, **kw):
-        # type: (*Any, **Any) -> Any
-        def _run_old_run_func():
-            # type: () -> Any
+    def run(*a: "Any", **kw: "Any") -> "Any":
+        def _run_old_run_func() -> "Any":
             try:
                 self = current_thread()
                 return old_run_func(self, *a, **kw)
@@ -118,8 +112,7 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
     return run  # type: ignore
 
 
-def _capture_exception():
-    # type: () -> ExcInfo
+def _capture_exception() -> "ExcInfo":
     exc_info = sys.exc_info()
 
     client = sentry_sdk.get_client()

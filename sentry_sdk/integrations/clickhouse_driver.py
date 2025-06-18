@@ -160,10 +160,10 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
             _set_on_span(span, data)
 
             if should_send_default_pii():
-                saved_db_data = getattr(
+                saved_db_data: "dict[str, Any]" = getattr(
                     connection, "_sentry_db_data", {}
-                )  # type: dict[str, Any]
-                db_params = saved_db_data.get("db.params") or []  # type: list[Any]
+                )
+                db_params: "list[Any]" = saved_db_data.get("db.params") or []
                 db_params.extend(db_params_data)
                 saved_db_data["db.params"] = db_params
                 span.set_attribute("db.params", _serialize_span_attribute(db_params))
