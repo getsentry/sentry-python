@@ -145,7 +145,7 @@ _MIN_VERSIONS = {
     "launchdarkly": (9, 8, 0),
     "loguru": (0, 7, 0),
     "openai": (1, 0, 0),
-    "openai_agents": (0, 0, 17),
+    "openai_agents": (0, 0, 19),
     "openfeature": (0, 7, 1),
     "quart": (0, 16, 0),
     "ray": (2, 7, 0),

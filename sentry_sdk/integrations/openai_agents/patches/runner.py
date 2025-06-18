@@ -3,7 +3,6 @@ import asyncio
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import (
     agent_workflow_span,
@@ -16,11 +15,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Callable
 
-try:
-    import agents
-except ImportError:
-    raise DidNotEnable("OpenAI Agents not installed")
-
 
 def _create_run_wrapper(original_func):
     # type: (Callable[..., Any]) -> Callable[..., Any]
@@ -29,11 +23,9 @@ def _create_run_wrapper(original_func):
     """
     is_async = asyncio.iscoroutinefunction(original_func)
 
-    @wraps(
-        original_func.__func__ if hasattr(original_func, "__func__") else original_func
-    )
-    async def async_wrapper(cls, *args, **kwargs):
-        # type: (agents.Runner, *Any, **Any) -> Any
+    @wraps(original_func)
+    async def async_wrapper(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         agent = args[0]
         with agent_workflow_span(agent) as span:
             kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
@@ -54,11 +46,9 @@ def _create_run_wrapper(original_func):
             finally:
                 update_agent_workflow_span(span, agent, result)
 
-    @wraps(
-        original_func.__func__ if hasattr(original_func, "__func__") else original_func
-    )
-    def sync_wrapper(cls, *args, **kwargs):
-        # type: (agents.Runner, *Any, **Any) -> Any
+    @wraps(original_func)
+    def sync_wrapper(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         # The sync version (.run_sync()) is just a wrapper around the async version (.run())
         return original_func(*args, **kwargs)
 

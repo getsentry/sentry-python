@@ -15,27 +15,28 @@ except ImportError:
 
 def _patch_runner():
     # type: () -> None
-    # Agent workflow spans
-    agents.Runner.run = classmethod(
-        _create_run_wrapper(agents.Runner.run),
+
+    # Creating agent workflow spans
+    # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
+    # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
+    agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(
+        agents.run.DEFAULT_AGENT_RUNNER.run
     )
-    agents.Runner.run_sync = classmethod(
-        _create_run_wrapper(agents.Runner.run_sync),
-    )
+
     # TODO-anton: Also patch streaming runner: agents.Runner.run_streamed
 
 
 def _patch_model():
     # type: () -> None
-    agents.Runner._get_model = classmethod(
-        _create_get_model_wrapper(agents.Runner._get_model),
+    agents.run.AgentRunner._get_model = classmethod(
+        _create_get_model_wrapper(agents.run.AgentRunner._get_model),
     )
 
 
 def _patch_tools():
     # type: () -> None
-    agents.Runner._get_all_tools = classmethod(
-        _create_get_all_tools_wrapper(agents.Runner._get_all_tools),
+    agents.run.AgentRunner._get_all_tools = classmethod(
+        _create_get_all_tools_wrapper(agents.run.AgentRunner._get_all_tools),
     )
 
 

@@ -17,10 +17,15 @@ except ImportError:
 class SentryRunHooks(agents.RunHooks):  # type: ignore[misc]
     async def on_agent_start(self, context, agent):
         # type: (agents.RunContextWrapper, agents.Agent) -> None
+        print(f"~~~ STARTING AGENT {agent.name}")
         invoke_agent_span(context, agent)
 
     async def on_agent_end(self, context, agent, output):
         # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
+        print(f"~~~ STOP AGENT {agent.name}")
+        # TODO-anton: in my test agent that handsoff to another agent,
+        # this hook is only called when the second agent finishes but
+        # never for the first agent. (this used to work that way in 0.0.18)
         update_invoke_agent_span(context, agent, output)
 
     async def on_handoff(
