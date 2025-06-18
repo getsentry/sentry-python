@@ -48,6 +48,13 @@ def _create_get_all_tools_wrapper(original_get_all_tools):
                 async def sentry_wrapped_on_invoke_tool(*args, **kwargs):
                     # type: (*Any, **Any) -> Any
                     with execute_tool_span(current_tool, *args, **kwargs) as span:
+                        # We can not capture exceptions in tool execution here because
+                        # `_on_invoke_tool` is swallowing the exception here:
+                        # https://github.com/openai/openai-agents-python/blob/main/src/agents/tool.py#L409-L422
+                        # And because function_tool is a decorator with `default_tool_error_function` set as a default parameter
+                        # I was unable to monkey patch it because those are evaluated at module import time
+                        # and the SDK is too late to patch it. I was also unable to patch `_on_invoke_tool_impl`
+                        # because it is nested inside this import time code. As if they made it hard to patch on purpose...
                         result = await current_on_invoke(*args, **kwargs)
                         update_execute_tool_span(span, agent, current_tool, result)
 

@@ -44,7 +44,8 @@ def _create_run_wrapper(original_func):
             except Exception as exc:
                 _capture_exception(exc)
 
-                # It could be that there is a "invoke agent" span still open (because its create in run_hooks)
+                # It could be that there is a "invoke agent" span still open
+                # (because its create in run_hooks without the context manager)
                 current_span = sentry_sdk.get_current_span()
                 if current_span.timestamp is None:
                     current_span.__exit__(None, None, None)
