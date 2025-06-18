@@ -10,6 +10,7 @@ from ..spans import (
     invoke_agent_span,
     update_invoke_agent_span,
 )
+from ..utils import _wrap_hooks
 
 from typing import TYPE_CHECKING
 
@@ -36,6 +37,7 @@ def _create_run_wrapper(original_func):
         # type: (agents.Runner, *Any, **Any) -> Any
         agent = args[0]
         with agent_workflow_span(agent) as span:
+            kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
             result = await original_func(*args, **kwargs)
             update_agent_workflow_span(span, agent, result)
 
@@ -46,6 +48,7 @@ def _create_run_wrapper(original_func):
     )
     def sync_wrapper(cls, *args, **kwargs):
         # type: (agents.Runner, *Any, **Any) -> Any
+        kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
         # The sync version (.run_sync()) is just a wrapper around the async version (.run())
         return original_func(*args, **kwargs)
 
