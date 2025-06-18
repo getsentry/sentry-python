@@ -1024,6 +1024,8 @@ class ClientConstructor:
             This is relative to the tracing sample rate - e.g. `0.5` means 50% of sampled transactions will be
             profiled.
 
+        :param http2: Defaults to `True`, enables HTTP/2 support for the SDK.
+
         :param profiles_sampler:
 
         :param profiler_mode:

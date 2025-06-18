@@ -157,8 +157,8 @@ def test_transport_works(
     if compression_algo is not None:
         experiments["transport_compression_algo"] = compression_algo
 
-    if http2:
-        experiments["transport_http2"] = True
+    if not http2:
+        experiments["http2"] = False
 
     client = make_client(
         debug=debug,
@@ -223,17 +223,13 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
 def test_two_way_ssl_authentication(make_client, http2):
-    _experiments = {}
-    if http2:
-        _experiments["transport_http2"] = True
-
     current_dir = os.path.dirname(__file__)
     cert_file = f"{current_dir}/test.pem"
     key_file = f"{current_dir}/test.key"
     client = make_client(
         cert_file=cert_file,
         key_file=key_file,
-        _experiments=_experiments,
+        http2=http2,
     )
     options = client.transport._get_pool_options()
 
@@ -280,7 +276,7 @@ def test_default_timeout(make_client):
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_default_timeout_http2(make_client):
-    client = make_client(_experiments={"transport_http2": True})
+    client = make_client()
 
     with mock.patch(
         "sentry_sdk.transport.httpcore.ConnectionPool.request",
@@ -303,7 +299,7 @@ def test_default_timeout_http2(make_client):
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_http2_with_https_dsn(make_client):
-    client = make_client(_experiments={"transport_http2": True})
+    client = make_client()
     client.transport.parsed_dsn.scheme = "https"
     options = client.transport._get_pool_options()
     assert options["http2"] is True
@@ -311,7 +307,7 @@ def test_http2_with_https_dsn(make_client):
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_no_http2_with_http_dsn(make_client):
-    client = make_client(_experiments={"transport_http2": True})
+    client = make_client()
     client.transport.parsed_dsn.scheme = "http"
     options = client.transport._get_pool_options()
     assert options["http2"] is False
