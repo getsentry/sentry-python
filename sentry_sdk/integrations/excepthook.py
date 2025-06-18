@@ -28,9 +28,7 @@ class ExcepthookIntegration(Integration):
 
     always_run = False
 
-    def __init__(self, always_run=False):
-        # type: (bool) -> None
-
+    def __init__(self, always_run: bool = False) -> None:
         if not isinstance(always_run, bool):
             raise ValueError(
                 "Invalid value for always_run: %s (must be type boolean)"
@@ -39,15 +37,12 @@ class ExcepthookIntegration(Integration):
         self.always_run = always_run
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         sys.excepthook = _make_excepthook(sys.excepthook)
 
 
-def _make_excepthook(old_excepthook):
-    # type: (Excepthook) -> Excepthook
-    def sentry_sdk_excepthook(type_, value, traceback):
-        # type: (Type[BaseException], BaseException, Optional[TracebackType]) -> None
+def _make_excepthook(old_excepthook: "Excepthook") -> "Excepthook":
+    def sentry_sdk_excepthook(type_: "Type[BaseException]", value: BaseException, traceback: "Optional[TracebackType]") -> None:
         integration = sentry_sdk.get_client().get_integration(ExcepthookIntegration)
 
         # Note: If  we replace this with ensure_integration_enabled then
@@ -70,8 +65,7 @@ def _make_excepthook(old_excepthook):
     return sentry_sdk_excepthook
 
 
-def _should_send(always_run=False):
-    # type: (bool) -> bool
+def _should_send(always_run: bool = False) -> bool:
     if always_run:
         return True
 

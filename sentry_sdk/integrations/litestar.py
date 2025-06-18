@@ -52,13 +52,12 @@ class LitestarIntegration(Integration):
 
     def __init__(
         self,
-        failed_request_status_codes=_DEFAULT_FAILED_REQUEST_STATUS_CODES,  # type: Set[int]
+        failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     ) -> None:
         self.failed_request_status_codes = failed_request_status_codes
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         patch_app_init()
         patch_middlewares()
         patch_http_route_handle()
@@ -75,9 +74,7 @@ class LitestarIntegration(Integration):
 
 
 class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
-    def __init__(self, app, span_origin=LitestarIntegration.origin):
-        # type: (ASGIApp, str) -> None
-
+    def __init__(self, app: "ASGIApp", span_origin: str = LitestarIntegration.origin) -> None:
         super().__init__(
             app=app,
             unsafe_context_data=False,
@@ -87,8 +84,7 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
         )
 
 
-def patch_app_init():
-    # type: () -> None
+def patch_app_init() -> None:
     """
     Replaces the Litestar class's `__init__` function in order to inject `after_exception` handlers and set the
     `SentryLitestarASGIMiddleware` as the outmost middleware in the stack.
@@ -99,8 +95,7 @@ def patch_app_init():
     old__init__ = Litestar.__init__
 
     @ensure_integration_enabled(LitestarIntegration, old__init__)
-    def injection_wrapper(self, *args, **kwargs):
-        # type: (Litestar, *Any, **Any) -> None
+    def injection_wrapper(self: "Litestar", *args: "Any", **kwargs: "Any") -> None:
         kwargs["after_exception"] = [
             exception_handler,
             *(kwargs.get("after_exception") or []),
@@ -114,13 +109,11 @@ def patch_app_init():
     Litestar.__init__ = injection_wrapper
 
 
-def patch_middlewares():
-    # type: () -> None
+def patch_middlewares() -> None:
     old_resolve_middleware_stack = BaseRouteHandler.resolve_middleware
 
     @ensure_integration_enabled(LitestarIntegration, old_resolve_middleware_stack)
-    def resolve_middleware_wrapper(self):
-        # type: (BaseRouteHandler) -> list[Middleware]
+    def resolve_middleware_wrapper(self) -> "list[Middleware]":
         return [
             enable_span_for_middleware(middleware)
             for middleware in old_resolve_middleware_stack(self)
@@ -129,8 +122,7 @@ def patch_middlewares():
     BaseRouteHandler.resolve_middleware = resolve_middleware_wrapper
 
 
-def enable_span_for_middleware(middleware):
-    # type: (Middleware) -> Middleware
+def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
     if (
         not hasattr(middleware, "__call__")  # noqa: B004
         or middleware is SentryLitestarASGIMiddleware
@@ -138,12 +130,11 @@ def enable_span_for_middleware(middleware):
         return middleware
 
     if isinstance(middleware, DefineMiddleware):
-        old_call = middleware.middleware.__call__  # type: ASGIApp
+        old_call: "ASGIApp" = middleware.middleware.__call__
     else:
         old_call = middleware.__call__
 
-    async def _create_span_call(self, scope, receive, send):
-        # type: (MiddlewareProtocol, LitestarScope, Receive, Send) -> None
+    async def _create_span_call(self: "MiddlewareProtocol", scope: "LitestarScope", receive: "Receive", send: "Send") -> None:
         if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
             return await old_call(self, scope, receive, send)
 
@@ -157,8 +148,7 @@ def enable_span_for_middleware(middleware):
             middleware_span.set_tag("litestar.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
-            async def _sentry_receive(*args, **kwargs):
-                # type: (*Any, **Any) -> Union[HTTPReceiveMessage, WebSocketReceiveMessage]
+            async def _sentry_receive(*args: "Any", **kwargs: "Any") -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                 if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
                     return await receive(*args, **kwargs)
                 with sentry_sdk.start_span(
@@ -175,8 +165,7 @@ def enable_span_for_middleware(middleware):
             new_receive = _sentry_receive if not receive_patched else receive
 
             # Creating spans for the "send" callback
-            async def _sentry_send(message):
-                # type: (Message) -> None
+            async def _sentry_send(message: "Message") -> None:
                 if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
                     return await send(message)
                 with sentry_sdk.start_span(
@@ -205,19 +194,17 @@ def enable_span_for_middleware(middleware):
     return middleware
 
 
-def patch_http_route_handle():
-    # type: () -> None
+def patch_http_route_handle() -> None:
     old_handle = HTTPRoute.handle
 
-    async def handle_wrapper(self, scope, receive, send):
-        # type: (HTTPRoute, HTTPScope, Receive, Send) -> None
+    async def handle_wrapper(self: "HTTPRoute", scope: "HTTPScope", receive: "Receive", send: "Send") -> None:
         if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
             return await old_handle(self, scope, receive, send)
 
         sentry_scope = sentry_sdk.get_isolation_scope()
         request = scope["app"].request_class(
             scope=scope, receive=receive, send=send
-        )  # type: Request[Any, Any]
+        )
         extracted_request_data = ConnectionDataExtractor(
             parse_body=True, parse_query=True
         )(request)
@@ -225,8 +212,7 @@ def patch_http_route_handle():
 
         request_data = await body
 
-        def event_processor(event, _):
-            # type: (Event, Hint) -> Event
+        def event_processor(event: "Event", _: "Hint") -> "Event":
             route_handler = scope.get("route_handler")
 
             request_info = event.get("request", {})
@@ -270,8 +256,7 @@ def patch_http_route_handle():
     HTTPRoute.handle = handle_wrapper
 
 
-def retrieve_user_from_scope(scope):
-    # type: (LitestarScope) -> Optional[dict[str, Any]]
+def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[dict[str, Any]]":
     scope_user = scope.get("user")
     if isinstance(scope_user, dict):
         return scope_user
@@ -282,9 +267,8 @@ def retrieve_user_from_scope(scope):
 
 
 @ensure_integration_enabled(LitestarIntegration)
-def exception_handler(exc, scope):
-    # type: (Exception, LitestarScope) -> None
-    user_info = None  # type: Optional[dict[str, Any]]
+def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
+    user_info: "Optional[dict[str, Any]]" = None
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):

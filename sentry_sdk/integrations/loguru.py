@@ -65,21 +65,20 @@ SEVERITY_TO_OTEL_SEVERITY = {
 class LoguruIntegration(Integration):
     identifier = "loguru"
 
-    level = DEFAULT_LEVEL  # type: Optional[int]
-    event_level = DEFAULT_EVENT_LEVEL  # type: Optional[int]
+    level: "Optional[int]" = DEFAULT_LEVEL
+    event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
-    sentry_logs_level = DEFAULT_LEVEL  # type: Optional[int]
+    sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL
 
     def __init__(
         self,
-        level=DEFAULT_LEVEL,
-        event_level=DEFAULT_EVENT_LEVEL,
-        breadcrumb_format=DEFAULT_FORMAT,
-        event_format=DEFAULT_FORMAT,
-        sentry_logs_level=DEFAULT_LEVEL,
-    ):
-        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction, Optional[int]) -> None
+        level: "Optional[int]" = DEFAULT_LEVEL,
+        event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL,
+        breadcrumb_format: "Any" = DEFAULT_FORMAT,
+        event_format: "Any" = DEFAULT_FORMAT,
+        sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
+    ) -> None:
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
         LoguruIntegration.breadcrumb_format = breadcrumb_format
@@ -87,8 +86,7 @@ class LoguruIntegration(Integration):
         LoguruIntegration.sentry_logs_level = sentry_logs_level
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         if LoguruIntegration.level is not None:
             logger.add(
                 LoguruBreadcrumbHandler(level=LoguruIntegration.level),
@@ -111,8 +109,7 @@ class LoguruIntegration(Integration):
 
 
 class _LoguruBaseHandler(_BaseHandler):
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def __init__(self, *args: "Any", **kwargs: "Any") -> None:
         if kwargs.get("level"):
             kwargs["level"] = SENTRY_LEVEL_FROM_LOGURU_LEVEL.get(
                 kwargs.get("level", ""), DEFAULT_LEVEL
@@ -120,8 +117,7 @@ class _LoguruBaseHandler(_BaseHandler):
 
         super().__init__(*args, **kwargs)
 
-    def _logging_to_event_level(self, record):
-        # type: (LogRecord) -> str
+    def _logging_to_event_level(self, record: "LogRecord") -> str:
         try:
             return SENTRY_LEVEL_FROM_LOGURU_LEVEL[
                 LoggingLevels(record.levelno).name
@@ -142,8 +138,7 @@ class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
     pass
 
 
-def loguru_sentry_logs_handler(message):
-    # type: (Message) -> None
+def loguru_sentry_logs_handler(message: "Any") -> None:
     # This is intentionally a callable sink instead of a standard logging handler
     # since otherwise we wouldn't get direct access to message.record
     client = sentry_sdk.get_client()
@@ -166,7 +161,7 @@ def loguru_sentry_logs_handler(message):
         record["level"].no, SEVERITY_TO_OTEL_SEVERITY
     )
 
-    attrs = {"sentry.origin": "auto.logger.loguru"}  # type: dict[str, Any]
+    attrs: "dict[str, Any]" = {"sentry.origin": "auto.logger.loguru"}
 
     project_root = client.options["project_root"]
     if record.get("file"):
