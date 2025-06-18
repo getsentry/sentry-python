@@ -38,6 +38,7 @@ def _create_get_model_wrapper(original_get_model):
             # type: (*Any, **Any) -> Any
             with ai_client_span(agent, kwargs) as span:
                 result = await original_get_response(*args, **kwargs)
+
                 update_ai_client_span(span, agent, kwargs, result)
 
             return result

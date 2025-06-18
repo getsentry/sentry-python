@@ -426,7 +426,15 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
                     test_agent, "Test input", run_config=test_run_config
                 )
 
-    (transaction,) = events
+    (
+        error_event,
+        transaction,
+    ) = events
+
+    assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert error_event["exception"]["values"][0]["value"] == "Model Error"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "openai_agents"
+
     spans = transaction["spans"]
     (invoke_agent_span, ai_client_span) = spans
 
@@ -435,7 +443,6 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
     assert invoke_agent_span["origin"] == "auto.ai.openai_agents"
-    assert invoke_agent_span["tags"]["status"] == "internal_error"
 
     assert ai_client_span["description"] == "chat gpt-4"
     assert ai_client_span["origin"] == "auto.ai.openai_agents"

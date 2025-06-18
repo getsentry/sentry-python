@@ -4,7 +4,6 @@ from .patches import (
     _create_get_model_wrapper,
     _create_get_all_tools_wrapper,
     _create_run_wrapper,
-    _create_run_single_turn_wrapper,
 )
 
 try:
@@ -24,11 +23,6 @@ def _patch_runner():
         _create_run_wrapper(agents.Runner.run_sync),
     )
     # TODO-anton: Also patch streaming runner: agents.Runner.run_streamed
-
-    # Agent invocation spans
-    agents.Runner._run_single_turn = classmethod(
-        _create_run_single_turn_wrapper(agents.Runner._run_single_turn),
-    )
 
 
 def _patch_model():
