@@ -108,115 +108,6 @@ class SPANDATA:
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
     """
 
-    AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
-    """
-    Used to reduce repetitiveness of generated tokens.
-    Example: 0.5
-    """
-
-    AI_PRESENCE_PENALTY = "ai.presence_penalty"
-    """
-    Used to reduce repetitiveness of generated tokens.
-    Example: 0.5
-    """
-
-    AI_INPUT_MESSAGES = "ai.input_messages"
-    """
-    The input messages to an LLM call.
-    Example: [{"role": "user", "message": "hello"}]
-    """
-
-    AI_MODEL_ID = "ai.model_id"
-    """
-    The unique descriptor of the model being execugted
-    Example: gpt-4
-    """
-
-    AI_METADATA = "ai.metadata"
-    """
-    Extra metadata passed to an AI pipeline step.
-    Example: {"executed_function": "add_integers"}
-    """
-
-    AI_TAGS = "ai.tags"
-    """
-    Tags that describe an AI pipeline step.
-    Example: {"executed_function": "add_integers"}
-    """
-
-    AI_STREAMING = "ai.streaming"
-    """
-    Whether or not the AI model call's repsonse was streamed back asynchronously
-    Example: true
-    """
-
-    AI_TEMPERATURE = "ai.temperature"
-    """
-    For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.
-    Example: 0.5
-    """
-
-    AI_TOP_P = "ai.top_p"
-    """
-    For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.
-    Example: 0.5
-    """
-
-    AI_TOP_K = "ai.top_k"
-    """
-    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
-    Example: 35
-    """
-
-    AI_FUNCTION_CALL = "ai.function_call"
-    """
-    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
-    """
-
-    AI_TOOL_CALLS = "ai.tool_calls"
-    """
-    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
-    """
-
-    AI_TOOLS = "ai.tools"
-    """
-    For an AI model call, the functions that are available
-    """
-
-    AI_RESPONSE_FORMAT = "ai.response_format"
-    """
-    For an AI model call, the format of the response
-    """
-
-    AI_LOGIT_BIAS = "ai.logit_bias"
-    """
-    For an AI model call, the logit bias
-    """
-
-    AI_PREAMBLE = "ai.preamble"
-    """
-    For an AI model call, the preamble parameter.
-    Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
-    Example: "You are now a clown."
-    """
-
-    AI_RAW_PROMPTING = "ai.raw_prompting"
-    """
-    Minimize pre-processing done to the prompt sent to the LLM.
-    Example: true
-    """
-    AI_RESPONSES = "ai.responses"
-    """
-    The responses to an AI model call. Always as a list.
-    Example: ["hello", "world"]
-    """
-
-    AI_SEED = "ai.seed"
-    """
-    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
-    Example: 123.45
-    """
-
     AI_CITATIONS = "ai.citations"
     """
     References or sources cited by the AI model in its response.
@@ -229,16 +120,21 @@ class SPANDATA:
     Example: ["doc1.txt", "doc2.pdf"]
     """
 
-    AI_SEARCH_QUERIES = "ai.search_queries"
+    AI_FINISH_REASON = "ai.finish_reason"
     """
-    Queries used to search for relevant context or documents.
-    Example: ["climate change effects", "renewable energy"]
+    The reason why the model stopped generating.
+    Example: "length"
     """
 
-    AI_SEARCH_RESULTS = "ai.search_results"
+    AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
     """
-    Results returned from search queries for context.
-    Example: ["Result 1", "Result 2"]
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
+    AI_FUNCTION_CALL = "ai.function_call"
+    """
+    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
     """
 
     AI_GENERATION_ID = "ai.generation_id"
@@ -247,16 +143,27 @@ class SPANDATA:
     Example: "gen_123abc"
     """
 
-    AI_SEARCH_REQUIRED = "ai.is_search_required"
+    AI_INPUT_MESSAGES = "ai.input_messages"
     """
-    Boolean indicating if the model needs to perform a search.
-    Example: true
+    The input messages to an LLM call.
+    Example: [{"role": "user", "message": "hello"}]
     """
 
-    AI_FINISH_REASON = "ai.finish_reason"
+    AI_LOGIT_BIAS = "ai.logit_bias"
     """
-    The reason why the model stopped generating.
-    Example: "length"
+    For an AI model call, the logit bias
+    """
+
+    AI_METADATA = "ai.metadata"
+    """
+    Extra metadata passed to an AI pipeline step.
+    Example: {"executed_function": "add_integers"}
+    """
+
+    AI_MODEL_ID = "ai.model_id"
+    """
+    The unique descriptor of the model being execugted
+    Example: gpt-4
     """
 
     AI_PIPELINE_NAME = "ai.pipeline.name"
@@ -265,50 +172,110 @@ class SPANDATA:
     Example: "qa-pipeline"
     """
 
+    AI_PREAMBLE = "ai.preamble"
+    """
+    For an AI model call, the preamble parameter.
+    Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
+    Example: "You are now a clown."
+    """
+
+    AI_PRESENCE_PENALTY = "ai.presence_penalty"
+    """
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
+    AI_RAW_PROMPTING = "ai.raw_prompting"
+    """
+    Minimize pre-processing done to the prompt sent to the LLM.
+    Example: true
+    """
+
+    AI_RESPONSE_FORMAT = "ai.response_format"
+    """
+    For an AI model call, the format of the response
+    """
+
+    AI_RESPONSES = "ai.responses"
+    """
+    The responses to an AI model call. Always as a list.
+    Example: ["hello", "world"]
+    """
+
+    AI_SEARCH_QUERIES = "ai.search_queries"
+    """
+    Queries used to search for relevant context or documents.
+    Example: ["climate change effects", "renewable energy"]
+    """
+
+    AI_SEARCH_REQUIRED = "ai.is_search_required"
+    """
+    Boolean indicating if the model needs to perform a search.
+    Example: true
+    """
+
+    AI_SEARCH_RESULTS = "ai.search_results"
+    """
+    Results returned from search queries for context.
+    Example: ["Result 1", "Result 2"]
+    """
+
+    AI_SEED = "ai.seed"
+    """
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: 123.45
+    """
+
+    AI_STREAMING = "ai.streaming"
+    """
+    Whether or not the AI model call's response was streamed back asynchronously
+    Example: true
+    """
+
+    AI_TAGS = "ai.tags"
+    """
+    Tags that describe an AI pipeline step.
+    Example: {"executed_function": "add_integers"}
+    """
+
+    AI_TEMPERATURE = "ai.temperature"
+    """
+    For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.
+    Example: 0.5
+    """
+
     AI_TEXTS = "ai.texts"
     """
     Raw text inputs provided to the model.
     Example: ["What is machine learning?"]
     """
 
+    AI_TOP_K = "ai.top_k"
+    """
+    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
+    Example: 35
+    """
+
+    AI_TOP_P = "ai.top_p"
+    """
+    For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.
+    Example: 0.5
+    """
+
+    AI_TOOL_CALLS = "ai.tool_calls"
+    """
+    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    """
+
+    AI_TOOLS = "ai.tools"
+    """
+    For an AI model call, the functions that are available
+    """
+
     AI_WARNINGS = "ai.warnings"
     """
     Warning messages generated during model execution.
     Example: ["Token limit exceeded"]
-    """
-
-    DB_NAME = "db.name"
-    """
-    The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
-    Example: myDatabase
-    """
-
-    DB_USER = "db.user"
-    """
-    The name of the database user used for connecting to the database.
-    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
-    Example: my_user
-    """
-
-    DB_OPERATION = "db.operation"
-    """
-    The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
-    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
-    Example: findAndModify, HMSET, SELECT
-    """
-
-    DB_SYSTEM = "db.system"
-    """
-    An identifier for the database management system (DBMS) product being used.
-    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
-    Example: postgresql
-    """
-
-    DB_MONGODB_COLLECTION = "db.mongodb.collection"
-    """
-    The MongoDB collection being accessed within the database.
-    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
-    Example: public.users; customers
     """
 
     CACHE_HIT = "cache.hit"
@@ -329,22 +296,212 @@ class SPANDATA:
     Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3
     """
 
-    NETWORK_PEER_ADDRESS = "network.peer.address"
+    CODE_FILEPATH = "code.filepath"
     """
-    Peer address of the network connection - IP address or Unix domain socket name.
-    Example: 10.1.2.80, /tmp/my.sock, localhost
-    """
-
-    NETWORK_PEER_PORT = "network.peer.port"
-    """
-    Peer port number of the network connection.
-    Example: 6379
+    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
+    Example: "/app/myapplication/http/handler/server.py"
     """
 
-    HTTP_QUERY = "http.query"
+    CODE_FUNCTION = "code.function"
     """
-    The Query string present in the URL.
-    Example: ?foo=bar&bar=baz
+    The method or function name, or equivalent (usually rightmost part of the code unit's name).
+    Example: "server_request"
+    """
+
+    CODE_LINENO = "code.lineno"
+    """
+    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
+    Example: 42
+    """
+
+    CODE_NAMESPACE = "code.namespace"
+    """
+    The "namespace" within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
+    Example: "http.handler"
+    """
+
+    DB_MONGODB_COLLECTION = "db.mongodb.collection"
+    """
+    The MongoDB collection being accessed within the database.
+    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
+    Example: public.users; customers
+    """
+
+    DB_NAME = "db.name"
+    """
+    The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
+    Example: myDatabase
+    """
+
+    DB_OPERATION = "db.operation"
+    """
+    The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: findAndModify, HMSET, SELECT
+    """
+
+    DB_SYSTEM = "db.system"
+    """
+    An identifier for the database management system (DBMS) product being used.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: postgresql
+    """
+
+    DB_USER = "db.user"
+    """
+    The name of the database user used for connecting to the database.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: my_user
+    """
+
+    GEN_AI_AGENT_NAME = "gen_ai.agent.name"
+    """
+    The name of the agent being used.
+    Example: "ResearchAssistant"
+    """
+
+    GEN_AI_CHOICE = "gen_ai.choice"
+    """
+    The model's response message.
+    Example: "The weather in Paris is rainy and overcast, with temperatures around 57°F"
+    """
+
+    GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
+    """
+    The name of the operation being performed.
+    Example: "chat"
+    """
+
+    GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
+    """
+    The model's response text messages.
+    Example: ["The weather in Paris is rainy and overcast, with temperatures around 57°F", "The weather in London is sunny and warm, with temperatures around 65°F"]
+    """
+
+    GEN_AI_RESPONSE_TOOL_CALLS = "gen_ai.response.tool_calls"
+    """
+    The tool calls in the model's response.
+    Example: [{"name": "get_weather", "arguments": {"location": "Paris"}}]
+    """
+
+    GEN_AI_REQUEST_AVAILABLE_TOOLS = "gen_ai.request.available_tools"
+    """
+    The available tools for the model.
+    Example: [{"name": "get_weather", "description": "Get the weather for a given location"}, {"name": "get_news", "description": "Get the news for a given topic"}]
+    """
+
+    GEN_AI_REQUEST_FREQUENCY_PENALTY = "gen_ai.request.frequency_penalty"
+    """
+    The frequency penalty parameter used to reduce repetitiveness of generated tokens.
+    Example: 0.1
+    """
+
+    GEN_AI_REQUEST_MAX_TOKENS = "gen_ai.request.max_tokens"
+    """
+    The maximum number of tokens to generate in the response.
+    Example: 2048
+    """
+
+    GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
+    """
+    The messages passed to the model. The "content" can be a string or an array of objects.
+    Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
+    """
+
+    GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
+    """
+    The model identifier being used for the request.
+    Example: "gpt-4-turbo-preview"
+    """
+
+    GEN_AI_REQUEST_PRESENCE_PENALTY = "gen_ai.request.presence_penalty"
+    """
+    The presence penalty parameter used to reduce repetitiveness of generated tokens.
+    Example: 0.1
+    """
+
+    GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
+    """
+    The temperature parameter used to control randomness in the output.
+    Example: 0.7
+    """
+
+    GEN_AI_REQUEST_TOP_P = "gen_ai.request.top_p"
+    """
+    The top_p parameter used to control diversity via nucleus sampling.
+    Example: 1.0
+    """
+
+    GEN_AI_SYSTEM = "gen_ai.system"
+    """
+    The name of the AI system being used.
+    Example: "openai"
+    """
+
+    GEN_AI_TOOL_DESCRIPTION = "gen_ai.tool.description"
+    """
+    The description of the tool being used.
+    Example: "Searches the web for current information about a topic"
+    """
+
+    GEN_AI_TOOL_INPUT = "gen_ai.tool.input"
+    """
+    The input of the tool being used.
+    Example: {"location": "Paris"}
+    """
+
+    GEN_AI_TOOL_NAME = "gen_ai.tool.name"
+    """
+    The name of the tool being used.
+    Example: "web_search"
+    """
+
+    GEN_AI_TOOL_OUTPUT = "gen_ai.tool.output"
+    """
+    The output of the tool being used.
+    Example: "rainy, 57°F"
+    """
+
+    GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
+    """
+    The type of tool being used.
+    Example: "function"
+    """
+
+    GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
+    """
+    The number of tokens in the input.
+    Example: 150
+    """
+
+    GEN_AI_USAGE_INPUT_TOKENS_CACHED = "gen_ai.usage.input_tokens.cached"
+    """
+    The number of cached tokens in the input.
+    Example: 50
+    """
+
+    GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+    """
+    The number of tokens in the output.
+    Example: 250
+    """
+
+    GEN_AI_USAGE_OUTPUT_TOKENS_REASONING = "gen_ai.usage.output_tokens.reasoning"
+    """
+    The number of tokens used for reasoning in the output.
+    Example: 75
+    """
+
+    GEN_AI_USAGE_TOTAL_TOKENS = "gen_ai.usage.total_tokens"
+    """
+    The total number of tokens used (input + output).
+    Example: 400
+    """
+
+    GEN_AI_USER_MESSAGE = "gen_ai.user.message"
+    """
+    The user message passed to the model.
+    Example: "What's the weather in Paris?"
     """
 
     HTTP_FRAGMENT = "http.fragment"
@@ -357,6 +514,12 @@ class SPANDATA:
     """
     The HTTP method used.
     Example: GET
+    """
+
+    HTTP_QUERY = "http.query"
+    """
+    The Query string present in the URL.
+    Example: ?foo=bar&bar=baz
     """
 
     HTTP_STATUS_CODE = "http.response.status_code"
@@ -376,19 +539,37 @@ class SPANDATA:
     The message's identifier.
     """
 
-    MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
-    """
-    Number of retries/attempts to process a message.
-    """
-
     MESSAGING_MESSAGE_RECEIVE_LATENCY = "messaging.message.receive.latency"
     """
     The latency between when the task was enqueued and when it was started to be processed.
     """
 
+    MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
+    """
+    Number of retries/attempts to process a message.
+    """
+
     MESSAGING_SYSTEM = "messaging.system"
     """
     The messaging system's name, e.g. `kafka`, `aws_sqs`
+    """
+
+    NETWORK_PEER_ADDRESS = "network.peer.address"
+    """
+    Peer address of the network connection - IP address or Unix domain socket name.
+    Example: 10.1.2.80, /tmp/my.sock, localhost
+    """
+
+    NETWORK_PEER_PORT = "network.peer.port"
+    """
+    Peer port number of the network connection.
+    Example: 6379
+    """
+
+    PROFILER_ID = "profiler_id"
+    """
+    Label identifying the profiler id that the span occurred in. This should be a string.
+    Example: "5249fbada8d5416482c2f6e47e337372"
     """
 
     SERVER_ADDRESS = "server.address"
@@ -416,30 +597,6 @@ class SPANDATA:
     Example: 16456
     """
 
-    CODE_FILEPATH = "code.filepath"
-    """
-    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
-    Example: "/app/myapplication/http/handler/server.py"
-    """
-
-    CODE_LINENO = "code.lineno"
-    """
-    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
-    Example: 42
-    """
-
-    CODE_FUNCTION = "code.function"
-    """
-    The method or function name, or equivalent (usually rightmost part of the code unit's name).
-    Example: "server_request"
-    """
-
-    CODE_NAMESPACE = "code.namespace"
-    """
-    The "namespace" within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
-    Example: "http.handler"
-    """
-
     THREAD_ID = "thread.id"
     """
     Identifier of a thread from where the span originated. This should be a string.
@@ -450,12 +607,6 @@ class SPANDATA:
     """
     Label identifying a thread from where the span originated. This should be a string.
     Example: "MainThread"
-    """
-
-    PROFILER_ID = "profiler_id"
-    """
-    Label identifying the profiler id that the span occurred in. This should be a string.
-    Example: "5249fbada8d5416482c2f6e47e337372"
     """
 
 
@@ -497,6 +648,10 @@ class OP:
     FUNCTION = "function"
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
+    GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
+    GEN_AI_HANDOFF = "gen_ai.handoff"
+    GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
     GRAPHQL_EXECUTE = "graphql.execute"
     GRAPHQL_MUTATION = "graphql.mutation"
     GRAPHQL_PARSE = "graphql.parse"
