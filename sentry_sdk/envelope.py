@@ -1,3 +1,4 @@
+from __future__ import annotations
 import io
 import json
 import mimetypes
@@ -8,18 +9,11 @@ from sentry_sdk.utils import json_dumps, capture_internal_exceptions
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
-    from typing import Union
-    from typing import Dict
-    from typing import List
-    from typing import Iterator
-
     from sentry_sdk._types import Event, EventDataCategory
+    from typing import Any, Optional, Union, Dict, List, Iterator
 
 
-def parse_json(data):
-    # type: (Union[bytes, str]) -> Any
+def parse_json(data: Union[bytes, str]) -> Any:
     # on some python 3 versions this needs to be bytes
     if isinstance(data, bytes):
         data = data.decode("utf-8", "replace")
@@ -35,10 +29,9 @@ class Envelope:
 
     def __init__(
         self,
-        headers=None,  # type: Optional[Dict[str, Any]]
-        items=None,  # type: Optional[List[Item]]
-    ):
-        # type: (...) -> None
+        headers: Optional[Dict[str, Any]] = None,
+        items: Optional[List[Item]] = None,
+    ) -> None:
         if headers is not None:
             headers = dict(headers)
         self.headers = headers or {}
@@ -49,35 +42,22 @@ class Envelope:
         self.items = items
 
     @property
-    def description(self):
-        # type: (...) -> str
+    def description(self) -> str:
         return "envelope with %s items (%s)" % (
             len(self.items),
             ", ".join(x.data_category for x in self.items),
         )
 
-    def add_event(
-        self, event  # type: Event
-    ):
-        # type: (...) -> None
+    def add_event(self, event: Event) -> None:
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
 
-    def add_transaction(
-        self, transaction  # type: Event
-    ):
-        # type: (...) -> None
+    def add_transaction(self, transaction: Event) -> None:
         self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
 
-    def add_profile(
-        self, profile  # type: Any
-    ):
-        # type: (...) -> None
+    def add_profile(self, profile: Any) -> None:
         self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))
 
-    def add_profile_chunk(
-        self, profile_chunk  # type: Any
-    ):
-        # type: (...) -> None
+    def add_profile_chunk(self, profile_chunk: Any) -> None:
         self.add_item(
             Item(
                 payload=PayloadRef(json=profile_chunk),
@@ -86,72 +66,50 @@ class Envelope:
             )
         )
 
-    def add_checkin(
-        self, checkin  # type: Any
-    ):
-        # type: (...) -> None
+    def add_checkin(self, checkin: Any) -> None:
         self.add_item(Item(payload=PayloadRef(json=checkin), type="check_in"))
 
-    def add_session(
-        self, session  # type: Union[Session, Any]
-    ):
-        # type: (...) -> None
+    def add_session(self, session: Union[Session, Any]) -> None:
         if isinstance(session, Session):
             session = session.to_json()
         self.add_item(Item(payload=PayloadRef(json=session), type="session"))
 
-    def add_sessions(
-        self, sessions  # type: Any
-    ):
-        # type: (...) -> None
+    def add_sessions(self, sessions: Any) -> None:
         self.add_item(Item(payload=PayloadRef(json=sessions), type="sessions"))
 
-    def add_item(
-        self, item  # type: Item
-    ):
-        # type: (...) -> None
+    def add_item(self, item: Item) -> None:
         self.items.append(item)
 
-    def get_event(self):
-        # type: (...) -> Optional[Event]
+    def get_event(self) -> Optional[Event]:
         for items in self.items:
             event = items.get_event()
             if event is not None:
                 return event
         return None
 
-    def get_transaction_event(self):
-        # type: (...) -> Optional[Event]
+    def get_transaction_event(self) -> Optional[Event]:
         for item in self.items:
             event = item.get_transaction_event()
             if event is not None:
                 return event
         return None
 
-    def __iter__(self):
-        # type: (...) -> Iterator[Item]
+    def __iter__(self) -> Iterator[Item]:
         return iter(self.items)
 
-    def serialize_into(
-        self, f  # type: Any
-    ):
-        # type: (...) -> None
+    def serialize_into(self, f: Any) -> None:
         f.write(json_dumps(self.headers))
         f.write(b"\n")
         for item in self.items:
             item.serialize_into(f)
 
-    def serialize(self):
-        # type: (...) -> bytes
+    def serialize(self) -> bytes:
         out = io.BytesIO()
         self.serialize_into(out)
         return out.getvalue()
 
     @classmethod
-    def deserialize_from(
-        cls, f  # type: Any
-    ):
-        # type: (...) -> Envelope
+    def deserialize_from(cls, f: Any) -> Envelope:
         headers = parse_json(f.readline())
         items = []
         while 1:
@@ -162,31 +120,25 @@ class Envelope:
         return cls(headers=headers, items=items)
 
     @classmethod
-    def deserialize(
-        cls, bytes  # type: bytes
-    ):
-        # type: (...) -> Envelope
+    def deserialize(cls, bytes: bytes) -> Envelope:
         return cls.deserialize_from(io.BytesIO(bytes))
 
-    def __repr__(self):
-        # type: (...) -> str
+    def __repr__(self) -> str:
         return "<Envelope headers=%r items=%r>" % (self.headers, self.items)
 
 
 class PayloadRef:
     def __init__(
         self,
-        bytes=None,  # type: Optional[bytes]
-        path=None,  # type: Optional[Union[bytes, str]]
-        json=None,  # type: Optional[Any]
-    ):
-        # type: (...) -> None
+        bytes: Optional[bytes] = None,
+        path: Optional[Union[bytes, str]] = None,
+        json: Optional[Any] = None,
+    ) -> None:
         self.json = json
         self.bytes = bytes
         self.path = path
 
-    def get_bytes(self):
-        # type: (...) -> bytes
+    def get_bytes(self) -> bytes:
         if self.bytes is None:
             if self.path is not None:
                 with capture_internal_exceptions():
@@ -197,8 +149,7 @@ class PayloadRef:
         return self.bytes or b""
 
     @property
-    def inferred_content_type(self):
-        # type: (...) -> str
+    def inferred_content_type(self) -> str:
         if self.json is not None:
             return "application/json"
         elif self.path is not None:
@@ -210,20 +161,19 @@ class PayloadRef:
                 return ty
         return "application/octet-stream"
 
-    def __repr__(self):
-        # type: (...) -> str
+    def __repr__(self) -> str:
         return "<Payload %r>" % (self.inferred_content_type,)
 
 
 class Item:
     def __init__(
         self,
-        payload,  # type: Union[bytes, str, PayloadRef]
-        headers=None,  # type: Optional[Dict[str, Any]]
-        type=None,  # type: Optional[str]
-        content_type=None,  # type: Optional[str]
-        filename=None,  # type: Optional[str]
-    ):
+        payload: Union[bytes, str, PayloadRef],
+        headers: Optional[Dict[str, Any]] = None,
+        type: Optional[str] = None,
+        content_type: Optional[str] = None,
+        filename: Optional[str] = None,
+    ) -> None:
         if headers is not None:
             headers = dict(headers)
         elif headers is None:
@@ -247,8 +197,7 @@ class Item:
 
         self.payload = payload
 
-    def __repr__(self):
-        # type: (...) -> str
+    def __repr__(self) -> str:
         return "<Item headers=%r payload=%r data_category=%r>" % (
             self.headers,
             self.payload,
@@ -256,13 +205,11 @@ class Item:
         )
 
     @property
-    def type(self):
-        # type: (...) -> Optional[str]
+    def type(self) -> Optional[str]:
         return self.headers.get("type")
 
     @property
-    def data_category(self):
-        # type: (...) -> EventDataCategory
+    def data_category(self) -> EventDataCategory:
         ty = self.headers.get("type")
         if ty == "session" or ty == "sessions":
             return "session"
@@ -285,12 +232,10 @@ class Item:
         else:
             return "default"
 
-    def get_bytes(self):
-        # type: (...) -> bytes
+    def get_bytes(self) -> bytes:
         return self.payload.get_bytes()
 
-    def get_event(self):
-        # type: (...) -> Optional[Event]
+    def get_event(self) -> Optional[Event]:
         """
         Returns an error event if there is one.
         """
@@ -298,16 +243,12 @@ class Item:
             return self.payload.json
         return None
 
-    def get_transaction_event(self):
-        # type: (...) -> Optional[Event]
+    def get_transaction_event(self) -> Optional[Event]:
         if self.type == "transaction" and self.payload.json is not None:
             return self.payload.json
         return None
 
-    def serialize_into(
-        self, f  # type: Any
-    ):
-        # type: (...) -> None
+    def serialize_into(self, f: Any) -> None:
         headers = dict(self.headers)
         bytes = self.get_bytes()
         headers["length"] = len(bytes)
@@ -316,17 +257,13 @@ class Item:
         f.write(bytes)
         f.write(b"\n")
 
-    def serialize(self):
-        # type: (...) -> bytes
+    def serialize(self) -> bytes:
         out = io.BytesIO()
         self.serialize_into(out)
         return out.getvalue()
 
     @classmethod
-    def deserialize_from(
-        cls, f  # type: Any
-    ):
-        # type: (...) -> Optional[Item]
+    def deserialize_from(cls, f: Any) -> Optional[Item]:
         line = f.readline().rstrip()
         if not line:
             return None
@@ -346,8 +283,5 @@ class Item:
         return rv
 
     @classmethod
-    def deserialize(
-        cls, bytes  # type: bytes
-    ):
-        # type: (...) -> Optional[Item]
+    def deserialize(cls, bytes: bytes) -> Optional[Item]:
         return cls.deserialize_from(io.BytesIO(bytes))
