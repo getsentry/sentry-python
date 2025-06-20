@@ -70,7 +70,8 @@ class AWSLambdaModuleLoader:
         return getattr(self.lambda_function_module, self.handler_name)
 
 
-def sentry_lambda_handler(event: "Any", context: "Any") -> None:
+def sentry_lambda_handler(event, context):
+    # type: (Any, Any) -> None
     """
     Handler function that invokes a lambda handler which path is defined in
     environment variables as "SENTRY_INITIAL_HANDLER"
