@@ -34,14 +34,12 @@ DJANGO_SPOTLIGHT_MIDDLEWARE_PATH = "sentry_sdk.spotlight.SpotlightMiddleware"
 
 
 class SpotlightClient:
-    def __init__(self, url):
-        # type: (str) -> None
+    def __init__(self, url: str) -> None:
         self.url = url
         self.http = urllib3.PoolManager()
         self.fails = 0
 
-    def capture_envelope(self, envelope):
-        # type: (Envelope) -> None
+    def capture_envelope(self, envelope: "Envelope") -> None:
         body = io.BytesIO()
         envelope.serialize_into(body)
         try:
@@ -90,11 +88,10 @@ try:
     )
 
     class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
-        _spotlight_script = None  # type: Optional[str]
-        _spotlight_url = None  # type: Optional[str]
+        _spotlight_script: "Optional[str]" = None
+        _spotlight_url: "Optional[str]" = None
 
-        def __init__(self, get_response):
-            # type: (Self, Callable[..., HttpResponse]) -> None
+        def __init__(self, get_response: "Callable[..., HttpResponse]") -> None:
             super().__init__(get_response)
 
             import sentry_sdk.api
@@ -111,8 +108,7 @@ try:
             self._spotlight_url = urllib.parse.urljoin(spotlight_client.url, "../")
 
         @property
-        def spotlight_script(self):
-            # type: (Self) -> Optional[str]
+        def spotlight_script(self) -> "Optional[str]":
             if self._spotlight_url is not None and self._spotlight_script is None:
                 try:
                     spotlight_js_url = urllib.parse.urljoin(
@@ -136,8 +132,7 @@ try:
 
             return self._spotlight_script
 
-        def process_response(self, _request, response):
-            # type: (Self, HttpRequest, HttpResponse) -> Optional[HttpResponse]
+        def process_response(self, _request: "HttpRequest", response: "HttpResponse") -> "Optional[HttpResponse]":
             content_type_header = tuple(
                 p.strip()
                 for p in response.headers.get("Content-Type", "").lower().split(";")
@@ -181,8 +176,7 @@ try:
 
             return response
 
-        def process_exception(self, _request, exception):
-            # type: (Self, HttpRequest, Exception) -> Optional[HttpResponseServerError]
+        def process_exception(self, _request: "HttpRequest", exception: Exception) -> "Optional[HttpResponseServerError]":
             if not settings.DEBUG or not self._spotlight_url:
                 return None
 
@@ -207,8 +201,7 @@ except ImportError:
     settings = None
 
 
-def setup_spotlight(options):
-    # type: (Dict[str, Any]) -> Optional[SpotlightClient]
+def setup_spotlight(options: "Dict[str, Any]") -> "Optional[SpotlightClient]":
     _handler = logging.StreamHandler(sys.stderr)
     _handler.setFormatter(logging.Formatter(" [spotlight] %(levelname)s: %(message)s"))
     logger.addHandler(_handler)

@@ -21,8 +21,7 @@ if TYPE_CHECKING:
 
 
 class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
-    def attach(self, context):
-        # type: (Context) -> Token[Context]
+    def attach(self, context: "Context") -> "Token[Context]":
         scopes = get_value(SENTRY_SCOPES_KEY, context)
 
         should_fork_isolation_scope = context.pop(

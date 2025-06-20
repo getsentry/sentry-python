@@ -52,30 +52,24 @@ class SentrySpanProcessor(SpanProcessor):
     Converts OTel spans into Sentry spans so they can be sent to the Sentry backend.
     """
 
-    def __new__(cls):
-        # type: () -> SentrySpanProcessor
+    def __new__(cls) -> "SentrySpanProcessor":
         if not hasattr(cls, "instance"):
             cls.instance = super().__new__(cls)
 
         return cls.instance
 
-    def __init__(self):
-        # type: () -> None
-        self._children_spans = defaultdict(
-            list
-        )  # type: DefaultDict[int, List[ReadableSpan]]
-        self._dropped_spans = defaultdict(lambda: 0)  # type: DefaultDict[int, int]
+    def __init__(self) -> None:
+        self._children_spans: "DefaultDict[int, List[ReadableSpan]]" = defaultdict(list)
+        self._dropped_spans: "DefaultDict[int, int]" = defaultdict(lambda: 0)
 
-    def on_start(self, span, parent_context=None):
-        # type: (Span, Optional[Context]) -> None
+    def on_start(self, span: Span, parent_context: "Optional[Context]" = None) -> None:
         if is_sentry_span(span):
             return
 
         self._add_root_span(span, get_current_span(parent_context))
         self._start_profile(span)
 
-    def on_end(self, span):
-        # type: (ReadableSpan) -> None
+    def on_end(self, span: ReadableSpan) -> None:
         if is_sentry_span(span):
             return
 
@@ -88,18 +82,15 @@ class SentrySpanProcessor(SpanProcessor):
             self._append_child_span(span)
 
     # TODO-neel-potel not sure we need a clear like JS
-    def shutdown(self):
-        # type: () -> None
+    def shutdown(self) -> None:
         pass
 
     # TODO-neel-potel change default? this is 30 sec
     # TODO-neel-potel call this in client.flush
-    def force_flush(self, timeout_millis=30000):
-        # type: (int) -> bool
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
         return True
 
-    def _add_root_span(self, span, parent_span):
-        # type: (Span, AbstractSpan) -> None
+    def _add_root_span(self, span: Span, parent_span: AbstractSpan) -> None:
         """
         This is required to make Span.root_span work
         since we can't traverse back to the root purely with otel efficiently.
@@ -112,8 +103,7 @@ class SentrySpanProcessor(SpanProcessor):
             # root span points to itself
             set_sentry_meta(span, "root_span", span)
 
-    def _start_profile(self, span):
-        # type: (Span) -> None
+    def _start_profile(self, span: Span) -> None:
         try_autostart_continuous_profiler()
 
         profiler_id = get_profiler_id()
@@ -148,14 +138,12 @@ class SentrySpanProcessor(SpanProcessor):
                 span.set_attribute(SPANDATA.PROFILER_ID, profiler_id)
             set_sentry_meta(span, "continuous_profile", continuous_profile)
 
-    def _stop_profile(self, span):
-        # type: (ReadableSpan) -> None
+    def _stop_profile(self, span: ReadableSpan) -> None:
         continuous_profiler = get_sentry_meta(span, "continuous_profile")
         if continuous_profiler:
             continuous_profiler.stop()
 
-    def _flush_root_span(self, span):
-        # type: (ReadableSpan) -> None
+    def _flush_root_span(self, span: ReadableSpan) -> None:
         transaction_event = self._root_span_to_transaction_event(span)
         if not transaction_event:
             return
@@ -176,8 +164,7 @@ class SentrySpanProcessor(SpanProcessor):
         sentry_sdk.capture_event(transaction_event)
         self._cleanup_references([span] + collected_spans)
 
-    def _append_child_span(self, span):
-        # type: (ReadableSpan) -> None
+    def _append_child_span(self, span: ReadableSpan) -> None:
         if not span.parent:
             return
 
@@ -192,14 +179,13 @@ class SentrySpanProcessor(SpanProcessor):
         else:
             self._dropped_spans[span.parent.span_id] += 1
 
-    def _collect_children(self, span):
-        # type: (ReadableSpan) -> tuple[List[ReadableSpan], int]
+    def _collect_children(self, span: ReadableSpan) -> "tuple[List[ReadableSpan], int]":
         if not span.context:
             return [], 0
 
         children = []
         dropped_spans = 0
-        bfs_queue = deque()  # type: Deque[int]
+        bfs_queue: "Deque[int]" = deque()
         bfs_queue.append(span.context.span_id)
 
         while bfs_queue:
@@ -215,8 +201,7 @@ class SentrySpanProcessor(SpanProcessor):
 
     # we construct the event from scratch here
     # and not use the current Transaction class for easier refactoring
-    def _root_span_to_transaction_event(self, span):
-        # type: (ReadableSpan) -> Optional[Event]
+    def _root_span_to_transaction_event(self, span: ReadableSpan) -> "Optional[Event]":
         if not span.context:
             return None
 
@@ -258,8 +243,7 @@ class SentrySpanProcessor(SpanProcessor):
 
         return event
 
-    def _span_to_json(self, span):
-        # type: (ReadableSpan) -> Optional[dict[str, Any]]
+    def _span_to_json(self, span: ReadableSpan) -> "Optional[dict[str, Any]]":
         if not span.context:
             return None
 
@@ -299,15 +283,14 @@ class SentrySpanProcessor(SpanProcessor):
 
         return span_json
 
-    def _common_span_transaction_attributes_as_json(self, span):
-        # type: (ReadableSpan) -> Optional[Event]
+    def _common_span_transaction_attributes_as_json(self, span: ReadableSpan) -> "Optional[Event]":
         if not span.start_time or not span.end_time:
             return None
 
-        common_json = {
+        common_json: "Event" = {
             "start_timestamp": convert_from_otel_timestamp(span.start_time),
             "timestamp": convert_from_otel_timestamp(span.end_time),
-        }  # type: Event
+        }
 
         tags = extract_span_attributes(span, SentrySpanAttribute.TAG)
         if tags:
@@ -315,13 +298,11 @@ class SentrySpanProcessor(SpanProcessor):
 
         return common_json
 
-    def _cleanup_references(self, spans):
-        # type: (List[ReadableSpan]) -> None
+    def _cleanup_references(self, spans: "List[ReadableSpan]") -> None:
         for span in spans:
             delete_sentry_meta(span)
 
-    def _log_debug_info(self):
-        # type: () -> None
+    def _log_debug_info(self) -> None:
         import pprint
 
         pprint.pprint(
