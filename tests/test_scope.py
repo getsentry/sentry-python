@@ -11,12 +11,22 @@ from sentry_sdk import (
 )
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import (
-    Scope,
+    Scope as BaseScope,
     ScopeType,
-    use_isolation_scope,
-    use_scope,
     should_send_default_pii,
 )
+from sentry_sdk.opentelemetry.scope import (
+    PotelScope as Scope,
+    use_scope,
+    use_isolation_scope,
+    setup_scope_context_management,
+)
+from tests.conftest import ApproxDict
+
+
+@pytest.fixture(autouse=True)
+def setup_otel_scope_management():
+    setup_scope_context_management()
 
 
 def test_copying():
@@ -206,7 +216,8 @@ def test_scope_client():
     assert scope.client.__class__ == NonRecordingClient
 
     custom_client = Client()
-    scope = Scope(ty="test_more", client=custom_client)
+    scope = Scope(ty="test_more")
+    scope.set_client(custom_client)
     assert scope._type == "test_more"
     assert scope.client is not None
     assert scope.client.__class__ == Client
@@ -230,7 +241,7 @@ def test_get_isolation_scope():
 def test_get_global_scope():
     scope = Scope.get_global_scope()
     assert scope is not None
-    assert scope.__class__ == Scope
+    assert scope.__class__ == BaseScope
     assert scope._type == ScopeType.GLOBAL
 
 
@@ -797,7 +808,7 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
         with sentry_sdk.new_scope() as scope2:
             scope2.set_tag("current_scope2", 1)
 
-            with sentry_sdk.start_transaction(name="trx") as trx:
+            with sentry_sdk.start_span(name="trx") as trx:
                 trx.set_tag("trx", 1)
 
                 with sentry_sdk.start_span(op="span1") as span1:
@@ -813,8 +824,8 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
     transaction = envelope.items[0].get_transaction_event()
 
     assert transaction["tags"] == {"isolation_scope1": 1, "current_scope2": 1, "trx": 1}
-    assert transaction["spans"][0]["tags"] == {"a": 1}
-    assert transaction["spans"][1]["tags"] == {"b": 1}
+    assert transaction["spans"][0]["tags"] == ApproxDict({"a": 1})
+    assert transaction["spans"][1]["tags"] == ApproxDict({"b": 1})
 
 
 def test_should_send_default_pii_true(sentry_init):
@@ -874,7 +885,7 @@ def test_set_tags():
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
@@ -884,18 +895,18 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
-    with sentry_sdk.start_transaction(name="test"):
+    with sentry_sdk.start_span(name="test"):
         pass
 
     assert Scope.last_event_id() is None, "Transaction should not set last_event_id"
 
 
 def test_last_event_id_cleared(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     # Make sure last_event_id is set
     sentry_sdk.capture_exception(Exception("test"))
@@ -907,65 +918,16 @@ def test_last_event_id_cleared(sentry_init):
     assert Scope.last_event_id() is None, "last_event_id should be cleared"
 
 
-@pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize(
-    "scope_manager",
-    [
-        new_scope,
-        use_scope,
-    ],
-)
-def test_handle_lookup_error_on_token_reset_current_scope(scope_manager):
-    with mock.patch("sentry_sdk.scope.capture_internal_exception") as mock_capture:
-        with mock.patch("sentry_sdk.scope._current_scope") as mock_token_var:
-            mock_token_var.reset.side_effect = LookupError()
+def test_root_span(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
 
-            mock_token = mock.Mock()
-            mock_token_var.set.return_value = mock_token
+    assert sentry_sdk.get_current_scope().root_span is None
 
-            try:
-                if scope_manager == use_scope:
-                    with scope_manager(Scope()):
-                        pass
-                else:
-                    with scope_manager():
-                        pass
+    with sentry_sdk.start_span(name="test") as root_span:
+        assert sentry_sdk.get_current_scope().root_span == root_span
+        with sentry_sdk.start_span(name="child"):
+            assert sentry_sdk.get_current_scope().root_span == root_span
+            with sentry_sdk.start_span(name="grandchild"):
+                assert sentry_sdk.get_current_scope().root_span == root_span
 
-            except Exception:
-                pytest.fail("Context manager should handle LookupError gracefully")
-
-            mock_capture.assert_called_once()
-            mock_token_var.reset.assert_called_once_with(mock_token)
-
-
-@pytest.mark.tests_internal_exceptions
-@pytest.mark.parametrize(
-    "scope_manager",
-    [
-        isolation_scope,
-        use_isolation_scope,
-    ],
-)
-def test_handle_lookup_error_on_token_reset_isolation_scope(scope_manager):
-    with mock.patch("sentry_sdk.scope.capture_internal_exception") as mock_capture:
-        with mock.patch("sentry_sdk.scope._current_scope") as mock_current_scope:
-            with mock.patch(
-                "sentry_sdk.scope._isolation_scope"
-            ) as mock_isolation_scope:
-                mock_isolation_scope.reset.side_effect = LookupError()
-                mock_current_token = mock.Mock()
-                mock_current_scope.set.return_value = mock_current_token
-
-                try:
-                    if scope_manager == use_isolation_scope:
-                        with scope_manager(Scope()):
-                            pass
-                    else:
-                        with scope_manager():
-                            pass
-
-                except Exception:
-                    pytest.fail("Context manager should handle LookupError gracefully")
-
-                mock_capture.assert_called_once()
-                mock_current_scope.reset.assert_called_once_with(mock_current_token)
+    assert sentry_sdk.get_current_scope().root_span is None

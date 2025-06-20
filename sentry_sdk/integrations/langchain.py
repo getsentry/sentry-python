@@ -3,7 +3,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name, record_token_usage
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
@@ -72,7 +72,6 @@ class LangchainIntegration(Integration):
 
 
 class WatchedSpan:
-    span = None  # type: Span
     num_completion_tokens = 0  # type: int
     num_prompt_tokens = 0  # type: int
     no_collect_tokens = False  # type: bool
@@ -123,8 +122,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         span_data = self.span_map[run_id]
         if not span_data:
             return
-        sentry_sdk.capture_exception(error, span_data.span.scope)
-        span_data.span.__exit__(None, None, None)
+        sentry_sdk.capture_exception(error)
+        span_data.span.set_status(SPANSTATUS.INTERNAL_ERROR)
+        span_data.span.finish()
         del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message):
@@ -136,21 +136,27 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def _create_span(self, run_id, parent_id, **kwargs):
         # type: (SentryLangchainCallback, UUID, Optional[Any], Any) -> WatchedSpan
 
-        watched_span = None  # type: Optional[WatchedSpan]
-        if parent_id:
-            parent_span = self.span_map.get(parent_id)  # type: Optional[WatchedSpan]
-            if parent_span:
-                watched_span = WatchedSpan(parent_span.span.start_child(**kwargs))
-                parent_span.children.append(watched_span)
-        if watched_span is None:
-            watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
+        parent_watched_span = self.span_map.get(parent_id) if parent_id else None
+        sentry_span = sentry_sdk.start_span(
+            parent_span=parent_watched_span.span if parent_watched_span else None,
+            only_if_parent=True,
+            **kwargs,
+        )
+        watched_span = WatchedSpan(sentry_span)
+        if parent_watched_span:
+            parent_watched_span.children.append(watched_span)
 
         if kwargs.get("op", "").startswith("ai.pipeline."):
             if kwargs.get("name"):
                 set_ai_pipeline_name(kwargs.get("name"))
             watched_span.is_pipeline = True
 
-        watched_span.span.__enter__()
+        # the same run_id is reused for the pipeline it seems
+        # so we need to end the older span to avoid orphan spans
+        existing_span_data = self.span_map.get(run_id)
+        if existing_span_data is not None:
+            self._exit_span(existing_span_data, run_id)
+
         self.span_map[run_id] = watched_span
         self.gc_span_map()
         return watched_span
@@ -161,7 +167,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         if span_data.is_pipeline:
             set_ai_pipeline_name(None)
 
-        span_data.span.__exit__(None, None, None)
+        span_data.span.set_status(SPANSTATUS.OK)
+        span_data.span.finish()
         del self.span_map[run_id]
 
     def on_llm_start(
@@ -222,7 +229,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not model and "anthropic" in all_params.get("_type"):
                 model = "claude-2"
             if model:
-                span.set_data(SPANDATA.AI_MODEL_ID, model)
+                span.set_attribute(SPANDATA.AI_MODEL_ID, model)
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,

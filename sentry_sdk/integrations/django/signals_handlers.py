@@ -50,6 +50,7 @@ def patch_signals():
 
     old_live_receivers = Signal._live_receivers
 
+    @wraps(old_live_receivers)
     def _sentry_live_receivers(self, sender):
         # type: (Signal, Any) -> Union[tuple[list[Callable[..., Any]], list[Callable[..., Any]]], list[Callable[..., Any]]]
         if DJANGO_VERSION >= (5, 0):
@@ -68,8 +69,9 @@ def patch_signals():
                     op=OP.EVENT_DJANGO,
                     name=signal_name,
                     origin=DjangoIntegration.origin,
+                    only_if_parent=True,
                 ) as span:
-                    span.set_data("signal", signal_name)
+                    span.set_attribute("signal", signal_name)
                     return receiver(*args, **kwargs)
 
             return wrapper

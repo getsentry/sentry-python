@@ -4,7 +4,7 @@ import httpx
 import pytest
 from cohere import Client, ChatMessage
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.cohere import CohereIntegration
 
@@ -42,7 +42,7 @@ def test_nonstreaming_chat(
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         response = client.chat(
             model="some-model",
             chat_history=[ChatMessage(role="SYSTEM", message="some context")],
@@ -57,16 +57,17 @@ def test_nonstreaming_chat(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     if send_default_pii and include_prompts:
-        assert "some context" in span["data"][SPANDATA.AI_INPUT_MESSAGES][0]["content"]
-        assert "hello" in span["data"][SPANDATA.AI_INPUT_MESSAGES][1]["content"]
+        input_messages = json.loads(span["data"][SPANDATA.AI_INPUT_MESSAGES])
+        assert "some context" in input_messages[0]["content"]
+        assert "hello" in input_messages[1]["content"]
         assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+    assert span["data"][SPANDATA.AI_COMPLETION_TOKENS_USED] == 10
+    assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 20
+    assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 30
 
 
 # noinspection PyTypeChecker
@@ -110,7 +111,7 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         responses = list(
             client.chat_stream(
                 model="some-model",
@@ -128,16 +129,17 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
     assert span["data"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     if send_default_pii and include_prompts:
-        assert "some context" in span["data"][SPANDATA.AI_INPUT_MESSAGES][0]["content"]
-        assert "hello" in span["data"][SPANDATA.AI_INPUT_MESSAGES][1]["content"]
+        input_messages = json.loads(span["data"][SPANDATA.AI_INPUT_MESSAGES])
+        assert "some context" in input_messages[0]["content"]
+        assert "hello" in input_messages[1]["content"]
         assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+    assert span["data"][SPANDATA.AI_COMPLETION_TOKENS_USED] == 10
+    assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 20
+    assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 30
 
 
 def test_bad_chat(sentry_init, capture_events):
@@ -185,7 +187,7 @@ def test_embed(sentry_init, capture_events, send_default_pii, include_prompts):
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         response = client.embed(texts=["hello"], model="text-embedding-3-large")
 
     assert len(response.embeddings[0]) == 3
@@ -199,8 +201,8 @@ def test_embed(sentry_init, capture_events, send_default_pii, include_prompts):
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 10
+    assert span["data"][SPANDATA.AI_PROMPT_TOKENS_USED] == 10
+    assert span["data"][SPANDATA.AI_TOTAL_TOKENS_USED] == 10
 
 
 def test_span_origin_chat(sentry_init, capture_events):
@@ -226,7 +228,7 @@ def test_span_origin_chat(sentry_init, capture_events):
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         client.chat(
             model="some-model",
             chat_history=[ChatMessage(role="SYSTEM", message="some context")],
@@ -264,7 +266,7 @@ def test_span_origin_embed(sentry_init, capture_events):
         )
     )
 
-    with start_transaction(name="cohere tx"):
+    with start_span(name="cohere tx"):
         client.embed(texts=["hello"], model="text-embedding-3-large")
 
     (event,) = events

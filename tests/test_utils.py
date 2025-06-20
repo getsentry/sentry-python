@@ -32,6 +32,7 @@ from sentry_sdk.utils import (
     _get_installed_modules,
     _generate_installed_modules,
     ensure_integration_enabled,
+    _serialize_span_attribute,
     to_string,
     exc_info_from_error,
     get_lines_from_file,
@@ -115,20 +116,6 @@ isoformat_inputs_and_datetime_outputs = (
 )
 def test_datetime_from_isoformat(input_str, expected_output):
     assert datetime_from_isoformat(input_str) == expected_output, input_str
-
-
-@pytest.mark.parametrize(
-    ("input_str", "expected_output"),
-    isoformat_inputs_and_datetime_outputs,
-)
-def test_datetime_from_isoformat_with_py_36_or_lower(input_str, expected_output):
-    """
-    `fromisoformat` was added in Python version 3.7
-    """
-    with mock.patch("sentry_sdk.utils.datetime") as datetime_mocked:
-        datetime_mocked.fromisoformat.side_effect = AttributeError()
-        datetime_mocked.strptime = datetime.strptime
-        assert datetime_from_isoformat(input_str) == expected_output, input_str
 
 
 @pytest.mark.parametrize(
@@ -1005,6 +992,37 @@ def test_format_timestamp_naive():
     # Ensure that some timestamp is returned, without error. We currently treat these as local time, but this is an
     # implementation detail which we should not assert here.
     assert re.fullmatch(timestamp_regex, format_timestamp(datetime_object))
+
+
+class NoStr:
+    def __str__(self):
+        1 / 0
+
+
+@pytest.mark.parametrize(
+    ("value", "result"),
+    (
+        ("meow", "meow"),
+        (1, 1),
+        (47.0, 47.0),
+        (True, True),
+        (["meow", "bark"], ["meow", "bark"]),
+        ([True, False], [True, False]),
+        ([1, 2, 3], [1, 2, 3]),
+        ([46.5, 47.0, 47.5], [46.5, 47.0, 47.5]),
+        (["meow", 47], '["meow", 47]'),  # mixed types not allowed in a list
+        (None, "null"),
+        (
+            {"cat": "meow", "dog": ["bark", "woof"]},
+            '{"cat": "meow", "dog": ["bark", "woof"]}',
+        ),
+        (datetime(2024, 1, 1), "2024-01-01 00:00:00"),
+        (("meow", "purr"), ["meow", "purr"]),
+        (NoStr(), None),
+    ),
+)
+def test_serialize_span_attribute(value, result):
+    assert _serialize_span_attribute(value) == result
 
 
 def test_qualname_from_function_inner_function():
