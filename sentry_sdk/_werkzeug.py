@@ -47,8 +47,7 @@ if TYPE_CHECKING:
 # We need this function because Django does not give us a "pure" http header
 # dict. So we might as well use it for all WSGI integrations.
 #
-def _get_headers(environ):
-    # type: (Dict[str, str]) -> Iterator[Tuple[str, str]]
+def _get_headers(environ: Dict[str, str]) -> Iterator[Tuple[str, str]]:
     """
     Returns only proper HTTP headers.
     """
@@ -67,8 +66,7 @@ def _get_headers(environ):
 # `get_host` comes from `werkzeug.wsgi.get_host`
 # https://github.com/pallets/werkzeug/blob/1.0.1/src/werkzeug/wsgi.py#L145
 #
-def get_host(environ, use_x_forwarded_for=False):
-    # type: (Dict[str, str], bool) -> str
+def get_host(environ: Dict[str, str], use_x_forwarded_for: bool = False) -> str:
     """
     Return the host for the given WSGI environment.
     """

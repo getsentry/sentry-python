@@ -15,11 +15,11 @@ class TrytondWSGIIntegration(Integration):
     identifier = "trytond_wsgi"
     origin = f"auto.http.{identifier}"
 
-    def __init__(self):  # type: () -> None
+    def __init__(self) -> None:
         pass
 
     @staticmethod
-    def setup_once():  # type: () -> None
+    def setup_once() -> None:
         _check_minimum_version(TrytondWSGIIntegration, trytond_version)
 
         app.wsgi_app = SentryWsgiMiddleware(
@@ -28,7 +28,7 @@ class TrytondWSGIIntegration(Integration):
         )
 
         @ensure_integration_enabled(TrytondWSGIIntegration)
-        def error_handler(e):  # type: (Exception) -> None
+        def error_handler(e: Exception) -> None:
             if isinstance(e, TrytonException):
                 return
             else:

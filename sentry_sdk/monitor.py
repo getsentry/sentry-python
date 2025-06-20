@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional
+    from sentry_sdk.transport import Transport
 
 
 MAX_DOWNSAMPLE_FACTOR = 10
@@ -23,21 +24,19 @@ class Monitor:
 
     name = "sentry.monitor"
 
-    def __init__(self, transport, interval=10):
-        # type: (sentry_sdk.transport.Transport, float) -> None
-        self.transport = transport  # type: sentry_sdk.transport.Transport
-        self.interval = interval  # type: float
+    def __init__(self, transport: "Transport", interval: float = 10) -> None:
+        self.transport: "Transport" = transport
+        self.interval: float = interval
 
         self._healthy = True
-        self._downsample_factor = 0  # type: int
+        self._downsample_factor: int = 0
 
-        self._thread = None  # type: Optional[Thread]
+        self._thread: Optional[Thread] = None
         self._thread_lock = Lock()
-        self._thread_for_pid = None  # type: Optional[int]
+        self._thread_for_pid: Optional[int] = None
         self._running = True
 
-    def _ensure_running(self):
-        # type: () -> None
+    def _ensure_running(self) -> None:
         """
         Check that the monitor has an active thread to run in, or create one if not.
 
@@ -52,8 +51,7 @@ class Monitor:
             if self._thread_for_pid == os.getpid() and self._thread is not None:
                 return None
 
-            def _thread():
-                # type: (...) -> None
+            def _thread() -> None:
                 while self._running:
                     time.sleep(self.interval)
                     if self._running:
@@ -74,13 +72,11 @@ class Monitor:
 
         return None
 
-    def run(self):
-        # type: () -> None
+    def run(self) -> None:
         self.check_health()
         self.set_downsample_factor()
 
-    def set_downsample_factor(self):
-        # type: () -> None
+    def set_downsample_factor(self) -> None:
         if self._healthy:
             if self._downsample_factor > 0:
                 logger.debug(
@@ -95,8 +91,7 @@ class Monitor:
                 self._downsample_factor,
             )
 
-    def check_health(self):
-        # type: () -> None
+    def check_health(self) -> None:
         """
         Perform the actual health checks,
         currently only checks if the transport is rate-limited.
@@ -104,21 +99,17 @@ class Monitor:
         """
         self._healthy = self.transport.is_healthy()
 
-    def is_healthy(self):
-        # type: () -> bool
+    def is_healthy(self) -> bool:
         self._ensure_running()
         return self._healthy
 
     @property
-    def downsample_factor(self):
-        # type: () -> int
+    def downsample_factor(self) -> int:
         self._ensure_running()
         return self._downsample_factor
 
-    def kill(self):
-        # type: () -> None
+    def kill(self) -> None:
         self._running = False
 
-    def __del__(self):
-        # type: () -> None
+    def __del__(self) -> None:
         self.kill()
