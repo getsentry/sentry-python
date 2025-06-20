@@ -58,7 +58,10 @@ class LangchainIntegration(Integration):
     max_spans = 1024
 
     def __init__(
-        self, include_prompts: bool = True, max_spans: int = 1024, tiktoken_encoding_name: "Optional[str]" = None
+        self,
+        include_prompts: bool = True,
+        max_spans: int = 1024,
+        tiktoken_encoding_name: "Optional[str]" = None,
     ) -> None:
         self.include_prompts = include_prompts
         self.max_spans = max_spans
@@ -87,7 +90,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     max_span_map_size = 0
 
-    def __init__(self, max_span_map_size: int, include_prompts: bool, tiktoken_encoding_name: "Optional[str]" = None) -> None:
+    def __init__(
+        self,
+        max_span_map_size: int,
+        include_prompts: bool,
+        tiktoken_encoding_name: "Optional[str]" = None,
+    ) -> None:
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
 
@@ -125,7 +133,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         parsed.update(message.additional_kwargs)
         return parsed
 
-    def _create_span(self, run_id: "UUID", parent_id: "Optional[Any]", **kwargs: Any) -> WatchedSpan:
+    def _create_span(
+        self, run_id: "UUID", parent_id: "Optional[Any]", **kwargs: Any
+    ) -> WatchedSpan:
 
         parent_watched_span = self.span_map.get(parent_id) if parent_id else None
         sentry_span = sentry_sdk.start_span(
@@ -192,7 +202,14 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 if k in all_params:
                     set_data_normalized(span, v, all_params[k])
 
-    def on_chat_model_start(self, serialized: "Dict[str, Any]", messages: "List[List[BaseMessage]]", *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_chat_model_start(
+        self,
+        serialized: "Dict[str, Any]",
+        messages: "List[List[BaseMessage]]",
+        *,
+        run_id: "UUID",
+        **kwargs: Any,
+    ) -> Any:
         """Run when Chat Model starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -247,7 +264,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 return
             span_data.num_completion_tokens += self.count_tokens(token)
 
-    def on_llm_end(self, response: "LLMResult", *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_llm_end(
+        self, response: "LLMResult", *, run_id: "UUID", **kwargs: Any
+    ) -> Any:
         """Run when LLM ends running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -285,12 +304,25 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             self._exit_span(span_data, run_id)
 
-    def on_llm_error(self, error: "Union[Exception, KeyboardInterrupt]", *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_llm_error(
+        self,
+        error: "Union[Exception, KeyboardInterrupt]",
+        *,
+        run_id: "UUID",
+        **kwargs: Any,
+    ) -> Any:
         """Run when LLM errors."""
         with capture_internal_exceptions():
             self._handle_error(run_id, error)
 
-    def on_chain_start(self, serialized: "Dict[str, Any]", inputs: "Dict[str, Any]", *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_chain_start(
+        self,
+        serialized: "Dict[str, Any]",
+        inputs: "Dict[str, Any]",
+        *,
+        run_id: "UUID",
+        **kwargs: Any,
+    ) -> Any:
         """Run when chain starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -310,7 +342,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if metadata:
                 set_data_normalized(watched_span.span, SPANDATA.AI_METADATA, metadata)
 
-    def on_chain_end(self, outputs: "Dict[str, Any]", *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_chain_end(
+        self, outputs: "Dict[str, Any]", *, run_id: "UUID", **kwargs: Any
+    ) -> Any:
         """Run when chain ends running."""
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
@@ -321,11 +355,19 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 return
             self._exit_span(span_data, run_id)
 
-    def on_chain_error(self, error: "Union[Exception, KeyboardInterrupt]", *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_chain_error(
+        self,
+        error: "Union[Exception, KeyboardInterrupt]",
+        *,
+        run_id: "UUID",
+        **kwargs: Any,
+    ) -> Any:
         """Run when chain errors."""
         self._handle_error(run_id, error)
 
-    def on_agent_action(self, action: "AgentAction", *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_agent_action(
+        self, action: "AgentAction", *, run_id: "UUID", **kwargs: Any
+    ) -> Any:
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -341,7 +383,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     watched_span.span, SPANDATA.AI_INPUT_MESSAGES, action.tool_input
                 )
 
-    def on_agent_finish(self, finish: "AgentFinish", *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_agent_finish(
+        self, finish: "AgentFinish", *, run_id: "UUID", **kwargs: Any
+    ) -> Any:
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -355,7 +399,14 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 )
             self._exit_span(span_data, run_id)
 
-    def on_tool_start(self, serialized: "Dict[str, Any]", input_str: str, *, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_tool_start(
+        self,
+        serialized: "Dict[str, Any]",
+        input_str: str,
+        *,
+        run_id: "UUID",
+        **kwargs: Any,
+    ) -> Any:
         """Run when tool starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -391,7 +442,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 set_data_normalized(span_data.span, SPANDATA.AI_RESPONSES, output)
             self._exit_span(span_data, run_id)
 
-    def on_tool_error(self, error: "Union[Exception, KeyboardInterrupt]", *args: Any, run_id: "UUID", **kwargs: Any) -> Any:
+    def on_tool_error(
+        self,
+        error: "Union[Exception, KeyboardInterrupt]",
+        *args: Any,
+        run_id: "UUID",
+        **kwargs: Any,
+    ) -> Any:
         """Run when tool errors."""
         self._handle_error(run_id, error)
 

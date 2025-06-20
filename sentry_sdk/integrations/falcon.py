@@ -83,7 +83,9 @@ class FalconRequestExtractor(RequestExtractor):
 class SentryFalconMiddleware:
     """Captures exceptions in Falcon requests and send to Sentry"""
 
-    def process_request(self, req: "Any", resp: "Any", *args: "Any", **kwargs: "Any") -> None:
+    def process_request(
+        self, req: "Any", resp: "Any", *args: "Any", **kwargs: "Any"
+    ) -> None:
         integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is None:
             return
@@ -123,7 +125,9 @@ class FalconIntegration(Integration):
 def _patch_wsgi_app() -> None:
     original_wsgi_app = falcon_app_class.__call__
 
-    def sentry_patched_wsgi_app(self: "Any", env: "Any", start_response: "Any") -> "Any":
+    def sentry_patched_wsgi_app(
+        self: "Any", env: "Any", start_response: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is None:
             return original_wsgi_app(self, env, start_response)
@@ -178,7 +182,9 @@ def _patch_prepare_middleware() -> None:
     original_prepare_middleware = falcon_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
-        middleware: "Any" = None, independent_middleware: "Any" = False, asgi: bool = False
+        middleware: "Any" = None,
+        independent_middleware: "Any" = False,
+        asgi: bool = False,
     ) -> "Any":
         if asgi:
             # We don't support ASGI Falcon apps, so we don't patch anything here
@@ -210,7 +216,9 @@ def _has_http_5xx_status(response: "Any") -> bool:
     return response.status.startswith("5")
 
 
-def _set_transaction_name_and_source(event: "Event", transaction_style: str, request: "Any") -> None:
+def _set_transaction_name_and_source(
+    event: "Event", transaction_style: str, request: "Any"
+) -> None:
     name_for_style = {
         "uri_template": request.uri_template,
         "path": request.path,
@@ -219,7 +227,9 @@ def _set_transaction_name_and_source(event: "Event", transaction_style: str, req
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
 
-def _make_request_event_processor(req: "Any", integration: "FalconIntegration") -> "EventProcessor":
+def _make_request_event_processor(
+    req: "Any", integration: "FalconIntegration"
+) -> "EventProcessor":
     def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         _set_transaction_name_and_source(event, integration.transaction_style, req)
 

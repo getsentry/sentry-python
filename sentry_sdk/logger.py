@@ -18,7 +18,9 @@ OTEL_RANGES = [
 ]
 
 
-def _capture_log(severity_text: str, severity_number: int, template: str, **kwargs: Any) -> None:
+def _capture_log(
+    severity_text: str, severity_number: int, template: str, **kwargs: Any
+) -> None:
     client = get_client()
 
     attrs: dict[str, str | bool | float | int] = {

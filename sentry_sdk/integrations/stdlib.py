@@ -50,7 +50,9 @@ class StdlibIntegration(Integration):
         _install_subprocess()
 
         @add_global_event_processor
-        def add_python_runtime_context(event: "Event", hint: "Hint") -> "Optional[Event]":
+        def add_python_runtime_context(
+            event: "Event", hint: "Hint"
+        ) -> "Optional[Event]":
             if sentry_sdk.get_client().get_integration(StdlibIntegration) is not None:
                 contexts = event.setdefault("contexts", {})
                 if isinstance(contexts, dict) and "runtime" not in contexts:
@@ -63,7 +65,9 @@ def _install_httplib() -> None:
     real_putrequest = HTTPConnection.putrequest
     real_getresponse = HTTPConnection.getresponse
 
-    def putrequest(self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any") -> "Any":
+    def putrequest(
+        self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         host = self.host
         port = self.port
         default_port = self.default_port
@@ -162,7 +166,13 @@ def _install_httplib() -> None:
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
 
 
-def _init_argument(args: "List[Any]", kwargs: "Dict[Any, Any]", name: str, position: int, setdefault_callback: "Optional[Callable[[Any], Any]]" = None) -> "Any":
+def _init_argument(
+    args: "List[Any]",
+    kwargs: "Dict[Any, Any]",
+    name: str,
+    position: int,
+    setdefault_callback: "Optional[Callable[[Any], Any]]" = None,
+) -> "Any":
     """
     given (*args, **kwargs) of a function call, retrieve (and optionally set a
     default for) an argument by either name or position.
@@ -196,7 +206,9 @@ def _install_subprocess() -> None:
     old_popen_init = subprocess.Popen.__init__
 
     @ensure_integration_enabled(StdlibIntegration, old_popen_init)
-    def sentry_patched_popen_init(self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any") -> None:
+    def sentry_patched_popen_init(
+        self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
+    ) -> None:
         # Convert from tuple to list to be able to set values.
         a = list(a)
 
@@ -271,7 +283,9 @@ def _install_subprocess() -> None:
     old_popen_wait = subprocess.Popen.wait
 
     @ensure_integration_enabled(StdlibIntegration, old_popen_wait)
-    def sentry_patched_popen_wait(self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any") -> "Any":
+    def sentry_patched_popen_wait(
+        self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
+    ) -> "Any":
         with sentry_sdk.start_span(
             op=OP.SUBPROCESS_WAIT,
             origin="auto.subprocess.stdlib.subprocess",
@@ -285,7 +299,9 @@ def _install_subprocess() -> None:
     old_popen_communicate = subprocess.Popen.communicate
 
     @ensure_integration_enabled(StdlibIntegration, old_popen_communicate)
-    def sentry_patched_popen_communicate(self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any") -> "Any":
+    def sentry_patched_popen_communicate(
+        self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
+    ) -> "Any":
         with sentry_sdk.start_span(
             op=OP.SUBPROCESS_COMMUNICATE,
             origin="auto.subprocess.stdlib.subprocess",

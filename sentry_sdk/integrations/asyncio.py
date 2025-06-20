@@ -34,7 +34,9 @@ def patch_asyncio() -> None:
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
 
-        def _sentry_task_factory(loop: "Any", coro: "Coroutine[Any, Any, Any]", **kwargs: "Any") -> "Any":
+        def _sentry_task_factory(
+            loop: "Any", coro: "Coroutine[Any, Any, Any]", **kwargs: "Any"
+        ) -> "Any":
 
             async def _task_with_sentry_span_creation() -> "Any":
                 result = None

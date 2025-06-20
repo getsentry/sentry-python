@@ -199,7 +199,9 @@ def _is_json_content_type(ct: "Optional[str]") -> bool:
     )
 
 
-def _filter_headers(headers: "Mapping[str, str]") -> "Mapping[str, Union[AnnotatedValue, str]]":
+def _filter_headers(
+    headers: "Mapping[str, str]",
+) -> "Mapping[str, Union[AnnotatedValue, str]]":
     if should_send_default_pii():
         return headers
 

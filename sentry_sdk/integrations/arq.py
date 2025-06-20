@@ -68,7 +68,9 @@ def patch_enqueue_job() -> None:
     old_enqueue_job = ArqRedis.enqueue_job
     original_kwdefaults = old_enqueue_job.__kwdefaults__
 
-    async def _sentry_enqueue_job(self: "ArqRedis", function: str, *args: "Any", **kwargs: "Any") -> "Optional[Job]":
+    async def _sentry_enqueue_job(
+        self: "ArqRedis", function: str, *args: "Any", **kwargs: "Any"
+    ) -> "Optional[Job]":
         integration = sentry_sdk.get_client().get_integration(ArqIntegration)
         if integration is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
@@ -135,7 +137,9 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _make_event_processor(ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any") -> "EventProcessor":
+def _make_event_processor(
+    ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
+) -> "EventProcessor":
     def event_processor(event: "Event", hint: "Hint") -> "Optional[Event]":
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
@@ -164,7 +168,9 @@ def _make_event_processor(ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any") 
 
 
 def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine":
-    async def _sentry_coroutine(ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any") -> "Any":
+    async def _sentry_coroutine(
+        ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(ArqIntegration)
         if integration is None:
             return await coroutine(ctx, *args, **kwargs)

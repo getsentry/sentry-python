@@ -90,7 +90,9 @@ def _capture_exception(exc: "Any") -> None:
 
 
 def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]":
-    def collect_chat_response_fields(span: "Span", res: "Any", include_pii: bool) -> None:
+    def collect_chat_response_fields(
+        span: "Span", res: "Any", include_pii: bool
+    ) -> None:
         if include_pii:
             if hasattr(res, "text"):
                 set_data_normalized(

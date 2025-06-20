@@ -94,7 +94,10 @@ def ai_track(description: str, **span_kwargs: "Any") -> "Callable[..., Any]":
 
 
 def record_token_usage(
-    span: Span, prompt_tokens: "Optional[int]" = None, completion_tokens: "Optional[int]" = None, total_tokens: "Optional[int]" = None
+    span: Span,
+    prompt_tokens: "Optional[int]" = None,
+    completion_tokens: "Optional[int]" = None,
+    total_tokens: "Optional[int]" = None,
 ) -> None:
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:

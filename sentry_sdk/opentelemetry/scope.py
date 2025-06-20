@@ -77,7 +77,9 @@ class PotelScope(Scope):
         return scopes[1] if scopes else None
 
     @contextmanager
-    def continue_trace(self, environ_or_headers: "Dict[str, Any]") -> "Generator[None, None, None]":
+    def continue_trace(
+        self, environ_or_headers: "Dict[str, Any]"
+    ) -> "Generator[None, None, None]":
         """
         Sets the propagation context from environment or headers to continue an incoming trace.
         Any span started within this context manager will use the same trace_id, parent_span_id
@@ -193,7 +195,9 @@ def use_scope(scope: "PotelScope") -> "Generator[PotelScope, None, None]":
 
 
 @contextmanager
-def use_isolation_scope(isolation_scope: "PotelScope") -> "Generator[PotelScope, None, None]":
+def use_isolation_scope(
+    isolation_scope: "PotelScope",
+) -> "Generator[PotelScope, None, None]":
     context = set_value(SENTRY_USE_ISOLATION_SCOPE_KEY, isolation_scope)
     token = attach(context)
 

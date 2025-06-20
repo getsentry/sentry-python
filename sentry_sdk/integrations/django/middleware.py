@@ -124,7 +124,12 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
             middleware, "async_capable", False
         )
 
-        def __init__(self, get_response: "Optional[Callable[..., Any]]" = None, *args: "Any", **kwargs: "Any") -> None:
+        def __init__(
+            self,
+            get_response: "Optional[Callable[..., Any]]" = None,
+            *args: "Any",
+            **kwargs: "Any"
+        ) -> None:
             if get_response:
                 self._inner = middleware(get_response, *args, **kwargs)
             else:

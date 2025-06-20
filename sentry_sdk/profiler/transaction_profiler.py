@@ -224,7 +224,9 @@ class Profile:
             )
         )
 
-    def _set_initial_sampling_decision(self, sampling_context: "SamplingContext") -> None:
+    def _set_initial_sampling_decision(
+        self, sampling_context: "SamplingContext"
+    ) -> None:
         """
         Sets the profile's sampling decision according to the following
         precedence rules:
@@ -326,7 +328,9 @@ class Profile:
 
         return self
 
-    def __exit__(self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]") -> None:
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
         self.stop()
 
         scope, old_profile = self._context_manager_state
@@ -395,7 +399,9 @@ class Profile:
             "thread_metadata": thread_metadata,
         }
 
-    def to_json(self, event_opt: "Event", options: "Dict[str, Any]") -> "Dict[str, Any]":
+    def to_json(
+        self, event_opt: "Event", options: "Dict[str, Any]"
+    ) -> "Dict[str, Any]":
         profile = self.process()
 
         set_in_app_in_frames(
@@ -487,7 +493,9 @@ class Scheduler(ABC):
         self.setup()
         return self
 
-    def __exit__(self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]") -> None:
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
         self.teardown()
 
     @abstractmethod

@@ -100,7 +100,9 @@ def convert_to_otel_timestamp(time: "Union[datetime, float]") -> int:
     return int(time * 1e9)
 
 
-def extract_transaction_name_source(span: "ReadableSpan") -> "tuple[Optional[str], Optional[str]]":
+def extract_transaction_name_source(
+    span: "ReadableSpan",
+) -> "tuple[Optional[str], Optional[str]]":
     if not span.attributes:
         return (None, None)
     return (
@@ -258,7 +260,9 @@ def extract_span_status(span: "ReadableSpan") -> "tuple[Optional[str], Optional[
         return (SPANSTATUS.UNKNOWN_ERROR, None)
 
 
-def infer_status_from_attributes(span_attributes: "Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]") -> "tuple[Optional[str], Optional[int]]":
+def infer_status_from_attributes(
+    span_attributes: "Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]",
+) -> "tuple[Optional[str], Optional[int]]":
     http_status = get_http_status_code(span_attributes)
 
     if http_status:
@@ -271,7 +275,9 @@ def infer_status_from_attributes(span_attributes: "Mapping[str, str | bool | int
     return (None, None)
 
 
-def get_http_status_code(span_attributes: "Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]") -> "Optional[int]":
+def get_http_status_code(
+    span_attributes: "Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]",
+) -> "Optional[int]":
     try:
         http_status = span_attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE)
     except AttributeError:
@@ -303,7 +309,9 @@ def extract_span_attributes(span: "ReadableSpan", namespace: str) -> "dict[str, 
     return extracted_attrs
 
 
-def get_trace_context(span: "ReadableSpan", span_data: "Optional[OtelExtractedSpanData]" = None) -> "dict[str, Any]":
+def get_trace_context(
+    span: "ReadableSpan", span_data: "Optional[OtelExtractedSpanData]" = None
+) -> "dict[str, Any]":
     if not span.context:
         return {}
 
@@ -438,7 +446,9 @@ def get_sentry_meta(span: "Union[AbstractSpan, ReadableSpan]", key: str) -> "Any
     return sentry_meta.get(key) if sentry_meta else None
 
 
-def set_sentry_meta(span: "Union[AbstractSpan, ReadableSpan]", key: str, value: "Any") -> None:
+def set_sentry_meta(
+    span: "Union[AbstractSpan, ReadableSpan]", key: str, value: "Any"
+) -> None:
     sentry_meta = getattr(span, "_sentry_meta", {})
     sentry_meta[key] = value
     span._sentry_meta = sentry_meta  # type: ignore[union-attr]

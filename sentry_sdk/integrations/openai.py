@@ -32,7 +32,11 @@ class OpenAIIntegration(Integration):
     identifier = "openai"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts: bool = True, tiktoken_encoding_name: "Optional[str]" = None) -> None:
+    def __init__(
+        self,
+        include_prompts: bool = True,
+        tiktoken_encoding_name: "Optional[str]" = None,
+    ) -> None:
         self.include_prompts = include_prompts
 
         self.tiktoken_encoding = None
@@ -67,11 +71,11 @@ def _capture_exception(exc: "Any") -> None:
 
 
 def _calculate_chat_completion_usage(
-    messages: "Iterable[ChatCompletionMessageParam]", 
-    response: "Any", 
-    span: "Span", 
-    streaming_message_responses: "Optional[List[str]]", 
-    count_tokens: "Callable[..., Any]"
+    messages: "Iterable[ChatCompletionMessageParam]",
+    response: "Any",
+    span: "Span",
+    streaming_message_responses: "Optional[List[str]]",
+    count_tokens: "Callable[..., Any]",
 ) -> None:
     completion_tokens: "Optional[int]" = 0
     prompt_tokens: "Optional[int]" = 0

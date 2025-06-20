@@ -107,7 +107,10 @@ class CommandTracer(monitoring.CommandListener):
     def __init__(self) -> None:
         self._ongoing_operations: "Dict[int, Span]" = {}
 
-    def _operation_key(self, event: "Union[CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent]") -> int:
+    def _operation_key(
+        self,
+        event: "Union[CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent]",
+    ) -> int:
         return event.request_id
 
     def started(self, event: "CommandStartedEvent") -> None:

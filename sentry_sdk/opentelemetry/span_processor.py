@@ -283,7 +283,9 @@ class SentrySpanProcessor(SpanProcessor):
 
         return span_json
 
-    def _common_span_transaction_attributes_as_json(self, span: ReadableSpan) -> "Optional[Event]":
+    def _common_span_transaction_attributes_as_json(
+        self, span: ReadableSpan
+    ) -> "Optional[Event]":
         if not span.start_time or not span.end_time:
             return None
 

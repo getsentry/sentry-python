@@ -23,7 +23,12 @@ class ClientInterceptor(
 ):
     _is_intercepted = False
 
-    def intercept_unary_unary(self, continuation: "Callable[[ClientCallDetails, Message], _UnaryOutcome]", client_call_details: "ClientCallDetails", request: "Message") -> "_UnaryOutcome":
+    def intercept_unary_unary(
+        self,
+        continuation: "Callable[[ClientCallDetails, Message], _UnaryOutcome]",
+        client_call_details: "ClientCallDetails",
+        request: "Message",
+    ) -> "_UnaryOutcome":
         method = client_call_details.method
 
         with sentry_sdk.start_span(
@@ -44,7 +49,12 @@ class ClientInterceptor(
 
             return response
 
-    def intercept_unary_stream(self, continuation: "Callable[[ClientCallDetails, Message], Union[Iterable[Any], UnaryStreamCall]]", client_call_details: "ClientCallDetails", request: "Message") -> "Union[Iterator[Message], Call]":
+    def intercept_unary_stream(
+        self,
+        continuation: "Callable[[ClientCallDetails, Message], Union[Iterable[Any], UnaryStreamCall]]",
+        client_call_details: "ClientCallDetails",
+        request: "Message",
+    ) -> "Union[Iterator[Message], Call]":
         method = client_call_details.method
 
         with sentry_sdk.start_span(
@@ -69,7 +79,9 @@ class ClientInterceptor(
             return response
 
     @staticmethod
-    def _update_client_call_details_metadata_from_scope(client_call_details: "ClientCallDetails") -> "ClientCallDetails":
+    def _update_client_call_details_metadata_from_scope(
+        client_call_details: "ClientCallDetails",
+    ) -> "ClientCallDetails":
         metadata = (
             list(client_call_details.metadata) if client_call_details.metadata else []
         )

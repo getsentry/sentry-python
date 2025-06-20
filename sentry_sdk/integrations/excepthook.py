@@ -42,7 +42,11 @@ class ExcepthookIntegration(Integration):
 
 
 def _make_excepthook(old_excepthook: "Excepthook") -> "Excepthook":
-    def sentry_sdk_excepthook(type_: "Type[BaseException]", value: BaseException, traceback: "Optional[TracebackType]") -> None:
+    def sentry_sdk_excepthook(
+        type_: "Type[BaseException]",
+        value: BaseException,
+        traceback: "Optional[TracebackType]",
+    ) -> None:
         integration = sentry_sdk.get_client().get_integration(ExcepthookIntegration)
 
         # Note: If  we replace this with ensure_integration_enabled then

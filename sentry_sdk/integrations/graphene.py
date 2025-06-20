@@ -43,7 +43,9 @@ def _patch_graphql() -> None:
     old_graphql_async = graphene_schema.graphql
 
     @ensure_integration_enabled(GrapheneIntegration, old_graphql_sync)
-    def _sentry_patched_graphql_sync(schema: "GraphQLSchema", source: "Union[str, Source]", *args: Any, **kwargs: Any) -> "ExecutionResult":
+    def _sentry_patched_graphql_sync(
+        schema: "GraphQLSchema", source: "Union[str, Source]", *args: Any, **kwargs: Any
+    ) -> "ExecutionResult":
         scope = sentry_sdk.get_isolation_scope()
         scope.add_event_processor(_event_processor)
 
@@ -65,7 +67,9 @@ def _patch_graphql() -> None:
 
         return result
 
-    async def _sentry_patched_graphql_async(schema: "GraphQLSchema", source: "Union[str, Source]", *args: Any, **kwargs: Any) -> "ExecutionResult":
+    async def _sentry_patched_graphql_async(
+        schema: "GraphQLSchema", source: "Union[str, Source]", *args: Any, **kwargs: Any
+    ) -> "ExecutionResult":
         integration = sentry_sdk.get_client().get_integration(GrapheneIntegration)
         if integration is None:
             return await old_graphql_async(schema, source, *args, **kwargs)
@@ -107,7 +111,9 @@ def _event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
 
 
 @contextmanager
-def graphql_span(schema: "GraphQLSchema", source: "Union[str, Source]", kwargs: "Dict[str, Any]") -> "Generator[None, None, None]":
+def graphql_span(
+    schema: "GraphQLSchema", source: "Union[str, Source]", kwargs: "Dict[str, Any]"
+) -> "Generator[None, None, None]":
     operation_name = kwargs.get("operation_name")
 
     operation_type = "query"

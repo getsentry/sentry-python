@@ -56,7 +56,9 @@ class RqIntegration(Integration):
         old_perform_job = Worker.perform_job
 
         @ensure_integration_enabled(RqIntegration, old_perform_job)
-        def sentry_patched_perform_job(self: "Any", job: "Job", queue: "Queue", *args: "Any", **kwargs: "Any") -> bool:
+        def sentry_patched_perform_job(
+            self: "Any", job: "Job", queue: "Queue", *args: "Any", **kwargs: "Any"
+        ) -> bool:
             with sentry_sdk.new_scope() as scope:
                 try:
                     transaction_name = job.func_name or DEFAULT_TRANSACTION_NAME
@@ -90,7 +92,9 @@ class RqIntegration(Integration):
 
         old_handle_exception = Worker.handle_exception
 
-        def sentry_patched_handle_exception(self: "Worker", job: "Any", *exc_info: "Any", **kwargs: "Any") -> "Any":
+        def sentry_patched_handle_exception(
+            self: "Worker", job: "Any", *exc_info: "Any", **kwargs: "Any"
+        ) -> "Any":
             retry = (
                 hasattr(job, "retries_left")
                 and job.retries_left
@@ -107,7 +111,9 @@ class RqIntegration(Integration):
         old_enqueue_job = Queue.enqueue_job
 
         @ensure_integration_enabled(RqIntegration, old_enqueue_job)
-        def sentry_patched_enqueue_job(self: "Queue", job: "Any", **kwargs: "Any") -> "Any":
+        def sentry_patched_enqueue_job(
+            self: "Queue", job: "Any", **kwargs: "Any"
+        ) -> "Any":
             job.meta["_sentry_trace_headers"] = dict(
                 sentry_sdk.get_current_scope().iter_trace_propagation_headers()
             )

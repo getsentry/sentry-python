@@ -64,7 +64,7 @@ class EventScrubber:
         denylist: Optional[List[str]] = None,
         recursive: bool = False,
         send_default_pii: bool = False,
-        pii_denylist: Optional[List[str]] = None
+        pii_denylist: Optional[List[str]] = None,
     ) -> None:
         """
         A scrubber that goes through the event payload and removes sensitive data configured through denylists.

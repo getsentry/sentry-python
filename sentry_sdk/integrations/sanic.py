@@ -59,7 +59,9 @@ class SanicIntegration(Integration):
     origin = f"auto.http.{identifier}"
     version = None
 
-    def __init__(self, unsampled_statuses: "Optional[Container[int]]" = frozenset({404})) -> None:
+    def __init__(
+        self, unsampled_statuses: "Optional[Container[int]]" = frozenset({404})
+    ) -> None:
         """
         The unsampled_statuses parameter can be used to specify for which HTTP statuses the
         transactions should not be sent to Sentry. By default, transactions are sent for all
@@ -189,7 +191,9 @@ async def _context_enter(request: "Request") -> None:
     ).__enter__()
 
 
-async def _context_exit(request: "Request", response: "Optional[BaseHTTPResponse]" = None) -> None:
+async def _context_exit(
+    request: "Request", response: "Optional[BaseHTTPResponse]" = None
+) -> None:
     with capture_internal_exceptions():
         if not request.ctx._sentry_do_integration:
             return
@@ -226,7 +230,9 @@ async def _set_transaction(request: "Request", route: "Route", **_: Any) -> None
             scope.set_transaction_name(route_name, source=TransactionSource.COMPONENT)
 
 
-def _sentry_error_handler_lookup(self: Any, exception: Exception, *args: Any, **kwargs: Any) -> "Optional[object]":
+def _sentry_error_handler_lookup(
+    self: Any, exception: Exception, *args: Any, **kwargs: Any
+) -> "Optional[object]":
     _capture_exception(exception)
     old_error_handler = old_error_handler_lookup(self, exception, *args, **kwargs)
 
@@ -236,7 +242,9 @@ def _sentry_error_handler_lookup(self: Any, exception: Exception, *args: Any, **
     if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
         return old_error_handler
 
-    async def sentry_wrapped_error_handler(request: "Request", exception: Exception) -> Any:
+    async def sentry_wrapped_error_handler(
+        request: "Request", exception: Exception
+    ) -> Any:
         try:
             response = old_error_handler(request, exception)
             if isawaitable(response):
@@ -258,7 +266,9 @@ def _sentry_error_handler_lookup(self: Any, exception: Exception, *args: Any, **
     return sentry_wrapped_error_handler
 
 
-async def _legacy_handle_request(self: Any, request: "Request", *args: Any, **kwargs: Any) -> Any:
+async def _legacy_handle_request(
+    self: Any, request: "Request", *args: Any, **kwargs: Any
+) -> Any:
     if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
         return await old_handle_request(self, request, *args, **kwargs)
 

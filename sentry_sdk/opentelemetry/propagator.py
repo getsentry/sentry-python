@@ -50,7 +50,12 @@ class SentryPropagator(TextMapPropagator):
     Propagates tracing headers for Sentry's tracing system in a way OTel understands.
     """
 
-    def extract(self, carrier: "CarrierT", context: "Optional[Context]" = None, getter: "Getter[CarrierT]" = default_getter) -> "Context":
+    def extract(
+        self,
+        carrier: "CarrierT",
+        context: "Optional[Context]" = None,
+        getter: "Getter[CarrierT]" = default_getter,
+    ) -> "Context":
         if context is None:
             context = get_current()
 
@@ -92,7 +97,12 @@ class SentryPropagator(TextMapPropagator):
         modified_context = trace.set_span_in_context(span, context)
         return modified_context
 
-    def inject(self, carrier: "CarrierT", context: "Optional[Context]" = None, setter: "Setter[CarrierT]" = default_setter) -> None:
+    def inject(
+        self,
+        carrier: "CarrierT",
+        context: "Optional[Context]" = None,
+        setter: "Setter[CarrierT]" = default_setter,
+    ) -> None:
         scopes = get_value(SENTRY_SCOPES_KEY, context)
         if not scopes:
             return

@@ -25,7 +25,9 @@ class SocketIntegration(Integration):
         _patch_getaddrinfo()
 
 
-def _get_span_description(host: "Union[bytes, str, None]", port: "Union[bytes, str, int, None]") -> str:
+def _get_span_description(
+    host: "Union[bytes, str, None]", port: "Union[bytes, str, int, None]"
+) -> str:
 
     try:
         host = host.decode()  # type: ignore
@@ -76,12 +78,12 @@ def _patch_getaddrinfo() -> None:
     real_getaddrinfo = socket.getaddrinfo
 
     def getaddrinfo(
-        host: "Union[bytes, str, None]", 
-        port: "Union[bytes, str, int, None]", 
-        family: int = 0, 
-        type: int = 0, 
-        proto: int = 0, 
-        flags: int = 0
+        host: "Union[bytes, str, None]",
+        port: "Union[bytes, str, int, None]",
+        family: int = 0,
+        type: int = 0,
+        proto: int = 0,
+        flags: int = 0,
     ) -> "List[Tuple[AddressFamily, SocketKind, int, str, Union[Tuple[str, int], Tuple[str, int, int, int], Tuple[int, bytes]]]]":
         integration = sentry_sdk.get_client().get_integration(SocketIntegration)
         if integration is None:

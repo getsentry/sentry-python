@@ -338,7 +338,9 @@ class SentryLogsHandler(_BaseHandler):
 
             self._capture_log_from_record(client, record)
 
-    def _capture_log_from_record(self, client: "BaseClient", record: "LogRecord") -> None:
+    def _capture_log_from_record(
+        self, client: "BaseClient", record: "LogRecord"
+    ) -> None:
         otel_severity_number, otel_severity_text = _log_level_to_otel(
             record.levelno, SEVERITY_TO_OTEL_SEVERITY
         )

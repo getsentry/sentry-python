@@ -19,7 +19,9 @@ class UnleashIntegration(Integration):
         old_is_enabled = UnleashClient.is_enabled
 
         @wraps(old_is_enabled)
-        def sentry_is_enabled(self: UnleashClient, feature: str, *args: Any, **kwargs: Any) -> Any:
+        def sentry_is_enabled(
+            self: UnleashClient, feature: str, *args: Any, **kwargs: Any
+        ) -> Any:
             enabled = old_is_enabled(self, feature, *args, **kwargs)
 
             # We have no way of knowing what type of unleash feature this is, so we have to treat

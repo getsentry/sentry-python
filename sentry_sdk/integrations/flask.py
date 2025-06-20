@@ -91,7 +91,9 @@ class FlaskIntegration(Integration):
 
         old_app = Flask.__call__
 
-        def sentry_patched_wsgi_app(self: Any, environ: "Dict[str, str]", start_response: "Callable[..., Any]") -> "_ScopedResponse":
+        def sentry_patched_wsgi_app(
+            self: Any, environ: "Dict[str, str]", start_response: "Callable[..., Any]"
+        ) -> "_ScopedResponse":
             if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -111,7 +113,9 @@ class FlaskIntegration(Integration):
         Flask.__call__ = sentry_patched_wsgi_app
 
 
-def _add_sentry_trace(sender: Flask, template: Any, context: "Dict[str, Any]", **extra: Any) -> None:
+def _add_sentry_trace(
+    sender: Flask, template: Any, context: "Dict[str, Any]", **extra: Any
+) -> None:
     if "sentry_trace" in context:
         return
 
@@ -121,7 +125,9 @@ def _add_sentry_trace(sender: Flask, template: Any, context: "Dict[str, Any]", *
     context["sentry_trace_meta"] = trace_meta
 
 
-def _set_transaction_name_and_source(scope: "sentry_sdk.Scope", transaction_style: str, request: "Request") -> None:
+def _set_transaction_name_and_source(
+    scope: "sentry_sdk.Scope", transaction_style: str, request: "Request"
+) -> None:
     try:
         name_for_style = {
             "url": request.url_rule.rule,
@@ -182,7 +188,9 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _make_request_event_processor(app: "Flask", request: "Callable[[], Request]", integration: "FlaskIntegration") -> "EventProcessor":
+def _make_request_event_processor(
+    app: "Flask", request: "Callable[[], Request]", integration: "FlaskIntegration"
+) -> "EventProcessor":
 
     def inner(event: "Event", hint: dict[str, Any]) -> "Event":
 
@@ -205,7 +213,9 @@ def _make_request_event_processor(app: "Flask", request: "Callable[[], Request]"
 
 
 @ensure_integration_enabled(FlaskIntegration)
-def _capture_exception(sender: "Flask", exception: "Union[ValueError, BaseException]", **kwargs: Any) -> None:
+def _capture_exception(
+    sender: "Flask", exception: "Union[ValueError, BaseException]", **kwargs: Any
+) -> None:
     event, hint = event_from_exception(
         exception,
         client_options=sentry_sdk.get_client().options,

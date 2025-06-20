@@ -28,7 +28,9 @@ if TYPE_CHECKING:
     from opentelemetry.util.types import Attributes
 
 
-def get_parent_sampled(parent_context: "Optional[SpanContext]", trace_id: int) -> "Optional[bool]":
+def get_parent_sampled(
+    parent_context: "Optional[SpanContext]", trace_id: int
+) -> "Optional[bool]":
     if parent_context is None:
         return None
 
@@ -53,7 +55,9 @@ def get_parent_sampled(parent_context: "Optional[SpanContext]", trace_id: int) -
     return None
 
 
-def get_parent_sample_rate(parent_context: "Optional[SpanContext]", trace_id: int) -> "Optional[float]":
+def get_parent_sample_rate(
+    parent_context: "Optional[SpanContext]", trace_id: int
+) -> "Optional[float]":
     if parent_context is None:
         return None
 
@@ -72,7 +76,9 @@ def get_parent_sample_rate(parent_context: "Optional[SpanContext]", trace_id: in
     return None
 
 
-def get_parent_sample_rand(parent_context: "Optional[SpanContext]", trace_id: int) -> "Optional[Decimal]":
+def get_parent_sample_rand(
+    parent_context: "Optional[SpanContext]", trace_id: int
+) -> "Optional[Decimal]":
     if parent_context is None:
         return None
 
@@ -88,7 +94,12 @@ def get_parent_sample_rand(parent_context: "Optional[SpanContext]", trace_id: in
     return None
 
 
-def dropped_result(span_context: "SpanContext", attributes: "Attributes", sample_rate: "Optional[float]" = None, sample_rand: "Optional[Decimal]" = None) -> "SamplingResult":
+def dropped_result(
+    span_context: "SpanContext",
+    attributes: "Attributes",
+    sample_rate: "Optional[float]" = None,
+    sample_rand: "Optional[Decimal]" = None,
+) -> "SamplingResult":
     """
     React to a span getting unsampled and return a DROP SamplingResult.
 
@@ -125,7 +136,12 @@ def dropped_result(span_context: "SpanContext", attributes: "Attributes", sample
     )
 
 
-def sampled_result(span_context: "SpanContext", attributes: "Attributes", sample_rate: "Optional[float]" = None, sample_rand: "Optional[Decimal]" = None) -> "SamplingResult":
+def sampled_result(
+    span_context: "SpanContext",
+    attributes: "Attributes",
+    sample_rate: "Optional[float]" = None,
+    sample_rand: "Optional[Decimal]" = None,
+) -> "SamplingResult":
     """
     React to a span being sampled and return a sampled SamplingResult.
 
@@ -146,7 +162,12 @@ def sampled_result(span_context: "SpanContext", attributes: "Attributes", sample
     )
 
 
-def _update_trace_state(span_context: "SpanContext", sampled: bool, sample_rate: "Optional[float]" = None, sample_rand: "Optional[Decimal]" = None) -> "TraceState":
+def _update_trace_state(
+    span_context: "SpanContext",
+    sampled: bool,
+    sample_rate: "Optional[float]" = None,
+    sample_rand: "Optional[Decimal]" = None,
+) -> "TraceState":
     trace_state = span_context.trace_state
 
     sampled = "true" if sampled else "false"
@@ -300,7 +321,12 @@ class SentrySampler(Sampler):
         return self.__class__.__name__
 
 
-def create_sampling_context(name: str, attributes: "Attributes", parent_span_context: "Optional[SpanContext]", trace_id: int) -> "dict[str, Any]":
+def create_sampling_context(
+    name: str,
+    attributes: "Attributes",
+    parent_span_context: "Optional[SpanContext]",
+    trace_id: int,
+) -> "dict[str, Any]":
     sampling_context: "dict[str, Any]" = {
         "transaction_context": {
             "name": name,

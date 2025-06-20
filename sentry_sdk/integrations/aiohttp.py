@@ -115,7 +115,9 @@ class AioHttpIntegration(Integration):
 
         old_handle = Application._handle
 
-        async def sentry_app_handle(self: "Any", request: "Request", *args: "Any", **kwargs: "Any") -> "Any":
+        async def sentry_app_handle(
+            self: "Any", request: "Request", *args: "Any", **kwargs: "Any"
+        ) -> "Any":
             integration = sentry_sdk.get_client().get_integration(AioHttpIntegration)
             if integration is None:
                 return await old_handle(self, request, *args, **kwargs)
@@ -169,7 +171,9 @@ class AioHttpIntegration(Integration):
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
         @wraps(old_urldispatcher_resolve)
-        async def sentry_urldispatcher_resolve(self: "UrlDispatcher", request: "Request") -> "UrlMappingMatchInfo":
+        async def sentry_urldispatcher_resolve(
+            self: "UrlDispatcher", request: "Request"
+        ) -> "UrlMappingMatchInfo":
             rv = await old_urldispatcher_resolve(self, request)
 
             integration = sentry_sdk.get_client().get_integration(AioHttpIntegration)
@@ -214,7 +218,9 @@ class AioHttpIntegration(Integration):
 
 def create_trace_config() -> "Any":
 
-    async def on_request_start(session: "Any", trace_config_ctx: "SimpleNamespace", params: "Any") -> None:
+    async def on_request_start(
+        session: "Any", trace_config_ctx: "SimpleNamespace", params: "Any"
+    ) -> None:
         if sentry_sdk.get_client().get_integration(AioHttpIntegration) is None:
             return
 
@@ -270,7 +276,9 @@ def create_trace_config() -> "Any":
         trace_config_ctx.span = span
         trace_config_ctx.span_data = data
 
-    async def on_request_end(session: "Any", trace_config_ctx: "SimpleNamespace", params: "Any") -> None:
+    async def on_request_end(
+        session: "Any", trace_config_ctx: "SimpleNamespace", params: "Any"
+    ) -> None:
         if trace_config_ctx.span is None:
             return
 
@@ -299,7 +307,9 @@ def create_trace_config() -> "Any":
     return trace_config
 
 
-def _make_request_processor(weak_request: "weakref.ReferenceType[Request]") -> "EventProcessor":
+def _make_request_processor(
+    weak_request: "weakref.ReferenceType[Request]",
+) -> "EventProcessor":
     def aiohttp_processor(
         event: "Event",
         hint: "dict[str, Tuple[type, BaseException, Any]]",
@@ -346,7 +356,9 @@ def _capture_exception() -> "ExcInfo":
 BODY_NOT_READ_MESSAGE = "[Can't show request body due to implementation details.]"
 
 
-def get_aiohttp_request_data(request: "Request") -> "Union[Optional[str], AnnotatedValue]":
+def get_aiohttp_request_data(
+    request: "Request",
+) -> "Union[Optional[str], AnnotatedValue]":
     bytes_body = request._read_bytes
 
     if bytes_body is not None:

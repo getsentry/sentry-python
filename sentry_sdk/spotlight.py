@@ -132,7 +132,9 @@ try:
 
             return self._spotlight_script
 
-        def process_response(self, _request: "HttpRequest", response: "HttpResponse") -> "Optional[HttpResponse]":
+        def process_response(
+            self, _request: "HttpRequest", response: "HttpResponse"
+        ) -> "Optional[HttpResponse]":
             content_type_header = tuple(
                 p.strip()
                 for p in response.headers.get("Content-Type", "").lower().split(";")
@@ -176,7 +178,9 @@ try:
 
             return response
 
-        def process_exception(self, _request: "HttpRequest", exception: Exception) -> "Optional[HttpResponseServerError]":
+        def process_exception(
+            self, _request: "HttpRequest", exception: Exception
+        ) -> "Optional[HttpResponseServerError]":
             if not settings.DEBUG or not self._spotlight_url:
                 return None
 

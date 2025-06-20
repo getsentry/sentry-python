@@ -40,7 +40,9 @@ def patch_views() -> None:
             return old_render(self)
 
     @functools.wraps(old_make_view_atomic)
-    def sentry_patched_make_view_atomic(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+    def sentry_patched_make_view_atomic(
+        self: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         callback = old_make_view_atomic(self, *args, **kwargs)
 
         # XXX: The wrapper function is created for every request. Find more

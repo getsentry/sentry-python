@@ -15,7 +15,11 @@ if TYPE_CHECKING:
 class RedisIntegration(Integration):
     identifier = "redis"
 
-    def __init__(self, max_data_size: int = _DEFAULT_MAX_DATA_SIZE, cache_prefixes: "Optional[list[str]]" = None) -> None:
+    def __init__(
+        self,
+        max_data_size: int = _DEFAULT_MAX_DATA_SIZE,
+        cache_prefixes: "Optional[list[str]]" = None,
+    ) -> None:
         self.max_data_size = max_data_size
         self.cache_prefixes = cache_prefixes if cache_prefixes is not None else []
 

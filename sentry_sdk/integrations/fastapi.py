@@ -42,7 +42,9 @@ class FastApiIntegration(StarletteIntegration):
         patch_get_request_handler()
 
 
-def _set_transaction_name_and_source(scope: "sentry_sdk.Scope", transaction_style: str, request: Any) -> None:
+def _set_transaction_name_and_source(
+    scope: "sentry_sdk.Scope", transaction_style: str, request: Any
+) -> None:
     name = ""
 
     if transaction_style == "endpoint":
@@ -111,7 +113,9 @@ def patch_get_request_handler() -> None:
             extractor = StarletteRequestExtractor(request)
             info = await extractor.extract_request_info()
 
-            def _make_request_event_processor(req: Any, integration: Any) -> "Callable[[Event, Dict[str, Any]], Event]":
+            def _make_request_event_processor(
+                req: Any, integration: Any
+            ) -> "Callable[[Event, Dict[str, Any]], Event]":
                 def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
 
                     # Extract information from request

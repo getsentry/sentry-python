@@ -134,7 +134,9 @@ class NoOpSpan:
     def init_span_recorder(self, maxlen: int) -> None:
         pass
 
-    def _set_initial_sampling_decision(self, sampling_context: "SamplingContext") -> None:
+    def _set_initial_sampling_decision(
+        self, sampling_context: "SamplingContext"
+    ) -> None:
         pass
 
 
@@ -258,7 +260,9 @@ class Span:
         self.activate()
         return self
 
-    def __exit__(self, ty: Optional[Any], value: Optional[Any], tb: Optional[Any]) -> None:
+    def __exit__(
+        self, ty: Optional[Any], value: Optional[Any], tb: Optional[Any]
+    ) -> None:
         if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
         else:
@@ -540,7 +544,9 @@ if TYPE_CHECKING:
         pass
 
 
-def trace(func: Optional["Callable[P, R]"] = None) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
+def trace(
+    func: Optional["Callable[P, R]"] = None,
+) -> "Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]":
     """
     Decorator to start a child span under the existing current transaction.
     If there is no current transaction, then nothing will be traced.

@@ -192,14 +192,14 @@ class BaseClient:
     if TYPE_CHECKING:
 
         @overload
-        def get_integration(self, name_or_class: str) -> Optional["Integration"]:
-            ...
+        def get_integration(self, name_or_class: str) -> Optional["Integration"]: ...
 
         @overload
-        def get_integration(self, name_or_class: "type[I]") -> Optional["I"]:
-            ...
+        def get_integration(self, name_or_class: "type[I]") -> Optional["I"]: ...
 
-    def get_integration(self, name_or_class: Union[str, "type[Integration]"]) -> Optional["Integration"]:
+    def get_integration(
+        self, name_or_class: Union[str, "type[Integration]"]
+    ) -> Optional["Integration"]:
         return None
 
     def close(self, *args: Any, **kwargs: Any) -> None:
@@ -246,7 +246,9 @@ class _Client(BaseClient):
         self.options = state["options"]
         self._init_impl()
 
-    def _setup_instrumentation(self, functions_to_trace: "Sequence[Dict[str, str]]") -> None:
+    def _setup_instrumentation(
+        self, functions_to_trace: "Sequence[Dict[str, str]]"
+    ) -> None:
         """
         Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.
         """
@@ -890,14 +892,14 @@ class _Client(BaseClient):
     if TYPE_CHECKING:
 
         @overload
-        def get_integration(self, name_or_class: str) -> Optional["Integration"]:
-            ...
+        def get_integration(self, name_or_class: str) -> Optional["Integration"]: ...
 
         @overload
-        def get_integration(self, name_or_class: "type[I]") -> Optional["I"]:
-            ...
+        def get_integration(self, name_or_class: "type[I]") -> Optional["I"]: ...
 
-    def get_integration(self, name_or_class: Union[str, "Type[Integration]"]) -> Optional["Integration"]:
+    def get_integration(
+        self, name_or_class: Union[str, "Type[Integration]"]
+    ) -> Optional["Integration"]:
         """Returns the integration for this client by name or class.
         If the client does not have that integration then `None` is returned.
         """

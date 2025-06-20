@@ -48,7 +48,11 @@ def _patch_graphql() -> None:
     old_handle_query_result = ariadne_graphql.handle_query_result
 
     @ensure_integration_enabled(AriadneIntegration, old_parse_query)
-    def _sentry_patched_parse_query(context_value: "Optional[Any]", query_parser: "Optional[QueryParser]", data: "Any") -> "DocumentNode":
+    def _sentry_patched_parse_query(
+        context_value: "Optional[Any]",
+        query_parser: "Optional[QueryParser]",
+        data: "Any",
+    ) -> "DocumentNode":
         event_processor = _make_request_event_processor(data)
         sentry_sdk.get_isolation_scope().add_event_processor(event_processor)
 
@@ -56,7 +60,9 @@ def _patch_graphql() -> None:
         return result
 
     @ensure_integration_enabled(AriadneIntegration, old_handle_errors)
-    def _sentry_patched_handle_graphql_errors(errors: "List[GraphQLError]", *args: "Any", **kwargs: "Any") -> "GraphQLResult":
+    def _sentry_patched_handle_graphql_errors(
+        errors: "List[GraphQLError]", *args: "Any", **kwargs: "Any"
+    ) -> "GraphQLResult":
         result = old_handle_errors(errors, *args, **kwargs)
 
         event_processor = _make_response_event_processor(result[1])
@@ -79,7 +85,9 @@ def _patch_graphql() -> None:
         return result
 
     @ensure_integration_enabled(AriadneIntegration, old_handle_query_result)
-    def _sentry_patched_handle_query_result(result: "Any", *args: "Any", **kwargs: "Any") -> "GraphQLResult":
+    def _sentry_patched_handle_query_result(
+        result: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "GraphQLResult":
         query_result = old_handle_query_result(result, *args, **kwargs)
 
         event_processor = _make_response_event_processor(query_result[1])

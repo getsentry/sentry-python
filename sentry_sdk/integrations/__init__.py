@@ -34,7 +34,9 @@ def _generate_default_integrations_iterator(
     auto_enabling_integrations: "List[str]",
 ) -> "Callable[[bool], Iterator[Type[Integration]]]":
 
-    def iter_default_integrations(with_auto_enabling_integrations: bool) -> "Iterator[Type[Integration]]":
+    def iter_default_integrations(
+        with_auto_enabling_integrations: bool,
+    ) -> "Iterator[Type[Integration]]":
         """Returns an iterator of the default integration classes:"""
         from importlib import import_module
 
@@ -236,7 +238,11 @@ def setup_integrations(
     return integrations
 
 
-def _check_minimum_version(integration: "type[Integration]", version: "Optional[tuple[int, ...]]", package: "Optional[str]" = None) -> None:
+def _check_minimum_version(
+    integration: "type[Integration]",
+    version: "Optional[tuple[int, ...]]",
+    package: "Optional[str]" = None,
+) -> None:
     package = package or integration.identifier
 
     if version is None:

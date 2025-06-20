@@ -74,7 +74,9 @@ class LitestarIntegration(Integration):
 
 
 class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
-    def __init__(self, app: "ASGIApp", span_origin: str = LitestarIntegration.origin) -> None:
+    def __init__(
+        self, app: "ASGIApp", span_origin: str = LitestarIntegration.origin
+    ) -> None:
         super().__init__(
             app=app,
             unsafe_context_data=False,
@@ -134,7 +136,12 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
     else:
         old_call = middleware.__call__
 
-    async def _create_span_call(self: "MiddlewareProtocol", scope: "LitestarScope", receive: "Receive", send: "Send") -> None:
+    async def _create_span_call(
+        self: "MiddlewareProtocol",
+        scope: "LitestarScope",
+        receive: "Receive",
+        send: "Send",
+    ) -> None:
         if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
             return await old_call(self, scope, receive, send)
 
@@ -148,7 +155,9 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             middleware_span.set_tag("litestar.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
-            async def _sentry_receive(*args: "Any", **kwargs: "Any") -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
+            async def _sentry_receive(
+                *args: "Any", **kwargs: "Any"
+            ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                 if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
                     return await receive(*args, **kwargs)
                 with sentry_sdk.start_span(
@@ -197,14 +206,14 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 def patch_http_route_handle() -> None:
     old_handle = HTTPRoute.handle
 
-    async def handle_wrapper(self: "HTTPRoute", scope: "HTTPScope", receive: "Receive", send: "Send") -> None:
+    async def handle_wrapper(
+        self: "HTTPRoute", scope: "HTTPScope", receive: "Receive", send: "Send"
+    ) -> None:
         if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
             return await old_handle(self, scope, receive, send)
 
         sentry_scope = sentry_sdk.get_isolation_scope()
-        request = scope["app"].request_class(
-            scope=scope, receive=receive, send=send
-        )
+        request = scope["app"].request_class(scope=scope, receive=receive, send=send)
         extracted_request_data = ConnectionDataExtractor(
             parse_body=True, parse_query=True
         )(request)

@@ -54,7 +54,9 @@ def patch_enqueue() -> None:
     old_enqueue = Huey.enqueue
 
     @ensure_integration_enabled(HueyIntegration, old_enqueue)
-    def _sentry_enqueue(self: "Huey", task: "Task") -> "Optional[Union[Result, ResultGroup]]":
+    def _sentry_enqueue(
+        self: "Huey", task: "Task"
+    ) -> "Optional[Union[Result, ResultGroup]]":
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_HUEY,
             name=task.name,
@@ -142,7 +144,9 @@ def patch_execute() -> None:
     old_execute = Huey._execute
 
     @ensure_integration_enabled(HueyIntegration, old_execute)
-    def _sentry_execute(self: "Huey", task: "Task", timestamp: "Optional[datetime]" = None) -> "Any":
+    def _sentry_execute(
+        self: "Huey", task: "Task", timestamp: "Optional[datetime]" = None
+    ) -> "Any":
         with sentry_sdk.isolation_scope() as scope:
             with capture_internal_exceptions():
                 scope._name = "huey"

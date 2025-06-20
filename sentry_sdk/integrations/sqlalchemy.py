@@ -40,7 +40,13 @@ class SqlalchemyIntegration(Integration):
 
 @ensure_integration_enabled(SqlalchemyIntegration)
 def _before_cursor_execute(
-    conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: bool, *args: Any
+    conn: Any,
+    cursor: Any,
+    statement: Any,
+    parameters: Any,
+    context: Any,
+    executemany: bool,
+    *args: Any,
 ) -> None:
     ctx_mgr = record_sql_queries(
         cursor,
@@ -60,7 +66,9 @@ def _before_cursor_execute(
 
 
 @ensure_integration_enabled(SqlalchemyIntegration)
-def _after_cursor_execute(conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, *args: Any) -> None:
+def _after_cursor_execute(
+    conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, *args: Any
+) -> None:
     ctx_mgr: "Optional[ContextManager[Any]]" = getattr(
         context, "_sentry_sql_span_manager", None
     )

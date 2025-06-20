@@ -84,7 +84,9 @@ class QuartIntegration(Integration):
 def patch_asgi_app() -> None:
     old_app = Quart.__call__
 
-    async def sentry_patched_asgi_app(self: Any, scope: Any, receive: Any, send: Any) -> Any:
+    async def sentry_patched_asgi_app(
+        self: Any, scope: Any, receive: Any, send: Any
+    ) -> Any:
         if sentry_sdk.get_client().get_integration(QuartIntegration) is None:
             return await old_app(self, scope, receive, send)
 
@@ -132,7 +134,9 @@ def patch_scaffold_route() -> None:
     Scaffold.route = _sentry_route
 
 
-def _set_transaction_name_and_source(scope: "sentry_sdk.Scope", transaction_style: str, request: "Request") -> None:
+def _set_transaction_name_and_source(
+    scope: "sentry_sdk.Scope", transaction_style: str, request: "Request"
+) -> None:
 
     try:
         name_for_style = {
@@ -168,7 +172,9 @@ async def _request_websocket_started(app: Quart, **kwargs: Any) -> None:
     scope.add_event_processor(evt_processor)
 
 
-def _make_request_event_processor(app: Quart, request: "Request", integration: "QuartIntegration") -> "EventProcessor":
+def _make_request_event_processor(
+    app: Quart, request: "Request", integration: "QuartIntegration"
+) -> "EventProcessor":
     def inner(event: "Event", hint: dict[str, Any]) -> "Event":
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
@@ -195,7 +201,9 @@ def _make_request_event_processor(app: Quart, request: "Request", integration: "
     return inner
 
 
-async def _capture_exception(sender: Quart, exception: "Union[ValueError, BaseException]", **kwargs: Any) -> None:
+async def _capture_exception(
+    sender: Quart, exception: "Union[ValueError, BaseException]", **kwargs: Any
+) -> None:
     integration = sentry_sdk.get_client().get_integration(QuartIntegration)
     if integration is None:
         return

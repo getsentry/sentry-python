@@ -76,14 +76,18 @@ class TornadoIntegration(Integration):
         if awaitable:
             # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
             # In that case our method should be a coroutine function too
-            async def sentry_execute_request_handler(self: RequestHandler, *args: Any, **kwargs: Any) -> Any:
+            async def sentry_execute_request_handler(
+                self: RequestHandler, *args: Any, **kwargs: Any
+            ) -> Any:
                 with _handle_request_impl(self):
                     return await old_execute(self, *args, **kwargs)
 
         else:
 
             @coroutine  # type: ignore
-            def sentry_execute_request_handler(self: RequestHandler, *args: Any, **kwargs: Any) -> Any:
+            def sentry_execute_request_handler(
+                self: RequestHandler, *args: Any, **kwargs: Any
+            ) -> Any:
                 with _handle_request_impl(self):
                     result = yield from old_execute(self, *args, **kwargs)
                     return result
@@ -92,7 +96,14 @@ class TornadoIntegration(Integration):
 
         old_log_exception = RequestHandler.log_exception
 
-        def sentry_log_exception(self: Any, ty: type, value: BaseException, tb: Any, *args: Any, **kwargs: Any) -> "Optional[Any]":
+        def sentry_log_exception(
+            self: Any,
+            ty: type,
+            value: BaseException,
+            tb: Any,
+            *args: Any,
+            **kwargs: Any,
+        ) -> "Optional[Any]":
             _capture_exception(ty, value, tb)
             return old_log_exception(self, ty, value, tb, *args, **kwargs)
 
@@ -144,7 +155,9 @@ def _capture_exception(ty: type, value: BaseException, tb: Any) -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _make_event_processor(weak_handler: "Callable[[], RequestHandler]") -> "EventProcessor":
+def _make_event_processor(
+    weak_handler: "Callable[[], RequestHandler]",
+) -> "EventProcessor":
     def tornado_processor(event: "Event", hint: dict[str, Any]) -> "Event":
         handler = weak_handler()
         if handler is None:

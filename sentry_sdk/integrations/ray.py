@@ -42,7 +42,9 @@ def _patch_ray_remote() -> None:
     old_remote = ray.remote
 
     @functools.wraps(old_remote)
-    def new_remote(f: "Callable[..., Any]", *args: "Any", **kwargs: "Any") -> "Callable[..., Any]":
+    def new_remote(
+        f: "Callable[..., Any]", *args: "Any", **kwargs: "Any"
+    ) -> "Callable[..., Any]":
         if inspect.isclass(f):
             # Ray Actors
             # (https://docs.ray.io/en/latest/ray-core/actors.html)
@@ -50,7 +52,11 @@ def _patch_ray_remote() -> None:
             # (Only Ray Tasks are supported)
             return old_remote(f, *args, *kwargs)
 
-        def _f(*f_args: "Any", _tracing: "Optional[dict[str, Any]]" = None, **f_kwargs: "Any") -> "Any":
+        def _f(
+            *f_args: "Any",
+            _tracing: "Optional[dict[str, Any]]" = None,
+            **f_kwargs: "Any",
+        ) -> "Any":
             """
             Ray Worker
             """
@@ -82,7 +88,9 @@ def _patch_ray_remote() -> None:
         rv = old_remote(_f, *args, *kwargs)
         old_remote_method = rv.remote
 
-        def _remote_method_with_header_propagation(*args: "Any", **kwargs: "Any") -> "Any":
+        def _remote_method_with_header_propagation(
+            *args: "Any", **kwargs: "Any"
+        ) -> "Any":
             """
             Ray Client
             """

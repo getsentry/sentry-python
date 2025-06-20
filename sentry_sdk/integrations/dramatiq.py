@@ -43,7 +43,9 @@ class DramatiqIntegration(Integration):
 def _patch_dramatiq_broker() -> None:
     original_broker__init__ = Broker.__init__
 
-    def sentry_patched_broker__init__(self: "Broker", *args: "Any", **kw: "Any") -> None:
+    def sentry_patched_broker__init__(
+        self: "Broker", *args: "Any", **kw: "Any"
+    ) -> None:
         integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
 
         try:
@@ -95,7 +97,14 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         scope.set_extra("dramatiq_message_id", message.message_id)
         scope.add_event_processor(_make_message_event_processor(message, integration))
 
-    def after_process_message(self, broker: "Broker", message: "Message", *, result: "Any" = None, exception: "Optional[Exception]" = None) -> None:
+    def after_process_message(
+        self,
+        broker: "Broker",
+        message: "Message",
+        *,
+        result: "Any" = None,
+        exception: "Optional[Exception]" = None
+    ) -> None:
         integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
         if integration is None:
             return
@@ -122,7 +131,9 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
             message._scope_manager.__exit__(None, None, None)
 
 
-def _make_message_event_processor(message: "Message", integration: "DramatiqIntegration") -> "Callable[[Event, Hint], Optional[Event]]":
+def _make_message_event_processor(
+    message: "Message", integration: "DramatiqIntegration"
+) -> "Callable[[Event, Hint], Optional[Event]]":
     def inner(event: "Event", hint: "Hint") -> "Optional[Event]":
         with capture_internal_exceptions():
             DramatiqMessageExtractor(message).extract_into_event(event)

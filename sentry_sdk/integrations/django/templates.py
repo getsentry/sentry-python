@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     from typing import Tuple
 
 
-def get_template_frame_from_exception(exc_value: "Optional[BaseException]") -> "Optional[Dict[str, Any]]":
+def get_template_frame_from_exception(
+    exc_value: "Optional[BaseException]",
+) -> "Optional[Dict[str, Any]]":
     # As of Django 1.9 or so the new template debug thing showed up.
     if hasattr(exc_value, "template_debug"):
         return _get_template_frame_from_debug(exc_value.template_debug)  # type: ignore
@@ -75,7 +77,13 @@ def patch_templates() -> None:
 
     @functools.wraps(real_render)
     @ensure_integration_enabled(DjangoIntegration, real_render)
-    def render(request: "django.http.HttpRequest", template_name: str, context: "Optional[Dict[str, Any]]" = None, *args: "Any", **kwargs: "Any") -> "django.http.HttpResponse":
+    def render(
+        request: "django.http.HttpRequest",
+        template_name: str,
+        context: "Optional[Dict[str, Any]]" = None,
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> "django.http.HttpResponse":
         # Inject trace meta tags into template context
         context = context or {}
         if "sentry_trace_meta" not in context:
@@ -135,7 +143,9 @@ def _linebreak_iter(template_source: str) -> "Iterator[int]":
         p = template_source.find("\n", p + 1)
 
 
-def _get_template_frame_from_source(source: "Tuple[Origin, Tuple[int, int]]") -> "Optional[Dict[str, Any]]":
+def _get_template_frame_from_source(
+    source: "Tuple[Origin, Tuple[int, int]]",
+) -> "Optional[Dict[str, Any]]":
     if not source:
         return None
 

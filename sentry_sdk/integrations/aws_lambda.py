@@ -86,7 +86,9 @@ def _wrap_init_error(init_error: "F") -> "F":
 
 def _wrap_handler(handler: "F") -> "F":
     @functools.wraps(handler)
-    def sentry_handler(aws_event: Any, aws_context: Any, *args: Any, **kwargs: Any) -> Any:
+    def sentry_handler(
+        aws_event: Any, aws_context: Any, *args: Any, **kwargs: Any
+    ) -> Any:
 
         # Per https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html,
         # `event` here is *likely* a dictionary, but also might be a number of
@@ -297,10 +299,14 @@ def get_lambda_bootstrap() -> "Optional[Any]":
         return None
 
 
-def _make_request_event_processor(aws_event: Any, aws_context: Any, configured_timeout: Any) -> "EventProcessor":
+def _make_request_event_processor(
+    aws_event: Any, aws_context: Any, configured_timeout: Any
+) -> "EventProcessor":
     start_time = datetime.now(timezone.utc)
 
-    def event_processor(sentry_event: "Event", hint: "Hint", start_time: datetime = start_time) -> "Optional[Event]":
+    def event_processor(
+        sentry_event: "Event", hint: "Hint", start_time: datetime = start_time
+    ) -> "Optional[Event]":
         remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
         exec_duration = configured_timeout - remaining_time_in_milis
 

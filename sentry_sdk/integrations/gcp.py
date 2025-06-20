@@ -41,7 +41,9 @@ if TYPE_CHECKING:
 
 def _wrap_func(func: "F") -> "F":
     @functools.wraps(func)
-    def sentry_func(functionhandler: "Any", gcp_event: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+    def sentry_func(
+        functionhandler: "Any", gcp_event: "Any", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         client = sentry_sdk.get_client()
 
         integration = client.get_integration(GcpIntegration)
@@ -136,7 +138,9 @@ class GcpIntegration(Integration):
         )
 
 
-def _make_request_event_processor(gcp_event: "Any", configured_timeout: "Any", initial_time: "Any") -> "EventProcessor":
+def _make_request_event_processor(
+    gcp_event: "Any", configured_timeout: "Any", initial_time: "Any"
+) -> "EventProcessor":
     def event_processor(event: "Event", hint: "Hint") -> "Optional[Event]":
         final_time = datetime.now(timezone.utc)
         time_diff = final_time - initial_time

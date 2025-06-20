@@ -72,7 +72,9 @@ class PyramidIntegration(Integration):
         old_call_view = router._call_view
 
         @functools.wraps(old_call_view)
-        def sentry_patched_call_view(registry: "Any", request: "Request", *args: "Any", **kwargs: "Any") -> "Response":
+        def sentry_patched_call_view(
+            registry: "Any", request: "Request", *args: "Any", **kwargs: "Any"
+        ) -> "Response":
             integration = sentry_sdk.get_client().get_integration(PyramidIntegration)
             if integration is None:
                 return old_call_view(registry, request, *args, **kwargs)
@@ -92,7 +94,9 @@ class PyramidIntegration(Integration):
         if hasattr(Request, "invoke_exception_view"):
             old_invoke_exception_view = Request.invoke_exception_view
 
-            def sentry_patched_invoke_exception_view(self: "Request", *args: "Any", **kwargs: "Any") -> "Any":
+            def sentry_patched_invoke_exception_view(
+                self: "Request", *args: "Any", **kwargs: "Any"
+            ) -> "Any":
                 rv = old_invoke_exception_view(self, *args, **kwargs)
 
                 if (
@@ -111,8 +115,12 @@ class PyramidIntegration(Integration):
         old_wsgi_call = router.Router.__call__
 
         @ensure_integration_enabled(PyramidIntegration, old_wsgi_call)
-        def sentry_patched_wsgi_call(self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]") -> "_ScopedResponse":
-            def sentry_patched_inner_wsgi_call(environ: "Dict[str, Any]", start_response: "Callable[..., Any]") -> "Any":
+        def sentry_patched_wsgi_call(
+            self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
+        ) -> "_ScopedResponse":
+            def sentry_patched_inner_wsgi_call(
+                environ: "Dict[str, Any]", start_response: "Callable[..., Any]"
+            ) -> "Any":
                 try:
                     return old_wsgi_call(self, environ, start_response)
                 except Exception:
@@ -143,7 +151,9 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _set_transaction_name_and_source(scope: "sentry_sdk.Scope", transaction_style: str, request: "Request") -> None:
+def _set_transaction_name_and_source(
+    scope: "sentry_sdk.Scope", transaction_style: str, request: "Request"
+) -> None:
     try:
         name_for_style = {
             "route_name": request.matched_route.name,
@@ -192,7 +202,9 @@ class PyramidRequestExtractor(RequestExtractor):
             return 0
 
 
-def _make_event_processor(weak_request: "Callable[[], Request]", integration: "PyramidIntegration") -> "EventProcessor":
+def _make_event_processor(
+    weak_request: "Callable[[], Request]", integration: "PyramidIntegration"
+) -> "EventProcessor":
     def pyramid_event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
         request = weak_request()
         if request is None:

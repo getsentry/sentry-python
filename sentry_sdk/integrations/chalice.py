@@ -55,7 +55,9 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                 reraise(*exc_info)
 
 
-def _get_view_function_response(app: Any, view_function: "F", function_args: Any) -> "F":
+def _get_view_function_response(
+    app: Any, view_function: "F", function_args: Any
+) -> "F":
     @wraps(view_function)
     def wrapped_view_function(**function_args: Any) -> Any:
         client = sentry_sdk.get_client()
@@ -112,7 +114,9 @@ class ChaliceIntegration(Integration):
                 RestAPIEventHandler._get_view_function_response
             )
 
-        def sentry_event_response(app: Any, view_function: "F", function_args: "Dict[str, Any]") -> Any:
+        def sentry_event_response(
+            app: Any, view_function: "F", function_args: "Dict[str, Any]"
+        ) -> Any:
             wrapped_view_function = _get_view_function_response(
                 app, view_function, function_args
             )

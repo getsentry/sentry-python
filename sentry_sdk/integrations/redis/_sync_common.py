@@ -62,7 +62,9 @@ def patch_redis_pipeline(
     pipeline_cls.execute = sentry_patched_execute
 
 
-def patch_redis_client(cls: "Any", is_cluster: bool, get_db_data_fn: "Callable[[Any], dict[str, Any]]") -> None:
+def patch_redis_client(
+    cls: "Any", is_cluster: bool, get_db_data_fn: "Callable[[Any], dict[str, Any]]"
+) -> None:
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
@@ -71,7 +73,9 @@ def patch_redis_client(cls: "Any", is_cluster: bool, get_db_data_fn: "Callable[[
 
     from sentry_sdk.integrations.redis import RedisIntegration
 
-    def sentry_patched_execute_command(self: "Any", name: str, *args: "Any", **kwargs: "Any") -> "Any":
+    def sentry_patched_execute_command(
+        self: "Any", name: str, *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         integration = sentry_sdk.get_client().get_integration(RedisIntegration)
         if integration is None:
             return old_execute_command(self, name, *args, **kwargs)

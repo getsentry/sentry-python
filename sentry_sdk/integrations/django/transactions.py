@@ -100,7 +100,12 @@ class RavenResolver:
 
         return result
 
-    def _resolve(self, resolver: "URLResolver", path: str, parents: "Optional[List[URLResolver]]" = None) -> "Optional[str]":
+    def _resolve(
+        self,
+        resolver: "URLResolver",
+        path: str,
+        parents: "Optional[List[URLResolver]]" = None,
+    ) -> "Optional[str]":
         match = get_regex(resolver).search(path)  # Django < 2.0
 
         if not match:

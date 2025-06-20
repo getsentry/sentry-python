@@ -95,7 +95,11 @@ class ThreadingIntegration(Integration):
         Thread.start = sentry_start  # type: ignore
 
 
-def _wrap_run(isolation_scope_to_use: "sentry_sdk.Scope", current_scope_to_use: "sentry_sdk.Scope", old_run_func: "F") -> "F":
+def _wrap_run(
+    isolation_scope_to_use: "sentry_sdk.Scope",
+    current_scope_to_use: "sentry_sdk.Scope",
+    old_run_func: "F",
+) -> "F":
     @wraps(old_run_func)
     def run(*a: "Any", **kw: "Any") -> "Any":
         def _run_old_run_func() -> "Any":

@@ -70,7 +70,11 @@ except ImportError:
 _scheduler: "Optional[ContinuousScheduler]" = None
 
 
-def setup_continuous_profiler(options: "Dict[str, Any]", sdk_info: "SDKInfo", capture_func: "Callable[[Envelope], None]") -> bool:
+def setup_continuous_profiler(
+    options: "Dict[str, Any]",
+    sdk_info: "SDKInfo",
+    capture_func: "Callable[[Envelope], None]",
+) -> bool:
     global _scheduler
 
     if _scheduler is not None:
@@ -160,7 +164,9 @@ def get_profiler_id() -> "Union[str, None]":
     return _scheduler.profiler_id
 
 
-def determine_profile_session_sampling_decision(sample_rate: "Union[float, None]") -> bool:
+def determine_profile_session_sampling_decision(
+    sample_rate: "Union[float, None]",
+) -> bool:
     # `None` is treated as `0.0`
     if not sample_rate:
         return False
@@ -178,7 +184,13 @@ class ContinuousProfile:
 class ContinuousScheduler:
     mode: "ContinuousProfilerMode" = "unknown"
 
-    def __init__(self, frequency: int, options: "Dict[str, Any]", sdk_info: "SDKInfo", capture_func: "Callable[[Envelope], None]") -> None:
+    def __init__(
+        self,
+        frequency: int,
+        options: "Dict[str, Any]",
+        sdk_info: "SDKInfo",
+        capture_func: "Callable[[Envelope], None]",
+    ) -> None:
         self.interval = 1.0 / frequency
         self.options = options
         self.sdk_info = sdk_info
@@ -393,7 +405,13 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     mode: "ContinuousProfilerMode" = "thread"
     name = "sentry.profiler.ThreadContinuousScheduler"
 
-    def __init__(self, frequency: int, options: "Dict[str, Any]", sdk_info: "SDKInfo", capture_func: "Callable[[Envelope], None]") -> None:
+    def __init__(
+        self,
+        frequency: int,
+        options: "Dict[str, Any]",
+        sdk_info: "SDKInfo",
+        capture_func: "Callable[[Envelope], None]",
+    ) -> None:
         super().__init__(frequency, options, sdk_info, capture_func)
 
         self.thread: "Optional[threading.Thread]" = None
@@ -460,7 +478,13 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
     mode: "ContinuousProfilerMode" = "gevent"
 
-    def __init__(self, frequency: int, options: "Dict[str, Any]", sdk_info: "SDKInfo", capture_func: "Callable[[Envelope], None]") -> None:
+    def __init__(
+        self,
+        frequency: int,
+        options: "Dict[str, Any]",
+        sdk_info: "SDKInfo",
+        capture_func: "Callable[[Envelope], None]",
+    ) -> None:
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
@@ -514,7 +538,13 @@ PROFILE_BUFFER_SECONDS = 60
 
 
 class ProfileBuffer:
-    def __init__(self, options: "Dict[str, Any]", sdk_info: "SDKInfo", buffer_size: int, capture_func: "Callable[[Envelope], None]") -> None:
+    def __init__(
+        self,
+        options: "Dict[str, Any]",
+        sdk_info: "SDKInfo",
+        buffer_size: int,
+        capture_func: "Callable[[Envelope], None]",
+    ) -> None:
         self.options = options
         self.sdk_info = sdk_info
         self.buffer_size = buffer_size
@@ -594,7 +624,9 @@ class ProfileChunk:
                 # When this happens, we abandon the current sample as it's bad.
                 capture_internal_exception(sys.exc_info())
 
-    def to_json(self, profiler_id: str, options: "Dict[str, Any]", sdk_info: "SDKInfo") -> "Dict[str, Any]":
+    def to_json(
+        self, profiler_id: str, options: "Dict[str, Any]", sdk_info: "SDKInfo"
+    ) -> "Dict[str, Any]":
         profile = {
             "frames": self.frames,
             "stacks": self.stacks,

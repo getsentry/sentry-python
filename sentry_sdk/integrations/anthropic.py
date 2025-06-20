@@ -80,7 +80,12 @@ def _get_responses(content: "list[Any]") -> "list[dict[str, Any]]":
     return responses
 
 
-def _collect_ai_data(event: "MessageStreamEvent", input_tokens: int, output_tokens: int, content_blocks: "list[str]") -> "tuple[int, int, list[str]]":
+def _collect_ai_data(
+    event: "MessageStreamEvent",
+    input_tokens: int,
+    output_tokens: int,
+    content_blocks: "list[str]",
+) -> "tuple[int, int, list[str]]":
     """
     Count token usage and collect content blocks from the AI streaming response.
     """
@@ -106,7 +111,11 @@ def _collect_ai_data(event: "MessageStreamEvent", input_tokens: int, output_toke
 
 
 def _add_ai_data_to_span(
-    span: "Span", integration: "AnthropicIntegration", input_tokens: int, output_tokens: int, content_blocks: "list[str]"
+    span: "Span",
+    integration: "AnthropicIntegration",
+    input_tokens: int,
+    output_tokens: int,
+    content_blocks: "list[str]",
 ) -> None:
     """
     Add token usage and content blocks from the AI streaming response to the span.

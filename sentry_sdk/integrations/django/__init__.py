@@ -149,7 +149,9 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         @ensure_integration_enabled(DjangoIntegration, old_app)
-        def sentry_patched_wsgi_handler(self, environ: "Dict[str, str]", start_response: "Callable[..., Any]") -> "_ScopedResponse":
+        def sentry_patched_wsgi_handler(
+            self, environ: "Dict[str, str]", start_response: "Callable[..., Any]"
+        ) -> "_ScopedResponse":
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
             from django.conf import settings
@@ -179,7 +181,9 @@ class DjangoIntegration(Integration):
         signals.got_request_exception.connect(_got_request_exception)
 
         @add_global_event_processor
-        def process_django_templates(event: "Event", hint: "Optional[Hint]") -> "Optional[Event]":
+        def process_django_templates(
+            event: "Event", hint: "Optional[Hint]"
+        ) -> "Optional[Event]":
             if hint is None:
                 return event
 
@@ -221,7 +225,9 @@ class DjangoIntegration(Integration):
             return event
 
         @add_global_repr_processor
-        def _django_queryset_repr(value: "Any", hint: "Dict[str, Any]") -> "Union[NotImplementedType, str]":
+        def _django_queryset_repr(
+            value: "Any", hint: "Dict[str, Any]"
+        ) -> "Union[NotImplementedType, str]":
             try:
                 # Django 1.6 can fail to import `QuerySet` when Django settings
                 # have not yet been initialized.
@@ -299,7 +305,9 @@ def _patch_drf() -> None:
                 old_drf_initial = APIView.initial
 
                 @functools.wraps(old_drf_initial)
-                def sentry_patched_drf_initial(self: "APIView", request: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+                def sentry_patched_drf_initial(
+                    self: "APIView", request: "Any", *args: "Any", **kwargs: "Any"
+                ) -> "Any":
                     with capture_internal_exceptions():
                         request._request._sentry_drf_request_backref = weakref.ref(
                             request
@@ -355,7 +363,9 @@ def _patch_django_asgi_handler() -> None:
     patch_django_asgi_handler_impl(ASGIHandler)
 
 
-def _set_transaction_name_and_source(scope: "sentry_sdk.Scope", transaction_style: str, request: "WSGIRequest") -> None:
+def _set_transaction_name_and_source(
+    scope: "sentry_sdk.Scope", transaction_style: str, request: "WSGIRequest"
+) -> None:
     try:
         transaction_name = None
         if transaction_style == "function_name":
@@ -414,7 +424,9 @@ def _before_get_response(request: "WSGIRequest") -> None:
     )
 
 
-def _attempt_resolve_again(request: "WSGIRequest", scope: "sentry_sdk.Scope", transaction_style: str) -> None:
+def _attempt_resolve_again(
+    request: "WSGIRequest", scope: "sentry_sdk.Scope", transaction_style: str
+) -> None:
     """
     Some django middlewares overwrite request.urlconf
     so we need to respect that contract,
@@ -444,7 +456,9 @@ def _patch_get_response() -> None:
     old_get_response = BaseHandler.get_response
 
     @functools.wraps(old_get_response)
-    def sentry_patched_get_response(self: "Any", request: "WSGIRequest") -> "Union[HttpResponse, BaseException]":
+    def sentry_patched_get_response(
+        self: "Any", request: "WSGIRequest"
+    ) -> "Union[HttpResponse, BaseException]":
         _before_get_response(request)
         rv = old_get_response(self, request)
         _after_get_response(request)
@@ -458,7 +472,9 @@ def _patch_get_response() -> None:
         patch_get_response_async(BaseHandler, _before_get_response)
 
 
-def _make_wsgi_request_event_processor(weak_request: "Callable[[], WSGIRequest]", integration: "DjangoIntegration") -> "EventProcessor":
+def _make_wsgi_request_event_processor(
+    weak_request: "Callable[[], WSGIRequest]", integration: "DjangoIntegration"
+) -> "EventProcessor":
     def wsgi_request_event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
@@ -587,7 +603,9 @@ def install_sql_hook() -> None:
     real_connect = BaseDatabaseWrapper.connect
 
     @ensure_integration_enabled(DjangoIntegration, real_execute)
-    def execute(self: "CursorWrapper", sql: "Any", params: "Optional[Any]" = None) -> "Any":
+    def execute(
+        self: "CursorWrapper", sql: "Any", params: "Optional[Any]" = None
+    ) -> "Any":
         with record_sql_queries(
             cursor=self.cursor,
             query=sql,
@@ -605,7 +623,9 @@ def install_sql_hook() -> None:
         return result
 
     @ensure_integration_enabled(DjangoIntegration, real_executemany)
-    def executemany(self: "CursorWrapper", sql: "Any", param_list: "List[Any]") -> "Any":
+    def executemany(
+        self: "CursorWrapper", sql: "Any", param_list: "List[Any]"
+    ) -> "Any":
         with record_sql_queries(
             cursor=self.cursor,
             query=sql,

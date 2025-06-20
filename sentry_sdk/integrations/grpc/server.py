@@ -18,12 +18,18 @@ except ImportError:
 
 
 class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
-    def __init__(self, find_name: "Optional[Callable[[ServicerContext], str]]" = None) -> None:
+    def __init__(
+        self, find_name: "Optional[Callable[[ServicerContext], str]]" = None
+    ) -> None:
         self._find_method_name = find_name or ServerInterceptor._find_name
 
         super().__init__()
 
-    def intercept_service(self, continuation: "Callable[[HandlerCallDetails], RpcMethodHandler]", handler_call_details: "HandlerCallDetails") -> "RpcMethodHandler":
+    def intercept_service(
+        self,
+        continuation: "Callable[[HandlerCallDetails], RpcMethodHandler]",
+        handler_call_details: "HandlerCallDetails",
+    ) -> "RpcMethodHandler":
         handler = continuation(handler_call_details)
         if not handler or not handler.unary_unary:
             return handler

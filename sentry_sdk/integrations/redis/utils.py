@@ -106,7 +106,11 @@ def _key_as_string(key: "Any") -> str:
     return key
 
 
-def _get_safe_key(method_name: str, args: "Optional[tuple[Any, ...]]", kwargs: "Optional[dict[str, Any]]") -> "Optional[tuple[str, ...]]":
+def _get_safe_key(
+    method_name: str,
+    args: "Optional[tuple[Any, ...]]",
+    kwargs: "Optional[dict[str, Any]]",
+) -> "Optional[tuple[str, ...]]":
     """
     Gets the key (or keys) from the given method_name.
     The method_name could be a redis command or a django caching command
@@ -140,7 +144,12 @@ def _parse_rediscluster_command(command: "Any") -> "Sequence[Any]":
     return command.args
 
 
-def _get_pipeline_data(is_cluster: bool, get_command_args_fn: "Any", is_transaction: bool, command_seq: "Sequence[Any]") -> "dict[str, Any]":
+def _get_pipeline_data(
+    is_cluster: bool,
+    get_command_args_fn: "Any",
+    is_transaction: bool,
+    command_seq: "Sequence[Any]",
+) -> "dict[str, Any]":
     data: "dict[str, Any]" = {
         "redis.is_cluster": is_cluster,
         "redis.transaction": is_transaction,

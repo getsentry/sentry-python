@@ -67,7 +67,9 @@ def _transport_method(transport: "Union[Transport, AsyncTransport]") -> str:
         return "POST"
 
 
-def _request_info_from_transport(transport: "Union[Transport, AsyncTransport, None]") -> "Dict[str, str]":
+def _request_info_from_transport(
+    transport: "Union[Transport, AsyncTransport, None]",
+) -> "Dict[str, str]":
     if transport is None:
         return {}
 
@@ -87,7 +89,9 @@ def _patch_execute() -> None:
     real_execute = gql.Client.execute
 
     @ensure_integration_enabled(GQLIntegration, real_execute)
-    def sentry_patched_execute(self: "Any", document: "DocumentNode", *args: "Any", **kwargs: "Any") -> "Any":
+    def sentry_patched_execute(
+        self: "Any", document: "DocumentNode", *args: "Any", **kwargs: "Any"
+    ) -> "Any":
         scope = sentry_sdk.get_isolation_scope()
         scope.add_event_processor(_make_gql_event_processor(self, document))
 
@@ -106,7 +110,9 @@ def _patch_execute() -> None:
     gql.Client.execute = sentry_patched_execute
 
 
-def _make_gql_event_processor(client: "Any", document: "DocumentNode") -> "EventProcessor":
+def _make_gql_event_processor(
+    client: "Any", document: "DocumentNode"
+) -> "EventProcessor":
     def processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         try:
             errors = hint["exc_info"][1].errors

@@ -155,7 +155,9 @@ class SentryAsgiMiddleware:
     async def _run_asgi3(self, scope: Any, receive: Any, send: Any) -> Any:
         return await self._run_app(scope, receive, send, asgi_version=3)
 
-    async def _run_original_app(self, scope: Any, receive: Any, send: Any, asgi_version: int) -> Any:
+    async def _run_original_app(
+        self, scope: Any, receive: Any, send: Any, asgi_version: int
+    ) -> Any:
         try:
             if asgi_version == 2:
                 return await self.app(scope)(receive, send)
@@ -166,7 +168,9 @@ class SentryAsgiMiddleware:
             _capture_exception(exc, mechanism_type=self.mechanism_type)
             raise exc from None
 
-    async def _run_app(self, scope: Any, receive: Any, send: Any, asgi_version: int) -> Any:
+    async def _run_app(
+        self, scope: Any, receive: Any, send: Any, asgi_version: int
+    ) -> Any:
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         is_lifespan = scope["type"] == "lifespan"
         if is_recursive_asgi_middleware or is_lifespan:
@@ -220,7 +224,9 @@ class SentryAsgiMiddleware:
                                 logger.debug("[ASGI] Started transaction: %s", span)
                                 span.set_tag("asgi.type", ty)
 
-                            async def _sentry_wrapped_send(event: "Dict[str, Any]") -> Any:
+                            async def _sentry_wrapped_send(
+                                event: "Dict[str, Any]",
+                            ) -> Any:
                                 is_http_response = (
                                     event.get("type") == "http.response.start"
                                     and span is not None
@@ -237,7 +243,9 @@ class SentryAsgiMiddleware:
         finally:
             _asgi_middleware_applied.set(False)
 
-    def event_processor(self, event: "Event", hint: "Hint", asgi_scope: Any) -> "Optional[Event]":
+    def event_processor(
+        self, event: "Event", hint: "Hint", asgi_scope: Any
+    ) -> "Optional[Event]":
         request_data = event.get("request", {})
         request_data.update(_get_request_data(asgi_scope))
         event["request"] = deepcopy(request_data)
@@ -276,7 +284,9 @@ class SentryAsgiMiddleware:
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
 
-    def _get_transaction_name_and_source(self, transaction_style: str, asgi_scope: Any) -> "Tuple[str, str]":
+    def _get_transaction_name_and_source(
+        self, transaction_style: str, asgi_scope: Any
+    ) -> "Tuple[str, str]":
         name = None
         source = SOURCE_FOR_STYLE[transaction_style]
         ty = asgi_scope.get("type")

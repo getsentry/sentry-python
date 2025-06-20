@@ -47,11 +47,18 @@ class LaunchDarklyHook(Hook):
     def metadata(self) -> "Metadata":
         return Metadata(name="sentry-flag-auditor")
 
-    def after_evaluation(self, series_context: "EvaluationSeriesContext", data: "dict[Any, Any]", detail: "EvaluationDetail") -> "dict[Any, Any]":
+    def after_evaluation(
+        self,
+        series_context: "EvaluationSeriesContext",
+        data: "dict[Any, Any]",
+        detail: "EvaluationDetail",
+    ) -> "dict[Any, Any]":
         if isinstance(detail.value, bool):
             add_feature_flag(series_context.key, detail.value)
 
         return data
 
-    def before_evaluation(self, series_context: "EvaluationSeriesContext", data: "dict[Any, Any]") -> "dict[Any, Any]":
+    def before_evaluation(
+        self, series_context: "EvaluationSeriesContext", data: "dict[Any, Any]"
+    ) -> "dict[Any, Any]":
         return data  # No-op.

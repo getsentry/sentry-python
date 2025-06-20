@@ -179,7 +179,9 @@ def _install_httpx_async_client() -> None:
     AsyncClient.send = send
 
 
-def _add_sentry_baggage_to_headers(headers: "MutableMapping[str, str]", sentry_baggage: str) -> None:
+def _add_sentry_baggage_to_headers(
+    headers: "MutableMapping[str, str]", sentry_baggage: str
+) -> None:
     """Add the Sentry baggage to the headers.
 
     This function directly mutates the provided headers. The provided sentry_baggage

@@ -28,11 +28,15 @@ def serverless_function(f: "F", flush: bool = True) -> "F":
 
 
 @overload
-def serverless_function(f: None = None, flush: bool = True) -> "Callable[[F], F]":  # noqa: F811
+def serverless_function(
+    f: None = None, flush: bool = True
+) -> "Callable[[F], F]":  # noqa: F811
     pass
 
 
-def serverless_function(f: "Optional[F]" = None, flush: bool = True) -> "Union[F, Callable[[F], F]]":  # noqa
+def serverless_function(
+    f: "Optional[F]" = None, flush: bool = True
+) -> "Union[F, Callable[[F], F]]":  # noqa
     def wrapper(f: "F") -> "F":
         @wraps(f)
         def inner(*args: Any, **kwargs: Any) -> Any:

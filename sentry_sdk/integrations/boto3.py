@@ -40,7 +40,9 @@ class Boto3Integration(Integration):
 
         orig_init = BaseClient.__init__
 
-        def sentry_patched_init(self: "Type[BaseClient]", *args: "Any", **kwargs: "Any") -> None:
+        def sentry_patched_init(
+            self: "Type[BaseClient]", *args: "Any", **kwargs: "Any"
+        ) -> None:
             orig_init(self, *args, **kwargs)
             meta = self.meta
             service_id = meta.service_model.service_id.hyphenize()
@@ -55,7 +57,9 @@ class Boto3Integration(Integration):
 
 
 @ensure_integration_enabled(Boto3Integration)
-def _sentry_request_created(service_id: str, request: "AWSRequest", operation_name: str, **kwargs: "Any") -> None:
+def _sentry_request_created(
+    service_id: str, request: "AWSRequest", operation_name: str, **kwargs: "Any"
+) -> None:
     description = "aws.%s.%s" % (service_id, operation_name)
     span = sentry_sdk.start_span(
         op=OP.HTTP_CLIENT,
@@ -89,7 +93,9 @@ def _sentry_request_created(service_id: str, request: "AWSRequest", operation_na
     request.context["_sentrysdk_span_data"] = data
 
 
-def _sentry_after_call(context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any") -> None:
+def _sentry_after_call(
+    context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
+) -> None:
     span: "Optional[Span]" = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
@@ -141,7 +147,9 @@ def _sentry_after_call(context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kw
     span.__exit__(None, None, None)
 
 
-def _sentry_after_call_error(context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any") -> None:
+def _sentry_after_call_error(
+    context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any"
+) -> None:
     span: "Optional[Span]" = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.

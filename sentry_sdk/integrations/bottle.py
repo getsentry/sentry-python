@@ -75,7 +75,9 @@ class BottleIntegration(Integration):
         old_app = Bottle.__call__
 
         @ensure_integration_enabled(BottleIntegration, old_app)
-        def sentry_patched_wsgi_app(self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]") -> "_ScopedResponse":
+        def sentry_patched_wsgi_app(
+            self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
+        ) -> "_ScopedResponse":
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),
                 span_origin=BottleIntegration.origin,
@@ -107,7 +109,9 @@ class BottleIntegration(Integration):
         old_make_callback = Route._make_callback
 
         @functools.wraps(old_make_callback)
-        def patched_make_callback(self: "Any", *args: object, **kwargs: object) -> "Any":
+        def patched_make_callback(
+            self: "Any", *args: object, **kwargs: object
+        ) -> "Any":
             prepared_callback = old_make_callback(self, *args, **kwargs)
 
             integration = sentry_sdk.get_client().get_integration(BottleIntegration)
@@ -159,7 +163,9 @@ class BottleRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _set_transaction_name_and_source(event: "Event", transaction_style: str, request: "Any") -> None:
+def _set_transaction_name_and_source(
+    event: "Event", transaction_style: str, request: "Any"
+) -> None:
     name = ""
 
     if transaction_style == "url":
@@ -182,7 +188,9 @@ def _set_transaction_name_and_source(event: "Event", transaction_style: str, req
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
 
-def _make_request_event_processor(app: "Any", request: "Any", integration: "BottleIntegration") -> "EventProcessor":
+def _make_request_event_processor(
+    app: "Any", request: "Any", integration: "BottleIntegration"
+) -> "EventProcessor":
     def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
         _set_transaction_name_and_source(event, integration.transaction_style, request)
 

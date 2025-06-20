@@ -33,7 +33,9 @@ def _is_auto_session_tracking_enabled(scope: "sentry_sdk.Scope") -> bool:
 
 
 @contextmanager
-def track_session(scope: "sentry_sdk.Scope", session_mode: str = "application") -> "Generator[None, None, None]":
+def track_session(
+    scope: "sentry_sdk.Scope", session_mode: str = "application"
+) -> "Generator[None, None, None]":
     """
     Start a new session in the provided scope, assuming session tracking is enabled.
     This is a no-op context manager if session tracking is not enabled.
