@@ -1,5 +1,5 @@
+from __future__ import annotations
 import contextlib
-import decimal
 import inspect
 import os
 import re
@@ -37,12 +37,8 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Generator
-    from typing import Optional
-    from typing import Union
     from types import FrameType
+    from typing import Any, Dict, Generator, Optional, Union
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -69,23 +65,19 @@ base64_stripped = (
 class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
-        environ,  # type: Mapping[str, str]
-        prefix="HTTP_",  # type: str
-    ):
-        # type: (...) -> None
+        environ: Mapping[str, str],
+        prefix: str = "HTTP_",
+    ) -> None:
         self.environ = environ
         self.prefix = prefix
 
-    def __getitem__(self, key):
-        # type: (str) -> Optional[Any]
+    def __getitem__(self, key: str) -> Optional[Any]:
         return self.environ[self.prefix + key.replace("-", "_").upper()]
 
-    def __len__(self):
-        # type: () -> int
+    def __len__(self) -> int:
         return sum(1 for _ in iter(self))
 
-    def __iter__(self):
-        # type: () -> Generator[str, None, None]
+    def __iter__(self) -> Generator[str, None, None]:
         for k in self.environ:
             if not isinstance(k, str):
                 continue
@@ -97,8 +89,7 @@ class EnvironHeaders(Mapping):  # type: ignore
             yield k[len(self.prefix) :]
 
 
-def has_tracing_enabled(options):
-    # type: (Optional[Dict[str, Any]]) -> bool
+def has_tracing_enabled(options: dict[str, Any]) -> bool:
     """
     Returns True if either traces_sample_rate or traces_sampler is
     defined.
@@ -114,16 +105,14 @@ def has_tracing_enabled(options):
 
 @contextlib.contextmanager
 def record_sql_queries(
-    cursor,  # type: Any
-    query,  # type: Any
-    params_list,  # type:  Any
-    paramstyle,  # type: Optional[str]
-    executemany,  # type: bool
-    record_cursor_repr=False,  # type: bool
-    span_origin=None,  # type: Optional[str]
-):
-    # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
-
+    cursor: Any,
+    query: Any,
+    params_list: Any,
+    paramstyle: Optional[str],
+    executemany: bool,
+    record_cursor_repr: bool = False,
+    span_origin: Optional[str] = None,
+) -> Generator[sentry_sdk.tracing.Span, None, None]:
     # TODO: Bring back capturing of params by default
     if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
         if not params_list or params_list == [None]:
@@ -161,8 +150,7 @@ def record_sql_queries(
         yield span
 
 
-def _get_frame_module_abs_path(frame):
-    # type: (FrameType) -> Optional[str]
+def _get_frame_module_abs_path(frame: FrameType) -> Optional[str]:
     try:
         return frame.f_code.co_filename
     except Exception:
@@ -170,14 +158,13 @@ def _get_frame_module_abs_path(frame):
 
 
 def _should_be_included(
-    is_sentry_sdk_frame,  # type: bool
-    namespace,  # type: Optional[str]
-    in_app_include,  # type: Optional[list[str]]
-    in_app_exclude,  # type: Optional[list[str]]
-    abs_path,  # type: Optional[str]
-    project_root,  # type: Optional[str]
-):
-    # type: (...) -> bool
+    is_sentry_sdk_frame: bool,
+    namespace: Optional[str],
+    in_app_include: Optional[list[str]],
+    in_app_exclude: Optional[list[str]],
+    abs_path: Optional[str],
+    project_root: Optional[str],
+) -> bool:
     # in_app_include takes precedence over in_app_exclude
     should_be_included = _module_in_list(namespace, in_app_include)
     should_be_excluded = _is_external_source(abs_path) or _module_in_list(
@@ -189,8 +176,7 @@ def _should_be_included(
     )
 
 
-def add_query_source(span):
-    # type: (sentry_sdk.tracing.Span) -> None
+def add_query_source(span: sentry_sdk.tracing.Span) -> None:
     """
     Adds OTel compatible source code information to the span
     """
@@ -220,12 +206,12 @@ def add_query_source(span):
     in_app_exclude = client.options.get("in_app_exclude")
 
     # Find the correct frame
-    frame = sys._getframe()  # type: Union[FrameType, None]
+    frame: Optional[FrameType] = sys._getframe()
     while frame is not None:
         abs_path = _get_frame_module_abs_path(frame)
 
         try:
-            namespace = frame.f_globals.get("__name__")  # type: Optional[str]
+            namespace: Optional[str] = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
 
@@ -283,8 +269,9 @@ def add_query_source(span):
             span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
-def extract_sentrytrace_data(header):
-    # type: (Optional[str]) -> Optional[Dict[str, Union[str, bool, None]]]
+def extract_sentrytrace_data(
+    header: Optional[str],
+) -> Optional[Dict[str, Union[str, bool, None]]]:
     """
     Given a `sentry-trace` header string, return a dictionary of data.
     """
@@ -315,8 +302,7 @@ def extract_sentrytrace_data(header):
     }
 
 
-def _format_sql(cursor, sql):
-    # type: (Any, str) -> Optional[str]
+def _format_sql(cursor: Any, sql: str) -> Optional[str]:
 
     real_sql = None
 
@@ -350,13 +336,12 @@ class PropagationContext:
 
     def __init__(
         self,
-        trace_id=None,  # type: Optional[str]
-        span_id=None,  # type: Optional[str]
-        parent_span_id=None,  # type: Optional[str]
-        parent_sampled=None,  # type: Optional[bool]
-        baggage=None,  # type: Optional[Baggage]
-    ):
-        # type: (...) -> None
+        trace_id: Optional[str] = None,
+        span_id: Optional[str] = None,
+        parent_span_id: Optional[str] = None,
+        parent_sampled: Optional[bool] = None,
+        baggage: Optional[Baggage] = None,
+    ) -> None:
         self._trace_id = trace_id
         """The trace id of the Sentry trace."""
 
@@ -376,13 +361,13 @@ class PropagationContext:
         """Baggage object used for dynamic sampling decisions."""
 
     @property
-    def dynamic_sampling_context(self):
-        # type: () -> Optional[Dict[str, str]]
+    def dynamic_sampling_context(self) -> Optional[Dict[str, str]]:
         return self.baggage.dynamic_sampling_context() if self.baggage else None
 
     @classmethod
-    def from_incoming_data(cls, incoming_data):
-        # type: (Dict[str, Any]) -> Optional[PropagationContext]
+    def from_incoming_data(
+        cls, incoming_data: Dict[str, Any]
+    ) -> Optional[PropagationContext]:
         propagation_context = None
 
         normalized_data = normalize_incoming_data(incoming_data)
@@ -405,8 +390,7 @@ class PropagationContext:
         return propagation_context
 
     @property
-    def trace_id(self):
-        # type: () -> str
+    def trace_id(self) -> str:
         """The trace id of the Sentry trace."""
         if not self._trace_id:
             self._trace_id = uuid.uuid4().hex
@@ -414,13 +398,11 @@ class PropagationContext:
         return self._trace_id
 
     @trace_id.setter
-    def trace_id(self, value):
-        # type: (str) -> None
+    def trace_id(self, value: str) -> None:
         self._trace_id = value
 
     @property
-    def span_id(self):
-        # type: () -> str
+    def span_id(self) -> str:
         """The span id of the currently executed span."""
         if not self._span_id:
             self._span_id = uuid.uuid4().hex[16:]
@@ -428,12 +410,10 @@ class PropagationContext:
         return self._span_id
 
     @span_id.setter
-    def span_id(self, value):
-        # type: (str) -> None
+    def span_id(self, value: str) -> None:
         self._span_id = value
 
-    def to_traceparent(self):
-        # type: () -> str
+    def to_traceparent(self) -> str:
         if self.parent_sampled is True:
             sampled = "1"
         elif self.parent_sampled is False:
@@ -447,8 +427,7 @@ class PropagationContext:
 
         return traceparent
 
-    def update(self, other_dict):
-        # type: (Dict[str, Any]) -> None
+    def update(self, other_dict: Dict[str, Any]) -> None:
         """
         Updates the PropagationContext with data from the given dictionary.
         """
@@ -458,8 +437,7 @@ class PropagationContext:
             except AttributeError:
                 pass
 
-    def _fill_sample_rand(self):
-        # type: () -> None
+    def _fill_sample_rand(self) -> None:
         """
         Ensure that there is a valid sample_rand value in the baggage.
 
@@ -522,16 +500,14 @@ class PropagationContext:
 
         self.baggage.sentry_items["sample_rand"] = f"{sample_rand:.6f}"  # noqa: E231
 
-    def _sample_rand(self):
-        # type: () -> Optional[str]
+    def _sample_rand(self) -> Optional[str]:
         """Convenience method to get the sample_rand value from the baggage."""
         if self.baggage is None:
             return None
 
         return self.baggage.sentry_items.get("sample_rand")
 
-    def __repr__(self):
-        # type: (...) -> str
+    def __repr__(self) -> str:
         return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} baggage={} dynamic_sampling_context={}>".format(
             self._trace_id,
             self._span_id,
@@ -558,10 +534,10 @@ class Baggage:
 
     def __init__(
         self,
-        sentry_items,  # type: Dict[str, str]
-        third_party_items="",  # type: str
-        mutable=True,  # type: bool
-    ):
+        sentry_items: Dict[str, str],
+        third_party_items: str = "",
+        mutable: bool = True,
+    ) -> None:
         self.sentry_items = sentry_items
         self.third_party_items = third_party_items
         self.mutable = mutable
@@ -569,9 +545,8 @@ class Baggage:
     @classmethod
     def from_incoming_header(
         cls,
-        header,  # type: Optional[str]
-    ):
-        # type: (...) -> Baggage
+        header: Optional[str],
+    ) -> Baggage:
         """
         freeze if incoming header already has sentry baggage
         """
@@ -597,10 +572,8 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def from_options(cls, scope):
-        # type: (sentry_sdk.scope.Scope) -> Optional[Baggage]
-
-        sentry_items = {}  # type: Dict[str, str]
+    def from_options(cls, scope: sentry_sdk.scope.Scope) -> Optional[Baggage]:
+        sentry_items: Dict[str, str] = {}
         third_party_items = ""
         mutable = False
 
@@ -629,12 +602,10 @@ class Baggage:
 
         return Baggage(sentry_items, third_party_items, mutable)
 
-    def freeze(self):
-        # type: () -> None
+    def freeze(self) -> None:
         self.mutable = False
 
-    def dynamic_sampling_context(self):
-        # type: () -> Dict[str, str]
+    def dynamic_sampling_context(self) -> Dict[str, str]:
         header = {}
 
         for key, item in self.sentry_items.items():
@@ -642,8 +613,7 @@ class Baggage:
 
         return header
 
-    def serialize(self, include_third_party=False):
-        # type: (bool) -> str
+    def serialize(self, include_third_party: bool = False) -> str:
         items = []
 
         for key, val in self.sentry_items.items():
@@ -657,8 +627,7 @@ class Baggage:
         return ",".join(items)
 
     @staticmethod
-    def strip_sentry_baggage(header):
-        # type: (str) -> str
+    def strip_sentry_baggage(header: str) -> str:
         """Remove Sentry baggage from the given header.
 
         Given a Baggage header, return a new Baggage header with all Sentry baggage items removed.
@@ -671,13 +640,11 @@ class Baggage:
             )
         )
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return f'<Baggage "{self.serialize(include_third_party=True)}", mutable={self.mutable}>'
 
 
-def should_propagate_trace(client, url):
-    # type: (sentry_sdk.client.BaseClient, str) -> bool
+def should_propagate_trace(client: sentry_sdk.client.BaseClient, url: str) -> bool:
     """
     Returns True if url matches trace_propagation_targets configured in the given client. Otherwise, returns False.
     """
@@ -689,8 +656,7 @@ def should_propagate_trace(client, url):
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
-def normalize_incoming_data(incoming_data):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+def normalize_incoming_data(incoming_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Normalizes incoming data so the keys are all lowercase with dashes instead of underscores and stripped from known prefixes.
     """
@@ -705,8 +671,7 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
-def start_child_span_decorator(func):
-    # type: (Any) -> Any
+def start_child_span_decorator(func: Any) -> Any:
     """
     Decorator to add child spans for functions.
 
@@ -716,9 +681,7 @@ def start_child_span_decorator(func):
     if inspect.iscoroutinefunction(func):
 
         @wraps(func)
-        async def func_with_tracing(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-
+        async def func_with_tracing(*args: Any, **kwargs: Any) -> Any:
             span = get_current_span()
 
             if span is None:
@@ -737,7 +700,9 @@ def start_child_span_decorator(func):
                 return await func(*args, **kwargs)
 
         try:
-            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+            func_with_tracing.__signature__ = inspect.signature(  # type: ignore[attr-defined]
+                func
+            )
         except Exception:
             pass
 
@@ -745,9 +710,7 @@ def start_child_span_decorator(func):
     else:
 
         @wraps(func)
-        def func_with_tracing(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-
+        def func_with_tracing(*args: Any, **kwargs: Any) -> Any:
             span = get_current_span()
 
             if span is None:
@@ -766,15 +729,18 @@ def start_child_span_decorator(func):
                 return func(*args, **kwargs)
 
         try:
-            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+            func_with_tracing.__signature__ = inspect.signature(  # type: ignore[attr-defined]
+                func
+            )
         except Exception:
             pass
 
     return func_with_tracing
 
 
-def get_current_span(scope=None):
-    # type: (Optional[sentry_sdk.Scope]) -> Optional[sentry_sdk.tracing.Span]
+def get_current_span(
+    scope: Optional[sentry_sdk.scope.Scope] = None,
+) -> Optional[sentry_sdk.tracing.Span]:
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -784,10 +750,9 @@ def get_current_span(scope=None):
 
 
 def _generate_sample_rand(
-    trace_id,  # type: Optional[str]
-    interval=(0.0, 1.0),  # type: tuple[float, float]
-):
-    # type: (...) -> Optional[decimal.Decimal]
+    trace_id: Optional[str],
+    interval: tuple[float, float] = (0.0, 1.0),
+) -> Optional[Decimal]:
     """Generate a sample_rand value from a trace ID.
 
     The generated value will be pseudorandomly chosen from the provided
@@ -817,8 +782,9 @@ def _generate_sample_rand(
         )
 
 
-def _sample_rand_range(parent_sampled, sample_rate):
-    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
+def _sample_rand_range(
+    parent_sampled: Optional[bool], sample_rate: Optional[float]
+) -> tuple[float, float]:
     """
     Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
     that a generated sample_rand value must fall into, given the parent_sampled and
@@ -832,8 +798,7 @@ def _sample_rand_range(parent_sampled, sample_rate):
         return sample_rate, 1.0
 
 
-def get_span_status_from_http_code(http_status_code):
-    # type: (int) -> str
+def get_span_status_from_http_code(http_status_code: int) -> str:
     """
     Returns the Sentry status corresponding to the given HTTP status code.
 
