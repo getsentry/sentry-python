@@ -76,10 +76,8 @@ import threading
 from collections import deque
 from time import time
 
-from typing import TYPE_CHECKING
+from typing import Any
 
-if TYPE_CHECKING:
-    from typing import Any
 
 __all__ = ["EmptyError", "FullError", "Queue"]
 
@@ -275,7 +273,7 @@ class Queue:
 
     # Initialize the queue representation
     def _init(self, maxsize):
-        self.queue = deque()  # type: Any
+        self.queue: Any = deque()
 
     def _qsize(self):
         return len(self.queue)

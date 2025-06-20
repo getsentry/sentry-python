@@ -1,14 +1,15 @@
+from __future__ import annotations
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     AnnotatedValue,
     iter_event_frames,
 )
 
-from typing import TYPE_CHECKING, cast, List, Dict
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from typing import List, Dict, Optional
     from sentry_sdk._types import Event
-    from typing import Optional
 
 
 DEFAULT_DENYLIST = [
@@ -60,9 +61,12 @@ DEFAULT_PII_DENYLIST = [
 
 class EventScrubber:
     def __init__(
-        self, denylist=None, recursive=False, send_default_pii=False, pii_denylist=None
-    ):
-        # type: (Optional[List[str]], bool, bool, Optional[List[str]]) -> None
+        self,
+        denylist: Optional[List[str]] = None,
+        recursive: bool = False,
+        send_default_pii: bool = False,
+        pii_denylist: Optional[List[str]] = None,
+    ) -> None:
         """
         A scrubber that goes through the event payload and removes sensitive data configured through denylists.
 
@@ -82,8 +86,7 @@ class EventScrubber:
         self.denylist = [x.lower() for x in self.denylist]
         self.recursive = recursive
 
-    def scrub_list(self, lst):
-        # type: (object) -> None
+    def scrub_list(self, lst: object) -> None:
         """
         If a list is passed to this method, the method recursively searches the list and any
         nested lists for any dictionaries. The method calls scrub_dict on all dictionaries
@@ -97,8 +100,7 @@ class EventScrubber:
             self.scrub_dict(v)  # no-op unless v is a dict
             self.scrub_list(v)  # no-op unless v is a list
 
-    def scrub_dict(self, d):
-        # type: (object) -> None
+    def scrub_dict(self, d: object) -> None:
         """
         If a dictionary is passed to this method, the method scrubs the dictionary of any
         sensitive data. The method calls itself recursively on any nested dictionaries (
@@ -117,8 +119,7 @@ class EventScrubber:
                 self.scrub_dict(v)  # no-op unless v is a dict
                 self.scrub_list(v)  # no-op unless v is a list
 
-    def scrub_request(self, event):
-        # type: (Event) -> None
+    def scrub_request(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "request" in event:
                 if "headers" in event["request"]:
@@ -128,20 +129,17 @@ class EventScrubber:
                 if "data" in event["request"]:
                     self.scrub_dict(event["request"]["data"])
 
-    def scrub_extra(self, event):
-        # type: (Event) -> None
+    def scrub_extra(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "extra" in event:
                 self.scrub_dict(event["extra"])
 
-    def scrub_user(self, event):
-        # type: (Event) -> None
+    def scrub_user(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "user" in event:
                 self.scrub_dict(event["user"])
 
-    def scrub_breadcrumbs(self, event):
-        # type: (Event) -> None
+    def scrub_breadcrumbs(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "breadcrumbs" in event:
                 if (
@@ -152,23 +150,20 @@ class EventScrubber:
                         if "data" in value:
                             self.scrub_dict(value["data"])
 
-    def scrub_frames(self, event):
-        # type: (Event) -> None
+    def scrub_frames(self, event: Event) -> None:
         with capture_internal_exceptions():
             for frame in iter_event_frames(event):
                 if "vars" in frame:
                     self.scrub_dict(frame["vars"])
 
-    def scrub_spans(self, event):
-        # type: (Event) -> None
+    def scrub_spans(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "spans" in event:
-                for span in cast(List[Dict[str, object]], event["spans"]):
+                for span in cast("List[Dict[str, object]]", event["spans"]):
                     if "data" in span:
                         self.scrub_dict(span["data"])
 
-    def scrub_event(self, event):
-        # type: (Event) -> None
+    def scrub_event(self, event: Event) -> None:
         self.scrub_request(event)
         self.scrub_extra(event)
         self.scrub_user(event)
