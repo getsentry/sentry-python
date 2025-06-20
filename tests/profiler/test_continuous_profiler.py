@@ -390,32 +390,55 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
 
     thread = threading.current_thread()
 
+    all_profiler_ids = set()
+
     for _ in range(3):
         envelopes.clear()
 
+        profiler_ids = set()
+
         with sentry_sdk.start_span(name="profiling 1"):
             assert get_profiler_id() is not None, "profiler should be running"
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
+
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.1)
-            assert get_profiler_id() is not None, "profiler should be running"
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
+
+        time.sleep(0.03)
 
         # the profiler takes a while to stop in auto mode so if we start
         # a transaction immediately, it'll be part of the same chunk
-        assert get_profiler_id() is not None, "profiler should be running"
+        profiler_id = get_profiler_id()
+        assert profiler_id is not None, "profiler should be running"
+        profiler_ids.add(profiler_id)
 
         with sentry_sdk.start_span(name="profiling 2"):
-            assert get_profiler_id() is not None, "profiler should be running"
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.1)
-            assert get_profiler_id() is not None, "profiler should be running"
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
 
         # wait at least 1 cycle for the profiler to stop
         time.sleep(0.2)
         assert get_profiler_id() is None, "profiler should not be running"
 
+        assert len(profiler_ids) == 1
+        all_profiler_ids.add(profiler_ids.pop())
+
         assert_single_transaction_with_profile_chunks(
             envelopes, thread, max_chunks=1, transactions=2
         )
+
+    assert len(all_profiler_ids) == 3
 
 
 @pytest.mark.parametrize(
