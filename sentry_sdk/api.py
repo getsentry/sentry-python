@@ -1,3 +1,4 @@
+from __future__ import annotations
 import inspect
 from contextlib import contextmanager
 
@@ -20,20 +21,22 @@ from sentry_sdk.opentelemetry.scope import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Callable
-    from typing import TypeVar
-    from typing import Union
-    from typing import Generator
-
-    import sentry_sdk
+    from typing import Any, Optional, Callable, TypeVar, Union, Generator
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
+
+    from collections.abc import Mapping
+    from sentry_sdk.client import BaseClient
+    from sentry_sdk.tracing import Span
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        LogLevelStr,
+        ExcInfo,
+        BreadcrumbHint,
+        Breadcrumb,
+    )
 
 
 # When changing this, update __all__ in __init__.py too
@@ -72,8 +75,7 @@ __all__ = [
 ]
 
 
-def scopemethod(f):
-    # type: (F) -> F
+def scopemethod(f: F) -> F:
     f.__doc__ = "%s\n\n%s" % (
         "Alias for :py:meth:`sentry_sdk.Scope.%s`" % f.__name__,
         inspect.getdoc(getattr(Scope, f.__name__)),
@@ -81,8 +83,7 @@ def scopemethod(f):
     return f
 
 
-def clientmethod(f):
-    # type: (F) -> F
+def clientmethod(f: F) -> F:
     f.__doc__ = "%s\n\n%s" % (
         "Alias for :py:meth:`sentry_sdk.Client.%s`" % f.__name__,
         inspect.getdoc(getattr(Client, f.__name__)),
@@ -91,13 +92,11 @@ def clientmethod(f):
 
 
 @scopemethod
-def get_client():
-    # type: () -> sentry_sdk.client.BaseClient
+def get_client() -> BaseClient:
     return Scope.get_client()
 
 
-def is_initialized():
-    # type: () -> bool
+def is_initialized() -> bool:
     """
     .. versionadded:: 2.0.0
 
@@ -111,26 +110,22 @@ def is_initialized():
 
 
 @scopemethod
-def get_global_scope():
-    # type: () -> BaseScope
+def get_global_scope() -> BaseScope:
     return Scope.get_global_scope()
 
 
 @scopemethod
-def get_isolation_scope():
-    # type: () -> Scope
+def get_isolation_scope() -> Scope:
     return Scope.get_isolation_scope()
 
 
 @scopemethod
-def get_current_scope():
-    # type: () -> Scope
+def get_current_scope() -> Scope:
     return Scope.get_current_scope()
 
 
 @scopemethod
-def last_event_id():
-    # type: () -> Optional[str]
+def last_event_id() -> Optional[str]:
     """
     See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding
     this method's limitations.
@@ -140,23 +135,21 @@ def last_event_id():
 
 @scopemethod
 def capture_event(
-    event,  # type: sentry_sdk._types.Event
-    hint=None,  # type: Optional[sentry_sdk._types.Hint]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    event: Event,
+    hint: Optional[Hint] = None,
+    scope: Optional[Any] = None,
+    **scope_kwargs: Any,
+) -> Optional[str]:
     return get_current_scope().capture_event(event, hint, scope=scope, **scope_kwargs)
 
 
 @scopemethod
 def capture_message(
-    message,  # type: str
-    level=None,  # type: Optional[sentry_sdk._types.LogLevelStr]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    message: str,
+    level: Optional[LogLevelStr] = None,
+    scope: Optional[Any] = None,
+    **scope_kwargs: Any,
+) -> Optional[str]:
     return get_current_scope().capture_message(
         message, level, scope=scope, **scope_kwargs
     )
@@ -164,23 +157,21 @@ def capture_message(
 
 @scopemethod
 def capture_exception(
-    error=None,  # type: Optional[Union[BaseException, sentry_sdk._types.ExcInfo]]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    error: Optional[Union[BaseException, ExcInfo]] = None,
+    scope: Optional[Any] = None,
+    **scope_kwargs: Any,
+) -> Optional[str]:
     return get_current_scope().capture_exception(error, scope=scope, **scope_kwargs)
 
 
 @scopemethod
 def add_attachment(
-    bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
-    filename=None,  # type: Optional[str]
-    path=None,  # type: Optional[str]
-    content_type=None,  # type: Optional[str]
-    add_to_transactions=False,  # type: bool
-):
-    # type: (...) -> None
+    bytes: Union[None, bytes, Callable[[], bytes]] = None,
+    filename: Optional[str] = None,
+    path: Optional[str] = None,
+    content_type: Optional[str] = None,
+    add_to_transactions: bool = False,
+) -> None:
     return get_isolation_scope().add_attachment(
         bytes, filename, path, content_type, add_to_transactions
     )
@@ -188,61 +179,52 @@ def add_attachment(
 
 @scopemethod
 def add_breadcrumb(
-    crumb=None,  # type: Optional[sentry_sdk._types.Breadcrumb]
-    hint=None,  # type: Optional[sentry_sdk._types.BreadcrumbHint]
-    **kwargs,  # type: Any
-):
-    # type: (...) -> None
+    crumb: Optional[Breadcrumb] = None,
+    hint: Optional[BreadcrumbHint] = None,
+    **kwargs: Any,
+) -> None:
     return get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
 
 @scopemethod
-def set_tag(key, value):
-    # type: (str, Any) -> None
+def set_tag(key: str, value: Any) -> None:
     return get_isolation_scope().set_tag(key, value)
 
 
 @scopemethod
-def set_tags(tags):
-    # type: (Mapping[str, object]) -> None
+def set_tags(tags: Mapping[str, object]) -> None:
     return get_isolation_scope().set_tags(tags)
 
 
 @scopemethod
-def set_context(key, value):
-    # type: (str, Dict[str, Any]) -> None
+def set_context(key: str, value: dict[str, Any]) -> None:
     return get_isolation_scope().set_context(key, value)
 
 
 @scopemethod
-def set_extra(key, value):
-    # type: (str, Any) -> None
+def set_extra(key: str, value: Any) -> None:
     return get_isolation_scope().set_extra(key, value)
 
 
 @scopemethod
-def set_user(value):
-    # type: (Optional[Dict[str, Any]]) -> None
+def set_user(value: Optional[dict[str, Any]]) -> None:
     return get_isolation_scope().set_user(value)
 
 
 @scopemethod
-def set_level(value):
-    # type: (sentry_sdk._types.LogLevelStr) -> None
+def set_level(value: LogLevelStr) -> None:
     return get_isolation_scope().set_level(value)
 
 
 @clientmethod
 def flush(
-    timeout=None,  # type: Optional[float]
-    callback=None,  # type: Optional[Callable[[int, float], None]]
-):
-    # type: (...) -> None
+    timeout: Optional[float] = None,
+    callback: Optional[Callable[[int, float], None]] = None,
+) -> None:
     return get_client().flush(timeout=timeout, callback=callback)
 
 
-def start_span(**kwargs):
-    # type: (Any) -> sentry_sdk.tracing.Span
+def start_span(**kwargs: Any) -> Span:
     """
     Start and return a span.
 
@@ -258,11 +240,7 @@ def start_span(**kwargs):
     return get_current_scope().start_span(**kwargs)
 
 
-def start_transaction(
-    transaction=None,  # type: Optional[sentry_sdk.tracing.Span]
-    **kwargs,  # type: Any
-):
-    # type: (...) -> sentry_sdk.tracing.Span
+def start_transaction(transaction: Optional[Span] = None, **kwargs: Any) -> Span:
     """
     .. deprecated:: 3.0.0
         This function is deprecated and will be removed in a future release.
@@ -301,24 +279,21 @@ def start_transaction(
     )
 
 
-def get_current_span(scope=None):
-    # type: (Optional[Scope]) -> Optional[sentry_sdk.tracing.Span]
+def get_current_span(scope: Optional[Scope] = None) -> Optional[Span]:
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
     return tracing_utils.get_current_span(scope)
 
 
-def get_traceparent():
-    # type: () -> Optional[str]
+def get_traceparent() -> Optional[str]:
     """
     Returns the traceparent either from the active span or from the scope.
     """
     return get_current_scope().get_traceparent()
 
 
-def get_baggage():
-    # type: () -> Optional[str]
+def get_baggage() -> Optional[str]:
     """
     Returns Baggage either from the active span or from the scope.
     """
@@ -330,8 +305,7 @@ def get_baggage():
 
 
 @contextmanager
-def continue_trace(environ_or_headers):
-    # type: (Dict[str, Any]) -> Generator[None, None, None]
+def continue_trace(environ_or_headers: dict[str, Any]) -> Generator[None, None, None]:
     """
     Sets the propagation context from environment or headers to continue an incoming trace.
     """
