@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk._types import NotImplementedType
+    from sentry_sdk._types import NotImplementedType, Event
 
     Span = Dict[str, Any]
 
@@ -96,7 +96,7 @@ class Memo:
 
 
 def serialize(event, **kwargs):
-    # type: (Dict[str, Any], **Any) -> Dict[str, Any]
+    # type: (Union[Dict[str, Any], Event], **Any) -> Dict[str, Any]
     """
     A very smart serializer that takes a dict and emits a json-friendly dict.
     Currently used for serializing the final Event and also prematurely while fetching the stack
