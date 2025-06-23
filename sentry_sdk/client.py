@@ -6,7 +6,7 @@ import socket
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
-from typing import TYPE_CHECKING, cast, overload
+from typing import TYPE_CHECKING, overload
 
 import sentry_sdk
 from sentry_sdk._compat import check_uwsgi_thread_support
@@ -57,7 +57,6 @@ if TYPE_CHECKING:
         Type,
         Union,
         TypeVar,
-        List,
         Dict,
     )
 
@@ -75,7 +74,7 @@ if TYPE_CHECKING:
 _client_init_debug = ContextVar("client_init_debug")
 
 
-SDK_INFO: "SDKInfo" = {
+SDK_INFO: SDKInfo = {
     "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
@@ -446,7 +445,7 @@ class _Client(BaseClient):
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            spans_before = len(cast("List[Dict[str, object]]", event.get("spans", [])))
+            spans_before = len(event.get("spans", []))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -464,10 +463,8 @@ class _Client(BaseClient):
                         )
                 return None
 
-            event = event_  # Updated event from scope
-            spans_delta = spans_before - len(
-                cast("List[Dict[str, object]]", event.get("spans", []))
-            )
+            event = event_
+            spans_delta = spans_before - len(event.get("spans", []))
             if is_transaction and spans_delta > 0 and self.transport is not None:
                 self.transport.record_lost_event(
                     "event_processor", data_category="span", quantity=spans_delta
@@ -545,14 +542,11 @@ class _Client(BaseClient):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = cast(
-                "Event",
-                serialize(
-                    cast("Dict[str, Any]", event),
-                    max_request_body_size=self.options.get("max_request_body_size"),
-                    max_value_length=self.options.get("max_value_length"),
-                    custom_repr=self.options.get("custom_repr"),
-                ),
+            event: Event = serialize(  # type: ignore[no-redef]
+                event,
+                max_request_body_size=self.options.get("max_request_body_size"),
+                max_value_length=self.options.get("max_value_length"),
+                custom_repr=self.options.get("custom_repr"),
             )
 
         before_send = self.options["before_send"]
@@ -578,7 +572,7 @@ class _Client(BaseClient):
                 if event.get("exception"):
                     DedupeIntegration.reset_last_seen()
 
-            event = new_event  # Updated event from before_send
+            event = new_event
 
         before_send_transaction = self.options["before_send_transaction"]
         if (
@@ -587,7 +581,7 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
-            spans_before = len(cast("List[Dict[str, object]]", event.get("spans", [])))
+            spans_before = len(event.get("spans", []))
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
@@ -602,15 +596,13 @@ class _Client(BaseClient):
                         quantity=spans_before + 1,  # +1 for the transaction itself
                     )
             else:
-                spans_delta = spans_before - len(
-                    cast("List[Dict[str, object]]", new_event.get("spans", []))
-                )
+                spans_delta = spans_before - len(new_event.get("spans", []))
                 if spans_delta > 0 and self.transport is not None:
                     self.transport.record_lost_event(
                         reason="before_send", data_category="span", quantity=spans_delta
                     )
 
-            event = new_event  # Updated event from before_send_transaction
+            event = new_event
 
         return event
 
@@ -757,9 +749,9 @@ class _Client(BaseClient):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        hint_dict: Hint = dict(hint or ())
+        hint: Hint = dict(hint or ())
 
-        if not self._should_capture(event, hint_dict, scope):
+        if not self._should_capture(event, hint, scope):
             return None
 
         profile = event.pop("profile", None)
@@ -767,7 +759,7 @@ class _Client(BaseClient):
         event_id = event.get("event_id")
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
-        event_opt = self._prepare_event(event, hint_dict, scope)
+        event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
 
@@ -783,11 +775,11 @@ class _Client(BaseClient):
         if (
             not is_transaction
             and not is_checkin
-            and not self._should_sample_error(event, hint_dict)
+            and not self._should_sample_error(event, hint)
         ):
             return None
 
-        attachments = hint_dict.get("attachments")
+        attachments = hint.get("attachments")
 
         trace_context = event_opt.get("contexts", {}).get("trace") or {}
         dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
