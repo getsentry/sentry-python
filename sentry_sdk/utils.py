@@ -35,7 +35,7 @@ from sentry_sdk.consts import (
 )
 from sentry_sdk._types import Annotated, AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
 
-from typing import TYPE_CHECKING, cast, overload
+from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -1679,11 +1679,6 @@ def reraise(
     raise value
 
 
-def _no_op(*_a: Any, **_k: Any) -> None:
-    """No-op function for ensure_integration_enabled."""
-    pass
-
-
 if TYPE_CHECKING:
 
     @overload
@@ -1700,8 +1695,8 @@ if TYPE_CHECKING:
 
 def ensure_integration_enabled(
     integration: type[sentry_sdk.integrations.Integration],
-    original_function: Union[Callable[P, R], Callable[P, None]] = _no_op,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    original_function: Optional[Callable[P, R]] = None,
+) -> Callable[[Callable[P, R]], Callable[P, Optional[R]]]:
     """
     Ensures a given integration is enabled prior to calling a Sentry-patched function.
 
@@ -1723,22 +1718,20 @@ def ensure_integration_enabled(
             return my_function()
     ```
     """
-    if TYPE_CHECKING:
-        # Type hint to ensure the default function has the right typing. The overloads
-        # ensure the default _no_op function is only used when R is None.
-        original_function = cast("Callable[P, R]", original_function)
 
-    def patcher(sentry_patched_function: Callable[P, R]) -> Callable[P, R]:
-        def runner(*args: "P.args", **kwargs: "P.kwargs") -> R:
-            if sentry_sdk.get_client().get_integration(integration) is None:
+    def patcher(sentry_patched_function: Callable[P, R]) -> Callable[P, Optional[R]]:
+        def runner(*args: P.args, **kwargs: P.kwargs) -> Optional[R]:
+            if sentry_sdk.get_client().get_integration(integration) is not None:
+                return sentry_patched_function(*args, **kwargs)
+            elif original_function is not None:
                 return original_function(*args, **kwargs)
+            else:
+                return None
 
-            return sentry_patched_function(*args, **kwargs)
-
-        if original_function is _no_op:
+        if original_function:
+            return wraps(original_function)(runner)
+        else:
             return wraps(sentry_patched_function)(runner)
-
-        return wraps(original_function)(runner)
 
     return patcher
 
