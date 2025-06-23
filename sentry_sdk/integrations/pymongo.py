@@ -150,7 +150,7 @@ class CommandTracer(monitoring.CommandListener):
 
             query = _serialize_span_attribute(command)
             span = sentry_sdk.start_span(
-                op=OP.DB,
+                op=OP.DB_QUERY,
                 name=query,
                 origin=PyMongoIntegration.origin,
                 only_if_parent=True,
@@ -158,7 +158,7 @@ class CommandTracer(monitoring.CommandListener):
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
-                    message=query, category="query", type=OP.DB, data=data
+                    message=query, category="query", type="query", data=data
                 )
 
             for key, value in data.items():

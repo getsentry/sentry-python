@@ -660,7 +660,7 @@ def install_sql_hook():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
         with sentry_sdk.start_span(
-            op=OP.DB,
+            op=OP.DB_QUERY,
             name="connect",
             origin=DjangoIntegration.origin_db,
             only_if_parent=True,

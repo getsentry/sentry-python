@@ -199,7 +199,7 @@ def test_span_data_for_db_query():
     otel_span.attributes = {}
 
     op, description, status, http_status, origin = span_data_for_db_query(otel_span)
-    assert op == "db"
+    assert op == "db.query"
     assert description == "OTel Span"
     assert status is None
     assert http_status is None
@@ -208,7 +208,7 @@ def test_span_data_for_db_query():
     otel_span.attributes = {"db.statement": "SELECT * FROM table;"}
 
     op, description, status, http_status, origin = span_data_for_db_query(otel_span)
-    assert op == "db"
+    assert op == "db.query"
     assert description == "SELECT * FROM table;"
     assert status is None
     assert http_status is None
