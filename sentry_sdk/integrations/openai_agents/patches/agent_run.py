@@ -19,7 +19,7 @@ except ImportError:
 def _patch_agent_run():
     # type: () -> None
     """
-    Patches AgentRunner methods to create agent invocation spans without using RunHooks.
+    Patches AgentRunner methods to create agent invocation spans.
     This directly patches the execution flow to track when agents start and stop.
     """
 
