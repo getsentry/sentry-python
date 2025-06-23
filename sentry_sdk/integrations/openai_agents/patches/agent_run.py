@@ -4,6 +4,11 @@ from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import invoke_agent_span, update_invoke_agent_span
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any, Optional
+
 
 try:
     import agents
@@ -12,6 +17,7 @@ except ImportError:
 
 
 def _patch_agent_run():
+    # type: () -> None
     """
     Patches AgentRunner methods to create agent invocation spans without using RunHooks.
     This directly patches the execution flow to track when agents start and stop.
@@ -23,12 +29,14 @@ def _patch_agent_run():
     original_execute_final_output = agents._run_impl.RunImpl.execute_final_output
 
     def _start_invoke_agent_span(context_wrapper, agent):
+        # type: (agents.RunContextWrapper, agents.Agent) -> None
         """Start an agent invocation span"""
         # Store the agent on the context wrapper so we can access it later
         context_wrapper._sentry_current_agent = agent
         invoke_agent_span(context_wrapper, agent)
 
-    def _end_invoke_agent_span(context_wrapper, agent, output):
+    def _end_invoke_agent_span(context_wrapper, agent, output=None):
+        # type: (agents.RunContextWrapper, agents.Agent, Optional[Any]) -> None
         """End the agent invocation span"""
         # Clear the stored agent
         if hasattr(context_wrapper, "_sentry_current_agent"):
@@ -37,14 +45,20 @@ def _patch_agent_run():
         update_invoke_agent_span(context_wrapper, agent, output)
 
     def _has_active_agent_span(context_wrapper):
+        # type: (agents.RunContextWrapper) -> bool
         """Check if there's an active agent span for this context"""
         return hasattr(context_wrapper, "_sentry_current_agent")
 
     def _get_current_agent(context_wrapper):
+        # type: (agents.RunContextWrapper) -> Optional[agents.Agent]
         """Get the current agent from context wrapper"""
         return getattr(context_wrapper, "_sentry_current_agent", None)
 
-    @wraps(original_run_single_turn)
+    @wraps(
+        original_run_single_turn.__func__
+        if hasattr(original_run_single_turn, "__func__")
+        else original_run_single_turn
+    )
     async def patched_run_single_turn(
         cls,
         *,
@@ -59,6 +73,7 @@ def _patch_agent_run():
         tool_use_tracker,
         previous_response_id,
     ):
+        # type: (agents.Agent, list[agents.Tool], Any, list[Any], list[Any], agents.RunContextWrapper, agents.RunConfig, bool, Any, Any, Optional[str]) -> Any
         """Patched _run_single_turn that creates agent invocation spans"""
 
         # Start agent span when agent starts (but only once per agent)
@@ -67,7 +82,7 @@ def _patch_agent_run():
             if _has_active_agent_span(context_wrapper):
                 current_agent = _get_current_agent(context_wrapper)
                 if current_agent and current_agent != agent:
-                    _end_invoke_agent_span(context_wrapper, current_agent, None)
+                    _end_invoke_agent_span(context_wrapper, current_agent)
 
             _start_invoke_agent_span(context_wrapper, agent)
 
@@ -87,7 +102,11 @@ def _patch_agent_run():
 
         return result
 
-    @wraps(original_execute_handoffs)
+    @wraps(
+        original_execute_handoffs.__func__
+        if hasattr(original_execute_handoffs, "__func__")
+        else original_execute_handoffs
+    )
     async def patched_execute_handoffs(
         cls,
         *,
@@ -101,6 +120,7 @@ def _patch_agent_run():
         context_wrapper,
         run_config,
     ):
+        # type: (Any, agents.Agent, Any, list[Any], list[Any], Any, list[Any], list[Any], agents.RunContextWrapper, agents.RunConfig) -> Any
         """Patched execute_handoffs that ends agent span for handoffs"""
 
         # Call original method with all parameters
@@ -118,11 +138,15 @@ def _patch_agent_run():
 
         # End span for current agent after handoff processing is complete
         if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-            _end_invoke_agent_span(context_wrapper, agent, None)
+            _end_invoke_agent_span(context_wrapper, agent)
 
         return result
 
-    @wraps(original_execute_final_output)
+    @wraps(
+        original_execute_final_output.__func__
+        if hasattr(original_execute_final_output, "__func__")
+        else original_execute_final_output
+    )
     async def patched_execute_final_output(
         cls,
         *,
@@ -135,6 +159,7 @@ def _patch_agent_run():
         hooks,
         context_wrapper,
     ):
+        # type: (Any, agents.Agent, Any, Any, list[Any], list[Any], Any, list[Any], agents.RunContextWrapper) -> Any
         """Patched execute_final_output that ends agent span for final outputs"""
 
         # Call original method with all parameters
