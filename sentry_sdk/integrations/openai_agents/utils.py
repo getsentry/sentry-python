@@ -1,4 +1,3 @@
-from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
@@ -156,49 +155,3 @@ def _set_output_data(span, result):
 
     if len(output_messages["response"]) > 0:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"])
-
-
-def _create_hook_wrapper(original_hook, sentry_hook):
-    # type: (Callable[..., Any], Callable[..., Any]) -> Callable[..., Any]
-    @wraps(original_hook)
-    async def async_wrapper(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
-        await sentry_hook(*args, **kwargs)
-        return await original_hook(*args, **kwargs)
-
-    return async_wrapper
-
-
-def _wrap_hooks(hooks):
-    # type: (agents.RunHooks) -> agents.RunHooks
-    """
-    Our integration uses RunHooks to create spans. This function will either
-    enable our SentryRunHooks or if the users has given custom RunHooks wrap
-    them so the Sentry hooks and the users hooks are both called
-    """
-    from .run_hooks import SentryRunHooks
-
-    sentry_hooks = SentryRunHooks()
-
-    if hooks is None:
-        return sentry_hooks
-
-    wrapped_hooks = type("SentryWrappedHooks", (hooks.__class__,), {})
-
-    # Wrap all methods from RunHooks
-    for method_name in dir(agents.RunHooks):
-        if method_name.startswith("on_"):
-            original_method = getattr(hooks, method_name)
-            # Only wrap if the method exists in SentryRunHooks
-            try:
-                sentry_method = getattr(sentry_hooks, method_name)
-                setattr(
-                    wrapped_hooks,
-                    method_name,
-                    _create_hook_wrapper(original_method, sentry_method),
-                )
-            except AttributeError:
-                # If method doesn't exist in SentryRunHooks, just use the original method
-                setattr(wrapped_hooks, method_name, original_method)
-
-    return wrapped_hooks()

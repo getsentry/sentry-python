@@ -8,7 +8,7 @@ from ..spans import (
     agent_workflow_span,
     update_agent_workflow_span,
 )
-from ..utils import _capture_exception, _wrap_hooks
+from ..utils import _capture_exception
 
 from typing import TYPE_CHECKING
 
@@ -28,7 +28,6 @@ def _create_run_wrapper(original_func):
         # type: (*Any, **Any) -> Any
         agent = args[0]
         with agent_workflow_span(agent) as span:
-            kwargs["hooks"] = _wrap_hooks(kwargs.get("hooks"))
             result = None
             try:
                 result = await original_func(*args, **kwargs)

@@ -4,6 +4,7 @@ from .patches import (
     _create_get_model_wrapper,
     _create_get_all_tools_wrapper,
     _create_run_wrapper,
+    _patch_agent_run,
 )
 
 try:
@@ -15,15 +16,16 @@ except ImportError:
 
 def _patch_runner():
     # type: () -> None
-
-    # Creating agent workflow spans
+    # Create the root span for one full agent run (including eventual handoffs)
     # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
     # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
+    # TODO-anton: Also patch streaming runner: agents.Runner.run_streamed
     agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(
         agents.run.DEFAULT_AGENT_RUNNER.run
     )
 
-    # TODO-anton: Also patch streaming runner: agents.Runner.run_streamed
+    # Creating the actual spans for each agent run.
+    _patch_agent_run()
 
 
 def _patch_model():
