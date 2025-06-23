@@ -570,11 +570,11 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
     (event,) = events
 
     for span in event["spans"]:
-        if span.get("op") == "db.query":
+        if span.get("op") == "db":
             data = span.get("data")
             assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
 
-    assert '- op="db.query": description="connect"' in render_span_tree(event)
+    assert '- op="db": description="connect"' in render_span_tree(event)
 
 
 @pytest.mark.forked
@@ -639,7 +639,7 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
     (event,) = events
 
     for span in event["spans"]:
-        if span.get("op") == "db.query":
+        if span.get("op") == "db":
             data = span.get("data")
             assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
             conn_params = connections["postgres"].get_connection_params()

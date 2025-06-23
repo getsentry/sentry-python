@@ -151,7 +151,7 @@ def record_sql_queries(
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
     with sentry_sdk.start_span(
-        op=OP.DB_QUERY,
+        op=OP.DB,
         name=query,
         origin=span_origin,
         only_if_parent=True,

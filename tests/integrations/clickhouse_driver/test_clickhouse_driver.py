@@ -252,13 +252,13 @@ def test_clickhouse_client_spans(
 
     expected_spans = [
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "sentry.name": "DROP TABLE IF EXISTS test",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -269,13 +269,13 @@ def test_clickhouse_client_spans(
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "sentry.name": "CREATE TABLE test (x Int32) ENGINE = Memory",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -286,13 +286,13 @@ def test_clickhouse_client_spans(
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "sentry.name": "INSERT INTO test (x) VALUES",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -303,13 +303,13 @@ def test_clickhouse_client_spans(
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "sentry.name": "INSERT INTO test (x) VALUES",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -320,13 +320,13 @@ def test_clickhouse_client_spans(
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "sentry.name": "SELECT sum(x) FROM test WHERE x > 150",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -385,13 +385,13 @@ def test_clickhouse_client_spans_with_pii(sentry_init, capture_events) -> None:
 
     expected_spans = [
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "sentry.name": "DROP TABLE IF EXISTS test",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -404,13 +404,13 @@ def test_clickhouse_client_spans_with_pii(sentry_init, capture_events) -> None:
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "sentry.name": "CREATE TABLE test (x Int32) ENGINE = Memory",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -423,13 +423,13 @@ def test_clickhouse_client_spans_with_pii(sentry_init, capture_events) -> None:
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "sentry.name": "INSERT INTO test (x) VALUES",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -442,13 +442,13 @@ def test_clickhouse_client_spans_with_pii(sentry_init, capture_events) -> None:
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "sentry.name": "INSERT INTO test (x) VALUES",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -460,13 +460,13 @@ def test_clickhouse_client_spans_with_pii(sentry_init, capture_events) -> None:
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "sentry.name": "SELECT sum(x) FROM test WHERE x > 150",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -726,13 +726,13 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
 
     expected_spans = [
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "sentry.name": "DROP TABLE IF EXISTS test",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -743,13 +743,13 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "sentry.name": "CREATE TABLE test (x Int32) ENGINE = Memory",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -760,13 +760,13 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "sentry.name": "INSERT INTO test (x) VALUES",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -777,13 +777,13 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "sentry.name": "INSERT INTO test (x) VALUES",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -794,13 +794,13 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "sentry.name": "SELECT sum(x) FROM test WHERE x > 150",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -860,13 +860,13 @@ def test_clickhouse_dbapi_spans_with_pii(
 
     expected_spans = [
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "sentry.name": "DROP TABLE IF EXISTS test",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -879,13 +879,13 @@ def test_clickhouse_dbapi_spans_with_pii(
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "sentry.name": "CREATE TABLE test (x Int32) ENGINE = Memory",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -898,13 +898,13 @@ def test_clickhouse_dbapi_spans_with_pii(
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "sentry.name": "INSERT INTO test (x) VALUES",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -917,13 +917,13 @@ def test_clickhouse_dbapi_spans_with_pii(
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "sentry.name": "INSERT INTO test (x) VALUES",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",
@@ -936,13 +936,13 @@ def test_clickhouse_dbapi_spans_with_pii(
             "parent_span_id": transaction_span_id,
         },
         {
-            "op": "db.query",
+            "op": "db",
             "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "sentry.name": "SELECT sum(x) FROM test WHERE x > 150",
                 "sentry.origin": "auto.db.clickhouse_driver",
-                "sentry.op": "db.query",
+                "sentry.op": "db",
                 "db.system": "clickhouse",
                 "db.name": "",
                 "db.user": "default",

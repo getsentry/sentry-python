@@ -57,7 +57,7 @@ def test_query_source_disabled(sentry_init, client, capture_events):
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db.query" and "auth_user" in span.get("description"):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO not in data
@@ -100,7 +100,7 @@ def test_query_source_enabled(
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db.query" and "auth_user" in span.get("description"):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO in data
@@ -137,7 +137,7 @@ def test_query_source(sentry_init, client, capture_events):
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db.query" and "auth_user" in span.get("description"):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO in data
@@ -197,7 +197,7 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db.query" and "auth_user" in span.get("description"):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO in data
@@ -245,7 +245,7 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db.query" and "auth_user" in span.get("description"):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO in data
@@ -308,7 +308,7 @@ def test_query_source_with_in_app_include(sentry_init, client, capture_events):
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db.query" and "auth_user" in span.get("description"):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO in data
@@ -371,7 +371,7 @@ def test_no_query_source_if_duration_too_short(sentry_init, client, capture_even
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db.query" and "auth_user" in span.get("description"):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO not in data
@@ -426,7 +426,7 @@ def test_query_source_if_duration_over_threshold(sentry_init, client, capture_ev
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db.query" and "auth_user" in span.get("description"):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO in data
@@ -477,7 +477,7 @@ def test_db_span_origin_execute(sentry_init, client, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.http.django"
 
     for span in event["spans"]:
-        if span["op"] == "db.query":
+        if span["op"] == "db":
             assert span["origin"] == "auto.db.django"
         else:
             assert span["origin"] == "auto.http.django"

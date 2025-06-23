@@ -496,7 +496,7 @@ class OP:
     CACHE_PUT = "cache.put"
     COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
     COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
-    DB_QUERY = "db.query"
+    DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
     FUNCTION = "function"

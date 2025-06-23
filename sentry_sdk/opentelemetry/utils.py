@@ -219,7 +219,7 @@ def span_data_for_db_query(span):
     # type: (ReadableSpan) -> OtelExtractedSpanData
     span_attributes = span.attributes or {}
 
-    op = cast("str", span_attributes.get(SentrySpanAttribute.OP, OP.DB_QUERY))
+    op = cast("str", span_attributes.get(SentrySpanAttribute.OP, OP.DB))
 
     statement = span_attributes.get(SpanAttributes.DB_STATEMENT, None)
     statement = cast("Optional[str]", statement)
