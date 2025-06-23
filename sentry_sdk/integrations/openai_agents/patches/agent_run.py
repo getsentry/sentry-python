@@ -2,7 +2,7 @@ from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 
-from ..spans import invoke_agent_span, update_invoke_agent_span
+from ..spans import invoke_agent_span, update_invoke_agent_span, handoff_span
 
 from typing import TYPE_CHECKING
 
@@ -121,7 +121,13 @@ def _patch_agent_run():
         run_config,
     ):
         # type: (Any, agents.Agent, Any, list[Any], list[Any], Any, list[Any], list[Any], agents.RunContextWrapper, agents.RunConfig) -> Any
-        """Patched execute_handoffs that ends agent span for handoffs"""
+        """Patched execute_handoffs that creates handoff spans and ends agent span for handoffs"""
+
+        # Create Sentry handoff span for the first handoff (agents library only processes the first one)
+        if run_handoffs:
+            first_handoff = run_handoffs[0]
+            handoff_agent_name = first_handoff.handoff.agent_name
+            handoff_span(context_wrapper, agent, handoff_agent_name)
 
         # Call original method with all parameters
         result = await original_execute_handoffs(

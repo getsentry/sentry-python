@@ -73,6 +73,78 @@ def test_agent():
     )
 
 
+@pytest.fixture
+def handoff_agents():
+    """Create two agents where the first can handoff to the second"""
+
+    secondary_agent = Agent(
+        name="secondary_agent",
+        instructions="You are a specialist assistant.",
+        model="gpt-4o-mini",
+        model_settings=ModelSettings(
+            temperature=0.5,
+            max_tokens=150,
+        ),
+    )
+
+    primary_agent = Agent(
+        name="primary_agent",
+        instructions="You are a primary assistant that can handoff to specialists.",
+        model="gpt-4",
+        handoffs=[secondary_agent],
+        model_settings=ModelSettings(
+            temperature=0.7,
+            max_tokens=100,
+        ),
+    )
+
+    return primary_agent, secondary_agent
+
+
+@pytest.fixture
+def mock_handoff_responses(mock_usage):
+    """Mock responses that simulate a handoff scenario"""
+
+    # First response: primary agent calls handoff tool
+    handoff_response = ModelResponse(
+        output=[
+            ResponseFunctionToolCall(
+                id="call_handoff_123",
+                call_id="call_handoff_123",
+                name="transfer_to_secondary_agent",
+                type="function_call",
+                arguments="{}",
+                function=MagicMock(name="transfer_to_secondary_agent", arguments="{}"),
+            )
+        ],
+        usage=mock_usage,
+        response_id="resp_handoff_123",
+    )
+
+    # Second response: secondary agent produces final output
+    final_response = ModelResponse(
+        output=[
+            ResponseOutputMessage(
+                id="msg_final",
+                type="message",
+                status="completed",
+                content=[
+                    ResponseOutputText(
+                        text="I'm the specialist and I can help with that!",
+                        type="output_text",
+                        annotations=[],
+                    )
+                ],
+                role="assistant",
+            )
+        ],
+        usage=mock_usage,
+        response_id="resp_final_123",
+    )
+
+    return [handoff_response, final_response]
+
+
 @pytest.mark.asyncio
 async def test_agent_invocation_span(
     sentry_init, capture_events, test_agent, mock_model_response
@@ -178,6 +250,157 @@ def test_agent_invocation_span_sync(
     assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_handoff_span(
+    sentry_init, capture_events, handoff_agents, mock_handoff_responses
+):
+    """
+    Test that the integration creates spans for agent handoffs.
+    """
+    primary_agent, secondary_agent = handoff_agents
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+
+            # First, let's see what handoff tools are actually available
+            # by mocking get_response to capture the tools
+            def debug_get_response(*args, **kwargs):
+                tools = kwargs.get("tools", [])
+                handoffs = kwargs.get("handoffs", [])
+                print(
+                    f"Tools available: {[tool.name if hasattr(tool, 'name') else str(tool) for tool in tools]}"
+                )
+                print(
+                    f"Handoffs available: {[h.tool_name if hasattr(h, 'tool_name') else str(h) for h in handoffs]}"
+                )
+
+                # Find the correct handoff tool name
+                handoff_tool_name = None
+                for handoff in handoffs:
+                    if (
+                        hasattr(handoff, "tool_name")
+                        and "secondary_agent" in handoff.tool_name
+                    ):
+                        handoff_tool_name = handoff.tool_name
+                        break
+
+                if not handoff_tool_name:
+                    # Fallback - look for any handoff tool
+                    for handoff in handoffs:
+                        if hasattr(handoff, "tool_name"):
+                            handoff_tool_name = handoff.tool_name
+                            break
+
+                print(f"Using handoff tool name: {handoff_tool_name}")
+
+                # Create corrected handoff response with the right tool name
+                corrected_handoff_response = ModelResponse(
+                    output=[
+                        ResponseFunctionToolCall(
+                            id="call_handoff_123",
+                            call_id="call_handoff_123",
+                            name=handoff_tool_name,  # Use the correct tool name
+                            type="function_call",
+                            arguments="{}",
+                            function=MagicMock(name=handoff_tool_name, arguments="{}"),
+                        )
+                    ],
+                    usage=Usage(
+                        requests=1,
+                        input_tokens=10,
+                        output_tokens=20,
+                        total_tokens=30,
+                        input_tokens_details=MagicMock(cached_tokens=0),
+                        output_tokens_details=MagicMock(reasoning_tokens=5),
+                    ),
+                    response_id="resp_handoff_123",
+                )
+
+                # Return the corrected response for the first call
+                debug_get_response.call_count += 1
+                if debug_get_response.call_count == 1:
+                    return corrected_handoff_response
+                else:
+                    # Second call - return final response from secondary agent
+                    return mock_handoff_responses[1]
+
+            debug_get_response.call_count = 0
+            mock_get_response.side_effect = debug_get_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                primary_agent,
+                "Please help me with this specialist task",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "I'm the specialist and I can help with that!"
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    # Remove the debugger import
+    # import ipdb; ipdb.set_trace()
+    print(f"Number of spans: {len(spans)}")
+    for i, span in enumerate(spans):
+        print(f"Span {i}: {span['op']} - {span['description']}")
+
+    # Should have: primary invoke, primary ai_client, handoff, secondary invoke, secondary ai_client
+    assert len(spans) >= 3
+
+    # Find the spans more flexibly
+    handoff_span = None
+    invoke_agent_spans = []
+    ai_client_spans = []
+
+    for span in spans:
+        if span["op"] == "gen_ai.handoff":
+            handoff_span = span
+        elif span["op"] == "gen_ai.invoke_agent":
+            invoke_agent_spans.append(span)
+        elif span["op"] == "gen_ai.chat":
+            ai_client_spans.append(span)
+
+    # Verify transaction
+    assert transaction["transaction"] == "primary_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    # Verify handoff span exists and has correct properties
+    assert handoff_span is not None
+    assert handoff_span["description"] == "handoff primary_agent -> secondary_agent"
+    assert handoff_span["data"]["gen_ai.operation.name"] == "handoff"
+    assert handoff_span["data"]["gen_ai.system"] == "openai"
+    assert handoff_span["data"]["gen_ai.agent.from"] == "primary_agent"
+    assert handoff_span["data"]["gen_ai.agent.to"] == "secondary_agent"
+
+    # Verify both agent invoke spans exist
+    assert len(invoke_agent_spans) == 2
+
+    primary_invoke_span = next(
+        (s for s in invoke_agent_spans if "primary_agent" in s["description"]), None
+    )
+    secondary_invoke_span = next(
+        (s for s in invoke_agent_spans if "secondary_agent" in s["description"]), None
+    )
+
+    assert primary_invoke_span is not None
+    assert primary_invoke_span["description"] == "invoke_agent primary_agent"
+    assert primary_invoke_span["data"]["gen_ai.agent.name"] == "primary_agent"
+
+    assert secondary_invoke_span is not None
+    assert secondary_invoke_span["description"] == "invoke_agent secondary_agent"
+    assert secondary_invoke_span["data"]["gen_ai.agent.name"] == "secondary_agent"
 
 
 @pytest.mark.asyncio
