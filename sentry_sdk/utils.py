@@ -1027,14 +1027,10 @@ def exc_info_from_error(error: Union[BaseException, ExcInfo]) -> ExcInfo:
     else:
         raise ValueError("Expected Exception object to report, got %s!" % type(error))
 
-    exc_info = (exc_type, exc_value, tb)
-
-    if TYPE_CHECKING:
-        # This cast is safe because exc_type and exc_value are either both
-        # None or both not None.
-        exc_info = cast("ExcInfo", exc_info)
-
-    return exc_info
+    if exc_type is not None and exc_value is not None:
+        return (exc_type, exc_value, tb)
+    else:
+        return (None, None, None)
 
 
 def merge_stack_frames(
