@@ -188,7 +188,7 @@ class Span:
         If otel_span is passed explicitly, just acts as a proxy.
 
         If span is passed explicitly, use it. The only purpose of this param
-        if backwards compatibility with start_transaction(transaction=...).
+        is backwards compatibility with start_transaction(transaction=...).
 
         If only_if_parent is True, just return an INVALID_SPAN
         and avoid instrumentation if there's no active parent span.
@@ -270,15 +270,21 @@ class Span:
             )
         )
 
-    def __enter__(self):
-        # type: () -> Span
-        # XXX use_span? https://github.com/open-telemetry/opentelemetry-python/blob/3836da8543ce9751051e38a110c0468724042e62/opentelemetry-api/src/opentelemetry/trace/__init__.py#L547
-        #
-        # create a Context object with parent set as current span
+    def activate(self):
+        # type: () -> None
         ctx = otel_trace.set_span_in_context(self._otel_span)
         # set as the implicit current context
         self._ctx_token = context.attach(ctx)
 
+    def deactivate(self):
+        # type: () -> None
+        if self._ctx_token:
+            context.detach(self._ctx_token)
+            del self._ctx_token
+
+    def __enter__(self):
+        # type: () -> Span
+        self.activate()
         return self
 
     def __exit__(self, ty, value, tb):
@@ -294,8 +300,7 @@ class Span:
                 self.set_status(SPANSTATUS.OK)
 
         self.finish()
-        context.detach(self._ctx_token)
-        del self._ctx_token
+        self.deactivate()
 
     @property
     def description(self):

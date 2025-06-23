@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
 
+import sentry_sdk
 from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -190,8 +191,8 @@ class BaseClient:
         # type: (*Any, **Any) -> Optional[str]
         return None
 
-    def _capture_experimental_log(self, scope, log):
-        # type: (Scope, Log) -> None
+    def _capture_experimental_log(self, log):
+        # type: (Log) -> None
         pass
 
     def capture_session(self, *args, **kwargs):
@@ -846,12 +847,14 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_experimental_log(self, current_scope, log):
-        # type: (Scope, Log) -> None
+    def _capture_experimental_log(self, log):
+        # type: (Log) -> None
         logs_enabled = self.options["_experiments"].get("enable_logs", False)
         if not logs_enabled:
             return
-        isolation_scope = current_scope.get_isolation_scope()
+
+        current_scope = sentry_sdk.get_current_scope()
+        isolation_scope = sentry_sdk.get_isolation_scope()
 
         log["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
         log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
@@ -879,6 +882,21 @@ class _Client(BaseClient):
                 log["trace_id"] = transaction.trace_id
             elif propagation_context is not None:
                 log["trace_id"] = propagation_context.trace_id
+
+        # The user, if present, is always set on the isolation scope.
+        if isolation_scope._user is not None:
+            for log_attribute, user_attribute in (
+                ("user.id", "id"),
+                ("user.name", "username"),
+                ("user.email", "email"),
+            ):
+                if (
+                    user_attribute in isolation_scope._user
+                    and log_attribute not in log["attributes"]
+                ):
+                    log["attributes"][log_attribute] = isolation_scope._user[
+                        user_attribute
+                    ]
 
         # If debug is enabled, log the log to the console
         debug = self.options.get("debug", False)

@@ -20,7 +20,9 @@ from opentelemetry.trace import (
     SpanContext,
     TraceFlags,
 )
+from opentelemetry.semconv.trace import SpanAttributes
 
+import sentry_sdk
 from sentry_sdk.consts import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -30,7 +32,11 @@ from sentry_sdk.opentelemetry.consts import (
     SENTRY_TRACE_KEY,
     SENTRY_SCOPES_KEY,
 )
-from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    extract_sentrytrace_data,
+    should_propagate_trace,
+)
 
 from typing import TYPE_CHECKING
 
@@ -89,18 +95,23 @@ class SentryPropagator(TextMapPropagator):
 
     def inject(self, carrier, context=None, setter=default_setter):
         # type: (CarrierT, Optional[Context], Setter[CarrierT]) -> None
-        if context is None:
-            context = get_current()
-
         scopes = get_value(SENTRY_SCOPES_KEY, context)
-        if scopes:
-            scopes = cast("tuple[scope.PotelScope, scope.PotelScope]", scopes)
-            (current_scope, _) = scopes
+        if not scopes:
+            return
 
-            # TODO-neel-potel check trace_propagation_targets
-            # TODO-neel-potel test propagator works with twp
-            for key, value in current_scope.iter_trace_propagation_headers():
-                setter.set(carrier, key, value)
+        scopes = cast("tuple[scope.PotelScope, scope.PotelScope]", scopes)
+        (current_scope, _) = scopes
+
+        span = current_scope.span
+        if span:
+            span_url = span.get_attribute(SpanAttributes.HTTP_URL)
+            if span_url and not should_propagate_trace(
+                sentry_sdk.get_client(), span_url
+            ):
+                return
+
+        for key, value in current_scope.iter_trace_propagation_headers():
+            setter.set(carrier, key, value)
 
     @property
     def fields(self):

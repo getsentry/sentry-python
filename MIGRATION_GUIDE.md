@@ -16,6 +16,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
 - You can no longer change the sampled status of a span with `span.sampled = False` after starting it.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
+- The `sentry_sdk.Scope()` constructor no longer accepts a `client` parameter.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - `Span.finish()` no longer returns the `event_id` if the event is sent to sentry.
 - Some integrations were creating spans with `op` `db`. This was changed to `db.query`.
@@ -33,6 +34,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `SentrySpanProcessor` and `SentryPropagator` are exported from `sentry_sdk.opentelemetry` instead of `sentry_sdk.integrations.opentelemetry`.
 - PyMongo breadcrumb type was changed from `db` to `query`.
 - The integration-specific content of the `sampling_context` argument of `traces_sampler` and `profiles_sampler` now looks different.
+
   - The Celery integration doesn't add the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
 
     | Dictionary keys        | Sampling context key        | Example                        |
@@ -135,7 +137,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
     | `gcp_event.query_string`          | `url.query`                    |
     | `gcp_event.headers`               | `http.request.header.{header}` |
 
-
 ### Removed
 
 - Dropped support for Python 3.6.
@@ -170,7 +171,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   - `span_id`
   - `parent_span_id`: you can supply a `parent_span` instead
 - The `Scope.transaction` property has been removed. To obtain the root span (previously transaction), use `Scope.root_span`. To set the root span's (transaction's) name, use `Scope.set_transaction_name()`.
-- The `Scope.span =` setter has been removed.
+- The `Scope.span =` setter has been removed. Please use the new `span.activate()` api instead if you want to activate a new span manually instead of using the `start_span` context manager.
 - Passing a list or `None` for `failed_request_status_codes` in the Starlette integration is no longer supported. Pass a set of integers instead.
 - The `span` argument of `Scope.trace_propagation_meta` is no longer supported.
 - Setting `Scope.user` directly is no longer supported. Use `Scope.set_user()` instead.

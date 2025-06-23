@@ -269,7 +269,7 @@ deps =
     # Redis
     redis: fakeredis!=1.7.4
     redis: pytest<8.0.0
-    py3.7-redis: fakeredis!=2.26.0  # https://github.com/cunla/fakeredis-py/issues/341
+    {py3.7,py3.8}-redis: fakeredis<2.26.0
     {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-redis: pytest-asyncio
     redis-v3: redis~=3.0
     redis-v4: redis~=4.0
@@ -297,6 +297,7 @@ deps =
     # Sanic
     sanic: websockets<11.0
     sanic: aiohttp
+    {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-sanic: tracerite<1.1.2
     sanic-v{24.6}: sanic_testing
     sanic-latest: sanic_testing
     sanic-v0.8: sanic~=0.8.0

@@ -2,6 +2,12 @@ import json
 import os
 import socket
 import warnings
+from opentelemetry import trace as otel_trace
+
+try:
+    from opentelemetry.util._once import Once
+except ImportError:
+    Once = None
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -71,6 +77,14 @@ def clean_scopes():
     scope._current_scope.set(None)
 
     setup_initial_scopes()
+
+
+@pytest.fixture(autouse=True)
+def clear_tracer_provider():
+    """Reset TracerProvider so that we can set it up from scratch."""
+    if Once is not None:
+        otel_trace._TRACER_PROVIDER_SET_ONCE = Once()
+    otel_trace._TRACER_PROVIDER = None
 
 
 @pytest.fixture(autouse=True)
@@ -605,7 +619,7 @@ def create_mock_http_server():
     mock_server_port = get_free_port()
     mock_server = HTTPServer(("localhost", mock_server_port), MockServerRequestHandler)
     mock_server_thread = Thread(target=mock_server.serve_forever)
-    mock_server_thread.setDaemon(True)
+    mock_server_thread.daemon = True
     mock_server_thread.start()
 
     return mock_server_port

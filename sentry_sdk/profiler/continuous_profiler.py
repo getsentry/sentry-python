@@ -207,6 +207,7 @@ class ContinuousScheduler:
         self.pid = None  # type: Optional[int]
 
         self.running = False
+        self.soft_shutdown = False
 
         self.new_profiles = deque(maxlen=128)  # type: Deque[ContinuousProfile]
         self.active_profiles = set()  # type: Set[ContinuousProfile]
@@ -288,7 +289,7 @@ class ContinuousScheduler:
         return self.buffer.profiler_id
 
     def make_sampler(self):
-        # type: () -> Callable[..., None]
+        # type: () -> Callable[..., bool]
         cwd = os.getcwd()
 
         cache = LRUCache(max_size=256)
@@ -296,7 +297,7 @@ class ContinuousScheduler:
         if self.lifecycle == "trace":
 
             def _sample_stack(*args, **kwargs):
-                # type: (*Any, **Any) -> None
+                # type: (*Any, **Any) -> bool
                 """
                 Take a sample of the stack on all the threads in the process.
                 This should be called at a regular interval to collect samples.
@@ -304,8 +305,7 @@ class ContinuousScheduler:
 
                 # no profiles taking place, so we can stop early
                 if not self.new_profiles and not self.active_profiles:
-                    self.running = False
-                    return
+                    return True
 
                 # This is the number of profiles we want to pop off.
                 # It's possible another thread adds a new profile to
@@ -328,7 +328,7 @@ class ContinuousScheduler:
                     # For some reason, the frame we get doesn't have certain attributes.
                     # When this happens, we abandon the current sample as it's bad.
                     capture_internal_exception(sys.exc_info())
-                    return
+                    return False
 
                 # Move the new profiles into the active_profiles set.
                 #
@@ -345,9 +345,7 @@ class ContinuousScheduler:
                 inactive_profiles = []
 
                 for profile in self.active_profiles:
-                    if profile.active:
-                        pass
-                    else:
+                    if not profile.active:
                         # If a profile is marked inactive, we buffer it
                         # to `inactive_profiles` so it can be removed.
                         # We cannot remove it here as it would result
@@ -360,10 +358,12 @@ class ContinuousScheduler:
                 if self.buffer is not None:
                     self.buffer.write(ts, sample)
 
+                return False
+
         else:
 
             def _sample_stack(*args, **kwargs):
-                # type: (*Any, **Any) -> None
+                # type: (*Any, **Any) -> bool
                 """
                 Take a sample of the stack on all the threads in the process.
                 This should be called at a regular interval to collect samples.
@@ -380,10 +380,12 @@ class ContinuousScheduler:
                     # For some reason, the frame we get doesn't have certain attributes.
                     # When this happens, we abandon the current sample as it's bad.
                     capture_internal_exception(sys.exc_info())
-                    return
+                    return False
 
                 if self.buffer is not None:
                     self.buffer.write(ts, sample)
+
+                return False
 
         return _sample_stack
 
@@ -392,7 +394,7 @@ class ContinuousScheduler:
         last = time.perf_counter()
 
         while self.running:
-            self.sampler()
+            self.soft_shutdown = self.sampler()
 
             # some time may have elapsed since the last time
             # we sampled, so we need to account for that and
@@ -400,6 +402,15 @@ class ContinuousScheduler:
             elapsed = time.perf_counter() - last
             if elapsed < self.interval:
                 thread_sleep(self.interval - elapsed)
+
+            # the soft shutdown happens here to give it a chance
+            # for the profiler to be reused
+            if self.soft_shutdown:
+                self.running = False
+
+                # make sure to explicitly exit the profiler here or there might
+                # be multiple profilers at once
+                break
 
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
@@ -428,6 +439,8 @@ class ThreadContinuousScheduler(ContinuousScheduler):
 
     def ensure_running(self):
         # type: () -> None
+
+        self.soft_shutdown = False
 
         pid = os.getpid()
 
@@ -503,6 +516,9 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
     def ensure_running(self):
         # type: () -> None
+
+        self.soft_shutdown = False
+
         pid = os.getpid()
 
         # is running on the right process

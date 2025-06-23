@@ -4,8 +4,10 @@ import pytest
 
 from opentelemetry.trace.propagation import get_current_span
 from opentelemetry.propagators.textmap import DefaultSetter
+from opentelemetry.semconv.trace import SpanAttributes
 
 import sentry_sdk
+from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -208,3 +210,67 @@ def test_inject_head_sdk(sentry_init):
             assert carrier["baggage"] == SortedBaggage(
                 expected_baggage.format(trace_id=span.trace_id)
             )
+
+
+@pytest.mark.parametrize(
+    "trace_propagation_targets,url,trace_propagated",
+    [
+        # No targets - should not propagate
+        ([], "https://example.com/api/users", False),
+        (None, "https://example.com/api/users", False),
+        # MATCH_ALL - should propagate
+        ([MATCH_ALL], "https://example.com/api/users", True),
+        # Exact match - should propagate
+        (["https://example.com"], "https://example.com/api/users", True),
+        (["https://example.com/"], "https://example.com/api/users", True),
+        # No match - should not propagate
+        (["https://example.com"], "https://other-domain.com/api/users", False),
+        (["https://example.com/"], "https://other-domain.com/api/users", False),
+        # Regex patterns
+        (
+            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "https://good.example.net/api",
+            True,
+        ),
+        (
+            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "https://example.net/api",
+            False,
+        ),
+        # HTTP vs HTTPS
+        (["https://example.com"], "http://example.com/api/users", False),
+        (["http://example.com"], "https://example.com/api/users", False),
+        # Path matching
+        (["https://example.com/api"], "https://example.com/api/users", True),
+        (["https://example.com/api"], "https://example.com/other/path", False),
+    ],
+)
+def test_propagator_trace_propagation_targets(
+    sentry_init,
+    trace_propagation_targets,
+    url,
+    trace_propagated,
+):
+    """Test that the propagator respects trace_propagation_targets for HTTP spans."""
+    sentry_init(
+        trace_propagation_targets=trace_propagation_targets,
+        traces_sample_rate=1.0,
+    )
+
+    carrier = {}
+    setter = DefaultSetter()
+
+    # Create a real HTTP span with the test URL
+    with sentry_sdk.start_span(name="http.client") as span:
+        span.set_attribute(SpanAttributes.HTTP_METHOD, "GET")
+        span.set_attribute(SpanAttributes.HTTP_URL, url)
+
+        # Test the propagator
+        SentryPropagator().inject(carrier, setter=setter)
+
+        if trace_propagated:
+            assert "sentry-trace" in carrier
+            assert "baggage" in carrier
+        else:
+            assert "sentry-trace" not in carrier
+            assert "baggage" not in carrier
