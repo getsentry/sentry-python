@@ -46,7 +46,7 @@ from sentry_sdk.utils import (
     should_be_treated_as_error,
 )
 
-from typing import TYPE_CHECKING, cast, overload
+from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
     from typing import (
@@ -290,8 +290,8 @@ class Span:
 
     @property
     def root_span(self) -> Optional[Span]:
-        root_otel_span = cast(
-            "Optional[OtelSpan]", get_sentry_meta(self._otel_span, "root_span")
+        root_otel_span: Optional[OtelSpan] = get_sentry_meta(
+            self._otel_span, "root_span"
         )
         return Span(otel_span=root_otel_span) if root_otel_span else None
 
