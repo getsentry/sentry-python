@@ -24,7 +24,7 @@ class LogBatcher:
         self._running = True
         self._lock = threading.Lock()
 
-        self._flush_event: threading.Event = threading.Event()
+        self._flush_event = threading.Event()
 
         self._flusher: Optional[threading.Thread] = None
         self._flusher_pid: Optional[int] = None
