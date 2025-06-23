@@ -31,7 +31,7 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import (
@@ -152,7 +152,7 @@ class Transport(ABC):
 
 def _parse_rate_limits(
     header: str, now: Optional[datetime] = None
-) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]:
+) -> Iterable[Tuple[Optional[str], datetime]]:
     if now is None:
         now = datetime.now(timezone.utc)
 
@@ -163,7 +163,6 @@ def _parse_rate_limits(
 
             retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
-                category = cast("Optional[EventDataCategory]", category)
                 yield category, retry_after
         except (LookupError, ValueError):
             continue
@@ -182,7 +181,7 @@ class BaseHttpTransport(Transport):
         self.options: Dict[str, Any] = options
         self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._disabled_until: Dict[Optional[EventDataCategory], datetime] = {}
+        self._disabled_until: Dict[Optional[str], datetime] = {}
         # We only use this Retry() class for the `get_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
         self._discarded_events: DefaultDict[Tuple[EventDataCategory, str], int] = (
@@ -251,9 +250,7 @@ class BaseHttpTransport(Transport):
                 event = item.get_transaction_event() or {}
 
                 # +1 for the transaction itself
-                span_count = (
-                    len(cast("List[Dict[str, object]]", event.get("spans") or [])) + 1
-                )
+                span_count = len(event.get("spans") or []) + 1
                 self.record_lost_event(reason, "span", quantity=span_count)
 
             elif data_category == "attachment":
