@@ -1,5 +1,3 @@
-import asyncio
-
 from functools import wraps
 
 import sentry_sdk
@@ -16,12 +14,11 @@ if TYPE_CHECKING:
 def _create_run_wrapper(original_func):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     """
-    Wraps the agents.Runner.run* methods to create a root span for the agent workflow runs.
+    Wraps the agents.Runner.run methods to create a root span for the agent workflow runs.
     """
-    is_async = asyncio.iscoroutinefunction(original_func)
 
     @wraps(original_func)
-    async def async_wrapper(*args, **kwargs):
+    async def wrapper(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         agent = args[0]
         with agent_workflow_span(agent):
@@ -39,10 +36,4 @@ def _create_run_wrapper(original_func):
 
                 raise exc from None
 
-    @wraps(original_func)
-    def sync_wrapper(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
-        # The sync version (.run_sync()) is just a wrapper around the async version (.run())
-        return original_func(*args, **kwargs)
-
-    return async_wrapper if is_async else sync_wrapper
+    return wrapper
