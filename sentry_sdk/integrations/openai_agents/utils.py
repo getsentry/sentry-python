@@ -1,3 +1,4 @@
+import json
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
@@ -76,7 +77,7 @@ def _set_agent_data(span, agent):
     if len(agent.tools) > 0:
         span.set_data(
             SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-            [vars(tool) for tool in agent.tools],
+            safe_serialize([vars(tool) for tool in agent.tools]),
         )
 
 
@@ -126,7 +127,7 @@ def _set_input_data(span, get_response_kwargs):
         if len(messages) > 0:
             request_messages.append({"role": role, "content": messages})
 
-    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages)
+    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize(request_messages))
 
 
 def _set_output_data(span, result):
@@ -148,10 +149,58 @@ def _set_output_data(span, result):
                     output_messages["response"].append(output_message.text)
                 except AttributeError:
                     # Unknown output message type, just return the json
-                    output_messages["response"].append(output_message.to_json())
+                    output_messages["response"].append(output_message.dict())
 
     if len(output_messages["tool"]) > 0:
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, output_messages["tool"])
+        span.set_data(
+            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(output_messages["tool"])
+        )
 
     if len(output_messages["response"]) > 0:
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"])
+        span.set_data(
+            SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(output_messages["response"])
+        )
+
+
+def safe_serialize(data):
+    """Safely serialize to a readable string."""
+
+    def serialize_item(item):
+        if callable(item):
+            try:
+                module = getattr(item, "__module__", None)
+                qualname = getattr(item, "__qualname__", None)
+                name = getattr(item, "__name__", "anonymous")
+
+                if module and qualname:
+                    full_path = f"{module}.{qualname}"
+                elif module and name:
+                    full_path = f"{module}.{name}"
+                else:
+                    full_path = name
+
+                return f"<function {full_path}>"
+            except Exception:
+                return f"<callable {type(item).__name__}>"
+        elif isinstance(item, dict):
+            return {k: serialize_item(v) for k, v in item.items()}
+        elif isinstance(item, (list, tuple)):
+            return [serialize_item(x) for x in item]
+        elif hasattr(item, "__dict__"):
+            try:
+                attrs = {
+                    k: serialize_item(v)
+                    for k, v in vars(item).items()
+                    if not k.startswith("_")
+                }
+                return f"<{type(item).__name__} {attrs}>"
+            except Exception:
+                return repr(item)
+        else:
+            return item
+
+    try:
+        serialized = serialize_item(data)
+        return json.dumps(serialized, default=str)
+    except Exception:
+        return str(data)

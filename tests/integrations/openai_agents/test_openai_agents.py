@@ -1,9 +1,10 @@
-from unittest import mock
+import re
 import pytest
 from unittest.mock import MagicMock, patch
 import os
 
 from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+from sentry_sdk.integrations.openai_agents.utils import safe_serialize
 
 import agents
 from agents import (
@@ -360,22 +361,24 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         ai_client_span2,
     ) = spans
 
-    available_tools = [
-        {
-            "name": "simple_test_tool",
-            "description": "A simple tool",
-            "params_json_schema": {
-                "properties": {"message": {"title": "Message", "type": "string"}},
-                "required": ["message"],
-                "title": "simple_test_tool_args",
-                "type": "object",
-                "additionalProperties": False,
-            },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
-        }
-    ]
+    available_tools = safe_serialize(
+        [
+            {
+                "name": "simple_test_tool",
+                "description": "A simple tool",
+                "params_json_schema": {
+                    "properties": {"message": {"title": "Message", "type": "string"}},
+                    "required": ["message"],
+                    "title": "simple_test_tool_args",
+                    "type": "object",
+                    "additionalProperties": False,
+                },
+                "on_invoke_tool": "<function agents.tool.function_tool.<locals>._create_function_tool.<locals>._on_invoke_tool>",
+                "strict_json_schema": True,
+                "is_enabled": True,
+            }
+        ]
+    )
 
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
@@ -397,16 +400,22 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span1["data"]["gen_ai.request.available_tools"] == available_tools
     assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span1["data"]["gen_ai.request.messages"] == [
-        {
-            "role": "system",
-            "content": [{"type": "text", "text": "You are a helpful test assistant."}],
-        },
-        {
-            "role": "user",
-            "content": [{"type": "text", "text": "Please use the simple test tool"}],
-        },
-    ]
+    assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
+        [
+            {
+                "role": "system",
+                "content": [
+                    {"type": "text", "text": "You are a helpful test assistant."}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Please use the simple test tool"}
+                ],
+            },
+        ]
+    )
     assert ai_client_span1["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span1["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span1["data"]["gen_ai.request.top_p"] == 1.0
@@ -415,22 +424,35 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
     assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
     assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-    assert ai_client_span1["data"]["gen_ai.response.tool_calls"] == [
-        {
-            "arguments": '{"message": "hello"}',
-            "call_id": "call_123",
-            "name": "simple_test_tool",
-            "type": "function_call",
-            "id": "call_123",
-            "status": None,
-            "function": mock.ANY,
-        }
-    ]
+    assert re.sub(
+        r"SerializationIterator\(.*\)",
+        "NOT_CHECKED",
+        ai_client_span1["data"]["gen_ai.response.tool_calls"],
+    ) == safe_serialize(
+        [
+            {
+                "arguments": '{"message": "hello"}',
+                "call_id": "call_123",
+                "name": "simple_test_tool",
+                "type": "function_call",
+                "id": "call_123",
+                "status": None,
+                "function": "NOT_CHECKED",
+            }
+        ]
+    )
 
     assert tool_span["description"] == "execute_tool simple_test_tool"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-    assert tool_span["data"]["gen_ai.request.available_tools"] == available_tools
+    assert (
+        re.sub(
+            "<.*>(,)",
+            r"'NOT_CHECKED'\1",
+            agent_span["data"]["gen_ai.request.available_tools"],
+        )
+        == available_tools
+    )
     assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
     assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"
     assert tool_span["data"]["gen_ai.request.temperature"] == 0.7
@@ -445,47 +467,64 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["description"] == "chat gpt-4"
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
-    assert ai_client_span2["data"]["gen_ai.request.available_tools"] == available_tools
+    assert (
+        re.sub(
+            "<.*>(,)",
+            r"'NOT_CHECKED'\1",
+            agent_span["data"]["gen_ai.request.available_tools"],
+        )
+        == available_tools
+    )
     assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span2["data"]["gen_ai.request.messages"] == [
-        {
-            "role": "system",
-            "content": [{"type": "text", "text": "You are a helpful test assistant."}],
-        },
-        {
-            "role": "user",
-            "content": [{"type": "text", "text": "Please use the simple test tool"}],
-        },
-        {
-            "role": "assistant",
-            "content": [
-                {
-                    "arguments": '{"message": "hello"}',
-                    "call_id": "call_123",
-                    "name": "simple_test_tool",
-                    "type": "function_call",
-                    "id": "call_123",
-                    "function": mock.ANY,
-                }
-            ],
-        },
-        {
-            "role": "tool",
-            "content": [
-                {
-                    "call_id": "call_123",
-                    "output": "Tool executed with: hello",
-                    "type": "function_call_output",
-                }
-            ],
-        },
-    ]
+    assert re.sub(
+        r"SerializationIterator\(.*\)",
+        "NOT_CHECKED",
+        ai_client_span2["data"]["gen_ai.request.messages"],
+    ) == safe_serialize(
+        [
+            {
+                "role": "system",
+                "content": [
+                    {"type": "text", "text": "You are a helpful test assistant."}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Please use the simple test tool"}
+                ],
+            },
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "arguments": '{"message": "hello"}',
+                        "call_id": "call_123",
+                        "name": "simple_test_tool",
+                        "type": "function_call",
+                        "id": "call_123",
+                        "function": "NOT_CHECKED",
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "content": [
+                    {
+                        "call_id": "call_123",
+                        "output": "Tool executed with: hello",
+                        "type": "function_call_output",
+                    }
+                ],
+            },
+        ]
+    )
     assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
-    assert ai_client_span2["data"]["gen_ai.response.text"] == [
-        "Task completed using the tool"
-    ]
+    assert ai_client_span2["data"]["gen_ai.response.text"] == safe_serialize(
+        ["Task completed using the tool"]
+    )
     assert ai_client_span2["data"]["gen_ai.system"] == "openai"
     assert ai_client_span2["data"]["gen_ai.usage.input_tokens.cached"] == 0
     assert ai_client_span2["data"]["gen_ai.usage.input_tokens"] == 15
