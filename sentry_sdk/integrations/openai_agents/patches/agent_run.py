@@ -102,11 +102,13 @@ def _patch_agent_run():
             handoff_span(context_wrapper, agent, handoff_agent_name)
 
         # Call original method with all parameters
-        result = await original_execute_handoffs(*args, **kwargs)
+        try:
+            result = await original_execute_handoffs(*args, **kwargs)
 
-        # End span for current agent after handoff processing is complete
-        if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-            _end_invoke_agent_span(context_wrapper, agent)
+        finally:
+            # End span for current agent after handoff processing is complete
+            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
+                _end_invoke_agent_span(context_wrapper, agent)
 
         return result
 
@@ -124,11 +126,12 @@ def _patch_agent_run():
         final_output = kwargs.get("final_output")
 
         # Call original method with all parameters
-        result = await original_execute_final_output(*args, **kwargs)
-
-        # End span for current agent after final output processing is complete
-        if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-            _end_invoke_agent_span(context_wrapper, agent, final_output)
+        try:
+            result = await original_execute_final_output(*args, **kwargs)
+        finally:
+            # End span for current agent after final output processing is complete
+            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
+                _end_invoke_agent_span(context_wrapper, agent, final_output)
 
         return result
 
