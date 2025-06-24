@@ -47,7 +47,7 @@ def _patch_agent_run():
     def _has_active_agent_span(context_wrapper):
         # type: (agents.RunContextWrapper) -> bool
         """Check if there's an active agent span for this context"""
-        return hasattr(context_wrapper, "_sentry_current_agent")
+        return getattr(context_wrapper, "_sentry_current_agent", None) is not None
 
     def _get_current_agent(context_wrapper):
         # type: (agents.RunContextWrapper) -> Optional[agents.Agent]
