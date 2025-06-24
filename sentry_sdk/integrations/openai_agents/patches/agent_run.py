@@ -59,22 +59,13 @@ def _patch_agent_run():
         if hasattr(original_run_single_turn, "__func__")
         else original_run_single_turn
     )
-    async def patched_run_single_turn(
-        cls,
-        *,
-        agent,
-        all_tools,
-        original_input,
-        generated_items,
-        hooks,
-        context_wrapper,
-        run_config,
-        should_run_agent_start_hooks,
-        tool_use_tracker,
-        previous_response_id,
-    ):
-        # type: (agents.Agent, list[agents.Tool], Any, list[Any], list[Any], agents.RunContextWrapper, agents.RunConfig, bool, Any, Any, Optional[str]) -> Any
+    async def patched_run_single_turn(cls, *args, **kwargs):
+        # type: (agents.Runner, *Any, **Any) -> Any
         """Patched _run_single_turn that creates agent invocation spans"""
+
+        agent = kwargs.get("agent")
+        context_wrapper = kwargs.get("context_wrapper")
+        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
 
         # Start agent span when agent starts (but only once per agent)
         if should_run_agent_start_hooks and agent and context_wrapper:
@@ -87,18 +78,7 @@ def _patch_agent_run():
             _start_invoke_agent_span(context_wrapper, agent)
 
         # Call original method with all the correct parameters
-        result = await original_run_single_turn(
-            agent=agent,
-            all_tools=all_tools,
-            original_input=original_input,
-            generated_items=generated_items,
-            hooks=hooks,
-            context_wrapper=context_wrapper,
-            run_config=run_config,
-            should_run_agent_start_hooks=should_run_agent_start_hooks,
-            tool_use_tracker=tool_use_tracker,
-            previous_response_id=previous_response_id,
-        )
+        result = await original_run_single_turn(*args, **kwargs)
 
         return result
 
@@ -107,21 +87,13 @@ def _patch_agent_run():
         if hasattr(original_execute_handoffs, "__func__")
         else original_execute_handoffs
     )
-    async def patched_execute_handoffs(
-        cls,
-        *,
-        agent,
-        original_input,
-        pre_step_items,
-        new_step_items,
-        new_response,
-        run_handoffs,
-        hooks,
-        context_wrapper,
-        run_config,
-    ):
-        # type: (Any, agents.Agent, Any, list[Any], list[Any], Any, list[Any], list[Any], agents.RunContextWrapper, agents.RunConfig) -> Any
+    async def patched_execute_handoffs(cls, *args, **kwargs):
+        # type: (agents.Runner, *Any, **Any) -> Any
         """Patched execute_handoffs that creates handoff spans and ends agent span for handoffs"""
+
+        context_wrapper = kwargs.get("context_wrapper")
+        run_handoffs = kwargs.get("run_handoffs")
+        agent = kwargs.get("agent")
 
         # Create Sentry handoff span for the first handoff (agents library only processes the first one)
         if run_handoffs:
@@ -130,17 +102,7 @@ def _patch_agent_run():
             handoff_span(context_wrapper, agent, handoff_agent_name)
 
         # Call original method with all parameters
-        result = await original_execute_handoffs(
-            agent=agent,
-            original_input=original_input,
-            pre_step_items=pre_step_items,
-            new_step_items=new_step_items,
-            new_response=new_response,
-            run_handoffs=run_handoffs,
-            hooks=hooks,
-            context_wrapper=context_wrapper,
-            run_config=run_config,
-        )
+        result = await original_execute_handoffs(*args, **kwargs)
 
         # End span for current agent after handoff processing is complete
         if agent and context_wrapper and _has_active_agent_span(context_wrapper):
@@ -153,32 +115,16 @@ def _patch_agent_run():
         if hasattr(original_execute_final_output, "__func__")
         else original_execute_final_output
     )
-    async def patched_execute_final_output(
-        cls,
-        *,
-        agent,
-        original_input,
-        new_response,
-        pre_step_items,
-        new_step_items,
-        final_output,
-        hooks,
-        context_wrapper,
-    ):
-        # type: (Any, agents.Agent, Any, Any, list[Any], list[Any], Any, list[Any], agents.RunContextWrapper) -> Any
+    async def patched_execute_final_output(cls, *args, **kwargs):
+        # type: (agents.Runner, *Any, **Any) -> Any
         """Patched execute_final_output that ends agent span for final outputs"""
 
+        agent = kwargs.get("agent")
+        context_wrapper = kwargs.get("context_wrapper")
+        final_output = kwargs.get("final_output")
+
         # Call original method with all parameters
-        result = await original_execute_final_output(
-            agent=agent,
-            original_input=original_input,
-            new_response=new_response,
-            pre_step_items=pre_step_items,
-            new_step_items=new_step_items,
-            final_output=final_output,
-            hooks=hooks,
-            context_wrapper=context_wrapper,
-        )
+        result = await original_execute_final_output(*args, **kwargs)
 
         # End span for current agent after final output processing is complete
         if agent and context_wrapper and _has_active_agent_span(context_wrapper):
