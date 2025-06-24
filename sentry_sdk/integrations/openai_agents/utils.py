@@ -31,10 +31,10 @@ def _capture_exception(exc):
 def _get_start_span_function():
     # type: () -> Callable[..., Any]
     current_span = sentry_sdk.get_current_span()
-    is_transaction = (
+    transaction_exists = (
         current_span is not None and current_span.containing_transaction == current_span
     )
-    return sentry_sdk.start_span if is_transaction else sentry_sdk.start_transaction
+    return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
 
 
 def _set_agent_data(span, agent):
