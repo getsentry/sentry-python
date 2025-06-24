@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.31.0
+
+### Various fixes & improvements
+
+- Support `openai-agents` (#4437) by @antonpirker
+- ref(langchain): Greatly simplify `_wrap_configure` (#4479) by @szokeasaurusrex
+- tests: Tox update (#4509) by @sentrivana
+- Cursor generated rules (#4493) by @sl0thentr0py
+- fix(ci): Remove tracerite pin (almost) (#4504) by @sentrivana
+- fix(profiling): Ensure profiler thread exits when needed (#4497) by @Zylphrex
+- fix(ci): Do not install newest tracerite (#4494) by @sentrivana
+- tests: Regenerate tox (#4484) by @sentrivana
+- fix(scope): Handle token reset `LookupError`s gracefully (#4481) by @sentrivana
+- tests: Upper bound on fakeredis on old Python versions (#4482) by @sentrivana
+- feat(logs): Add support for dict args (#4478) by @AbhiPrasad
+- tests: Regenerate tox (#4457) by @sentrivana
+
 ## 2.30.0
 
 ### Various fixes & improvements
