@@ -15,6 +15,9 @@ def _create_run_wrapper(original_func):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     """
     Wraps the agents.Runner.run methods to create a root span for the agent workflow runs.
+
+    Note agents.Runner.run_sync() is a wrapper around agents.Runner.run(),
+    so it does not need to be wrapped separately.
     """
 
     @wraps(original_func)
