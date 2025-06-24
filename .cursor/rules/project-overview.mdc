@@ -1,0 +1,47 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Sentry Python SDK - Project Overview
+
+## What is this project?
+
+The Sentry Python SDK is the official Python SDK for [Sentry](mdc:https://sentry.io), an error monitoring and performance monitoring platform. It helps developers capture errors, exceptions, traces and profiles from Python applications.
+
+## Key Files and Directories
+
+### Core SDK
+- [sentry_sdk/__init__.py](mdc:sentry_sdk/__init__.py) - Main entry point, exports all public APIs
+- [sentry_sdk/api.py](mdc:sentry_sdk/api.py) - Public API functions (init, capture_exception, etc.)
+- [sentry_sdk/client.py](mdc:sentry_sdk/client.py) - Core client implementation
+- [sentry_sdk/scope.py](mdc:sentry_sdk/scope.py) - Scope holds contextual metadata such as tags that are applied automatically to events and envelopes
+- [sentry_sdk/transport.py](mdc:sentry_sdk/transport.py) - HTTP Transport that sends the envelopes to Sentry's servers
+- [sentry_sdk/worker.py](mdc:sentry_sdk/worker.py) - Background threaded worker with a queue to manage transport requests
+- [sentry_sdk/serializer.py](mdc:sentry_sdk/serializer.py) - Serializes the payload along with truncation logic
+
+### Integrations
+- [sentry_sdk/integrations/](mdc:sentry_sdk/integrations) - Framework and library integrations
+  - [sentry_sdk/integrations/__init__.py](mdc:sentry_sdk/integrations/__init__.py) - Integration registry
+  - [sentry_sdk/integrations/django/](mdc:sentry_sdk/integrations/django) - Django framework integration
+  - [sentry_sdk/integrations/flask/](mdc:sentry_sdk/integrations/flask) - Flask framework integration
+  - [sentry_sdk/integrations/fastapi/](mdc:sentry_sdk/integrations/fastapi) - FastAPI integration
+  - [sentry_sdk/integrations/celery/](mdc:sentry_sdk/integrations/celery) - Celery task queue integration
+  - [sentry_sdk/integrations/aws_lambda/](mdc:sentry_sdk/integrations/aws_lambda) - AWS Lambda integration
+
+### Configuration and Setup
+- [setup.py](mdc:setup.py) - Package configuration and dependencies
+- [pyproject.toml](mdc:pyproject.toml) - Modern Python project configuration
+- [tox.ini](mdc:tox.ini) - Test matrix configuration for multiple Python versions and integrations
+- [requirements-*.txt](mdc:requirements-testing.txt) - Various dependency requirements
+
+### Documentation and Guides
+- [README.md](mdc:README.md) - Project overview and quick start
+- [CONTRIBUTING.md](mdc:CONTRIBUTING.md) - Development and contribution guidelines
+- [MIGRATION_GUIDE.md](mdc:MIGRATION_GUIDE.md) - Migration from older versions
+- [CHANGELOG.md](mdc:CHANGELOG.md) - Version history and changes
+
+### Testing
+- [tests/](mdc:tests) - Comprehensive test suite
+  - [tests/integrations/](mdc:tests/integrations) - Integration-specific tests
+  - [tests/conftest.py](mdc:tests/conftest.py) - Pytest configuration and fixtures
