@@ -4,10 +4,7 @@ from functools import wraps
 
 import sentry_sdk
 
-from ..spans import (
-    agent_workflow_span,
-    update_agent_workflow_span,
-)
+from ..spans import agent_workflow_span
 from ..utils import _capture_exception
 
 from typing import TYPE_CHECKING
@@ -27,7 +24,7 @@ def _create_run_wrapper(original_func):
     async def async_wrapper(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         agent = args[0]
-        with agent_workflow_span(agent) as span:
+        with agent_workflow_span(agent):
             result = None
             try:
                 result = await original_func(*args, **kwargs)
@@ -41,8 +38,6 @@ def _create_run_wrapper(original_func):
                     current_span.__exit__(None, None, None)
 
                 raise exc from None
-            finally:
-                update_agent_workflow_span(span, agent, result)
 
     @wraps(original_func)
     def sync_wrapper(*args, **kwargs):

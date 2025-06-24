@@ -1,7 +1,4 @@
-from .agent_workflow import (  # noqa: F401
-    agent_workflow_span,
-    update_agent_workflow_span,
-)
+from .agent_workflow import agent_workflow_span  # noqa: F401
 from .ai_client import ai_client_span, update_ai_client_span  # noqa: F401
 from .execute_tool import execute_tool_span, update_execute_tool_span  # noqa: F401
 from .handoff import handoff_span  # noqa: F401
