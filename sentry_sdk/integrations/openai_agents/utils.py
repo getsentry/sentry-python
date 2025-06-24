@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
+    from typing import Union
     from agents import Usage
 
 try:
@@ -163,9 +164,11 @@ def _set_output_data(span, result):
 
 
 def safe_serialize(data):
+    # type: (Any) -> str
     """Safely serialize to a readable string."""
 
     def serialize_item(item):
+        # type: (Any) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]
         if callable(item):
             try:
                 module = getattr(item, "__module__", None)
