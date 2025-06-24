@@ -66,9 +66,8 @@ def is_sentry_span(span: ReadableSpan) -> bool:
     if not span.attributes:
         return False
 
-    span_url = span.attributes.get(SpanAttributes.HTTP_URL, None)
-
-    if span_url is None or not isinstance(span_url, str):
+    span_url = get_typed_attribute(span.attributes, SpanAttributes.HTTP_URL, str)
+    if span_url is None:
         return False
 
     dsn_url = None

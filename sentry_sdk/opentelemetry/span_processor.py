@@ -247,7 +247,7 @@ class SentrySpanProcessor(SpanProcessor):
         if not span.context:
             return None
 
-        # need ot ignore the type here due to TypedDict nonsense
+        # need to ignore the type here due to TypedDict nonsense
         span_json: Optional[dict[str, Any]] = self._common_span_transaction_attributes_as_json(span)  # type: ignore
         if span_json is None:
             return None
