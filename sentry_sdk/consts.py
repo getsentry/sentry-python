@@ -101,6 +101,12 @@ class SPANDATA:
     Example: ["Smith et al. 2020", "Jones 2019"]
     """
 
+    AI_COMPLETION_TOKENS_USED = "ai.completion_tokens.used"
+    """
+    The number of output completion tokens used by the model.
+    Example: 10
+    """
+
     AI_DOCUMENTS = "ai.documents"
     """
     Documents or content chunks used as context for the AI model.
@@ -170,6 +176,12 @@ class SPANDATA:
     """
     Used to reduce repetitiveness of generated tokens.
     Example: 0.5
+    """
+
+    AI_PROMPT_TOKENS_USED = "ai.prompt_tokens.used"
+    """
+    The number of input prompt tokens used by the model.
+    Example: 10
     """
 
     AI_RAW_PROMPTING = "ai.raw_prompting"
@@ -257,6 +269,12 @@ class SPANDATA:
     AI_TOOLS = "ai.tools"
     """
     For an AI model call, the functions that are available
+    """
+
+    AI_TOTAL_TOKENS_USED = "ai.total_tokens.used"
+    """
+    The total number of tokens (input + output) used by the request to the model.
+    Example: 20
     """
 
     AI_WARNINGS = "ai.warnings"
