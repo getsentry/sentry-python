@@ -1,0 +1,51 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Quick Reference
+
+## Common Commands
+
+### Development Setup
+```bash
+make .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+```
+
+### Testing
+
+Our test matrix is implemented in [tox](mdc:https://tox.wiki).
+The following runs the whole test suite and takes a long time.
+
+```bash
+source .venv/bin/activate
+tox
+```
+
+Prefer testing a single environment instead while developing.
+
+```bash
+tox -e py3.12-common
+```
+
+For running a single test, use the pattern:
+
+```bash
+tox -e py3.12-common -- project/tests/test_file.py::TestClassName::test_method
+```
+
+For testing specific integrations, refer to the test matrix in [sentry_sdk/tox.ini](mdc:sentry_sdk/tox.ini) for finding an entry.
+For example, to test django, use:
+
+```bash
+tox -e py3.12-django-v5.2.3
+```
+
+### Code Quality
+
+Our `linters` tox environment runs `black` for formatting, `flake8` for linting and `mypy` for type checking.
+
+```bash
+tox -e linters
+```

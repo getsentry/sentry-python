@@ -145,3 +145,82 @@ def test_no_thread_on_shutdown_no_errors(sentry_init):
         sentry_sdk.flush()
 
     # If we reach this point without error, the test is successful.
+
+
+def test_no_thread_on_shutdown_no_errors_deprecated(
+    sentry_init, suppress_deprecation_warnings
+):
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+    )
+
+    # make it seem like the interpreter is shutting down
+    with mock.patch(
+        "threading.Thread.start",
+        side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
+    ):
+        with track_session(session_mode="request"):
+            with sentry_sdk.new_scope():
+                try:
+                    raise Exception("all is wrong")
+                except Exception:
+                    sentry_sdk.capture_exception()
+
+        with track_session(session_mode="request"):
+            pass
+
+        sentry_sdk.get_isolation_scope().start_session(session_mode="request")
+        sentry_sdk.get_isolation_scope().end_session()
+        sentry_sdk.flush()
+
+    # If we reach this point without error, the test is successful.
+
+
+def test_top_level_start_session_basic(sentry_init, capture_envelopes):
+    """Test that top-level start_session starts a session on the isolation scope."""
+    sentry_init(release="test-release", environment="test-env")
+    envelopes = capture_envelopes()
+
+    # Start a session using the top-level API
+    sentry_sdk.start_session()
+
+    # End the session
+    sentry_sdk.end_session()
+    sentry_sdk.flush()
+
+    # Check that we got a session envelope
+    assert len(envelopes) == 1
+    sess = envelopes[0]
+    assert len(sess.items) == 1
+    sess_event = sess.items[0].payload.json
+
+    assert sess_event["attrs"] == {
+        "release": "test-release",
+        "environment": "test-env",
+    }
+    assert sess_event["status"] == "exited"
+
+
+def test_top_level_start_session_with_mode(sentry_init, capture_envelopes):
+    """Test that top-level start_session accepts session_mode parameter."""
+    sentry_init(release="test-release", environment="test-env")
+    envelopes = capture_envelopes()
+
+    # Start a session with request mode
+    sentry_sdk.start_session(session_mode="request")
+    sentry_sdk.end_session()
+    sentry_sdk.flush()
+
+    # Request mode sessions are aggregated
+    assert len(envelopes) == 1
+    sess = envelopes[0]
+    assert len(sess.items) == 1
+    sess_event = sess.items[0].payload.json
+
+    assert sess_event["attrs"] == {
+        "release": "test-release",
+        "environment": "test-env",
+    }
+    # Request sessions show up as aggregates
+    assert "aggregates" in sess_event
