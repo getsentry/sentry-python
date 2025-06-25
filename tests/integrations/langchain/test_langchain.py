@@ -416,3 +416,15 @@ def test_manual_callback_no_duplication(sentry_init):
 
     # Verify the callback ID matches our manual callback
     assert id(manual_callback) in tracked_callback_instances
+
+
+def test_span_map_is_instance_variable():
+    """Test that each SentryLangchainCallback instance has its own span_map."""
+    # Create two separate callback instances
+    callback1 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+    callback2 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+    # Verify they have different span_map instances
+    assert (
+        callback1.span_map is not callback2.span_map
+    ), "span_map should be an instance variable, not shared between instances"
