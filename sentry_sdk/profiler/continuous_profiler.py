@@ -1,3 +1,4 @@
+from __future__ import annotations
 import atexit
 import os
 import random
@@ -60,18 +61,19 @@ try:
     from gevent.monkey import get_original
     from gevent.threadpool import ThreadPool as _ThreadPool
 
-    ThreadPool = _ThreadPool  # type: Optional[Type[_ThreadPool]]
+    ThreadPool: Optional[Type[_ThreadPool]] = _ThreadPool
     thread_sleep = get_original("time", "sleep")
 except ImportError:
     thread_sleep = time.sleep
     ThreadPool = None
 
 
-_scheduler = None  # type: Optional[ContinuousScheduler]
+_scheduler: Optional[ContinuousScheduler] = None
 
 
-def setup_continuous_profiler(options, sdk_info, capture_func):
-    # type: (Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> bool
+def setup_continuous_profiler(
+    options: Dict[str, Any], sdk_info: SDKInfo, capture_func: Callable[[Envelope], None]
+) -> bool:
     global _scheduler
 
     if _scheduler is not None:
@@ -115,8 +117,7 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
     return True
 
 
-def try_autostart_continuous_profiler():
-    # type: () -> None
+def try_autostart_continuous_profiler() -> None:
 
     # TODO: deprecate this as it'll be replaced by the auto lifecycle option
 
@@ -129,47 +130,43 @@ def try_autostart_continuous_profiler():
     _scheduler.manual_start()
 
 
-def try_profile_lifecycle_trace_start():
-    # type: () -> Union[ContinuousProfile, None]
+def try_profile_lifecycle_trace_start() -> Union[ContinuousProfile, None]:
     if _scheduler is None:
         return None
 
     return _scheduler.auto_start()
 
 
-def start_profiler():
-    # type: () -> None
+def start_profiler() -> None:
     if _scheduler is None:
         return
 
     _scheduler.manual_start()
 
 
-def stop_profiler():
-    # type: () -> None
+def stop_profiler() -> None:
     if _scheduler is None:
         return
 
     _scheduler.manual_stop()
 
 
-def teardown_continuous_profiler():
-    # type: () -> None
+def teardown_continuous_profiler() -> None:
     stop_profiler()
 
     global _scheduler
     _scheduler = None
 
 
-def get_profiler_id():
-    # type: () -> Union[str, None]
+def get_profiler_id() -> Union[str, None]:
     if _scheduler is None:
         return None
     return _scheduler.profiler_id
 
 
-def determine_profile_session_sampling_decision(sample_rate):
-    # type: (Union[float, None]) -> bool
+def determine_profile_session_sampling_decision(
+    sample_rate: Union[float, None],
+) -> bool:
 
     # `None` is treated as `0.0`
     if not sample_rate:
@@ -181,16 +178,20 @@ def determine_profile_session_sampling_decision(sample_rate):
 class ContinuousProfile:
     active: bool = True
 
-    def stop(self):
-        # type: () -> None
+    def stop(self) -> None:
         self.active = False
 
 
 class ContinuousScheduler:
-    mode = "unknown"  # type: ContinuousProfilerMode
+    mode: ContinuousProfilerMode = "unknown"
 
-    def __init__(self, frequency, options, sdk_info, capture_func):
-        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
+    def __init__(
+        self,
+        frequency: int,
+        options: Dict[str, Any],
+        sdk_info: SDKInfo,
+        capture_func: Callable[[Envelope], None],
+    ) -> None:
         self.interval = 1.0 / frequency
         self.options = options
         self.sdk_info = sdk_info
@@ -203,17 +204,16 @@ class ContinuousScheduler:
         )
 
         self.sampler = self.make_sampler()
-        self.buffer = None  # type: Optional[ProfileBuffer]
-        self.pid = None  # type: Optional[int]
+        self.buffer: Optional[ProfileBuffer] = None
+        self.pid: Optional[int] = None
 
         self.running = False
         self.soft_shutdown = False
 
-        self.new_profiles = deque(maxlen=128)  # type: Deque[ContinuousProfile]
-        self.active_profiles = set()  # type: Set[ContinuousProfile]
+        self.new_profiles: Deque[ContinuousProfile] = deque(maxlen=128)
+        self.active_profiles: Set[ContinuousProfile] = set()
 
-    def is_auto_start_enabled(self):
-        # type: () -> bool
+    def is_auto_start_enabled(self) -> bool:
 
         # Ensure that the scheduler only autostarts once per process.
         # This is necessary because many web servers use forks to spawn
@@ -229,8 +229,7 @@ class ContinuousScheduler:
 
         return experiments.get("continuous_profiling_auto_start")
 
-    def auto_start(self):
-        # type: () -> Union[ContinuousProfile, None]
+    def auto_start(self) -> Union[ContinuousProfile, None]:
         if not self.sampled:
             return None
 
@@ -246,8 +245,7 @@ class ContinuousScheduler:
 
         return profile
 
-    def manual_start(self):
-        # type: () -> None
+    def manual_start(self) -> None:
         if not self.sampled:
             return
 
@@ -256,48 +254,40 @@ class ContinuousScheduler:
 
         self.ensure_running()
 
-    def manual_stop(self):
-        # type: () -> None
+    def manual_stop(self) -> None:
         if self.lifecycle != "manual":
             return
 
         self.teardown()
 
-    def ensure_running(self):
-        # type: () -> None
+    def ensure_running(self) -> None:
         raise NotImplementedError
 
-    def teardown(self):
-        # type: () -> None
+    def teardown(self) -> None:
         raise NotImplementedError
 
-    def pause(self):
-        # type: () -> None
+    def pause(self) -> None:
         raise NotImplementedError
 
-    def reset_buffer(self):
-        # type: () -> None
+    def reset_buffer(self) -> None:
         self.buffer = ProfileBuffer(
             self.options, self.sdk_info, PROFILE_BUFFER_SECONDS, self.capture_func
         )
 
     @property
-    def profiler_id(self):
-        # type: () -> Union[str, None]
+    def profiler_id(self) -> Union[str, None]:
         if self.buffer is None:
             return None
         return self.buffer.profiler_id
 
-    def make_sampler(self):
-        # type: () -> Callable[..., bool]
+    def make_sampler(self) -> Callable[..., bool]:
         cwd = os.getcwd()
 
         cache = LRUCache(max_size=256)
 
         if self.lifecycle == "trace":
 
-            def _sample_stack(*args, **kwargs):
-                # type: (*Any, **Any) -> bool
+            def _sample_stack(*args: Any, **kwargs: Any) -> bool:
                 """
                 Take a sample of the stack on all the threads in the process.
                 This should be called at a regular interval to collect samples.
@@ -362,8 +352,7 @@ class ContinuousScheduler:
 
         else:
 
-            def _sample_stack(*args, **kwargs):
-                # type: (*Any, **Any) -> bool
+            def _sample_stack(*args: Any, **kwargs: Any) -> bool:
                 """
                 Take a sample of the stack on all the threads in the process.
                 This should be called at a regular interval to collect samples.
@@ -389,8 +378,7 @@ class ContinuousScheduler:
 
         return _sample_stack
 
-    def run(self):
-        # type: () -> None
+    def run(self) -> None:
         last = time.perf_counter()
 
         while self.running:
@@ -427,18 +415,22 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     the sampler at a regular interval.
     """
 
-    mode = "thread"  # type: ContinuousProfilerMode
+    mode: ContinuousProfilerMode = "thread"
     name = "sentry.profiler.ThreadContinuousScheduler"
 
-    def __init__(self, frequency, options, sdk_info, capture_func):
-        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
+    def __init__(
+        self,
+        frequency: int,
+        options: Dict[str, Any],
+        sdk_info: SDKInfo,
+        capture_func: Callable[[Envelope], None],
+    ) -> None:
         super().__init__(frequency, options, sdk_info, capture_func)
 
-        self.thread = None  # type: Optional[threading.Thread]
+        self.thread: Optional[threading.Thread] = None
         self.lock = threading.Lock()
 
-    def ensure_running(self):
-        # type: () -> None
+    def ensure_running(self) -> None:
 
         self.soft_shutdown = False
 
@@ -475,8 +467,7 @@ class ThreadContinuousScheduler(ContinuousScheduler):
                 self.running = False
                 self.thread = None
 
-    def teardown(self):
-        # type: () -> None
+    def teardown(self) -> None:
         if self.running:
             self.running = False
 
@@ -501,21 +492,25 @@ class GeventContinuousScheduler(ContinuousScheduler):
        results in a sample containing only the sampler's code.
     """
 
-    mode = "gevent"  # type: ContinuousProfilerMode
+    mode: ContinuousProfilerMode = "gevent"
 
-    def __init__(self, frequency, options, sdk_info, capture_func):
-        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
+    def __init__(
+        self,
+        frequency: int,
+        options: Dict[str, Any],
+        sdk_info: SDKInfo,
+        capture_func: Callable[[Envelope], None],
+    ) -> None:
 
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
         super().__init__(frequency, options, sdk_info, capture_func)
 
-        self.thread = None  # type: Optional[_ThreadPool]
+        self.thread: Optional[_ThreadPool] = None
         self.lock = threading.Lock()
 
-    def ensure_running(self):
-        # type: () -> None
+    def ensure_running(self) -> None:
 
         self.soft_shutdown = False
 
@@ -548,8 +543,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
                 self.running = False
                 self.thread = None
 
-    def teardown(self):
-        # type: () -> None
+    def teardown(self) -> None:
         if self.running:
             self.running = False
 
@@ -564,8 +558,13 @@ PROFILE_BUFFER_SECONDS = 60
 
 
 class ProfileBuffer:
-    def __init__(self, options, sdk_info, buffer_size, capture_func):
-        # type: (Dict[str, Any], SDKInfo, int, Callable[[Envelope], None]) -> None
+    def __init__(
+        self,
+        options: Dict[str, Any],
+        sdk_info: SDKInfo,
+        buffer_size: int,
+        capture_func: Callable[[Envelope], None],
+    ) -> None:
         self.options = options
         self.sdk_info = sdk_info
         self.buffer_size = buffer_size
@@ -587,8 +586,7 @@ class ProfileBuffer:
             datetime.now(timezone.utc).timestamp() - self.start_monotonic_time
         )
 
-    def write(self, monotonic_time, sample):
-        # type: (float, ExtractedSample) -> None
+    def write(self, monotonic_time: float, sample: ExtractedSample) -> None:
         if self.should_flush(monotonic_time):
             self.flush()
             self.chunk = ProfileChunk()
@@ -596,15 +594,13 @@ class ProfileBuffer:
 
         self.chunk.write(self.start_timestamp + monotonic_time, sample)
 
-    def should_flush(self, monotonic_time):
-        # type: (float) -> bool
+    def should_flush(self, monotonic_time: float) -> bool:
 
         # If the delta between the new monotonic time and the start monotonic time
         # exceeds the buffer size, it means we should flush the chunk
         return monotonic_time - self.start_monotonic_time >= self.buffer_size
 
-    def flush(self):
-        # type: () -> None
+    def flush(self) -> None:
         chunk = self.chunk.to_json(self.profiler_id, self.options, self.sdk_info)
         envelope = Envelope()
         envelope.add_profile_chunk(chunk)
@@ -612,18 +608,16 @@ class ProfileBuffer:
 
 
 class ProfileChunk:
-    def __init__(self):
-        # type: () -> None
+    def __init__(self) -> None:
         self.chunk_id = uuid.uuid4().hex
 
-        self.indexed_frames = {}  # type: Dict[FrameId, int]
-        self.indexed_stacks = {}  # type: Dict[StackId, int]
-        self.frames = []  # type: List[ProcessedFrame]
-        self.stacks = []  # type: List[ProcessedStack]
-        self.samples = []  # type: List[ProcessedSample]
+        self.indexed_frames: Dict[FrameId, int] = {}
+        self.indexed_stacks: Dict[StackId, int] = {}
+        self.frames: List[ProcessedFrame] = []
+        self.stacks: List[ProcessedStack] = []
+        self.samples: List[ProcessedSample] = []
 
-    def write(self, ts, sample):
-        # type: (float, ExtractedSample) -> None
+    def write(self, ts: float, sample: ExtractedSample) -> None:
         for tid, (stack_id, frame_ids, frames) in sample:
             try:
                 # Check if the stack is indexed first, this lets us skip
@@ -651,8 +645,9 @@ class ProfileChunk:
                 # When this happens, we abandon the current sample as it's bad.
                 capture_internal_exception(sys.exc_info())
 
-    def to_json(self, profiler_id, options, sdk_info):
-        # type: (str, Dict[str, Any], SDKInfo) -> Dict[str, Any]
+    def to_json(
+        self, profiler_id: str, options: Dict[str, Any], sdk_info: SDKInfo
+    ) -> Dict[str, Any]:
         profile = {
             "frames": self.frames,
             "stacks": self.stacks,
