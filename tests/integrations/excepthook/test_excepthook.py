@@ -5,10 +5,10 @@ import subprocess
 from textwrap import dedent
 
 
-TEST_PARAMETERS = [("", "HttpTransport")]
+TEST_PARAMETERS = [("http2=False", "HttpTransport")]
 
 if sys.version_info >= (3, 8):
-    TEST_PARAMETERS.append(('_experiments={"transport_http2": True}', "Http2Transport"))
+    TEST_PARAMETERS.append(("", "Http2Transport"))
 
 
 @pytest.mark.parametrize("options, transport", TEST_PARAMETERS)
