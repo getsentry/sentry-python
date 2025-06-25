@@ -281,7 +281,8 @@ class Profile:
             self.sampled = False
             return
 
-        if not is_valid_sample_rate(sample_rate, source="Profiling"):
+        sample_rate = is_valid_sample_rate(sample_rate, source="Profiling")
+        if sample_rate is None:
             logger.warning(
                 "[Profiling] Discarding profile because of invalid sample rate."
             )
@@ -291,14 +292,14 @@ class Profile:
         # Now we roll the dice. random.random is inclusive of 0, but not of 1,
         # so strict < is safe here. In case sample_rate is a boolean, cast it
         # to a float (True becomes 1.0 and False becomes 0.0)
-        self.sampled = random.random() < float(sample_rate)
+        self.sampled = random.random() < sample_rate
 
         if self.sampled:
             logger.debug("[Profiling] Initializing profile")
         else:
             logger.debug(
                 "[Profiling] Discarding profile because it's not included in the random sample (sample rate = {sample_rate})".format(
-                    sample_rate=float(sample_rate)
+                    sample_rate=sample_rate
                 )
             )
 
