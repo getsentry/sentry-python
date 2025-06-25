@@ -1,4 +1,4 @@
-from typing import cast
+from __future__ import annotations
 from contextlib import contextmanager
 import warnings
 
@@ -24,9 +24,6 @@ from sentry_sdk.opentelemetry.consts import (
     SENTRY_USE_ISOLATION_SCOPE_KEY,
     TRACESTATE_SAMPLED_KEY,
 )
-from sentry_sdk.opentelemetry.contextvars_context import (
-    SentryContextVarsRuntimeContext,
-)
 from sentry_sdk.opentelemetry.utils import trace_state_from_baggage
 from sentry_sdk.scope import Scope, ScopeType
 from sentry_sdk.tracing import Span
@@ -38,26 +35,21 @@ if TYPE_CHECKING:
 
 class PotelScope(Scope):
     @classmethod
-    def _get_scopes(cls):
-        # type: () -> Optional[Tuple[PotelScope, PotelScope]]
+    def _get_scopes(cls) -> Optional[Tuple[PotelScope, PotelScope]]:
         """
         Returns the current scopes tuple on the otel context. Internal use only.
         """
-        return cast(
-            "Optional[Tuple[PotelScope, PotelScope]]", get_value(SENTRY_SCOPES_KEY)
-        )
+        return validate_scopes(get_value(SENTRY_SCOPES_KEY))
 
     @classmethod
-    def get_current_scope(cls):
-        # type: () -> PotelScope
+    def get_current_scope(cls) -> PotelScope:
         """
         Returns the current scope.
         """
         return cls._get_current_scope() or _INITIAL_CURRENT_SCOPE
 
     @classmethod
-    def _get_current_scope(cls):
-        # type: () -> Optional[PotelScope]
+    def _get_current_scope(cls) -> Optional[PotelScope]:
         """
         Returns the current scope without creating a new one. Internal use only.
         """
@@ -65,16 +57,14 @@ class PotelScope(Scope):
         return scopes[0] if scopes else None
 
     @classmethod
-    def get_isolation_scope(cls):
-        # type: () -> PotelScope
+    def get_isolation_scope(cls) -> PotelScope:
         """
         Returns the isolation scope.
         """
         return cls._get_isolation_scope() or _INITIAL_ISOLATION_SCOPE
 
     @classmethod
-    def _get_isolation_scope(cls):
-        # type: () -> Optional[PotelScope]
+    def _get_isolation_scope(cls) -> Optional[PotelScope]:
         """
         Returns the isolation scope without creating a new one. Internal use only.
         """
@@ -82,8 +72,9 @@ class PotelScope(Scope):
         return scopes[1] if scopes else None
 
     @contextmanager
-    def continue_trace(self, environ_or_headers):
-        # type: (Dict[str, Any]) -> Generator[None, None, None]
+    def continue_trace(
+        self, environ_or_headers: Dict[str, Any]
+    ) -> Generator[None, None, None]:
         """
         Sets the propagation context from environment or headers to continue an incoming trace.
         Any span started within this context manager will use the same trace_id, parent_span_id
@@ -98,8 +89,7 @@ class PotelScope(Scope):
             with use_span(NonRecordingSpan(span_context)):
                 yield
 
-    def _incoming_otel_span_context(self):
-        # type: () -> Optional[SpanContext]
+    def _incoming_otel_span_context(self) -> Optional[SpanContext]:
         if self._propagation_context is None:
             return None
         # If sentry-trace extraction didn't have a parent_span_id, we don't have an upstream header
@@ -132,8 +122,7 @@ class PotelScope(Scope):
 
         return span_context
 
-    def start_transaction(self, **kwargs):
-        # type: (Any) -> Span
+    def start_transaction(self, **kwargs: Any) -> Span:
         """
         .. deprecated:: 3.0.0
             This function is deprecated and will be removed in a future release.
@@ -146,8 +135,7 @@ class PotelScope(Scope):
         )
         return self.start_span(**kwargs)
 
-    def start_span(self, **kwargs):
-        # type: (Any) -> Span
+    def start_span(self, **kwargs: Any) -> Span:
         return Span(**kwargs)
 
 
@@ -155,8 +143,7 @@ _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
 _INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
 
 
-def setup_initial_scopes():
-    # type: () -> None
+def setup_initial_scopes() -> None:
     global _INITIAL_CURRENT_SCOPE, _INITIAL_ISOLATION_SCOPE
     _INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
     _INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
@@ -165,17 +152,18 @@ def setup_initial_scopes():
     attach(set_value(SENTRY_SCOPES_KEY, scopes))
 
 
-def setup_scope_context_management():
-    # type: () -> None
+def setup_scope_context_management() -> None:
     import opentelemetry.context
+    from sentry_sdk.opentelemetry.contextvars_context import (
+        SentryContextVarsRuntimeContext,
+    )
 
     opentelemetry.context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
     setup_initial_scopes()
 
 
 @contextmanager
-def isolation_scope():
-    # type: () -> Generator[PotelScope, None, None]
+def isolation_scope() -> Generator[PotelScope, None, None]:
     context = set_value(SENTRY_FORK_ISOLATION_SCOPE_KEY, True)
     token = attach(context)
     try:
@@ -185,8 +173,7 @@ def isolation_scope():
 
 
 @contextmanager
-def new_scope():
-    # type: () -> Generator[PotelScope, None, None]
+def new_scope() -> Generator[PotelScope, None, None]:
     token = attach(get_current())
     try:
         yield PotelScope.get_current_scope()
@@ -195,8 +182,7 @@ def new_scope():
 
 
 @contextmanager
-def use_scope(scope):
-    # type: (PotelScope) -> Generator[PotelScope, None, None]
+def use_scope(scope: PotelScope) -> Generator[PotelScope, None, None]:
     context = set_value(SENTRY_USE_CURRENT_SCOPE_KEY, scope)
     token = attach(context)
 
@@ -207,8 +193,9 @@ def use_scope(scope):
 
 
 @contextmanager
-def use_isolation_scope(isolation_scope):
-    # type: (PotelScope) -> Generator[PotelScope, None, None]
+def use_isolation_scope(
+    isolation_scope: PotelScope,
+) -> Generator[PotelScope, None, None]:
     context = set_value(SENTRY_USE_ISOLATION_SCOPE_KEY, isolation_scope)
     token = attach(context)
 
@@ -216,3 +203,15 @@ def use_isolation_scope(isolation_scope):
         yield isolation_scope
     finally:
         detach(token)
+
+
+def validate_scopes(scopes: Any) -> Optional[Tuple[PotelScope, PotelScope]]:
+    if (
+        isinstance(scopes, tuple)
+        and len(scopes) == 2
+        and isinstance(scopes[0], PotelScope)
+        and isinstance(scopes[1], PotelScope)
+    ):
+        return scopes
+    else:
+        return None

@@ -752,7 +752,7 @@ def get_current_span(
 def _generate_sample_rand(
     trace_id: Optional[str],
     interval: tuple[float, float] = (0.0, 1.0),
-) -> Optional[Decimal]:
+) -> Decimal:
     """Generate a sample_rand value from a trace ID.
 
     The generated value will be pseudorandomly chosen from the provided

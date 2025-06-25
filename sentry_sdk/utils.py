@@ -1561,10 +1561,11 @@ def parse_url(url: str, sanitize: bool = True) -> ParsedUrl:
     )
 
 
-def is_valid_sample_rate(rate: Any, source: str) -> bool:
+def is_valid_sample_rate(rate: Any, source: str) -> Optional[float]:
     """
     Checks the given sample rate to make sure it is valid type and value (a
     boolean or a number between 0 and 1, inclusive).
+    Returns the final float value to use if valid.
     """
 
     # both booleans and NaN are instances of Real, so a) checking for Real
@@ -1576,7 +1577,7 @@ def is_valid_sample_rate(rate: Any, source: str) -> bool:
                 source=source, rate=rate, type=type(rate)
             )
         )
-        return False
+        return None
 
     # in case rate is a boolean, it will get cast to 1 if it's True and 0 if it's False
     rate = float(rate)
@@ -1586,9 +1587,9 @@ def is_valid_sample_rate(rate: Any, source: str) -> bool:
                 source=source, rate=rate
             )
         )
-        return False
+        return None
 
-    return True
+    return rate
 
 
 def match_regex_list(

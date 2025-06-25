@@ -1,4 +1,4 @@
-from typing import cast
+from __future__ import annotations
 
 from opentelemetry import trace
 from opentelemetry.context import (
@@ -37,12 +37,12 @@ from sentry_sdk.tracing_utils import (
     extract_sentrytrace_data,
     should_propagate_trace,
 )
+from sentry_sdk.opentelemetry.scope import validate_scopes
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional, Set
-    import sentry_sdk.opentelemetry.scope as scope
 
 
 class SentryPropagator(TextMapPropagator):
@@ -50,8 +50,12 @@ class SentryPropagator(TextMapPropagator):
     Propagates tracing headers for Sentry's tracing system in a way OTel understands.
     """
 
-    def extract(self, carrier, context=None, getter=default_getter):
-        # type: (CarrierT, Optional[Context], Getter[CarrierT]) -> Context
+    def extract(
+        self,
+        carrier: CarrierT,
+        context: Optional[Context] = None,
+        getter: Getter[CarrierT] = default_getter,
+    ) -> Context:
         if context is None:
             context = get_current()
 
@@ -93,13 +97,16 @@ class SentryPropagator(TextMapPropagator):
         modified_context = trace.set_span_in_context(span, context)
         return modified_context
 
-    def inject(self, carrier, context=None, setter=default_setter):
-        # type: (CarrierT, Optional[Context], Setter[CarrierT]) -> None
-        scopes = get_value(SENTRY_SCOPES_KEY, context)
+    def inject(
+        self,
+        carrier: CarrierT,
+        context: Optional[Context] = None,
+        setter: Setter[CarrierT] = default_setter,
+    ) -> None:
+        scopes = validate_scopes(get_value(SENTRY_SCOPES_KEY, context))
         if not scopes:
             return
 
-        scopes = cast("tuple[scope.PotelScope, scope.PotelScope]", scopes)
         (current_scope, _) = scopes
 
         span = current_scope.span
@@ -114,6 +121,5 @@ class SentryPropagator(TextMapPropagator):
             setter.set(carrier, key, value)
 
     @property
-    def fields(self):
-        # type: () -> Set[str]
+    def fields(self) -> Set[str]:
         return {SENTRY_TRACE_HEADER_NAME, BAGGAGE_HEADER_NAME}
