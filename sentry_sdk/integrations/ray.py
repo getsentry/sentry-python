@@ -60,7 +60,9 @@ def _patch_ray_remote():
                 # type: (Any, Optional[dict[str, Any]], Any) -> Any
                 _check_sentry_initialized()
 
-                root_span_name = qualname_from_function(f) or DEFAULT_TRANSACTION_NAME
+                root_span_name = (
+                    qualname_from_function(user_f) or DEFAULT_TRANSACTION_NAME
+                )
                 sentry_sdk.get_current_scope().set_transaction_name(
                     root_span_name,
                     source=TransactionSource.TASK,
