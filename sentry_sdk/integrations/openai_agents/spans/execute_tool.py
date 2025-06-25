@@ -20,17 +20,17 @@ def execute_tool_span(tool, *args, **kwargs):
         origin=SPAN_ORIGIN,
     )
 
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
+    span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
 
     if tool.__class__.__name__ == "FunctionTool":
-        span.set_data(SPANDATA.GEN_AI_TOOL_TYPE, "function")
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_TYPE, "function")
 
-    span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
-    span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
+    span.set_attribute(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
+    span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
 
     if should_send_default_pii():
         input = args[1]
-        span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, input)
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, input)
 
     return span
 
@@ -40,4 +40,4 @@ def update_execute_tool_span(span, agent, tool, result):
     _set_agent_data(span, agent)
 
     if should_send_default_pii():
-        span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
