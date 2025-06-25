@@ -14,10 +14,15 @@ except ImportError:
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessageChunk
-from langchain_core.outputs import ChatGenerationChunk
+from langchain_core.outputs import ChatGenerationChunk, ChatResult
+from langchain_core.runnables import RunnableConfig
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from sentry_sdk import start_transaction
-from sentry_sdk.integrations.langchain import LangchainIntegration
+from sentry_sdk.integrations.langchain import (
+    LangchainIntegration,
+    SentryLangchainCallback,
+)
 from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
@@ -342,3 +347,72 @@ def test_span_origin(sentry_init, capture_events):
     assert event["contexts"]["trace"]["origin"] == "manual"
     for span in event["spans"]:
         assert span["origin"] == "auto.ai.langchain"
+
+
+def test_manual_callback_no_duplication(sentry_init):
+    """
+    Test that when a user manually provides a SentryLangchainCallback,
+    the integration doesn't create a duplicate callback.
+    """
+
+    # Track callback instances
+    tracked_callback_instances = set()
+
+    class CallbackTrackingModel(BaseChatModel):
+        """Mock model that tracks callback instances for testing."""
+
+        def _generate(
+            self,
+            messages,
+            stop=None,
+            run_manager=None,
+            **kwargs,
+        ):
+            # Track all SentryLangchainCallback instances
+            if run_manager:
+                for handler in run_manager.handlers:
+                    if isinstance(handler, SentryLangchainCallback):
+                        tracked_callback_instances.add(id(handler))
+
+                for handler in run_manager.inheritable_handlers:
+                    if isinstance(handler, SentryLangchainCallback):
+                        tracked_callback_instances.add(id(handler))
+
+            return ChatResult(
+                generations=[
+                    ChatGenerationChunk(message=AIMessageChunk(content="Hello!"))
+                ],
+                llm_output={},
+            )
+
+        @property
+        def _llm_type(self):
+            return "test_model"
+
+        @property
+        def _identifying_params(self):
+            return {}
+
+    sentry_init(integrations=[LangchainIntegration()])
+
+    # Create a manual SentryLangchainCallback
+    manual_callback = SentryLangchainCallback(
+        max_span_map_size=100, include_prompts=False
+    )
+
+    # Create RunnableConfig with the manual callback
+    config = RunnableConfig(callbacks=[manual_callback])
+
+    # Invoke the model with the config
+    llm = CallbackTrackingModel()
+    llm.invoke("Hello", config)
+
+    # Verify that only ONE SentryLangchainCallback instance was used
+    assert len(tracked_callback_instances) == 1, (
+        f"Expected exactly 1 SentryLangchainCallback instance, "
+        f"but found {len(tracked_callback_instances)}. "
+        f"This indicates callback duplication occurred."
+    )
+
+    # Verify the callback ID matches our manual callback
+    assert id(manual_callback) in tracked_callback_instances
