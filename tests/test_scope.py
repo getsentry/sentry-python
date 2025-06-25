@@ -905,3 +905,67 @@ def test_last_event_id_cleared(sentry_init):
     Scope.get_isolation_scope().clear()
 
     assert Scope.last_event_id() is None, "last_event_id should be cleared"
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize(
+    "scope_manager",
+    [
+        new_scope,
+        use_scope,
+    ],
+)
+def test_handle_lookup_error_on_token_reset_current_scope(scope_manager):
+    with mock.patch("sentry_sdk.scope.capture_internal_exception") as mock_capture:
+        with mock.patch("sentry_sdk.scope._current_scope") as mock_token_var:
+            mock_token_var.reset.side_effect = LookupError()
+
+            mock_token = mock.Mock()
+            mock_token_var.set.return_value = mock_token
+
+            try:
+                if scope_manager == use_scope:
+                    with scope_manager(Scope()):
+                        pass
+                else:
+                    with scope_manager():
+                        pass
+
+            except Exception:
+                pytest.fail("Context manager should handle LookupError gracefully")
+
+            mock_capture.assert_called_once()
+            mock_token_var.reset.assert_called_once_with(mock_token)
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize(
+    "scope_manager",
+    [
+        isolation_scope,
+        use_isolation_scope,
+    ],
+)
+def test_handle_lookup_error_on_token_reset_isolation_scope(scope_manager):
+    with mock.patch("sentry_sdk.scope.capture_internal_exception") as mock_capture:
+        with mock.patch("sentry_sdk.scope._current_scope") as mock_current_scope:
+            with mock.patch(
+                "sentry_sdk.scope._isolation_scope"
+            ) as mock_isolation_scope:
+                mock_isolation_scope.reset.side_effect = LookupError()
+                mock_current_token = mock.Mock()
+                mock_current_scope.set.return_value = mock_current_token
+
+                try:
+                    if scope_manager == use_isolation_scope:
+                        with scope_manager(Scope()):
+                            pass
+                    else:
+                        with scope_manager():
+                            pass
+
+                except Exception:
+                    pytest.fail("Context manager should handle LookupError gracefully")
+
+                mock_capture.assert_called_once()
+                mock_current_scope.reset.assert_called_once_with(mock_current_token)

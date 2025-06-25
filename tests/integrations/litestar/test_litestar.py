@@ -402,7 +402,7 @@ def test_litestar_scope_user_on_exception_event(
 
 
 @parametrize_test_configurable_status_codes
-def test_configurable_status_codes(
+def test_configurable_status_codes_handler(
     sentry_init,
     capture_events,
     failed_request_status_codes,
@@ -427,3 +427,67 @@ def test_configurable_status_codes(
     client.get("/error")
 
     assert len(events) == int(expected_error)
+
+
+@parametrize_test_configurable_status_codes
+def test_configurable_status_codes_middleware(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    integration_kwargs = (
+        {"failed_request_status_codes": failed_request_status_codes}
+        if failed_request_status_codes is not None
+        else {}
+    )
+    sentry_init(integrations=[LitestarIntegration(**integration_kwargs)])
+
+    events = capture_events()
+
+    def create_raising_middleware(app):
+        async def raising_middleware(scope, receive, send):
+            raise HTTPException(status_code=status_code)
+
+        return raising_middleware
+
+    @get("/error")
+    async def error() -> None: ...
+
+    app = Litestar([error], middleware=[create_raising_middleware])
+    client = TestClient(app)
+    client.get("/error")
+
+    assert len(events) == int(expected_error)
+
+
+def test_catch_non_http_exceptions_in_middleware(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(integrations=[LitestarIntegration()])
+
+    events = capture_events()
+
+    def create_raising_middleware(app):
+        async def raising_middleware(scope, receive, send):
+            raise RuntimeError("Too Hot")
+
+        return raising_middleware
+
+    @get("/error")
+    async def error() -> None: ...
+
+    app = Litestar([error], middleware=[create_raising_middleware])
+    client = TestClient(app)
+
+    try:
+        client.get("/error")
+    except RuntimeError:
+        pass
+
+    assert len(events) == 1
+    event_exception = events[0]["exception"]["values"][0]
+    assert event_exception["type"] == "RuntimeError"
+    assert event_exception["value"] == "Too Hot"

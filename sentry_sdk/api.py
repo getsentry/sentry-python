@@ -82,6 +82,8 @@ __all__ = [
     "start_transaction",
     "trace",
     "monitor",
+    "start_session",
+    "end_session",
 ]
 
 
@@ -450,3 +452,17 @@ def continue_trace(
     return get_isolation_scope().continue_trace(
         environ_or_headers, op, name, source, origin
     )
+
+
+@scopemethod
+def start_session(
+    session_mode="application",  # type: str
+):
+    # type: (...) -> None
+    return get_isolation_scope().start_session(session_mode=session_mode)
+
+
+@scopemethod
+def end_session():
+    # type: () -> None
+    return get_isolation_scope().end_session()

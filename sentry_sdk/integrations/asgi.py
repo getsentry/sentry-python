@@ -145,6 +145,22 @@ class SentryAsgiMiddleware:
         else:
             self.__call__ = self._run_asgi2
 
+    def _capture_lifespan_exception(self, exc):
+        # type: (Exception) -> None
+        """Capture exceptions raise in application lifespan handlers.
+
+        The separate function is needed to support overriding in derived integrations that use different catching mechanisms.
+        """
+        return _capture_exception(exc=exc, mechanism_type=self.mechanism_type)
+
+    def _capture_request_exception(self, exc):
+        # type: (Exception) -> None
+        """Capture exceptions raised in incoming request handlers.
+
+        The separate function is needed to support overriding in derived integrations that use different catching mechanisms.
+        """
+        return _capture_exception(exc=exc, mechanism_type=self.mechanism_type)
+
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
         async def inner(receive, send):
@@ -158,7 +174,7 @@ class SentryAsgiMiddleware:
         return await self._run_app(scope, receive, send, asgi_version=3)
 
     async def _run_app(self, scope, receive, send, asgi_version):
-        # type: (Any, Any, Any, Any, int) -> Any
+        # type: (Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         is_lifespan = scope["type"] == "lifespan"
         if is_recursive_asgi_middleware or is_lifespan:
@@ -169,7 +185,7 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                _capture_exception(exc, mechanism_type=self.mechanism_type)
+                self._capture_lifespan_exception(exc)
                 raise exc from None
 
         _asgi_middleware_applied.set(True)
@@ -256,7 +272,7 @@ class SentryAsgiMiddleware:
                                     scope, receive, _sentry_wrapped_send
                                 )
                         except Exception as exc:
-                            _capture_exception(exc, mechanism_type=self.mechanism_type)
+                            self._capture_request_exception(exc)
                             raise exc from None
         finally:
             _asgi_middleware_applied.set(False)

@@ -1,5 +1,78 @@
 # Changelog
 
+## 2.31.0
+
+### Various fixes & improvements
+
+- **New Integration (BETA):** Add support for `openai-agents` (#4437) by @antonpirker
+
+  We can now instrument AI agents that are created with the [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) out of the box.
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+
+# Add the OpenAIAgentsIntegration to your sentry_sdk.init call:
+sentry_sdk.init(
+    dsn="...",
+    integrations=[
+        OpenAIAgentsIntegration(),
+    ]
+)
+```
+
+For more information see the [OpenAI Agents integrations documentation](https://docs.sentry.io/platforms/python/integrations/openai-agents/).
+
+- Logs: Add support for `dict` arguments (#4478) by @AbhiPrasad
+- Add Cursor generated rules (#4493) by @sl0thentr0py
+- Greatly simplify Langchain integrations `_wrap_configure` (#4479) by @szokeasaurusrex
+- Fix(ci): Remove tracerite pin (almost) (#4504) by @sentrivana
+- Fix(profiling): Ensure profiler thread exits when needed (#4497) by @Zylphrex
+- Fix(ci): Do not install newest `tracerite` (#4494) by @sentrivana
+- Fix(scope): Handle token reset `LookupError`s gracefully (#4481) by @sentrivana
+- Tests: Tox update (#4509) by @sentrivana
+- Tests: Upper bound on fakeredis on old Python versions (#4482) by @sentrivana
+- Tests: Regenerate tox (#4457) by @sentrivana
+
+## 2.30.0
+
+### Various fixes & improvements
+
+- **New beta feature:** Sentry logs for Loguru (#4445) by @sentrivana
+
+  We can now capture Loguru logs and send them to Sentry.
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.loguru import LoguruIntegration
+
+# Setup Sentry SDK to send Loguru log messages with a level of "error" or higher to Sentry
+sentry_sdk.init(
+    _experiments={
+        "enable_logs": True,
+    },
+    integrations=[
+        LoguruIntegration(sentry_logs_level=logging.ERROR),
+    ]
+)
+```
+
+- fix(logs): Don't gate user behind `send_default_pii` (#4453) by @AbhiPrasad
+- fix(logging): Strip log `record.name` for more robust matching (#4411) by @romaingd-spi
+- Migrate to modern threading interface (#4452) by @emmanuel-ferdman
+- ref: Remove `_capture_experimental_log` `scope` parameter (#4424) by @szokeasaurusrex
+- feat(logs): Add user attributes to logs (#4423) by @szokeasaurusrex
+- fix: fix ARQ integration error (#4427) (#4428) by @ninoseki
+- fix(grpc): Fix AttributeError when instrumenting with OTel (#4405) by @sentrivana
+- fix(redis): Use `command_queue` instead of `command_stack` if available (#4404) by @sentrivana
+- fix: Handle invalid `SENTRY_DEBUG` values properly (#4400) by @szokeasaurusrex
+- Increase test coverage (#4393) by @mgaligniana
+- tests(logs): avoid failures when running with integrations enabled (#4388) by @rominf
+- Fix CI, adapt to new redis-py release (#4431) by @sentrivana
+- tests: Regenerate toxgen (#4403) by @sentrivana
+- tests: Regenerate tox.ini & fix CI (#4435) by @sentrivana
+- build(deps): bump codecov/codecov-action from 5.4.2 to 5.4.3 (#4397) by @dependabot
+
 ## 2.29.1
 
 ### Various fixes & improvements
@@ -122,7 +195,7 @@
   sentry_sdk.init(
     dsn="...",
     _experiments={
-        "enable_sentry_logs": True
+        "enable_logs": True
     }
     integrations=[
       LoggingIntegration(sentry_logs_level=logging.ERROR),
