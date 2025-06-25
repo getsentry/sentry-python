@@ -160,15 +160,17 @@ def test_no_thread_on_shutdown_no_errors_deprecated(
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        with track_session(session_mode="request"):
-            with sentry_sdk.new_scope():
-                try:
-                    raise Exception("all is wrong")
-                except Exception:
-                    sentry_sdk.capture_exception()
+        with sentry_sdk.isolation_scope() as scope:
+            with track_session(scope, session_mode="request"):
+                with sentry_sdk.new_scope():
+                    try:
+                        raise Exception("all is wrong")
+                    except Exception:
+                        sentry_sdk.capture_exception()
 
-        with track_session(session_mode="request"):
-            pass
+        with sentry_sdk.isolation_scope() as scope:
+            with track_session(scope, session_mode="request"):
+                pass
 
         sentry_sdk.get_isolation_scope().start_session(session_mode="request")
         sentry_sdk.get_isolation_scope().end_session()
