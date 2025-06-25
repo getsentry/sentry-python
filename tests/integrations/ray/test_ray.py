@@ -59,7 +59,10 @@ def read_error_from_log(job_id):
 
 
 @pytest.mark.forked
-def test_tracing_in_ray_tasks():
+@pytest.mark.parametrize(
+    "task_options", [{}, {"num_cpus": 0, "memory": 1024 * 1024 * 10}]
+)
+def test_tracing_in_ray_tasks(task_options):
     setup_sentry()
 
     ray.init(
@@ -69,13 +72,18 @@ def test_tracing_in_ray_tasks():
         }
     )
 
-    # Setup ray task
-    @ray.remote
     def example_task():
         with sentry_sdk.start_span(op="task", name="example task step"):
             ...
 
         return sentry_sdk.get_client().transport.envelopes
+
+    # Setup ray task, calling decorator directly instead of @,
+    # to accommodate for test parametrization
+    if task_options:
+        example_task = ray.remote(**task_options)(example_task)
+    else:
+        example_task = ray.remote(example_task)
 
     with sentry_sdk.start_span(op="test", name="ray client root span"):
         worker_envelopes = ray.get(example_task.remote())

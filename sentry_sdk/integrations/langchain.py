@@ -1,3 +1,4 @@
+import itertools
 from collections import OrderedDict
 from functools import wraps
 
@@ -87,12 +88,9 @@ class WatchedSpan:
 class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     """Base callback handler that can be used to handle callbacks from langchain."""
 
-    span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
-
-    max_span_map_size = 0
-
     def __init__(self, max_span_map_size, include_prompts, tiktoken_encoding_name=None):
         # type: (int, bool, Optional[str]) -> None
+        self.span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
 
@@ -458,7 +456,14 @@ def _wrap_configure(f):
                 **kwargs,
             )
 
-        if not any(isinstance(cb, SentryLangchainCallback) for cb in callbacks_list):
+        inheritable_callbacks_list = (
+            inheritable_callbacks if isinstance(inheritable_callbacks, list) else []
+        )
+
+        if not any(
+            isinstance(cb, SentryLangchainCallback)
+            for cb in itertools.chain(callbacks_list, inheritable_callbacks_list)
+        ):
             # Avoid mutating the existing callbacks list
             callbacks_list = [
                 *callbacks_list,
