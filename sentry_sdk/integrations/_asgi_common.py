@@ -1,26 +1,25 @@
+from __future__ import annotations
 import urllib
 
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
     from typing import Union
-    from typing_extensions import Literal
 
     from sentry_sdk.utils import AnnotatedValue
 
 
-def _get_headers(asgi_scope):
-    # type: (Any) -> Dict[str, str]
+def _get_headers(asgi_scope: Any) -> Dict[str, str]:
     """
     Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
     """
-    headers = {}  # type: Dict[str, str]
+    headers: Dict[str, str] = {}
     for raw_key, raw_value in asgi_scope.get("headers", {}):
         key = raw_key.decode("latin-1")
         value = raw_value.decode("latin-1")
@@ -32,12 +31,16 @@ def _get_headers(asgi_scope):
     return headers
 
 
-def _get_url(asgi_scope, default_scheme=None, host=None):
-    # type: (Dict[str, Any], Optional[Literal["ws", "http"]], Optional[Union[AnnotatedValue, str]]) -> str
+def _get_url(
+    asgi_scope: Dict[str, Any],
+    host: Optional[Union[AnnotatedValue, str]] = None,
+) -> str:
     """
     Extract URL from the ASGI scope, without also including the querystring.
     """
-    scheme = cast(str, asgi_scope.get("scheme", default_scheme))
+    scheme = asgi_scope.get(
+        "scheme", "http" if asgi_scope.get("type") == "http" else "ws"
+    )
     server = asgi_scope.get("server", None)
     path = asgi_scope.get("root_path", "") + asgi_scope.get("path", "")
 
@@ -53,8 +56,7 @@ def _get_url(asgi_scope, default_scheme=None, host=None):
     return path
 
 
-def _get_query(asgi_scope):
-    # type: (Any) -> Any
+def _get_query(asgi_scope: Any) -> Any:
     """
     Extract querystring from the ASGI scope, in the format that the Sentry protocol expects.
     """
@@ -64,8 +66,7 @@ def _get_query(asgi_scope):
     return urllib.parse.unquote(qs.decode("latin-1"))
 
 
-def _get_ip(asgi_scope):
-    # type: (Any) -> str
+def _get_ip(asgi_scope: Any) -> str:
     """
     Extract IP Address from the ASGI scope based on request headers with fallback to scope client.
     """
@@ -83,12 +84,11 @@ def _get_ip(asgi_scope):
     return asgi_scope.get("client")[0]
 
 
-def _get_request_data(asgi_scope):
-    # type: (Any) -> Dict[str, Any]
+def _get_request_data(asgi_scope: Any) -> Dict[str, Any]:
     """
     Returns data related to the HTTP request from the ASGI scope.
     """
-    request_data = {}  # type: Dict[str, Any]
+    request_data: Dict[str, Any] = {}
     ty = asgi_scope["type"]
     if ty in ("http", "websocket"):
         request_data["method"] = asgi_scope.get("method")
@@ -96,9 +96,7 @@ def _get_request_data(asgi_scope):
         request_data["headers"] = headers = _filter_headers(_get_headers(asgi_scope))
         request_data["query_string"] = _get_query(asgi_scope)
 
-        request_data["url"] = _get_url(
-            asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
-        )
+        request_data["url"] = _get_url(asgi_scope, headers.get("host"))
 
     client = asgi_scope.get("client")
     if client and should_send_default_pii():
