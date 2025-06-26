@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.scope import should_send_default_pii
 
 from ..consts import SPAN_ORIGIN
@@ -38,6 +38,11 @@ def execute_tool_span(tool, *args, **kwargs):
 def update_execute_tool_span(span, agent, tool, result):
     # type: (sentry_sdk.tracing.Span, agents.Agent, agents.Tool, Any) -> None
     _set_agent_data(span, agent)
+
+    if isinstance(result, str) and result.startswith(
+        "An error occurred while running the tool"
+    ):
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     if should_send_default_pii():
         span.set_data(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
