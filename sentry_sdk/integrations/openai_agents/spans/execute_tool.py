@@ -39,7 +39,7 @@ def update_execute_tool_span(span, agent, tool, result):
     # type: (sentry_sdk.tracing.Span, agents.Agent, agents.Tool, Any) -> None
     _set_agent_data(span, agent)
 
-    if type(result) == str and result.startswith(
+    if isinstance(result, str) and result.startswith(
         "An error occurred while running the tool"
     ):
         span.set_status(SPANSTATUS.INTERNAL_ERROR)
