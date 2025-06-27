@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -7,8 +8,7 @@ from sentry_sdk.tracing import Span
 from sentry_sdk.utils import logger
 
 
-def _normalize_data(data):
-    # type: (Any) -> Any
+def _normalize_data(data: Any) -> Any:
 
     # convert pydantic data (e.g. OpenAI v1+) to json compatible format
     if hasattr(data, "model_dump"):
@@ -26,7 +26,6 @@ def _normalize_data(data):
     return data
 
 
-def set_data_normalized(span, key, value):
-    # type: (Span, str, Any) -> None
+def set_data_normalized(span: Span, key: str, value: Any) -> None:
     normalized = _normalize_data(value)
     span.set_attribute(key, normalized)

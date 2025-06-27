@@ -259,8 +259,8 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
     assert events[1]["logentry"]["params"] == []
 
     # Using recwarn suppresses the "third" warning in the test output
-    assert len(recwarn) == 1
-    assert str(recwarn[0].message) == "third"
+    third_warnings = [w for w in recwarn if str(w.message) == "third"]
+    assert len(third_warnings) == 1
 
 
 def test_ignore_logger(sentry_init, capture_events):

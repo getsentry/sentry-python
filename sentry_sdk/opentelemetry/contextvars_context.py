@@ -1,4 +1,5 @@
-from typing import cast, TYPE_CHECKING
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
 from opentelemetry.trace import get_current_span, set_span_in_context
 from opentelemetry.trace.span import INVALID_SPAN
@@ -13,36 +14,37 @@ from sentry_sdk.opentelemetry.consts import (
     SENTRY_USE_CURRENT_SCOPE_KEY,
     SENTRY_USE_ISOLATION_SCOPE_KEY,
 )
+from sentry_sdk.opentelemetry.scope import PotelScope, validate_scopes
 
 if TYPE_CHECKING:
-    from typing import Optional
     from contextvars import Token
-    import sentry_sdk.opentelemetry.scope as scope
 
 
 class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
-    def attach(self, context):
-        # type: (Context) -> Token[Context]
-        scopes = get_value(SENTRY_SCOPES_KEY, context)
+    def attach(self, context: Context) -> Token[Context]:
+        scopes = validate_scopes(get_value(SENTRY_SCOPES_KEY, context))
 
-        should_fork_isolation_scope = context.pop(
-            SENTRY_FORK_ISOLATION_SCOPE_KEY, False
+        should_fork_isolation_scope = bool(
+            context.pop(SENTRY_FORK_ISOLATION_SCOPE_KEY, False)
         )
-        should_fork_isolation_scope = cast("bool", should_fork_isolation_scope)
 
         should_use_isolation_scope = context.pop(SENTRY_USE_ISOLATION_SCOPE_KEY, None)
-        should_use_isolation_scope = cast(
-            "Optional[scope.PotelScope]", should_use_isolation_scope
+        should_use_isolation_scope = (
+            should_use_isolation_scope
+            if isinstance(should_use_isolation_scope, PotelScope)
+            else None
         )
 
         should_use_current_scope = context.pop(SENTRY_USE_CURRENT_SCOPE_KEY, None)
-        should_use_current_scope = cast(
-            "Optional[scope.PotelScope]", should_use_current_scope
+        should_use_current_scope = (
+            should_use_current_scope
+            if isinstance(should_use_current_scope, PotelScope)
+            else None
         )
 
         if scopes:
-            scopes = cast("tuple[scope.PotelScope, scope.PotelScope]", scopes)
-            (current_scope, isolation_scope) = scopes
+            current_scope = scopes[0]
+            isolation_scope = scopes[1]
         else:
             current_scope = sentry_sdk.get_current_scope()
             isolation_scope = sentry_sdk.get_isolation_scope()

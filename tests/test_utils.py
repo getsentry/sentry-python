@@ -493,7 +493,7 @@ def test_accepts_valid_sample_rate(rate):
     with mock.patch.object(logger, "warning", mock.Mock()):
         result = is_valid_sample_rate(rate, source="Testing")
         assert logger.warning.called is False
-        assert result is True
+        assert result == float(rate)
 
 
 @pytest.mark.parametrize(
@@ -514,7 +514,7 @@ def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
     with mock.patch.object(logger, "warning", mock.Mock()):
         result = is_valid_sample_rate(rate, source="Testing")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
-        assert result is False
+        assert result is None
 
 
 @pytest.mark.parametrize(

@@ -1,5 +1,5 @@
+from __future__ import annotations
 from decimal import Decimal
-from typing import cast
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace.sampling import Sampler, SamplingResult, Decision
@@ -21,15 +21,16 @@ from sentry_sdk.utils import is_valid_sample_rate, logger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Sequence, Union
+    from typing import Any, Optional, Sequence
     from opentelemetry.context import Context
     from opentelemetry.trace import Link, SpanKind
     from opentelemetry.trace.span import SpanContext
     from opentelemetry.util.types import Attributes
 
 
-def get_parent_sampled(parent_context, trace_id):
-    # type: (Optional[SpanContext], int) -> Optional[bool]
+def get_parent_sampled(
+    parent_context: Optional[SpanContext], trace_id: int
+) -> Optional[bool]:
     if parent_context is None:
         return None
 
@@ -54,8 +55,9 @@ def get_parent_sampled(parent_context, trace_id):
     return None
 
 
-def get_parent_sample_rate(parent_context, trace_id):
-    # type: (Optional[SpanContext], int) -> Optional[float]
+def get_parent_sample_rate(
+    parent_context: Optional[SpanContext], trace_id: int
+) -> Optional[float]:
     if parent_context is None:
         return None
 
@@ -74,8 +76,9 @@ def get_parent_sample_rate(parent_context, trace_id):
     return None
 
 
-def get_parent_sample_rand(parent_context, trace_id):
-    # type: (Optional[SpanContext], int) -> Optional[Decimal]
+def get_parent_sample_rand(
+    parent_context: Optional[SpanContext], trace_id: int
+) -> Optional[Decimal]:
     if parent_context is None:
         return None
 
@@ -91,8 +94,12 @@ def get_parent_sample_rand(parent_context, trace_id):
     return None
 
 
-def dropped_result(span_context, attributes, sample_rate=None, sample_rand=None):
-    # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
+def dropped_result(
+    span_context: SpanContext,
+    attributes: Attributes,
+    sample_rate: Optional[float] = None,
+    sample_rand: Optional[Decimal] = None,
+) -> SamplingResult:
     """
     React to a span getting unsampled and return a DROP SamplingResult.
 
@@ -129,8 +136,12 @@ def dropped_result(span_context, attributes, sample_rate=None, sample_rand=None)
     )
 
 
-def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None):
-    # type: (SpanContext, Attributes, Optional[float], Optional[Decimal]) -> SamplingResult
+def sampled_result(
+    span_context: SpanContext,
+    attributes: Attributes,
+    sample_rate: Optional[float] = None,
+    sample_rand: Optional[Decimal] = None,
+) -> SamplingResult:
     """
     React to a span being sampled and return a sampled SamplingResult.
 
@@ -151,8 +162,12 @@ def sampled_result(span_context, attributes, sample_rate=None, sample_rand=None)
     )
 
 
-def _update_trace_state(span_context, sampled, sample_rate=None, sample_rand=None):
-    # type: (SpanContext, bool, Optional[float], Optional[Decimal]) -> TraceState
+def _update_trace_state(
+    span_context: SpanContext,
+    sampled: bool,
+    sample_rate: Optional[float] = None,
+    sample_rand: Optional[Decimal] = None,
+) -> TraceState:
     trace_state = span_context.trace_state
 
     sampled = "true" if sampled else "false"
@@ -175,15 +190,14 @@ def _update_trace_state(span_context, sampled, sample_rate=None, sample_rand=Non
 class SentrySampler(Sampler):
     def should_sample(
         self,
-        parent_context,  # type: Optional[Context]
-        trace_id,  # type: int
-        name,  # type: str
-        kind=None,  # type: Optional[SpanKind]
-        attributes=None,  # type: Attributes
-        links=None,  # type: Optional[Sequence[Link]]
-        trace_state=None,  # type: Optional[TraceState]
-    ):
-        # type: (...) -> SamplingResult
+        parent_context: Optional[Context],
+        trace_id: int,
+        name: str,
+        kind: Optional[SpanKind] = None,
+        attributes: Attributes = None,
+        links: Optional[Sequence[Link]] = None,
+        trace_state: Optional[TraceState] = None,
+    ) -> SamplingResult:
         client = sentry_sdk.get_client()
 
         parent_span_context = trace.get_current_span(parent_context).get_span_context()
@@ -209,13 +223,12 @@ class SentrySampler(Sampler):
             sample_rand = parent_sample_rand
         else:
             # We are the head SDK and we need to generate a new sample_rand
-            sample_rand = cast(Decimal, _generate_sample_rand(str(trace_id), (0, 1)))
+            sample_rand = _generate_sample_rand(str(trace_id), (0, 1))
 
         # Explicit sampled value provided at start_span
-        custom_sampled = cast(
-            "Optional[bool]", attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED)
-        )
-        if custom_sampled is not None:
+        custom_sampled = attributes.get(SentrySpanAttribute.CUSTOM_SAMPLED)
+
+        if custom_sampled is not None and isinstance(custom_sampled, bool):
             if is_root_span:
                 sample_rate = float(custom_sampled)
                 if sample_rate > 0:
@@ -262,7 +275,8 @@ class SentrySampler(Sampler):
                 sample_rate_to_propagate = sample_rate
 
         # If the sample rate is invalid, drop the span
-        if not is_valid_sample_rate(sample_rate, source=self.__class__.__name__):
+        sample_rate = is_valid_sample_rate(sample_rate, source=self.__class__.__name__)
+        if sample_rate is None:
             logger.warning(
                 f"[Tracing.Sampler] Discarding {name} because of invalid sample rate."
             )
@@ -275,7 +289,6 @@ class SentrySampler(Sampler):
                 sample_rate_to_propagate = sample_rate
 
         # Compare sample_rand to sample_rate to make the final sampling decision
-        sample_rate = float(cast("Union[bool, float, int]", sample_rate))
         sampled = sample_rand < Decimal.from_float(sample_rate)
 
         if sampled:
@@ -307,9 +320,13 @@ class SentrySampler(Sampler):
         return self.__class__.__name__
 
 
-def create_sampling_context(name, attributes, parent_span_context, trace_id):
-    # type: (str, Attributes, Optional[SpanContext], int) -> dict[str, Any]
-    sampling_context = {
+def create_sampling_context(
+    name: str,
+    attributes: Attributes,
+    parent_span_context: Optional[SpanContext],
+    trace_id: int,
+) -> dict[str, Any]:
+    sampling_context: dict[str, Any] = {
         "transaction_context": {
             "name": name,
             "op": attributes.get(SentrySpanAttribute.OP) if attributes else None,
@@ -318,7 +335,7 @@ def create_sampling_context(name, attributes, parent_span_context, trace_id):
             ),
         },
         "parent_sampled": get_parent_sampled(parent_span_context, trace_id),
-    }  # type: dict[str, Any]
+    }
 
     if attributes is not None:
         sampling_context.update(attributes)

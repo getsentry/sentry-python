@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from threading import Lock
 
@@ -23,20 +24,20 @@ _DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
 _installer_lock = Lock()
 
 # Set of all integration identifiers we have attempted to install
-_processed_integrations = set()  # type: Set[str]
+_processed_integrations: Set[str] = set()
 
 # Set of all integration identifiers we have actually installed
-_installed_integrations = set()  # type: Set[str]
+_installed_integrations: Set[str] = set()
 
 
 def _generate_default_integrations_iterator(
-    integrations,  # type: List[str]
-    auto_enabling_integrations,  # type: List[str]
-):
-    # type: (...) -> Callable[[bool], Iterator[Type[Integration]]]
+    integrations: List[str],
+    auto_enabling_integrations: List[str],
+) -> Callable[[bool], Iterator[Type[Integration]]]:
 
-    def iter_default_integrations(with_auto_enabling_integrations):
-        # type: (bool) -> Iterator[Type[Integration]]
+    def iter_default_integrations(
+        with_auto_enabling_integrations: bool,
+    ) -> Iterator[Type[Integration]]:
         """Returns an iterator of the default integration classes:"""
         from importlib import import_module
 
@@ -165,12 +166,13 @@ _MIN_VERSIONS = {
 
 
 def setup_integrations(
-    integrations,
-    with_defaults=True,
-    with_auto_enabling_integrations=False,
-    disabled_integrations=None,
-):
-    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Union[type[Integration], Integration]]]) -> Dict[str, Integration]
+    integrations: Sequence[Integration],
+    with_defaults: bool = True,
+    with_auto_enabling_integrations: bool = False,
+    disabled_integrations: Optional[
+        Sequence[Union[type[Integration], Integration]]
+    ] = None,
+) -> Dict[str, Integration]:
     """
     Given a list of integration instances, this installs them all.
 
@@ -239,8 +241,11 @@ def setup_integrations(
     return integrations
 
 
-def _check_minimum_version(integration, version, package=None):
-    # type: (type[Integration], Optional[tuple[int, ...]], Optional[str]) -> None
+def _check_minimum_version(
+    integration: type[Integration],
+    version: Optional[tuple[int, ...]],
+    package: Optional[str] = None,
+) -> None:
     package = package or integration.identifier
 
     if version is None:
@@ -276,13 +281,12 @@ class Integration(ABC):
     install = None
     """Legacy method, do not implement."""
 
-    identifier = None  # type: str
+    identifier: str
     """String unique ID of integration type"""
 
     @staticmethod
     @abstractmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         Initialize the integration.
 

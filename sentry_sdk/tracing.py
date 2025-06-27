@@ -1,3 +1,4 @@
+from __future__ import annotations
 from datetime import datetime
 import json
 import warnings
@@ -45,29 +46,26 @@ from sentry_sdk.utils import (
     should_be_treated_as_error,
 )
 
-from typing import TYPE_CHECKING, cast
-
+from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from typing import Any
-    from typing import Dict
-    from typing import Iterator
-    from typing import Optional
-    from typing import overload
-    from typing import ParamSpec
-    from typing import Tuple
-    from typing import Union
-    from typing import TypeVar
+    from typing import (
+        Callable,
+        Any,
+        Dict,
+        Iterator,
+        Optional,
+        ParamSpec,
+        Tuple,
+        Union,
+        TypeVar,
+    )
+    from sentry_sdk._types import SamplingContext
+    from sentry_sdk.tracing_utils import Baggage
 
     P = ParamSpec("P")
     R = TypeVar("R")
 
-    from sentry_sdk._types import (
-        SamplingContext,
-    )
-
-    from sentry_sdk.tracing_utils import Baggage
 
 _FLAGS_CAPACITY = 10
 _OTEL_VERSION = parse_version(otel_version)
@@ -76,88 +74,65 @@ tracer = otel_trace.get_tracer(__name__)
 
 
 class NoOpSpan:
-    def __init__(self, **kwargs):
-        # type: (Any) -> None
+    def __init__(self, **kwargs: Any) -> None:
         pass
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return "<%s>" % self.__class__.__name__
 
     @property
-    def root_span(self):
-        # type: () -> Optional[Span]
+    def root_span(self) -> Optional[Span]:
         return None
 
-    def start_child(self, **kwargs):
-        # type: (**Any) -> NoOpSpan
+    def start_child(self, **kwargs: Any) -> NoOpSpan:
         return NoOpSpan()
 
-    def to_traceparent(self):
-        # type: () -> str
+    def to_traceparent(self) -> str:
         return ""
 
-    def to_baggage(self):
-        # type: () -> Optional[Baggage]
+    def to_baggage(self) -> Optional[Baggage]:
         return None
 
-    def get_baggage(self):
-        # type: () -> Optional[Baggage]
+    def get_baggage(self) -> Optional[Baggage]:
         return None
 
-    def iter_headers(self):
-        # type: () -> Iterator[Tuple[str, str]]
+    def iter_headers(self) -> Iterator[Tuple[str, str]]:
         return iter(())
 
-    def set_tag(self, key, value):
-        # type: (str, Any) -> None
+    def set_tag(self, key: str, value: Any) -> None:
         pass
 
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
+    def set_data(self, key: str, value: Any) -> None:
         pass
 
-    def set_status(self, value):
-        # type: (str) -> None
+    def set_status(self, value: str) -> None:
         pass
 
-    def set_http_status(self, http_status):
-        # type: (int) -> None
+    def set_http_status(self, http_status: int) -> None:
         pass
 
-    def is_success(self):
-        # type: () -> bool
+    def is_success(self) -> bool:
         return True
 
-    def to_json(self):
-        # type: () -> Dict[str, Any]
+    def to_json(self) -> Dict[str, Any]:
         return {}
 
-    def get_trace_context(self):
-        # type: () -> Any
+    def get_trace_context(self) -> Any:
         return {}
 
-    def get_profile_context(self):
-        # type: () -> Any
+    def get_profile_context(self) -> Any:
         return {}
 
-    def finish(
-        self,
-        end_timestamp=None,  # type: Optional[Union[float, datetime]]
-    ):
-        # type: (...) -> None
+    def finish(self, end_timestamp: Optional[Union[float, datetime]] = None) -> None:
         pass
 
-    def set_context(self, key, value):
-        # type: (str, dict[str, Any]) -> None
+    def set_context(self, key: str, value: dict[str, Any]) -> None:
         pass
 
-    def init_span_recorder(self, maxlen):
-        # type: (int) -> None
+    def init_span_recorder(self, maxlen: int) -> None:
         pass
 
-    def _set_initial_sampling_decision(self, sampling_context):
-        # type: (SamplingContext) -> None
+    def _set_initial_sampling_decision(self, sampling_context: SamplingContext) -> None:
         pass
 
 
@@ -169,21 +144,20 @@ class Span:
     def __init__(
         self,
         *,
-        op=None,  # type: Optional[str]
-        description=None,  # type: Optional[str]
-        status=None,  # type: Optional[str]
-        sampled=None,  # type: Optional[bool]
-        start_timestamp=None,  # type: Optional[Union[datetime, float]]
-        origin=None,  # type: Optional[str]
-        name=None,  # type: Optional[str]
-        source=TransactionSource.CUSTOM,  # type: str
-        attributes=None,  # type: Optional[dict[str, Any]]
-        only_if_parent=False,  # type: bool
-        parent_span=None,  # type: Optional[Span]
-        otel_span=None,  # type: Optional[OtelSpan]
-        span=None,  # type: Optional[Span]
-    ):
-        # type: (...) -> None
+        op: Optional[str] = None,
+        description: Optional[str] = None,
+        status: Optional[str] = None,
+        sampled: Optional[bool] = None,
+        start_timestamp: Optional[Union[datetime, float]] = None,
+        origin: Optional[str] = None,
+        name: Optional[str] = None,
+        source: str = TransactionSource.CUSTOM,
+        attributes: Optional[dict[str, Any]] = None,
+        only_if_parent: bool = False,
+        parent_span: Optional[Span] = None,
+        otel_span: Optional[OtelSpan] = None,
+        span: Optional[Span] = None,
+    ) -> None:
         """
         If otel_span is passed explicitly, just acts as a proxy.
 
@@ -248,14 +222,12 @@ class Span:
 
                 self.update_active_thread()
 
-    def __eq__(self, other):
-        # type: (object) -> bool
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Span):
             return False
         return self._otel_span == other._otel_span
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return (
             "<%s(op=%r, name:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
             % (
@@ -270,25 +242,23 @@ class Span:
             )
         )
 
-    def activate(self):
-        # type: () -> None
+    def activate(self) -> None:
         ctx = otel_trace.set_span_in_context(self._otel_span)
         # set as the implicit current context
         self._ctx_token = context.attach(ctx)
 
-    def deactivate(self):
-        # type: () -> None
+    def deactivate(self) -> None:
         if self._ctx_token:
             context.detach(self._ctx_token)
             del self._ctx_token
 
-    def __enter__(self):
-        # type: () -> Span
+    def __enter__(self) -> Span:
         self.activate()
         return self
 
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+    def __exit__(
+        self, ty: Optional[Any], value: Optional[Any], tb: Optional[Any]
+    ) -> None:
         if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
         else:
@@ -303,41 +273,34 @@ class Span:
         self.deactivate()
 
     @property
-    def description(self):
-        # type: () -> Optional[str]
+    def description(self) -> Optional[str]:
         return self.get_attribute(SentrySpanAttribute.DESCRIPTION)
 
     @description.setter
-    def description(self, value):
-        # type: (Optional[str]) -> None
+    def description(self, value: Optional[str]) -> None:
         self.set_attribute(SentrySpanAttribute.DESCRIPTION, value)
 
     @property
-    def origin(self):
-        # type: () -> Optional[str]
+    def origin(self) -> Optional[str]:
         return self.get_attribute(SentrySpanAttribute.ORIGIN)
 
     @origin.setter
-    def origin(self, value):
-        # type: (Optional[str]) -> None
+    def origin(self, value: Optional[str]) -> None:
         self.set_attribute(SentrySpanAttribute.ORIGIN, value)
 
     @property
-    def root_span(self):
-        # type: () -> Optional[Span]
-        root_otel_span = cast(
-            "Optional[OtelSpan]", get_sentry_meta(self._otel_span, "root_span")
+    def root_span(self) -> Optional[Span]:
+        root_otel_span: Optional[OtelSpan] = get_sentry_meta(
+            self._otel_span, "root_span"
         )
         return Span(otel_span=root_otel_span) if root_otel_span else None
 
     @property
-    def is_root_span(self):
-        # type: () -> bool
+    def is_root_span(self) -> bool:
         return self.root_span == self
 
     @property
-    def parent_span_id(self):
-        # type: () -> Optional[str]
+    def parent_span_id(self) -> Optional[str]:
         if (
             not isinstance(self._otel_span, ReadableSpan)
             or self._otel_span.parent is None
@@ -346,70 +309,58 @@ class Span:
         return format_span_id(self._otel_span.parent.span_id)
 
     @property
-    def trace_id(self):
-        # type: () -> str
+    def trace_id(self) -> str:
         return format_trace_id(self._otel_span.get_span_context().trace_id)
 
     @property
-    def span_id(self):
-        # type: () -> str
+    def span_id(self) -> str:
         return format_span_id(self._otel_span.get_span_context().span_id)
 
     @property
-    def is_valid(self):
-        # type: () -> bool
+    def is_valid(self) -> bool:
         return self._otel_span.get_span_context().is_valid and isinstance(
             self._otel_span, ReadableSpan
         )
 
     @property
-    def sampled(self):
-        # type: () -> Optional[bool]
+    def sampled(self) -> Optional[bool]:
         return self._otel_span.get_span_context().trace_flags.sampled
 
     @property
-    def sample_rate(self):
-        # type: () -> Optional[float]
+    def sample_rate(self) -> Optional[float]:
         sample_rate = self._otel_span.get_span_context().trace_state.get(
             TRACESTATE_SAMPLE_RATE_KEY
         )
         return float(sample_rate) if sample_rate is not None else None
 
     @property
-    def op(self):
-        # type: () -> Optional[str]
+    def op(self) -> Optional[str]:
         return self.get_attribute(SentrySpanAttribute.OP)
 
     @op.setter
-    def op(self, value):
-        # type: (Optional[str]) -> None
+    def op(self, value: Optional[str]) -> None:
         self.set_attribute(SentrySpanAttribute.OP, value)
 
     @property
-    def name(self):
-        # type: () -> Optional[str]
+    def name(self) -> Optional[str]:
         return self.get_attribute(SentrySpanAttribute.NAME)
 
     @name.setter
-    def name(self, value):
-        # type: (Optional[str]) -> None
+    def name(self, value: Optional[str]) -> None:
         self.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property
-    def source(self):
-        # type: () -> str
+    def source(self) -> str:
         return (
             self.get_attribute(SentrySpanAttribute.SOURCE) or TransactionSource.CUSTOM
         )
 
     @source.setter
-    def source(self, value):
-        # type: (str) -> None
+    def source(self, value: str) -> None:
         self.set_attribute(SentrySpanAttribute.SOURCE, value)
 
     @property
-    def start_timestamp(self):
-        # type: () -> Optional[datetime]
+    def start_timestamp(self) -> Optional[datetime]:
         if not isinstance(self._otel_span, ReadableSpan):
             return None
 
@@ -420,8 +371,7 @@ class Span:
         return convert_from_otel_timestamp(start_time)
 
     @property
-    def timestamp(self):
-        # type: () -> Optional[datetime]
+    def timestamp(self) -> Optional[datetime]:
         if not isinstance(self._otel_span, ReadableSpan):
             return None
 
@@ -431,17 +381,14 @@ class Span:
 
         return convert_from_otel_timestamp(end_time)
 
-    def start_child(self, **kwargs):
-        # type: (**Any) -> Span
+    def start_child(self, **kwargs: Any) -> Span:
         return Span(parent_span=self, **kwargs)
 
-    def iter_headers(self):
-        # type: () -> Iterator[Tuple[str, str]]
+    def iter_headers(self) -> Iterator[Tuple[str, str]]:
         yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
         yield BAGGAGE_HEADER_NAME, serialize_trace_state(self.trace_state)
 
-    def to_traceparent(self):
-        # type: () -> str
+    def to_traceparent(self) -> str:
         if self.sampled is True:
             sampled = "1"
         elif self.sampled is False:
@@ -456,24 +403,19 @@ class Span:
         return traceparent
 
     @property
-    def trace_state(self):
-        # type: () -> TraceState
+    def trace_state(self) -> TraceState:
         return get_trace_state(self._otel_span)
 
-    def to_baggage(self):
-        # type: () -> Baggage
+    def to_baggage(self) -> Baggage:
         return self.get_baggage()
 
-    def get_baggage(self):
-        # type: () -> Baggage
+    def get_baggage(self) -> Baggage:
         return baggage_from_trace_state(self.trace_state)
 
-    def set_tag(self, key, value):
-        # type: (str, Any) -> None
+    def set_tag(self, key: str, value: Any) -> None:
         self.set_attribute(f"{SentrySpanAttribute.TAG}.{key}", value)
 
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
+    def set_data(self, key: str, value: Any) -> None:
         warnings.warn(
             "`Span.set_data` is deprecated. Please use `Span.set_attribute` instead.",
             DeprecationWarning,
@@ -483,8 +425,7 @@ class Span:
         # TODO-neel-potel we cannot add dicts here
         self.set_attribute(key, value)
 
-    def get_attribute(self, name):
-        # type: (str) -> Optional[Any]
+    def get_attribute(self, name: str) -> Optional[Any]:
         if (
             not isinstance(self._otel_span, ReadableSpan)
             or not self._otel_span.attributes
@@ -492,8 +433,7 @@ class Span:
             return None
         return self._otel_span.attributes.get(name)
 
-    def set_attribute(self, key, value):
-        # type: (str, Any) -> None
+    def set_attribute(self, key: str, value: Any) -> None:
         # otel doesn't support None as values, preferring to not set the key
         # at all instead
         if value is None:
@@ -505,8 +445,7 @@ class Span:
         self._otel_span.set_attribute(key, serialized_value)
 
     @property
-    def status(self):
-        # type: () -> Optional[str]
+    def status(self) -> Optional[str]:
         """
         Return the Sentry `SPANSTATUS` corresponding to the underlying OTel status.
         Because differences in possible values in OTel `StatusCode` and
@@ -523,8 +462,7 @@ class Span:
         else:
             return SPANSTATUS.UNKNOWN_ERROR
 
-    def set_status(self, status):
-        # type: (str) -> None
+    def set_status(self, status: str) -> None:
         if status == SPANSTATUS.OK:
             otel_status = StatusCode.OK
             otel_description = None
@@ -537,37 +475,31 @@ class Span:
         else:
             self._otel_span.set_status(Status(otel_status, otel_description))
 
-    def set_thread(self, thread_id, thread_name):
-        # type: (Optional[int], Optional[str]) -> None
+    def set_thread(self, thread_id: Optional[int], thread_name: Optional[str]) -> None:
         if thread_id is not None:
             self.set_attribute(SPANDATA.THREAD_ID, str(thread_id))
 
             if thread_name is not None:
                 self.set_attribute(SPANDATA.THREAD_NAME, thread_name)
 
-    def update_active_thread(self):
-        # type: () -> None
+    def update_active_thread(self) -> None:
         thread_id, thread_name = get_current_thread_meta()
         self.set_thread(thread_id, thread_name)
 
-    def set_http_status(self, http_status):
-        # type: (int) -> None
+    def set_http_status(self, http_status: int) -> None:
         self.set_attribute(SPANDATA.HTTP_STATUS_CODE, http_status)
         self.set_status(get_span_status_from_http_code(http_status))
 
-    def is_success(self):
-        # type: () -> bool
+    def is_success(self) -> bool:
         return self.status == SPANSTATUS.OK
 
-    def finish(self, end_timestamp=None):
-        # type: (Optional[Union[float, datetime]]) -> None
+    def finish(self, end_timestamp: Optional[Union[float, datetime]] = None) -> None:
         if end_timestamp is not None:
             self._otel_span.end(convert_to_otel_timestamp(end_timestamp))
         else:
             self._otel_span.end()
 
-    def to_json(self):
-        # type: () -> dict[str, Any]
+    def to_json(self) -> dict[str, Any]:
         """
         Only meant for testing. Not used internally anymore.
         """
@@ -575,21 +507,18 @@ class Span:
             return {}
         return json.loads(self._otel_span.to_json())
 
-    def get_trace_context(self):
-        # type: () -> dict[str, Any]
+    def get_trace_context(self) -> dict[str, Any]:
         if not isinstance(self._otel_span, ReadableSpan):
             return {}
 
         return get_trace_context(self._otel_span)
 
-    def set_context(self, key, value):
-        # type: (str, Any) -> None
+    def set_context(self, key: str, value: Any) -> None:
         # TODO-neel-potel we cannot add dicts here
 
         self.set_attribute(f"{SentrySpanAttribute.CONTEXT}.{key}", value)
 
-    def set_flag(self, flag, value):
-        # type: (str, bool) -> None
+    def set_flag(self, flag: str, value: bool) -> None:
         flag_count = self.get_attribute("_flag.count") or 0
         if flag_count < _FLAGS_CAPACITY:
             self.set_attribute(f"flag.evaluation.{flag}", value)
@@ -603,18 +532,17 @@ Transaction = Span
 if TYPE_CHECKING:
 
     @overload
-    def trace(func=None):
-        # type: (None) -> Callable[[Callable[P, R]], Callable[P, R]]
+    def trace(func: None = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
         pass
 
     @overload
-    def trace(func):
-        # type: (Callable[P, R]) -> Callable[P, R]
+    def trace(func: Callable[P, R]) -> Callable[P, R]:
         pass
 
 
-def trace(func=None):
-    # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+def trace(
+    func: Optional[Callable[P, R]] = None,
+) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]:
     """
     Decorator to start a child span under the existing current transaction.
     If there is no current transaction, then nothing will be traced.
