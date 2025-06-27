@@ -263,7 +263,7 @@ def test_transaction_tags_started_with_otel(capture_envelopes):
     (item,) = envelope.items
     payload = item.payload.json
 
-    assert payload["tags"] == {"tag.global": 99, "tag.inner": "foo"}
+    assert payload["tags"] == {"tag.global": "99", "tag.inner": "foo"}
 
 
 def test_transaction_tags_started_with_sentry(capture_envelopes):
@@ -277,7 +277,7 @@ def test_transaction_tags_started_with_sentry(capture_envelopes):
     (item,) = envelope.items
     payload = item.payload.json
 
-    assert payload["tags"] == {"tag.global": 99, "tag.inner": "foo"}
+    assert payload["tags"] == {"tag.global": "99", "tag.inner": "foo"}
 
 
 def test_multiple_transaction_tags_isolation_scope_started_with_otel(capture_envelopes):
@@ -293,8 +293,8 @@ def test_multiple_transaction_tags_isolation_scope_started_with_otel(capture_env
 
     (payload_a, payload_b) = [envelope.items[0].payload.json for envelope in envelopes]
 
-    assert payload_a["tags"] == {"tag.global": 99, "tag.inner.a": "a"}
-    assert payload_b["tags"] == {"tag.global": 99, "tag.inner.b": "b"}
+    assert payload_a["tags"] == {"tag.global": "99", "tag.inner.a": "a"}
+    assert payload_b["tags"] == {"tag.global": "99", "tag.inner.b": "b"}
 
 
 def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
@@ -312,8 +312,8 @@ def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
 
     (payload_a, payload_b) = [envelope.items[0].payload.json for envelope in envelopes]
 
-    assert payload_a["tags"] == {"tag.global": 99, "tag.inner.a": "a"}
-    assert payload_b["tags"] == {"tag.global": 99, "tag.inner.b": "b"}
+    assert payload_a["tags"] == {"tag.global": "99", "tag.inner.a": "a"}
+    assert payload_b["tags"] == {"tag.global": "99", "tag.inner.b": "b"}
 
 
 def test_potel_span_root_span_references():

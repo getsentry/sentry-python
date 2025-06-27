@@ -823,9 +823,13 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
     (envelope,) = envelopes
     transaction = envelope.items[0].get_transaction_event()
 
-    assert transaction["tags"] == {"isolation_scope1": 1, "current_scope2": 1, "trx": 1}
-    assert transaction["spans"][0]["tags"] == ApproxDict({"a": 1})
-    assert transaction["spans"][1]["tags"] == ApproxDict({"b": 1})
+    assert transaction["tags"] == {
+        "isolation_scope1": "1",
+        "current_scope2": "1",
+        "trx": "1",
+    }
+    assert transaction["spans"][0]["tags"] == ApproxDict({"a": "1"})
+    assert transaction["spans"][1]["tags"] == ApproxDict({"b": "1"})
 
 
 def test_should_send_default_pii_true(sentry_init):
@@ -931,3 +935,107 @@ def test_root_span(sentry_init):
                 assert sentry_sdk.get_current_scope().root_span == root_span
 
     assert sentry_sdk.get_current_scope().root_span is None
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "expected"),
+    [
+        ("int", 123, "123"),
+        ("float", 123.456, "123.456"),
+        ("bool_true", True, "True"),
+        ("bool_false", False, "False"),
+        ("none", None, "None"),
+        ("list", [1, 2, 3], "[1, 2, 3]"),
+        ("dict", {"key": "value"}, "{'key': 'value'}"),
+        ("already_string", "test", "test"),
+    ],
+)
+def test_set_tag_converts_to_string(key, value, expected):
+    """Test that set_tag converts various types to strings."""
+    scope = Scope()
+    scope.set_tag(key, value)
+
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+
+    assert tags[key] == expected, f"Tag {key} was not converted properly"
+
+
+def test_set_tags_converts_to_string():
+    """Test that set_tags converts all values to strings."""
+    scope = Scope()
+
+    scope.set_tags(
+        {
+            "int": 123,
+            "float": 123.456,
+            "bool": True,
+            "none": None,
+            "list": [1, 2, 3],
+            "string": "test",
+        }
+    )
+
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+
+    assert tags["int"] == "123"
+    assert tags["float"] == "123.456"
+    assert tags["bool"] == "True"
+    assert tags["none"] == "None"
+    assert tags["list"] == "[1, 2, 3]"
+    assert tags["string"] == "test"
+
+
+def test_set_tag_handles_conversion_failure():
+    """Test that set_tag handles objects that fail to convert to string."""
+    scope = Scope()
+
+    # Create an object that raises an exception when str() is called
+    class BadObject:
+        def __str__(self):
+            raise Exception("Cannot convert to string")
+
+        def __repr__(self):
+            return "BadObject()"
+
+    bad_obj = BadObject()
+
+    # This should not raise an exception
+    scope.set_tag("bad_object", bad_obj)
+
+    # The tag should be set with the repr value
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+
+    assert tags["bad_object"] == "BadObject()", "Tag should be set with repr value"
+
+
+def test_set_tags_handles_conversion_failure():
+    """Test that set_tags handles objects that fail to convert to string."""
+    scope = Scope()
+
+    # Create an object that raises an exception when str() is called
+    class BadObject:
+        def __str__(self):
+            raise Exception("Cannot convert to string")
+
+        def __repr__(self):
+            return "BadObject()"
+
+    bad_obj = BadObject()
+
+    scope.set_tags(
+        {
+            "good_tag1": "value1",
+            "bad_tag": bad_obj,
+            "good_tag2": 123,
+        }
+    )
+
+    event = scope.apply_to_event({}, {})
+    tags = event.get("tags", {})
+
+    assert tags["good_tag1"] == "value1"
+    assert tags["bad_tag"] == "BadObject()", "Tag should be set with repr value"
+    assert tags["good_tag2"] == "123"

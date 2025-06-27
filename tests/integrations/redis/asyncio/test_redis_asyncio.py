@@ -78,8 +78,8 @@ async def test_async_redis_pipeline(
         }
     )
     assert span["tags"] == {
-        "redis.transaction": is_transaction,
-        "redis.is_cluster": False,
+        "redis.transaction": str(is_transaction),
+        "redis.is_cluster": "False",
     }
 
 

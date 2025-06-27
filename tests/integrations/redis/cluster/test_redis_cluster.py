@@ -94,7 +94,7 @@ def test_rediscluster_basic(sentry_init, capture_events, send_default_pii, descr
     assert span["tags"] == {
         "db.operation": "SET",
         "redis.command": "SET",
-        "redis.is_cluster": True,
+        "redis.is_cluster": "True",
         "redis.key": "bar",
     }
 
@@ -139,8 +139,8 @@ def test_rediscluster_pipeline(
         }
     )
     assert span["tags"] == {
-        "redis.transaction": False,  # For Cluster, this is always False
-        "redis.is_cluster": True,
+        "redis.transaction": "False",  # For Cluster, this is always False
+        "redis.is_cluster": "True",
     }
 
 
