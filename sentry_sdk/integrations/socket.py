@@ -1,3 +1,4 @@
+from __future__ import annotations
 import socket
 
 import sentry_sdk
@@ -17,8 +18,7 @@ class SocketIntegration(Integration):
     origin = f"auto.socket.{identifier}"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         patches two of the most used functions of socket: create_connection and getaddrinfo(dns resolver)
         """
@@ -26,8 +26,9 @@ class SocketIntegration(Integration):
         _patch_getaddrinfo()
 
 
-def _get_span_description(host, port):
-    # type: (Union[bytes, str, None], Union[bytes, str, int, None]) -> str
+def _get_span_description(
+    host: Union[bytes, str, None], port: Union[bytes, str, int, None]
+) -> str:
 
     try:
         host = host.decode()  # type: ignore
@@ -43,16 +44,14 @@ def _get_span_description(host, port):
     return description
 
 
-def _patch_create_connection():
-    # type: () -> None
+def _patch_create_connection() -> None:
     real_create_connection = socket.create_connection
 
     def create_connection(
-        address,
-        timeout=socket._GLOBAL_DEFAULT_TIMEOUT,  # type: ignore
-        source_address=None,
-    ):
-        # type: (Tuple[Optional[str], int], Optional[float], Optional[Tuple[Union[bytearray, bytes, str], int]])-> socket.socket
+        address: Tuple[Optional[str], int],
+        timeout: Optional[float] = socket._GLOBAL_DEFAULT_TIMEOUT,  # type: ignore
+        source_address: Optional[Tuple[Union[bytearray, bytes, str], int]] = None,
+    ) -> socket.socket:
         integration = sentry_sdk.get_client().get_integration(SocketIntegration)
         if integration is None:
             return real_create_connection(address, timeout, source_address)
@@ -76,12 +75,25 @@ def _patch_create_connection():
     socket.create_connection = create_connection  # type: ignore
 
 
-def _patch_getaddrinfo():
-    # type: () -> None
+def _patch_getaddrinfo() -> None:
     real_getaddrinfo = socket.getaddrinfo
 
-    def getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-        # type: (Union[bytes, str, None], Union[bytes, str, int, None], int, int, int, int) -> List[Tuple[AddressFamily, SocketKind, int, str, Union[Tuple[str, int], Tuple[str, int, int, int], Tuple[int, bytes]]]]
+    def getaddrinfo(
+        host: Union[bytes, str, None],
+        port: Union[bytes, str, int, None],
+        family: int = 0,
+        type: int = 0,
+        proto: int = 0,
+        flags: int = 0,
+    ) -> List[
+        Tuple[
+            AddressFamily,
+            SocketKind,
+            int,
+            str,
+            Union[Tuple[str, int], Tuple[str, int, int, int], Tuple[int, bytes]],
+        ]
+    ]:
         integration = sentry_sdk.get_client().get_integration(SocketIntegration)
         if integration is None:
             return real_getaddrinfo(host, port, family, type, proto, flags)

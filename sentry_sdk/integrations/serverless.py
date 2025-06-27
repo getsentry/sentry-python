@@ -1,10 +1,11 @@
+from __future__ import annotations
 import sys
 from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.utils import event_from_exception, reraise
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
     from typing import Any
@@ -12,36 +13,24 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Union
     from typing import Optional
-    from typing import overload
 
     F = TypeVar("F", bound=Callable[..., Any])
 
-else:
+    @overload
+    def serverless_function(f: F, flush: bool = True) -> F:
+        pass
 
-    def overload(x):
-        # type: (F) -> F
-        return x
-
-
-@overload
-def serverless_function(f, flush=True):
-    # type: (F, bool) -> F
-    pass
+    @overload
+    def serverless_function(f: None = None, flush: bool = True) -> Callable[[F], F]:
+        pass
 
 
-@overload
-def serverless_function(f=None, flush=True):  # noqa: F811
-    # type: (None, bool) -> Callable[[F], F]
-    pass
-
-
-def serverless_function(f=None, flush=True):  # noqa
-    # type: (Optional[F], bool) -> Union[F, Callable[[F], F]]
-    def wrapper(f):
-        # type: (F) -> F
+def serverless_function(
+    f: Optional[F] = None, flush: bool = True
+) -> Union[F, Callable[[F], F]]:
+    def wrapper(f: F) -> F:
         @wraps(f)
-        def inner(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
+        def inner(*args: Any, **kwargs: Any) -> Any:
             with sentry_sdk.isolation_scope() as scope:
                 scope.clear_breadcrumbs()
 
@@ -61,8 +50,7 @@ def serverless_function(f=None, flush=True):  # noqa
         return wrapper(f)
 
 
-def _capture_and_reraise():
-    # type: () -> None
+def _capture_and_reraise() -> None:
     exc_info = sys.exc_info()
     client = sentry_sdk.get_client()
     if client.is_active():
