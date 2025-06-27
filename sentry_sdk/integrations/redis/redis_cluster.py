@@ -5,6 +5,8 @@ This is part of the main redis-py client.
 https://github.com/redis/redis-py/blob/master/redis/cluster.py
 """
 
+from __future__ import annotations
+
 from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
@@ -25,8 +27,9 @@ if TYPE_CHECKING:
     )
 
 
-def _get_async_cluster_db_data(async_redis_cluster_instance):
-    # type: (AsyncRedisCluster[Any]) -> dict[str, Any]
+def _get_async_cluster_db_data(
+    async_redis_cluster_instance: AsyncRedisCluster[Any],
+) -> dict[str, Any]:
     default_node = async_redis_cluster_instance.get_default_node()
     if default_node is not None and default_node.connection_kwargs is not None:
         return _get_connection_data(default_node.connection_kwargs)
@@ -34,8 +37,9 @@ def _get_async_cluster_db_data(async_redis_cluster_instance):
         return {}
 
 
-def _get_async_cluster_pipeline_db_data(async_redis_cluster_pipeline_instance):
-    # type: (AsyncClusterPipeline[Any]) -> dict[str, Any]
+def _get_async_cluster_pipeline_db_data(
+    async_redis_cluster_pipeline_instance: AsyncClusterPipeline[Any],
+) -> dict[str, Any]:
     with capture_internal_exceptions():
         client = getattr(async_redis_cluster_pipeline_instance, "cluster_client", None)
         if client is None:
@@ -50,8 +54,7 @@ def _get_async_cluster_pipeline_db_data(async_redis_cluster_pipeline_instance):
         return _get_async_cluster_db_data(client)
 
 
-def _get_cluster_db_data(redis_cluster_instance):
-    # type: (RedisCluster[Any]) -> dict[str, Any]
+def _get_cluster_db_data(redis_cluster_instance: RedisCluster[Any]) -> dict[str, Any]:
     default_node = redis_cluster_instance.get_default_node()
 
     if default_node is not None:
@@ -64,8 +67,7 @@ def _get_cluster_db_data(redis_cluster_instance):
         return {}
 
 
-def _patch_redis_cluster():
-    # type: () -> None
+def _patch_redis_cluster() -> None:
     """Patches the cluster module on redis SDK (as opposed to rediscluster library)"""
     try:
         from redis import RedisCluster, cluster

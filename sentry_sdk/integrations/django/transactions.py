@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Copied from raven-python.
 
@@ -27,8 +29,7 @@ except ImportError:
     from django.core.urlresolvers import get_resolver
 
 
-def get_regex(resolver_or_pattern):
-    # type: (Union[URLPattern, URLResolver]) -> Pattern[str]
+def get_regex(resolver_or_pattern: Union[URLPattern, URLResolver]) -> Pattern[str]:
     """Utility method for django's deprecated resolver.regex"""
     try:
         regex = resolver_or_pattern.regex
@@ -48,10 +49,9 @@ class RavenResolver:
     _either_option_matcher = re.compile(r"\[([^\]]+)\|([^\]]+)\]")
     _camel_re = re.compile(r"([A-Z]+)([a-z])")
 
-    _cache = {}  # type: Dict[URLPattern, str]
+    _cache: Dict[URLPattern, str] = {}
 
-    def _simplify(self, pattern):
-        # type: (Union[URLPattern, URLResolver]) -> str
+    def _simplify(self, pattern: Union[URLPattern, URLResolver]) -> str:
         r"""
         Clean up urlpattern regexes into something readable by humans:
 
@@ -102,8 +102,12 @@ class RavenResolver:
 
         return result
 
-    def _resolve(self, resolver, path, parents=None):
-        # type: (URLResolver, str, Optional[List[URLResolver]]) -> Optional[str]
+    def _resolve(
+        self,
+        resolver: URLResolver,
+        path: str,
+        parents: Optional[List[URLResolver]] = None,
+    ) -> Optional[str]:
 
         match = get_regex(resolver).search(path)  # Django < 2.0
 
@@ -142,10 +146,11 @@ class RavenResolver:
 
     def resolve(
         self,
-        path,  # type: str
-        urlconf=None,  # type: Union[None, Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern]]
-    ):
-        # type: (...) -> Optional[str]
+        path: str,
+        urlconf: Union[
+            None, Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern]
+        ] = None,
+    ) -> Optional[str]:
         resolver = get_resolver(urlconf)
         match = self._resolve(resolver, path)
         return match

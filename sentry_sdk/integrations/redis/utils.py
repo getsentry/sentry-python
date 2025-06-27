@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
@@ -26,8 +27,7 @@ TAG_KEYS = [
 ]
 
 
-def _update_span(span, *data_bags):
-    # type: (Span, *dict[str, Any]) -> None
+def _update_span(span: Span, *data_bags: dict[str, Any]) -> None:
     """
     Set tags and data on the given span to data from the given data bags.
     """
@@ -39,8 +39,7 @@ def _update_span(span, *data_bags):
                 span.set_attribute(key, value)
 
 
-def _create_breadcrumb(message, *data_bags):
-    # type: (str, *dict[str, Any]) -> None
+def _create_breadcrumb(message: str, *data_bags: dict[str, Any]) -> None:
     """
     Create a breadcrumb containing the tags data from the given data bags.
     """
@@ -58,8 +57,7 @@ def _create_breadcrumb(message, *data_bags):
     )
 
 
-def _get_safe_command(name, args):
-    # type: (str, Sequence[Any]) -> str
+def _get_safe_command(name: str, args: Sequence[Any]) -> str:
     command_parts = [name]
 
     for i, arg in enumerate(args):
@@ -86,8 +84,7 @@ def _get_safe_command(name, args):
     return command
 
 
-def _safe_decode(key):
-    # type: (Any) -> str
+def _safe_decode(key: Any) -> str:
     if isinstance(key, bytes):
         try:
             return key.decode()
@@ -97,8 +94,7 @@ def _safe_decode(key):
     return str(key)
 
 
-def _key_as_string(key):
-    # type: (Any) -> str
+def _key_as_string(key: Any) -> str:
     if isinstance(key, (dict, list, tuple)):
         key = ", ".join(_safe_decode(x) for x in key)
     elif isinstance(key, bytes):
@@ -111,8 +107,9 @@ def _key_as_string(key):
     return key
 
 
-def _get_safe_key(method_name, args, kwargs):
-    # type: (str, Optional[tuple[Any, ...]], Optional[dict[str, Any]]) -> Optional[tuple[str, ...]]
+def _get_safe_key(
+    method_name: str, args: Optional[tuple[Any, ...]], kwargs: Optional[dict[str, Any]]
+) -> Optional[tuple[str, ...]]:
     """
     Gets the key (or keys) from the given method_name.
     The method_name could be a redis command or a django caching command
@@ -142,17 +139,20 @@ def _get_safe_key(method_name, args, kwargs):
     return key
 
 
-def _parse_rediscluster_command(command):
-    # type: (Any) -> Sequence[Any]
+def _parse_rediscluster_command(command: Any) -> Sequence[Any]:
     return command.args
 
 
-def _get_pipeline_data(is_cluster, get_command_args_fn, is_transaction, command_seq):
-    # type: (bool, Any, bool, Sequence[Any]) -> dict[str, Any]
-    data = {
+def _get_pipeline_data(
+    is_cluster: bool,
+    get_command_args_fn: Any,
+    is_transaction: bool,
+    command_seq: Sequence[Any],
+) -> dict[str, Any]:
+    data: dict[str, Any] = {
         "redis.is_cluster": is_cluster,
         "redis.transaction": is_transaction,
-    }  # type: dict[str, Any]
+    }
 
     commands = []
     for i, arg in enumerate(command_seq):
@@ -168,11 +168,10 @@ def _get_pipeline_data(is_cluster, get_command_args_fn, is_transaction, command_
     return data
 
 
-def _get_client_data(is_cluster, name, *args):
-    # type: (bool, str, *Any) -> dict[str, Any]
-    data = {
+def _get_client_data(is_cluster: bool, name: str, *args: Any) -> dict[str, Any]:
+    data: dict[str, Any] = {
         "redis.is_cluster": is_cluster,
-    }  # type: dict[str, Any]
+    }
 
     if name:
         data["redis.command"] = name

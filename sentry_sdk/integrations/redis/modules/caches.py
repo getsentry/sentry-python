@@ -2,6 +2,7 @@
 Code used for the Caches module in Sentry
 """
 
+from __future__ import annotations
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import capture_internal_exceptions
@@ -16,8 +17,7 @@ if TYPE_CHECKING:
     from typing import Any, Optional
 
 
-def _get_op(name):
-    # type: (str) -> Optional[str]
+def _get_op(name: str) -> Optional[str]:
     op = None
     if name.lower() in GET_COMMANDS:
         op = OP.CACHE_GET
@@ -27,8 +27,12 @@ def _get_op(name):
     return op
 
 
-def _compile_cache_span_properties(redis_command, args, kwargs, integration):
-    # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> dict[str, Any]
+def _compile_cache_span_properties(
+    redis_command: str,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    integration: RedisIntegration,
+) -> dict[str, Any]:
     key = _get_safe_key(redis_command, args, kwargs)
     key_as_string = _key_as_string(key)
     keys_as_string = key_as_string.split(", ")
@@ -61,8 +65,12 @@ def _compile_cache_span_properties(redis_command, args, kwargs, integration):
     return properties
 
 
-def _get_cache_span_description(redis_command, args, kwargs, integration):
-    # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> str
+def _get_cache_span_description(
+    redis_command: str,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    integration: RedisIntegration,
+) -> str:
     description = _key_as_string(_get_safe_key(redis_command, args, kwargs))
 
     data_should_be_truncated = (
@@ -74,8 +82,9 @@ def _get_cache_span_description(redis_command, args, kwargs, integration):
     return description
 
 
-def _get_cache_data(redis_client, properties, return_value):
-    # type: (Any, dict[str, Any], Optional[Any]) -> dict[str, Any]
+def _get_cache_data(
+    redis_client: Any, properties: dict[str, Any], return_value: Optional[Any]
+) -> dict[str, Any]:
     data = {}
 
     with capture_internal_exceptions():
