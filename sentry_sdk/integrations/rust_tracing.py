@@ -30,9 +30,13 @@ sentry_sdk.init(
 Each native extension requires its own integration.
 """
 
+from __future__ import annotations
 import json
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
@@ -56,8 +60,7 @@ class EventTypeMapping(Enum):
     Event = auto()
 
 
-def tracing_level_to_sentry_level(level):
-    # type: (str) -> sentry_sdk._types.LogLevelStr
+def tracing_level_to_sentry_level(level: str) -> sentry_sdk._types.LogLevelStr:
     level = RustTracingLevel(level)
     if level in (RustTracingLevel.Trace, RustTracingLevel.Debug):
         return "debug"
@@ -97,15 +100,15 @@ def process_event(event: Dict[str, Any]) -> None:
 
     logger = metadata.get("target")
     level = tracing_level_to_sentry_level(metadata.get("level"))
-    message = event.get("message")  # type: sentry_sdk._types.Any
+    message: sentry_sdk._types.Any = event.get("message")
     contexts = extract_contexts(event)
 
-    sentry_event = {
+    sentry_event: sentry_sdk._types.Event = {
         "logger": logger,
         "level": level,
         "message": message,
         "contexts": contexts,
-    }  # type: sentry_sdk._types.Event
+    }
 
     sentry_sdk.capture_event(sentry_event)
 
