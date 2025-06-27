@@ -1,3 +1,4 @@
+from __future__ import annotations
 from importlib import import_module
 
 import sentry_sdk
@@ -33,8 +34,7 @@ class AriadneIntegration(Integration):
     identifier = "ariadne"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         version = package_version("ariadne")
         _check_minimum_version(AriadneIntegration, version)
 
@@ -43,15 +43,15 @@ class AriadneIntegration(Integration):
         _patch_graphql()
 
 
-def _patch_graphql():
-    # type: () -> None
+def _patch_graphql() -> None:
     old_parse_query = ariadne_graphql.parse_query
     old_handle_errors = ariadne_graphql.handle_graphql_errors
     old_handle_query_result = ariadne_graphql.handle_query_result
 
     @ensure_integration_enabled(AriadneIntegration, old_parse_query)
-    def _sentry_patched_parse_query(context_value, query_parser, data):
-        # type: (Optional[Any], Optional[QueryParser], Any) -> DocumentNode
+    def _sentry_patched_parse_query(
+        context_value: Optional[Any], query_parser: Optional[QueryParser], data: Any
+    ) -> DocumentNode:
         event_processor = _make_request_event_processor(data)
         sentry_sdk.get_isolation_scope().add_event_processor(event_processor)
 
@@ -59,8 +59,9 @@ def _patch_graphql():
         return result
 
     @ensure_integration_enabled(AriadneIntegration, old_handle_errors)
-    def _sentry_patched_handle_graphql_errors(errors, *args, **kwargs):
-        # type: (List[GraphQLError], Any, Any) -> GraphQLResult
+    def _sentry_patched_handle_graphql_errors(
+        errors: List[GraphQLError], *args: Any, **kwargs: Any
+    ) -> GraphQLResult:
         result = old_handle_errors(errors, *args, **kwargs)
 
         event_processor = _make_response_event_processor(result[1])
@@ -83,8 +84,9 @@ def _patch_graphql():
         return result
 
     @ensure_integration_enabled(AriadneIntegration, old_handle_query_result)
-    def _sentry_patched_handle_query_result(result, *args, **kwargs):
-        # type: (Any, Any, Any) -> GraphQLResult
+    def _sentry_patched_handle_query_result(
+        result: Any, *args: Any, **kwargs: Any
+    ) -> GraphQLResult:
         query_result = old_handle_query_result(result, *args, **kwargs)
 
         event_processor = _make_response_event_processor(query_result[1])
@@ -111,12 +113,10 @@ def _patch_graphql():
     ariadne_graphql.handle_query_result = _sentry_patched_handle_query_result  # type: ignore
 
 
-def _make_request_event_processor(data):
-    # type: (GraphQLSchema) -> EventProcessor
+def _make_request_event_processor(data: GraphQLSchema) -> EventProcessor:
     """Add request data and api_target to events."""
 
-    def inner(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+    def inner(event: Event, hint: dict[str, Any]) -> Event:
         if not isinstance(data, dict):
             return event
 
@@ -143,12 +143,10 @@ def _make_request_event_processor(data):
     return inner
 
 
-def _make_response_event_processor(response):
-    # type: (Dict[str, Any]) -> EventProcessor
+def _make_response_event_processor(response: Dict[str, Any]) -> EventProcessor:
     """Add response data to the event's response context."""
 
-    def inner(event, hint):
-        # type: (Event, dict[str, Any]) -> Event
+    def inner(event: Event, hint: dict[str, Any]) -> Event:
         with capture_internal_exceptions():
             if should_send_default_pii() and response.get("errors"):
                 contexts = event.setdefault("contexts", {})
