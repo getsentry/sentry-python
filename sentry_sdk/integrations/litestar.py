@@ -1,6 +1,6 @@
 from collections.abc import Set
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, TransactionSource, SOURCE_FOR_STYLE
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -9,7 +9,6 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TransactionSource, SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -162,6 +161,7 @@ def enable_span_for_middleware(middleware):
             op=OP.MIDDLEWARE_LITESTAR,
             name=middleware_name,
             origin=LitestarIntegration.origin,
+            only_if_parent=True,
         ) as middleware_span:
             middleware_span.set_tag("litestar.middleware_name", middleware_name)
 
@@ -174,6 +174,7 @@ def enable_span_for_middleware(middleware):
                     op=OP.MIDDLEWARE_LITESTAR_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
                     origin=LitestarIntegration.origin,
+                    only_if_parent=True,
                 ) as span:
                     span.set_tag("litestar.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -191,6 +192,7 @@ def enable_span_for_middleware(middleware):
                     op=OP.MIDDLEWARE_LITESTAR_SEND,
                     name=getattr(send, "__qualname__", str(send)),
                     origin=LitestarIntegration.origin,
+                    only_if_parent=True,
                 ) as span:
                     span.set_tag("litestar.middleware_name", middleware_name)
                     return await send(message)

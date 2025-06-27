@@ -235,15 +235,15 @@ def test_logs_message_params(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_logs_tied_to_transactions(sentry_init, capture_envelopes):
+def test_logs_tied_to_root_spans(sentry_init, capture_envelopes):
     """
-    Log messages are also tied to transactions.
+    Log messages are also tied to root spans.
     """
     sentry_init(_experiments={"enable_logs": True})
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_transaction(name="test-transaction") as trx:
-        sentry_sdk.logger.warning("This is a log tied to a transaction")
+    with sentry_sdk.start_span(name="test-root-span") as trx:
+        sentry_sdk.logger.warning("This is a log tied to a root span")
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)
@@ -258,9 +258,9 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
     sentry_init(_experiments={"enable_logs": True})
     envelopes = capture_envelopes()
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
+    with sentry_sdk.start_span(name="test-root-span"):
         with sentry_sdk.start_span(name="test-span") as span:
-            sentry_sdk.logger.warning("This is a log tied to a span")
+            sentry_sdk.logger.warning("This is a log tied to a child span")
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)

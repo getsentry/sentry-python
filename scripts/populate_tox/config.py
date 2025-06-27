@@ -39,11 +39,23 @@ TEST_SUITE_CONFIG = {
         "package": "celery",
         "deps": {
             "*": ["newrelic", "redis"],
-            "py3.7": ["importlib-metadata<5.0"],
         },
+        "python": ">=3.8",
     },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
+    },
+    "common": {
+        "package": "opentelemetry-sdk",
+        "test_on_all_python_versions": True,
+        "deps": {
+            "*": ["pytest", "pytest-asyncio"],
+            # See https://github.com/pytest-dev/pytest/issues/9621
+            # and https://github.com/pytest-dev/pytest-forked/issues/67
+            # for justification of the upper bound on pytest
+            "py3.7": ["pytest<7.0.0"],
+            "py3.8": ["hypothesis"],
+        },
     },
     "cohere": {
         "package": "cohere",
@@ -53,6 +65,7 @@ TEST_SUITE_CONFIG = {
         "package": "django",
         "deps": {
             "*": [
+                "channels[daphne]",
                 "psycopg2-binary",
                 "djangorestframework",
                 "pytest-django",
@@ -138,12 +151,6 @@ TEST_SUITE_CONFIG = {
     },
     "loguru": {
         "package": "loguru",
-    },
-    "openai_agents": {
-        "package": "openai-agents",
-        "deps": {
-            "*": ["pytest-asyncio"],
-        },
     },
     "openfeature": {
         "package": "openfeature-sdk",
@@ -232,7 +239,7 @@ TEST_SUITE_CONFIG = {
         "package": "trytond",
         "deps": {
             "*": ["werkzeug"],
-            "<=5.0": ["werkzeug<1.0"],
+            "<5.1": ["werkzeug<1.0"],
         },
     },
     "typer": {

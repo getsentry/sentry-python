@@ -139,6 +139,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
         op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
         name="Chat Completion",
         origin=OpenAIIntegration.origin,
+        only_if_parent=True,
     )
     span.__enter__()
 
@@ -324,6 +325,7 @@ def _new_embeddings_create_common(f, *args, **kwargs):
         op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
         description="OpenAI Embedding Creation",
         origin=OpenAIIntegration.origin,
+        only_if_parent=True,
     ) as span:
         if "input" in kwargs and (
             should_send_default_pii() and integration.include_prompts

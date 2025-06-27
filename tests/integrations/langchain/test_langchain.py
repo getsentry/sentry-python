@@ -18,7 +18,7 @@ from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
@@ -170,7 +170,7 @@ def test_langchain_agent(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction():
+    with start_span(name="agent"):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     tx = events[0]
@@ -186,24 +186,23 @@ def test_langchain_agent(
     assert len(list(x for x in tx["spans"] if x["op"] == "ai.run.langchain")) > 0
 
     if use_unknown_llm_type:
-        assert "ai_prompt_tokens_used" in chat_spans[0]["measurements"]
-        assert "ai_total_tokens_used" in chat_spans[0]["measurements"]
+        assert SPANDATA.AI_PROMPT_TOKENS_USED in chat_spans[0]["data"]
+        assert SPANDATA.AI_TOTAL_TOKENS_USED in chat_spans[0]["data"]
     else:
         # important: to avoid double counting, we do *not* measure
         # tokens used if we have an explicit integration (e.g. OpenAI)
-        assert "measurements" not in chat_spans[0]
+        assert SPANDATA.AI_PROMPT_TOKENS_USED not in chat_spans[0]["data"]
+        assert SPANDATA.AI_TOTAL_TOKENS_USED not in chat_spans[0]["data"]
 
     if send_default_pii and include_prompts:
         assert (
-            "You are very powerful"
-            in chat_spans[0]["data"][SPANDATA.AI_INPUT_MESSAGES][0]["content"]
+            "You are very powerful" in chat_spans[0]["data"][SPANDATA.AI_INPUT_MESSAGES]
         )
         assert "5" in chat_spans[0]["data"][SPANDATA.AI_RESPONSES]
         assert "word" in tool_exec_span["data"][SPANDATA.AI_INPUT_MESSAGES]
         assert 5 == int(tool_exec_span["data"][SPANDATA.AI_RESPONSES])
         assert (
-            "You are very powerful"
-            in chat_spans[1]["data"][SPANDATA.AI_INPUT_MESSAGES][0]["content"]
+            "You are very powerful" in chat_spans[1]["data"][SPANDATA.AI_INPUT_MESSAGES]
         )
         assert "5" in chat_spans[1]["data"][SPANDATA.AI_RESPONSES]
     else:
@@ -244,7 +243,7 @@ def test_langchain_error(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction(), pytest.raises(Exception):
+    with start_span(name="agent"), pytest.raises(Exception):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     error = events[0]
@@ -339,7 +338,7 @@ def test_span_origin(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction():
+    with start_span(name="agent"):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     (event,) = events

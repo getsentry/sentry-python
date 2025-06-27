@@ -3,9 +3,9 @@ from copy import deepcopy
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk.consts import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.utils import (
     transaction_from_function,
     logger,
@@ -89,8 +89,8 @@ def patch_get_request_handler():
             def _sentry_call(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 current_scope = sentry_sdk.get_current_scope()
-                if current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
+                if current_scope.root_span is not None:
+                    current_scope.root_span.update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
                 if sentry_scope.profile is not None:

@@ -1,7 +1,7 @@
 import functools
 
 import sentry_sdk
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.consts import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
