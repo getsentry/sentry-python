@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, BAGGAGE_HEADER_NAME
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -32,8 +33,7 @@ class HttpxIntegration(Integration):
     origin = f"auto.http.{identifier}"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         httpx has its own transport layer and can be customized when needed,
         so patch Client.send and AsyncClient.send to support both synchronous and async interfaces.
@@ -42,13 +42,11 @@ class HttpxIntegration(Integration):
         _install_httpx_async_client()
 
 
-def _install_httpx_client():
-    # type: () -> None
+def _install_httpx_client() -> None:
     real_send = Client.send
 
     @ensure_integration_enabled(HttpxIntegration, real_send)
-    def send(self, request, **kwargs):
-        # type: (Client, Request, **Any) -> Response
+    def send(self: Client, request: Request, **kwargs: Any) -> Response:
         parsed_url = None
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
@@ -112,12 +110,10 @@ def _install_httpx_client():
     Client.send = send
 
 
-def _install_httpx_async_client():
-    # type: () -> None
+def _install_httpx_async_client() -> None:
     real_send = AsyncClient.send
 
-    async def send(self, request, **kwargs):
-        # type: (AsyncClient, Request, **Any) -> Response
+    async def send(self: AsyncClient, request: Request, **kwargs: Any) -> Response:
         if sentry_sdk.get_client().get_integration(HttpxIntegration) is None:
             return await real_send(self, request, **kwargs)
 
@@ -184,8 +180,9 @@ def _install_httpx_async_client():
     AsyncClient.send = send
 
 
-def _add_sentry_baggage_to_headers(headers, sentry_baggage):
-    # type: (MutableMapping[str, str], str) -> None
+def _add_sentry_baggage_to_headers(
+    headers: MutableMapping[str, str], sentry_baggage: str
+) -> None:
     """Add the Sentry baggage to the headers.
 
     This function directly mutates the provided headers. The provided sentry_baggage

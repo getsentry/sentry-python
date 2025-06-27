@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
@@ -9,27 +10,13 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
 )
 
-from typing import TYPE_CHECKING, cast, Any, Dict, TypeVar
+from typing import TYPE_CHECKING
 
-# Hack to get new Python features working in older versions
-# without introducing a hard dependency on `typing_extensions`
-# from: https://stackoverflow.com/a/71944042/300572
 if TYPE_CHECKING:
-    from typing import ParamSpec, Callable
-else:
-    # Fake ParamSpec
-    class ParamSpec:
-        def __init__(self, _):
-            self.args = None
-            self.kwargs = None
+    from typing import ParamSpec, Callable, Any, Dict, TypeVar
 
-    # Callable[anything] will return None
-    class _Callable:
-        def __getitem__(self, _):
-            return None
-
-    # Make instances
-    Callable = _Callable()
+    P = ParamSpec("P")
+    T = TypeVar("T")
 
 
 try:
@@ -72,10 +59,6 @@ class ClickhouseDriverIntegration(Integration):
         )
 
 
-P = ParamSpec("P")
-T = TypeVar("T")
-
-
 def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
     @ensure_integration_enabled(ClickhouseDriverIntegration, f)
     def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
@@ -93,8 +76,7 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 
         connection._sentry_span = span  # type: ignore[attr-defined]
 
-        data = _get_db_data(connection)
-        data = cast("dict[str, Any]", data)
+        data: dict[str, Any] = _get_db_data(connection)
         data["db.query.text"] = query
 
         if query_id:
@@ -117,7 +99,11 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_end(*args: P.args, **kwargs: P.kwargs) -> T:
         res = f(*args, **kwargs)
-        client = cast("clickhouse_driver.client.Client", args[0])
+
+        client = args[0]
+        if not isinstance(client, clickhouse_driver.client.Client):
+            return res
+
         connection = client.connection
 
         span = getattr(connection, "_sentry_span", None)
@@ -150,9 +136,11 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
 def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_send_data(*args: P.args, **kwargs: P.kwargs) -> T:
-        client = cast("clickhouse_driver.client.Client", args[0])
+        client = args[0]
+        if not isinstance(client, clickhouse_driver.client.Client):
+            return f(*args, **kwargs)
+
         connection = client.connection
-        db_params_data = cast("list[Any]", args[2])
         span = getattr(connection, "_sentry_span", None)
 
         if span is not None:
@@ -160,11 +148,13 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
             _set_on_span(span, data)
 
             if should_send_default_pii():
-                saved_db_data = getattr(
+                saved_db_data: dict[str, Any] = getattr(
                     connection, "_sentry_db_data", {}
-                )  # type: dict[str, Any]
-                db_params = saved_db_data.get("db.params") or []  # type: list[Any]
-                db_params.extend(db_params_data)
+                )
+                db_params: list[Any] = saved_db_data.get("db.params") or []
+                db_params_data = args[2]
+                if isinstance(db_params_data, list):
+                    db_params.extend(db_params_data)
                 saved_db_data["db.params"] = db_params
                 span.set_attribute("db.params", _serialize_span_attribute(db_params))
 
