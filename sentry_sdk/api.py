@@ -317,13 +317,11 @@ def continue_trace(environ_or_headers: dict[str, Any]) -> Generator[None, None, 
 
 @scopemethod
 def start_session(
-    session_mode="application",  # type: str
-):
-    # type: (...) -> None
+    session_mode: str = "application",
+) -> None:
     return get_isolation_scope().start_session(session_mode=session_mode)
 
 
 @scopemethod
-def end_session():
-    # type: () -> None
+def end_session() -> None:
     return get_isolation_scope().end_session()
