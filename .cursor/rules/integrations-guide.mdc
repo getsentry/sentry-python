@@ -1,0 +1,158 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Integrations Guide
+
+## Integration Categories
+
+The Sentry Python SDK includes integrations for popular frameworks, libraries, and services:
+
+### Web Frameworks
+- [sentry_sdk/integrations/django/](mdc:sentry_sdk/integrations/django) - Django web framework
+- [sentry_sdk/integrations/flask/](mdc:sentry_sdk/integrations/flask) - Flask microframework
+- [sentry_sdk/integrations/fastapi/](mdc:sentry_sdk/integrations/fastapi) - FastAPI framework
+- [sentry_sdk/integrations/starlette/](mdc:sentry_sdk/integrations/starlette) - Starlette ASGI framework
+- [sentry_sdk/integrations/sanic/](mdc:sentry_sdk/integrations/sanic) - Sanic async framework
+- [sentry_sdk/integrations/tornado/](mdc:sentry_sdk/integrations/tornado) - Tornado web framework
+- [sentry_sdk/integrations/pyramid/](mdc:sentry_sdk/integrations/pyramid) - Pyramid framework
+- [sentry_sdk/integrations/bottle/](mdc:sentry_sdk/integrations/bottle) - Bottle microframework
+- [sentry_sdk/integrations/chalice/](mdc:sentry_sdk/integrations/chalice) - AWS Chalice
+- [sentry_sdk/integrations/quart/](mdc:sentry_sdk/integrations/quart) - Quart async framework
+- [sentry_sdk/integrations/falcon/](mdc:sentry_sdk/integrations/falcon) - Falcon framework
+- [sentry_sdk/integrations/litestar/](mdc:sentry_sdk/integrations/litestar) - Litestar framework
+- [sentry_sdk/integrations/starlite/](mdc:sentry_sdk/integrations/starlite) - Starlite framework
+
+### Task Queues and Background Jobs
+- [sentry_sdk/integrations/celery/](mdc:sentry_sdk/integrations/celery) - Celery task queue
+- [sentry_sdk/integrations/rq/](mdc:sentry_sdk/integrations/rq) - Redis Queue
+- [sentry_sdk/integrations/huey/](mdc:sentry_sdk/integrations/huey) - Huey task queue
+- [sentry_sdk/integrations/arq/](mdc:sentry_sdk/integrations/arq) - Arq async task queue
+- [sentry_sdk/integrations/dramatiq/](mdc:sentry_sdk/integrations/dramatiq) - Dramatiq task queue
+
+### Databases and Data Stores
+- [sentry_sdk/integrations/sqlalchemy/](mdc:sentry_sdk/integrations/sqlalchemy) - SQLAlchemy ORM
+- [sentry_sdk/integrations/asyncpg/](mdc:sentry_sdk/integrations/asyncpg) - AsyncPG PostgreSQL
+- [sentry_sdk/integrations/pymongo/](mdc:sentry_sdk/integrations/pymongo) - PyMongo MongoDB
+- [sentry_sdk/integrations/redis/](mdc:sentry_sdk/integrations/redis) - Redis client
+- [sentry_sdk/integrations/clickhouse_driver/](mdc:sentry_sdk/integrations/clickhouse_driver) - ClickHouse driver
+
+### Cloud and Serverless
+- [sentry_sdk/integrations/aws_lambda/](mdc:sentry_sdk/integrations/aws_lambda) - AWS Lambda
+- [sentry_sdk/integrations/gcp/](mdc:sentry_sdk/integrations/gcp) - Google Cloud Platform
+- [sentry_sdk/integrations/serverless/](mdc:sentry_sdk/integrations/serverless) - Serverless framework
+
+### HTTP and Networking
+- [sentry_sdk/integrations/requests/](mdc:sentry_sdk/integrations/requests) - Requests HTTP library
+- [sentry_sdk/integrations/httpx/](mdc:sentry_sdk/integrations/httpx) - HTTPX async HTTP client
+- [sentry_sdk/integrations/aiohttp/](mdc:sentry_sdk/integrations/aiohttp) - aiohttp async HTTP
+- [sentry_sdk/integrations/grpc/](mdc:sentry_sdk/integrations/grpc) - gRPC framework
+
+### AI and Machine Learning
+- [sentry_sdk/integrations/openai/](mdc:sentry_sdk/integrations/openai) - OpenAI API
+- [sentry_sdk/integrations/anthropic/](mdc:sentry_sdk/integrations/anthropic) - Anthropic Claude
+- [sentry_sdk/integrations/cohere/](mdc:sentry_sdk/integrations/cohere) - Cohere AI
+- [sentry_sdk/integrations/huggingface_hub/](mdc:sentry_sdk/integrations/huggingface_hub) - Hugging Face Hub
+- [sentry_sdk/integrations/langchain/](mdc:sentry_sdk/integrations/langchain) - LangChain framework
+
+### GraphQL
+- [sentry_sdk/integrations/graphene/](mdc:sentry_sdk/integrations/graphene) - Graphene GraphQL
+- [sentry_sdk/integrations/ariadne/](mdc:sentry_sdk/integrations/ariadne) - Ariadne GraphQL
+- [sentry_sdk/integrations/strawberry/](mdc:sentry_sdk/integrations/strawberry) - Strawberry GraphQL
+- [sentry_sdk/integrations/gql/](mdc:sentry_sdk/integrations/gql) - GQL GraphQL client
+
+### Feature Flags and Configuration
+- [sentry_sdk/integrations/launchdarkly/](mdc:sentry_sdk/integrations/launchdarkly) - LaunchDarkly
+- [sentry_sdk/integrations/unleash/](mdc:sentry_sdk/integrations/unleash) - Unleash
+- [sentry_sdk/integrations/statsig/](mdc:sentry_sdk/integrations/statsig) - Statsig
+- [sentry_sdk/integrations/openfeature/](mdc:sentry_sdk/integrations/openfeature) - OpenFeature
+
+### Other Integrations
+- [sentry_sdk/integrations/logging/](mdc:sentry_sdk/integrations/logging) - Python logging
+- [sentry_sdk/integrations/loguru/](mdc:sentry_sdk/integrations/loguru) - Loguru logging
+- [sentry_sdk/integrations/opentelemetry/](mdc:sentry_sdk/integrations/opentelemetry) - OpenTelemetry
+- [sentry_sdk/integrations/ray/](mdc:sentry_sdk/integrations/ray) - Ray distributed computing
+- [sentry_sdk/integrations/spark/](mdc:sentry_sdk/integrations/spark) - Apache Spark
+- [sentry_sdk/integrations/beam/](mdc:sentry_sdk/integrations/beam) - Apache Beam
+
+## Integration Usage
+
+### Basic Integration Setup
+```python
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
+
+sentry_sdk.init(
+    dsn="your-dsn",
+    integrations=[
+        DjangoIntegration(),
+        CeleryIntegration(),
+    ],
+    traces_sample_rate=1.0,
+)
+```
+
+### Integration Configuration
+Most integrations accept configuration parameters:
+```python
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
+
+sentry_sdk.init(
+    dsn="your-dsn",
+    integrations=[
+        DjangoIntegration(
+            transaction_style="url",  # Customize transaction naming
+        ),
+        RedisIntegration(
+            cache_prefixes=["myapp:"],  # Filter cache operations
+        ),
+    ],
+)
+```
+
+### Integration Testing
+Each integration has corresponding tests in [tests/integrations/](mdc:tests/integrations):
+- [tests/integrations/django/](mdc:tests/integrations/django) - Django integration tests
+- [tests/integrations/flask/](mdc:tests/integrations/flask) - Flask integration tests
+- [tests/integrations/celery/](mdc:tests/integrations/celery) - Celery integration tests
+
+## Integration Development
+
+### Creating New Integrations
+1. **Create integration file** in [sentry_sdk/integrations/](mdc:sentry_sdk/integrations)
+2. **Inherit from Integration base class**
+3. **Implement setup_once() method**
+4. **Add to integration registry**
+
+### Integration Base Class
+```python
+from sentry_sdk.integrations import Integration
+
+class MyIntegration(Integration):
+    identifier = "my_integration"
+    
+    def __init__(self, param=None):
+        self.param = param
+    
+    @staticmethod
+    def setup_once():
+        # Install hooks, monkey patches, etc.
+        pass
+```
+
+### Common Integration Patterns
+- **Monkey patching**: Replace functions with instrumented versions
+- **Middleware**: Add middleware to web frameworks
+- **Signal handlers**: Hook into framework signals
+- **Exception handlers**: Catch and process exceptions
+- **Context managers**: Add context to operations
+
+### Integration Best Practices
+- **Zero configuration**: Work without user setup
+- **Check integration status**: Use `sentry_sdk.get_client().get_integration()`
+- **No side effects**: Don't alter library behavior
+- **Graceful degradation**: Handle missing dependencies
+- **Comprehensive testing**: Test all integration features

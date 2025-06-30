@@ -69,6 +69,8 @@ __all__ = [
     "monitor",
     "use_scope",
     "use_isolation_scope",
+    "start_session",
+    "end_session",
 ]
 
 
@@ -337,3 +339,17 @@ def continue_trace(environ_or_headers):
     """
     with get_isolation_scope().continue_trace(environ_or_headers):
         yield
+
+
+@scopemethod
+def start_session(
+    session_mode="application",  # type: str
+):
+    # type: (...) -> None
+    return get_isolation_scope().start_session(session_mode=session_mode)
+
+
+@scopemethod
+def end_session():
+    # type: () -> None
+    return get_isolation_scope().end_session()

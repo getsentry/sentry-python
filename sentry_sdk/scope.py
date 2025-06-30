@@ -1420,8 +1420,11 @@ def new_scope():
         yield new_scope
 
     finally:
-        # restore original scope
-        _current_scope.reset(token)
+        try:
+            # restore original scope
+            _current_scope.reset(token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1455,8 +1458,11 @@ def use_scope(scope):
         yield scope
 
     finally:
-        # restore original scope
-        _current_scope.reset(token)
+        try:
+            # restore original scope
+            _current_scope.reset(token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1497,8 +1503,15 @@ def isolation_scope():
 
     finally:
         # restore original scopes
-        _current_scope.reset(current_token)
-        _isolation_scope.reset(isolation_token)
+        try:
+            _current_scope.reset(current_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
+
+        try:
+            _isolation_scope.reset(isolation_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1537,8 +1550,15 @@ def use_isolation_scope(isolation_scope):
 
     finally:
         # restore original scopes
-        _current_scope.reset(current_token)
-        _isolation_scope.reset(isolation_token)
+        try:
+            _current_scope.reset(current_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
+
+        try:
+            _isolation_scope.reset(isolation_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 def should_send_default_pii():

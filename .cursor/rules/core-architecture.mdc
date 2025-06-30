@@ -1,0 +1,122 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Core Architecture
+
+## Scope and Client Pattern
+
+The Sentry SDK uses a **Scope and Client** pattern for managing state and context:
+
+### Scope
+- [sentry_sdk/scope.py](mdc:sentry_sdk/scope.py) - Holds contextual data
+- Holds a reference to the Client
+- Contains tags, extra data, user info, breadcrumbs
+- Thread-local storage for isolation
+
+### Client
+- [sentry_sdk/client.py](mdc:sentry_sdk/client.py) - Handles event processing
+- Manages transport and event serialization
+- Applies sampling and filtering
+
+## Key Components
+
+### API Layer
+- [sentry_sdk/api.py](mdc:sentry_sdk/api.py) - Public API functions
+- `init()` - Initialize the SDK
+- `capture_exception()` - Capture exceptions
+- `capture_message()` - Capture custom messages
+- `set_tag()`, `set_user()`, `set_context()` - Add context
+- `start_transaction()` - Performance monitoring
+
+### Transport
+- [sentry_sdk/transport.py](mdc:sentry_sdk/transport.py) - Event delivery
+- `HttpTransport` - HTTP transport to Sentry servers
+- Handles retries, rate limiting, and queuing
+
+### Integrations System
+- [sentry_sdk/integrations/__init__.py](mdc:sentry_sdk/integrations/__init__.py) - Integration registry
+- Base `Integration` class for all integrations
+- Automatic setup and teardown
+- Integration-specific configuration
+
+## Data Flow
+
+### Event Capture Flow
+1. **Exception occurs** or **manual capture** called
+2. **get_current_scope** gets the active current scope
+2. **get_isolation_scope** gets the active isolation scope
+3. **Scope data** (tags, user, context) is attached
+4. **Client.process_event()** processes the event
+5. **Sampling** and **filtering** applied
+6. **Transport** sends to Sentry servers
+
+### Performance Monitoring Flow
+1. **Transaction started** with `start_transaction()`
+2. **Spans** created for operations within transaction with `start_span()`
+3. **Timing data** collected automatically
+4. **Transaction finished** and sent to Sentry
+
+## Context Management
+
+### Scope Stack
+- **Global scope**: Default scope for the process
+- **Isolation scope**: Isolated scope for specific operations, manages concurrency isolation
+- **Current scope**: Active scope for current execution context
+
+### Scope Operations
+- `configure_scope()` - Modify current scope
+- `new_scope()` - Create isolated scope
+
+## Integration Architecture
+
+### Integration Lifecycle
+1. **Registration**: Integration registered during `init()`
+2. **Setup**: `setup_once()` called to install hooks
+3. **Runtime**: Integration monitors and captures events
+4. **Teardown**: Integration cleaned up on shutdown
+
+### Common Integration Patterns
+- **Monkey patching**: Replace functions/methods with instrumented versions
+- **Signal handlers**: Hook into framework signals/events
+- **Middleware**: Add middleware to web frameworks
+- **Exception handlers**: Catch and process exceptions
+
+### Integration Configuration
+```python
+# Example integration setup
+sentry_sdk.init(
+    dsn="your-dsn",
+    integrations=[
+        DjangoIntegration(),
+        CeleryIntegration(),
+        RedisIntegration(),
+    ],
+    traces_sample_rate=1.0,
+)
+```
+
+## Error Handling
+
+### Exception Processing
+- **Automatic capture**: Unhandled exceptions captured automatically
+- **Manual capture**: Use `capture_exception()` for handled exceptions
+- **Context preservation**: Stack traces, local variables, and context preserved
+
+### Breadcrumbs
+- **Automatic breadcrumbs**: Framework operations logged automatically
+- **Manual breadcrumbs**: Use `add_breadcrumb()` for custom events
+- **Breadcrumb categories**: HTTP, database, navigation, etc.
+
+## Performance Monitoring
+
+### Transaction Tracking
+- **Automatic transactions**: Web requests, background tasks
+- **Custom transactions**: Use `start_transaction()` for custom operations
+- **Span tracking**: Database queries, HTTP requests, custom operations
+- **Performance data**: Timing, resource usage, custom measurements
+
+### Sampling
+- **Transaction sampling**: Control percentage of transactions captured
+- **Dynamic sampling**: Adjust sampling based on context

@@ -40,6 +40,51 @@ for your feedback. How was the migration? Is everything working as expected? Is
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
 [on Discord](https://discord.com/invite/Ww9hbqr).
 
+## 2.32.0
+
+### Various fixes & improvements
+
+- feat(sessions): Add top-level start- and end session methods (#4474) by @szokeasaurusrex
+- feat(openai-agents): Set tool span to failed if an error is raised in the tool (#4527) by @antonpirker
+- fix(integrations/ray): Correctly pass keyword arguments to ray.remote function (#4430) by @svartalf
+- fix(langchain): Make `span_map` an instance variable (#4476) by @szokeasaurusrex
+- fix(langchain): Ensure no duplicate `SentryLangchainCallback` (#4485) by @szokeasaurusrex
+- fix(Litestar): Apply `failed_request_status_codes` to exceptions raised in middleware (#4074) by @vrslev
+
+## 2.31.0
+
+### Various fixes & improvements
+
+- **New Integration (BETA):** Add support for `openai-agents` (#4437) by @antonpirker
+
+  We can now instrument AI agents that are created with the [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) out of the box.
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+
+# Add the OpenAIAgentsIntegration to your sentry_sdk.init call:
+sentry_sdk.init(
+    dsn="...",
+    integrations=[
+        OpenAIAgentsIntegration(),
+    ]
+)
+```
+
+For more information see the [OpenAI Agents integrations documentation](https://docs.sentry.io/platforms/python/integrations/openai-agents/).
+
+- Logs: Add support for `dict` arguments (#4478) by @AbhiPrasad
+- Add Cursor generated rules (#4493) by @sl0thentr0py
+- Greatly simplify Langchain integrations `_wrap_configure` (#4479) by @szokeasaurusrex
+- Fix(ci): Remove tracerite pin (almost) (#4504) by @sentrivana
+- Fix(profiling): Ensure profiler thread exits when needed (#4497) by @Zylphrex
+- Fix(ci): Do not install newest `tracerite` (#4494) by @sentrivana
+- Fix(scope): Handle token reset `LookupError`s gracefully (#4481) by @sentrivana
+- Tests: Tox update (#4509) by @sentrivana
+- Tests: Upper bound on fakeredis on old Python versions (#4482) by @sentrivana
+- Tests: Regenerate tox (#4457) by @sentrivana
+
 ## 2.30.0
 
 ### Various fixes & improvements
