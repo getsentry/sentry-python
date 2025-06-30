@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sys
 
 import sentry_sdk
@@ -11,7 +12,7 @@ try:
 except ImportError:
     raise DidNotEnable("asyncio not available")
 
-from typing import cast, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -20,8 +21,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import ExcInfo
 
 
-def get_name(coro):
-    # type: (Any) -> str
+def get_name(coro: Any) -> str:
     return (
         getattr(coro, "__qualname__", None)
         or getattr(coro, "__name__", None)
@@ -29,18 +29,19 @@ def get_name(coro):
     )
 
 
-def patch_asyncio():
-    # type: () -> None
+def patch_asyncio() -> None:
     orig_task_factory = None
     try:
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
 
-        def _sentry_task_factory(loop, coro, **kwargs):
-            # type: (asyncio.AbstractEventLoop, Coroutine[Any, Any, Any], Any) -> asyncio.Future[Any]
+        def _sentry_task_factory(
+            loop: asyncio.AbstractEventLoop,
+            coro: Coroutine[Any, Any, Any],
+            **kwargs: Any,
+        ) -> asyncio.Future[Any]:
 
-            async def _task_with_sentry_span_creation():
-                # type: () -> Any
+            async def _task_with_sentry_span_creation() -> Any:
                 result = None
 
                 with sentry_sdk.isolation_scope():
@@ -79,9 +80,8 @@ def patch_asyncio():
 
             # Set the task name to include the original coroutine's name
             try:
-                cast("asyncio.Task[Any]", task).set_name(
-                    f"{get_name(coro)} (Sentry-wrapped)"
-                )
+                if isinstance(task, asyncio.Task):
+                    task.set_name(f"{get_name(coro)} (Sentry-wrapped)")
             except AttributeError:
                 # set_name might not be available in all Python versions
                 pass
@@ -100,8 +100,7 @@ def patch_asyncio():
         )
 
 
-def _capture_exception():
-    # type: () -> ExcInfo
+def _capture_exception() -> ExcInfo:
     exc_info = sys.exc_info()
 
     client = sentry_sdk.get_client()
@@ -123,6 +122,5 @@ class AsyncioIntegration(Integration):
     origin = f"auto.function.{identifier}"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         patch_asyncio()

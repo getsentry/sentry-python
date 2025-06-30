@@ -1,23 +1,23 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional, Any
 
 import sentry_sdk
 from sentry_sdk.consts import ClientConstructor
 from sentry_sdk.opentelemetry.scope import setup_scope_context_management
 
-if TYPE_CHECKING:
-    from typing import Any, Optional
 
-
-def _check_python_deprecations():
-    # type: () -> None
+def _check_python_deprecations() -> None:
     # Since we're likely to deprecate Python versions in the future, I'm keeping
     # this handy function around. Use this to detect the Python version used and
     # to output logger.warning()s if it's deprecated.
     pass
 
 
-def _init(*args, **kwargs):
-    # type: (*Optional[str], **Any) -> None
+def _init(*args: Optional[str], **kwargs: Any) -> None:
     """Initializes the SDK and optionally integrations.
 
     This takes the same arguments as the client constructor.
