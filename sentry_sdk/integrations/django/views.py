@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 
 import sentry_sdk
@@ -21,8 +22,7 @@ except (ImportError, SyntaxError):
     wrap_async_view = None  # type: ignore
 
 
-def patch_views():
-    # type: () -> None
+def patch_views() -> None:
 
     from django.core.handlers.base import BaseHandler
     from django.template.response import SimpleTemplateResponse
@@ -32,8 +32,7 @@ def patch_views():
     old_render = SimpleTemplateResponse.render
 
     @functools.wraps(old_render)
-    def sentry_patched_render(self):
-        # type: (SimpleTemplateResponse) -> Any
+    def sentry_patched_render(self: SimpleTemplateResponse) -> Any:
         with sentry_sdk.start_span(
             op=OP.VIEW_RESPONSE_RENDER,
             name="serialize response",
@@ -43,8 +42,7 @@ def patch_views():
             return old_render(self)
 
     @functools.wraps(old_make_view_atomic)
-    def sentry_patched_make_view_atomic(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_patched_make_view_atomic(self: Any, *args: Any, **kwargs: Any) -> Any:
         callback = old_make_view_atomic(self, *args, **kwargs)
 
         # XXX: The wrapper function is created for every request. Find more
@@ -71,13 +69,11 @@ def patch_views():
     BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
 
 
-def _wrap_sync_view(callback):
-    # type: (Any) -> Any
+def _wrap_sync_view(callback: Any) -> Any:
     from sentry_sdk.integrations.django import DjangoIntegration
 
     @functools.wraps(callback)
-    def sentry_wrapped_callback(request, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_wrapped_callback(request: Any, *args: Any, **kwargs: Any) -> Any:
         current_scope = sentry_sdk.get_current_scope()
         if current_scope.root_span is not None:
             current_scope.root_span.update_active_thread()

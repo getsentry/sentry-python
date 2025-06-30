@@ -5,6 +5,8 @@ The project redis-py-cluster is EOL and was integrated into redis-py starting fr
 https://github.com/grokzen/redis-py-cluster
 """
 
+from __future__ import annotations
+
 from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
@@ -13,8 +15,7 @@ from sentry_sdk.integrations.redis.modules.queries import _get_db_data
 from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 
 
-def _patch_rediscluster():
-    # type: () -> None
+def _patch_rediscluster() -> None:
     try:
         import rediscluster  # type: ignore
     except ImportError:

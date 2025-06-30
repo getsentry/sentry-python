@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
@@ -18,20 +19,24 @@ except ImportError:
 
 
 class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
-    def __init__(self, find_name=None):
-        # type: (ServerInterceptor, Optional[Callable[[ServicerContext], str]]) -> None
+    def __init__(
+        self: ServerInterceptor,
+        find_name: Optional[Callable[[ServicerContext], str]] = None,
+    ) -> None:
         self._find_method_name = find_name or ServerInterceptor._find_name
 
         super().__init__()
 
-    def intercept_service(self, continuation, handler_call_details):
-        # type: (ServerInterceptor, Callable[[HandlerCallDetails], RpcMethodHandler], HandlerCallDetails) -> RpcMethodHandler
+    def intercept_service(
+        self: ServerInterceptor,
+        continuation: Callable[[HandlerCallDetails], RpcMethodHandler],
+        handler_call_details: HandlerCallDetails,
+    ) -> RpcMethodHandler:
         handler = continuation(handler_call_details)
         if not handler or not handler.unary_unary:
             return handler
 
-        def behavior(request, context):
-            # type: (Message, ServicerContext) -> Message
+        def behavior(request: Message, context: ServicerContext) -> Message:
             with sentry_sdk.isolation_scope():
                 name = self._find_method_name(context)
 
@@ -59,6 +64,5 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
 
     @staticmethod
-    def _find_name(context):
-        # type: (ServicerContext) -> str
+    def _find_name(context: ServicerContext) -> str:
         return context._rpc_event.call_details.method.decode()
