@@ -39,6 +39,18 @@ for your feedback. How was the migration? Is everything working as expected? Is
 *nothing* working as expected? Something in between? Please let us know
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
 [on Discord](https://discord.com/invite/Ww9hbqr).
+
+## 2.32.0
+
+### Various fixes & improvements
+
+- feat(sessions): Add top-level start- and end session methods (#4474) by @szokeasaurusrex
+- feat(openai-agents): Set tool span to failed if an error is raised in the tool (#4527) by @antonpirker
+- fix(integrations/ray): Correctly pass keyword arguments to ray.remote function (#4430) by @svartalf
+- fix(langchain): Make `span_map` an instance variable (#4476) by @szokeasaurusrex
+- fix(langchain): Ensure no duplicate `SentryLangchainCallback` (#4485) by @szokeasaurusrex
+- fix(Litestar): Apply `failed_request_status_codes` to exceptions raised in middleware (#4074) by @vrslev
+
 ## 2.31.0
 
 ### Various fixes & improvements
