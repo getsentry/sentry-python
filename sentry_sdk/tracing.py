@@ -248,7 +248,7 @@ class Span:
         self._ctx_token = context.attach(ctx)
 
     def deactivate(self) -> None:
-        if self._ctx_token:
+        if hasattr(self, "_ctx_token"):
             context.detach(self._ctx_token)
             del self._ctx_token
 
