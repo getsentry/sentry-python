@@ -39,6 +39,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     exc_info_from_error,
     logger,
+    safe_str,
 )
 
 from typing import TYPE_CHECKING
@@ -1141,7 +1142,9 @@ class Scope:
         self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
     ) -> None:
         if self._tags:
-            event.setdefault("tags", {}).update(self._tags)
+            event.setdefault("tags", {}).update(
+                {k: safe_str(v) for k, v in self._tags.items()}
+            )
 
     def _apply_contexts_to_event(
         self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
