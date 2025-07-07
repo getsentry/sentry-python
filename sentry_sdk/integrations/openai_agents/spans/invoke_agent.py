@@ -24,11 +24,14 @@ def invoke_agent_span(context, agent):
 
     _set_agent_data(span, agent)
 
+    context._sentry_invoke_agent_span = span
+
     return span
 
 
 def update_invoke_agent_span(context, agent, output):
     # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
-    current_span = sentry_sdk.get_current_span()
-    if current_span:
-        current_span.__exit__(None, None, None)
+    span = getattr(context, "_sentry_invoke_agent_span", None)
+    if span is not None:
+        span.__exit__(None, None, None)
+        del context._sentry_invoke_agent_span

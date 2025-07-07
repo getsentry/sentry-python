@@ -263,10 +263,10 @@ async def test_handoff_span(sentry_init, capture_events, mock_usage):
 
     (transaction,) = events
     spans = transaction["spans"]
-    handoff_span = spans[2]
 
-    # Verify handoff span was created
-    assert handoff_span is not None
+    # There should be exactly one handoff span
+    (handoff_span,) = [span for span in spans if span["op"] == "gen_ai.handoff"]
+
     assert (
         handoff_span["description"] == "handoff from primary_agent to secondary_agent"
     )
@@ -354,12 +354,25 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
 
     (transaction,) = events
     spans = transaction["spans"]
-    (
-        agent_span,
-        ai_client_span1,
-        tool_span,
-        ai_client_span2,
-    ) = spans
+
+    assert len(spans) == 4
+
+    # Find each span by its characteristics
+    agent_span = next(s for s in spans if s["description"] == "invoke_agent test_agent")
+    tool_span = next(
+        s for s in spans if s["description"] == "execute_tool simple_test_tool"
+    )
+    ai_client_span1 = next(
+        s
+        for s in spans
+        if s["description"] == "chat gpt-4"
+        and "gen_ai.response.tool_calls" in s["data"]
+    )
+    ai_client_span2 = next(
+        s
+        for s in spans
+        if s["description"] == "chat gpt-4" and "gen_ai.response.text" in s["data"]
+    )
 
     available_tools = safe_serialize(
         [
@@ -383,7 +396,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
-    assert agent_span["description"] == "invoke_agent test_agent"
     assert agent_span["origin"] == "auto.ai.openai_agents"
     assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
@@ -394,7 +406,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert agent_span["data"]["gen_ai.request.top_p"] == 1.0
     assert agent_span["data"]["gen_ai.system"] == "openai"
 
-    assert ai_client_span1["description"] == "chat gpt-4"
     assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
     assert ai_client_span1["data"]["gen_ai.system"] == "openai"
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
@@ -442,7 +453,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         ]
     )
 
-    assert tool_span["description"] == "execute_tool simple_test_tool"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
     assert (
@@ -464,7 +474,6 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
     assert tool_span["data"]["gen_ai.tool.type"] == "function"
 
-    assert ai_client_span2["description"] == "chat gpt-4"
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
     assert (
