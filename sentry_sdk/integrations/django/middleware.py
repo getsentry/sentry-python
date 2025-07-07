@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Create spans from Django middleware invocations
 """
@@ -38,14 +40,12 @@ else:
     from .asgi import _asgi_middleware_mixin_factory
 
 
-def patch_django_middlewares():
-    # type: () -> None
+def patch_django_middlewares() -> None:
     from django.core.handlers import base
 
     old_import_string = base.import_string
 
-    def sentry_patched_import_string(dotted_path):
-        # type: (str) -> Any
+    def sentry_patched_import_string(dotted_path: str) -> Any:
         rv = old_import_string(dotted_path)
 
         if _import_string_should_wrap_middleware.get(None):
@@ -57,8 +57,7 @@ def patch_django_middlewares():
 
     old_load_middleware = base.BaseHandler.load_middleware
 
-    def sentry_patched_load_middleware(*args, **kwargs):
-        # type: (Any, Any) -> Any
+    def sentry_patched_load_middleware(*args: Any, **kwargs: Any) -> Any:
         _import_string_should_wrap_middleware.set(True)
         try:
             return old_load_middleware(*args, **kwargs)
@@ -68,12 +67,10 @@ def patch_django_middlewares():
     base.BaseHandler.load_middleware = sentry_patched_load_middleware
 
 
-def _wrap_middleware(middleware, middleware_name):
-    # type: (Any, str) -> Any
+def _wrap_middleware(middleware: Any, middleware_name: str) -> Any:
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    def _check_middleware_span(old_method):
-        # type: (Callable[..., Any]) -> Optional[Span]
+    def _check_middleware_span(old_method: Callable[..., Any]) -> Optional[Span]:
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
             return None
@@ -96,12 +93,10 @@ def _wrap_middleware(middleware, middleware_name):
 
         return middleware_span
 
-    def _get_wrapped_method(old_method):
-        # type: (F) -> F
+    def _get_wrapped_method(old_method: F) -> F:
         with capture_internal_exceptions():
 
-            def sentry_wrapped_method(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
+            def sentry_wrapped_method(*args: Any, **kwargs: Any) -> Any:
                 middleware_span = _check_middleware_span(old_method)
 
                 if middleware_span is None:
@@ -131,8 +126,12 @@ def _wrap_middleware(middleware, middleware_name):
             middleware, "async_capable", False
         )
 
-        def __init__(self, get_response=None, *args, **kwargs):
-            # type: (Optional[Callable[..., Any]], *Any, **Any) -> None
+        def __init__(
+            self,
+            get_response: Optional[Callable[..., Any]] = None,
+            *args: Any,
+            **kwargs: Any,
+        ) -> None:
             if get_response:
                 self._inner = middleware(get_response, *args, **kwargs)
             else:
@@ -144,8 +143,7 @@ def _wrap_middleware(middleware, middleware_name):
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
-        def __getattr__(self, method_name):
-            # type: (str) -> Any
+        def __getattr__(self, method_name: str) -> Any:
             if method_name not in (
                 "process_request",
                 "process_view",
@@ -160,8 +158,7 @@ def _wrap_middleware(middleware, middleware_name):
             self.__dict__[method_name] = rv
             return rv
 
-        def __call__(self, *args, **kwargs):
-            # type: (*Any, **Any) -> Any
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
             if hasattr(self, "async_route_check") and self.async_route_check():
                 return self.__acall__(*args, **kwargs)
 

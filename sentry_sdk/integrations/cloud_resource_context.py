@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 import urllib3
 
@@ -65,13 +66,11 @@ class CloudResourceContextIntegration(Integration):
 
     gcp_metadata = None
 
-    def __init__(self, cloud_provider=""):
-        # type: (str) -> None
+    def __init__(self, cloud_provider: str = "") -> None:
         CloudResourceContextIntegration.cloud_provider = cloud_provider
 
     @classmethod
-    def _is_aws(cls):
-        # type: () -> bool
+    def _is_aws(cls) -> bool:
         try:
             r = cls.http.request(
                 "PUT",
@@ -95,8 +94,7 @@ class CloudResourceContextIntegration(Integration):
             return False
 
     @classmethod
-    def _get_aws_context(cls):
-        # type: () -> Dict[str, str]
+    def _get_aws_context(cls) -> Dict[str, str]:
         ctx = {
             "cloud.provider": CLOUD_PROVIDER.AWS,
             "cloud.platform": CLOUD_PLATFORM.AWS_EC2,
@@ -149,8 +147,7 @@ class CloudResourceContextIntegration(Integration):
         return ctx
 
     @classmethod
-    def _is_gcp(cls):
-        # type: () -> bool
+    def _is_gcp(cls) -> bool:
         try:
             r = cls.http.request(
                 "GET",
@@ -174,8 +171,7 @@ class CloudResourceContextIntegration(Integration):
             return False
 
     @classmethod
-    def _get_gcp_context(cls):
-        # type: () -> Dict[str, str]
+    def _get_gcp_context(cls) -> Dict[str, str]:
         ctx = {
             "cloud.provider": CLOUD_PROVIDER.GCP,
             "cloud.platform": CLOUD_PLATFORM.GCP_COMPUTE_ENGINE,
@@ -229,8 +225,7 @@ class CloudResourceContextIntegration(Integration):
         return ctx
 
     @classmethod
-    def _get_cloud_provider(cls):
-        # type: () -> str
+    def _get_cloud_provider(cls) -> str:
         if cls._is_aws():
             return CLOUD_PROVIDER.AWS
 
@@ -240,8 +235,7 @@ class CloudResourceContextIntegration(Integration):
         return ""
 
     @classmethod
-    def _get_cloud_resource_context(cls):
-        # type: () -> Dict[str, str]
+    def _get_cloud_resource_context(cls) -> Dict[str, str]:
         cloud_provider = (
             cls.cloud_provider
             if cls.cloud_provider != ""
@@ -253,8 +247,7 @@ class CloudResourceContextIntegration(Integration):
         return {}
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         cloud_provider = CloudResourceContextIntegration.cloud_provider
         unsupported_cloud_provider = (
             cloud_provider != "" and cloud_provider not in context_getters.keys()
