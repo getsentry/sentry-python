@@ -1,12 +1,19 @@
 from __future__ import annotations
 from opentelemetry import trace
 from opentelemetry.propagate import set_global_textmap
+from opentelemetry.sdk.resource import Resource
 from opentelemetry.sdk.trace import TracerProvider, Span, ReadableSpan
 
+from sentry_sdk.consts import VERSION
 from sentry_sdk.opentelemetry import (
     SentryPropagator,
     SentrySampler,
     SentrySpanProcessor,
+)
+from sentry_sdk.opentelemetry.consts import (
+    RESOURCE_SERVICE_NAME,
+    RESOURCE_SERVICE_NAMESPACE,
+    RESOURCE_SERVICE_VERSION,
 )
 from sentry_sdk.utils import logger
 
@@ -38,7 +45,16 @@ def setup_sentry_tracing() -> None:
 
     else:
         logger.debug("[Tracing] No TracerProvider set, creating a new one")
-        tracer_provider = TracerProvider(sampler=SentrySampler())
+        tracer_provider = TracerProvider(
+            sampler=SentrySampler(),
+            resource=Resource.create(
+                {
+                    RESOURCE_SERVICE_NAME: "sentry-python",
+                    RESOURCE_SERVICE_VERSION: VERSION,
+                    RESOURCE_SERVICE_NAMESPACE: "sentry",
+                }
+            ),
+        )
         trace.set_tracer_provider(tracer_provider)
 
     try:

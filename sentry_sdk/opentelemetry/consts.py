@@ -21,6 +21,13 @@ TRACESTATE_SAMPLE_RAND_KEY = SENTRY_PREFIX + "sample_rand"
 OTEL_SENTRY_CONTEXT = "otel"
 SPAN_ORIGIN = "auto.otel"
 
+# resource semconv attributes
+# Not all of these are stable yet, so defining them here rather than importing.
+# https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/README.md#service
+RESOURCE_SERVICE_NAME = "service.name"
+RESOURCE_SERVICE_NAMESPACE = "service.namespace"
+RESOURCE_SERVICE_VERSION = "service.version"
+
 
 class SentrySpanAttribute:
     DESCRIPTION = "sentry.description"
