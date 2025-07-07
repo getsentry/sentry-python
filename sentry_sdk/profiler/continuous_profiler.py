@@ -370,7 +370,13 @@ class ContinuousScheduler:
                 # that are starting profiles are not blocked until it
                 # can acquire the lock.
                 for _ in range(new_profiles):
-                    self.active_profiles.add(self.new_profiles.popleft())
+                    try:
+                        profile = self.new_profiles.popleft()
+                    except IndexError:
+                        # If another thread is concurrently popping profiles, we could
+                        # end up with an empty deque here.
+                        break
+                    self.active_profiles.add(profile)
                 inactive_profiles = []
 
                 for profile in self.active_profiles:
