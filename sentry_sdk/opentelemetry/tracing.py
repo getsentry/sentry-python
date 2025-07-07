@@ -1,7 +1,7 @@
 from __future__ import annotations
 from opentelemetry import trace
 from opentelemetry.propagate import set_global_textmap
-from opentelemetry.sdk.resource import Resource
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider, Span, ReadableSpan
 
 from sentry_sdk.consts import VERSION
