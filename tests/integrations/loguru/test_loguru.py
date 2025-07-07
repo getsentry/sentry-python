@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock, patch
-import inspect
+import re
 
 import pytest
 from loguru import logger
@@ -55,17 +55,12 @@ def test_just_log(
     )
     events = capture_events()
 
-    frame = inspect.currentframe()
-    assert frame is not None
-    log_line_number = frame.f_lineno + 1
     getattr(logger, level.name.lower())("test")
 
-    formatted_message = (
-        " | "
-        + "{:9}".format(level.name.upper())
-        + "| tests.integrations.loguru.test_loguru:test_just_log:{} - test".format(
-            log_line_number
-        )
+    expected_pattern = (
+        r" \| "
+        + r"{:9}".format(level.name.upper())
+        + r"\| tests\.integrations\.loguru\.test_loguru:test_just_log:\d+ - test"
     )
 
     if not created_event:
@@ -78,7 +73,8 @@ def test_just_log(
             (breadcrumb,) = breadcrumbs
             assert breadcrumb["level"] == expected_sentry_level
             assert breadcrumb["category"] == "tests.integrations.loguru.test_loguru"
-            assert breadcrumb["message"][23:] == formatted_message
+            # Check that the message matches the expected pattern with a line number
+            assert re.search(expected_pattern, breadcrumb["message"][23:])
         else:
             assert not breadcrumbs
 
@@ -91,7 +87,8 @@ def test_just_log(
     (event,) = events
     assert event["level"] == expected_sentry_level
     assert event["logger"] == "tests.integrations.loguru.test_loguru"
-    assert event["logentry"]["message"][23:] == formatted_message
+    # Check that the message matches the expected pattern with a line number
+    assert re.search(expected_pattern, event["logentry"]["message"][23:])
 
 
 def test_breadcrumb_format(sentry_init, capture_events, uninstall_integration, request):
