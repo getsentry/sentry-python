@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+import inspect
 
 import pytest
 from loguru import logger
@@ -54,12 +55,17 @@ def test_just_log(
     )
     events = capture_events()
 
+    frame = inspect.currentframe()
+    assert frame is not None
+    log_line_number = frame.f_lineno + 1
     getattr(logger, level.name.lower())("test")
 
     formatted_message = (
         " | "
         + "{:9}".format(level.name.upper())
-        + "| tests.integrations.loguru.test_loguru:test_just_log:57 - test"
+        + "| tests.integrations.loguru.test_loguru:test_just_log:{} - test".format(
+            log_line_number
+        )
     )
 
     if not created_event:
