@@ -25,7 +25,7 @@ def ai_client_span(agent, get_response_kwargs):
         origin=SPAN_ORIGIN,
     )
     # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     return span
 

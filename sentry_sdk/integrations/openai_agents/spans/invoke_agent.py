@@ -20,7 +20,7 @@ def invoke_agent_span(context, agent):
     )
     span.__enter__()
 
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+    span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
     _set_agent_data(span, agent)
 
