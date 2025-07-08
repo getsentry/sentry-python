@@ -73,8 +73,7 @@ def test_just_log(
             (breadcrumb,) = breadcrumbs
             assert breadcrumb["level"] == expected_sentry_level
             assert breadcrumb["category"] == "tests.integrations.loguru.test_loguru"
-            # Check that the message matches the expected pattern with a line number
-            assert re.search(expected_pattern, breadcrumb["message"][23:])
+            assert re.fullmatch(expected_pattern, breadcrumb["message"][23:])
         else:
             assert not breadcrumbs
 
@@ -87,8 +86,7 @@ def test_just_log(
     (event,) = events
     assert event["level"] == expected_sentry_level
     assert event["logger"] == "tests.integrations.loguru.test_loguru"
-    # Check that the message matches the expected pattern with a line number
-    assert re.search(expected_pattern, event["logentry"]["message"][23:])
+    assert re.fullmatch(expected_pattern, event["logentry"]["message"][23:])
 
 
 def test_breadcrumb_format(sentry_init, capture_events, uninstall_integration, request):
