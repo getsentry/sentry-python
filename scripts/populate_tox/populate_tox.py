@@ -10,7 +10,7 @@ import time
 from bisect import bisect_left
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone  # noqa: F401
-from importlib.metadata import metadata
+from importlib.metadata import PackageMetadata, distributions
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 from pathlib import Path
@@ -85,6 +85,13 @@ IGNORE = {
     "rq",
     "sanic",
 }
+
+
+def _fetch_sdk_metadata() -> PackageMetadata:
+    (dist,) = distributions(
+        name="sentry-sdk", path=[Path(__file__).parent.parent.parent]
+    )
+    return dist.metadata
 
 
 def fetch_url(url: str) -> Optional[dict]:
@@ -592,8 +599,9 @@ def main(fail_on_changes: bool = False) -> None:
         )
 
     global MIN_PYTHON_VERSION, MAX_PYTHON_VERSION
+    meta = _fetch_sdk_metadata()
     sdk_python_versions = _parse_python_versions_from_classifiers(
-        metadata("sentry-sdk").get_all("Classifier")
+        meta.get_all("Classifier")
     )
     MIN_PYTHON_VERSION = sdk_python_versions[0]
     MAX_PYTHON_VERSION = sdk_python_versions[-1]
