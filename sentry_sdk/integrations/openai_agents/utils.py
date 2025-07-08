@@ -135,7 +135,7 @@ def _set_output_data(span, result):
 
     for output in result.output:
         if output.type == "function_call":
-            output_messages["tool"].append(output.dict())
+            output_messages["tool"].append(output.model_dump())
         elif output.type == "message":
             for output_message in output.content:
                 try:
