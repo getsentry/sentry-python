@@ -1,6 +1,7 @@
 from __future__ import annotations
 import re
 from datetime import datetime, timezone
+from dataclasses import dataclass
 
 from urllib3.util import parse_url as urlparse
 from urllib.parse import quote, unquote
@@ -30,8 +31,7 @@ from sentry_sdk.tracing_utils import Baggage, get_span_status_from_http_code
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Mapping, Sequence, Union, Type, TypeVar
-    from sentry_sdk._types import OtelExtractedSpanData
+    from typing import Any, Optional, Mapping, Union, Type, TypeVar
 
     T = TypeVar("T")
 
@@ -111,115 +111,111 @@ def extract_transaction_name_source(
     )
 
 
-def extract_span_data(span: ReadableSpan) -> OtelExtractedSpanData:
-    op = span.name
-    description = span.name
-    status, http_status = extract_span_status(span)
+@dataclass
+class ExtractedSpanData:
+    description: str
+    op: Optional[str] = None
+    status: Optional[str] = None
+    http_status: Optional[int] = None
+    origin: Optional[str] = None
+
+
+def extract_span_data(span: ReadableSpan) -> ExtractedSpanData:
+    """
+    Try to populate sane values for op, description and statuses based on what we have.
+    The op and description mapping is fundamentally janky because otel only has a single `name`.
+
+    Priority is given first to attributes explicitly defined by us via the SDK.
+    Otherwise we try to infer sane values from other attributes.
+    """
+    op = None
+    description = None
     origin = None
-    if span.attributes is None:
-        return (op, description, status, http_status, origin)
 
-    attribute_op = get_typed_attribute(span.attributes, SentrySpanAttribute.OP, str)
-    op = attribute_op or op
-    description = (
-        get_typed_attribute(span.attributes, SentrySpanAttribute.DESCRIPTION, str)
-        or description
+    if span.attributes is not None:
+        op = get_typed_attribute(
+            span.attributes, SentrySpanAttribute.OP, str
+        ) or infer_op(span)
+
+        description = (
+            get_typed_attribute(span.attributes, SentrySpanAttribute.DESCRIPTION, str)
+            or get_typed_attribute(span.attributes, SentrySpanAttribute.NAME, str)
+            or infer_description(span)
+        )
+
+        origin = get_typed_attribute(span.attributes, SentrySpanAttribute.ORIGIN, str)
+
+    # TODO status cleanup
+    (status, http_status) = extract_span_status(span)
+
+    return ExtractedSpanData(
+        description=description or span.name,
+        op=op,
+        status=status,
+        http_status=http_status,
+        origin=origin,
     )
-    origin = get_typed_attribute(span.attributes, SentrySpanAttribute.ORIGIN, str)
-
-    http_method = get_typed_attribute(span.attributes, SpanAttributes.HTTP_METHOD, str)
-    if http_method:
-        return span_data_for_http_method(span)
-
-    db_query = span.attributes.get(SpanAttributes.DB_SYSTEM)
-    if db_query:
-        return span_data_for_db_query(span)
-
-    rpc_service = span.attributes.get(SpanAttributes.RPC_SERVICE)
-    if rpc_service:
-        return (
-            attribute_op or "rpc",
-            description,
-            status,
-            http_status,
-            origin,
-        )
-
-    messaging_system = span.attributes.get(SpanAttributes.MESSAGING_SYSTEM)
-    if messaging_system:
-        return (
-            attribute_op or "message",
-            description,
-            status,
-            http_status,
-            origin,
-        )
-
-    faas_trigger = span.attributes.get(SpanAttributes.FAAS_TRIGGER)
-    if faas_trigger:
-        return (str(faas_trigger), description, status, http_status, origin)
-
-    return (op, description, status, http_status, origin)
 
 
-def span_data_for_http_method(span: ReadableSpan) -> OtelExtractedSpanData:
-    span_attributes = span.attributes or {}
+def infer_op(span: ReadableSpan) -> Optional[str]:
+    """
+    Try to infer op for the various types of instrumentation.
+    """
+    if span.attributes is None:
+        return None
 
-    op = get_typed_attribute(span_attributes, SentrySpanAttribute.OP, str)
-    if op is None:
+    if SpanAttributes.HTTP_METHOD in span.attributes:
         op = "http"
-
         if span.kind == SpanKind.SERVER:
             op += ".server"
         elif span.kind == SpanKind.CLIENT:
             op += ".client"
+        return op
+    elif SpanAttributes.DB_SYSTEM in span.attributes:
+        return OP.DB
+    elif SpanAttributes.RPC_SERVICE in span.attributes:
+        return OP.RPC
+    elif SpanAttributes.MESSAGING_SYSTEM in span.attributes:
+        return OP.MESSAGE
+    elif SpanAttributes.FAAS_TRIGGER in span.attributes:
+        return get_typed_attribute(span.attributes, SpanAttributes.FAAS_TRIGGER, str)
+    else:
+        return None
 
-    http_method = span_attributes.get(SpanAttributes.HTTP_METHOD)
-    route = span_attributes.get(SpanAttributes.HTTP_ROUTE)
-    target = span_attributes.get(SpanAttributes.HTTP_TARGET)
-    peer_name = span_attributes.get(SpanAttributes.NET_PEER_NAME)
 
-    # TODO-neel-potel remove description completely
-    description = get_typed_attribute(
-        span_attributes, SentrySpanAttribute.DESCRIPTION, str
-    ) or get_typed_attribute(span_attributes, SentrySpanAttribute.NAME, str)
-    if description is None:
-        description = f"{http_method}"
+def infer_description(span: ReadableSpan) -> Optional[str]:
+    if span.attributes is None:
+        return None
+
+    if SpanAttributes.HTTP_METHOD in span.attributes:
+        http_method = get_typed_attribute(
+            span.attributes, SpanAttributes.HTTP_METHOD, str
+        )
+        route = get_typed_attribute(span.attributes, SpanAttributes.HTTP_ROUTE, str)
+        target = get_typed_attribute(span.attributes, SpanAttributes.HTTP_TARGET, str)
+        peer_name = get_typed_attribute(
+            span.attributes, SpanAttributes.NET_PEER_NAME, str
+        )
+        url = get_typed_attribute(span.attributes, SpanAttributes.HTTP_URL, str)
 
         if route:
-            description = f"{http_method} {route}"
+            return f"{http_method} {route}"
         elif target:
-            description = f"{http_method} {target}"
+            return f"{http_method} {target}"
         elif peer_name:
-            description = f"{http_method} {peer_name}"
+            return f"{http_method} {peer_name}"
+        elif url:
+            parsed_url = urlparse(url)
+            url = "{}://{}{}".format(
+                parsed_url.scheme, parsed_url.netloc, parsed_url.path
+            )
+            return f"{http_method} {url}"
         else:
-            url = span_attributes.get(SpanAttributes.HTTP_URL)
-            url = get_typed_attribute(span_attributes, SpanAttributes.HTTP_URL, str)
-
-            if url:
-                parsed_url = urlparse(url)
-                url = "{}://{}{}".format(
-                    parsed_url.scheme, parsed_url.netloc, parsed_url.path
-                )
-                description = f"{http_method} {url}"
-
-    status, http_status = extract_span_status(span)
-
-    origin = get_typed_attribute(span_attributes, SentrySpanAttribute.ORIGIN, str)
-
-    return (op, description, status, http_status, origin)
-
-
-def span_data_for_db_query(span: ReadableSpan) -> OtelExtractedSpanData:
-    span_attributes = span.attributes or {}
-
-    op = get_typed_attribute(span_attributes, SentrySpanAttribute.OP, str) or OP.DB
-    statement = get_typed_attribute(span_attributes, SpanAttributes.DB_STATEMENT, str)
-
-    description = statement or span.name
-    origin = get_typed_attribute(span_attributes, SentrySpanAttribute.ORIGIN, str)
-
-    return (op, description, None, None, origin)
+            return http_method
+    elif SpanAttributes.DB_SYSTEM in span.attributes:
+        return get_typed_attribute(span.attributes, SpanAttributes.DB_STATEMENT, str)
+    else:
+        return None
 
 
 def extract_span_status(span: ReadableSpan) -> tuple[Optional[str], Optional[int]]:
@@ -258,17 +254,7 @@ def extract_span_status(span: ReadableSpan) -> tuple[Optional[str], Optional[int
 
 
 def infer_status_from_attributes(
-    span_attributes: Mapping[
-        str,
-        str
-        | bool
-        | int
-        | float
-        | Sequence[str]
-        | Sequence[bool]
-        | Sequence[int]
-        | Sequence[float],
-    ],
+    span_attributes: Mapping[str, Any],
 ) -> tuple[Optional[str], Optional[int]]:
     http_status = get_http_status_code(span_attributes)
 
@@ -282,19 +268,7 @@ def infer_status_from_attributes(
     return (None, None)
 
 
-def get_http_status_code(
-    span_attributes: Mapping[
-        str,
-        str
-        | bool
-        | int
-        | float
-        | Sequence[str]
-        | Sequence[bool]
-        | Sequence[int]
-        | Sequence[float],
-    ],
-) -> Optional[int]:
+def get_http_status_code(span_attributes: Mapping[str, Any]) -> Optional[int]:
     try:
         http_status = get_typed_attribute(
             span_attributes, SpanAttributes.HTTP_RESPONSE_STATUS_CODE, int
@@ -329,7 +303,7 @@ def extract_span_attributes(span: ReadableSpan, namespace: str) -> dict[str, Any
 
 
 def get_trace_context(
-    span: ReadableSpan, span_data: Optional[OtelExtractedSpanData] = None
+    span: ReadableSpan, span_data: Optional[ExtractedSpanData] = None
 ) -> dict[str, Any]:
     if not span.context:
         return {}
@@ -341,26 +315,22 @@ def get_trace_context(
     if span_data is None:
         span_data = extract_span_data(span)
 
-    (op, _, status, _, origin) = span_data
-
     trace_context: dict[str, Any] = {
         "trace_id": trace_id,
         "span_id": span_id,
         "parent_span_id": parent_span_id,
-        "op": op,
-        "origin": origin or DEFAULT_SPAN_ORIGIN,
+        "origin": span_data.origin or DEFAULT_SPAN_ORIGIN,
     }
 
-    if status:
-        trace_context["status"] = status
-
+    if span_data.op:
+        trace_context["op"] = span_data.op
+    if span_data.status:
+        trace_context["status"] = span_data.status
     if span.attributes:
         trace_context["data"] = dict(span.attributes)
 
     trace_state = get_trace_state(span)
     trace_context["dynamic_sampling_context"] = dsc_from_trace_state(trace_state)
-
-    # TODO-neel-potel profiler thread_id, thread_name
 
     return trace_context
 
