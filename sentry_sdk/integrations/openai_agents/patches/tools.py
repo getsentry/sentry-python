@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
@@ -15,8 +17,9 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-def _create_get_all_tools_wrapper(original_get_all_tools):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _create_get_all_tools_wrapper(
+    original_get_all_tools: Callable[..., Any]
+) -> Callable[..., Any]:
     """
     Wraps the agents.Runner._get_all_tools method of the Runner class to wrap all function tools with Sentry instrumentation.
     """
@@ -26,9 +29,11 @@ def _create_get_all_tools_wrapper(original_get_all_tools):
         if hasattr(original_get_all_tools, "__func__")
         else original_get_all_tools
     )
-    async def wrapped_get_all_tools(cls, agent, context_wrapper):
-        # type: (agents.Runner, agents.Agent, agents.RunContextWrapper) -> list[agents.Tool]
-
+    async def wrapped_get_all_tools(
+        cls: agents.Runner,
+        agent: agents.Agent,
+        context_wrapper: agents.RunContextWrapper,
+    ) -> list[agents.Tool]:
         # Get the original tools
         tools = await original_get_all_tools(agent, context_wrapper)
 
@@ -42,11 +47,13 @@ def _create_get_all_tools_wrapper(original_get_all_tools):
             # Create a new FunctionTool with our wrapped invoke method
             original_on_invoke = tool.on_invoke_tool
 
-            def create_wrapped_invoke(current_tool, current_on_invoke):
-                # type: (agents.Tool, Callable[..., Any]) -> Callable[..., Any]
+            def create_wrapped_invoke(
+                current_tool: agents.Tool, current_on_invoke: Callable[..., Any]
+            ) -> Callable[..., Any]:
                 @wraps(current_on_invoke)
-                async def sentry_wrapped_on_invoke_tool(*args, **kwargs):
-                    # type: (*Any, **Any) -> Any
+                async def sentry_wrapped_on_invoke_tool(
+                    *args: Any, **kwargs: Any
+                ) -> Any:
                     with execute_tool_span(current_tool, *args, **kwargs) as span:
                         # We can not capture exceptions in tool execution here because
                         # `_on_invoke_tool` is swallowing the exception here:

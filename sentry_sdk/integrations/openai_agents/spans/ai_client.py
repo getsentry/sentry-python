@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
@@ -16,8 +18,9 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def ai_client_span(agent, get_response_kwargs):
-    # type: (Agent, dict[str, Any]) -> sentry_sdk.tracing.Span
+def ai_client_span(
+    agent: Agent, get_response_kwargs: dict[str, Any]
+) -> sentry_sdk.tracing.Span:
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
@@ -30,8 +33,12 @@ def ai_client_span(agent, get_response_kwargs):
     return span
 
 
-def update_ai_client_span(span, agent, get_response_kwargs, result):
-    # type: (sentry_sdk.tracing.Span, Agent, dict[str, Any], Any) -> None
+def update_ai_client_span(
+    span: sentry_sdk.tracing.Span,
+    agent: Agent,
+    get_response_kwargs: dict[str, Any],
+    result: Any,
+) -> None:
     _set_agent_data(span, agent)
     _set_usage_data(span, result.usage)
     _set_input_data(span, get_response_kwargs)

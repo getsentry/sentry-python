@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from functools import wraps
 
 import sentry_sdk
@@ -11,8 +13,7 @@ if TYPE_CHECKING:
     from typing import Any, Callable
 
 
-def _create_run_wrapper(original_func):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _create_run_wrapper(original_func: Callable[..., Any]) -> Callable[..., Any]:
     """
     Wraps the agents.Runner.run methods to create a root span for the agent workflow runs.
 
@@ -21,8 +22,7 @@ def _create_run_wrapper(original_func):
     """
 
     @wraps(original_func)
-    async def wrapper(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         agent = args[0]
         with agent_workflow_span(agent):
             result = None

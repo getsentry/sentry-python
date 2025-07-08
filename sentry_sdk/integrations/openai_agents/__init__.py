@@ -14,8 +14,7 @@ except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
 
-def _patch_runner():
-    # type: () -> None
+def _patch_runner() -> None:
     # Create the root span for one full agent run (including eventual handoffs)
     # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
     # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
@@ -28,15 +27,13 @@ def _patch_runner():
     _patch_agent_run()
 
 
-def _patch_model():
-    # type: () -> None
+def _patch_model() -> None:
     agents.run.AgentRunner._get_model = classmethod(
         _create_get_model_wrapper(agents.run.AgentRunner._get_model),
     )
 
 
-def _patch_tools():
-    # type: () -> None
+def _patch_tools() -> None:
     agents.run.AgentRunner._get_all_tools = classmethod(
         _create_get_all_tools_wrapper(agents.run.AgentRunner._get_all_tools),
     )
@@ -46,8 +43,7 @@ class OpenAIAgentsIntegration(Integration):
     identifier = "openai_agents"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         _patch_tools()
         _patch_model()
         _patch_runner()

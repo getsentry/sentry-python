@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
@@ -11,8 +13,9 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def invoke_agent_span(context, agent):
-    # type: (agents.RunContextWrapper, agents.Agent) -> sentry_sdk.tracing.Span
+def invoke_agent_span(
+    context: agents.RunContextWrapper, agent: agents.Agent
+) -> sentry_sdk.tracing.Span:
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_INVOKE_AGENT,
         name=f"invoke_agent {agent.name}",
@@ -29,8 +32,9 @@ def invoke_agent_span(context, agent):
     return span
 
 
-def update_invoke_agent_span(context, agent, output):
-    # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
+def update_invoke_agent_span(
+    context: agents.RunContextWrapper, agent: agents.Agent, output: Any
+) -> None:
     span = getattr(context, "_sentry_invoke_agent_span", None)
     if span is not None:
         span.__exit__(None, None, None)
