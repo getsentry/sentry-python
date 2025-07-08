@@ -165,8 +165,9 @@ class SessionFlusher:
 
     def flush(self):
         # type: (...) -> None
-        pending_sessions = self.pending_sessions
-        self.pending_sessions = []
+        with self._thread_lock:
+            pending_sessions = self.pending_sessions
+            self.pending_sessions = []
 
         with self._aggregate_lock:
             pending_aggregates = self.pending_aggregates
@@ -189,6 +190,26 @@ class SessionFlusher:
 
         if len(envelope.items) > 0:
             self.capture_func(envelope)
+
+        # hygiene: deterministically clean up any stopping thread
+        if not self._thread_stopping():
+            return
+        with self._thread_lock:
+            if not self._thread_stopping():
+                return
+            if self._thread:  # typing
+                self._thread.join()
+                self._thread = None
+                self._thread_for_pid = None
+
+    def _thread_stopping(self):
+        # type: (...) -> bool
+        return (
+            not self._running
+            and self._thread is not None
+            # we are the parent thread:
+            and self._thread_for_pid == os.getpid()
+        )
 
     def _ensure_running(self):
         # type: (...) -> None
