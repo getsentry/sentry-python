@@ -681,8 +681,6 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
-    OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
-    OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
