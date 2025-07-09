@@ -192,20 +192,20 @@ class SessionFlusher:
             self.capture_func(envelope)
 
         # hygiene: deterministically clean up any stopping thread
-        if not self._thread_stopping():
+        if not self._should_join_thread():
             return
         with self._thread_lock:
-            if not self._thread_stopping():
+            if not self._should_join_thread():
                 return
             if self._thread:  # typing
                 self._thread.join()
                 self._thread = None
                 self._thread_for_pid = None
 
-    def _thread_stopping(self):
+    def _should_join_thread(self):
         # type: (...) -> bool
         return (
-            not self._running
+            not self.__shutdown_requested.is_set()
             and self._thread is not None
             # we are the parent thread:
             and self._thread_for_pid == os.getpid()
@@ -217,8 +217,8 @@ class SessionFlusher:
         Check that we have an active thread to run in, or create one if not.
 
         Note that this might fail (e.g. in Python 3.12 it's not possible to
-        spawn new threads at interpreter shutdown). In that case self._running
-        will be False after running this function.
+        spawn new threads at interpreter shutdown). In that case
+        `__shutdown_requested` will be set after running this function.
         """
         if self._thread_for_pid == os.getpid() and self._thread is not None:
             return None
