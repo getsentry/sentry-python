@@ -19,7 +19,7 @@ except ImportError:
 
 
 def _create_get_model_wrapper(
-    original_get_model: Callable[..., Any]
+    original_get_model: Callable[..., Any],
 ) -> Callable[..., Any]:
     """
     Wraps the agents.Runner._get_model method to wrap the get_response method of the model to create a AI client span.

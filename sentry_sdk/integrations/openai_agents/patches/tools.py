@@ -18,7 +18,7 @@ except ImportError:
 
 
 def _create_get_all_tools_wrapper(
-    original_get_all_tools: Callable[..., Any]
+    original_get_all_tools: Callable[..., Any],
 ) -> Callable[..., Any]:
     """
     Wraps the agents.Runner._get_all_tools method of the Runner class to wrap all function tools with Sentry instrumentation.
