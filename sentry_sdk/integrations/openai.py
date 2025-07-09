@@ -70,48 +70,75 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _calculate_chat_completion_usage(
+def _get_usage(usage, names):
+    # type: (Any, List[str]) -> int
+    for name in names:
+        if hasattr(usage, name) and isinstance(getattr(usage, name), int):
+            return getattr(usage, name)
+    return 0
+
+
+def _calculate_token_usage(
     messages, response, span, streaming_message_responses, count_tokens
 ):
     # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
-    completion_tokens = 0  # type: Optional[int]
-    prompt_tokens = 0  # type: Optional[int]
+    input_tokens = 0  # type: Optional[int]
+    input_tokens_cached = 0  # type: Optional[int]
+    output_tokens = 0  # type: Optional[int]
+    output_tokens_reasoning = 0  # type: Optional[int]
     total_tokens = 0  # type: Optional[int]
-    if hasattr(response, "usage"):
-        if hasattr(response.usage, "completion_tokens") and isinstance(
-            response.usage.completion_tokens, int
-        ):
-            completion_tokens = response.usage.completion_tokens
-        if hasattr(response.usage, "prompt_tokens") and isinstance(
-            response.usage.prompt_tokens, int
-        ):
-            prompt_tokens = response.usage.prompt_tokens
-        if hasattr(response.usage, "total_tokens") and isinstance(
-            response.usage.total_tokens, int
-        ):
-            total_tokens = response.usage.total_tokens
 
-    if prompt_tokens == 0:
+    if hasattr(response, "usage"):
+        input_tokens = _get_usage(response.usage, ["input_tokens", "prompt_tokens"])
+        if hasattr(response.usage, "input_tokens_details"):
+            input_tokens_cached = _get_usage(
+                response.usage.input_tokens_details, ["cached_tokens"]
+            )
+
+        output_tokens = _get_usage(
+            response.usage, ["output_tokens", "completion_tokens"]
+        )
+        if hasattr(response.usage, "output_tokens_details"):
+            output_tokens_reasoning = _get_usage(
+                response.usage.output_tokens_details, ["reasoning_tokens"]
+            )
+
+        total_tokens = _get_usage(response.usage, ["total_tokens"])
+
+    # Manually count tokens
+    # TODO: check for responses API
+    if input_tokens == 0:
         for message in messages:
             if "content" in message:
-                prompt_tokens += count_tokens(message["content"])
+                input_tokens += count_tokens(message["content"])
 
-    if completion_tokens == 0:
+    # TODO: check for responses API
+    if output_tokens == 0:
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
-                completion_tokens += count_tokens(message)
+                output_tokens += count_tokens(message)
         elif hasattr(response, "choices"):
             for choice in response.choices:
                 if hasattr(choice, "message"):
-                    completion_tokens += count_tokens(choice.message)
+                    output_tokens += count_tokens(choice.message)
 
-    if prompt_tokens == 0:
-        prompt_tokens = None
-    if completion_tokens == 0:
-        completion_tokens = None
-    if total_tokens == 0:
-        total_tokens = None
-    record_token_usage(span, prompt_tokens, completion_tokens, total_tokens)
+    # Do not set token data if it is 0
+    input_tokens = None if input_tokens == 0 else input_tokens
+    input_tokens_cached = None if input_tokens_cached == 0 else input_tokens_cached
+    output_tokens = None if output_tokens == 0 else output_tokens
+    output_tokens_reasoning = (
+        None if output_tokens_reasoning == 0 else output_tokens_reasoning
+    )
+    total_tokens = None if total_tokens == 0 else total_tokens
+
+    record_token_usage(
+        span,
+        input_tokens=input_tokens,
+        input_tokens_cached=input_tokens_cached,
+        output_tokens=output_tokens,
+        output_tokens_reasoning=output_tokens_reasoning,
+        total_tokens=total_tokens,
+    )
 
 
 def _new_chat_completion_common(f, *args, **kwargs):
@@ -158,9 +185,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
                     SPANDATA.AI_RESPONSES,
                     list(map(lambda x: x.message, res.choices)),
                 )
-            _calculate_chat_completion_usage(
-                messages, res, span, None, integration.count_tokens
-            )
+            _calculate_token_usage(messages, res, span, None, integration.count_tokens)
             span.__exit__(None, None, None)
         elif hasattr(res, "_iterator"):
             data_buf: list[list[str]] = []  # one for each choice
@@ -191,7 +216,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
                             set_data_normalized(
                                 span, SPANDATA.AI_RESPONSES, all_responses
                             )
-                        _calculate_chat_completion_usage(
+                        _calculate_token_usage(
                             messages,
                             res,
                             span,
@@ -224,7 +249,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
                             set_data_normalized(
                                 span, SPANDATA.AI_RESPONSES, all_responses
                             )
-                        _calculate_chat_completion_usage(
+                        _calculate_token_usage(
                             messages,
                             res,
                             span,
