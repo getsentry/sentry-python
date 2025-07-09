@@ -68,7 +68,6 @@ def _patch_agent_run() -> None:
         cls: agents.Runner, *args: Any, **kwargs: Any
     ) -> Any:
         """Patched _run_single_turn that creates agent invocation spans"""
-
         agent = kwargs.get("agent")
         context_wrapper = kwargs.get("context_wrapper")
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
@@ -84,7 +83,11 @@ def _patch_agent_run() -> None:
             _start_invoke_agent_span(context_wrapper, agent)
 
         # Call original method with all the correct parameters
-        result = await original_run_single_turn(*args, **kwargs)
+        try:
+            result = await original_run_single_turn(*args, **kwargs)
+        finally:
+            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
+                _end_invoke_agent_span(context_wrapper, agent)
 
         return result
 
@@ -97,7 +100,6 @@ def _patch_agent_run() -> None:
         cls: agents.Runner, *args: Any, **kwargs: Any
     ) -> Any:
         """Patched execute_handoffs that creates handoff spans and ends agent span for handoffs"""
-
         context_wrapper = kwargs.get("context_wrapper")
         run_handoffs = kwargs.get("run_handoffs")
         agent = kwargs.get("agent")
@@ -128,7 +130,6 @@ def _patch_agent_run() -> None:
         cls: agents.Runner, *args: Any, **kwargs: Any
     ) -> Any:
         """Patched execute_final_output that ends agent span for final outputs"""
-
         agent = kwargs.get("agent")
         context_wrapper = kwargs.get("context_wrapper")
         final_output = kwargs.get("final_output")

@@ -586,4 +586,4 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
     assert ai_client_span["description"] == "chat gpt-4"
     assert ai_client_span["origin"] == "auto.ai.openai_agents"
-    assert ai_client_span["tags"]["status"] == "internal_error"
+    assert ai_client_span["status"] == "internal_error"

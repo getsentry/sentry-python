@@ -33,9 +33,9 @@ def _create_run_wrapper(original_func: Callable[..., Any]) -> Callable[..., Any]
                 _capture_exception(exc)
 
                 # It could be that there is a "invoke agent" span still open
-                current_span = sentry_sdk.get_current_span()
-                if current_span is not None and current_span.timestamp is None:
-                    current_span.__exit__(None, None, None)
+                span = sentry_sdk.get_current_span()
+                if span is not None and span.timestamp is None:
+                    span.__exit__(None, None, None)
 
                 raise exc from None
 

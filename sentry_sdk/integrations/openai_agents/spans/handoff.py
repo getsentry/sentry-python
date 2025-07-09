@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 
 
 def handoff_span(
-    context: agents.RunContextWrapper, from_agent: agents.Agent, to_agent_name: str
+    context_wrapper: agents.RunContextWrapper,
+    from_agent: agents.Agent,
+    to_agent_name: str,
 ) -> None:
     with sentry_sdk.start_span(
         op=OP.GEN_AI_HANDOFF,

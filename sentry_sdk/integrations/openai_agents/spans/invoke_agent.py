@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 def invoke_agent_span(
-    context: agents.RunContextWrapper, agent: agents.Agent
+    context_wrapper: agents.RunContextWrapper, agent: agents.Agent
 ) -> sentry_sdk.tracing.Span:
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_INVOKE_AGENT,
@@ -27,15 +27,15 @@ def invoke_agent_span(
 
     _set_agent_data(span, agent)
 
-    context._sentry_invoke_agent_span = span
+    context_wrapper._sentry_invoke_agent_span = span
 
     return span
 
 
 def update_invoke_agent_span(
-    context: agents.RunContextWrapper, agent: agents.Agent, output: Any
+    context_wrapper: agents.RunContextWrapper, agent: agents.Agent, output: Any
 ) -> None:
-    span = getattr(context, "_sentry_invoke_agent_span", None)
+    span = getattr(context_wrapper, "_sentry_invoke_agent_span", None)
     if span is not None:
         span.__exit__(None, None, None)
-        del context._sentry_invoke_agent_span
+        del context_wrapper._sentry_invoke_agent_span
