@@ -450,6 +450,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert transaction["transaction"] == "test_agent workflow"
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
+    assert agent_span["description"] == "invoke_agent test_agent"
     assert agent_span["origin"] == "auto.ai.openai_agents"
     assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
@@ -507,6 +508,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
         ]
     )
 
+    assert tool_span["description"] == "execute_tool simple_test_tool"
     assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
     assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
     assert (
@@ -528,6 +530,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
     assert tool_span["data"]["gen_ai.tool.type"] == "function"
 
+    assert ai_client_span2["description"] == "chat gpt-4"
     assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
     assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
     assert (
