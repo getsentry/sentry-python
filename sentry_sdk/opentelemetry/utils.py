@@ -219,53 +219,50 @@ def infer_description(span: ReadableSpan) -> Optional[str]:
 
 
 def extract_span_status(span: ReadableSpan) -> tuple[Optional[str], Optional[int]]:
+    """
+    Extract a reasonable Sentry SPANSTATUS and a HTTP status code from the otel span.
+    OKs are simply OKs.
+    ERRORs first try to map to HTTP/GRPC statuses via attributes otherwise fallback
+    on the description if it is a valid status for Sentry.
+    In the final UNSET case, we try to infer HTTP/GRPC.
+    """
     span_attributes = span.attributes or {}
-    status = span.status or None
+    status = span.status
+    http_status = get_http_status_code(span_attributes)
+    final_status = None
 
-    if status:
-        inferred_status, http_status = infer_status_from_attributes(span_attributes)
+    if status.status_code == StatusCode.OK:
+        final_status = SPANSTATUS.OK
+    elif status.status_code == StatusCode.ERROR:
+        inferred_status = infer_status_from_attributes(span_attributes, http_status)
 
-        if status.status_code == StatusCode.OK:
-            return (SPANSTATUS.OK, http_status)
-        elif status.status_code == StatusCode.ERROR:
-            if status.description is None:
-                if inferred_status:
-                    return (inferred_status, http_status)
-
-            if http_status is not None:
-                return (inferred_status, http_status)
-
-            if (
-                status.description is not None
-                and status.description in GRPC_ERROR_MAP.values()
-            ):
-                return (status.description, None)
-            else:
-                return (SPANSTATUS.UNKNOWN_ERROR, None)
-
-    inferred_status, http_status = infer_status_from_attributes(span_attributes)
-    if inferred_status:
-        return (inferred_status, http_status)
-
-    if status and status.status_code == StatusCode.UNSET:
-        return (None, None)
+        if inferred_status is not None:
+            final_status = inferred_status
+        elif (
+            status.description is not None
+            and status.description in GRPC_ERROR_MAP.values()
+        ):
+            final_status = status.description
+        else:
+            final_status = SPANSTATUS.UNKNOWN_ERROR
     else:
-        return (SPANSTATUS.UNKNOWN_ERROR, None)
+        # UNSET case
+        final_status = infer_status_from_attributes(span_attributes, http_status)
+
+    return (final_status, http_status)
 
 
 def infer_status_from_attributes(
-    span_attributes: Mapping[str, Any],
-) -> tuple[Optional[str], Optional[int]]:
-    http_status = get_http_status_code(span_attributes)
-
+    span_attributes: Mapping[str, Any], http_status: Optional[int]
+) -> Optional[str]:
     if http_status:
-        return (get_span_status_from_http_code(http_status), http_status)
+        return get_span_status_from_http_code(http_status)
 
     grpc_status = span_attributes.get(SpanAttributes.RPC_GRPC_STATUS_CODE)
     if grpc_status:
-        return (GRPC_ERROR_MAP.get(str(grpc_status), SPANSTATUS.UNKNOWN_ERROR), None)
+        return GRPC_ERROR_MAP.get(str(grpc_status), SPANSTATUS.UNKNOWN_ERROR)
 
-    return (None, None)
+    return None
 
 
 def get_http_status_code(span_attributes: Mapping[str, Any]) -> Optional[int]:
