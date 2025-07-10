@@ -366,22 +366,26 @@ def _new_embeddings_create_common(f, *args, **kwargs):
 
         response = yield f, args, kwargs
 
-        prompt_tokens = 0
+        input_tokens = 0
         total_tokens = 0
         if hasattr(response, "usage"):
             if hasattr(response.usage, "prompt_tokens") and isinstance(
                 response.usage.prompt_tokens, int
             ):
-                prompt_tokens = response.usage.prompt_tokens
+                input_tokens = response.usage.prompt_tokens
             if hasattr(response.usage, "total_tokens") and isinstance(
                 response.usage.total_tokens, int
             ):
                 total_tokens = response.usage.total_tokens
 
-        if prompt_tokens == 0:
-            prompt_tokens = integration.count_tokens(kwargs["input"] or "")
+        if input_tokens == 0:
+            input_tokens = integration.count_tokens(kwargs["input"] or "")
 
-        record_token_usage(span, prompt_tokens, None, total_tokens or prompt_tokens)
+        record_token_usage(
+            span,
+            input_tokens=input_tokens,
+            total_tokens=total_tokens or input_tokens,
+        )
 
         return response
 

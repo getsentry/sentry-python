@@ -128,5 +128,8 @@ def record_token_usage(
             output_tokens_reasoning,
         )
 
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+
     if total_tokens is not None:
         span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
