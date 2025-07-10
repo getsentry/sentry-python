@@ -1,16 +1,18 @@
+from __future__ import annotations
 import sys
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
-from sentry_sdk.consts import OP, SPANSTATUS
-from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import (
+from sentry_sdk.api import get_baggage, get_traceparent
+from sentry_sdk.consts import (
+    OP,
+    SPANSTATUS,
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
     TransactionSource,
 )
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -44,23 +46,21 @@ class HueyIntegration(Integration):
     origin = f"auto.queue.{identifier}"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         patch_enqueue()
         patch_execute()
 
 
-def patch_enqueue():
-    # type: () -> None
+def patch_enqueue() -> None:
     old_enqueue = Huey.enqueue
 
     @ensure_integration_enabled(HueyIntegration, old_enqueue)
-    def _sentry_enqueue(self, task):
-        # type: (Huey, Task) -> Optional[Union[Result, ResultGroup]]
+    def _sentry_enqueue(self: Huey, task: Task) -> Optional[Union[Result, ResultGroup]]:
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_HUEY,
             name=task.name,
             origin=HueyIntegration.origin,
+            only_if_parent=True,
         ):
             if not isinstance(task, PeriodicTask):
                 # Attach trace propagation data to task kwargs. We do
@@ -75,10 +75,8 @@ def patch_enqueue():
     Huey.enqueue = _sentry_enqueue
 
 
-def _make_event_processor(task):
-    # type: (Any) -> EventProcessor
-    def event_processor(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+def _make_event_processor(task: Any) -> EventProcessor:
+    def event_processor(event: Event, hint: Hint) -> Optional[Event]:
 
         with capture_internal_exceptions():
             tags = event.setdefault("tags", {})
@@ -105,15 +103,16 @@ def _make_event_processor(task):
     return event_processor
 
 
-def _capture_exception(exc_info):
-    # type: (ExcInfo) -> None
+def _capture_exception(exc_info: ExcInfo) -> None:
     scope = sentry_sdk.get_current_scope()
 
-    if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
-        scope.transaction.set_status(SPANSTATUS.ABORTED)
-        return
+    if scope.root_span is not None:
+        if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
+            scope.root_span.set_status(SPANSTATUS.ABORTED)
+            return
 
-    scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+        scope.root_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+
     event, hint = event_from_exception(
         exc_info,
         client_options=sentry_sdk.get_client().options,
@@ -122,12 +121,10 @@ def _capture_exception(exc_info):
     scope.capture_event(event, hint=hint)
 
 
-def _wrap_task_execute(func):
-    # type: (F) -> F
+def _wrap_task_execute(func: F) -> F:
 
     @ensure_integration_enabled(HueyIntegration, func)
-    def _sentry_execute(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _sentry_execute(*args: Any, **kwargs: Any) -> Any:
         try:
             result = func(*args, **kwargs)
         except Exception:
@@ -135,40 +132,40 @@ def _wrap_task_execute(func):
             _capture_exception(exc_info)
             reraise(*exc_info)
 
+        root_span = sentry_sdk.get_current_scope().root_span
+        if root_span is not None:
+            root_span.set_status(SPANSTATUS.OK)
+
         return result
 
     return _sentry_execute  # type: ignore
 
 
-def patch_execute():
-    # type: () -> None
+def patch_execute() -> None:
     old_execute = Huey._execute
 
     @ensure_integration_enabled(HueyIntegration, old_execute)
-    def _sentry_execute(self, task, timestamp=None):
-        # type: (Huey, Task, Optional[datetime]) -> Any
+    def _sentry_execute(
+        self: Huey, task: Task, timestamp: Optional[datetime] = None
+    ) -> Any:
         with sentry_sdk.isolation_scope() as scope:
             with capture_internal_exceptions():
                 scope._name = "huey"
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(task))
 
-            sentry_headers = task.kwargs.pop("sentry_headers", None)
-
-            transaction = continue_trace(
-                sentry_headers or {},
-                name=task.name,
-                op=OP.QUEUE_TASK_HUEY,
-                source=TransactionSource.TASK,
-                origin=HueyIntegration.origin,
-            )
-            transaction.set_status(SPANSTATUS.OK)
-
             if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)
                 task._sentry_is_patched = True
 
-            with sentry_sdk.start_transaction(transaction):
-                return old_execute(self, task, timestamp)
+            sentry_headers = task.kwargs.pop("sentry_headers", {})
+            with sentry_sdk.continue_trace(sentry_headers):
+                with sentry_sdk.start_span(
+                    name=task.name,
+                    op=OP.QUEUE_TASK_HUEY,
+                    source=TransactionSource.TASK,
+                    origin=HueyIntegration.origin,
+                ):
+                    return old_execute(self, task, timestamp)
 
     Huey._execute = _sentry_execute

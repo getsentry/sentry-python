@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.integrations import Integration
@@ -14,16 +15,13 @@ if TYPE_CHECKING:
 class DedupeIntegration(Integration):
     identifier = "dedupe"
 
-    def __init__(self):
-        # type: () -> None
+    def __init__(self) -> None:
         self._last_seen = ContextVar("last-seen")
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         @add_global_event_processor
-        def processor(event, hint):
-            # type: (Event, Optional[Hint]) -> Optional[Event]
+        def processor(event: Event, hint: Optional[Hint]) -> Optional[Event]:
             if hint is None:
                 return event
 
@@ -42,8 +40,7 @@ class DedupeIntegration(Integration):
             return event
 
     @staticmethod
-    def reset_last_seen():
-        # type: () -> None
+    def reset_last_seen() -> None:
         integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
         if integration is None:
             return

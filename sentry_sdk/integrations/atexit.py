@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import sys
 import atexit
@@ -12,15 +13,13 @@ if TYPE_CHECKING:
     from typing import Optional
 
 
-def default_callback(pending, timeout):
-    # type: (int, int) -> None
+def default_callback(pending: int, timeout: int) -> None:
     """This is the default shutdown callback that is set on the options.
     It prints out a message to stderr that informs the user that some events
     are still pending and the process is waiting for them to flush out.
     """
 
-    def echo(msg):
-        # type: (str) -> None
+    def echo(msg: str) -> None:
         sys.stderr.write(msg + "\n")
 
     echo("Sentry is attempting to send %i pending events" % pending)
@@ -32,18 +31,15 @@ def default_callback(pending, timeout):
 class AtexitIntegration(Integration):
     identifier = "atexit"
 
-    def __init__(self, callback=None):
-        # type: (Optional[Any]) -> None
+    def __init__(self, callback: Optional[Any] = None) -> None:
         if callback is None:
             callback = default_callback
         self.callback = callback
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         @atexit.register
-        def _shutdown():
-            # type: () -> None
+        def _shutdown() -> None:
             client = sentry_sdk.get_client()
             integration = client.get_integration(AtexitIntegration)
 

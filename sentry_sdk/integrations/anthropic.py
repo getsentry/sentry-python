@@ -1,3 +1,4 @@
+from __future__ import annotations
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -29,13 +30,11 @@ class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (AnthropicIntegration, bool) -> None
+    def __init__(self: AnthropicIntegration, include_prompts: bool = True) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         version = package_version("anthropic")
         _check_minimum_version(AnthropicIntegration, version)
 
@@ -43,8 +42,7 @@ class AnthropicIntegration(Integration):
         AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc: Any) -> None:
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -53,8 +51,7 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _calculate_token_usage(result, span):
-    # type: (Messages, Span) -> None
+def _calculate_token_usage(result: Messages, span: Span) -> None:
     input_tokens = 0
     output_tokens = 0
     if hasattr(result, "usage"):
@@ -68,8 +65,7 @@ def _calculate_token_usage(result, span):
     record_token_usage(span, input_tokens, output_tokens, total_tokens)
 
 
-def _get_responses(content):
-    # type: (list[Any]) -> list[dict[str, Any]]
+def _get_responses(content: list[Any]) -> list[dict[str, Any]]:
     """
     Get JSON of a Anthropic responses.
     """
@@ -85,8 +81,12 @@ def _get_responses(content):
     return responses
 
 
-def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
-    # type: (MessageStreamEvent, int, int, list[str]) -> tuple[int, int, list[str]]
+def _collect_ai_data(
+    event: MessageStreamEvent,
+    input_tokens: int,
+    output_tokens: int,
+    content_blocks: list[str],
+) -> tuple[int, int, list[str]]:
     """
     Count token usage and collect content blocks from the AI streaming response.
     """
@@ -112,26 +112,28 @@ def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
 
 
 def _add_ai_data_to_span(
-    span, integration, input_tokens, output_tokens, content_blocks
-):
-    # type: (Span, AnthropicIntegration, int, int, list[str]) -> None
+    span: Span,
+    integration: AnthropicIntegration,
+    input_tokens: int,
+    output_tokens: int,
+    content_blocks: list[str],
+) -> None:
     """
     Add token usage and content blocks from the AI streaming response to the span.
     """
     with capture_internal_exceptions():
         if should_send_default_pii() and integration.include_prompts:
             complete_message = "".join(content_blocks)
-            span.set_data(
+            span.set_attribute(
                 SPANDATA.AI_RESPONSES,
                 [{"type": "text", "text": complete_message}],
             )
         total_tokens = input_tokens + output_tokens
         record_token_usage(span, input_tokens, output_tokens, total_tokens)
-        span.set_data(SPANDATA.AI_STREAMING, True)
+        span.set_attribute(SPANDATA.AI_STREAMING, True)
 
 
-def _sentry_patched_create_common(f, *args, **kwargs):
-    # type: (Any, *Any, **Any) -> Any
+def _sentry_patched_create_common(f: Any, *args: Any, **kwargs: Any) -> Any:
     integration = kwargs.pop("integration")
     if integration is None:
         return f(*args, **kwargs)
@@ -148,6 +150,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         op=OP.ANTHROPIC_MESSAGES_CREATE,
         description="Anthropic messages create",
         origin=AnthropicIntegration.origin,
+        only_if_parent=True,
     )
     span.__enter__()
 
@@ -158,15 +161,17 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     model = kwargs.get("model")
 
     with capture_internal_exceptions():
-        span.set_data(SPANDATA.AI_MODEL_ID, model)
-        span.set_data(SPANDATA.AI_STREAMING, False)
+        span.set_attribute(SPANDATA.AI_MODEL_ID, model)
+        span.set_attribute(SPANDATA.AI_STREAMING, False)
 
         if should_send_default_pii() and integration.include_prompts:
-            span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
+            span.set_attribute(SPANDATA.AI_INPUT_MESSAGES, messages)
 
         if hasattr(result, "content"):
             if should_send_default_pii() and integration.include_prompts:
-                span.set_data(SPANDATA.AI_RESPONSES, _get_responses(result.content))
+                span.set_attribute(
+                    SPANDATA.AI_RESPONSES, _get_responses(result.content)
+                )
             _calculate_token_usage(result, span)
             span.__exit__(None, None, None)
 
@@ -174,11 +179,10 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         elif hasattr(result, "_iterator"):
             old_iterator = result._iterator
 
-            def new_iterator():
-                # type: () -> Iterator[MessageStreamEvent]
+            def new_iterator() -> Iterator[MessageStreamEvent]:
                 input_tokens = 0
                 output_tokens = 0
-                content_blocks = []  # type: list[str]
+                content_blocks: list[str] = []
 
                 for event in old_iterator:
                     input_tokens, output_tokens, content_blocks = _collect_ai_data(
@@ -191,11 +195,10 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 )
                 span.__exit__(None, None, None)
 
-            async def new_iterator_async():
-                # type: () -> AsyncIterator[MessageStreamEvent]
+            async def new_iterator_async() -> AsyncIterator[MessageStreamEvent]:
                 input_tokens = 0
                 output_tokens = 0
-                content_blocks = []  # type: list[str]
+                content_blocks: list[str] = []
 
                 async for event in old_iterator:
                     input_tokens, output_tokens, content_blocks = _collect_ai_data(
@@ -214,16 +217,14 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 result._iterator = new_iterator()
 
         else:
-            span.set_data("unknown_response", True)
+            span.set_attribute("unknown_response", True)
             span.__exit__(None, None, None)
 
     return result
 
 
-def _wrap_message_create(f):
-    # type: (Any) -> Any
-    def _execute_sync(f, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+def _wrap_message_create(f: Any) -> Any:
+    def _execute_sync(f: Any, *args: Any, **kwargs: Any) -> Any:
         gen = _sentry_patched_create_common(f, *args, **kwargs)
 
         try:
@@ -243,8 +244,7 @@ def _wrap_message_create(f):
             return e.value
 
     @wraps(f)
-    def _sentry_patched_create_sync(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _sentry_patched_create_sync(*args: Any, **kwargs: Any) -> Any:
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
         kwargs["integration"] = integration
 
@@ -253,10 +253,8 @@ def _wrap_message_create(f):
     return _sentry_patched_create_sync
 
 
-def _wrap_message_create_async(f):
-    # type: (Any) -> Any
-    async def _execute_async(f, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+def _wrap_message_create_async(f: Any) -> Any:
+    async def _execute_async(f: Any, *args: Any, **kwargs: Any) -> Any:
         gen = _sentry_patched_create_common(f, *args, **kwargs)
 
         try:
@@ -276,8 +274,7 @@ def _wrap_message_create_async(f):
             return e.value
 
     @wraps(f)
-    async def _sentry_patched_create_async(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    async def _sentry_patched_create_async(*args: Any, **kwargs: Any) -> Any:
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
         kwargs["integration"] = integration
 

@@ -1,16 +1,18 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
 from sentry_sdk.integrations.redis.modules.caches import (
     _compile_cache_span_properties,
-    _set_cache_data,
+    _get_cache_data,
 )
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
-    _set_client_data,
-    _set_pipeline_data,
+    _create_breadcrumb,
+    _get_client_data,
+    _get_pipeline_data,
+    _update_span,
 )
-from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 from typing import TYPE_CHECKING
@@ -21,18 +23,16 @@ if TYPE_CHECKING:
 
 
 def patch_redis_pipeline(
-    pipeline_cls,
-    is_cluster,
-    get_command_args_fn,
-    set_db_data_fn,
-):
-    # type: (Any, bool, Any, Callable[[Span, Any], None]) -> None
+    pipeline_cls: Any,
+    is_cluster: bool,
+    get_command_args_fn: Any,
+    get_db_data_fn: Callable[[Any], dict[str, Any]],
+) -> None:
     old_execute = pipeline_cls.execute
 
     from sentry_sdk.integrations.redis import RedisIntegration
 
-    def sentry_patched_execute(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_patched_execute(self: Any, *args: Any, **kwargs: Any) -> Any:
         if sentry_sdk.get_client().get_integration(RedisIntegration) is None:
             return old_execute(self, *args, **kwargs)
 
@@ -40,30 +40,32 @@ def patch_redis_pipeline(
             op=OP.DB_REDIS,
             name="redis.pipeline.execute",
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         ) as span:
             with capture_internal_exceptions():
-                command_seq = None
                 try:
                     command_seq = self._execution_strategy.command_queue
                 except AttributeError:
                     command_seq = self.command_stack
 
-                set_db_data_fn(span, self)
-                _set_pipeline_data(
-                    span,
-                    is_cluster,
-                    get_command_args_fn,
-                    False if is_cluster else self.transaction,
-                    command_seq,
+                span_data = get_db_data_fn(self)
+                pipeline_data = _get_pipeline_data(
+                    is_cluster=is_cluster,
+                    get_command_args_fn=get_command_args_fn,
+                    is_transaction=False if is_cluster else self.transaction,
+                    command_seq=command_seq,
                 )
+                _update_span(span, span_data, pipeline_data)
+                _create_breadcrumb("redis.pipeline.execute", span_data, pipeline_data)
 
             return old_execute(self, *args, **kwargs)
 
     pipeline_cls.execute = sentry_patched_execute
 
 
-def patch_redis_client(cls, is_cluster, set_db_data_fn):
-    # type: (Any, bool, Callable[[Span, Any], None]) -> None
+def patch_redis_client(
+    cls: Any, is_cluster: bool, get_db_data_fn: Callable[[Any], dict[str, Any]]
+) -> None:
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
@@ -72,8 +74,9 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
 
     from sentry_sdk.integrations.redis import RedisIntegration
 
-    def sentry_patched_execute_command(self, name, *args, **kwargs):
-        # type: (Any, str, *Any, **Any) -> Any
+    def sentry_patched_execute_command(
+        self: Any, name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         integration = sentry_sdk.get_client().get_integration(RedisIntegration)
         if integration is None:
             return old_execute_command(self, name, *args, **kwargs)
@@ -91,6 +94,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
                 op=cache_properties["op"],
                 name=cache_properties["description"],
                 origin=SPAN_ORIGIN,
+                only_if_parent=True,
             )
             cache_span.__enter__()
 
@@ -100,18 +104,24 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
             op=db_properties["op"],
             name=db_properties["description"],
             origin=SPAN_ORIGIN,
+            only_if_parent=True,
         )
         db_span.__enter__()
 
-        set_db_data_fn(db_span, self)
-        _set_client_data(db_span, is_cluster, name, *args)
+        db_span_data = get_db_data_fn(self)
+        db_client_span_data = _get_client_data(is_cluster, name, *args)
+        _update_span(db_span, db_span_data, db_client_span_data)
+        _create_breadcrumb(
+            db_properties["description"], db_span_data, db_client_span_data
+        )
 
         value = old_execute_command(self, name, *args, **kwargs)
 
         db_span.__exit__(None, None, None)
 
         if cache_span:
-            _set_cache_data(cache_span, self, cache_properties, value)
+            cache_span_data = _get_cache_data(self, cache_properties, value)
+            _update_span(cache_span, cache_span_data)
             cache_span.__exit__(None, None, None)
 
         return value

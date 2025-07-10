@@ -211,7 +211,7 @@ class LocalLambdaStack(Stack):
             )
 
     @classmethod
-    def wait_for_stack(cls, timeout=60, port=SAM_PORT):
+    def wait_for_stack(cls, timeout=60, port=SAM_PORT, log_file=None):
         """
         Wait for SAM to be ready, with timeout.
         """
@@ -219,8 +219,8 @@ class LocalLambdaStack(Stack):
         while True:
             if time.time() - start_time > timeout:
                 raise TimeoutError(
-                    "AWS SAM failed to start within %s seconds. (Maybe Docker is not running?)"
-                    % timeout
+                    "AWS SAM failed to start within %s seconds. (Maybe Docker is not running, or new docker images could not be built in time?) Check the log for more details: %s"
+                    % (timeout, log_file)
                 )
 
             try:

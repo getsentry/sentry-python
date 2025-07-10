@@ -1,10 +1,10 @@
+from __future__ import annotations
 import sys
 import weakref
 from inspect import isawaitable
 from urllib.parse import urlsplit
 
 import sentry_sdk
-from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
@@ -60,8 +60,9 @@ class SanicIntegration(Integration):
     origin = f"auto.http.{identifier}"
     version = None
 
-    def __init__(self, unsampled_statuses=frozenset({404})):
-        # type: (Optional[Container[int]]) -> None
+    def __init__(
+        self, unsampled_statuses: Optional[Container[int]] = frozenset({404})
+    ) -> None:
         """
         The unsampled_statuses parameter can be used to specify for which HTTP statuses the
         transactions should not be sent to Sentry. By default, transactions are sent for all
@@ -71,8 +72,7 @@ class SanicIntegration(Integration):
         self._unsampled_statuses = unsampled_statuses or set()
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         SanicIntegration.version = parse_version(SANIC_VERSION)
         _check_minimum_version(SanicIntegration, SanicIntegration.version)
 
@@ -104,56 +104,45 @@ class SanicIntegration(Integration):
 
 
 class SanicRequestExtractor(RequestExtractor):
-    def content_length(self):
-        # type: () -> int
+    def content_length(self) -> int:
         if self.request.body is None:
             return 0
         return len(self.request.body)
 
-    def cookies(self):
-        # type: () -> Dict[str, str]
+    def cookies(self) -> Dict[str, str]:
         return dict(self.request.cookies)
 
-    def raw_data(self):
-        # type: () -> bytes
+    def raw_data(self) -> bytes:
         return self.request.body
 
-    def form(self):
-        # type: () -> RequestParameters
+    def form(self) -> RequestParameters:
         return self.request.form
 
-    def is_json(self):
-        # type: () -> bool
+    def is_json(self) -> bool:
         raise NotImplementedError()
 
-    def json(self):
-        # type: () -> Optional[Any]
+    def json(self) -> Optional[Any]:
         return self.request.json
 
-    def files(self):
-        # type: () -> RequestParameters
+    def files(self) -> RequestParameters:
         return self.request.files
 
-    def size_of_file(self, file):
-        # type: (Any) -> int
+    def size_of_file(self, file: Any) -> int:
         return len(file.body or ())
 
 
-def _setup_sanic():
-    # type: () -> None
+def _setup_sanic() -> None:
     Sanic._startup = _startup
     ErrorHandler.lookup = _sentry_error_handler_lookup
 
 
-def _setup_legacy_sanic():
-    # type: () -> None
+def _setup_legacy_sanic() -> None:
     Sanic.handle_request = _legacy_handle_request
     Router.get = _legacy_router_get
     ErrorHandler.lookup = _sentry_error_handler_lookup
 
 
-async def _startup(self):
-    # type: (Sanic) -> None
+async def _startup(self: Sanic) -> None:
     # This happens about as early in the lifecycle as possible, just after the
     # Request object is created. The body has not yet been consumed.
     self.signal("http.lifecycle.request")(_context_enter)
@@ -172,8 +161,7 @@ async def _startup(self):
     await old_startup(self)
 
 
-async def _context_enter(request):
-    # type: (Request) -> None
+async def _context_enter(request: Request) -> None:
     request.ctx._sentry_do_integration = (
         sentry_sdk.get_client().get_integration(SanicIntegration) is not None
     )
@@ -182,26 +170,31 @@ async def _context_enter(request):
         return
 
     weak_request = weakref.ref(request)
-    request.ctx._sentry_scope = sentry_sdk.isolation_scope()
-    scope = request.ctx._sentry_scope.__enter__()
+    request.ctx._sentry_scope_manager = sentry_sdk.isolation_scope()
+    scope = request.ctx._sentry_scope_manager.__enter__()
+    request.ctx._sentry_scope = scope
+
+    scope.set_transaction_name(request.path, TransactionSource.URL)
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
-    transaction = continue_trace(
-        dict(request.headers),
+    # TODO-neel-potel test if this works
+    request.ctx._sentry_continue_trace = sentry_sdk.continue_trace(
+        dict(request.headers)
+    )
+    request.ctx._sentry_continue_trace.__enter__()
+    request.ctx._sentry_transaction = sentry_sdk.start_span(
         op=OP.HTTP_SERVER,
         # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
         name=request.path,
         source=TransactionSource.URL,
         origin=SanicIntegration.origin,
-    )
-    request.ctx._sentry_transaction = sentry_sdk.start_transaction(
-        transaction
     ).__enter__()
 
 
-async def _context_exit(request, response=None):
-    # type: (Request, Optional[BaseHTTPResponse]) -> None
+async def _context_exit(
+    request: Request, response: Optional[BaseHTTPResponse] = None
+) -> None:
     with capture_internal_exceptions():
         if not request.ctx._sentry_do_integration:
             return
@@ -211,20 +204,26 @@ async def _context_exit(request, response=None):
         response_status = None if response is None else response.status
 
         # This capture_internal_exceptions block has been intentionally nested here, so that in case an exception
-        # happens while trying to end the transaction, we still attempt to exit the hub.
+        # happens while trying to end the transaction, we still attempt to exit the scope.
         with capture_internal_exceptions():
             request.ctx._sentry_transaction.set_http_status(response_status)
-            request.ctx._sentry_transaction.sampled &= (
+
+            if (
                 isinstance(integration, SanicIntegration)
-                and response_status not in integration._unsampled_statuses
-            )
+                and response_status in integration._unsampled_statuses
+            ):
+                # drop the event in an event processor
+                request.ctx._sentry_scope.add_event_processor(
+                    lambda _event, _hint: None
+                )
+
             request.ctx._sentry_transaction.__exit__(None, None, None)
+            request.ctx._sentry_continue_trace.__exit__(None, None, None)
 
-        request.ctx._sentry_scope.__exit__(None, None, None)
+        request.ctx._sentry_scope_manager.__exit__(None, None, None)
 
 
-async def _set_transaction(request, route, **_):
-    # type: (Request, Route, **Any) -> None
+async def _set_transaction(request: Request, route: Route, **_: Any) -> None:
     if request.ctx._sentry_do_integration:
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
@@ -232,8 +231,9 @@ async def _set_transaction(request, route, **_):
             scope.set_transaction_name(route_name, source=TransactionSource.COMPONENT)
 
 
-def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
-    # type: (Any, Exception, *Any, **Any) -> Optional[object]
+def _sentry_error_handler_lookup(
+    self: Any, exception: Exception, *args: Any, **kwargs: Any
+) -> Optional[object]:
     _capture_exception(exception)
     old_error_handler = old_error_handler_lookup(self, exception, *args, **kwargs)
 
@@ -243,8 +243,9 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
     if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
         return old_error_handler
 
-    async def sentry_wrapped_error_handler(request, exception):
-        # type: (Request, Exception) -> Any
+    async def sentry_wrapped_error_handler(
+        request: Request, exception: Exception
+    ) -> Any:
         try:
             response = old_error_handler(request, exception)
             if isawaitable(response):
@@ -266,8 +267,9 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
     return sentry_wrapped_error_handler
 
 
-async def _legacy_handle_request(self, request, *args, **kwargs):
-    # type: (Any, Request, *Any, **Any) -> Any
+async def _legacy_handle_request(
+    self: Any, request: Request, *args: Any, **kwargs: Any
+) -> Any:
     if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
         return await old_handle_request(self, request, *args, **kwargs)
 
@@ -284,8 +286,7 @@ async def _legacy_handle_request(self, request, *args, **kwargs):
         return response
 
 
-def _legacy_router_get(self, *args):
-    # type: (Any, Union[Any, Request]) -> Any
+def _legacy_router_get(self: Any, *args: Union[Any, Request]) -> Any:
     rv = old_router_get(self, *args)
     if sentry_sdk.get_client().get_integration(SanicIntegration) is not None:
         with capture_internal_exceptions():
@@ -315,8 +316,7 @@ def _legacy_router_get(self, *args):
 
 
 @ensure_integration_enabled(SanicIntegration)
-def _capture_exception(exception):
-    # type: (Union[ExcInfo, BaseException]) -> None
+def _capture_exception(exception: Union[ExcInfo, BaseException]) -> None:
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,
@@ -330,10 +330,8 @@ def _capture_exception(exception):
         sentry_sdk.capture_event(event, hint=hint)
 
 
-def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> EventProcessor
-    def sanic_processor(event, hint):
-        # type: (Event, Optional[Hint]) -> Optional[Event]
+def _make_request_processor(weak_request: Callable[[], Request]) -> EventProcessor:
+    def sanic_processor(event: Event, hint: Optional[Hint]) -> Optional[Event]:
 
         try:
             if hint and issubclass(hint["exc_info"][0], SanicException):
