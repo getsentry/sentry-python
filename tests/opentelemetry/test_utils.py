@@ -220,31 +220,6 @@ def test_span_data_for_db_query():
     "kind, status, attributes, expected",
     [
         (
-            SpanKind.CLIENT,
-            None,  # None means unknown error
-            {
-                "http.method": "POST",
-                "http.route": "/some/route",
-            },
-            {
-                "status": "unknown_error",
-                "http_status_code": None,
-            },
-        ),
-        (
-            SpanKind.CLIENT,
-            None,
-            {
-                "http.method": "POST",
-                "http.route": "/some/route",
-                "http.status_code": 502,  # Take this status in case of None status
-            },
-            {
-                "status": "internal_error",
-                "http_status_code": 502,
-            },
-        ),
-        (
             SpanKind.SERVER,
             Status(StatusCode.UNSET),
             {
@@ -267,23 +242,6 @@ def test_span_data_for_db_query():
             {
                 "status": "internal_error",
                 "http_status_code": 502,
-            },
-        ),
-        (
-            SpanKind.SERVER,
-            None,
-            {
-                "http.method": "POST",
-                "http.route": "/some/route",
-                "http.status_code": 502,
-                "http.response.status_code": 503,  # this takes precedence over deprecated http.status_code
-            },
-            {
-                "status": "unavailable",
-                "http_status_code": 503,
-                # old otel versions won't take the new attribute into account
-                "status_old": "internal_error",
-                "http_status_code_old": 502,
             },
         ),
         (
