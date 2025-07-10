@@ -2,7 +2,7 @@ import pytest
 from opentelemetry import trace
 
 import sentry_sdk
-from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.consts import SPANSTATUS, VERSION
 from tests.conftest import ApproxDict
 
 
@@ -361,3 +361,13 @@ def test_potel_span_status(status_in, status_out):
         span.set_status(status_in)
 
     assert span.status == status_out
+
+
+def test_otel_resource(sentry_init):
+    sentry_init()
+
+    tracer_provider = trace.get_tracer_provider()
+    resource_attrs = tracer_provider.resource.attributes
+    assert resource_attrs["service.name"] == "sentry-python"
+    assert resource_attrs["service.namespace"] == "sentry"
+    assert resource_attrs["service.version"] == VERSION
