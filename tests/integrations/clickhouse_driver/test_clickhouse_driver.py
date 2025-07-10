@@ -1,7 +1,7 @@
 """
 Tests need a local clickhouse instance running, this can best be done using
 ```sh
-docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=262144:262144 --rm clickhouse
+docker run -d -e CLICKHOUSE_SKIP_USER_SETUP=1 -p 8123:8123 -p 9000:9000 --name clickhouse-test --ulimit nofile=262144:262144 --rm clickhouse
 ```
 """
 
@@ -822,7 +822,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         span.pop("span_id", None)
         span.pop("start_timestamp", None)
         span.pop("timestamp", None)
-        span.pop("status")
+        span.pop("status", None)
 
     assert event["spans"] == expected_spans
 

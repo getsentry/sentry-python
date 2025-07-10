@@ -536,12 +536,13 @@ def test_cache_spans_get_many(
         cache.get_many([f"S{id}", f"S{id+1}"])
 
     (transaction,) = events
+    assert transaction["transaction"] == "caches"
     assert len(transaction["spans"]) == 7
 
     assert (
         render_span_tree(transaction)
         == f"""\
-- op="caches": description=null
+- op=null: description=null
   - op="cache.get": description="S{id}, S{id+1}"
     - op="cache.get": description="S{id}"
     - op="cache.get": description="S{id+1}"
@@ -579,12 +580,13 @@ def test_cache_spans_set_many(
         cache.get(f"S{id}")
 
     (transaction,) = events
+    assert transaction["transaction"] == "caches"
     assert len(transaction["spans"]) == 4
 
     assert (
         render_span_tree(transaction)
         == f"""\
-- op="caches": description=null
+- op=null: description=null
   - op="cache.put": description="S{id}, S{id+1}"
     - op="cache.put": description="S{id}"
     - op="cache.put": description="S{id+1}"

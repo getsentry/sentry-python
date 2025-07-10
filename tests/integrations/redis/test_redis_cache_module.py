@@ -28,10 +28,11 @@ def test_no_cache_basic(sentry_init, capture_events, render_span_tree):
         connection.get("mycachekey")
 
     (event,) = events
+    assert event["transaction"] == "cache"
     assert (
         render_span_tree(event)
         == """\
-- op="cache": description=null
+- op=null: description=null
   - op="db.redis": description="GET 'mycachekey'"\
 """
     )
@@ -57,11 +58,12 @@ def test_cache_basic(sentry_init, capture_events, render_span_tree):
         connection.mget("mycachekey1", "mycachekey2")
 
     (event,) = events
+    assert event["transaction"] == "cache"
     # no cache support for HGET command
     assert (
         render_span_tree(event)
         == """\
-- op="cache": description=null
+- op=null: description=null
   - op="db.redis": description="HGET 'mycachekey' [Filtered]"
   - op="cache.get": description="mycachekey"
     - op="db.redis": description="GET 'mycachekey'"
@@ -94,10 +96,11 @@ def test_cache_keys(sentry_init, capture_events, render_span_tree):
         connection.get("bl")
 
     (event,) = events
+    assert event["transaction"] == "cache"
     assert (
         render_span_tree(event)
         == """\
-- op="cache": description=null
+- op=null: description=null
   - op="db.redis": description="GET 'somethingelse'"
   - op="cache.get": description="blub"
     - op="db.redis": description="GET 'blub'"
@@ -126,6 +129,7 @@ def test_cache_data(sentry_init, capture_events):
         connection.get("mycachekey")
 
     (event,) = events
+    assert event["transaction"] == "cache"
     spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
 
     assert len(spans) == 6
@@ -214,6 +218,7 @@ def test_cache_prefixes(sentry_init, capture_events):
         connection.mget(uuid.uuid4().bytes, "yes")
 
     (event,) = events
+    assert event["transaction"] == "cache"
 
     spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
     assert len(spans) == 13  # 8 db spans + 5 cache spans

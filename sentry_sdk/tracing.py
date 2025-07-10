@@ -187,7 +187,7 @@ class Span:
                     # OTel timestamps have nanosecond precision
                     start_timestamp = convert_to_otel_timestamp(start_timestamp)
 
-                span_name = name or description or op or DEFAULT_SPAN_NAME
+                span_name = name or description or DEFAULT_SPAN_NAME
 
                 # Prepopulate some attrs so that they're accessible in traces_sampler
                 attributes = attributes or {}
