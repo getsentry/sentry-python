@@ -461,6 +461,7 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert agent_span["data"]["gen_ai.request.top_p"] == 1.0
     assert agent_span["data"]["gen_ai.system"] == "openai"
 
+    assert ai_client_span1["description"] == "chat gpt-4"
     assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
     assert ai_client_span1["data"]["gen_ai.system"] == "openai"
     assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
