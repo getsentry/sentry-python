@@ -1,7 +1,6 @@
 from __future__ import annotations
 import os
-import time
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 from contextlib import contextmanager
 
 import sentry_sdk
@@ -76,7 +75,7 @@ class SessionFlusher:
         self._thread_lock = Lock()
         self._aggregate_lock = Lock()
         self._thread_for_pid: Optional[int] = None
-        self._running = True
+        self.__shutdown_requested: Event = Event()
 
     def flush(self) -> None:
         pending_sessions = self.pending_sessions
@@ -119,10 +118,10 @@ class SessionFlusher:
                 return None
 
             def _thread() -> None:
-                while self._running:
-                    time.sleep(self.flush_interval)
-                    if self._running:
-                        self.flush()
+                running = True
+                while running:
+                    running = not self.__shutdown_requested.wait(self.flush_interval)
+                    self.flush()
 
             thread = Thread(target=_thread)
             thread.daemon = True
@@ -131,7 +130,7 @@ class SessionFlusher:
             except RuntimeError:
                 # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.
-                self._running = False
+                self.__shutdown_requested.set()
                 return None
 
             self._thread = thread
@@ -175,7 +174,7 @@ class SessionFlusher:
         self._ensure_running()
 
     def kill(self) -> None:
-        self._running = False
+        self.__shutdown_requested.set()
 
     def __del__(self) -> None:
         self.kill()

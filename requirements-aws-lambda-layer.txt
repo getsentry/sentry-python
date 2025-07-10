@@ -1,7 +1,8 @@
 certifi
-
-# In Lambda functions botocore is used, and botocore is not
-# yet supporting urllib3 1.27.0 never mind 2+.
+urllib3
+# In Lambda functions botocore is used, and botocore has
+# restrictions on urllib3
+# https://github.com/boto/botocore/blob/develop/setup.cfg
 # So we pin this here to make our Lambda layer work with
 # Lambda Function using Python 3.7+
 urllib3<1.27
