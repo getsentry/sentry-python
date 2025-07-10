@@ -1,4 +1,5 @@
 from functools import wraps
+import json
 
 import sentry_sdk
 from sentry_sdk import consts
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 try:
     from openai.resources.chat.completions import Completions, AsyncCompletions
     from openai.resources import Embeddings, AsyncEmbeddings
+    from openai.resources.responses import Responses
 
     if TYPE_CHECKING:
         from openai.types.chat import ChatCompletionMessageParam, ChatCompletionChunk
@@ -47,6 +49,7 @@ class OpenAIIntegration(Integration):
         # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
+        Responses.create = _wrap_responses_create(Responses.create)
 
         AsyncCompletions.create = _wrap_async_chat_completion_create(
             AsyncCompletions.create
@@ -74,44 +77,46 @@ def _calculate_chat_completion_usage(
     messages, response, span, streaming_message_responses, count_tokens
 ):
     # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
-    completion_tokens = 0  # type: Optional[int]
-    prompt_tokens = 0  # type: Optional[int]
+    input_tokens = 0  # type: Optional[int]
+    output_tokens = 0  # type: Optional[int]
     total_tokens = 0  # type: Optional[int]
     if hasattr(response, "usage"):
-        if hasattr(response.usage, "completion_tokens") and isinstance(
-            response.usage.completion_tokens, int
+        if hasattr(response.usage, "input_tokens") and isinstance(
+            response.usage.input_tokens, int
         ):
-            completion_tokens = response.usage.completion_tokens
-        if hasattr(response.usage, "prompt_tokens") and isinstance(
-            response.usage.prompt_tokens, int
+            input_tokens = response.usage.input_tokens
+
+        if hasattr(response.usage, "output_tokens") and isinstance(
+            response.usage.output_tokens, int
         ):
-            prompt_tokens = response.usage.prompt_tokens
+            output_tokens = response.usage.output_tokens
+
         if hasattr(response.usage, "total_tokens") and isinstance(
             response.usage.total_tokens, int
         ):
             total_tokens = response.usage.total_tokens
 
-    if prompt_tokens == 0:
+    if input_tokens == 0:
         for message in messages:
             if "content" in message:
-                prompt_tokens += count_tokens(message["content"])
+                input_tokens += count_tokens(message["content"])
 
-    if completion_tokens == 0:
+    if output_tokens == 0:
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
-                completion_tokens += count_tokens(message)
+                output_tokens += count_tokens(message)
         elif hasattr(response, "choices"):
             for choice in response.choices:
                 if hasattr(choice, "message"):
-                    completion_tokens += count_tokens(choice.message)
+                    output_tokens += count_tokens(choice.message)
 
-    if prompt_tokens == 0:
-        prompt_tokens = None
-    if completion_tokens == 0:
-        completion_tokens = None
+    if input_tokens == 0:
+        input_tokens = None
+    if output_tokens == 0:
+        output_tokens = None
     if total_tokens == 0:
         total_tokens = None
-    record_token_usage(span, prompt_tokens, completion_tokens, total_tokens)
+    record_token_usage(span, input_tokens, output_tokens, total_tokens)
 
 
 def _new_chat_completion_common(f, *args, **kwargs):
@@ -427,3 +432,80 @@ def _wrap_async_embeddings_create(f):
         return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_create_async
+
+
+def _new_responses_create_common(f, *args, **kwargs):
+    # type: (Any, *Any, **Any) -> Any
+    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    if integration is None:
+        return f(*args, **kwargs)
+
+    model = kwargs.get("model")
+    input = kwargs.get("input")
+
+    span = sentry_sdk.start_span(
+        op=consts.OP.GEN_AI_RESPONSES,
+        name=f"{consts.OP.GEN_AI_RESPONSES} {model}",
+        origin=OpenAIIntegration.origin,
+    )
+    span.__enter__()
+
+    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+
+    if should_send_default_pii() and integration.include_prompts:
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, input)
+
+    res = yield f, args, kwargs
+
+    if hasattr(res, "output"):
+        if should_send_default_pii() and integration.include_prompts:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                json.dumps([item.to_dict() for item in res.output]),
+            )
+        import ipdb
+
+        ipdb.set_trace()
+        _calculate_chat_completion_usage([], res, span, None, integration.count_tokens)
+        span.__exit__(None, None, None)
+
+    else:
+        set_data_normalized(span, "unknown_response", True)
+        span.__exit__(None, None, None)
+
+    return res
+
+
+def _wrap_responses_create(f):
+    # type: (Any) -> Any
+    def _execute_sync(f, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
+        gen = _new_responses_create_common(f, *args, **kwargs)
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return e.value
+
+        try:
+            try:
+                result = f(*args, **kwargs)
+            except Exception as e:
+                _capture_exception(e)
+                raise e from None
+
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
+
+    @wraps(f)
+    def _sentry_patched_create_sync(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
+        return _execute_sync(f, *args, **kwargs)
+
+    return _sentry_patched_create_sync
