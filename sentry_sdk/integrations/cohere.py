@@ -116,14 +116,14 @@ def _wrap_chat(f, streaming):
             if hasattr(res.meta, "billed_units"):
                 record_token_usage(
                     span,
-                    prompt_tokens=res.meta.billed_units.input_tokens,
-                    completion_tokens=res.meta.billed_units.output_tokens,
+                    input_tokens=res.meta.billed_units.input_tokens,
+                    output_tokens=res.meta.billed_units.output_tokens,
                 )
             elif hasattr(res.meta, "tokens"):
                 record_token_usage(
                     span,
-                    prompt_tokens=res.meta.tokens.input_tokens,
-                    completion_tokens=res.meta.tokens.output_tokens,
+                    input_tokens=res.meta.tokens.input_tokens,
+                    output_tokens=res.meta.tokens.output_tokens,
                 )
 
             if hasattr(res.meta, "warnings"):
@@ -262,7 +262,7 @@ def _wrap_embed(f):
             ):
                 record_token_usage(
                     span,
-                    prompt_tokens=res.meta.billed_units.input_tokens,
+                    input_tokens=res.meta.billed_units.input_tokens,
                     total_tokens=res.meta.billed_units.input_tokens,
                 )
             return res
