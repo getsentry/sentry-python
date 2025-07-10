@@ -74,6 +74,24 @@ def test_agent():
     )
 
 
+@pytest.fixture
+def test_agent_custom_model():
+    """Create a real Agent instance for testing."""
+    return Agent(
+        name="test_agent_custom_model",
+        instructions="You are a helpful test assistant.",
+        # the model could be agents.OpenAIChatCompletionsModel()
+        model=MagicMock(model="my-custom-model"),
+        model_settings=ModelSettings(
+            max_tokens=100,
+            temperature=0.7,
+            top_p=1.0,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+        ),
+    )
+
+
 @pytest.mark.asyncio
 async def test_agent_invocation_span(
     sentry_init, capture_events, test_agent, mock_model_response
@@ -126,6 +144,42 @@ async def test_agent_invocation_span(
     assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_client_span_custom_model(
+    sentry_init, capture_events, test_agent_custom_model, mock_model_response
+):
+    """
+    Test that the integration uses the correct model name if a custom model is used.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                test_agent_custom_model, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    _, ai_client_span = spans
+
+    assert ai_client_span["description"] == "chat my-custom-model"
+    assert ai_client_span["data"]["gen_ai.request.model"] == "my-custom-model"
 
 
 def test_agent_invocation_span_sync(
