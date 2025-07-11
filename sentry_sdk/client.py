@@ -25,7 +25,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
-from sentry_sdk.transport import HttpTransportCore, make_transport
+from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
     SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
@@ -403,7 +403,7 @@ class _Client(BaseClient):
             self.monitor
             or self.log_batcher
             or has_profiling_enabled(self.options)
-            or isinstance(self.transport, HttpTransportCore)
+            or isinstance(self.transport, BaseHttpTransport)
         ):
             # If we have anything on that could spawn a background thread, we
             # need to check if it's safe to use them.
