@@ -162,7 +162,7 @@ def _parse_rate_limits(
             continue
 
 
-class BaseHttpTransport(Transport):
+class HttpTransportCore(Transport):
     """The base HTTP transport."""
 
     TIMEOUT = 30  # seconds
@@ -286,12 +286,8 @@ class BaseHttpTransport(Transport):
                 seconds=retry_after
             )
 
-    def _send_request(
-        self: Self,
-        body: bytes,
-        headers: Dict[str, str],
-        endpoint_type: EndpointType = EndpointType.ENVELOPE,
-        envelope: Optional[Envelope] = None,
+    def _handle_request_error(
+        self: Self, envelope: Optional[Envelope], loss_reason: str = "network"
     ) -> None:
         def record_loss(reason: str) -> None:
             if envelope is None:
@@ -300,45 +296,45 @@ class BaseHttpTransport(Transport):
                 for item in envelope.items:
                     self.record_lost_event(reason, item=item)
 
+        self.on_dropped_event(loss_reason)
+        record_loss("network_error")
+
+    def _handle_response(
+        self: Self,
+        response: Union[urllib3.BaseHTTPResponse, httpcore.Response],
+        envelope: Optional[Envelope],
+    ) -> None:
+        self._update_rate_limits(response)
+
+        if response.status == 429:
+            # if we hit a 429.  Something was rate limited but we already
+            # acted on this in `self._update_rate_limits`.  Note that we
+            # do not want to record event loss here as we will have recorded
+            # an outcome in relay already.
+            self.on_dropped_event("status_429")
+            pass
+
+        elif response.status >= 300 or response.status < 200:
+            logger.error(
+                "Unexpected status code: %s (body: %s)",
+                response.status,
+                getattr(response, "data", getattr(response, "content", None)),
+            )
+            self._handle_request_error(
+                envelope=envelope, loss_reason="status_{}".format(response.status)
+            )
+
+    def _update_headers(
+        self: Self,
+        headers: Dict[str, str],
+    ) -> None:
+
         headers.update(
             {
                 "User-Agent": str(self._auth.client),
                 "X-Sentry-Auth": str(self._auth.to_header()),
             }
         )
-        try:
-            response = self._request(
-                "POST",
-                endpoint_type,
-                body,
-                headers,
-            )
-        except Exception:
-            self.on_dropped_event("network")
-            record_loss("network_error")
-            raise
-
-        try:
-            self._update_rate_limits(response)
-
-            if response.status == 429:
-                # if we hit a 429.  Something was rate limited but we already
-                # acted on this in `self._update_rate_limits`.  Note that we
-                # do not want to record event loss here as we will have recorded
-                # an outcome in relay already.
-                self.on_dropped_event("status_429")
-                pass
-
-            elif response.status >= 300 or response.status < 200:
-                logger.error(
-                    "Unexpected status code: %s (body: %s)",
-                    response.status,
-                    getattr(response, "data", getattr(response, "content", None)),
-                )
-                self.on_dropped_event("status_{}".format(response.status))
-                record_loss("network_error")
-        finally:
-            response.close()
 
     def on_dropped_event(self: Self, _reason: str) -> None:
         return None
@@ -375,11 +371,6 @@ class BaseHttpTransport(Transport):
             type="client_report",
         )
 
-    def _flush_client_reports(self: Self, force: bool = False) -> None:
-        client_report = self._fetch_pending_client_report(force=force, interval=60)
-        if client_report is not None:
-            self.capture_envelope(Envelope(items=[client_report]))
-
     def _check_disabled(self: Self, category: EventDataCategory) -> bool:
         def _disabled(bucket: Optional[EventDataCategory]) -> bool:
             ts = self._disabled_until.get(bucket)
@@ -398,9 +389,9 @@ class BaseHttpTransport(Transport):
     def is_healthy(self: Self) -> bool:
         return not (self._is_worker_full() or self._is_rate_limited())
 
-    def _send_envelope(self: Self, envelope: Envelope) -> None:
-
-        # remove all items from the envelope which are over quota
+    def _prepare_envelope(
+        self: Self, envelope: Envelope
+    ) -> Optional[Tuple[Envelope, io.BytesIO, Dict[str, str]]]:
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
@@ -442,13 +433,7 @@ class BaseHttpTransport(Transport):
         if content_encoding:
             headers["Content-Encoding"] = content_encoding
 
-        self._send_request(
-            body.getvalue(),
-            headers=headers,
-            endpoint_type=EndpointType.ENVELOPE,
-            envelope=envelope,
-        )
-        return None
+        return envelope, body, headers
 
     def _serialize_envelope(
         self: Self, envelope: Envelope
@@ -506,6 +491,54 @@ class BaseHttpTransport(Transport):
     ) -> Union[urllib3.BaseHTTPResponse, httpcore.Response]:
         raise NotImplementedError()
 
+    def kill(self: Self) -> None:
+        logger.debug("Killing HTTP transport")
+        self._worker.kill()
+
+
+class BaseSyncHttpTransport(HttpTransportCore):
+
+    def _send_envelope(self: Self, envelope: Envelope) -> None:
+        _prepared_envelope = self._prepare_envelope(envelope)
+        if _prepared_envelope is None:  # TODO: check this behaviour in detail
+            return None
+        envelope, body, headers = _prepared_envelope
+        self._send_request(
+            body.getvalue(),
+            headers=headers,
+            endpoint_type=EndpointType.ENVELOPE,
+            envelope=envelope,
+        )
+        return None
+
+    def _send_request(
+        self: Self,
+        body: bytes,
+        headers: Dict[str, str],
+        endpoint_type: EndpointType,
+        envelope: Optional[Envelope],
+    ) -> None:
+        self._update_headers(headers)
+        try:
+            response = self._request(
+                "POST",
+                endpoint_type,
+                body,
+                headers,
+            )
+        except Exception:
+            self._handle_request_error(envelope=envelope, loss_reason="network")
+            raise
+        try:
+            self._handle_response(response=response, envelope=envelope)
+        finally:
+            response.close()
+
+    def _flush_client_reports(self: Self, force: bool = False) -> None:
+        client_report = self._fetch_pending_client_report(force=force, interval=60)
+        if client_report is not None:
+            self.capture_envelope(Envelope(items=[client_report]))
+
     def capture_envelope(self: Self, envelope: Envelope) -> None:
         def send_envelope_wrapper() -> None:
             with capture_internal_exceptions():
@@ -528,12 +561,8 @@ class BaseHttpTransport(Transport):
             self._worker.submit(lambda: self._flush_client_reports(force=True))
             self._worker.flush(timeout, callback)
 
-    def kill(self: Self) -> None:
-        logger.debug("Killing HTTP transport")
-        self._worker.kill()
 
-
-class HttpTransport(BaseHttpTransport):
+class HttpTransport(BaseSyncHttpTransport):
     if TYPE_CHECKING:
         _pool: Union[PoolManager, ProxyManager]
 
@@ -650,7 +679,7 @@ if not HTTP2_ENABLED:
 
 else:
 
-    class Http2Transport(BaseHttpTransport):  # type: ignore
+    class Http2Transport(BaseSyncHttpTransport):  # type: ignore
         """The HTTP2 transport based on httpcore."""
 
         TIMEOUT = 15
