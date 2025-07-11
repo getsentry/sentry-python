@@ -162,7 +162,7 @@ def _parse_rate_limits(
             continue
 
 
-class HttpTransportCore(Transport):
+class BaseHttpTransport(Transport):
     """The base HTTP transport."""
 
     TIMEOUT = 30  # seconds
@@ -496,11 +496,11 @@ class HttpTransportCore(Transport):
         self._worker.kill()
 
 
-class BaseSyncHttpTransport(HttpTransportCore):
+class BaseSyncHttpTransport(BaseHttpTransport):
 
     def _send_envelope(self: Self, envelope: Envelope) -> None:
         _prepared_envelope = self._prepare_envelope(envelope)
-        if _prepared_envelope is None:  # TODO: check this behaviour in detail
+        if _prepared_envelope is None:
             return None
         envelope, body, headers = _prepared_envelope
         self._send_request(
