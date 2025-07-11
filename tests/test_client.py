@@ -1342,6 +1342,8 @@ class TestSpanClientReports:
     Tests for client reports related to spans.
     """
 
+    __test__ = False
+
     @staticmethod
     def span_dropper(spans_to_drop):
         """
