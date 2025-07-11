@@ -1297,7 +1297,6 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
         assert len(test_config.sampler_function_mock.call_args[0]) == 2
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize(
     "opt,missing_flags",
     [
