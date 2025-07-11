@@ -619,9 +619,9 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
     transport.record_lost_event(reason="test", item=transaction_item)
     client.flush()
 
-    (captured,) = capturing_server.captured  # Should only be one envelope
+    (captured,) = capturing_server.captured
     envelope = captured.envelope
-    (item,) = envelope.items  # Envelope should only have one item
+    (item,) = envelope.items
 
     assert item.type == "client_report"
 
@@ -641,3 +641,38 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
         "reason": "test",
         "quantity": span_count + 1,
     } in discarded_events
+
+
+def test_handle_unexpected_status_invokes_handle_request_error(
+    make_client, monkeypatch
+):
+    client = make_client()
+    transport = client.transport
+
+    monkeypatch.setattr(transport._worker, "submit", lambda fn: fn() or True)
+
+    def stub_request(method, endpoint, body=None, headers=None):
+        class MockResponse:
+            def __init__(self):
+                self.status = 500  # Integer
+                self.data = b"server error"
+                self.headers = {}
+
+            def close(self):
+                pass
+
+        return MockResponse()
+
+    monkeypatch.setattr(transport, "_request", stub_request)
+
+    seen = []
+    monkeypatch.setattr(
+        transport,
+        "_handle_request_error",
+        lambda envelope, loss_reason: seen.append(loss_reason),
+    )
+
+    client.capture_event({"message": "test"})
+    client.flush()
+
+    assert seen == ["status_500"]
