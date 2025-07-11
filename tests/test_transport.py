@@ -619,9 +619,9 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
     transport.record_lost_event(reason="test", item=transaction_item)
     client.flush()
 
-    (captured,) = capturing_server.captured
+    (captured,) = capturing_server.captured  # Should only be one envelope
     envelope = captured.envelope
-    (item,) = envelope.items
+    (item,) = envelope.items  # Envelope should only have one item
 
     assert item.type == "client_report"
 
