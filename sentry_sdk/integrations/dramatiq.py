@@ -1,8 +1,11 @@
 import json
+import contextvars
 
 import sentry_sdk
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -18,6 +21,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, Union
+    from sentry_sdk.tracing import Transaction
     from sentry_sdk._types import Event, Hint
 
 
@@ -85,19 +89,26 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
     DramatiqIntegration.
     """
 
+    # type: contextvars.ContextVar[Transaction]
+    _transaction = contextvars.ContextVar("_transaction", default=None)
+
     def before_process_message(self, broker, message):
         # type: (Broker, Message) -> None
         integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
         if integration is None:
             return
 
-        message._scope_manager = sentry_sdk.new_scope()
-        message._scope_manager.__enter__()
-
         scope = sentry_sdk.get_current_scope()
-        scope.set_transaction_name(message.actor_name)
         scope.set_extra("dramatiq_message_id", message.message_id)
         scope.add_event_processor(_make_message_event_processor(message, integration))
+
+        transaction = sentry_sdk.start_transaction(
+            name=message.actor_name,
+            op=OP.QUEUE_PROCESS,
+            source=TransactionSource.TASK,
+        )
+        transaction.__enter__()
+        self._transaction.set(transaction)
 
     def after_process_message(self, broker, message, *, result=None, exception=None):
         # type: (Broker, Message, Any, Optional[Any], Optional[Exception]) -> None
@@ -108,23 +119,29 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         actor = broker.get_actor(message.actor_name)
         throws = message.options.get("throws") or actor.options.get("throws")
 
-        try:
-            if (
-                exception is not None
-                and not (throws and isinstance(exception, throws))
-                and not isinstance(exception, Retry)
-            ):
-                event, hint = event_from_exception(
-                    exception,
-                    client_options=sentry_sdk.get_client().options,
-                    mechanism={
-                        "type": DramatiqIntegration.identifier,
-                        "handled": False,
-                    },
-                )
-                sentry_sdk.capture_event(event, hint=hint)
-        finally:
-            message._scope_manager.__exit__(None, None, None)
+        transaction = self._transaction.get()
+
+        is_event_capture_required = (
+            exception is not None
+            and not (throws and isinstance(exception, throws))
+            and not isinstance(exception, Retry)
+        )
+        if not is_event_capture_required:
+            # normal transaction finish
+            transaction.__exit__(None, None, None)
+            return
+
+        event, hint = event_from_exception(
+            exception,
+            client_options=sentry_sdk.get_client().options,
+            mechanism={
+                "type": DramatiqIntegration.identifier,
+                "handled": False,
+            },
+        )
+        sentry_sdk.capture_event(event, hint=hint)
+        # transaction error
+        transaction.__exit__(type(exception), exception, None)
 
 
 def _make_message_event_processor(message, integration):
