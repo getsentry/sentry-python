@@ -48,17 +48,40 @@ CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compres
 class CapturingServer(WSGIServer):
     def __init__(self, host="127.0.0.1", port=0, ssl_context=None):
         WSGIServer.__init__(self, host, port, self, ssl_context=ssl_context)
-        self.code = 204
+        self.code = {}
         self.headers = {}
-        self.captured = []
+        self._captured = {}
+        self.active_pytest_request = None
 
     def respond_with(self, code=200, headers=None):
-        self.code = code
-        if headers:
-            self.headers = headers
+        assert self.active_pytest_request is not None
+        self.code[self.active_pytest_request] = code
+        self.headers[self.active_pytest_request] = headers or None
+
+    @property
+    def captured(self):
+        if self.active_pytest_request is not None:
+            return self._captured[self.active_pytest_request]
+        else:
+            return []
 
     def clear_captured(self):
-        del self.captured[:]
+        assert self.active_pytest_request is not None
+        del self._captured[self.active_pytest_request][:]
+
+    def set_pytest_request(self, pytest_request):
+        self.active_pytest_request = pytest_request
+        self._captured[self.active_pytest_request] = []
+
+    def clear_pytest_request(self):
+        if self.active_pytest_request is not None:
+            if self.active_pytest_request in self._captured:
+                del self._captured[self.active_pytest_request]
+            if self.active_pytest_request in self.code:
+                del self.code[self.active_pytest_request]
+            if self.active_pytest_request in self.headers:
+                del self.headers[self.active_pytest_request]
+            self.active_pytest_request = None
 
     def __call__(self, environ, start_response):
         """
@@ -82,25 +105,41 @@ class CapturingServer(WSGIServer):
         else:
             envelope = Envelope.deserialize_from(rdr)
 
-        self.captured.append(
-            CapturedData(
-                path=request.path,
-                event=event,
-                envelope=envelope,
-                compressed=compressed,
+        if self.active_pytest_request is not None:
+            self._captured[self.active_pytest_request].append(
+                CapturedData(
+                    path=request.path,
+                    event=event,
+                    envelope=envelope,
+                    compressed=compressed,
+                )
             )
-        )
 
-        response = Response(status=self.code)
-        response.headers.extend(self.headers)
+        response = Response(status=self.code.get(self.active_pytest_request, 204))
+        response.headers.extend(self.headers.get(self.active_pytest_request, {}))
         return response(environ, start_response)
+
+
+server = None
+
+
+@pytest.fixture(scope="module", autouse=True)
+def make_capturing_server(request):
+    global server
+    server = CapturingServer()
+    server.start()
+    request.addfinalizer(server.stop)
 
 
 @pytest.fixture
 def capturing_server(request):
-    server = CapturingServer()
-    server.start()
-    request.addfinalizer(server.stop)
+    global server
+    server.set_pytest_request(request)
+
+    @request.addfinalizer
+    def cleanup():
+        server.clear_pytest_request()
+
     return server
 
 
@@ -129,7 +168,6 @@ def mock_transaction_envelope(span_count):
     return envelope
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
