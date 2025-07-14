@@ -40,7 +40,6 @@ def test_root_span_transaction_payload_started_with_otel_only(capture_envelopes)
     assert "trace_id" in trace_context
     assert "span_id" in trace_context
     assert trace_context["origin"] == "manual"
-    assert trace_context["op"] == "request"
 
     assert payload["spans"] == []
 
@@ -57,7 +56,6 @@ def test_child_span_payload_started_with_otel_only(capture_envelopes):
     payload = item.payload.json
     (span,) = payload["spans"]
 
-    assert span["op"] == "db"
     assert span["description"] == "db"
     assert span["origin"] == "manual"
     assert span["span_id"] is not None
@@ -82,9 +80,9 @@ def test_children_span_nesting_started_with_otel_only(capture_envelopes):
     payload = item.payload.json
     (db_span, http_span, redis_span) = payload["spans"]
 
-    assert db_span["op"] == "db"
-    assert redis_span["op"] == "redis"
-    assert http_span["op"] == "http"
+    assert db_span["description"] == "db"
+    assert redis_span["description"] == "redis"
+    assert http_span["description"] == "http"
 
     assert db_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
     assert redis_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
@@ -121,7 +119,6 @@ def test_root_span_transaction_payload_started_with_sentry_only(capture_envelope
     assert "trace_id" in trace_context
     assert "span_id" in trace_context
     assert trace_context["origin"] == "manual"
-    assert trace_context["op"] == "request"
     assert trace_context["status"] == "ok"
 
     assert payload["spans"] == []
@@ -139,7 +136,6 @@ def test_child_span_payload_started_with_sentry_only(capture_envelopes):
     payload = item.payload.json
     (span,) = payload["spans"]
 
-    assert span["op"] == "db"
     assert span["description"] == "db"
     assert span["origin"] == "manual"
     assert span["status"] == "ok"
@@ -165,9 +161,9 @@ def test_children_span_nesting_started_with_sentry_only(capture_envelopes):
     payload = item.payload.json
     (db_span, http_span, redis_span) = payload["spans"]
 
-    assert db_span["op"] == "db"
-    assert redis_span["op"] == "redis"
-    assert http_span["op"] == "http"
+    assert db_span["description"] == "db"
+    assert redis_span["description"] == "redis"
+    assert http_span["description"] == "http"
 
     assert db_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
     assert redis_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
@@ -193,9 +189,9 @@ def test_children_span_nesting_mixed(capture_envelopes):
     payload = item.payload.json
     (db_span, http_span, redis_span) = payload["spans"]
 
-    assert db_span["op"] == "db"
-    assert redis_span["op"] == "redis"
-    assert http_span["op"] == "http"
+    assert db_span["description"] == "db"
+    assert redis_span["description"] == "redis"
+    assert http_span["description"] == "http"
 
     assert db_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
     assert redis_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]

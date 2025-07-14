@@ -219,10 +219,8 @@ class SentrySpanProcessor(SpanProcessor):
         if profile_context:
             contexts["profile"] = profile_context
 
-        (_, description, _, http_status, _) = span_data
-
-        if http_status:
-            contexts["response"] = {"status_code": http_status}
+        if span_data.http_status:
+            contexts["response"] = {"status_code": span_data.http_status}
 
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
@@ -230,7 +228,7 @@ class SentrySpanProcessor(SpanProcessor):
         event.update(
             {
                 "type": "transaction",
-                "transaction": transaction_name or description,
+                "transaction": transaction_name or span_data.description,
                 "transaction_info": {"source": transaction_source or "custom"},
                 "contexts": contexts,
             }
@@ -257,19 +255,21 @@ class SentrySpanProcessor(SpanProcessor):
         span_id = format_span_id(span.context.span_id)
         parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
 
-        (op, description, status, _, origin) = extract_span_data(span)
+        span_data = extract_span_data(span)
 
         span_json.update(
             {
                 "trace_id": trace_id,
                 "span_id": span_id,
-                "op": op,
-                "description": description,
-                "status": status,
-                "origin": origin or DEFAULT_SPAN_ORIGIN,
+                "description": span_data.description,
+                "origin": span_data.origin or DEFAULT_SPAN_ORIGIN,
             }
         )
 
+        if span_data.op:
+            span_json["op"] = span_data.op
+        if span_data.status:
+            span_json["status"] = span_data.status
         if parent_span_id:
             span_json["parent_span_id"] = parent_span_id
 
