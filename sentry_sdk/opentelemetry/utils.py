@@ -160,12 +160,12 @@ def infer_op(span: ReadableSpan) -> Optional[str]:
         return None
 
     if SpanAttributes.HTTP_METHOD in span.attributes:
-        op = "http"
         if span.kind == SpanKind.SERVER:
-            op += ".server"
+            return OP.HTTP_SERVER
         elif span.kind == SpanKind.CLIENT:
-            op += ".client"
-        return op
+            return OP.HTTP_CLIENT
+        else:
+            return OP.HTTP
     elif SpanAttributes.DB_SYSTEM in span.attributes:
         return OP.DB
     elif SpanAttributes.RPC_SERVICE in span.attributes:
