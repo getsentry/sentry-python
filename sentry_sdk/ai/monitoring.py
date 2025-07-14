@@ -103,15 +103,19 @@ def record_token_usage(
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
         span.set_attribute(SPANDATA.AI_PIPELINE_NAME, ai_pipeline_name)
+
     if prompt_tokens is not None:
-        span.set_attribute(SPANDATA.AI_PROMPT_TOKENS_USED, prompt_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
+
     if completion_tokens is not None:
-        span.set_attribute(SPANDATA.AI_COMPLETION_TOKENS_USED, completion_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens)
+
     if (
         total_tokens is None
         and prompt_tokens is not None
         and completion_tokens is not None
     ):
         total_tokens = prompt_tokens + completion_tokens
+
     if total_tokens is not None:
-        span.set_attribute(SPANDATA.AI_TOTAL_TOKENS_USED, total_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
