@@ -656,6 +656,21 @@ def should_propagate_trace(client: sentry_sdk.client.BaseClient, url: str) -> bo
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
+def _is_span_origin_excluded(origin: Optional[str]) -> bool:
+    """
+    Check if spans with this origin should be ignored based on the `exclude_span_origins` option.
+    """
+    if origin is None:
+        return False
+
+    client = sentry_sdk.get_client()
+    exclude_span_origins = client.options.get("exclude_span_origins")
+    if not exclude_span_origins:
+        return False
+
+    return match_regex_list(origin, exclude_span_origins, substring_matching=True)
+
+
 def normalize_incoming_data(incoming_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Normalizes incoming data so the keys are all lowercase with dashes instead of underscores and stripped from known prefixes.
