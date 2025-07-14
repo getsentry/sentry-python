@@ -212,12 +212,12 @@ def test_passes_parent_sampling_decision_in_sampling_context(
 
 
 def test_passes_custom_attributes_in_sampling_context(sentry_init):
-    def dummy_traces_sampler(sampling_context):
+    def traces_sampler(sampling_context):
         assert sampling_context["dog.name"] == "Lily"
         assert sampling_context["dog.activity"] == "fetch"
         return 1.0
 
-    sentry_init(traces_sample_rate=1.0, traces_sampler=dummy_traces_sampler)
+    sentry_init(traces_sample_rate=1.0, traces_sampler=traces_sampler)
 
     with sentry_sdk.continue_trace(
         {"sentry-trace": "12312012123120121231201212312012-1121201211212012-1"}
