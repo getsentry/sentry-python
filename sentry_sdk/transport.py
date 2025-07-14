@@ -168,7 +168,7 @@ def _parse_rate_limits(
             continue
 
 
-class BaseHttpTransport(Transport):
+class HttpTransportCore(Transport):
     """The base HTTP transport."""
 
     TIMEOUT = 30  # seconds
@@ -502,7 +502,7 @@ class BaseHttpTransport(Transport):
         self._worker.kill()
 
 
-class BaseSyncHttpTransport(BaseHttpTransport):
+class BaseHttpTransport(HttpTransportCore):
 
     def _send_envelope(self: Self, envelope: Envelope) -> None:
         _prepared_envelope = self._prepare_envelope(envelope)
@@ -568,7 +568,7 @@ class BaseSyncHttpTransport(BaseHttpTransport):
             self._worker.flush(timeout, callback)
 
 
-class HttpTransport(BaseSyncHttpTransport):
+class HttpTransport(BaseHttpTransport):
     if TYPE_CHECKING:
         _pool: Union[PoolManager, ProxyManager]
 
@@ -685,7 +685,7 @@ if not HTTP2_ENABLED:
 
 else:
 
-    class Http2Transport(BaseSyncHttpTransport):  # type: ignore
+    class Http2Transport(BaseHttpTransport):  # type: ignore
         """The HTTP2 transport based on httpcore."""
 
         TIMEOUT = 15
