@@ -21,7 +21,6 @@ from sentry_sdk.client import Client, NonRecordingClient
 from tests.conftest import SortedBaggage
 
 
-@pytest.mark.forked
 def test_get_current_span_current_scope_with_span(sentry_init):
     sentry_init()
 
@@ -31,7 +30,6 @@ def test_get_current_span_current_scope_with_span(sentry_init):
         assert get_current_span() == new_span
 
 
-@pytest.mark.forked
 def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
@@ -43,7 +41,6 @@ def test_traceparent_with_tracing_enabled(sentry_init):
         assert get_traceparent() == expected_traceparent
 
 
-@pytest.mark.forked
 def test_traceparent_with_tracing_disabled(sentry_init):
     sentry_init()
 
@@ -55,7 +52,6 @@ def test_traceparent_with_tracing_disabled(sentry_init):
     assert get_traceparent() == expected_traceparent
 
 
-@pytest.mark.forked
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
@@ -67,7 +63,6 @@ def test_baggage_with_tracing_disabled(sentry_init):
     assert get_baggage() == SortedBaggage(expected_baggage)
 
 
-@pytest.mark.forked
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.111111):
@@ -76,7 +71,6 @@ def test_baggage_with_tracing_enabled(sentry_init):
             assert get_baggage() == SortedBaggage(expected_baggage)
 
 
-@pytest.mark.forked
 def test_continue_trace(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
@@ -102,7 +96,6 @@ def test_continue_trace(sentry_init):
             }
 
 
-@pytest.mark.forked
 def test_is_initialized():
     assert not is_initialized()
 
@@ -111,7 +104,6 @@ def test_is_initialized():
     assert is_initialized()
 
 
-@pytest.mark.forked
 def test_get_client():
     client = get_client()
     assert client is not None
