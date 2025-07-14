@@ -31,7 +31,8 @@ from sentry_sdk.tracing_utils import Baggage, get_span_status_from_http_code
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Mapping, Union, Type, TypeVar
+    from typing import Any, Optional, Union, Type, TypeVar
+    from opentelemetry.util.types import Attributes
 
     T = TypeVar("T")
 
@@ -128,24 +129,18 @@ def extract_span_data(span: ReadableSpan) -> ExtractedSpanData:
     Priority is given first to attributes explicitly defined by us via the SDK.
     Otherwise we try to infer sane values from other attributes.
     """
-    op = None
-    description = None
-    origin = None
+    op = get_typed_attribute(span.attributes, SentrySpanAttribute.OP, str) or infer_op(
+        span
+    )
 
-    if span.attributes is not None:
-        op = get_typed_attribute(
-            span.attributes, SentrySpanAttribute.OP, str
-        ) or infer_op(span)
+    description = (
+        get_typed_attribute(span.attributes, SentrySpanAttribute.DESCRIPTION, str)
+        or get_typed_attribute(span.attributes, SentrySpanAttribute.NAME, str)
+        or infer_description(span)
+    )
 
-        description = (
-            get_typed_attribute(span.attributes, SentrySpanAttribute.DESCRIPTION, str)
-            or get_typed_attribute(span.attributes, SentrySpanAttribute.NAME, str)
-            or infer_description(span)
-        )
+    origin = get_typed_attribute(span.attributes, SentrySpanAttribute.ORIGIN, str)
 
-        origin = get_typed_attribute(span.attributes, SentrySpanAttribute.ORIGIN, str)
-
-    # TODO status cleanup
     (status, http_status) = extract_span_status(span)
 
     return ExtractedSpanData(
@@ -226,15 +221,14 @@ def extract_span_status(span: ReadableSpan) -> tuple[Optional[str], Optional[int
     on the description if it is a valid status for Sentry.
     In the final UNSET case, we try to infer HTTP/GRPC.
     """
-    span_attributes = span.attributes or {}
     status = span.status
-    http_status = get_http_status_code(span_attributes)
+    http_status = get_http_status_code(span.attributes)
     final_status = None
 
     if status.status_code == StatusCode.OK:
         final_status = SPANSTATUS.OK
     elif status.status_code == StatusCode.ERROR:
-        inferred_status = infer_status_from_attributes(span_attributes, http_status)
+        inferred_status = infer_status_from_attributes(span.attributes, http_status)
 
         if inferred_status is not None:
             final_status = inferred_status
@@ -247,14 +241,17 @@ def extract_span_status(span: ReadableSpan) -> tuple[Optional[str], Optional[int
             final_status = SPANSTATUS.UNKNOWN_ERROR
     else:
         # UNSET case
-        final_status = infer_status_from_attributes(span_attributes, http_status)
+        final_status = infer_status_from_attributes(span.attributes, http_status)
 
     return (final_status, http_status)
 
 
 def infer_status_from_attributes(
-    span_attributes: Mapping[str, Any], http_status: Optional[int]
+    span_attributes: Attributes, http_status: Optional[int]
 ) -> Optional[str]:
+    if span_attributes is None:
+        return None
+
     if http_status:
         return get_span_status_from_http_code(http_status)
 
@@ -265,7 +262,7 @@ def infer_status_from_attributes(
     return None
 
 
-def get_http_status_code(span_attributes: Mapping[str, Any]) -> Optional[int]:
+def get_http_status_code(span_attributes: Attributes) -> Optional[int]:
     try:
         http_status = get_typed_attribute(
             span_attributes, SpanAttributes.HTTP_RESPONSE_STATUS_CODE, int
@@ -458,12 +455,12 @@ def get_profile_context(span: ReadableSpan) -> Optional[dict[str, str]]:
     return {"profiler_id": profiler_id}
 
 
-def get_typed_attribute(
-    attributes: Mapping[str, Any], key: str, type: Type[T]
-) -> Optional[T]:
+def get_typed_attribute(attributes: Attributes, key: str, type: Type[T]) -> Optional[T]:
     """
     helper method to coerce types of attribute values
     """
+    if attributes is None:
+        return None
     value = attributes.get(key)
     if value is not None and isinstance(value, type):
         return value
