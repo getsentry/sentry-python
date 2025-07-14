@@ -217,7 +217,7 @@ def test_passes_custom_attributes_in_sampling_context(sentry_init):
         assert sampling_context["dog.activity"] == "fetch"
         return 1.0
 
-    sentry_init(traces_sample_rate=1.0, traces_sampler=traces_sampler)
+    sentry_init(traces_sampler=traces_sampler)
 
     with sentry_sdk.continue_trace(
         {"sentry-trace": "12312012123120121231201212312012-1121201211212012-1"}
@@ -226,18 +226,6 @@ def test_passes_custom_attributes_in_sampling_context(sentry_init):
             name="dogpark", attributes={"dog.name": "Lily", "dog.activity": "fetch"}
         ):
             pass
-
-
-def test_passes_attributes_from_start_span_to_traces_sampler(
-    sentry_init, DictionaryContaining  # noqa: N803
-):
-    traces_sampler = mock.Mock()
-    sentry_init(traces_sampler=traces_sampler)
-
-    with start_span(attributes={"dogs": "yes", "cats": "maybe"}):
-        traces_sampler.assert_called_once_with(
-            DictionaryContaining({"dogs": "yes", "cats": "maybe"})
-        )
 
 
 def test_sample_rate_affects_errors(sentry_init, capture_events):
