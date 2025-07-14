@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 import os
 import threading
 
@@ -16,7 +17,48 @@ if TYPE_CHECKING:
 _TERMINATOR = object()
 
 
-class BackgroundWorker:
+class Worker(ABC):
+    """
+    Base class for all workers.
+
+    A worker is used to process events in the background and send them to Sentry.
+    """
+
+    @property
+    @abstractmethod
+    def is_alive(self) -> bool:
+        pass
+
+    @abstractmethod
+    def kill(self) -> None:
+        pass
+
+    @abstractmethod
+    def flush(
+        self, timeout: float, callback: Optional[Callable[[int, float], None]] = None
+    ) -> None:
+        """
+        Flush the worker.
+
+        This method blocks until the worker has flushed all events or the specified timeout is reached.
+        """
+        pass
+
+    @abstractmethod
+    def full(self) -> bool:
+        pass
+
+    @abstractmethod
+    def submit(self, callback: Callable[[], None]) -> bool:
+        """
+        Schedule a callback to be executed by the worker.
+
+        Returns True if the callback was scheduled, False if the queue is full.
+        """
+        pass
+
+
+class BackgroundWorker(Worker):
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
         self._queue: Queue = Queue(queue_size)
         self._lock = threading.Lock()
