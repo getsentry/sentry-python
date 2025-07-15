@@ -1,4 +1,5 @@
 from functools import wraps
+import json
 
 import sentry_sdk
 from sentry_sdk import consts
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 try:
     from openai.resources.chat.completions import Completions, AsyncCompletions
     from openai.resources import Embeddings, AsyncEmbeddings
+    from openai.resources.responses import Responses
 
     if TYPE_CHECKING:
         from openai.types.chat import ChatCompletionMessageParam, ChatCompletionChunk
@@ -47,6 +49,7 @@ class OpenAIIntegration(Integration):
         # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
+        Responses.create = _wrap_responses_create(Responses.create)
 
         AsyncCompletions.create = _wrap_async_chat_completion_create(
             AsyncCompletions.create
@@ -454,3 +457,77 @@ def _wrap_async_embeddings_create(f):
         return await _execute_async(f, *args, **kwargs)
 
     return _sentry_patched_create_async
+
+
+def _new_responses_create_common(f, *args, **kwargs):
+    # type: (Any, *Any, **Any) -> Any
+    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    if integration is None:
+        return f(*args, **kwargs)
+
+    model = kwargs.get("model")
+    input = kwargs.get("input")
+
+    span = sentry_sdk.start_span(
+        op=consts.OP.GEN_AI_RESPONSES,
+        name=f"{consts.OP.GEN_AI_RESPONSES} {model}",
+        origin=OpenAIIntegration.origin,
+    )
+    span.__enter__()
+
+    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+
+    if should_send_default_pii() and integration.include_prompts:
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, input)
+
+    res = yield f, args, kwargs
+
+    if hasattr(res, "output"):
+        if should_send_default_pii() and integration.include_prompts:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                json.dumps([item.to_dict() for item in res.output]),
+            )
+        _calculate_token_usage([], res, span, None, integration.count_tokens)
+        span.__exit__(None, None, None)
+
+    else:
+        set_data_normalized(span, "unknown_response", True)
+        span.__exit__(None, None, None)
+
+    return res
+
+
+def _wrap_responses_create(f):
+    # type: (Any) -> Any
+    def _execute_sync(f, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
+        gen = _new_responses_create_common(f, *args, **kwargs)
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return e.value
+
+        try:
+            try:
+                result = f(*args, **kwargs)
+            except Exception as e:
+                _capture_exception(e)
+                raise e from None
+
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
+
+    @wraps(f)
+    def _sentry_patched_create_sync(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+
+        return _execute_sync(f, *args, **kwargs)
+
+    return _sentry_patched_create_sync
