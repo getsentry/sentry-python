@@ -123,13 +123,11 @@ def _calculate_token_usage(
                     output_tokens += count_tokens(choice.message)
 
     # Do not set token data if it is 0
-    input_tokens = None if input_tokens == 0 else input_tokens
-    input_tokens_cached = None if input_tokens_cached == 0 else input_tokens_cached
-    output_tokens = None if output_tokens == 0 else output_tokens
-    output_tokens_reasoning = (
-        None if output_tokens_reasoning == 0 else output_tokens_reasoning
-    )
-    total_tokens = None if total_tokens == 0 else total_tokens
+    input_tokens = input_tokens or None
+    input_tokens_cached = input_tokens_cached or None
+    output_tokens = output_tokens or None
+    output_tokens_reasoning = output_tokens_reasoning or None
+    total_tokens = total_tokens or None
 
     record_token_usage(
         span,
