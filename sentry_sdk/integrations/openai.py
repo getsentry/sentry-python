@@ -464,9 +464,6 @@ def _new_responses_create_common(f, *args, **kwargs):
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
                 json.dumps([item.to_dict() for item in res.output]),
             )
-        import ipdb
-
-        ipdb.set_trace()
         _calculate_chat_completion_usage([], res, span, None, integration.count_tokens)
         span.__exit__(None, None, None)
 
