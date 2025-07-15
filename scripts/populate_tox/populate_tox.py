@@ -513,7 +513,8 @@ def _compare_min_version_with_defined(
         ):
             print(
                 f"  Integration defines {defined_min_version} as minimum "
-                f"version, but the effective minimum version is {releases[0]}."
+                f"version, but the effective minimum version based on metadata "
+                f"is {releases[0]}."
             )
 
 
