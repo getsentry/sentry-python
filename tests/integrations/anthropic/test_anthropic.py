@@ -125,9 +125,9 @@ def test_nonstreaming_create_message(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 20
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+    assert span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert span["data"]["gen_ai.usage.output_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
     assert span["data"][SPANDATA.AI_STREAMING] is False
 
 
@@ -193,9 +193,9 @@ async def test_nonstreaming_create_message_async(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 20
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+    assert span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert span["data"]["gen_ai.usage.output_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
     assert span["data"][SPANDATA.AI_STREAMING] is False
 
 
@@ -293,9 +293,9 @@ def test_streaming_create_message(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 30
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 40
+    assert span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert span["data"]["gen_ai.usage.output_tokens"] == 30
+    assert span["data"]["gen_ai.usage.total_tokens"] == 40
     assert span["data"][SPANDATA.AI_STREAMING] is True
 
 
@@ -396,9 +396,9 @@ async def test_streaming_create_message_async(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 30
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 40
+    assert span["data"]["gen_ai.usage.input_tokens"] == 10
+    assert span["data"]["gen_ai.usage.output_tokens"] == 30
+    assert span["data"]["gen_ai.usage.total_tokens"] == 40
     assert span["data"][SPANDATA.AI_STREAMING] is True
 
 
@@ -525,9 +525,9 @@ def test_streaming_create_message_with_input_json_delta(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 366
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 51
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 417
+    assert span["data"]["gen_ai.usage.input_tokens"] == 366
+    assert span["data"]["gen_ai.usage.output_tokens"] == 51
+    assert span["data"]["gen_ai.usage.total_tokens"] == 417
     assert span["data"][SPANDATA.AI_STREAMING] is True
 
 
@@ -662,9 +662,9 @@ async def test_streaming_create_message_with_input_json_delta_async(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 366
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 51
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 417
+    assert span["data"]["gen_ai.usage.input_tokens"] == 366
+    assert span["data"]["gen_ai.usage.output_tokens"] == 51
+    assert span["data"]["gen_ai.usage.total_tokens"] == 417
     assert span["data"][SPANDATA.AI_STREAMING] is True
 
 
@@ -807,10 +807,10 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init):
             content_blocks=["{'test': 'data',", "'more': 'json'}"],
         )
 
-        assert span._data.get(SPANDATA.AI_RESPONSES) == [
+        assert span._data.get("ai.responses") == [
             {"type": "text", "text": "{'test': 'data','more': 'json'}"}
         ]
-        assert span._data.get(SPANDATA.AI_STREAMING) is True
-        assert span._measurements.get("ai_prompt_tokens_used")["value"] == 10
-        assert span._measurements.get("ai_completion_tokens_used")["value"] == 20
-        assert span._measurements.get("ai_total_tokens_used")["value"] == 30
+        assert span._data.get("ai.streaming") is True
+        assert span._data.get("gen_ai.usage.input_tokens") == 10
+        assert span._data.get("gen_ai.usage.output_tokens") == 20
+        assert span._data.get("gen_ai.usage.total_tokens") == 30
