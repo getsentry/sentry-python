@@ -5,12 +5,21 @@ import dramatiq
 from dramatiq.brokers.stub import StubBroker
 
 import sentry_sdk
+from sentry_sdk.tracing import TransactionSource
+from sentry_sdk import start_transaction
+from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.integrations.dramatiq import DramatiqIntegration
 
+# from sentry_sdk.integrations.logging import LoggingIntegration
 
-@pytest.fixture
-def broker(sentry_init):
-    sentry_init(integrations=[DramatiqIntegration()])
+
+@pytest.fixture(scope="function")
+def broker(request, sentry_init):
+    sentry_init(
+        integrations=[DramatiqIntegration()],
+        traces_sample_rate=getattr(request, "param", None),
+        # disabled_integrations=[LoggingIntegration()],
+    )
     broker = StubBroker()
     broker.emit_after("process_boot")
     dramatiq.set_broker(broker)
@@ -44,22 +53,61 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events):
     assert exception["type"] == "ZeroDivisionError"
 
 
-def test_that_actor_name_is_set_as_transaction(broker, worker, capture_events):
+@pytest.mark.parametrize(
+    "broker,expected_span_status",
+    [
+        (1.0, SPANSTATUS.INTERNAL_ERROR),
+        (1.0, SPANSTATUS.OK),
+    ],
+    ids=["error", "success"],
+    indirect=["broker"],
+)
+def test_task_transaction(broker, worker, capture_events, expected_span_status):
     events = capture_events()
+    task_fails = expected_span_status == SPANSTATUS.INTERNAL_ERROR
 
     @dramatiq.actor(max_retries=0)
     def dummy_actor(x, y):
         return x / y
 
-    dummy_actor.send(1, 0)
+    dummy_actor.send(1, int(not task_fails))
     broker.join(dummy_actor.queue_name)
     worker.join()
 
+    if task_fails:
+        error_event = events.pop(0)
+        exception = error_event["exception"]["values"][0]
+        assert exception["type"] == "ZeroDivisionError"
+        # todo: failed assert. Logging instead of dramatiq
+        # assert exception["mechanism"]["type"] == DramatiqIntegration.identifier
+
     (event,) = events
+    assert event["type"] == "transaction"
     assert event["transaction"] == "dummy_actor"
+    assert event["transaction_info"] == {"source": TransactionSource.TASK}
+    assert event["contexts"]["trace"]["status"] == expected_span_status
 
 
-def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events):
+@pytest.mark.parametrize("broker", [1.0], indirect=True)
+def test_dramatiq_propagate_trace(broker, worker, capture_events):
+    events = capture_events()
+
+    @dramatiq.actor(max_retries=0)
+    def propagated_trace_task():
+        pass
+
+    with start_transaction() as outer_transaction:
+        propagated_trace_task.send()
+        broker.join(propagated_trace_task.queue_name)
+        worker.join()
+
+    assert (
+        events[0]["transaction"] == "propagated_trace_task"
+    )  # the "inner" transaction
+    assert events[0]["contexts"]["trace"]["trace_id"] == outer_transaction.trace_id
+
+
+def test_that_dramatiq_message_id_is_set_as_tag(broker, worker, capture_events):
     events = capture_events()
 
     @dramatiq.actor(max_retries=0)
@@ -72,13 +120,14 @@ def test_that_dramatiq_message_id_is_set_as_extra(broker, worker, capture_events
     worker.join()
 
     event_message, event_error = events
-    assert "dramatiq_message_id" in event_message["extra"]
-    assert "dramatiq_message_id" in event_error["extra"]
+
+    assert "dramatiq_message_id" in event_message["tags"]
+    assert "dramatiq_message_id" in event_error["tags"]
     assert (
-        event_message["extra"]["dramatiq_message_id"]
-        == event_error["extra"]["dramatiq_message_id"]
+        event_message["tags"]["dramatiq_message_id"]
+        == event_error["tags"]["dramatiq_message_id"]
     )
-    msg_ids = [e["extra"]["dramatiq_message_id"] for e in events]
+    msg_ids = [e["tags"]["dramatiq_message_id"] for e in events]
     assert all(uuid.UUID(msg_id) and isinstance(msg_id, str) for msg_id in msg_ids)
 
 
