@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.33.0
+
+### Various fixes & improvements
+
+- feat(langchain): Support `BaseCallbackManager` (#4486) by @szokeasaurusrex
+- Use `span.data` instead of `measurements` for token usage (#4567) by @antonpirker
+- Fix custom model name (#4569) by @antonpirker
+- fix: shut down "session flusher" more promptly (#4561) by @bukzor
+- chore: Remove Lambda urllib3 pin on Python 3.10+ (#4549) by @sentrivana
+
 ## 2.32.0
 
 ### Various fixes & improvements
