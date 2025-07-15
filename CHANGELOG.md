@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.33.0
+
+### Various fixes & improvements
+
+- feat(langchain): Support `BaseCallbackManager` (#4486) by @szokeasaurusrex
+- tests: Regenerate tox.ini (#4583) by @sentrivana
+- Remove all forked markers in test_api (#4576) by @sl0thentr0py
+- Remove forked marker in client uwsgi test (#4575) by @sl0thentr0py
+- Fix pytest collection warning (#4574) by @sl0thentr0py
+- Remove print statements from excepthook test (#4573) by @sl0thentr0py
+- Use `span.data` instead of `measurements` for token usage (#4567) by @antonpirker
+- Fix custom model name (#4569) by @antonpirker
+- fix: shut down "session flusher" more promptly (#4561) by @bukzor
+- test(loguru): Remove hardcoded line number in test_just_log (#4552) by @srothh
+- toxgen: Detect correct sentry-sdk (#4558) by @sentrivana
+- tests: Tox update (#4555) by @sentrivana
+- chore: Remove Lambda urllib3 pin on Python 3.10+ (#4549) by @sentrivana
+
 ## 2.32.0
 
 ### Various fixes & improvements
