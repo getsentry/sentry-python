@@ -24,7 +24,6 @@ from sentry_sdk import (
 from sentry_sdk.client import Client, NonRecordingClient
 
 
-@pytest.mark.forked
 def test_get_current_span():
     fake_scope = mock.MagicMock()
     fake_scope.span = mock.MagicMock()
@@ -34,7 +33,6 @@ def test_get_current_span():
     assert get_current_span(fake_scope) is None
 
 
-@pytest.mark.forked
 def test_get_current_span_default_hub(sentry_init):
     sentry_init()
 
@@ -47,7 +45,6 @@ def test_get_current_span_default_hub(sentry_init):
     assert get_current_span() == fake_span
 
 
-@pytest.mark.forked
 def test_get_current_span_default_hub_with_transaction(sentry_init):
     sentry_init()
 
@@ -57,7 +54,6 @@ def test_get_current_span_default_hub_with_transaction(sentry_init):
         assert get_current_span() == new_transaction
 
 
-@pytest.mark.forked
 def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
@@ -69,7 +65,6 @@ def test_traceparent_with_tracing_enabled(sentry_init):
         assert get_traceparent() == expected_traceparent
 
 
-@pytest.mark.forked
 def test_traceparent_with_tracing_disabled(sentry_init):
     sentry_init()
 
@@ -81,7 +76,6 @@ def test_traceparent_with_tracing_disabled(sentry_init):
     assert get_traceparent() == expected_traceparent
 
 
-@pytest.mark.forked
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
@@ -93,7 +87,6 @@ def test_baggage_with_tracing_disabled(sentry_init):
     assert get_baggage() == expected_baggage
 
 
-@pytest.mark.forked
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_transaction() as transaction:
@@ -103,7 +96,6 @@ def test_baggage_with_tracing_enabled(sentry_init):
         assert re.match(expected_baggage_re, get_baggage())
 
 
-@pytest.mark.forked
 def test_continue_trace(sentry_init):
     sentry_init()
 
@@ -130,7 +122,6 @@ def test_continue_trace(sentry_init):
         }
 
 
-@pytest.mark.forked
 def test_is_initialized():
     assert not is_initialized()
 
@@ -139,7 +130,6 @@ def test_is_initialized():
     assert is_initialized()
 
 
-@pytest.mark.forked
 def test_get_client():
     client = get_client()
     assert client is not None

@@ -53,7 +53,8 @@ def _set_agent_data(span, agent):
         )
 
     if agent.model:
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, agent.model)
+        model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
     if agent.model_settings.presence_penalty:
         span.set_data(
