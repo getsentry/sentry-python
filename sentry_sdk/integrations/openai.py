@@ -106,13 +106,13 @@ def _calculate_token_usage(
         total_tokens = _get_usage(response.usage, ["total_tokens"])
 
     # Manually count tokens
-    # TODO: check for responses API
+    # TODO: when implementing responses API, check for responses API
     if input_tokens == 0:
         for message in messages:
             if "content" in message:
                 input_tokens += count_tokens(message["content"])
 
-    # TODO: check for responses API
+    # TODO: when implementing responses API, check for responses API
     if output_tokens == 0:
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
