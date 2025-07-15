@@ -20,11 +20,6 @@ try:
 except ImportError:
     gevent = None
 
-try:
-    import eventlet
-except ImportError:
-    eventlet = None
-
 import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope
@@ -334,23 +329,11 @@ class EventStreamReader:
 # scope=session ensures that fixture is run earlier
 @pytest.fixture(
     scope="session",
-    params=[None, "eventlet", "gevent"],
-    ids=("threads", "eventlet", "greenlet"),
+    params=[None, "gevent"],
+    ids=("threads", "greenlet"),
 )
 def maybe_monkeypatched_threading(request):
-    if request.param == "eventlet":
-        if eventlet is None:
-            pytest.skip("no eventlet installed")
-
-        try:
-            eventlet.monkey_patch()
-        except AttributeError as e:
-            if "'thread.RLock' object has no attribute" in str(e):
-                # https://bitbucket.org/pypy/pypy/issues/2962/gevent-cannot-patch-rlock-under-pypy-27-7
-                pytest.skip("https://github.com/eventlet/eventlet/issues/546")
-            else:
-                raise
-    elif request.param == "gevent":
+    if request.param == "gevent":
         if gevent is None:
             pytest.skip("no gevent installed")
         try:

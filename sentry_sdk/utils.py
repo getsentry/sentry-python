@@ -1240,7 +1240,7 @@ def parse_version(version: str) -> Optional[Tuple[int, ...]]:
 
 def _is_contextvars_broken() -> bool:
     """
-    Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
+    Returns whether gevent has patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
         import gevent
@@ -1265,23 +1265,6 @@ def _is_contextvars_broken() -> bool:
             ):
                 return False
 
-            return True
-    except ImportError:
-        pass
-
-    try:
-        import greenlet
-        from eventlet.patcher import is_monkey_patched  # type: ignore
-
-        greenlet_version = parse_version(greenlet.__version__)
-
-        if greenlet_version is None:
-            logger.error(
-                "Internal error in Sentry SDK: Could not parse Greenlet version from greenlet.__version__."
-            )
-            return False
-
-        if is_monkey_patched("thread") and greenlet_version < (0, 5):
             return True
     except ImportError:
         pass

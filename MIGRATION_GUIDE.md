@@ -177,6 +177,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Dropped support for Django versions below 2.0.
 - Dropped support for trytond versions below 5.0.
 - Dropped support for Falcon versions below 3.0.
+- Dropped support for eventlet completely.
 
 ### Deprecated
 
