@@ -161,8 +161,8 @@ def _new_chat_completion_common(f, *args, **kwargs):
     streaming = kwargs.get("stream")
 
     span = sentry_sdk.start_span(
-        op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
-        name="Chat Completion",
+        op=consts.OP.GEN_AI_CHAT,
+        name=f"{consts.OP.GEN_AI_CHAT} {model}",
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
@@ -171,16 +171,16 @@ def _new_chat_completion_common(f, *args, **kwargs):
 
     with capture_internal_exceptions():
         if should_send_default_pii() and integration.include_prompts:
-            set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, messages)
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
 
-        set_data_normalized(span, SPANDATA.AI_MODEL_ID, model)
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
         set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
 
         if hasattr(res, "choices"):
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(
                     span,
-                    SPANDATA.AI_RESPONSES,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
                     list(map(lambda x: x.message, res.choices)),
                 )
             _calculate_token_usage(messages, res, span, None, integration.count_tokens)
@@ -212,7 +212,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
                         )
                         if should_send_default_pii() and integration.include_prompts:
                             set_data_normalized(
-                                span, SPANDATA.AI_RESPONSES, all_responses
+                                span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                             )
                         _calculate_token_usage(
                             messages,
@@ -245,7 +245,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
                         )
                         if should_send_default_pii() and integration.include_prompts:
                             set_data_normalized(
-                                span, SPANDATA.AI_RESPONSES, all_responses
+                                span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                             )
                         _calculate_token_usage(
                             messages,
@@ -343,24 +343,30 @@ def _new_embeddings_create_common(f, *args, **kwargs):
     if integration is None:
         return f(*args, **kwargs)
 
+    model = kwargs.get("model")
+
     with sentry_sdk.start_span(
-        op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
-        description="OpenAI Embedding Creation",
+        op=consts.OP.GEN_AI_EMBEDDINGS,
+        name=f"{consts.OP.GEN_AI_EMBEDDINGS} {model}",
         origin=OpenAIIntegration.origin,
     ) as span:
         if "input" in kwargs and (
             should_send_default_pii() and integration.include_prompts
         ):
             if isinstance(kwargs["input"], str):
-                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, [kwargs["input"]])
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [kwargs["input"]]
+                )
             elif (
                 isinstance(kwargs["input"], list)
                 and len(kwargs["input"]) > 0
                 and isinstance(kwargs["input"][0], str)
             ):
-                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, kwargs["input"])
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, kwargs["input"]
+                )
         if "model" in kwargs:
-            set_data_normalized(span, SPANDATA.AI_MODEL_ID, kwargs["model"])
+            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"])
 
         response = yield f, args, kwargs
 
