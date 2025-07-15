@@ -279,15 +279,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 if token_usage:
                     record_token_usage(
                         span_data.span,
-                        token_usage.get("prompt_tokens"),
-                        token_usage.get("completion_tokens"),
-                        token_usage.get("total_tokens"),
+                        input_tokens=token_usage.get("prompt_tokens"),
+                        output_tokens=token_usage.get("completion_tokens"),
+                        total_tokens=token_usage.get("total_tokens"),
                     )
                 else:
                     record_token_usage(
                         span_data.span,
-                        span_data.num_prompt_tokens,
-                        span_data.num_completion_tokens,
+                        input_tokens=span_data.num_prompt_tokens,
+                        output_tokens=span_data.num_completion_tokens,
                     )
 
             self._exit_span(span_data, run_id)
