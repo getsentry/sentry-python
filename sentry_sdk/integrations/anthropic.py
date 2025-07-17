@@ -62,7 +62,13 @@ def _calculate_token_usage(result: Messages, span: Span) -> None:
             output_tokens = usage.output_tokens
 
     total_tokens = input_tokens + output_tokens
-    record_token_usage(span, input_tokens, output_tokens, total_tokens)
+
+    record_token_usage(
+        span,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+    )
 
 
 def _get_responses(content: list[Any]) -> list[dict[str, Any]]:
@@ -129,7 +135,12 @@ def _add_ai_data_to_span(
                 [{"type": "text", "text": complete_message}],
             )
         total_tokens = input_tokens + output_tokens
-        record_token_usage(span, input_tokens, output_tokens, total_tokens)
+        record_token_usage(
+            span,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
         span.set_attribute(SPANDATA.AI_STREAMING, True)
 
 

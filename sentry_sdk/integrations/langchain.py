@@ -24,6 +24,7 @@ try:
     from langchain_core.callbacks import (
         manager,
         BaseCallbackHandler,
+        BaseCallbackManager,
         Callbacks,
     )
     from langchain_core.agents import AgentAction, AgentFinish
@@ -302,15 +303,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 if token_usage:
                     record_token_usage(
                         span_data.span,
-                        token_usage.get("prompt_tokens"),
-                        token_usage.get("completion_tokens"),
-                        token_usage.get("total_tokens"),
+                        input_tokens=token_usage.get("prompt_tokens"),
+                        output_tokens=token_usage.get("completion_tokens"),
+                        total_tokens=token_usage.get("total_tokens"),
                     )
                 else:
                     record_token_usage(
                         span_data.span,
-                        span_data.num_prompt_tokens,
-                        span_data.num_completion_tokens,
+                        input_tokens=span_data.num_prompt_tokens,
+                        output_tokens=span_data.num_completion_tokens,
                     )
 
             self._exit_span(span_data, run_id)
@@ -499,12 +500,20 @@ def _wrap_configure(f: Callable[..., Any]) -> Callable[..., Any]:
                 **kwargs,
             )
 
-        callbacks_list = local_callbacks or []
+        local_callbacks = local_callbacks or []
 
-        if isinstance(callbacks_list, BaseCallbackHandler):
-            callbacks_list = [callbacks_list]
-        elif not isinstance(callbacks_list, list):
-            logger.debug("Unknown callback type: %s", callbacks_list)
+        # Handle each possible type of local_callbacks. For each type, we
+        # extract the list of callbacks to check for SentryLangchainCallback,
+        # and define a function that would add the SentryLangchainCallback
+        # to the existing callbacks list.
+        if isinstance(local_callbacks, BaseCallbackManager):
+            callbacks_list = local_callbacks.handlers
+        elif isinstance(local_callbacks, BaseCallbackHandler):
+            callbacks_list = [local_callbacks]
+        elif isinstance(local_callbacks, list):
+            callbacks_list = local_callbacks
+        else:
+            logger.debug("Unknown callback type: %s", local_callbacks)
             # Just proceed with original function call
             return f(
                 callback_manager_cls,
@@ -514,28 +523,38 @@ def _wrap_configure(f: Callable[..., Any]) -> Callable[..., Any]:
                 **kwargs,
             )
 
-        inheritable_callbacks_list = (
-            inheritable_callbacks if isinstance(inheritable_callbacks, list) else []
-        )
+        # Handle each possible type of inheritable_callbacks.
+        if isinstance(inheritable_callbacks, BaseCallbackManager):
+            inheritable_callbacks_list = inheritable_callbacks.handlers
+        elif isinstance(inheritable_callbacks, list):
+            inheritable_callbacks_list = inheritable_callbacks
+        else:
+            inheritable_callbacks_list = []
 
         if not any(
             isinstance(cb, SentryLangchainCallback)
             for cb in itertools.chain(callbacks_list, inheritable_callbacks_list)
         ):
-            # Avoid mutating the existing callbacks list
-            callbacks_list = [
-                *callbacks_list,
-                SentryLangchainCallback(
-                    integration.max_spans,
-                    integration.include_prompts,
-                    integration.tiktoken_encoding_name,
-                ),
-            ]
+            sentry_handler = SentryLangchainCallback(
+                integration.max_spans,
+                integration.include_prompts,
+                integration.tiktoken_encoding_name,
+            )
+            if isinstance(local_callbacks, BaseCallbackManager):
+                local_callbacks = local_callbacks.copy()
+                local_callbacks.handlers = [
+                    *local_callbacks.handlers,
+                    sentry_handler,
+                ]
+            elif isinstance(local_callbacks, BaseCallbackHandler):
+                local_callbacks = [local_callbacks, sentry_handler]
+            else:  # local_callbacks is a list
+                local_callbacks = [*local_callbacks, sentry_handler]
 
         return f(
             callback_manager_cls,
             inheritable_callbacks,
-            callbacks_list,
+            local_callbacks,
             *args,
             **kwargs,
         )

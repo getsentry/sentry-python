@@ -96,26 +96,37 @@ def ai_track(description: str, **span_kwargs: Any) -> Callable[..., Any]:
 
 def record_token_usage(
     span: Span,
-    prompt_tokens: Optional[int] = None,
-    completion_tokens: Optional[int] = None,
+    input_tokens: Optional[int] = None,
+    input_tokens_cached: Optional[int] = None,
+    output_tokens: Optional[int] = None,
+    output_tokens_reasoning: Optional[int] = None,
     total_tokens: Optional[int] = None,
 ) -> None:
+    # TODO: move pipeline name elsewhere
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
         span.set_attribute(SPANDATA.AI_PIPELINE_NAME, ai_pipeline_name)
 
-    if prompt_tokens is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
+    if input_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
-    if completion_tokens is not None:
-        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens)
+    if input_tokens_cached is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+            input_tokens_cached,
+        )
 
-    if (
-        total_tokens is None
-        and prompt_tokens is not None
-        and completion_tokens is not None
-    ):
-        total_tokens = prompt_tokens + completion_tokens
+    if output_tokens is not None:
+        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    if output_tokens_reasoning is not None:
+        span.set_data(
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            output_tokens_reasoning,
+        )
+
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
 
     if total_tokens is not None:
         span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)

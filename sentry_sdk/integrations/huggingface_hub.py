@@ -108,7 +108,10 @@ def _wrap_text_generation(f: Callable[..., Any]) -> Callable[..., Any]:
                         [res.generated_text],
                     )
                 if res.details is not None and res.details.generated_tokens > 0:
-                    record_token_usage(span, total_tokens=res.details.generated_tokens)
+                    record_token_usage(
+                        span,
+                        total_tokens=res.details.generated_tokens,
+                    )
                 span.__exit__(None, None, None)
                 return res
 
@@ -141,7 +144,10 @@ def _wrap_text_generation(f: Callable[..., Any]) -> Callable[..., Any]:
                                 span, SPANDATA.AI_RESPONSES, "".join(data_buf)
                             )
                         if tokens_used > 0:
-                            record_token_usage(span, total_tokens=tokens_used)
+                            record_token_usage(
+                                span,
+                                total_tokens=tokens_used,
+                            )
                     span.__exit__(None, None, None)
 
                 return new_details_iterator()
