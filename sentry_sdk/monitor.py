@@ -118,7 +118,3 @@ class Monitor:
     def kill(self):
         # type: () -> None
         self._running = False
-
-    def __del__(self):
-        # type: () -> None
-        self.kill()
