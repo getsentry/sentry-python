@@ -211,6 +211,7 @@ class AsyncWorker(Worker):
             self._task.cancel()
             self._task = None
             self._task_for_pid = None
+            self._loop = None
 
     def start(self) -> None:
         if not self.is_alive:
