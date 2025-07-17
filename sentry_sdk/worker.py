@@ -259,7 +259,7 @@ class AsyncWorker(Worker):
             await self._wait_flush(timeout, callback)
         logger.debug("background worker flushed")
 
-    def submit(self, callback: Callable[[], None]) -> bool:
+    def submit(self, callback: Callable[[], Any]) -> bool:
         self._ensure_task()
 
         try:
