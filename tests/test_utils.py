@@ -669,7 +669,7 @@ def test_safe_str_fails():
 
 def test_installed_modules():
     try:
-        from importlib.metadata import distributions, version
+        from importlib.metadata import distributions
 
         importlib_available = True
     except ImportError:
@@ -689,12 +689,9 @@ def test_installed_modules():
 
     if importlib_available:
         importlib_distributions = {
-            _normalize_distribution_name(dist.metadata.get("Name", None)): version(
-                dist.metadata.get("Name", None)
-            )
+            _normalize_distribution_name(dist.metadata.get("Name", None)): dist.version
             for dist in distributions()
-            if dist.metadata.get("Name", None) is not None
-            and version(dist.metadata.get("Name", None)) is not None
+            if dist.metadata.get("Name", None) is not None and dist.version is not None
         }
         assert installed_distributions == importlib_distributions
 
