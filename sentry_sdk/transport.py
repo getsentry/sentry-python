@@ -107,19 +107,6 @@ class Transport(ABC):
         """
         return None
 
-    async def flush_async(
-        self: Self,
-        timeout: float,
-        callback: Optional[Any] = None,
-    ) -> None:
-        """
-        Send out current events within `timeout` seconds. This method needs to be awaited for blocking behavior.
-
-        The default implementation is a no-op, since this method may only be relevant to some transports.
-        Subclasses should override this method if necessary.
-        """
-        return None
-
     def kill(self: Self) -> None:
         """
         Forcefully kills the transport.
