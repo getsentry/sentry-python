@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import os
 import threading
+import asyncio
 
 from time import sleep, time
 from sentry_sdk._queue import Queue, FullError
@@ -186,3 +187,94 @@ class BackgroundWorker(Worker):
             finally:
                 self._queue.task_done()
             sleep(0)
+
+
+class AsyncWorker(Worker):
+    def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
+        self._queue: asyncio.Queue = asyncio.Queue(queue_size)
+        self._task: Optional[asyncio.Task] = None
+        # Event loop needs to remain in the same process
+        self._task_for_pid: Optional[int] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    @property
+    def is_alive(self) -> bool:
+        if self._task_for_pid != os.getpid():
+            return False
+        if not self._task or not self._loop:
+            return False
+        return self._loop.is_running() and not self._task.done()
+
+    def kill(self) -> None:
+        if self._task:
+            self._task.cancel()
+            self._task = None
+            self._task_for_pid = None
+
+    def start(self) -> None:
+        if not self.is_alive:
+            try:
+                self._loop = asyncio.get_running_loop()
+                self._task = self._loop.create_task(self._target())
+                self._task_for_pid = os.getpid()
+            except RuntimeError:
+                # There is no event loop running
+                self._loop = None
+                self._task = None
+                self._task_for_pid = None
+
+    def full(self) -> bool:
+        return self._queue.full()
+
+    def _ensure_task(self) -> None:
+        if not self.is_alive:
+            self.start()
+
+    async def _wait_flush(self, timeout: float, callback: Optional[Any] = None) -> None:
+        if not self._loop or not self._loop.is_running():
+            return
+
+        initial_timeout = min(0.1, timeout)
+
+        # Timeout on the join
+        try:
+            await asyncio.wait_for(self._queue.join(), timeout=initial_timeout)
+        except asyncio.TimeoutError:
+            pending = self._queue.qsize() + 1
+            logger.debug("%d event(s) pending on flush", pending)
+            if callback is not None:
+                callback(pending, timeout)
+
+            try:
+                remaining_timeout = timeout - initial_timeout
+                await asyncio.wait_for(self._queue.join(), timeout=remaining_timeout)
+            except asyncio.TimeoutError:
+                pending = self._queue.qsize() + 1
+                logger.error("flush timed out, dropped %s events", pending)
+
+    async def flush(self, timeout: float, callback: Optional[Any] = None) -> None:
+        logger.debug("background worker got flush request")
+        if self.is_alive and timeout > 0.0:
+            await self._wait_flush(timeout, callback)
+        logger.debug("background worker flushed")
+
+    def submit(self, callback: Callable[[], None]) -> bool:
+        self._ensure_task()
+
+        try:
+            self._queue.put_nowait(callback)
+            return True
+        except asyncio.QueueFull:
+            return False
+
+    async def _target(self) -> None:
+        while True:
+            callback = await self._queue.get()
+            try:
+                callback()
+            except Exception:
+                logger.error("Failed processing job", exc_info=True)
+            finally:
+                self._queue.task_done()
+            # Yield to let the event loop run other tasks
+            await asyncio.sleep(0)
