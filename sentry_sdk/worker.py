@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 import os
 import threading
 import asyncio
+import inspect
 
 from time import sleep, time
 from sentry_sdk._queue import Queue, FullError
@@ -255,7 +256,12 @@ class AsyncWorker(Worker):
         while True:
             callback = await self._queue.get()
             try:
-                callback()
+                if inspect.iscoroutinefunction(callback):
+                    # Callback is an async coroutine, need to await it
+                    await callback()
+                else:
+                    # Callback is a sync function, need to call it
+                    callback()
             except Exception:
                 logger.error("Failed processing job", exc_info=True)
             finally:
