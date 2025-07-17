@@ -45,18 +45,6 @@ class Worker(ABC):
         """
         return None
 
-    async def flush_async(
-        self, timeout: float, callback: Optional[Callable[[int, float], None]] = None
-    ) -> None:
-        """
-        Flush the worker.
-
-        This method can be awaited until the worker has flushed all events or the specified timeout is reached.
-        Default implementation is a no-op, since this method may only be relevant to some workers.
-        Subclasses should override this method if necessary.
-        """
-        return None
-
     @abstractmethod
     def full(self) -> bool:
         pass
