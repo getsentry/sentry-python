@@ -3,6 +3,8 @@ import requests
 import sentry_sdk
 from http.client import HTTPConnection
 
+from tests.conftest import create_mock_http_server
+
 USE_DEFAULT_TRACES_SAMPLE_RATE = -1
 
 INCOMING_TRACE_ID = "771a43a4192642f0b136d5159a501700"
@@ -18,12 +20,12 @@ INCOMING_HEADERS = {
     ),
 }
 
+PORT = create_mock_http_server()
 
-#
+
 # Proper high level testing for trace propagation.
 # Testing the matrix of test cases described here:
 # https://develop.sentry.dev/sdk/telemetry/traces/trace-propagation-cheat-sheet/
-#
 
 
 @pytest.fixture
@@ -71,7 +73,7 @@ def test_no_incoming_trace_and_trace_propagation_targets_matching(
 
     with sentry_sdk.continue_trace(NO_INCOMING_HEADERS):
         with sentry_sdk.start_span(op="test", name="test"):
-            requests.get("http://example.com")
+            requests.get(f"http://localhost:{PORT}")  # noqa:E231
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
     if traces_sample_rate == 1:
@@ -122,7 +124,7 @@ def test_no_incoming_trace_and_trace_propagation_targets_not_matching(
 
     with sentry_sdk.continue_trace(NO_INCOMING_HEADERS):
         with sentry_sdk.start_span(op="test", name="test"):
-            requests.get("http://example.com")
+            requests.get(f"http://localhost:{PORT}")  # noqa:E231
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
     if traces_sample_rate == 1:
@@ -187,7 +189,7 @@ def test_with_incoming_trace_and_trace_propagation_targets_matching(
 
     with sentry_sdk.continue_trace(incoming_headers):
         with sentry_sdk.start_span(op="test", name="test"):
-            requests.get("http://example.com")
+            requests.get(f"http://localhost:{PORT}")  # noqa:E231
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
     if (
@@ -265,7 +267,7 @@ def test_with_incoming_trace_and_trace_propagation_targets_not_matching(
 
     with sentry_sdk.continue_trace(incoming_headers):
         with sentry_sdk.start_span(op="test", name="test"):
-            requests.get("http://example.com")
+            requests.get(f"http://localhost:{PORT}")  # noqa:E231
 
     # CHECK if performance data (a transaction/span) is sent to Sentry
     if (
