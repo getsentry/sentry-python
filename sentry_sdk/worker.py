@@ -252,7 +252,7 @@ class AsyncWorker(Worker):
                 pending = self._queue.qsize() + 1
                 logger.error("flush timed out, dropped %s events", pending)
 
-    async def flush(self, timeout: float, callback: Optional[Any] = None) -> None:
+    async def flush_async(self, timeout: float, callback: Optional[Any] = None) -> None:
         logger.debug("background worker got flush request")
         if self.is_alive and timeout > 0.0:
             await self._wait_flush(timeout, callback)
