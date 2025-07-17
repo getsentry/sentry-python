@@ -143,12 +143,6 @@ class Transport(ABC):
     def is_healthy(self: Self) -> bool:
         return True
 
-    def __del__(self: Self) -> None:
-        try:
-            self.kill()
-        except Exception:
-            pass
-
 
 def _parse_rate_limits(
     header: str, now: Optional[datetime] = None

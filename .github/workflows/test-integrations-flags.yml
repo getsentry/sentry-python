@@ -88,6 +88,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-flags-pinned.result, 'failure') || contains(needs.test-flags-pinned.result, 'skipped')
+        if: needs.test-flags-pinned.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

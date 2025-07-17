@@ -110,6 +110,3 @@ class Monitor:
 
     def kill(self) -> None:
         self._running = False
-
-    def __del__(self) -> None:
-        self.kill()

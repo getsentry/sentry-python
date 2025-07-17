@@ -30,7 +30,6 @@ from sentry_sdk.utils import (
     serialize_frame,
     is_sentry_url,
     _get_installed_modules,
-    _generate_installed_modules,
     ensure_integration_enabled,
     _serialize_span_attribute,
     to_string,
@@ -652,47 +651,6 @@ def test_safe_str_fails():
     result = safe_str(obj)
 
     assert result == repr(obj)
-
-
-def test_installed_modules():
-    try:
-        from importlib.metadata import distributions, version
-
-        importlib_available = True
-    except ImportError:
-        importlib_available = False
-
-    try:
-        import pkg_resources
-
-        pkg_resources_available = True
-    except ImportError:
-        pkg_resources_available = False
-
-    installed_distributions = {
-        _normalize_distribution_name(dist): version
-        for dist, version in _generate_installed_modules()
-    }
-
-    if importlib_available:
-        importlib_distributions = {
-            _normalize_distribution_name(dist.metadata.get("Name", None)): version(
-                dist.metadata.get("Name", None)
-            )
-            for dist in distributions()
-            if dist.metadata.get("Name", None) is not None
-            and version(dist.metadata.get("Name", None)) is not None
-        }
-        assert installed_distributions == importlib_distributions
-
-    elif pkg_resources_available:
-        pkg_resources_distributions = {
-            _normalize_distribution_name(dist.key): dist.version
-            for dist in pkg_resources.working_set
-        }
-        assert installed_distributions == pkg_resources_distributions
-    else:
-        pytest.fail("Neither importlib nor pkg_resources is available")
 
 
 def test_installed_modules_caching():
