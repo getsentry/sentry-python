@@ -36,7 +36,7 @@ class Worker(ABC):
         pass
 
     def flush(
-        self, timeout: float, callback: Optional[Callable[[int, float], None]] = None
+        self, timeout: float, callback: Optional[Callable[[int, float], Any]] = None
     ) -> None:
         """
         Flush the worker.
@@ -52,7 +52,7 @@ class Worker(ABC):
         pass
 
     @abstractmethod
-    def submit(self, callback: Callable[[], None]) -> bool:
+    def submit(self, callback: Callable[[], Any]) -> bool:
         """
         Schedule a callback to be executed by the worker.
 
@@ -151,7 +151,7 @@ class BackgroundWorker(Worker):
                 pending = self._queue.qsize() + 1
                 logger.error("flush timed out, dropped %s events", pending)
 
-    def submit(self, callback: Callable[[], None]) -> bool:
+    def submit(self, callback: Callable[[], Any]) -> bool:
         self._ensure_thread()
         try:
             self._queue.put_nowait(callback)
@@ -243,7 +243,7 @@ class AsyncWorker(Worker):
             await self._wait_flush(timeout, callback)
         logger.debug("background worker flushed")
 
-    def submit(self, callback: Callable[[], None]) -> bool:
+    def submit(self, callback: Callable[[], Any]) -> bool:
         self._ensure_task()
 
         try:
