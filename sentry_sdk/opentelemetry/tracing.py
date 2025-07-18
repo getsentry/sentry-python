@@ -18,19 +18,25 @@ from sentry_sdk.opentelemetry.consts import (
 from sentry_sdk.utils import logger
 
 
+READABLE_SPAN_PATCHED = False
+
+
 def patch_readable_span() -> None:
     """
     We need to pass through sentry specific metadata/objects from Span to ReadableSpan
     to work with them consistently in the SpanProcessor.
     """
-    old_readable_span = Span._readable_span
+    global READABLE_SPAN_PATCHED
+    if not READABLE_SPAN_PATCHED:
+        old_readable_span = Span._readable_span
 
-    def sentry_patched_readable_span(self: Span) -> ReadableSpan:
-        readable_span = old_readable_span(self)
-        readable_span._sentry_meta = getattr(self, "_sentry_meta", {})  # type: ignore[attr-defined]
-        return readable_span
+        def sentry_patched_readable_span(self: Span) -> ReadableSpan:
+            readable_span = old_readable_span(self)
+            readable_span._sentry_meta = getattr(self, "_sentry_meta", {})  # type: ignore[attr-defined]
+            return readable_span
 
-    Span._readable_span = sentry_patched_readable_span  # type: ignore[method-assign]
+        Span._readable_span = sentry_patched_readable_span  # type: ignore[method-assign]
+        READABLE_SPAN_PATCHED = True
 
 
 def setup_sentry_tracing() -> None:
