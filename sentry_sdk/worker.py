@@ -197,6 +197,8 @@ class AsyncWorker(Worker):
         # Event loop needs to remain in the same process
         self._task_for_pid: Optional[int] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        # Track active callback tasks so they have a strong reference and can be cancelled on kill
+        self._active_tasks: set[asyncio.Task] = set()
 
     @property
     def is_alive(self) -> bool:
@@ -211,6 +213,12 @@ class AsyncWorker(Worker):
             self._task.cancel()
             self._task = None
             self._task_for_pid = None
+            # Also cancel any active callback tasks
+            # Avoid modifying the set while cancelling tasks
+            tasks_to_cancel = set(self._active_tasks)
+            for task in tasks_to_cancel:
+                task.cancel()
+            self._active_tasks.clear()
             self._loop = None
 
     def start(self) -> None:
@@ -272,16 +280,30 @@ class AsyncWorker(Worker):
     async def _target(self) -> None:
         while True:
             callback = await self._queue.get()
-            try:
-                if inspect.iscoroutinefunction(callback):
-                    # Callback is an async coroutine, need to await it
-                    await callback()
-                else:
-                    # Callback is a sync function, need to call it
-                    callback()
-            except Exception:
-                logger.error("Failed processing job", exc_info=True)
-            finally:
-                self._queue.task_done()
+            # Firing tasks instead of awaiting them allows for concurrent requests
+            task = asyncio.create_task(self._process_callback(callback))
+            # Create a strong reference to the task so it can be cancelled on kill
+            # and does not get garbage collected while running
+            self._active_tasks.add(task)
+            task.add_done_callback(self._on_task_complete)
             # Yield to let the event loop run other tasks
             await asyncio.sleep(0)
+
+    async def _process_callback(self, callback: Callable[[], Any]) -> None:
+        if inspect.iscoroutinefunction(callback):
+            # Callback is an async coroutine, need to await it
+            await callback()
+        else:
+            # Callback is a sync function, need to call it
+            callback()
+
+    def _on_task_complete(self, task: asyncio.Task[None]) -> None:
+        try:
+            task.result()
+        except Exception:
+            logger.error("Failed processing job", exc_info=True)
+        finally:
+            # Mark the task as done and remove it from the active tasks set
+            # This happens only after the task has completed
+            self._queue.task_done()
+            self._active_tasks.discard(task)
