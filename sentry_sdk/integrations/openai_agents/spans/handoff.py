@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
@@ -9,11 +11,14 @@ if TYPE_CHECKING:
     import agents
 
 
-def handoff_span(context, from_agent, to_agent_name):
-    # type: (agents.RunContextWrapper, agents.Agent, str) -> None
+def handoff_span(
+    context_wrapper: agents.RunContextWrapper,
+    from_agent: agents.Agent,
+    to_agent_name: str,
+) -> None:
     with sentry_sdk.start_span(
         op=OP.GEN_AI_HANDOFF,
         name=f"handoff from {from_agent.name} to {to_agent_name}",
         origin=SPAN_ORIGIN,
     ) as span:
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "handoff")
+        span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "handoff")

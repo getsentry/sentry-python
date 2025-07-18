@@ -1,8 +1,9 @@
+from __future__ import annotations
 import functools
 
 from django.template import TemplateSyntaxError
+from django.template.base import Origin
 from django.utils.safestring import mark_safe
-from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -17,16 +18,10 @@ if TYPE_CHECKING:
     from typing import Iterator
     from typing import Tuple
 
-try:
-    # support Django 1.9
-    from django.template.base import Origin
-except ImportError:
-    # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin
 
-
-def get_template_frame_from_exception(exc_value):
-    # type: (Optional[BaseException]) -> Optional[Dict[str, Any]]
+def get_template_frame_from_exception(
+    exc_value: Optional[BaseException],
+) -> Optional[Dict[str, Any]]:
 
     # As of Django 1.9 or so the new template debug thing showed up.
     if hasattr(exc_value, "template_debug"):
@@ -48,8 +43,7 @@ def get_template_frame_from_exception(exc_value):
     return None
 
 
-def _get_template_name_description(template_name):
-    # type: (str) -> str
+def _get_template_name_description(template_name: str) -> str:
     if isinstance(template_name, (list, tuple)):
         if template_name:
             return "[{}, ...]".format(template_name[0])
@@ -57,8 +51,7 @@ def _get_template_name_description(template_name):
         return template_name
 
 
-def patch_templates():
-    # type: () -> None
+def patch_templates() -> None:
     from django.template.response import SimpleTemplateResponse
     from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -66,28 +59,33 @@ def patch_templates():
 
     @property  # type: ignore
     @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
-    def rendered_content(self):
-        # type: (SimpleTemplateResponse) -> str
+    def rendered_content(self: SimpleTemplateResponse) -> str:
         with sentry_sdk.start_span(
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(self.template_name),
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data("context", self.context_data)
+            if isinstance(self.context_data, dict):
+                for k, v in self.context_data.items():
+                    span.set_attribute(f"context.{k}", v)
             return real_rendered_content.fget(self)
 
     SimpleTemplateResponse.rendered_content = rendered_content
 
-    if DJANGO_VERSION < (1, 7):
-        return
     import django.shortcuts
 
     real_render = django.shortcuts.render
 
     @functools.wraps(real_render)
     @ensure_integration_enabled(DjangoIntegration, real_render)
-    def render(request, template_name, context=None, *args, **kwargs):
-        # type: (django.http.HttpRequest, str, Optional[Dict[str, Any]], *Any, **Any) -> django.http.HttpResponse
+    def render(
+        request: django.http.HttpRequest,
+        template_name: str,
+        context: Optional[Dict[str, Any]] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> django.http.HttpResponse:
 
         # Inject trace meta tags into template context
         context = context or {}
@@ -100,15 +98,16 @@ def patch_templates():
             op=OP.TEMPLATE_RENDER,
             name=_get_template_name_description(template_name),
             origin=DjangoIntegration.origin,
+            only_if_parent=True,
         ) as span:
-            span.set_data("context", context)
+            for k, v in context.items():
+                span.set_attribute(f"context.{k}", v)
             return real_render(request, template_name, context, *args, **kwargs)
 
     django.shortcuts.render = render
 
 
-def _get_template_frame_from_debug(debug):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+def _get_template_frame_from_debug(debug: Dict[str, Any]) -> Dict[str, Any]:
     if debug is None:
         return None
 
@@ -139,8 +138,7 @@ def _get_template_frame_from_debug(debug):
     }
 
 
-def _linebreak_iter(template_source):
-    # type: (str) -> Iterator[int]
+def _linebreak_iter(template_source: str) -> Iterator[int]:
     yield 0
     p = template_source.find("\n")
     while p >= 0:
@@ -148,8 +146,9 @@ def _linebreak_iter(template_source):
         p = template_source.find("\n", p + 1)
 
 
-def _get_template_frame_from_source(source):
-    # type: (Tuple[Origin, Tuple[int, int]]) -> Optional[Dict[str, Any]]
+def _get_template_frame_from_source(
+    source: Tuple[Origin, Tuple[int, int]],
+) -> Optional[Dict[str, Any]]:
     if not source:
         return None
 

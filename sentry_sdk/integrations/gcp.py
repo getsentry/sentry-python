@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 import sys
 from copy import deepcopy
@@ -5,10 +6,12 @@ from datetime import datetime, timedelta, timezone
 from os import environ
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import (
+    _filter_headers,
+    _request_headers_to_span_attributes,
+)
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
@@ -37,11 +40,11 @@ if TYPE_CHECKING:
     F = TypeVar("F", bound=Callable[..., Any])
 
 
-def _wrap_func(func):
-    # type: (F) -> F
+def _wrap_func(func: F) -> F:
     @functools.wraps(func)
-    def sentry_func(functionhandler, gcp_event, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> Any
+    def sentry_func(
+        functionhandler: Any, gcp_event: Any, *args: Any, **kwargs: Any
+    ) -> Any:
         client = sentry_sdk.get_client()
 
         integration = client.get_integration(GcpIntegration)
@@ -84,42 +87,30 @@ def _wrap_func(func):
             if hasattr(gcp_event, "headers"):
                 headers = gcp_event.headers
 
-            transaction = continue_trace(
-                headers,
-                op=OP.FUNCTION_GCP,
-                name=environ.get("FUNCTION_NAME", ""),
-                source=TransactionSource.COMPONENT,
-                origin=GcpIntegration.origin,
-            )
-            sampling_context = {
-                "gcp_env": {
-                    "function_name": environ.get("FUNCTION_NAME"),
-                    "function_entry_point": environ.get("ENTRY_POINT"),
-                    "function_identity": environ.get("FUNCTION_IDENTITY"),
-                    "function_region": environ.get("FUNCTION_REGION"),
-                    "function_project": environ.get("GCP_PROJECT"),
-                },
-                "gcp_event": gcp_event,
-            }
-            with sentry_sdk.start_transaction(
-                transaction, custom_sampling_context=sampling_context
-            ):
-                try:
-                    return func(functionhandler, gcp_event, *args, **kwargs)
-                except Exception:
-                    exc_info = sys.exc_info()
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "gcp", "handled": False},
-                    )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
-                    reraise(*exc_info)
-                finally:
-                    if timeout_thread:
-                        timeout_thread.stop()
-                    # Flush out the event queue
-                    client.flush()
+            with sentry_sdk.continue_trace(headers):
+                with sentry_sdk.start_span(
+                    op=OP.FUNCTION_GCP,
+                    name=environ.get("FUNCTION_NAME", ""),
+                    source=TransactionSource.COMPONENT,
+                    origin=GcpIntegration.origin,
+                    attributes=_prepopulate_attributes(gcp_event),
+                ):
+                    try:
+                        return func(functionhandler, gcp_event, *args, **kwargs)
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        sentry_event, hint = event_from_exception(
+                            exc_info,
+                            client_options=client.options,
+                            mechanism={"type": "gcp", "handled": False},
+                        )
+                        sentry_sdk.capture_event(sentry_event, hint=hint)
+                        reraise(*exc_info)
+                    finally:
+                        if timeout_thread:
+                            timeout_thread.stop()
+                        # Flush out the event queue
+                        client.flush()
 
     return sentry_func  # type: ignore
 
@@ -128,13 +119,11 @@ class GcpIntegration(Integration):
     identifier = "gcp"
     origin = f"auto.function.{identifier}"
 
-    def __init__(self, timeout_warning=False):
-        # type: (bool) -> None
+    def __init__(self, timeout_warning: bool = False) -> None:
         self.timeout_warning = timeout_warning
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         import __main__ as gcp_functions
 
         if not hasattr(gcp_functions, "worker_v1"):
@@ -150,11 +139,11 @@ class GcpIntegration(Integration):
         )
 
 
-def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
-    # type: (Any, Any, Any) -> EventProcessor
+def _make_request_event_processor(
+    gcp_event: Any, configured_timeout: Any, initial_time: Any
+) -> EventProcessor:
 
-    def event_processor(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+    def event_processor(event: Event, hint: Hint) -> Optional[Event]:
 
         final_time = datetime.now(timezone.utc)
         time_diff = final_time - initial_time
@@ -205,8 +194,7 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
     return event_processor
 
 
-def _get_google_cloud_logs_url(final_time):
-    # type: (datetime) -> str
+def _get_google_cloud_logs_url(final_time: datetime) -> str:
     """
     Generates a Google Cloud Logs console URL based on the environment variables
     Arguments:
@@ -232,3 +220,37 @@ def _get_google_cloud_logs_url(final_time):
     )
 
     return url
+
+
+ENV_TO_ATTRIBUTE = {
+    "FUNCTION_NAME": "faas.name",
+    "ENTRY_POINT": "gcp.function.entry_point",
+    "FUNCTION_IDENTITY": "gcp.function.identity",
+    "FUNCTION_REGION": "faas.region",
+    "GCP_PROJECT": "gcp.function.project",
+}
+
+EVENT_TO_ATTRIBUTE = {
+    "method": "http.request.method",
+    "query_string": "url.query",
+}
+
+
+def _prepopulate_attributes(gcp_event: Any) -> dict[str, Any]:
+    attributes = {
+        "cloud.provider": "gcp",
+    }
+
+    for key, attr in ENV_TO_ATTRIBUTE.items():
+        if environ.get(key):
+            attributes[attr] = environ[key]
+
+    for key, attr in EVENT_TO_ATTRIBUTE.items():
+        if getattr(gcp_event, key, None):
+            attributes[attr] = getattr(gcp_event, key)
+
+    if hasattr(gcp_event, "headers"):
+        headers = gcp_event.headers
+        attributes.update(_request_headers_to_span_attributes(headers))
+
+    return attributes

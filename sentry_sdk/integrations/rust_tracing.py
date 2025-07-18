@@ -30,17 +30,19 @@ sentry_sdk.init(
 Each native extension requires its own integration.
 """
 
+from __future__ import annotations
 import json
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Tuple, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import Span as SentrySpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
-
-TraceState = Optional[Tuple[Optional[SentrySpan], SentrySpan]]
 
 
 class RustTracingLevel(Enum):
@@ -58,8 +60,7 @@ class EventTypeMapping(Enum):
     Event = auto()
 
 
-def tracing_level_to_sentry_level(level):
-    # type: (str) -> sentry_sdk._types.LogLevelStr
+def tracing_level_to_sentry_level(level: str) -> sentry_sdk._types.LogLevelStr:
     level = RustTracingLevel(level)
     if level in (RustTracingLevel.Trace, RustTracingLevel.Debug):
         return "debug"
@@ -99,15 +100,15 @@ def process_event(event: Dict[str, Any]) -> None:
 
     logger = metadata.get("target")
     level = tracing_level_to_sentry_level(metadata.get("level"))
-    message = event.get("message")  # type: sentry_sdk._types.Any
+    message: sentry_sdk._types.Any = event.get("message")
     contexts = extract_contexts(event)
 
-    sentry_event = {
+    sentry_event: sentry_sdk._types.Event = {
         "logger": logger,
         "level": level,
         "message": message,
         "contexts": contexts,
-    }  # type: sentry_sdk._types.Event
+    }
 
     sentry_sdk.capture_event(sentry_event)
 
@@ -171,7 +172,7 @@ class RustTracingLayer:
             else self.include_tracing_fields
         )
 
-    def on_event(self, event: str, _span_state: TraceState) -> None:
+    def on_event(self, event: str, _span_state: Optional[Span]) -> None:
         deserialized_event = json.loads(event)
         metadata = deserialized_event.get("metadata", {})
 
@@ -185,7 +186,7 @@ class RustTracingLayer:
         elif event_type == EventTypeMapping.Event:
             process_event(deserialized_event)
 
-    def on_new_span(self, attrs: str, span_id: str) -> TraceState:
+    def on_new_span(self, attrs: str, span_id: str) -> Optional[Span]:
         attrs = json.loads(attrs)
         metadata = attrs.get("metadata", {})
 
@@ -205,48 +206,35 @@ class RustTracingLayer:
         else:
             sentry_span_name = "<unknown>"
 
-        kwargs = {
-            "op": "function",
-            "name": sentry_span_name,
-            "origin": self.origin,
-        }
-
-        scope = sentry_sdk.get_current_scope()
-        parent_sentry_span = scope.span
-        if parent_sentry_span:
-            sentry_span = parent_sentry_span.start_child(**kwargs)
-        else:
-            sentry_span = scope.start_span(**kwargs)
+        span = sentry_sdk.start_span(
+            op="function",
+            name=sentry_span_name,
+            origin=self.origin,
+            only_if_parent=True,
+        )
+        span.__enter__()
 
         fields = metadata.get("fields", [])
         for field in fields:
             if self._include_tracing_fields():
-                sentry_span.set_data(field, attrs.get(field))
+                span.set_attribute(field, attrs.get(field))
             else:
-                sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
+                span.set_attribute(field, SENSITIVE_DATA_SUBSTITUTE)
 
-        scope.span = sentry_span
-        return (parent_sentry_span, sentry_span)
+        return span
 
-    def on_close(self, span_id: str, span_state: TraceState) -> None:
-        if span_state is None:
-            return
+    def on_close(self, span_id: str, span: Optional[Span]) -> None:
+        if span is not None:
+            span.__exit__(None, None, None)
 
-        parent_sentry_span, sentry_span = span_state
-        sentry_span.finish()
-        sentry_sdk.get_current_scope().span = parent_sentry_span
-
-    def on_record(self, span_id: str, values: str, span_state: TraceState) -> None:
-        if span_state is None:
-            return
-        _parent_sentry_span, sentry_span = span_state
-
-        deserialized_values = json.loads(values)
-        for key, value in deserialized_values.items():
-            if self._include_tracing_fields():
-                sentry_span.set_data(key, value)
-            else:
-                sentry_span.set_data(key, SENSITIVE_DATA_SUBSTITUTE)
+    def on_record(self, span_id: str, values: str, span: Optional[Span]) -> None:
+        if span is not None:
+            deserialized_values = json.loads(values)
+            for key, value in deserialized_values.items():
+                if self._include_tracing_fields():
+                    span.set_attribute(key, value)
+                else:
+                    span.set_attribute(key, SENSITIVE_DATA_SUBSTITUTE)
 
 
 class RustTracingIntegration(Integration):

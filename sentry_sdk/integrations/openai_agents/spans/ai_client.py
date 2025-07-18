@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
@@ -16,23 +18,28 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def ai_client_span(agent, get_response_kwargs):
-    # type: (Agent, dict[str, Any]) -> sentry_sdk.tracing.Span
-    # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
+def ai_client_span(
+    agent: Agent, get_response_kwargs: dict[str, Any]
+) -> sentry_sdk.tracing.Span:
     model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
+    # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
         description=f"chat {model_name}",
         origin=SPAN_ORIGIN,
     )
     # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     return span
 
 
-def update_ai_client_span(span, agent, get_response_kwargs, result):
-    # type: (sentry_sdk.tracing.Span, Agent, dict[str, Any], Any) -> None
+def update_ai_client_span(
+    span: sentry_sdk.tracing.Span,
+    agent: Agent,
+    get_response_kwargs: dict[str, Any],
+    result: Any,
+) -> None:
     _set_agent_data(span, agent)
     _set_usage_data(span, result.usage)
     _set_input_data(span, get_response_kwargs)

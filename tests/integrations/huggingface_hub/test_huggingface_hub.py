@@ -7,7 +7,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.errors import OverloadedError
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
 
@@ -52,7 +52,7 @@ def test_nonstreaming_chat_completion(
         )
     mock_client_post(client, post_mock)
 
-    with start_transaction(name="huggingface_hub tx"):
+    with start_span(name="huggingface_hub tx"):
         response = client.text_generation(
             prompt="hello",
             details=details_arg,
@@ -107,7 +107,7 @@ def test_streaming_chat_completion(
     )
     mock_client_post(client, post_mock)
 
-    with start_transaction(name="huggingface_hub tx"):
+    with start_span(name="huggingface_hub tx"):
         response = list(
             client.text_generation(
                 prompt="hello",
@@ -169,7 +169,7 @@ def test_span_origin(sentry_init, capture_events):
     )
     mock_client_post(client, post_mock)
 
-    with start_transaction(name="huggingface_hub tx"):
+    with start_span(name="huggingface_hub tx"):
         list(
             client.text_generation(
                 prompt="hello",
