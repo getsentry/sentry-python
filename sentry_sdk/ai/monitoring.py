@@ -32,7 +32,7 @@ def ai_track(description, **span_kwargs):
         def sync_wrapped(*args, **kwargs):
             # type: (Any, Any) -> Any
             curr_pipeline = _ai_pipeline_name.get()
-            op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
+            op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
             with start_span(name=description, op=op, **span_kwargs) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
@@ -61,7 +61,7 @@ def ai_track(description, **span_kwargs):
         async def async_wrapped(*args, **kwargs):
             # type: (Any, Any) -> Any
             curr_pipeline = _ai_pipeline_name.get()
-            op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
+            op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
             with start_span(name=description, op=op, **span_kwargs) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
