@@ -176,7 +176,7 @@ class BackgroundWorker(Worker):
 
 class AsyncWorker(Worker):
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
-        self._queue: asyncio.Queue[Callable[[], Any]] = asyncio.Queue(queue_size)
+        self._queue: asyncio.Queue[Any] = asyncio.Queue(queue_size)
         self._task: Optional[asyncio.Task[None]] = None
         # Event loop needs to remain in the same process
         self._task_for_pid: Optional[int] = None
@@ -194,9 +194,10 @@ class AsyncWorker(Worker):
 
     def kill(self) -> None:
         if self._task:
-            self._task.cancel()
-            self._task = None
-            self._task_for_pid = None
+            try:
+                self._queue.put_nowait(_TERMINATOR)
+            except asyncio.QueueFull:
+                logger.debug("async worker queue full, kill failed")
             # Also cancel any active callback tasks
             # Avoid modifying the set while cancelling tasks
             tasks_to_cancel = set(self._active_tasks)
@@ -204,6 +205,8 @@ class AsyncWorker(Worker):
                 task.cancel()
             self._active_tasks.clear()
             self._loop = None
+            self._task = None
+            self._task_for_pid = None
 
     def start(self) -> None:
         if not self.is_alive:
@@ -264,6 +267,9 @@ class AsyncWorker(Worker):
     async def _target(self) -> None:
         while True:
             callback = await self._queue.get()
+            if callback is _TERMINATOR:
+                self._queue.task_done()
+                break
             # Firing tasks instead of awaiting them allows for concurrent requests
             task = asyncio.create_task(self._process_callback(callback))
             # Create a strong reference to the task so it can be cancelled on kill
