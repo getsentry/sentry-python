@@ -31,6 +31,7 @@ LINES = r"""
 24. ? @ 0x00000000000d162c in /usr/lib/aarch64-linux-gnu/libc-2.31.so
 """
 
+
 @pytest.mark.parametrize("input", LINES.strip().splitlines())
 def test_basic(sentry_init, capture_events, input):
     sentry_init(integrations=[GnuBacktraceIntegration()])

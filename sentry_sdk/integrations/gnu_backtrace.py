@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event
 
 
-FUNCTION_RE =r"[^@]+?)\s+@\s+0x[0-9a-fA-F]+"
+FUNCTION_RE = r"[^@]+?)\s+@\s+0x[0-9a-fA-F]+"
 
 FRAME_RE = r"""
 ^(?P<index>\d+)\.\s+(?P<function>{FUNCTION_RE}\s+in\s+(?P<package>.+)$
