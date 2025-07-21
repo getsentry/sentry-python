@@ -5,16 +5,22 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatComplet
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
-from openai.types.responses.response_usage import (
-    InputTokensDetails,
-    OutputTokensDetails,
-)
-from openai.types.responses import (
-    Response,
-    ResponseUsage,
-    ResponseOutputMessage,
-    ResponseOutputText,
-)
+
+SKIP_API_TESTS = False
+
+try:
+    from openai.types.responses.response_usage import (
+        InputTokensDetails,
+        OutputTokensDetails,
+    )
+    from openai.types.responses import (
+        Response,
+        ResponseUsage,
+        ResponseOutputMessage,
+        ResponseOutputText,
+    )
+except ImportError:
+    SKIP_API_TESTS = True
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
@@ -946,6 +952,7 @@ def test_calculate_token_usage_e():
         )
 
 
+@pytest.mark.skipif(SKIP_API_TESTS, reason="Responses API not available")
 def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
     sentry_init(
         integrations=[OpenAIIntegration()],
@@ -984,6 +991,7 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
     assert "gen_ai.response.text" not in spans[0]["data"]
 
 
+@pytest.mark.skipif(SKIP_API_TESTS, reason="Responses API not available")
 def test_ai_client_span_responses_api(sentry_init, capture_events):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
