@@ -20,6 +20,17 @@ from sentry_sdk.utils import logger
 
 READABLE_SPAN_PATCHED = False
 
+SENTRY_TRACER_PROVIDER = TracerProvider(
+    sampler=SentrySampler(),
+    resource=Resource.create(
+        {
+            RESOURCE_SERVICE_NAME: "sentry-python",
+            RESOURCE_SERVICE_VERSION: VERSION,
+            RESOURCE_SERVICE_NAMESPACE: "sentry",
+        }
+    ),
+)
+
 
 def patch_readable_span() -> None:
     """
@@ -51,16 +62,7 @@ def setup_sentry_tracing() -> None:
 
     else:
         logger.debug("[Tracing] No TracerProvider set, creating a new one")
-        tracer_provider = TracerProvider(
-            sampler=SentrySampler(),
-            resource=Resource.create(
-                {
-                    RESOURCE_SERVICE_NAME: "sentry-python",
-                    RESOURCE_SERVICE_VERSION: VERSION,
-                    RESOURCE_SERVICE_NAMESPACE: "sentry",
-                }
-            ),
-        )
+        tracer_provider = SENTRY_TRACER_PROVIDER
         trace.set_tracer_provider(tracer_provider)
 
     try:

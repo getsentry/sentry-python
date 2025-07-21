@@ -7,6 +7,7 @@ from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.opentelemetry.tracing import SENTRY_TRACER_PROVIDER
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -14,6 +15,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     package_version,
 )
+from opentelemetry.instrumentation.flask import FlaskInstrumentor
 
 from typing import TYPE_CHECKING
 
@@ -91,6 +93,7 @@ class FlaskIntegration(Integration):
         got_request_exception.connect(_capture_exception)
 
         old_app = Flask.__call__
+        old_app_init = Flask.__init__
 
         def sentry_patched_wsgi_app(
             self: Any, environ: Dict[str, str], start_response: Callable[..., Any]
@@ -109,9 +112,17 @@ class FlaskIntegration(Integration):
                     else DEFAULT_HTTP_METHODS_TO_CAPTURE
                 ),
             )
+
             return middleware(environ, start_response)
 
+        def sentry_patched_flask_init(self, *args, **kwargs) -> Any:
+            old_app_init(self, *args, **kwargs)
+            FlaskInstrumentor.instrument_app(
+                self, tracer_provider=SENTRY_TRACER_PROVIDER
+            )
+
         Flask.__call__ = sentry_patched_wsgi_app
+        Flask.__init__ = sentry_patched_flask_init
 
 
 def _add_sentry_trace(
