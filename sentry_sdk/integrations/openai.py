@@ -172,7 +172,7 @@ def _new_chat_completion_common(f, *args, **kwargs):
 
     span = sentry_sdk.start_span(
         op=consts.OP.GEN_AI_CHAT,
-        name=f"{consts.OP.GEN_AI_CHAT} {model}",
+        name=f"chat {model}",
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
@@ -183,7 +183,9 @@ def _new_chat_completion_common(f, *args, **kwargs):
         if should_send_default_pii() and integration.include_prompts:
             set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
 
+        set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
 
         if hasattr(res, "choices"):
@@ -357,9 +359,13 @@ def _new_embeddings_create_common(f, *args, **kwargs):
 
     with sentry_sdk.start_span(
         op=consts.OP.GEN_AI_EMBEDDINGS,
-        name=f"{consts.OP.GEN_AI_EMBEDDINGS} {model}",
+        name=f"embeddings {model}",
         origin=OpenAIIntegration.origin,
     ) as span:
+        set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+
         if "input" in kwargs and (
             should_send_default_pii() and integration.include_prompts
         ):
@@ -483,12 +489,14 @@ def _new_responses_create_common(f, *args, **kwargs):
 
     span = sentry_sdk.start_span(
         op=consts.OP.GEN_AI_RESPONSES,
-        name=f"{consts.OP.GEN_AI_RESPONSES} {model}",
+        name=f"responses {model}",
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
 
+    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
     set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
 
     if should_send_default_pii() and integration.include_prompts:
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, input)
