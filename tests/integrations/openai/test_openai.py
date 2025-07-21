@@ -62,41 +62,44 @@ EXAMPLE_CHAT_COMPLETION = ChatCompletion(
 )
 
 
-EXAMPLE_RESPONSE = Response(
-    id="chat-id",
-    output=[
-        ResponseOutputMessage(
-            id="message-id",
-            content=[
-                ResponseOutputText(
-                    annotations=[],
-                    text="the model response",
-                    type="output_text",
-                ),
-            ],
-            role="assistant",
-            status="completed",
-            type="message",
+if SKIP_API_TESTS:
+    EXAMPLE_RESPONSE = None
+else:
+    EXAMPLE_RESPONSE = Response(
+        id="chat-id",
+        output=[
+            ResponseOutputMessage(
+                id="message-id",
+                content=[
+                    ResponseOutputText(
+                        annotations=[],
+                        text="the model response",
+                        type="output_text",
+                    ),
+                ],
+                role="assistant",
+                status="completed",
+                type="message",
+            ),
+        ],
+        parallel_tool_calls=False,
+        tool_choice="none",
+        tools=[],
+        created_at=10000000,
+        model="model-id",
+        object="response",
+        usage=ResponseUsage(
+            input_tokens=20,
+            input_tokens_details=InputTokensDetails(
+                cached_tokens=5,
+            ),
+            output_tokens=10,
+            output_tokens_details=OutputTokensDetails(
+                reasoning_tokens=8,
+            ),
+            total_tokens=30,
         ),
-    ],
-    parallel_tool_calls=False,
-    tool_choice="none",
-    tools=[],
-    created_at=10000000,
-    model="model-id",
-    object="response",
-    usage=ResponseUsage(
-        input_tokens=20,
-        input_tokens_details=InputTokensDetails(
-            cached_tokens=5,
-        ),
-        output_tokens=10,
-        output_tokens_details=OutputTokensDetails(
-            reasoning_tokens=8,
-        ),
-        total_tokens=30,
-    ),
-)
+    )
 
 
 async def async_iterator(values):
