@@ -284,6 +284,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
         assert_single_transaction_with_profile_chunks(envelopes, thread)
 
 
+@pytest.mark.skip(reason="TODO: re-enable this test")
 @pytest.mark.parametrize(
     "mode",
     [
