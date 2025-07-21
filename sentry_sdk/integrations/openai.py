@@ -53,15 +53,15 @@ class OpenAIIntegration(Integration):
     def setup_once():
         # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
-        Embeddings.create = _wrap_embeddings_create(Embeddings.create)
-
-        if Responses is not None:
-            Responses.create = _wrap_responses_create(Responses.create)
-
         AsyncCompletions.create = _wrap_async_chat_completion_create(
             AsyncCompletions.create
         )
+
+        Embeddings.create = _wrap_embeddings_create(Embeddings.create)
         AsyncEmbeddings.create = _wrap_async_embeddings_create(AsyncEmbeddings.create)
+
+        if Responses is not None:
+            Responses.create = _wrap_responses_create(Responses.create)
 
     def count_tokens(self, s):
         # type: (OpenAIIntegration, str) -> int
