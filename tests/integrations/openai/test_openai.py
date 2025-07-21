@@ -5,6 +5,16 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatComplet
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
+from openai.types.responses.response_usage import (
+    InputTokensDetails,
+    OutputTokensDetails,
+)
+from openai.types.responses import (
+    Response,
+    ResponseUsage,
+    ResponseOutputMessage,
+    ResponseOutputText,
+)
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
@@ -41,6 +51,43 @@ EXAMPLE_CHAT_COMPLETION = ChatCompletion(
     usage=CompletionUsage(
         completion_tokens=10,
         prompt_tokens=20,
+        total_tokens=30,
+    ),
+)
+
+
+EXAMPLE_RESPONSE = Response(
+    id="chat-id",
+    output=[
+        ResponseOutputMessage(
+            id="message-id",
+            content=[
+                ResponseOutputText(
+                    annotations=[],
+                    text="the model response",
+                    type="output_text",
+                ),
+            ],
+            role="assistant",
+            status="completed",
+            type="message",
+        ),
+    ],
+    parallel_tool_calls=False,
+    tool_choice="none",
+    tools=[],
+    created_at=10000000,
+    model="model-id",
+    object="response",
+    usage=ResponseUsage(
+        input_tokens=20,
+        input_tokens_details=InputTokensDetails(
+            cached_tokens=5,
+        ),
+        output_tokens=10,
+        output_tokens_details=OutputTokensDetails(
+            reasoning_tokens=8,
+        ),
         total_tokens=30,
     ),
 )
@@ -897,3 +944,79 @@ def test_calculate_token_usage_e():
             output_tokens_reasoning=None,
             total_tokens=None,
         )
+
+
+def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    with start_transaction(name="openai tx"):
+        client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
+        )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    assert len(spans) == 1
+    assert spans[0]["op"] == "gen_ai.responses"
+    assert spans[0]["origin"] == "auto.ai.openai"
+    assert spans[0]["data"] == {
+        "gen_ai.request.model": "gpt-4o",
+        "gen_ai.usage.input_tokens": 20,
+        "gen_ai.usage.input_tokens.cached": 5,
+        "gen_ai.usage.output_tokens": 10,
+        "gen_ai.usage.output_tokens.reasoning": 8,
+        "gen_ai.usage.total_tokens": 30,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    assert "gen_ai.request.messages" not in spans[0]["data"]
+    assert "gen_ai.response.text" not in spans[0]["data"]
+
+
+def test_ai_client_span_responses_api(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    with start_transaction(name="openai tx"):
+        client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
+        )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    assert len(spans) == 1
+    assert spans[0]["op"] == "gen_ai.responses"
+    assert spans[0]["origin"] == "auto.ai.openai"
+    assert spans[0]["data"] == {
+        "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
+        "gen_ai.request.model": "gpt-4o",
+        "gen_ai.usage.input_tokens": 20,
+        "gen_ai.usage.input_tokens.cached": 5,
+        "gen_ai.usage.output_tokens": 10,
+        "gen_ai.usage.output_tokens.reasoning": 8,
+        "gen_ai.usage.total_tokens": 30,
+        "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
