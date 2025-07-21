@@ -198,7 +198,7 @@ class AsyncWorker(Worker):
         self._task_for_pid: Optional[int] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         # Track active callback tasks so they have a strong reference and can be cancelled on kill
-        self._active_tasks: set[asyncio.Task] = set()
+        self._active_tasks: set[asyncio.Task[None]] = set()
 
     @property
     def is_alive(self) -> bool:
