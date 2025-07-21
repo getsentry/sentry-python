@@ -119,3 +119,44 @@ async def test_ai_track_async_with_tags(sentry_init, capture_events):
     assert ai_pipeline_span["tags"]["user"] == "czyber"
     assert ai_pipeline_span["data"]["some_data"] == "value"
     assert ai_run_span["description"] == "my async tool"
+
+
+def test_ai_track_with_explicit_op(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @ai_track("my tool", op="custom.operation")
+    def tool(**kwargs):
+        pass
+
+    with sentry_sdk.start_transaction():
+        tool()
+
+    transaction = events[0]
+    assert transaction["type"] == "transaction"
+    assert len(transaction["spans"]) == 1
+    span = transaction["spans"][0]
+
+    assert span["description"] == "my tool"
+    assert span["op"] == "custom.operation"
+
+
+@pytest.mark.asyncio
+async def test_ai_track_async_with_explicit_op(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @ai_track("my async tool", op="custom.async.operation")
+    async def async_tool(**kwargs):
+        pass
+
+    with sentry_sdk.start_transaction():
+        await async_tool()
+
+    transaction = events[0]
+    assert transaction["type"] == "transaction"
+    assert len(transaction["spans"]) == 1
+    span = transaction["spans"][0]
+
+    assert span["description"] == "my async tool"
+    assert span["op"] == "custom.async.operation"

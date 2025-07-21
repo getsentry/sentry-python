@@ -551,9 +551,14 @@ def serialize_frame(
     if tb_lineno is None:
         tb_lineno = frame.f_lineno
 
+    try:
+        os_abs_path = os.path.abspath(abs_path) if abs_path else None
+    except Exception:
+        os_abs_path = None
+
     rv: Dict[str, Any] = {
         "filename": filename_for_module(module, abs_path) or None,
-        "abs_path": os.path.abspath(abs_path) if abs_path else None,
+        "abs_path": os_abs_path,
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb_lineno,
