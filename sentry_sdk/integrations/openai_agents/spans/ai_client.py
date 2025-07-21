@@ -19,9 +19,10 @@ if TYPE_CHECKING:
 def ai_client_span(agent, get_response_kwargs):
     # type: (Agent, dict[str, Any]) -> sentry_sdk.tracing.Span
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
+    model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
-        description=f"chat {agent.model}",
+        description=f"chat {model_name}",
         origin=SPAN_ORIGIN,
     )
     # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on

@@ -10,7 +10,7 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
-    _calculate_chat_completion_usage,
+    _calculate_token_usage,
 )
 
 from unittest import mock  # python 3.3 and above
@@ -90,9 +90,9 @@ def test_nonstreaming_chat_completion(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+    assert span["data"]["gen_ai.usage.output_tokens"] == 10
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 @pytest.mark.asyncio
@@ -132,9 +132,9 @@ async def test_nonstreaming_chat_completion_async(
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
         assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 10
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+    assert span["data"]["gen_ai.usage.output_tokens"] == 10
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 def tiktoken_encoding_if_installed():
@@ -228,9 +228,9 @@ def test_streaming_chat_completion(
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
-        assert span["measurements"]["ai_completion_tokens_used"]["value"] == 2
-        assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 1
-        assert span["measurements"]["ai_total_tokens_used"]["value"] == 3
+        assert span["data"]["gen_ai.usage.output_tokens"] == 2
+        assert span["data"]["gen_ai.usage.input_tokens"] == 1
+        assert span["data"]["gen_ai.usage.total_tokens"] == 3
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
@@ -324,9 +324,9 @@ async def test_streaming_chat_completion_async(
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
-        assert span["measurements"]["ai_completion_tokens_used"]["value"] == 2
-        assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 1
-        assert span["measurements"]["ai_total_tokens_used"]["value"] == 3
+        assert span["data"]["gen_ai.usage.output_tokens"] == 2
+        assert span["data"]["gen_ai.usage.input_tokens"] == 1
+        assert span["data"]["gen_ai.usage.total_tokens"] == 3
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
@@ -409,8 +409,8 @@ def test_embeddings_create(
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 @pytest.mark.asyncio
@@ -457,8 +457,8 @@ async def test_embeddings_create_async(
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
 
-    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
-    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+    assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 @pytest.mark.parametrize(
@@ -743,7 +743,7 @@ async def test_span_origin_embeddings_async(sentry_init, capture_events):
     assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
-def test_calculate_chat_completion_usage_a():
+def test_calculate_token_usage_a():
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -760,13 +760,20 @@ def test_calculate_chat_completion_usage_a():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_chat_completion_usage(
+        _calculate_token_usage(
             messages, response, span, streaming_message_responses, count_tokens
         )
-        mock_record_token_usage.assert_called_once_with(span, 20, 10, 30)
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=None,
+            output_tokens=10,
+            output_tokens_reasoning=None,
+            total_tokens=30,
+        )
 
 
-def test_calculate_chat_completion_usage_b():
+def test_calculate_token_usage_b():
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -786,13 +793,20 @@ def test_calculate_chat_completion_usage_b():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_chat_completion_usage(
+        _calculate_token_usage(
             messages, response, span, streaming_message_responses, count_tokens
         )
-        mock_record_token_usage.assert_called_once_with(span, 11, 10, 10)
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=11,
+            input_tokens_cached=None,
+            output_tokens=10,
+            output_tokens_reasoning=None,
+            total_tokens=10,
+        )
 
 
-def test_calculate_chat_completion_usage_c():
+def test_calculate_token_usage_c():
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -812,13 +826,20 @@ def test_calculate_chat_completion_usage_c():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_chat_completion_usage(
+        _calculate_token_usage(
             messages, response, span, streaming_message_responses, count_tokens
         )
-        mock_record_token_usage.assert_called_once_with(span, 20, 11, 20)
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=None,
+            output_tokens=11,
+            output_tokens_reasoning=None,
+            total_tokens=20,
+        )
 
 
-def test_calculate_chat_completion_usage_d():
+def test_calculate_token_usage_d():
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -839,13 +860,20 @@ def test_calculate_chat_completion_usage_d():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_chat_completion_usage(
+        _calculate_token_usage(
             messages, response, span, streaming_message_responses, count_tokens
         )
-        mock_record_token_usage.assert_called_once_with(span, 20, None, 20)
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=20,
+            input_tokens_cached=None,
+            output_tokens=None,
+            output_tokens_reasoning=None,
+            total_tokens=20,
+        )
 
 
-def test_calculate_chat_completion_usage_e():
+def test_calculate_token_usage_e():
     span = mock.MagicMock()
 
     def count_tokens(msg):
@@ -858,7 +886,14 @@ def test_calculate_chat_completion_usage_e():
     with mock.patch(
         "sentry_sdk.integrations.openai.record_token_usage"
     ) as mock_record_token_usage:
-        _calculate_chat_completion_usage(
+        _calculate_token_usage(
             messages, response, span, streaming_message_responses, count_tokens
         )
-        mock_record_token_usage.assert_called_once_with(span, None, None, None)
+        mock_record_token_usage.assert_called_once_with(
+            span,
+            input_tokens=None,
+            input_tokens_cached=None,
+            output_tokens=None,
+            output_tokens_reasoning=None,
+            total_tokens=None,
+        )
