@@ -7,9 +7,7 @@
 - fix(integrations): allow explicit op parameter in `ai_track` (#4597) by @mshavliuk
 - fix: Fix `abs_path` bug in `serialize_frame` (#4599) by @szokeasaurusrex
 - Remove pyrsistent from test dependencies (#4588) by @musicinmybrain
-- Remove explicit __del__'s in threaded classes (#4590) by @sl0thentr0py
-- ci: Check strictly for success (#4589) by @szokeasaurusrex
-- test: Remove `test_installed_modules` (#4593) by @szokeasaurusrex
+- Remove explicit `__del__`'s in threaded classes (#4590) by @sl0thentr0py
 - Remove forked from test_transport, separate gevent tests and generalize capturing_server to be module level (#4577) by @sl0thentr0py
 - Improve token usage recording (#4566) by @antonpirker
 
