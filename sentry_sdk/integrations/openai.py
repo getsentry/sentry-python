@@ -28,11 +28,12 @@ try:
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
 
+RESPONSES_API_ENABLED = True
 try:
     # responses API support was instroduces in v1.66.0
-    from openai.resources.responses import Responses
+    from openai.resources.responses import Responses, AsyncResponses
 except ImportError:
-    Responses = None
+    RESPONSES_API_ENABLED = False
 
 
 class OpenAIIntegration(Integration):
@@ -60,8 +61,9 @@ class OpenAIIntegration(Integration):
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
         AsyncEmbeddings.create = _wrap_async_embeddings_create(AsyncEmbeddings.create)
 
-        if Responses is not None:
+        if RESPONSES_API_ENABLED:
             Responses.create = _wrap_responses_create(Responses.create)
+            AsyncResponses.create = _wrap_async_responses_create(AsyncResponses.create)
 
     def count_tokens(self, s):
         # type: (OpenAIIntegration, str) -> int
@@ -552,3 +554,37 @@ def _wrap_responses_create(f):
         return _execute_sync(f, *args, **kwargs)
 
     return _sentry_patched_create_sync
+
+
+def _wrap_async_responses_create(f):
+    # type: (Any) -> Any
+    async def _execute_async(f, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
+        gen = _new_responses_create_common(f, *args, **kwargs)
+
+        try:
+            f, args, kwargs = next(gen)
+        except StopIteration as e:
+            return await e.value
+
+        try:
+            try:
+                result = await f(*args, **kwargs)
+            except Exception as e:
+                _capture_exception(e)
+                raise e from None
+
+            return gen.send(result)
+        except StopIteration as e:
+            return e.value
+
+    @wraps(f)
+    async def _sentry_patched_create_async(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+        if integration is None:
+            return await f(*args, **kwargs)
+
+        return await _execute_async(f, *args, **kwargs)
+
+    return _sentry_patched_create_async
