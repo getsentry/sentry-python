@@ -1031,3 +1031,35 @@ def test_ai_client_span_responses_api(sentry_init, capture_events):
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+
+
+@pytest.mark.skipif(SKIP_API_TESTS, reason="Responses API not available")
+def test_error_in_responses_api(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(
+        side_effect=OpenAIError("API rate limit reached")
+    )
+
+    with start_transaction(name="openai tx"):
+        with pytest.raises(OpenAIError):
+            client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+            )
+
+    (error_event, transaction_event) = events
+    assert error_event["level"] == "error"
+    assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+    assert transaction_event["type"] == "transaction"
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
