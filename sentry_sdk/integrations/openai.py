@@ -379,8 +379,6 @@ def _new_embeddings_create_common(f, *args, **kwargs):
                 set_data_normalized(
                     span, SPANDATA.GEN_AI_REQUEST_MESSAGES, kwargs["input"]
                 )
-        if "model" in kwargs:
-            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, kwargs["model"])
 
         response = yield f, args, kwargs
 
