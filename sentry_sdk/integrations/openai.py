@@ -74,6 +74,12 @@ class OpenAIIntegration(Integration):
 
 def _capture_exception(exc):
     # type: (Any) -> None
+    # Close an eventually open span
+    # We need to do this by hand because we are not using the start_span context manager
+    current_span = sentry_sdk.get_current_span()
+    if current_span is not None:
+        current_span.__exit__(None, None, None)
+
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,

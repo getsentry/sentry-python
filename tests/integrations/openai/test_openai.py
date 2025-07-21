@@ -1062,9 +1062,14 @@ def test_error_in_responses_api(sentry_init, capture_events):
             )
 
     (error_event, transaction_event) = events
+
+    assert transaction_event["type"] == "transaction"
+    # make sure the span where the error occurred is captured
+    assert transaction_event["spans"][0]["op"] == "gen_ai.responses"
+
     assert error_event["level"] == "error"
     assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
-    assert transaction_event["type"] == "transaction"
+
     assert (
         error_event["contexts"]["trace"]["trace_id"]
         == transaction_event["contexts"]["trace"]["trace_id"]
