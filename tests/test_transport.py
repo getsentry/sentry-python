@@ -1,28 +1,19 @@
 import logging
 import pickle
-import gzip
-import io
 import os
 import socket
 import sys
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
-import brotli
 import pytest
-from pytest_localserver.http import WSGIServer
-from werkzeug.wrappers import Request, Response
+from tests.conftest import CapturingServer
 
 try:
     import httpcore
 except (ImportError, ModuleNotFoundError):
     httpcore = None
-
-try:
-    import gevent
-except ImportError:
-    gevent = None
 
 import sentry_sdk
 from sentry_sdk import (
@@ -42,65 +33,22 @@ from sentry_sdk.transport import (
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
-CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
+
+server = None
 
 
-class CapturingServer(WSGIServer):
-    def __init__(self, host="127.0.0.1", port=0, ssl_context=None):
-        WSGIServer.__init__(self, host, port, self, ssl_context=ssl_context)
-        self.code = 204
-        self.headers = {}
-        self.captured = []
-
-    def respond_with(self, code=200, headers=None):
-        self.code = code
-        if headers:
-            self.headers = headers
-
-    def clear_captured(self):
-        del self.captured[:]
-
-    def __call__(self, environ, start_response):
-        """
-        This is the WSGI application.
-        """
-        request = Request(environ)
-        event = envelope = None
-        content_encoding = request.headers.get("content-encoding")
-        if content_encoding == "gzip":
-            rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
-            compressed = True
-        elif content_encoding == "br":
-            rdr = io.BytesIO(brotli.decompress(request.data))
-            compressed = True
-        else:
-            rdr = io.BytesIO(request.data)
-            compressed = False
-
-        if request.mimetype == "application/json":
-            event = parse_json(rdr.read())
-        else:
-            envelope = Envelope.deserialize_from(rdr)
-
-        self.captured.append(
-            CapturedData(
-                path=request.path,
-                event=event,
-                envelope=envelope,
-                compressed=compressed,
-            )
-        )
-
-        response = Response(status=self.code)
-        response.headers.extend(self.headers)
-        return response(environ, start_response)
-
-
-@pytest.fixture
-def capturing_server(request):
+@pytest.fixture(scope="module", autouse=True)
+def make_capturing_server(request):
+    global server
     server = CapturingServer()
     server.start()
     request.addfinalizer(server.stop)
+
+
+@pytest.fixture
+def capturing_server():
+    global server
+    server.clear_captured()
     return server
 
 
@@ -129,18 +77,13 @@ def mock_transaction_envelope(span_count):
     return envelope
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize(
     "compression_algo",
-    (
-        ("gzip", "br", "<invalid>", None)
-        if PY37 or gevent is None
-        else ("gzip", "<invalid>", None)
-    ),
+    (("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)),
 )
 @pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works(
@@ -155,7 +98,6 @@ def test_transport_works(
     compression_level,
     compression_algo,
     http2,
-    maybe_monkeypatched_threading,
 ):
     caplog.set_level(logging.DEBUG)
 
