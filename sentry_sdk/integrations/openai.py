@@ -22,12 +22,17 @@ if TYPE_CHECKING:
 try:
     from openai.resources.chat.completions import Completions, AsyncCompletions
     from openai.resources import Embeddings, AsyncEmbeddings
-    from openai.resources.responses import Responses
 
     if TYPE_CHECKING:
         from openai.types.chat import ChatCompletionMessageParam, ChatCompletionChunk
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
+
+try:
+    # responses API support was instroduces in v1.66.0
+    from openai.resources.responses import Responses
+except ImportError:
+    Responses = None
 
 
 class OpenAIIntegration(Integration):
@@ -49,7 +54,9 @@ class OpenAIIntegration(Integration):
         # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
-        Responses.create = _wrap_responses_create(Responses.create)
+
+        if Responses is not None:
+            Responses.create = _wrap_responses_create(Responses.create)
 
         AsyncCompletions.create = _wrap_async_chat_completion_create(
             AsyncCompletions.create
