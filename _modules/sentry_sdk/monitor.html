@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.monitor - sentry-python 3.0.0a3 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.monitor - sentry-python 2.33.2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
@@ -106,123 +106,131 @@ data-aria-dark="Switch to auto color mode">
       <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.monitor</h1><div class="highlight"><pre>
-<span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
-</span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-</span><span data-line="3"><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
-</span><span data-line="4"><span class="kn">from</span><span class="w"> </span><span class="nn">threading</span><span class="w"> </span><span class="kn">import</span> <span class="n">Thread</span><span class="p">,</span> <span class="n">Lock</span>
-</span><span data-line="5">
+<span></span><span data-line="1"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+</span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span data-line="3"><span class="kn">from</span><span class="w"> </span><span class="nn">threading</span><span class="w"> </span><span class="kn">import</span> <span class="n">Thread</span><span class="p">,</span> <span class="n">Lock</span>
+</span><span data-line="4">
+</span><span data-line="5"><span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
 </span><span data-line="6"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
 </span><span data-line="7">
 </span><span data-line="8"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span data-line="9">
 </span><span data-line="10"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
 </span><span data-line="11">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
-</span><span data-line="12">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.transport</span><span class="w"> </span><span class="kn">import</span> <span class="n">Transport</span>
+</span><span data-line="12">
 </span><span data-line="13">
-</span><span data-line="14">
-</span><span data-line="15"><span class="n">MAX_DOWNSAMPLE_FACTOR</span> <span class="o">=</span> <span class="mi">10</span>
+</span><span data-line="14"><span class="n">MAX_DOWNSAMPLE_FACTOR</span> <span class="o">=</span> <span class="mi">10</span>
+</span><span data-line="15">
 </span><span data-line="16">
-</span><span data-line="17">
 <div class="viewcode-block" id="Monitor">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.monitor.Monitor">[docs]</a>
-</span><span data-line="18"><span class="k">class</span><span class="w"> </span><span class="nc">Monitor</span><span class="p">:</span>
-</span><span data-line="19"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="20"><span class="sd">    Performs health checks in a separate thread once every interval seconds</span>
-</span><span data-line="21"><span class="sd">    and updates the internal state. Other parts of the SDK only read this state</span>
-</span><span data-line="22"><span class="sd">    and act accordingly.</span>
-</span><span data-line="23"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="24">
-</span><span data-line="25">    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;sentry.monitor&quot;</span>
-</span><span data-line="26">
-</span><span data-line="27">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">transport</span><span class="p">:</span> <span class="n">Transport</span><span class="p">,</span> <span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="28">        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="p">:</span> <span class="n">Transport</span> <span class="o">=</span> <span class="n">transport</span>
-</span><span data-line="29">        <span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">interval</span>
+</span><span data-line="17"><span class="k">class</span><span class="w"> </span><span class="nc">Monitor</span><span class="p">:</span>
+</span><span data-line="18"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="19"><span class="sd">    Performs health checks in a separate thread once every interval seconds</span>
+</span><span data-line="20"><span class="sd">    and updates the internal state. Other parts of the SDK only read this state</span>
+</span><span data-line="21"><span class="sd">    and act accordingly.</span>
+</span><span data-line="22"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="23">
+</span><span data-line="24">    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;sentry.monitor&quot;</span>
+</span><span data-line="25">
+</span><span data-line="26">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">transport</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+</span><span data-line="27">        <span class="c1"># type: (sentry_sdk.transport.Transport, float) -&gt; None</span>
+</span><span data-line="28">        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">transport</span>  <span class="c1"># type: sentry_sdk.transport.Transport</span>
+</span><span data-line="29">        <span class="bp">self</span><span class="o">.</span><span class="n">interval</span> <span class="o">=</span> <span class="n">interval</span>  <span class="c1"># type: float</span>
 </span><span data-line="30">
 </span><span data-line="31">        <span class="bp">self</span><span class="o">.</span><span class="n">_healthy</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span data-line="32">        <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+</span><span data-line="32">        <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># type: int</span>
 </span><span data-line="33">
-</span><span data-line="34">        <span class="bp">self</span><span class="o">.</span><span class="n">_thread</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Thread</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="34">        <span class="bp">self</span><span class="o">.</span><span class="n">_thread</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Thread]</span>
 </span><span data-line="35">        <span class="bp">self</span><span class="o">.</span><span class="n">_thread_lock</span> <span class="o">=</span> <span class="n">Lock</span><span class="p">()</span>
-</span><span data-line="36">        <span class="bp">self</span><span class="o">.</span><span class="n">_thread_for_pid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="36">        <span class="bp">self</span><span class="o">.</span><span class="n">_thread_for_pid</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[int]</span>
 </span><span data-line="37">        <span class="bp">self</span><span class="o">.</span><span class="n">_running</span> <span class="o">=</span> <span class="kc">True</span>
 </span><span data-line="38">
-</span><span data-line="39">    <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="40"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="41"><span class="sd">        Check that the monitor has an active thread to run in, or create one if not.</span>
-</span><span data-line="42">
-</span><span data-line="43"><span class="sd">        Note that this might fail (e.g. in Python 3.12 it&#39;s not possible to</span>
-</span><span data-line="44"><span class="sd">        spawn new threads at interpreter shutdown). In that case self._running</span>
-</span><span data-line="45"><span class="sd">        will be False after running this function.</span>
-</span><span data-line="46"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="47">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread_for_pid</span> <span class="o">==</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="48">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="49">
-</span><span data-line="50">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread_lock</span><span class="p">:</span>
-</span><span data-line="51">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread_for_pid</span> <span class="o">==</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="52">                <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="53">
-</span><span data-line="54">            <span class="k">def</span><span class="w"> </span><span class="nf">_thread</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="55">                <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="p">:</span>
-</span><span data-line="56">                    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">)</span>
-</span><span data-line="57">                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="p">:</span>
-</span><span data-line="58">                        <span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-</span><span data-line="59">
-</span><span data-line="60">            <span class="n">thread</span> <span class="o">=</span> <span class="n">Thread</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">_thread</span><span class="p">)</span>
-</span><span data-line="61">            <span class="n">thread</span><span class="o">.</span><span class="n">daemon</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span data-line="62">            <span class="k">try</span><span class="p">:</span>
-</span><span data-line="63">                <span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-</span><span data-line="64">            <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
-</span><span data-line="65">                <span class="c1"># Unfortunately at this point the interpreter is in a state that no</span>
-</span><span data-line="66">                <span class="c1"># longer allows us to spawn a thread and we have to bail.</span>
-</span><span data-line="67">                <span class="bp">self</span><span class="o">.</span><span class="n">_running</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span data-line="68">                <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="69">
-</span><span data-line="70">            <span class="bp">self</span><span class="o">.</span><span class="n">_thread</span> <span class="o">=</span> <span class="n">thread</span>
-</span><span data-line="71">            <span class="bp">self</span><span class="o">.</span><span class="n">_thread_for_pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
-</span><span data-line="72">
-</span><span data-line="73">        <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="39">    <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="40">        <span class="c1"># type: () -&gt; None</span>
+</span><span data-line="41"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="42"><span class="sd">        Check that the monitor has an active thread to run in, or create one if not.</span>
+</span><span data-line="43">
+</span><span data-line="44"><span class="sd">        Note that this might fail (e.g. in Python 3.12 it&#39;s not possible to</span>
+</span><span data-line="45"><span class="sd">        spawn new threads at interpreter shutdown). In that case self._running</span>
+</span><span data-line="46"><span class="sd">        will be False after running this function.</span>
+</span><span data-line="47"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="48">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread_for_pid</span> <span class="o">==</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="49">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="50">
+</span><span data-line="51">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread_lock</span><span class="p">:</span>
+</span><span data-line="52">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread_for_pid</span> <span class="o">==</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_thread</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="53">                <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="54">
+</span><span data-line="55">            <span class="k">def</span><span class="w"> </span><span class="nf">_thread</span><span class="p">():</span>
+</span><span data-line="56">                <span class="c1"># type: (...) -&gt; None</span>
+</span><span data-line="57">                <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="p">:</span>
+</span><span data-line="58">                    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">)</span>
+</span><span data-line="59">                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_running</span><span class="p">:</span>
+</span><span data-line="60">                        <span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span data-line="61">
+</span><span data-line="62">            <span class="n">thread</span> <span class="o">=</span> <span class="n">Thread</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">_thread</span><span class="p">)</span>
+</span><span data-line="63">            <span class="n">thread</span><span class="o">.</span><span class="n">daemon</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span data-line="64">            <span class="k">try</span><span class="p">:</span>
+</span><span data-line="65">                <span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</span><span data-line="66">            <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+</span><span data-line="67">                <span class="c1"># Unfortunately at this point the interpreter is in a state that no</span>
+</span><span data-line="68">                <span class="c1"># longer allows us to spawn a thread and we have to bail.</span>
+</span><span data-line="69">                <span class="bp">self</span><span class="o">.</span><span class="n">_running</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span data-line="70">                <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="71">
+</span><span data-line="72">            <span class="bp">self</span><span class="o">.</span><span class="n">_thread</span> <span class="o">=</span> <span class="n">thread</span>
+</span><span data-line="73">            <span class="bp">self</span><span class="o">.</span><span class="n">_thread_for_pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
 </span><span data-line="74">
-</span><span data-line="75">    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="76">        <span class="bp">self</span><span class="o">.</span><span class="n">check_health</span><span class="p">()</span>
-</span><span data-line="77">        <span class="bp">self</span><span class="o">.</span><span class="n">set_downsample_factor</span><span class="p">()</span>
-</span><span data-line="78">
-</span><span data-line="79">    <span class="k">def</span><span class="w"> </span><span class="nf">set_downsample_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="80">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_healthy</span><span class="p">:</span>
-</span><span data-line="81">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-</span><span data-line="82">                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="83">                    <span class="s2">&quot;[Monitor] health check positive, reverting to normal sampling&quot;</span>
-</span><span data-line="84">                <span class="p">)</span>
-</span><span data-line="85">            <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span> <span class="o">=</span> <span class="mi">0</span>
-</span><span data-line="86">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="87">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">downsample_factor</span> <span class="o">&lt;</span> <span class="n">MAX_DOWNSAMPLE_FACTOR</span><span class="p">:</span>
-</span><span data-line="88">                <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span> <span class="o">+=</span> <span class="mi">1</span>
-</span><span data-line="89">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span data-line="90">                <span class="s2">&quot;[Monitor] health check negative, downsampling with a factor of </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
-</span><span data-line="91">                <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span><span class="p">,</span>
-</span><span data-line="92">            <span class="p">)</span>
-</span><span data-line="93">
+</span><span data-line="75">        <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="76">
+</span><span data-line="77">    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="78">        <span class="c1"># type: () -&gt; None</span>
+</span><span data-line="79">        <span class="bp">self</span><span class="o">.</span><span class="n">check_health</span><span class="p">()</span>
+</span><span data-line="80">        <span class="bp">self</span><span class="o">.</span><span class="n">set_downsample_factor</span><span class="p">()</span>
+</span><span data-line="81">
+</span><span data-line="82">    <span class="k">def</span><span class="w"> </span><span class="nf">set_downsample_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="83">        <span class="c1"># type: () -&gt; None</span>
+</span><span data-line="84">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_healthy</span><span class="p">:</span>
+</span><span data-line="85">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+</span><span data-line="86">                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span data-line="87">                    <span class="s2">&quot;[Monitor] health check positive, reverting to normal sampling&quot;</span>
+</span><span data-line="88">                <span class="p">)</span>
+</span><span data-line="89">            <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span> <span class="o">=</span> <span class="mi">0</span>
+</span><span data-line="90">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="91">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">downsample_factor</span> <span class="o">&lt;</span> <span class="n">MAX_DOWNSAMPLE_FACTOR</span><span class="p">:</span>
+</span><span data-line="92">                <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span> <span class="o">+=</span> <span class="mi">1</span>
+</span><span data-line="93">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span data-line="94">                <span class="s2">&quot;[Monitor] health check negative, downsampling with a factor of </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span data-line="95">                <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span><span class="p">,</span>
+</span><span data-line="96">            <span class="p">)</span>
+</span><span data-line="97">
 <div class="viewcode-block" id="Monitor.check_health">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.monitor.Monitor.check_health">[docs]</a>
-</span><span data-line="94">    <span class="k">def</span><span class="w"> </span><span class="nf">check_health</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="95"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="96"><span class="sd">        Perform the actual health checks,</span>
-</span><span data-line="97"><span class="sd">        currently only checks if the transport is rate-limited.</span>
-</span><span data-line="98"><span class="sd">        TODO: augment in the future with more checks.</span>
-</span><span data-line="99"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="100">        <span class="bp">self</span><span class="o">.</span><span class="n">_healthy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">is_healthy</span><span class="p">()</span></div>
+</span><span data-line="98">    <span class="k">def</span><span class="w"> </span><span class="nf">check_health</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="99">        <span class="c1"># type: () -&gt; None</span>
+</span><span data-line="100"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="101"><span class="sd">        Perform the actual health checks,</span>
+</span><span data-line="102"><span class="sd">        currently only checks if the transport is rate-limited.</span>
+</span><span data-line="103"><span class="sd">        TODO: augment in the future with more checks.</span>
+</span><span data-line="104"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="105">        <span class="bp">self</span><span class="o">.</span><span class="n">_healthy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">is_healthy</span><span class="p">()</span></div>
 
-</span><span data-line="101">
-</span><span data-line="102">    <span class="k">def</span><span class="w"> </span><span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span data-line="103">        <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_running</span><span class="p">()</span>
-</span><span data-line="104">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_healthy</span>
-</span><span data-line="105">
-</span><span data-line="106">    <span class="nd">@property</span>
-</span><span data-line="107">    <span class="k">def</span><span class="w"> </span><span class="nf">downsample_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-</span><span data-line="108">        <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_running</span><span class="p">()</span>
-</span><span data-line="109">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span>
-</span><span data-line="110">
-</span><span data-line="111">    <span class="k">def</span><span class="w"> </span><span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="112">        <span class="bp">self</span><span class="o">.</span><span class="n">_running</span> <span class="o">=</span> <span class="kc">False</span></div>
+</span><span data-line="106">
+</span><span data-line="107">    <span class="k">def</span><span class="w"> </span><span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="108">        <span class="c1"># type: () -&gt; bool</span>
+</span><span data-line="109">        <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_running</span><span class="p">()</span>
+</span><span data-line="110">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_healthy</span>
+</span><span data-line="111">
+</span><span data-line="112">    <span class="nd">@property</span>
+</span><span data-line="113">    <span class="k">def</span><span class="w"> </span><span class="nf">downsample_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="114">        <span class="c1"># type: () -&gt; int</span>
+</span><span data-line="115">        <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_running</span><span class="p">()</span>
+</span><span data-line="116">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_downsample_factor</span>
+</span><span data-line="117">
+</span><span data-line="118">    <span class="k">def</span><span class="w"> </span><span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span data-line="119">        <span class="c1"># type: () -&gt; None</span>
+</span><span data-line="120">        <span class="bp">self</span><span class="o">.</span><span class="n">_running</span> <span class="o">=</span> <span class="kc">False</span></div>
 
 </span></pre></div>
         </article><button class="back-to-top" type="button">
@@ -254,7 +262,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=178a9fdf"></script>
+      <script src="../../_static/documentation_options.js?v=43e1a29a"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=1d2088d1"></script></body>
