@@ -42,6 +42,7 @@ setup(
         "urllib3>=1.26.11",
         "certifi",
         "opentelemetry-sdk>=1.4.0",
+        "opentelemetry-instrumentation-flask",
     ],
     extras_require={
         "aiohttp": ["aiohttp>=3.5"],
