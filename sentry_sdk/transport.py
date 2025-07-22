@@ -669,18 +669,18 @@ class AsyncHttpTransport(HttpTransportCore):
     def capture_envelope(self: Self, envelope: Envelope) -> None:
         # Synchronous entry point
         try:
-            asyncio.get_running_loop()
             # We are on the main thread running the event loop
+            asyncio.get_running_loop()
             task = asyncio.create_task(self._capture_envelope(envelope))
             self.background_tasks.add(task)
             task.add_done_callback(self.background_tasks.discard)
         except RuntimeError:
             # We are in a background thread, not running an event loop,
             # have to launch the task on the loop in a threadsafe way.
-            if self._loop and self._loop.is_running():
+            if self.loop and self.loop.is_running():
                 asyncio.run_coroutine_threadsafe(
                     self._capture_envelope(envelope),
-                    self._loop,
+                    self.loop,
                 )
             else:
                 # The event loop is no longer running
@@ -702,7 +702,7 @@ class AsyncHttpTransport(HttpTransportCore):
 
     def _get_pool_options(self: Self) -> Dict[str, Any]:
         options: Dict[str, Any] = {
-            "http2": False,  # no HTTP2 for now
+            "http2": False,  # no HTTP2 for now, should probably just work with this setting
             "retries": 3,
         }
 
