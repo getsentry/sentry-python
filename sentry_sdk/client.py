@@ -3,6 +3,7 @@ import os
 import uuid
 import random
 import socket
+import asyncio
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -25,7 +26,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
-from sentry_sdk.transport import HttpTransportCore, make_transport
+from sentry_sdk.transport import HttpTransportCore, make_transport, AsyncHttpTransport
 from sentry_sdk.consts import (
     SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
@@ -914,36 +915,50 @@ class _Client(BaseClient):
 
         return self.integrations.get(integration_name)
 
+    def _close_components(self) -> None:
+        """Kill all client components in the correct order."""
+        self.session_flusher.kill()
+        if self.log_batcher is not None:
+            self.log_batcher.kill()
+        if self.monitor:
+            self.monitor.kill()
+        if self.transport is not None:
+            self.transport.kill()
+            self.transport = None
+
     def close(
         self,
         timeout: Optional[float] = None,
         callback: Optional[Callable[[int, float], None]] = None,
-    ) -> None:
+    ) -> Optional[asyncio.Task[None]]:
         """
         Close the client and shut down the transport. Arguments have the same
-        semantics as :py:meth:`Client.flush`.
+        semantics as :py:meth:`Client.flush`. When using the async transport, close needs to be awaited to block.
         """
         if self.transport is not None:
-            self.flush(timeout=timeout, callback=callback)
+            if isinstance(self.transport, AsyncHttpTransport):
 
-            self.session_flusher.kill()
+                def _on_flush_done(_: asyncio.Task[None]) -> None:
+                    self._close_components()
 
-            if self.log_batcher is not None:
-                self.log_batcher.kill()
-
-            if self.monitor:
-                self.monitor.kill()
-
-            self.transport.kill()
-            self.transport = None
+                flush_task = self.transport.loop.create_task(
+                    self._flush_async(timeout, callback)
+                )
+                # Enforce flush before shutdown
+                flush_task.add_done_callback(_on_flush_done)
+                return flush_task
+            else:
+                self.flush(timeout=timeout, callback=callback)
+                self._close_components()
+                return None
 
     def flush(
         self,
         timeout: Optional[float] = None,
         callback: Optional[Callable[[int, float], None]] = None,
-    ) -> None:
+    ) -> Optional[asyncio.Task[None]]:
         """
-        Wait for the current events to be sent.
+        Wait for the current events to be sent. When using the async transport, flush needs to be awaited to block.
 
         :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.
 
@@ -952,12 +967,28 @@ class _Client(BaseClient):
         if self.transport is not None:
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
+
             self.session_flusher.flush()
 
             if self.log_batcher is not None:
                 self.log_batcher.flush()
 
-            self.transport.flush(timeout=timeout, callback=callback)
+            if isinstance(self.transport, AsyncHttpTransport):
+                return self.transport.loop.create_task(
+                    self._flush_async(timeout, callback)
+                )
+            else:
+                self.transport.flush(timeout=timeout, callback=callback)
+
+            return None
+
+    async def _flush_async(
+        self, timeout: float, callback: Optional[Callable[[int, float], None]]
+    ) -> None:
+        self.session_flusher.flush()
+        if self.log_batcher is not None:
+            self.log_batcher.flush()
+        await self.transport.flush_async(timeout=timeout, callback=callback)  # type: ignore
 
     def __enter__(self) -> _Client:
         return self
