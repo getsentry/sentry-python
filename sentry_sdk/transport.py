@@ -29,7 +29,7 @@ import certifi
 
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
-from sentry_sdk.worker import BackgroundWorker, Worker
+from sentry_sdk.worker import BackgroundWorker, Worker, AsyncWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 from typing import TYPE_CHECKING
@@ -225,9 +225,10 @@ class HttpTransportCore(Transport):
         elif self._compression_algo == "br":
             self._compression_level = 4
 
-    def _create_worker(self: Self, options: Dict[str, Any]) -> Worker:
-        # For now, we only support the threaded sync background worker.
-        return BackgroundWorker(queue_size=options["transport_queue_size"])
+    def _create_worker(self, options: dict[str, Any]) -> Worker:
+        async_enabled = options.get("_experiments", {}).get("transport_async", False)
+        worker_cls = AsyncWorker if async_enabled else BackgroundWorker
+        return worker_cls(queue_size=options["transport_queue_size"])
 
     def record_lost_event(
         self: Self,
@@ -645,18 +646,26 @@ class AsyncHttpTransport(HttpTransportCore):
 
     def capture_envelope(self: Self, envelope: Envelope) -> None:
         # Synchronous entry point
-        if asyncio.get_running_loop() is not None:
+        try:
+            asyncio.get_running_loop()
             # We are on the main thread running the event loop
             task = asyncio.create_task(self._capture_envelope(envelope))
             self.background_tasks.add(task)
             task.add_done_callback(self.background_tasks.discard)
-        else:
+        except RuntimeError:
             # We are in a background thread, not running an event loop,
             # have to launch the task on the loop in a threadsafe way.
-            asyncio.run_coroutine_threadsafe(
-                self._capture_envelope(envelope),
-                self._loop,
-            )
+            if self._loop and self._loop.is_running():
+                asyncio.run_coroutine_threadsafe(
+                    self._capture_envelope(envelope),
+                    self._loop,
+                )
+            else:
+                # The event loop is no longer running
+                logger.warning("Async Transport is not running in an event loop.")
+                self.on_dropped_event("no_async_context")
+                for item in envelope.items:
+                    self.record_lost_event("no_async_context", item=item)
 
     async def flush_async(
         self: Self,
@@ -996,11 +1005,13 @@ def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
     ref_transport = options["transport"]
 
     use_http2_transport = options.get("_experiments", {}).get("transport_http2", False)
-
+    use_async_transport = options.get("_experiments", {}).get("transport_async", False)
     # By default, we use the http transport class
-    transport_cls: Type[Transport] = (
-        Http2Transport if use_http2_transport else HttpTransport
-    )
+    if use_async_transport and asyncio.get_running_loop() is not None:
+        transport_cls: Type[Transport] = AsyncHttpTransport
+    else:
+        use_http2 = use_http2_transport
+        transport_cls = Http2Transport if use_http2 else HttpTransport
 
     if isinstance(ref_transport, Transport):
         return ref_transport
