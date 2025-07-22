@@ -669,8 +669,8 @@ class AsyncHttpTransport(HttpTransportCore):
     def capture_envelope(self: Self, envelope: Envelope) -> None:
         # Synchronous entry point
         try:
-            # We are on the main thread running the event loop
             asyncio.get_running_loop()
+            # We are on the main thread running the event loop
             task = asyncio.create_task(self._capture_envelope(envelope))
             self.background_tasks.add(task)
             task.add_done_callback(self.background_tasks.discard)
@@ -702,7 +702,7 @@ class AsyncHttpTransport(HttpTransportCore):
 
     def _get_pool_options(self: Self) -> Dict[str, Any]:
         options: Dict[str, Any] = {
-            "http2": False,  # no HTTP2 for now, should probably just work with this setting
+            "http2": False,  # no HTTP2 for now
             "retries": 3,
         }
 
