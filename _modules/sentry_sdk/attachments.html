@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.attachments - sentry-python 2.33.1 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.attachments - sentry-python 3.0.0a3 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
@@ -106,48 +106,48 @@ data-aria-dark="Switch to auto color mode">
       <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.attachments</h1><div class="highlight"><pre>
-<span></span><span data-line="1"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-</span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">mimetypes</span>
-</span><span data-line="3">
-</span><span data-line="4"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.envelope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Item</span><span class="p">,</span> <span class="n">PayloadRef</span>
-</span><span data-line="5">
-</span><span data-line="6"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
-</span><span data-line="7">
-</span><span data-line="8"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="9">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Callable</span>
-</span><span data-line="10">
+<span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span data-line="2"><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+</span><span data-line="3"><span class="kn">import</span><span class="w"> </span><span class="nn">mimetypes</span>
+</span><span data-line="4">
+</span><span data-line="5"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.envelope</span><span class="w"> </span><span class="kn">import</span> <span class="n">Item</span><span class="p">,</span> <span class="n">PayloadRef</span>
+</span><span data-line="6">
+</span><span data-line="7"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="8">
+</span><span data-line="9"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span data-line="10">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Callable</span>
 </span><span data-line="11">
+</span><span data-line="12">
 <div class="viewcode-block" id="Attachment">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.attachments.Attachment">[docs]</a>
-</span><span data-line="12"><span class="k">class</span><span class="w"> </span><span class="nc">Attachment</span><span class="p">:</span>
-</span><span data-line="13"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Additional files/data to send along with an event.</span>
-</span><span data-line="14">
-</span><span data-line="15"><span class="sd">    This class stores attachments that can be sent along with an event. Attachments are files or other data, e.g.</span>
-</span><span data-line="16"><span class="sd">    config or log files, that are relevant to an event. Attachments are set on the ``Scope``, and are sent along with</span>
-</span><span data-line="17"><span class="sd">    all non-transaction events (or all events including transactions if ``add_to_transactions`` is ``True``) that are</span>
-</span><span data-line="18"><span class="sd">    captured within the ``Scope``.</span>
-</span><span data-line="19">
-</span><span data-line="20"><span class="sd">    To add an attachment to a ``Scope``, use :py:meth:`sentry_sdk.Scope.add_attachment`. The parameters for</span>
-</span><span data-line="21"><span class="sd">    ``add_attachment`` are the same as the parameters for this class&#39;s constructor.</span>
-</span><span data-line="22">
-</span><span data-line="23"><span class="sd">    :param bytes: Raw bytes of the attachment, or a function that returns the raw bytes. Must be provided unless</span>
-</span><span data-line="24"><span class="sd">                  ``path`` is provided.</span>
-</span><span data-line="25"><span class="sd">    :param filename: The filename of the attachment. Must be provided unless ``path`` is provided.</span>
-</span><span data-line="26"><span class="sd">    :param path: Path to a file to attach. Must be provided unless ``bytes`` is provided.</span>
-</span><span data-line="27"><span class="sd">    :param content_type: The content type of the attachment. If not provided, it will be guessed from the ``filename``</span>
-</span><span data-line="28"><span class="sd">                         parameter, if available, or the ``path`` parameter if ``filename`` is ``None``.</span>
-</span><span data-line="29"><span class="sd">    :param add_to_transactions: Whether to add this attachment to transactions. Defaults to ``False``.</span>
-</span><span data-line="30"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="31">
-</span><span data-line="32">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span data-line="33">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="34">        <span class="nb">bytes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Union[None, bytes, Callable[[], bytes]]</span>
-</span><span data-line="35">        <span class="n">filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="36">        <span class="n">path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="37">        <span class="n">content_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="38">        <span class="n">add_to_transactions</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="39">    <span class="p">):</span>
-</span><span data-line="40">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span data-line="13"><span class="k">class</span><span class="w"> </span><span class="nc">Attachment</span><span class="p">:</span>
+</span><span data-line="14"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Additional files/data to send along with an event.</span>
+</span><span data-line="15">
+</span><span data-line="16"><span class="sd">    This class stores attachments that can be sent along with an event. Attachments are files or other data, e.g.</span>
+</span><span data-line="17"><span class="sd">    config or log files, that are relevant to an event. Attachments are set on the ``Scope``, and are sent along with</span>
+</span><span data-line="18"><span class="sd">    all non-transaction events (or all events including transactions if ``add_to_transactions`` is ``True``) that are</span>
+</span><span data-line="19"><span class="sd">    captured within the ``Scope``.</span>
+</span><span data-line="20">
+</span><span data-line="21"><span class="sd">    To add an attachment to a ``Scope``, use :py:meth:`sentry_sdk.Scope.add_attachment`. The parameters for</span>
+</span><span data-line="22"><span class="sd">    ``add_attachment`` are the same as the parameters for this class&#39;s constructor.</span>
+</span><span data-line="23">
+</span><span data-line="24"><span class="sd">    :param bytes: Raw bytes of the attachment, or a function that returns the raw bytes. Must be provided unless</span>
+</span><span data-line="25"><span class="sd">                  ``path`` is provided.</span>
+</span><span data-line="26"><span class="sd">    :param filename: The filename of the attachment. Must be provided unless ``path`` is provided.</span>
+</span><span data-line="27"><span class="sd">    :param path: Path to a file to attach. Must be provided unless ``bytes`` is provided.</span>
+</span><span data-line="28"><span class="sd">    :param content_type: The content type of the attachment. If not provided, it will be guessed from the ``filename``</span>
+</span><span data-line="29"><span class="sd">                         parameter, if available, or the ``path`` parameter if ``filename`` is ``None``.</span>
+</span><span data-line="30"><span class="sd">    :param add_to_transactions: Whether to add this attachment to transactions. Defaults to ``False``.</span>
+</span><span data-line="31"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="32">
+</span><span data-line="33">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="34">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="35">        <span class="nb">bytes</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="nb">bytes</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="36">        <span class="n">filename</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="37">        <span class="n">path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="38">        <span class="n">content_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="39">        <span class="n">add_to_transactions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span data-line="40">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="41">        <span class="k">if</span> <span class="nb">bytes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="42">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;path or raw bytes required for attachment&quot;</span><span class="p">)</span>
 </span><span data-line="43">        <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -164,28 +164,26 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="54">
 <div class="viewcode-block" id="Attachment.to_envelope_item">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.attachments.Attachment.to_envelope_item">[docs]</a>
-</span><span data-line="55">    <span class="k">def</span><span class="w"> </span><span class="nf">to_envelope_item</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span data-line="56">        <span class="c1"># type: () -&gt; Item</span>
-</span><span data-line="57"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns an envelope item for this attachment.&quot;&quot;&quot;</span>
-</span><span data-line="58">        <span class="n">payload</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Union[None, PayloadRef, bytes]</span>
-</span><span data-line="59">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="60">            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bytes</span><span class="p">):</span>
-</span><span data-line="61">                <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span><span class="p">()</span>
-</span><span data-line="62">            <span class="k">else</span><span class="p">:</span>
-</span><span data-line="63">                <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span>
-</span><span data-line="64">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="65">            <span class="n">payload</span> <span class="o">=</span> <span class="n">PayloadRef</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
-</span><span data-line="66">        <span class="k">return</span> <span class="n">Item</span><span class="p">(</span>
-</span><span data-line="67">            <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span>
-</span><span data-line="68">            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;attachment&quot;</span><span class="p">,</span>
-</span><span data-line="69">            <span class="n">content_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">content_type</span><span class="p">,</span>
-</span><span data-line="70">            <span class="n">filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
-</span><span data-line="71">        <span class="p">)</span></div>
+</span><span data-line="55">    <span class="k">def</span><span class="w"> </span><span class="nf">to_envelope_item</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Item</span><span class="p">:</span>
+</span><span data-line="56"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns an envelope item for this attachment.&quot;&quot;&quot;</span>
+</span><span data-line="57">        <span class="n">payload</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">PayloadRef</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="58">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="59">            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bytes</span><span class="p">):</span>
+</span><span data-line="60">                <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span><span class="p">()</span>
+</span><span data-line="61">            <span class="k">else</span><span class="p">:</span>
+</span><span data-line="62">                <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bytes</span>
+</span><span data-line="63">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="64">            <span class="n">payload</span> <span class="o">=</span> <span class="n">PayloadRef</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">)</span>
+</span><span data-line="65">        <span class="k">return</span> <span class="n">Item</span><span class="p">(</span>
+</span><span data-line="66">            <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span>
+</span><span data-line="67">            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;attachment&quot;</span><span class="p">,</span>
+</span><span data-line="68">            <span class="n">content_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">content_type</span><span class="p">,</span>
+</span><span data-line="69">            <span class="n">filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
+</span><span data-line="70">        <span class="p">)</span></div>
 
-</span><span data-line="72">
-</span><span data-line="73">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span data-line="74">        <span class="c1"># type: () -&gt; str</span>
-</span><span data-line="75">        <span class="k">return</span> <span class="s2">&quot;&lt;Attachment </span><span class="si">%r</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,)</span></div>
+</span><span data-line="71">
+</span><span data-line="72">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="73">        <span class="k">return</span> <span class="s2">&quot;&lt;Attachment </span><span class="si">%r</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,)</span></div>
 
 </span></pre></div>
         </article><button class="back-to-top" type="button">
@@ -217,7 +215,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=741928f0"></script>
+      <script src="../../_static/documentation_options.js?v=178a9fdf"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=1d2088d1"></script></body>
