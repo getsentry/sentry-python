@@ -761,6 +761,16 @@ class AsyncHttpTransport(HttpTransportCore):
 
         return httpcore.AsyncConnectionPool(**opts)
 
+    def kill(self: Self) -> None:
+
+        logger.debug("Killing HTTP transport")
+        self._worker.kill()
+        for task in self.background_tasks:
+            task.cancel()
+        self.background_tasks.clear()
+
+        self._loop.create_task(self._pool.aclose())  # type: ignore
+
 
 class HttpTransport(BaseHttpTransport):
     if TYPE_CHECKING:
