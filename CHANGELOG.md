@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.0.0a3
+
+### Various fixes & improvements
+
+- fix(integrations): allow explicit op parameter in `ai_track` (#4597) by @mshavliuk
+- fix: Fix `abs_path` bug in `serialize_frame` (#4599) by @szokeasaurusrex
+- Remove pyrsistent from test dependencies (#4588) by @musicinmybrain
+- Setup opentelemetry patch only once (#4595) by @sl0thentr0py
+- Don't use remote server in tests.. (#3152) by @sl0thentr0py
+- Fix merge (#3152) by @sl0thentr0py
+- Remove explicit __del__'s in threaded classes (#4590) by @sl0thentr0py
+- ci: Check strictly for success (#4589) by @szokeasaurusrex
+- test: Remove `test_installed_modules` (#4593) by @szokeasaurusrex
+- Remove forked from test_transport, separate gevent tests and generalize capturing_server to be module level (#4577) by @sl0thentr0py
+- Improve token usage recording (#4566) by @antonpirker
+- Remove eventlet support (#4584) by @sl0thentr0py
+- meta: Update CHANGELOG.md (98b107fd) by @szokeasaurusrex
+- release: 2.33.0 (220a235b) by @getsentry-bot
+- feat(langchain): Support `BaseCallbackManager` (#4486) by @szokeasaurusrex
+- tests: Regenerate tox.ini (#4583) by @sentrivana
+- Add custom sampling context testcases (#4579) by @sl0thentr0py
+- feat(tracing): Add option to exclude specific span origins (#4463) by @sl0thentr0py
+- Cleanup op and description mapping (#4560) by @sl0thentr0py
+- Remove all forked markers in test_api (#4576) by @sl0thentr0py
+- Remove forked marker in client uwsgi test (#4575) by @sl0thentr0py
+- Fix pytest collection warning (#4574) by @sl0thentr0py
+- Remove print statements from excepthook test (#4573) by @sl0thentr0py
+- Use `span.data` instead of `measurements` for token usage (#4567) by @antonpirker
+
+_Plus 42 more_
+
 ## 3.0.0a2
 
 We're excited to announce that version 3.0 of the Sentry Python SDK is now
