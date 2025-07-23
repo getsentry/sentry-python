@@ -950,7 +950,7 @@ class _Client(BaseClient):
             else:
                 self.flush(timeout=timeout, callback=callback)
                 self._close_components()
-                return None
+        return None
 
     def flush(
         self,
@@ -967,6 +967,7 @@ class _Client(BaseClient):
         if self.transport is not None:
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
+            assert timeout is not None  # shutdown_timeout should never be None
 
             self.session_flusher.flush()
 
@@ -979,12 +980,12 @@ class _Client(BaseClient):
                 )
             else:
                 self.transport.flush(timeout=timeout, callback=callback)
-
-            return None
+        return None
 
     async def _flush_async(
-        self, timeout: float, callback: Optional[Callable[[int, float], None]]
+        self, timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
     ) -> None:
+
         self.session_flusher.flush()
         if self.log_batcher is not None:
             self.log_batcher.flush()
