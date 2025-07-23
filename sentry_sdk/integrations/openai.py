@@ -191,6 +191,12 @@ def _set_request_data(span, kwargs, operation, integration):
             span, SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
         )
 
+    frequency_penalty = kwargs.get("frequency_penalty")
+    if frequency_penalty is not None:
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
+        )
+
     temperature = kwargs.get("temperature")
     if temperature is not None:
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
@@ -198,6 +204,13 @@ def _set_request_data(span, kwargs, operation, integration):
     top_p = kwargs.get("top_p")
     if top_p is not None:
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+    # Tools
+    tools = kwargs.get("tools", [])
+    if tools is not None and len(tools) > 0:
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+        )
 
 
 def _set_response_data(span, response, kwargs, integration):
