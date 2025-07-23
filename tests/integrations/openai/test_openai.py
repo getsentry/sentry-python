@@ -1,3 +1,4 @@
+import json
 import pytest
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
@@ -52,7 +53,7 @@ EXAMPLE_CHAT_COMPLETION = ChatCompletion(
         )
     ],
     created=10000000,
-    model="model-id",
+    model="response-model-id",
     object="chat.completion",
     usage=CompletionUsage(
         completion_tokens=10,
@@ -86,7 +87,7 @@ else:
         tool_choice="none",
         tools=[],
         created_at=10000000,
-        model="model-id",
+        model="response-model-id",
         object="response",
         usage=ResponseUsage(
             input_tokens=20,
@@ -143,7 +144,7 @@ def test_nonstreaming_chat_completion(
         assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
         assert (
             "the model response"
-            in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]["content"]
+            in json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])[0]["content"]
         )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -188,7 +189,7 @@ async def test_nonstreaming_chat_completion_async(
         assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
         assert (
             "the model response"
-            in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]["content"]
+            in json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])[0]["content"]
         )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -986,7 +987,10 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
     assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
+        "gen_ai.operation.name": "responses",
         "gen_ai.request.model": "gpt-4o",
+        "gen_ai.response.model": "response-model-id",
+        "gen_ai.system": "openai",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
@@ -1026,8 +1030,11 @@ def test_ai_client_span_responses_api(sentry_init, capture_events):
     assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
+        "gen_ai.operation.name": "responses",
         "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
         "gen_ai.request.model": "gpt-4o",
+        "gen_ai.system": "openai",
+        "gen_ai.response.model": "response-model-id",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,
@@ -1103,8 +1110,11 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
     assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
+        "gen_ai.operation.name": "responses",
         "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
         "gen_ai.request.model": "gpt-4o",
+        "gen_ai.response.model": "response-model-id",
+        "gen_ai.system": "openai",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
         "gen_ai.usage.output_tokens": 10,

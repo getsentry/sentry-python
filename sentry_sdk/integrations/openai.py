@@ -174,13 +174,15 @@ def _set_request_data(span, kwargs, operation, integration):
 
     # Common attributes
     model = kwargs.get("model")
-    streaming = kwargs.get("stream")
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
     set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
-    set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
 
     # Optional attributes
+    streaming = kwargs.get("stream")
+    if streaming is not None:
+        set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
+
     max_tokens = kwargs.get("max_tokens")
     if max_tokens is not None:
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
