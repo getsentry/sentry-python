@@ -577,7 +577,7 @@ def _wrap_async_responses_create(f):
             return e.value
 
     @wraps(f)
-    async def _sentry_patched_create_async(*args, **kwargs):
+    async def _sentry_patched_responses_async(*args, **kwargs):
         # type: (Any, Any) -> Any
         integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
         if integration is None:
@@ -585,4 +585,4 @@ def _wrap_async_responses_create(f):
 
         return await _execute_async(f, *args, **kwargs)
 
-    return _sentry_patched_create_async
+    return _sentry_patched_responses_async

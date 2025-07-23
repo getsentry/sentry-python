@@ -1076,6 +1076,7 @@ def test_error_in_responses_api(sentry_init, capture_events):
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
     sentry_init(
@@ -1086,7 +1087,7 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
 
     with start_transaction(name="openai tx"):
         await client.responses.create(
@@ -1115,6 +1116,7 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
     }
 
 
+@pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_error_in_responses_async_api(sentry_init, capture_events):
     sentry_init(
@@ -1125,7 +1127,7 @@ async def test_error_in_responses_async_api(sentry_init, capture_events):
     events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.responses._post = mock.Mock(
+    client.responses._post = AsyncMock(
         side_effect=OpenAIError("API rate limit reached")
     )
 
