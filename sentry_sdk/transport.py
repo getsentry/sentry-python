@@ -479,6 +479,9 @@ class HttpTransportCore(Transport):
         httpcore.SOCKSProxy,
         httpcore.HTTPProxy,
         httpcore.ConnectionPool,
+        httpcore.AsyncSOCKSProxy,
+        httpcore.AsyncHTTPProxy,
+        httpcore.AsyncConnectionPool,
     ]:
         raise NotImplementedError()
 
