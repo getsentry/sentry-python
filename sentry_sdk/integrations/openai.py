@@ -1,5 +1,4 @@
 from functools import wraps
-import json
 
 import sentry_sdk
 from sentry_sdk import consts
@@ -216,6 +215,16 @@ def _set_response_data(span, response, kwargs, integration):
     if hasattr(response, "choices"):
         if should_send_default_pii() and integration.include_prompts:
             response_text = [choice.message.dict() for choice in response.choices]
+            if len(response_text) > 0:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    safe_serialize(response_text),
+                )
+
+    elif hasattr(response, "output"):
+        if should_send_default_pii() and integration.include_prompts:
+            response_text = [item.to_dict() for item in response.output]
             if len(response_text) > 0:
                 set_data_normalized(
                     span,
@@ -499,39 +508,20 @@ def _new_responses_create_common(f, *args, **kwargs):
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
-    input = kwargs.get("input")
+    operation = "responses"
 
-    span = sentry_sdk.start_span(
+    with sentry_sdk.start_span(
         op=consts.OP.GEN_AI_RESPONSES,
-        name=f"responses {model}",
+        name=f"{operation} {model}",
         origin=OpenAIIntegration.origin,
-    )
-    span.__enter__()
+    ) as span:
+        _set_request_data(span, kwargs, operation, integration)
 
-    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
-    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        response = yield f, args, kwargs
 
-    if should_send_default_pii() and integration.include_prompts:
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, input)
+        _set_response_data(span, response, kwargs, integration)
 
-    res = yield f, args, kwargs
-
-    if hasattr(res, "output"):
-        if should_send_default_pii() and integration.include_prompts:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_RESPONSE_TEXT,
-                json.dumps([item.to_dict() for item in res.output]),
-            )
-        _calculate_token_usage([], res, span, None, integration.count_tokens)
-
-    else:
-        set_data_normalized(span, "unknown_response", True)
-
-    span.__exit__(None, None, None)
-
-    return res
+        return response
 
 
 def _wrap_responses_create(f):
