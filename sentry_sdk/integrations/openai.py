@@ -30,7 +30,7 @@ except ImportError:
 
 RESPONSES_API_ENABLED = True
 try:
-    # responses API support was instroduces in v1.66.0
+    # responses API support was introduced in v1.66.0
     from openai.resources.responses import Responses, AsyncResponses
 except ImportError:
     RESPONSES_API_ENABLED = False
@@ -511,11 +511,11 @@ def _new_responses_create_common(f, *args, **kwargs):
                 json.dumps([item.to_dict() for item in res.output]),
             )
         _calculate_token_usage([], res, span, None, integration.count_tokens)
-        span.__exit__(None, None, None)
 
     else:
         set_data_normalized(span, "unknown_response", True)
-        span.__exit__(None, None, None)
+
+    span.__exit__(None, None, None)
 
     return res
 
