@@ -156,35 +156,19 @@ def _calculate_token_usage(
     )
 
 
-def _new_chat_completion_common(f, *args, **kwargs):
-    # type: (Any, Any, Any) -> Any
-    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
-    if integration is None:
-        return f(*args, **kwargs)
-
-    if "messages" not in kwargs:
-        # invalid call (in all versions of openai), let it return error
-        return f(*args, **kwargs)
-
-    try:
-        iter(kwargs["messages"])
-    except TypeError:
-        # invalid call (in all versions), messages must be iterable
-        return f(*args, **kwargs)
-
-    kwargs["messages"] = list(kwargs["messages"])
-    messages = kwargs["messages"]
-    model = kwargs.get("model")
-    streaming = kwargs.get("stream")
-
-    span = sentry_sdk.start_span(
-        op=consts.OP.GEN_AI_CHAT,
-        name=f"chat {model}",
-        origin=OpenAIIntegration.origin,
-    )
-    span.__enter__()
+def _set_request_data(span, kwargs, integration):
+    # type: (Span, dict[str, Any], Integration) -> None
+    messages = kwargs.get("messages")
+    if (
+        messages is not None
+        and should_send_default_pii()
+        and integration.include_prompts
+    ):
+        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
 
     # Common attributes
+    model = kwargs.get("model")
+    streaming = kwargs.get("stream")
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
     set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
@@ -209,106 +193,131 @@ def _new_chat_completion_common(f, *args, **kwargs):
     if top_p is not None:
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
-    res = yield f, args, kwargs
 
-    with capture_internal_exceptions():
+def _set_response_data(span, res, kwargs, integration):
+    # type: (Span, Any, dict[str, Any], Integration) -> None
+    if hasattr(res, "model"):
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, res.model)
+
+    messages = kwargs.get("messages", [])
+
+    if hasattr(res, "choices"):
         if should_send_default_pii() and integration.include_prompts:
-            set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
+            response_text = [choice.message.dict() for choice in res.choices]
+            if len(response_text) > 0:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    safe_serialize(response_text),
+                )
 
-        if hasattr(res, "model"):
-            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, res.model)
+        _calculate_token_usage(messages, res, span, None, integration.count_tokens)
 
-        if hasattr(res, "choices"):
-            if should_send_default_pii() and integration.include_prompts:
-                response_text = [choice.message.dict() for choice in res.choices]
-                if len(response_text) > 0:
-                    set_data_normalized(
+    elif hasattr(res, "_iterator"):
+        data_buf: list[list[str]] = []  # one for each choice
+
+        old_iterator = res._iterator
+
+        def new_iterator():
+            # type: () -> Iterator[ChatCompletionChunk]
+            with capture_internal_exceptions():
+                for x in old_iterator:
+                    if hasattr(x, "choices"):
+                        choice_index = 0
+                        for choice in x.choices:
+                            if hasattr(choice, "delta") and hasattr(
+                                choice.delta, "content"
+                            ):
+                                content = choice.delta.content
+                                if len(data_buf) <= choice_index:
+                                    data_buf.append([])
+                                data_buf[choice_index].append(content or "")
+                            choice_index += 1
+                    yield x
+                if len(data_buf) > 0:
+                    all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
+                    if should_send_default_pii() and integration.include_prompts:
+                        set_data_normalized(
+                            span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                        )
+                    _calculate_token_usage(
+                        messages,
+                        res,
                         span,
-                        SPANDATA.GEN_AI_RESPONSE_TEXT,
-                        safe_serialize(response_text),
+                        all_responses,
+                        integration.count_tokens,
                     )
-
-            _calculate_token_usage(messages, res, span, None, integration.count_tokens)
             span.__exit__(None, None, None)
-        elif hasattr(res, "_iterator"):
-            data_buf: list[list[str]] = []  # one for each choice
 
-            old_iterator = res._iterator
-
-            def new_iterator():
-                # type: () -> Iterator[ChatCompletionChunk]
-                with capture_internal_exceptions():
-                    for x in old_iterator:
-                        if hasattr(x, "choices"):
-                            choice_index = 0
-                            for choice in x.choices:
-                                if hasattr(choice, "delta") and hasattr(
-                                    choice.delta, "content"
-                                ):
-                                    content = choice.delta.content
-                                    if len(data_buf) <= choice_index:
-                                        data_buf.append([])
-                                    data_buf[choice_index].append(content or "")
-                                choice_index += 1
-                        yield x
-                    if len(data_buf) > 0:
-                        all_responses = list(
-                            map(lambda chunk: "".join(chunk), data_buf)
+        async def new_iterator_async():
+            # type: () -> AsyncIterator[ChatCompletionChunk]
+            with capture_internal_exceptions():
+                async for x in old_iterator:
+                    if hasattr(x, "choices"):
+                        choice_index = 0
+                        for choice in x.choices:
+                            if hasattr(choice, "delta") and hasattr(
+                                choice.delta, "content"
+                            ):
+                                content = choice.delta.content
+                                if len(data_buf) <= choice_index:
+                                    data_buf.append([])
+                                data_buf[choice_index].append(content or "")
+                            choice_index += 1
+                    yield x
+                if len(data_buf) > 0:
+                    all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
+                    if should_send_default_pii() and integration.include_prompts:
+                        set_data_normalized(
+                            span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                         )
-                        if should_send_default_pii() and integration.include_prompts:
-                            set_data_normalized(
-                                span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
-                            )
-                        _calculate_token_usage(
-                            messages,
-                            res,
-                            span,
-                            all_responses,
-                            integration.count_tokens,
-                        )
-                span.__exit__(None, None, None)
+                    _calculate_token_usage(
+                        messages,
+                        res,
+                        span,
+                        all_responses,
+                        integration.count_tokens,
+                    )
+            span.__exit__(None, None, None)
 
-            async def new_iterator_async():
-                # type: () -> AsyncIterator[ChatCompletionChunk]
-                with capture_internal_exceptions():
-                    async for x in old_iterator:
-                        if hasattr(x, "choices"):
-                            choice_index = 0
-                            for choice in x.choices:
-                                if hasattr(choice, "delta") and hasattr(
-                                    choice.delta, "content"
-                                ):
-                                    content = choice.delta.content
-                                    if len(data_buf) <= choice_index:
-                                        data_buf.append([])
-                                    data_buf[choice_index].append(content or "")
-                                choice_index += 1
-                        yield x
-                    if len(data_buf) > 0:
-                        all_responses = list(
-                            map(lambda chunk: "".join(chunk), data_buf)
-                        )
-                        if should_send_default_pii() and integration.include_prompts:
-                            set_data_normalized(
-                                span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
-                            )
-                        _calculate_token_usage(
-                            messages,
-                            res,
-                            span,
-                            all_responses,
-                            integration.count_tokens,
-                        )
-                span.__exit__(None, None, None)
-
-            if str(type(res._iterator)) == "<class 'async_generator'>":
-                res._iterator = new_iterator_async()
-            else:
-                res._iterator = new_iterator()
-
+        if str(type(res._iterator)) == "<class 'async_generator'>":
+            res._iterator = new_iterator_async()
         else:
-            set_data_normalized(span, "unknown_response", True)
-            span.__exit__(None, None, None)
+            res._iterator = new_iterator()
+
+    else:
+        set_data_normalized(span, "unknown_response", True)
+
+
+def _new_chat_completion_common(f, *args, **kwargs):
+    # type: (Any, Any, Any) -> Any
+    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    if integration is None:
+        return f(*args, **kwargs)
+
+    if "messages" not in kwargs:
+        # invalid call (in all versions of openai), let it return error
+        return f(*args, **kwargs)
+
+    try:
+        iter(kwargs["messages"])
+    except TypeError:
+        # invalid call (in all versions), messages must be iterable
+        return f(*args, **kwargs)
+
+    model = kwargs.get("model")
+
+    with sentry_sdk.start_span(
+        op=consts.OP.GEN_AI_CHAT,
+        name=f"chat {model}",
+        origin=OpenAIIntegration.origin,
+    ) as span:
+        _set_request_data(span, kwargs, integration)
+
+        res = yield f, args, kwargs
+
+        _set_response_data(span, res, kwargs, integration)
+
     return res
 
 
