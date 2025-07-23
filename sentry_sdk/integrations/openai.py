@@ -156,11 +156,18 @@ def _calculate_token_usage(
     )
 
 
-def _set_request_data(span, kwargs, integration):
-    # type: (Span, dict[str, Any], Integration) -> None
+def _set_request_data(span, kwargs, operation, integration):
+    # type: (Span, dict[str, Any], str, Integration) -> None
     messages = kwargs.get("messages")
+    if messages is None:
+        messages = kwargs.get("input")
+
+    if isinstance(messages, str):
+        messages = [messages]
+
     if (
         messages is not None
+        and len(messages) > 0
         and should_send_default_pii()
         and integration.include_prompts
     ):
@@ -171,7 +178,7 @@ def _set_request_data(span, kwargs, integration):
     streaming = kwargs.get("stream")
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
     set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
     set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
 
     # Optional attributes
@@ -194,16 +201,21 @@ def _set_request_data(span, kwargs, integration):
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
 
-def _set_response_data(span, res, kwargs, integration):
+def _set_response_data(span, response, kwargs, integration):
     # type: (Span, Any, dict[str, Any], Integration) -> None
-    if hasattr(res, "model"):
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, res.model)
+    if hasattr(response, "model"):
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
-    messages = kwargs.get("messages", [])
+    messages = kwargs.get("messages")
+    if messages is None:
+        messages = kwargs.get("input")
 
-    if hasattr(res, "choices"):
+    if isinstance(messages, str):
+        messages = [messages]
+
+    if hasattr(response, "choices"):
         if should_send_default_pii() and integration.include_prompts:
-            response_text = [choice.message.dict() for choice in res.choices]
+            response_text = [choice.message.dict() for choice in response.choices]
             if len(response_text) > 0:
                 set_data_normalized(
                     span,
@@ -211,12 +223,10 @@ def _set_response_data(span, res, kwargs, integration):
                     safe_serialize(response_text),
                 )
 
-        _calculate_token_usage(messages, res, span, None, integration.count_tokens)
-
-    elif hasattr(res, "_iterator"):
+    elif hasattr(response, "_iterator"):
         data_buf: list[list[str]] = []  # one for each choice
 
-        old_iterator = res._iterator
+        old_iterator = response._iterator
 
         def new_iterator():
             # type: () -> Iterator[ChatCompletionChunk]
@@ -242,7 +252,7 @@ def _set_response_data(span, res, kwargs, integration):
                         )
                     _calculate_token_usage(
                         messages,
-                        res,
+                        response,
                         span,
                         all_responses,
                         integration.count_tokens,
@@ -273,20 +283,19 @@ def _set_response_data(span, res, kwargs, integration):
                         )
                     _calculate_token_usage(
                         messages,
-                        res,
+                        response,
                         span,
                         all_responses,
                         integration.count_tokens,
                     )
             span.__exit__(None, None, None)
 
-        if str(type(res._iterator)) == "<class 'async_generator'>":
-            res._iterator = new_iterator_async()
+        if str(type(response._iterator)) == "<class 'async_generator'>":
+            response._iterator = new_iterator_async()
         else:
-            res._iterator = new_iterator()
+            response._iterator = new_iterator()
 
-    else:
-        set_data_normalized(span, "unknown_response", True)
+    _calculate_token_usage(messages, response, span, None, integration.count_tokens)
 
 
 def _new_chat_completion_common(f, *args, **kwargs):
@@ -306,19 +315,20 @@ def _new_chat_completion_common(f, *args, **kwargs):
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
+    operation = "chat"
 
     with sentry_sdk.start_span(
         op=consts.OP.GEN_AI_CHAT,
-        name=f"chat {model}",
+        name=f"{operation} {model}",
         origin=OpenAIIntegration.origin,
     ) as span:
-        _set_request_data(span, kwargs, integration)
+        _set_request_data(span, kwargs, operation, integration)
 
-        res = yield f, args, kwargs
+        response = yield f, args, kwargs
 
-        _set_response_data(span, res, kwargs, integration)
+        _set_response_data(span, response, kwargs, integration)
 
-    return res
+    return response
 
 
 def _wrap_chat_completion_create(f):
@@ -398,54 +408,18 @@ def _new_embeddings_create_common(f, *args, **kwargs):
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
+    operation = "embeddings"
 
     with sentry_sdk.start_span(
         op=consts.OP.GEN_AI_EMBEDDINGS,
-        name=f"embeddings {model}",
+        name=f"{operation} {model}",
         origin=OpenAIIntegration.origin,
     ) as span:
-        set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-
-        if "input" in kwargs and (
-            should_send_default_pii() and integration.include_prompts
-        ):
-            if isinstance(kwargs["input"], str):
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [kwargs["input"]]
-                )
-            elif (
-                isinstance(kwargs["input"], list)
-                and len(kwargs["input"]) > 0
-                and isinstance(kwargs["input"][0], str)
-            ):
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, kwargs["input"]
-                )
+        _set_request_data(span, kwargs, operation, integration)
 
         response = yield f, args, kwargs
 
-        input_tokens = 0
-        total_tokens = 0
-        if hasattr(response, "usage"):
-            if hasattr(response.usage, "prompt_tokens") and isinstance(
-                response.usage.prompt_tokens, int
-            ):
-                input_tokens = response.usage.prompt_tokens
-            if hasattr(response.usage, "total_tokens") and isinstance(
-                response.usage.total_tokens, int
-            ):
-                total_tokens = response.usage.total_tokens
-
-        if input_tokens == 0:
-            input_tokens = integration.count_tokens(kwargs["input"] or "")
-
-        record_token_usage(
-            span,
-            input_tokens=input_tokens,
-            total_tokens=total_tokens or input_tokens,
-        )
+        _set_response_data(span, response, kwargs, integration)
 
         return response
 
