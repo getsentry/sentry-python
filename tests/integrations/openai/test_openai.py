@@ -6,6 +6,22 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
+SKIP_RESPONSES_TESTS = False
+
+try:
+    from openai.types.responses.response_usage import (
+        InputTokensDetails,
+        OutputTokensDetails,
+    )
+    from openai.types.responses import (
+        Response,
+        ResponseUsage,
+        ResponseOutputMessage,
+        ResponseOutputText,
+    )
+except ImportError:
+    SKIP_RESPONSES_TESTS = True
+
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai import (
@@ -44,6 +60,46 @@ EXAMPLE_CHAT_COMPLETION = ChatCompletion(
         total_tokens=30,
     ),
 )
+
+
+if SKIP_RESPONSES_TESTS:
+    EXAMPLE_RESPONSE = None
+else:
+    EXAMPLE_RESPONSE = Response(
+        id="chat-id",
+        output=[
+            ResponseOutputMessage(
+                id="message-id",
+                content=[
+                    ResponseOutputText(
+                        annotations=[],
+                        text="the model response",
+                        type="output_text",
+                    ),
+                ],
+                role="assistant",
+                status="completed",
+                type="message",
+            ),
+        ],
+        parallel_tool_calls=False,
+        tool_choice="none",
+        tools=[],
+        created_at=10000000,
+        model="model-id",
+        object="response",
+        usage=ResponseUsage(
+            input_tokens=20,
+            input_tokens_details=InputTokensDetails(
+                cached_tokens=5,
+            ),
+            output_tokens=10,
+            output_tokens_details=OutputTokensDetails(
+                reasoning_tokens=8,
+            ),
+            total_tokens=30,
+        ),
+    )
 
 
 async def async_iterator(values):
@@ -903,3 +959,196 @@ def test_calculate_token_usage_e():
             output_tokens_reasoning=None,
             total_tokens=None,
         )
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    with start_transaction(name="openai tx"):
+        client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
+        )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    assert len(spans) == 1
+    assert spans[0]["op"] == "gen_ai.responses"
+    assert spans[0]["origin"] == "auto.ai.openai"
+    assert spans[0]["data"] == {
+        "gen_ai.request.model": "gpt-4o",
+        "gen_ai.usage.input_tokens": 20,
+        "gen_ai.usage.input_tokens.cached": 5,
+        "gen_ai.usage.output_tokens": 10,
+        "gen_ai.usage.output_tokens.reasoning": 8,
+        "gen_ai.usage.total_tokens": 30,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    assert "gen_ai.request.messages" not in spans[0]["data"]
+    assert "gen_ai.response.text" not in spans[0]["data"]
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_ai_client_span_responses_api(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    with start_transaction(name="openai tx"):
+        client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
+        )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    assert len(spans) == 1
+    assert spans[0]["op"] == "gen_ai.responses"
+    assert spans[0]["origin"] == "auto.ai.openai"
+    assert spans[0]["data"] == {
+        "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
+        "gen_ai.request.model": "gpt-4o",
+        "gen_ai.usage.input_tokens": 20,
+        "gen_ai.usage.input_tokens.cached": 5,
+        "gen_ai.usage.output_tokens": 10,
+        "gen_ai.usage.output_tokens.reasoning": 8,
+        "gen_ai.usage.total_tokens": 30,
+        "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_error_in_responses_api(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(
+        side_effect=OpenAIError("API rate limit reached")
+    )
+
+    with start_transaction(name="openai tx"):
+        with pytest.raises(OpenAIError):
+            client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+            )
+
+    (error_event, transaction_event) = events
+
+    assert transaction_event["type"] == "transaction"
+    # make sure the span where the error occurred is captured
+    assert transaction_event["spans"][0]["op"] == "gen_ai.responses"
+
+    assert error_event["level"] == "error"
+    assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
+
+    with start_transaction(name="openai tx"):
+        await client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
+        )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    assert len(spans) == 1
+    assert spans[0]["op"] == "gen_ai.responses"
+    assert spans[0]["origin"] == "auto.ai.openai"
+    assert spans[0]["data"] == {
+        "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
+        "gen_ai.request.model": "gpt-4o",
+        "gen_ai.usage.input_tokens": 20,
+        "gen_ai.usage.input_tokens.cached": 5,
+        "gen_ai.usage.output_tokens": 10,
+        "gen_ai.usage.output_tokens.reasoning": 8,
+        "gen_ai.usage.total_tokens": 30,
+        "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+async def test_error_in_responses_async_api(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    client.responses._post = AsyncMock(
+        side_effect=OpenAIError("API rate limit reached")
+    )
+
+    with start_transaction(name="openai tx"):
+        with pytest.raises(OpenAIError):
+            await client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+            )
+
+    (error_event, transaction_event) = events
+
+    assert transaction_event["type"] == "transaction"
+    # make sure the span where the error occurred is captured
+    assert transaction_event["spans"][0]["op"] == "gen_ai.responses"
+
+    assert error_event["level"] == "error"
+    assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
