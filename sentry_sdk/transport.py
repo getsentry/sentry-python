@@ -579,7 +579,7 @@ class AsyncHttpTransport(HttpTransportCore):
     def __init__(self: Self, options: Dict[str, Any]) -> None:
         super().__init__(options)
         # Requires event loop at init time
-        self._loop = asyncio.get_running_loop()
+        self.loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         self.background_tasks: set[asyncio.Task[None]] = set()
 
     def _get_header_value(self: Self, response: Any, header: str) -> Optional[str]:
