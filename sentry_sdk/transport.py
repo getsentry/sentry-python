@@ -576,7 +576,7 @@ class AsyncHttpTransport(HttpTransportCore):
         super().__init__(options)
         # Requires event loop at init time
         self._loop = asyncio.get_running_loop()
-        self.background_tasks = set()
+        self.background_tasks: set[asyncio.Task[None]] = set()
 
     async def _send_envelope(self: Self, envelope: Envelope) -> None:
         _prepared_envelope = self._prepare_envelope(envelope)
@@ -614,7 +614,7 @@ class AsyncHttpTransport(HttpTransportCore):
         finally:
             response.close()
 
-    async def _request(
+    async def _request(  # type: ignore[override]
         self: Self,
         method: str,
         endpoint_type: EndpointType,
