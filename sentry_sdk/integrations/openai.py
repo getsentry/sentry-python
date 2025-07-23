@@ -124,13 +124,11 @@ def _calculate_token_usage(
         total_tokens = _get_usage(response.usage, ["total_tokens"])
 
     # Manually count tokens
-    # TODO: when implementing responses API, check for responses API
     if input_tokens == 0:
         for message in messages:
             if "content" in message:
                 input_tokens += count_tokens(message["content"])
 
-    # TODO: when implementing responses API, check for responses API
     if output_tokens == 0:
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
@@ -191,7 +189,9 @@ def _new_chat_completion_common(f, *args, **kwargs):
         if should_send_default_pii() and integration.include_prompts:
             set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
 
+        set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
 
         if hasattr(res, "choices"):
@@ -368,7 +368,9 @@ def _new_embeddings_create_common(f, *args, **kwargs):
         name=f"embeddings {model}",
         origin=OpenAIIntegration.origin,
     ) as span:
+        set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
 
         if "input" in kwargs and (
             should_send_default_pii() and integration.include_prompts
@@ -496,7 +498,9 @@ def _new_responses_create_common(f, *args, **kwargs):
     )
     span.__enter__()
 
+    set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
     set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
 
     if should_send_default_pii() and integration.include_prompts:
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, input)
