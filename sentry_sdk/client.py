@@ -930,7 +930,7 @@ class _Client(BaseClient):
         self,
         timeout: Optional[float] = None,
         callback: Optional[Callable[[int, float], None]] = None,
-    ) -> Optional[asyncio.Task[None]]:
+    ) -> Optional[asyncio.Task[None]]:  # type: ignore[override]
         """
         Close the client and shut down the transport. Arguments have the same
         semantics as :py:meth:`Client.flush`. When using the async transport, close needs to be awaited to block.
@@ -956,7 +956,7 @@ class _Client(BaseClient):
         self,
         timeout: Optional[float] = None,
         callback: Optional[Callable[[int, float], None]] = None,
-    ) -> Optional[asyncio.Task[None]]:
+    ) -> Optional[asyncio.Task[None]]:  # type: ignore[override]
         """
         Wait for the current events to be sent. When using the async transport, flush needs to be awaited to block.
 
