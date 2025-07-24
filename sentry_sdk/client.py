@@ -935,21 +935,24 @@ class _Client(BaseClient):
         Close the client and shut down the transport. Arguments have the same
         semantics as :py:meth:`Client.flush`. When using the async transport, close needs to be awaited to block.
         """
+
+        async def _flush_and_close(
+            timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
+        ) -> None:
+            await self._flush_async(timeout=timeout, callback=callback)
+            self._close_components()
+
         if self.transport is not None:
             if isinstance(self.transport, AsyncHttpTransport):
 
-                def _on_flush_done(_: asyncio.Task[None]) -> None:
-                    self._close_components()
-
                 try:
                     flush_task = self.transport.loop.create_task(
-                        self._flush_async(timeout, callback)
+                        _flush_and_close(timeout, callback)
                     )
                 except RuntimeError:
                     logger.warning("Event loop not running, aborting close.")
                     return None
                 # Enforce flush before shutdown
-                flush_task.add_done_callback(_on_flush_done)
                 return flush_task
             else:
                 self.flush(timeout=timeout, callback=callback)
