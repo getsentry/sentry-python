@@ -941,9 +941,13 @@ class _Client(BaseClient):
                 def _on_flush_done(_: asyncio.Task[None]) -> None:
                     self._close_components()
 
-                flush_task = self.transport.loop.create_task(
-                    self._flush_async(timeout, callback)
-                )
+                try:
+                    flush_task = self.transport.loop.create_task(
+                        self._flush_async(timeout, callback)
+                    )
+                except RuntimeError:
+                    logger.warning("Event loop not running, aborting close.")
+                    return None
                 # Enforce flush before shutdown
                 flush_task.add_done_callback(_on_flush_done)
                 return flush_task
@@ -975,9 +979,13 @@ class _Client(BaseClient):
                 self.log_batcher.flush()
 
             if isinstance(self.transport, AsyncHttpTransport):
-                return self.transport.loop.create_task(
-                    self._flush_async(timeout, callback)
-                )
+                try:
+                    return self.transport.loop.create_task(
+                        self._flush_async(timeout, callback)
+                    )
+                except RuntimeError:
+                    logger.warning("Event loop not running, aborting flush.")
+                    return None
             else:
                 self.transport.flush(timeout=timeout, callback=callback)
         return None
