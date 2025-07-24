@@ -27,10 +27,21 @@ class Worker(ABC):
     @property
     @abstractmethod
     def is_alive(self) -> bool:
+        """
+        Checks whether the worker is alive and running.
+
+        Returns True if the worker is alive, False otherwise.
+        """
         pass
 
     @abstractmethod
     def kill(self) -> None:
+        """
+        Kills the worker.
+
+        This method is used to kill the worker. The queue will be drained up to the point where the worker is killed.
+        The worker will not be able to process any more events.
+        """
         pass
 
     def flush(
@@ -47,6 +58,11 @@ class Worker(ABC):
 
     @abstractmethod
     def full(self) -> bool:
+        """
+        Checks whether the worker's queue is full.
+
+        Returns True if the queue is full, False otherwise.
+        """
         pass
 
     @abstractmethod
