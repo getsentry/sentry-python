@@ -14,6 +14,7 @@ original_start = Thread.start
 original_run = Thread.run
 
 
+@pytest.mark.filterwarnings("ignore:.*:pytest.PytestUnhandledThreadExceptionWarning")
 @pytest.mark.parametrize("integrations", [[ThreadingIntegration()], []])
 def test_handles_exceptions(sentry_init, capture_events, integrations):
     sentry_init(default_integrations=False, integrations=integrations)
@@ -37,6 +38,7 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
         assert not events
 
 
+@pytest.mark.filterwarnings("ignore:.*:pytest.PytestUnhandledThreadExceptionWarning")
 @pytest.mark.parametrize("propagate_scope", (True, False))
 def test_propagates_scope(sentry_init, capture_events, propagate_scope):
     sentry_init(
@@ -129,6 +131,7 @@ def test_circular_references(sentry_init, request):
     assert unreachable_objects == 0
 
 
+@pytest.mark.filterwarnings("ignore:.*:pytest.PytestUnhandledThreadExceptionWarning")
 def test_double_patching(sentry_init, capture_events):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
     events = capture_events()

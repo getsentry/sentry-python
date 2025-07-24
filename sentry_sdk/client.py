@@ -46,7 +46,6 @@ from sentry_sdk.profiler.transaction_profiler import (
 )
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
-from sentry_sdk.spotlight import setup_spotlight
 
 if TYPE_CHECKING:
     from typing import (
@@ -358,6 +357,10 @@ class _Client(BaseClient):
                 )
 
             if self.options.get("spotlight"):
+                # This is intentionally here to prevent setting up spotlight
+                # stuff we don't need unless spotlight is explicitly enabled
+                from sentry_sdk.spotlight import setup_spotlight
+
                 self.spotlight = setup_spotlight(self.options)
                 if not self.options["dsn"]:
                     sample_all = lambda *_args, **_kwargs: 1.0

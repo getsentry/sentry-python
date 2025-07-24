@@ -15,8 +15,10 @@ from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
 def mock_client_post(client, post_mock):
     # huggingface-hub==0.28.0 deprecates the `post` method
     # so patch `_inner_post` instead
-    client.post = post_mock
-    client._inner_post = post_mock
+    if hasattr(client, "post"):
+        client.post = post_mock
+    if hasattr(client, "_inner_post"):
+        client._inner_post = post_mock
 
 
 @pytest.mark.parametrize(
@@ -33,7 +35,8 @@ def test_nonstreaming_chat_completion(
     )
     events = capture_events()
 
-    client = InferenceClient()
+    client = InferenceClient(model="https://")
+
     if details_arg:
         post_mock = mock.Mock(
             return_value=b"""[{
@@ -92,7 +95,7 @@ def test_streaming_chat_completion(
     )
     events = capture_events()
 
-    client = InferenceClient()
+    client = InferenceClient(model="https://")
 
     post_mock = mock.Mock(
         return_value=[
@@ -141,7 +144,7 @@ def test_bad_chat_completion(sentry_init, capture_events):
     sentry_init(integrations=[HuggingfaceHubIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    client = InferenceClient()
+    client = InferenceClient(model="https://")
     post_mock = mock.Mock(side_effect=OverloadedError("The server is overloaded"))
     mock_client_post(client, post_mock)
 
@@ -159,7 +162,7 @@ def test_span_origin(sentry_init, capture_events):
     )
     events = capture_events()
 
-    client = InferenceClient()
+    client = InferenceClient(model="https://")
     post_mock = mock.Mock(
         return_value=[
             b"""data:{
