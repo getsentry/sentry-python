@@ -157,7 +157,7 @@ def enable_span_for_middleware(middleware: Middleware) -> Middleware:
             op=OP.MIDDLEWARE_LITESTAR,
             name=middleware_name,
             origin=LitestarIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as middleware_span:
             middleware_span.set_tag("litestar.middleware_name", middleware_name)
 
@@ -171,7 +171,7 @@ def enable_span_for_middleware(middleware: Middleware) -> Middleware:
                     op=OP.MIDDLEWARE_LITESTAR_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
                     origin=LitestarIntegration.origin,
-                    only_if_parent=True,
+                    only_as_child_span=True,
                 ) as span:
                     span.set_tag("litestar.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -188,7 +188,7 @@ def enable_span_for_middleware(middleware: Middleware) -> Middleware:
                     op=OP.MIDDLEWARE_LITESTAR_SEND,
                     name=getattr(send, "__qualname__", str(send)),
                     origin=LitestarIntegration.origin,
-                    only_if_parent=True,
+                    only_as_child_span=True,
                 ) as span:
                     span.set_tag("litestar.middleware_name", middleware_name)
                     return await send(message)

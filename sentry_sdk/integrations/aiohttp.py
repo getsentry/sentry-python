@@ -238,7 +238,7 @@ def create_trace_config() -> TraceConfig:
             name="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
             origin=AioHttpIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         )
 
         data = {

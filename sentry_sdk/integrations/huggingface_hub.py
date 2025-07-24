@@ -73,7 +73,7 @@ def _wrap_text_generation(f: Callable[..., Any]) -> Callable[..., Any]:
             op=consts.OP.HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE,
             name="Text Generation",
             origin=HuggingfaceHubIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         )
         span.__enter__()
         try:

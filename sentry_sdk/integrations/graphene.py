@@ -137,7 +137,7 @@ def graphql_span(
     )
 
     with sentry_sdk.start_span(
-        op=op, name=operation_name, only_if_parent=True
+        op=op, name=operation_name, only_as_child_span=True
     ) as graphql_span:
         graphql_span.set_attribute("graphql.document", source)
         graphql_span.set_attribute("graphql.operation.name", operation_name)

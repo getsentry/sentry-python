@@ -49,7 +49,7 @@ def patch_asyncio() -> None:
                         op=OP.FUNCTION,
                         name=get_name(coro),
                         origin=AsyncioIntegration.origin,
-                        only_if_parent=True,
+                        only_as_child_span=True,
                     ):
                         try:
                             result = await coro

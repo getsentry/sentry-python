@@ -60,7 +60,7 @@ def _patch_create_connection() -> None:
             op=OP.SOCKET_CONNECTION,
             name=_get_span_description(address[0], address[1]),
             origin=SocketIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as span:
             host, port = address
             span.set_attribute("address.host", host)
@@ -102,7 +102,7 @@ def _patch_getaddrinfo() -> None:
             op=OP.SOCKET_DNS,
             name=_get_span_description(host, port),
             origin=SocketIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as span:
             span.set_attribute("host", host)
             span.set_attribute("port", port)

@@ -31,7 +31,7 @@ def ai_track(description: str, **span_kwargs: Any) -> Callable[..., Any]:
             op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
             with start_span(
-                name=description, op=op, only_if_parent=True, **span_kwargs
+                name=description, op=op, only_as_child_span=True, **span_kwargs
             ) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
                     span.set_tag(k, v)
@@ -61,7 +61,7 @@ def ai_track(description: str, **span_kwargs: Any) -> Callable[..., Any]:
             op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
             with start_span(
-                name=description, op=op, only_if_parent=True, **span_kwargs
+                name=description, op=op, only_as_child_span=True, **span_kwargs
             ) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
                     span.set_tag(k, v)

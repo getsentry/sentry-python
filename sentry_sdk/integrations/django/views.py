@@ -37,7 +37,7 @@ def patch_views() -> None:
             op=OP.VIEW_RESPONSE_RENDER,
             name="serialize response",
             origin=DjangoIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ):
             return old_render(self)
 
@@ -88,7 +88,7 @@ def _wrap_sync_view(callback: Any) -> Any:
             op=OP.VIEW_RENDER,
             name=request.resolver_match.view_name,
             origin=DjangoIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ):
             return callback(request, *args, **kwargs)
 

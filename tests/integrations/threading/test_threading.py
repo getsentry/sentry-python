@@ -82,7 +82,9 @@ def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scop
     events = capture_events()
 
     def double(number):
-        with sentry_sdk.start_span(op="task", name=str(number), only_if_parent=True):
+        with sentry_sdk.start_span(
+            op="task", name=str(number), only_as_child_span=True
+        ):
             return number * 2
 
     with sentry_sdk.start_span(name="test_handles_threadpool"):
