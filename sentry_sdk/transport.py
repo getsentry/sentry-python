@@ -163,7 +163,7 @@ def _parse_rate_limits(
 
 
 class HttpTransportCore(Transport):
-    """The base HTTP transport."""
+    """Shared base class for sync and async transports."""
 
     TIMEOUT = 30  # seconds
 
@@ -392,6 +392,8 @@ class HttpTransportCore(Transport):
     def _prepare_envelope(
         self: Self, envelope: Envelope
     ) -> Optional[Tuple[Envelope, io.BytesIO, Dict[str, str]]]:
+
+        # remove all items from the envelope which are over quota
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
@@ -500,18 +502,18 @@ class HttpTransportCore(Transport):
 
 
 class BaseHttpTransport(HttpTransportCore):
+    """The base HTTP transport."""
 
     def _send_envelope(self: Self, envelope: Envelope) -> None:
         _prepared_envelope = self._prepare_envelope(envelope)
-        if _prepared_envelope is None:
-            return None
-        envelope, body, headers = _prepared_envelope
-        self._send_request(
-            body.getvalue(),
-            headers=headers,
-            endpoint_type=EndpointType.ENVELOPE,
-            envelope=envelope,
-        )
+        if _prepared_envelope is not None:
+            envelope, body, headers = _prepared_envelope
+            self._send_request(
+                body.getvalue(),
+                headers=headers,
+                endpoint_type=EndpointType.ENVELOPE,
+                envelope=envelope,
+            )
         return None
 
     def _send_request(
