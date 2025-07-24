@@ -1021,11 +1021,14 @@ def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
     use_http2_transport = options.get("_experiments", {}).get("transport_http2", False)
     use_async_transport = options.get("_experiments", {}).get("transport_async", False)
     # By default, we use the http transport class
-    if use_async_transport and asyncio.get_running_loop() is not None:
-        transport_cls: Type[Transport] = AsyncHttpTransport
-    else:
-        use_http2 = use_http2_transport
-        transport_cls = Http2Transport if use_http2 else HttpTransport
+    if use_async_transport:
+        try:
+            asyncio.get_running_loop()
+            transport_cls: Type[Transport] = AsyncHttpTransport
+        except RuntimeError:
+            # No event loop running, fall back to sync transport
+            logger.warning("No event loop running, falling back to sync transport.")
+            transport_cls = Http2Transport if use_http2_transport else HttpTransport
 
     if isinstance(ref_transport, Transport):
         return ref_transport
