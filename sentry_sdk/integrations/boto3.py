@@ -66,7 +66,7 @@ def _sentry_request_created(
         op=OP.HTTP_CLIENT,
         name=description,
         origin=Boto3Integration.origin,
-        only_if_parent=True,
+        only_as_child_span=True,
     )
 
     data = {
@@ -120,7 +120,7 @@ def _sentry_after_call(
         op=OP.HTTP_CLIENT_STREAM,
         name=span.name,
         origin=Boto3Integration.origin,
-        only_if_parent=True,
+        only_as_child_span=True,
     )
 
     orig_read = body.read

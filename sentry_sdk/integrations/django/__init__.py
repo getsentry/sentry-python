@@ -649,7 +649,7 @@ def install_sql_hook() -> None:
             op=OP.DB,
             name="connect",
             origin=DjangoIntegration.origin_db,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as span:
             _set_db_data(span, self)
             return real_connect(self)

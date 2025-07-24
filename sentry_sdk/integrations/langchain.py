@@ -144,7 +144,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         parent_watched_span = self.span_map.get(parent_id) if parent_id else None
         sentry_span = sentry_sdk.start_span(
             parent_span=parent_watched_span.span if parent_watched_span else None,
-            only_if_parent=True,
+            only_as_child_span=True,
             **kwargs,
         )
         watched_span = WatchedSpan(sentry_span)

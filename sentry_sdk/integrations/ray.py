@@ -101,7 +101,7 @@ def _patch_ray_remote() -> None:
                     op=OP.QUEUE_SUBMIT_RAY,
                     name=qualname_from_function(user_f),
                     origin=RayIntegration.origin,
-                    only_if_parent=True,
+                    only_as_child_span=True,
                 ) as span:
                     tracing = {
                         k: v

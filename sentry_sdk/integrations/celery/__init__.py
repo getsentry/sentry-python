@@ -269,7 +269,7 @@ def _wrap_task_run(f: F) -> F:
                 op=OP.QUEUE_SUBMIT_CELERY,
                 name=task_name,
                 origin=CeleryIntegration.origin,
-                only_if_parent=True,
+                only_as_child_span=True,
             )
             if not task_started_from_beat
             else NoOpMgr()
@@ -354,7 +354,7 @@ def _wrap_task_call(task: Any, f: F) -> F:
                 op=OP.QUEUE_PROCESS,
                 name=task.name,
                 origin=CeleryIntegration.origin,
-                only_if_parent=True,
+                only_as_child_span=True,
             ) as span:
                 _set_messaging_destination_name(task, span)
 
@@ -479,7 +479,7 @@ def _patch_producer_publish() -> None:
             op=OP.QUEUE_PUBLISH,
             name=task_name,
             origin=CeleryIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as span:
             if task_id is not None:
                 span.set_attribute(SPANDATA.MESSAGING_MESSAGE_ID, task_id)

@@ -86,7 +86,7 @@ def _wrap_middleware(middleware: Any, middleware_name: str) -> Any:
             op=OP.MIDDLEWARE_DJANGO,
             name=description,
             origin=DjangoIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         )
         middleware_span.set_tag("django.function_name", function_name)
         middleware_span.set_tag("django.middleware_name", middleware_name)

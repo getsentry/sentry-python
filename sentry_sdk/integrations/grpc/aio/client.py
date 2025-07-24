@@ -51,7 +51,7 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
             op=OP.GRPC_CLIENT,
             name="unary unary call to %s" % method,
             origin=SPAN_ORIGIN,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as span:
             span.set_attribute("type", "unary unary")
             span.set_attribute("method", method)
@@ -84,7 +84,7 @@ class SentryUnaryStreamClientInterceptor(
             op=OP.GRPC_CLIENT,
             name="unary stream call to %s" % method,
             origin=SPAN_ORIGIN,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as span:
             span.set_attribute("type", "unary stream")
             span.set_attribute("method", method)

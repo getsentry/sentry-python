@@ -42,7 +42,7 @@ def patch_redis_async_pipeline(
             op=OP.DB_REDIS,
             name="redis.pipeline.execute",
             origin=SPAN_ORIGIN,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as span:
             with capture_internal_exceptions():
                 span_data = get_db_data_fn(self)
@@ -98,7 +98,7 @@ def patch_redis_async_client(
                 op=cache_properties["op"],
                 name=cache_properties["description"],
                 origin=SPAN_ORIGIN,
-                only_if_parent=True,
+                only_as_child_span=True,
             )
             cache_span.__enter__()
 
@@ -108,7 +108,7 @@ def patch_redis_async_client(
             op=db_properties["op"],
             name=db_properties["description"],
             origin=SPAN_ORIGIN,
-            only_if_parent=True,
+            only_as_child_span=True,
         )
         db_span.__enter__()
 

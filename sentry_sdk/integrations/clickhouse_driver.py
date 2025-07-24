@@ -71,7 +71,7 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
             op=OP.DB,
             name=query,
             origin=ClickhouseDriverIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         )
 
         connection._sentry_span = span  # type: ignore[attr-defined]
