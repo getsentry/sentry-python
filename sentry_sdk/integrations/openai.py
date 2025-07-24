@@ -156,8 +156,9 @@ def _calculate_token_usage(
 
 
 # TODO: rename to _set_input_data and _set_output_data
-def _set_request_data(span, kwargs, operation, integration):
+def _set_input_data(span, kwargs, operation, integration):
     # type: (Span, dict[str, Any], str, Integration) -> None
+    # Input messages (the prompt or data sent to the model)
     messages = kwargs.get("messages")
     if messages is None:
         messages = kwargs.get("input")
@@ -173,43 +174,26 @@ def _set_request_data(span, kwargs, operation, integration):
     ):
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
 
-    # TODO: make mapping and loop over kwargs to set attributes
-    # Common attributes
-    model = kwargs.get("model")
+    # Input attributes: Common
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
-    set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
-    # Optional attributes
-    streaming = kwargs.get("stream")
-    if streaming is not None:
-        set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
+    # Input attributes: Optional
+    kwargs_keys_to_attributes = {
+        "model": SPANDATA.GEN_AI_REQUEST_MODEL,
+        "stream": SPANDATA.AI_STREAMING,
+        "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+        "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+        "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+        "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+        "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+    }
+    for key, attribute in kwargs_keys_to_attributes.items():
+        value = kwargs.get(key)
+        if value is not None:
+            set_data_normalized(span, attribute, value)
 
-    max_tokens = kwargs.get("max_tokens")
-    if max_tokens is not None:
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
-
-    presence_penalty = kwargs.get("presence_penalty")
-    if presence_penalty is not None:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty
-        )
-
-    frequency_penalty = kwargs.get("frequency_penalty")
-    if frequency_penalty is not None:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty
-        )
-
-    temperature = kwargs.get("temperature")
-    if temperature is not None:
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
-
-    top_p = kwargs.get("top_p")
-    if top_p is not None:
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
-
-    # Tools
+    # Input attributes: Tools
     tools = kwargs.get("tools", [])
     if tools is not None and len(tools) > 0:
         set_data_normalized(
@@ -217,7 +201,7 @@ def _set_request_data(span, kwargs, operation, integration):
         )
 
 
-def _set_response_data(span, response, kwargs, integration, finish_span=True):
+def _set_output_data(span, response, kwargs, integration, finish_span=True):
     # type: (Span, Any, dict[str, Any], Integration, bool) -> None
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
@@ -238,7 +222,8 @@ def _set_response_data(span, response, kwargs, integration, finish_span=True):
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                     safe_serialize(response_text),
                 )
-        span.__exit__(None, None, None)
+        if finish_span:
+            span.__exit__(None, None, None)
 
     elif hasattr(response, "output"):
         if should_send_default_pii() and integration.include_prompts:
@@ -249,6 +234,8 @@ def _set_response_data(span, response, kwargs, integration, finish_span=True):
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                     safe_serialize(response_text),
                 )
+        if finish_span:
+            span.__exit__(None, None, None)
 
     elif hasattr(response, "_iterator"):
         data_buf: list[list[str]] = []  # one for each choice
@@ -284,7 +271,8 @@ def _set_response_data(span, response, kwargs, integration, finish_span=True):
                         all_responses,
                         integration.count_tokens,
                     )
-            span.__exit__(None, None, None)
+            if finish_span:
+                span.__exit__(None, None, None)
 
         async def new_iterator_async():
             # type: () -> AsyncIterator[ChatCompletionChunk]
@@ -315,14 +303,14 @@ def _set_response_data(span, response, kwargs, integration, finish_span=True):
                         all_responses,
                         integration.count_tokens,
                     )
-            span.__exit__(None, None, None)
+            if finish_span:
+                span.__exit__(None, None, None)
 
         if str(type(response._iterator)) == "<class 'async_generator'>":
             response._iterator = new_iterator_async()
         else:
             response._iterator = new_iterator()
     else:
-        set_data_normalized(span, "unknown_response", True)
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -355,11 +343,11 @@ def _new_chat_completion_common(f, *args, **kwargs):
     )
     span.__enter__()
 
-    _set_request_data(span, kwargs, operation, integration)
+    _set_input_data(span, kwargs, operation, integration)
 
     response = yield f, args, kwargs
 
-    _set_response_data(span, response, kwargs, integration)
+    _set_output_data(span, response, kwargs, integration, finish_span=True)
 
     return response
 
@@ -448,11 +436,11 @@ def _new_embeddings_create_common(f, *args, **kwargs):
         name=f"{operation} {model}",
         origin=OpenAIIntegration.origin,
     ) as span:
-        _set_request_data(span, kwargs, operation, integration)
+        _set_input_data(span, kwargs, operation, integration)
 
         response = yield f, args, kwargs
 
-        _set_response_data(span, response, kwargs, integration, finish_span=False)
+        _set_output_data(span, response, kwargs, integration, finish_span=False)
 
         return response
 
@@ -540,13 +528,12 @@ def _new_responses_create_common(f, *args, **kwargs):
         origin=OpenAIIntegration.origin,
     )
     span.__enter__()
-    _set_request_data(span, kwargs, operation, integration)
+
+    _set_input_data(span, kwargs, operation, integration)
 
     response = yield f, args, kwargs
 
-    _set_response_data(span, response, kwargs, integration)
-
-    span.__exit__(None, None, None)
+    _set_output_data(span, response, kwargs, integration, finish_span=True)
 
     return response
 
