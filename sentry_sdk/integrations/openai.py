@@ -155,6 +155,7 @@ def _calculate_token_usage(
     )
 
 
+# TODO: rename to _set_input_data and _set_output_data
 def _set_request_data(span, kwargs, operation, integration):
     # type: (Span, dict[str, Any], str, Integration) -> None
     messages = kwargs.get("messages")
@@ -172,6 +173,7 @@ def _set_request_data(span, kwargs, operation, integration):
     ):
         set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
 
+    # TODO: make mapping and loop over kwargs to set attributes
     # Common attributes
     model = kwargs.get("model")
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
@@ -215,8 +217,8 @@ def _set_request_data(span, kwargs, operation, integration):
         )
 
 
-def _set_response_data(span, response, kwargs, integration):
-    # type: (Span, Any, dict[str, Any], Integration) -> None
+def _set_response_data(span, response, kwargs, integration, finish_span=True):
+    # type: (Span, Any, dict[str, Any], Integration, bool) -> None
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
@@ -236,6 +238,7 @@ def _set_response_data(span, response, kwargs, integration):
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                     safe_serialize(response_text),
                 )
+        span.__exit__(None, None, None)
 
     elif hasattr(response, "output"):
         if should_send_default_pii() and integration.include_prompts:
@@ -318,6 +321,10 @@ def _set_response_data(span, response, kwargs, integration):
             response._iterator = new_iterator_async()
         else:
             response._iterator = new_iterator()
+    else:
+        set_data_normalized(span, "unknown_response", True)
+        if finish_span:
+            span.__exit__(None, None, None)
 
     _calculate_token_usage(messages, response, span, None, integration.count_tokens)
 
@@ -341,16 +348,18 @@ def _new_chat_completion_common(f, *args, **kwargs):
     model = kwargs.get("model")
     operation = "chat"
 
-    with sentry_sdk.start_span(
+    span = sentry_sdk.start_span(
         op=consts.OP.GEN_AI_CHAT,
         name=f"{operation} {model}",
         origin=OpenAIIntegration.origin,
-    ) as span:
-        _set_request_data(span, kwargs, operation, integration)
+    )
+    span.__enter__()
 
-        response = yield f, args, kwargs
+    _set_request_data(span, kwargs, operation, integration)
 
-        _set_response_data(span, response, kwargs, integration)
+    response = yield f, args, kwargs
+
+    _set_response_data(span, response, kwargs, integration)
 
     return response
 
@@ -443,7 +452,7 @@ def _new_embeddings_create_common(f, *args, **kwargs):
 
         response = yield f, args, kwargs
 
-        _set_response_data(span, response, kwargs, integration)
+        _set_response_data(span, response, kwargs, integration, finish_span=False)
 
         return response
 
@@ -525,18 +534,21 @@ def _new_responses_create_common(f, *args, **kwargs):
     model = kwargs.get("model")
     operation = "responses"
 
-    with sentry_sdk.start_span(
+    span = sentry_sdk.start_span(
         op=consts.OP.GEN_AI_RESPONSES,
         name=f"{operation} {model}",
         origin=OpenAIIntegration.origin,
-    ) as span:
-        _set_request_data(span, kwargs, operation, integration)
+    )
+    span.__enter__()
+    _set_request_data(span, kwargs, operation, integration)
 
-        response = yield f, args, kwargs
+    response = yield f, args, kwargs
 
-        _set_response_data(span, response, kwargs, integration)
+    _set_response_data(span, response, kwargs, integration)
 
-        return response
+    span.__exit__(None, None, None)
+
+    return response
 
 
 def _wrap_responses_create(f):

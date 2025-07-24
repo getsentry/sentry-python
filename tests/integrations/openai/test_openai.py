@@ -1128,6 +1128,53 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+async def test_ai_client_span_streaming_responses_async_api(
+    sentry_init, capture_events
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = AsyncOpenAI(api_key="z")
+    client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
+
+    with start_transaction(name="openai tx"):
+        await client.responses.create(
+            model="gpt-4o",
+            instructions="You are a coding assistant that talks like a pirate.",
+            input="How do I check if a Python object is an instance of a class?",
+            stream=True,
+        )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+
+    assert len(spans) == 1
+    assert spans[0]["op"] == "gen_ai.responses"
+    assert spans[0]["origin"] == "auto.ai.openai"
+    assert spans[0]["data"] == {
+        "ai.streaming": True,
+        "gen_ai.operation.name": "responses",
+        "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
+        "gen_ai.request.model": "gpt-4o",
+        "gen_ai.response.model": "response-model-id",
+        "gen_ai.system": "openai",
+        "gen_ai.usage.input_tokens": 20,
+        "gen_ai.usage.input_tokens.cached": 5,
+        "gen_ai.usage.output_tokens": 10,
+        "gen_ai.usage.output_tokens.reasoning": 8,
+        "gen_ai.usage.total_tokens": 30,
+        "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_error_in_responses_async_api(sentry_init, capture_events):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
