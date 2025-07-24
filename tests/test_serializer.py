@@ -93,6 +93,18 @@ def test_serialize_sets(extra_normalizer):
     assert result == [1, 2, 3]
 
 
+def test_serialize_custom_iter_class(extra_normalizer):
+    class MyList:
+        def __init__(self, list_):
+            self.list_ = list_
+
+        def __iter__(self):
+            return iter(self.list_)
+
+    result = extra_normalizer(MyList([1, 2, 3]))
+    assert result == [1, 2, 3]
+
+
 def test_serialize_custom_mapping(extra_normalizer):
     class CustomReprDict(dict):
         def __sentry_repr__(self):

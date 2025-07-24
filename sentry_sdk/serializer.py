@@ -1,6 +1,6 @@
 import sys
 import math
-from collections.abc import Mapping, Sequence, Set
+from collections.abc import Mapping, Iterable
 from datetime import datetime
 
 from sentry_sdk.utils import (
@@ -331,9 +331,7 @@ def serialize(event, **kwargs):
 
             return rv_dict
 
-        elif not isinstance(obj, serializable_str_types) and isinstance(
-            obj, (Set, Sequence)
-        ):
+        elif not isinstance(obj, serializable_str_types) and isinstance(obj, Iterable):
             rv_list = []
 
             for i, v in enumerate(obj):
