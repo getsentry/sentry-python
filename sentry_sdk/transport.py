@@ -1029,6 +1029,8 @@ def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
             # No event loop running, fall back to sync transport
             logger.warning("No event loop running, falling back to sync transport.")
             transport_cls = Http2Transport if use_http2_transport else HttpTransport
+    else:
+        transport_cls = Http2Transport if use_http2_transport else HttpTransport
 
     if isinstance(ref_transport, Transport):
         return ref_transport
