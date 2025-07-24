@@ -126,8 +126,10 @@ def _calculate_token_usage(
     # Manually count tokens
     if input_tokens == 0:
         for message in messages:
-            if "content" in message:
+            if isinstance(message, dict) and "content" in message:
                 input_tokens += count_tokens(message["content"])
+            elif isinstance(message, str):
+                input_tokens += count_tokens(message)
 
     if output_tokens == 0:
         if streaming_message_responses is not None:
@@ -246,6 +248,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
             # type: () -> Iterator[ChatCompletionChunk]
             with capture_internal_exceptions():
                 for x in old_iterator:
+                    # OpenAI chat completion API
                     if hasattr(x, "choices"):
                         choice_index = 0
                         for choice in x.choices:
@@ -257,6 +260,11 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                                     data_buf.append([])
                                 data_buf[choice_index].append(content or "")
                             choice_index += 1
+                    # OpenAI responses API
+                    elif hasattr(x, "delta"):
+                        if len(data_buf) == 0:
+                            data_buf.append([])
+                        data_buf[0].append(x.delta or "")
                     yield x
                 if len(data_buf) > 0:
                     all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
