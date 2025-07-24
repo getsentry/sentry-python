@@ -1,7 +1,7 @@
 # Changelog
 
 ## 2.33.2
-
+xxx
 ### Various fixes & improvements
 
 - ref(spotlight): Do not import `sentry_sdk.spotlight` unless enabled (#4607) by @sentrivana
