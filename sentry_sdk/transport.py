@@ -575,7 +575,7 @@ class AsyncHttpTransport(HttpTransportCore):
     def __init__(self: Self, options: Dict[str, Any]) -> None:
         super().__init__(options)
         # Requires event loop at init time
-        self._loop = asyncio.get_running_loop()
+        self.loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         self.background_tasks: set[asyncio.Task[None]] = set()
 
     def _get_header_value(self: Self, response: Any, header: str) -> Optional[str]:
@@ -665,10 +665,10 @@ class AsyncHttpTransport(HttpTransportCore):
         except RuntimeError:
             # We are in a background thread, not running an event loop,
             # have to launch the task on the loop in a threadsafe way.
-            if self._loop and self._loop.is_running():
+            if self.loop and self.loop.is_running():
                 asyncio.run_coroutine_threadsafe(
                     self._capture_envelope(envelope),
-                    self._loop,
+                    self.loop,
                 )
             else:
                 # The event loop is no longer running
@@ -777,7 +777,7 @@ class AsyncHttpTransport(HttpTransportCore):
             task.cancel()
         self.background_tasks.clear()
         try:
-            self._loop.create_task(self._pool.aclose())  # type: ignore
+            self.loop.create_task(self._pool.aclose())  # type: ignore
         except RuntimeError:
             logger.warning("Event loop not running, aborting kill.")
 

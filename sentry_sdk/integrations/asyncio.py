@@ -5,6 +5,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.utils import event_from_exception, logger, reraise
+from sentry_sdk.transport import AsyncHttpTransport
 
 try:
     import asyncio
@@ -124,3 +125,46 @@ class AsyncioIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         patch_asyncio()
+
+        def _patch_loop_close() -> None:
+            # Atexit shutdown hook happens after the event loop is closed.
+            # Therefore, it is necessary to patch the loop.close method to ensure
+            # that pending events are flushed before the interpreter shuts down.
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # No running loop → cannot patch now
+                return
+
+            if getattr(loop, "_sentry_flush_patched", False):
+                return
+
+            async def _flush() -> None:
+                client = sentry_sdk.get_client()
+                if not client:
+                    return
+                try:
+
+                    if not isinstance(client.transport, AsyncHttpTransport):
+                        return
+
+                    t = client.close()  # type: ignore
+                    if t is not None:
+                        await t
+                except Exception:
+                    logger.warning(
+                        "Sentry flush failed during loop shutdown", exc_info=True
+                    )
+
+            orig_close = loop.close
+
+            def _patched_close() -> None:
+                try:
+                    loop.run_until_complete(_flush())
+                finally:
+                    orig_close()
+
+            loop.close = _patched_close  # type: ignore
+            loop._sentry_flush_patched = True  # type: ignore
+
+        _patch_loop_close()
