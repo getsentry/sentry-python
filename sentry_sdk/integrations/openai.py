@@ -157,9 +157,8 @@ def _calculate_token_usage(
     )
 
 
-# TODO: rename to _set_input_data and _set_output_data
 def _set_input_data(span, kwargs, operation, integration):
-    # type: (Span, dict[str, Any], str, Integration) -> None
+    # type: (Span, dict[str, Any], str, OpenAIIntegration) -> None
     # Input messages (the prompt or data sent to the model)
     messages = kwargs.get("messages")
     if messages is None:
@@ -204,7 +203,7 @@ def _set_input_data(span, kwargs, operation, integration):
 
 
 def _set_output_data(span, response, kwargs, integration, finish_span=True):
-    # type: (Span, Any, dict[str, Any], Integration, bool) -> None
+    # type: (Span, Any, dict[str, Any], OpenAIIntegration, bool) -> None
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
