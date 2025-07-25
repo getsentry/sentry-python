@@ -148,10 +148,9 @@ class AsyncioIntegration(Integration):
                     if not isinstance(client.transport, AsyncHttpTransport):
                         return
 
-                    t = client.close()
+                    t = client.close()  # type: ignore
                     if t is not None:
-                        # Wait for the task to complete.
-                        await t  # type: ignore
+                        await t
                 except Exception:
                     logger.warning(
                         "Sentry flush failed during loop shutdown", exc_info=True
@@ -165,7 +164,7 @@ class AsyncioIntegration(Integration):
                 finally:
                     orig_close()
 
-            loop.close = _patched_close
+            loop.close = _patched_close  # type: ignore
             loop._sentry_flush_patched = True  # type: ignore
 
         _patch_loop_close()
