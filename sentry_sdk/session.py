@@ -1,3 +1,4 @@
+from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
@@ -6,23 +7,15 @@ from sentry_sdk.utils import format_timestamp
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
-    from typing import Union
-    from typing import Any
-    from typing import Dict
-
     from sentry_sdk._types import SessionStatus
+    from typing import Optional, Union, Any, Dict
 
 
-def _minute_trunc(ts):
-    # type: (datetime) -> datetime
+def _minute_trunc(ts: datetime) -> datetime:
     return ts.replace(second=0, microsecond=0)
 
 
-def _make_uuid(
-    val,  # type: Union[str, uuid.UUID]
-):
-    # type: (...) -> uuid.UUID
+def _make_uuid(val: Union[str, uuid.UUID]) -> uuid.UUID:
     if isinstance(val, uuid.UUID):
         return val
     return uuid.UUID(val)
@@ -31,21 +24,20 @@ def _make_uuid(
 class Session:
     def __init__(
         self,
-        sid=None,  # type: Optional[Union[str, uuid.UUID]]
-        did=None,  # type: Optional[str]
-        timestamp=None,  # type: Optional[datetime]
-        started=None,  # type: Optional[datetime]
-        duration=None,  # type: Optional[float]
-        status=None,  # type: Optional[SessionStatus]
-        release=None,  # type: Optional[str]
-        environment=None,  # type: Optional[str]
-        user_agent=None,  # type: Optional[str]
-        ip_address=None,  # type: Optional[str]
-        errors=None,  # type: Optional[int]
-        user=None,  # type: Optional[Any]
-        session_mode="application",  # type: str
-    ):
-        # type: (...) -> None
+        sid: Optional[Union[str, uuid.UUID]] = None,
+        did: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
+        started: Optional[datetime] = None,
+        duration: Optional[float] = None,
+        status: Optional[SessionStatus] = None,
+        release: Optional[str] = None,
+        environment: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        errors: Optional[int] = None,
+        user: Optional[Any] = None,
+        session_mode: str = "application",
+    ) -> None:
         if sid is None:
             sid = uuid.uuid4()
         if started is None:
@@ -53,14 +45,14 @@ class Session:
         if status is None:
             status = "ok"
         self.status = status
-        self.did = None  # type: Optional[str]
+        self.did: Optional[str] = None
         self.started = started
-        self.release = None  # type: Optional[str]
-        self.environment = None  # type: Optional[str]
-        self.duration = None  # type: Optional[float]
-        self.user_agent = None  # type: Optional[str]
-        self.ip_address = None  # type: Optional[str]
-        self.session_mode = session_mode  # type: str
+        self.release: Optional[str] = None
+        self.environment: Optional[str] = None
+        self.duration: Optional[float] = None
+        self.user_agent: Optional[str] = None
+        self.ip_address: Optional[str] = None
+        self.session_mode: str = session_mode
         self.errors = 0
 
         self.update(
@@ -77,26 +69,24 @@ class Session:
         )
 
     @property
-    def truncated_started(self):
-        # type: (...) -> datetime
+    def truncated_started(self) -> datetime:
         return _minute_trunc(self.started)
 
     def update(
         self,
-        sid=None,  # type: Optional[Union[str, uuid.UUID]]
-        did=None,  # type: Optional[str]
-        timestamp=None,  # type: Optional[datetime]
-        started=None,  # type: Optional[datetime]
-        duration=None,  # type: Optional[float]
-        status=None,  # type: Optional[SessionStatus]
-        release=None,  # type: Optional[str]
-        environment=None,  # type: Optional[str]
-        user_agent=None,  # type: Optional[str]
-        ip_address=None,  # type: Optional[str]
-        errors=None,  # type: Optional[int]
-        user=None,  # type: Optional[Any]
-    ):
-        # type: (...) -> None
+        sid: Optional[Union[str, uuid.UUID]] = None,
+        did: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
+        started: Optional[datetime] = None,
+        duration: Optional[float] = None,
+        status: Optional[SessionStatus] = None,
+        release: Optional[str] = None,
+        environment: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        errors: Optional[int] = None,
+        user: Optional[Any] = None,
+    ) -> None:
         # If a user is supplied we pull some data form it
         if user:
             if ip_address is None:
@@ -129,19 +119,13 @@ class Session:
         if status is not None:
             self.status = status
 
-    def close(
-        self, status=None  # type: Optional[SessionStatus]
-    ):
-        # type: (...) -> Any
+    def close(self, status: Optional[SessionStatus] = None) -> Any:
         if status is None and self.status == "ok":
             status = "exited"
         if status is not None:
             self.update(status=status)
 
-    def get_json_attrs(
-        self, with_user_info=True  # type: Optional[bool]
-    ):
-        # type: (...) -> Any
+    def get_json_attrs(self, with_user_info: bool = True) -> Any:
         attrs = {}
         if self.release is not None:
             attrs["release"] = self.release
@@ -154,15 +138,14 @@ class Session:
                 attrs["user_agent"] = self.user_agent
         return attrs
 
-    def to_json(self):
-        # type: (...) -> Any
-        rv = {
+    def to_json(self) -> Any:
+        rv: Dict[str, Any] = {
             "sid": str(self.sid),
             "init": True,
             "started": format_timestamp(self.started),
             "timestamp": format_timestamp(self.timestamp),
             "status": self.status,
-        }  # type: Dict[str, Any]
+        }
         if self.errors:
             rv["errors"] = self.errors
         if self.did is not None:

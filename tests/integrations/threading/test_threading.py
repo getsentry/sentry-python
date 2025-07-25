@@ -2,6 +2,7 @@ import gc
 from concurrent import futures
 from textwrap import dedent
 from threading import Thread
+import sys
 
 import pytest
 
@@ -38,11 +39,11 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
 
 
 @pytest.mark.filterwarnings("ignore:.*:pytest.PytestUnhandledThreadExceptionWarning")
-@pytest.mark.parametrize("propagate_hub", (True, False))
-def test_propagates_hub(sentry_init, capture_events, propagate_hub):
+@pytest.mark.parametrize("propagate_scope", (True, False))
+def test_propagates_scope(sentry_init, capture_events, propagate_scope):
     sentry_init(
         default_integrations=False,
-        integrations=[ThreadingIntegration(propagate_hub=propagate_hub)],
+        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
     )
     events = capture_events()
 
@@ -68,25 +69,27 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
 
-    if propagate_hub:
+    if propagate_scope:
         assert event["tags"]["stage1"] == "true"
     else:
         assert "stage1" not in event.get("tags", {})
 
 
-@pytest.mark.parametrize("propagate_hub", (True, False))
-def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
+@pytest.mark.parametrize("propagate_scope", (True, False))
+def test_propagates_threadpool_scope(sentry_init, capture_events, propagate_scope):
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[ThreadingIntegration(propagate_hub=propagate_hub)],
+        integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
     )
     events = capture_events()
 
     def double(number):
-        with sentry_sdk.start_span(op="task", name=str(number)):
+        with sentry_sdk.start_span(
+            op="task", name=str(number), only_as_child_span=True
+        ):
             return number * 2
 
-    with sentry_sdk.start_transaction(name="test_handles_threadpool"):
+    with sentry_sdk.start_span(name="test_handles_threadpool"):
         with futures.ThreadPoolExecutor(max_workers=1) as executor:
             tasks = [executor.submit(double, number) for number in [1, 2, 3, 4]]
             for future in futures.as_completed(tasks):
@@ -94,7 +97,7 @@ def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
 
     sentry_sdk.flush()
 
-    if propagate_hub:
+    if propagate_scope:
         assert len(events) == 1
         (event,) = events
         assert event["spans"][0]["trace_id"] == event["spans"][1]["trace_id"]
@@ -106,13 +109,14 @@ def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
         assert len(event["spans"]) == 0
 
 
-@pytest.mark.skip(reason="Temporarily disable to release SDK 2.0a1.")
+@pytest.mark.skipif(sys.version[:3] == "3.8", reason="Fails in CI on 3.8")
 def test_circular_references(sentry_init, request):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
 
-    gc.collect()
     gc.disable()
     request.addfinalizer(gc.enable)
+
+    gc.collect()
 
     class MyThread(Thread):
         def run(self):
@@ -235,8 +239,8 @@ def test_spans_from_multiple_threads(
 
     threads = []
 
-    with sentry_sdk.start_transaction(op="outer-trx"):
-        for number in range(5):
+    with sentry_sdk.start_span(op="outer-trx"):
+        for number in range(2):
             with sentry_sdk.start_span(
                 op=f"outer-submit-{number}", name="Thread: main"
             ):
@@ -247,32 +251,44 @@ def test_spans_from_multiple_threads(
         for t in threads:
             t.join()
 
-    (event,) = events
     if propagate_scope:
+        # The children spans from the threads become parts of the existing span
+        # tree since we propagated the scope
+        assert len(events) == 1
+        (event,) = events
+
         assert render_span_tree(event) == dedent(
             """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
                 - op="inner-run-0": description="Thread: child-0"
               - op="outer-submit-1": description="Thread: main"
-                - op="inner-run-1": description="Thread: child-1"
-              - op="outer-submit-2": description="Thread: main"
-                - op="inner-run-2": description="Thread: child-2"
-              - op="outer-submit-3": description="Thread: main"
-                - op="inner-run-3": description="Thread: child-3"
-              - op="outer-submit-4": description="Thread: main"
-                - op="inner-run-4": description="Thread: child-4"\
+                - op="inner-run-1": description="Thread: child-1"\
 """
         )
 
     elif not propagate_scope:
-        assert render_span_tree(event) == dedent(
+        # The spans from the threads become their own root spans/transactions
+        # as the connection to the parent span was severed when the scope was
+        # cleared
+        assert len(events) == 3
+        (event1, event2, event3) = sorted(events, key=render_span_tree)
+
+        assert render_span_tree(event1) == dedent(
+            """\
+            - op="inner-run-0": description=null\
+"""
+        )
+        assert render_span_tree(event2) == dedent(
+            """\
+            - op="inner-run-1": description=null\
+"""
+        )
+
+        assert render_span_tree(event3) == dedent(
             """\
             - op="outer-trx": description=null
               - op="outer-submit-0": description="Thread: main"
-              - op="outer-submit-1": description="Thread: main"
-              - op="outer-submit-2": description="Thread: main"
-              - op="outer-submit-3": description="Thread: main"
-              - op="outer-submit-4": description="Thread: main"\
+              - op="outer-submit-1": description="Thread: main"\
 """
         )

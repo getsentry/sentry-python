@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.33.2",
+    version="3.0.0a3",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -37,10 +37,11 @@ setup(
     package_data={"sentry_sdk": ["py.typed"]},
     zip_safe=False,
     license="MIT",
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     install_requires=[
         "urllib3>=1.26.11",
         "certifi",
+        "opentelemetry-sdk>=1.4.0",
     ],
     extras_require={
         "aiohttp": ["aiohttp>=3.5"],
@@ -69,7 +70,6 @@ setup(
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "openfeature": ["openfeature-sdk>=0.7.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
-        "opentelemetry-experimental": ["opentelemetry-distro"],
         "pure-eval": ["pure_eval", "executing", "asttokens"],
         "pymongo": ["pymongo>=3.1"],
         "pyspark": ["pyspark>=2.4.4"],
@@ -85,8 +85,8 @@ setup(
     },
     entry_points={
         "opentelemetry_propagator": [
-            "sentry=sentry_sdk.integrations.opentelemetry:SentryPropagator"
-        ]
+            "sentry=sentry_sdk.opentelemetry:SentryPropagator"
+        ],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -96,7 +96,6 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

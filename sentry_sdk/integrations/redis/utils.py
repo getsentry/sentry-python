@@ -1,3 +1,5 @@
+from __future__ import annotations
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,
@@ -16,8 +18,46 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def _get_safe_command(name, args):
-    # type: (str, Sequence[Any]) -> str
+TAG_KEYS = [
+    "redis.command",
+    "redis.is_cluster",
+    "redis.key",
+    "redis.transaction",
+    SPANDATA.DB_OPERATION,
+]
+
+
+def _update_span(span: Span, *data_bags: dict[str, Any]) -> None:
+    """
+    Set tags and data on the given span to data from the given data bags.
+    """
+    for data in data_bags:
+        for key, value in data.items():
+            if key in TAG_KEYS:
+                span.set_tag(key, value)
+            else:
+                span.set_attribute(key, value)
+
+
+def _create_breadcrumb(message: str, *data_bags: dict[str, Any]) -> None:
+    """
+    Create a breadcrumb containing the tags data from the given data bags.
+    """
+    data = {}
+    for data in data_bags:
+        for key, value in data.items():
+            if key in TAG_KEYS:
+                data[key] = value
+
+    sentry_sdk.add_breadcrumb(
+        message=message,
+        type="redis",
+        category="redis",
+        data=data,
+    )
+
+
+def _get_safe_command(name: str, args: Sequence[Any]) -> str:
     command_parts = [name]
 
     for i, arg in enumerate(args):
@@ -44,8 +84,7 @@ def _get_safe_command(name, args):
     return command
 
 
-def _safe_decode(key):
-    # type: (Any) -> str
+def _safe_decode(key: Any) -> str:
     if isinstance(key, bytes):
         try:
             return key.decode()
@@ -55,8 +94,7 @@ def _safe_decode(key):
     return str(key)
 
 
-def _key_as_string(key):
-    # type: (Any) -> str
+def _key_as_string(key: Any) -> str:
     if isinstance(key, (dict, list, tuple)):
         key = ", ".join(_safe_decode(x) for x in key)
     elif isinstance(key, bytes):
@@ -69,8 +107,9 @@ def _key_as_string(key):
     return key
 
 
-def _get_safe_key(method_name, args, kwargs):
-    # type: (str, Optional[tuple[Any, ...]], Optional[dict[str, Any]]) -> Optional[tuple[str, ...]]
+def _get_safe_key(
+    method_name: str, args: Optional[tuple[Any, ...]], kwargs: Optional[dict[str, Any]]
+) -> Optional[tuple[str, ...]]:
     """
     Gets the key (or keys) from the given method_name.
     The method_name could be a redis command or a django caching command
@@ -100,49 +139,49 @@ def _get_safe_key(method_name, args, kwargs):
     return key
 
 
-def _parse_rediscluster_command(command):
-    # type: (Any) -> Sequence[Any]
+def _parse_rediscluster_command(command: Any) -> Sequence[Any]:
     return command.args
 
 
-def _set_pipeline_data(
-    span,
-    is_cluster,
-    get_command_args_fn,
-    is_transaction,
-    commands_seq,
-):
-    # type: (Span, bool, Any, bool, Sequence[Any]) -> None
-    span.set_tag("redis.is_cluster", is_cluster)
-    span.set_tag("redis.transaction", is_transaction)
+def _get_pipeline_data(
+    is_cluster: bool,
+    get_command_args_fn: Any,
+    is_transaction: bool,
+    command_seq: Sequence[Any],
+) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "redis.is_cluster": is_cluster,
+        "redis.transaction": is_transaction,
+    }
 
     commands = []
-    for i, arg in enumerate(commands_seq):
+    for i, arg in enumerate(command_seq):
         if i >= _MAX_NUM_COMMANDS:
             break
 
         command = get_command_args_fn(arg)
         commands.append(_get_safe_command(command[0], command[1:]))
 
-    span.set_data(
-        "redis.commands",
-        {
-            "count": len(commands_seq),
-            "first_ten": commands,
-        },
-    )
+    data["redis.commands.count"] = len(command_seq)
+    data["redis.commands.first_ten"] = commands
+
+    return data
 
 
-def _set_client_data(span, is_cluster, name, *args):
-    # type: (Span, bool, str, *Any) -> None
-    span.set_tag("redis.is_cluster", is_cluster)
+def _get_client_data(is_cluster: bool, name: str, *args: Any) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "redis.is_cluster": is_cluster,
+    }
+
     if name:
-        span.set_tag("redis.command", name)
-        span.set_tag(SPANDATA.DB_OPERATION, name)
+        data["redis.command"] = name
+        data[SPANDATA.DB_OPERATION] = name
 
     if name and args:
         name_low = name.lower()
         if (name_low in _SINGLE_KEY_COMMANDS) or (
             name_low in _MULTI_KEY_COMMANDS and len(args) == 1
         ):
-            span.set_tag("redis.key", args[0])
+            data["redis.key"] = args[0]
+
+    return data

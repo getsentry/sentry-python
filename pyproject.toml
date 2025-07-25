@@ -214,3 +214,6 @@ exclude = [
   "grpc_test_service_pb2.py",
   "grpc_test_service_pb2_grpc.py",
 ]
+per-file-ignores = [
+  "sentry_sdk/integrations/spark/*:N802,N803",
+]
