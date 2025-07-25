@@ -636,6 +636,14 @@ class AsyncHttpTransport(HttpTransportCore):
             self._auth.get_api_url(endpoint_type),
             content=body,
             headers=headers,  # type: ignore
+            extensions={
+                "timeout": {
+                    "pool": self.TIMEOUT,
+                    "connect": self.TIMEOUT,
+                    "write": self.TIMEOUT,
+                    "read": self.TIMEOUT,
+                }
+            },
         )
 
     def _flush_client_reports(self: Self, force: bool = False) -> None:
