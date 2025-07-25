@@ -951,6 +951,7 @@ class _Client(BaseClient):
                         _flush_and_close(timeout, callback)
                     )
                 except RuntimeError:
+                    self._close_components()
                     logger.warning("Event loop not running, aborting close.")
                     return None
                 # Enforce flush before shutdown
@@ -975,12 +976,6 @@ class _Client(BaseClient):
         if self.transport is not None:
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
-            assert timeout is not None  # shutdown_timeout should never be None
-
-            self.session_flusher.flush()
-
-            if self.log_batcher is not None:
-                self.log_batcher.flush()
 
             if isinstance(self.transport, AsyncHttpTransport):
                 try:
@@ -991,6 +986,11 @@ class _Client(BaseClient):
                     logger.warning("Event loop not running, aborting flush.")
                     return None
             else:
+                self.session_flusher.flush()
+
+            if self.log_batcher is not None:
+                self.log_batcher.flush()
+
                 self.transport.flush(timeout=timeout, callback=callback)
         return None
 
