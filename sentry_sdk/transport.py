@@ -777,7 +777,7 @@ class AsyncHttpTransport(HttpTransportCore):
             task.cancel()
         self.background_tasks.clear()
         try:
-            self._loop.create_task(self._pool.aclose())  # type: ignore
+            self.loop.create_task(self._pool.aclose())  # type: ignore
         except RuntimeError:
             logger.warning("Event loop not running, aborting kill.")
 
