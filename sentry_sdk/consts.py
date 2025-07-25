@@ -417,7 +417,7 @@ class SPANDATA:
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
     """
     The model identifier being used for the request.
-    Example: "gpt-4-turbo-preview"
+    Example: "gpt-4-turbo"
     """
 
     GEN_AI_REQUEST_PRESENCE_PENALTY = "gen_ai.request.presence_penalty"
