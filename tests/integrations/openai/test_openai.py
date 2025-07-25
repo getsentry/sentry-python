@@ -1214,74 +1214,77 @@ async def test_error_in_responses_async_api(sentry_init, capture_events):
     )
 
 
-EXAMPLE_RESPONSES_STREAM = [
-    ResponseCreatedEvent(
-        sequence_number=1,
-        type="response.created",
-        response=Response(
-            id="chat-id",
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-            output=[],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-        ),
-    ),
-    ResponseTextDeltaEvent(
-        item_id="msg_1",
-        sequence_number=2,
-        type="response.output_text.delta",
-        logprobs=[],
-        content_index=0,
-        output_index=0,
-        delta="hel",
-    ),
-    ResponseTextDeltaEvent(
-        item_id="msg_1",
-        sequence_number=3,
-        type="response.output_text.delta",
-        logprobs=[],
-        content_index=0,
-        output_index=0,
-        delta="lo ",
-    ),
-    ResponseTextDeltaEvent(
-        item_id="msg_1",
-        sequence_number=4,
-        type="response.output_text.delta",
-        logprobs=[],
-        content_index=0,
-        output_index=0,
-        delta="world",
-    ),
-    ResponseCompletedEvent(
-        sequence_number=5,
-        type="response.completed",
-        response=Response(
-            id="chat-id",
-            created_at=10000000,
-            model="response-model-id",
-            object="response",
-            output=[],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            usage=ResponseUsage(
-                input_tokens=20,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=5,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=8,
-                ),
-                total_tokens=30,
+if SKIP_RESPONSES_TESTS:
+    EXAMPLE_RESPONSES_STREAM = []
+else:
+    EXAMPLE_RESPONSES_STREAM = [
+        ResponseCreatedEvent(
+            sequence_number=1,
+            type="response.created",
+            response=Response(
+                id="chat-id",
+                created_at=10000000,
+                model="response-model-id",
+                object="response",
+                output=[],
+                parallel_tool_calls=False,
+                tool_choice="none",
+                tools=[],
             ),
         ),
-    ),
-]
+        ResponseTextDeltaEvent(
+            item_id="msg_1",
+            sequence_number=2,
+            type="response.output_text.delta",
+            logprobs=[],
+            content_index=0,
+            output_index=0,
+            delta="hel",
+        ),
+        ResponseTextDeltaEvent(
+            item_id="msg_1",
+            sequence_number=3,
+            type="response.output_text.delta",
+            logprobs=[],
+            content_index=0,
+            output_index=0,
+            delta="lo ",
+        ),
+        ResponseTextDeltaEvent(
+            item_id="msg_1",
+            sequence_number=4,
+            type="response.output_text.delta",
+            logprobs=[],
+            content_index=0,
+            output_index=0,
+            delta="world",
+        ),
+        ResponseCompletedEvent(
+            sequence_number=5,
+            type="response.completed",
+            response=Response(
+                id="chat-id",
+                created_at=10000000,
+                model="response-model-id",
+                object="response",
+                output=[],
+                parallel_tool_calls=False,
+                tool_choice="none",
+                tools=[],
+                usage=ResponseUsage(
+                    input_tokens=20,
+                    input_tokens_details=InputTokensDetails(
+                        cached_tokens=5,
+                    ),
+                    output_tokens=10,
+                    output_tokens_details=OutputTokensDetails(
+                        reasoning_tokens=8,
+                    ),
+                    total_tokens=30,
+                ),
+            ),
+        ),
+    ]
 
 
 @pytest.mark.parametrize(
