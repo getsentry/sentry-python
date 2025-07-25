@@ -580,6 +580,16 @@ class AsyncHttpTransport(HttpTransportCore):
         self._loop = asyncio.get_running_loop()
         self.background_tasks: set[asyncio.Task[None]] = set()
 
+    def _get_header_value(self: Self, response: Any, header: str) -> Optional[str]:
+        return next(
+            (
+                val.decode("ascii")
+                for key, val in response.headers
+                if key.decode("ascii").lower() == header
+            ),
+            None,
+        )
+
     async def _send_envelope(self: Self, envelope: Envelope) -> None:
         _prepared_envelope = self._prepare_envelope(envelope)
         if _prepared_envelope is None:
@@ -614,7 +624,7 @@ class AsyncHttpTransport(HttpTransportCore):
         try:
             self._handle_response(response=response, envelope=envelope)
         finally:
-            response.close()
+            await response.aclose()
 
     async def _request(  # type: ignore[override]
         self: Self,
