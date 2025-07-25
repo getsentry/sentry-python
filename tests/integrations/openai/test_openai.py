@@ -6,13 +6,13 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatComplet
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
-from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
-from openai.types.responses.response_created_event import ResponseCreatedEvent
-from openai.types.responses.response_completed_event import ResponseCompletedEvent
 
 SKIP_RESPONSES_TESTS = False
 
 try:
+    from openai.types.responses.response_completed_event import ResponseCompletedEvent
+    from openai.types.responses.response_created_event import ResponseCreatedEvent
+    from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
     from openai.types.responses.response_usage import (
         InputTokensDetails,
         OutputTokensDetails,
