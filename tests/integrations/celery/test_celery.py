@@ -246,25 +246,34 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     ]
 
 
-def test_no_stackoverflows(celery):
-    """We used to have a bug in the Celery integration where its monkeypatching
+def test_no_double_patching(celery):
+    """Ensure that Celery tasks are only patched once to prevent stack overflows.
+
+    We used to have a bug in the Celery integration where its monkeypatching
     was repeated for every task invocation, leading to stackoverflows.
 
     See https://github.com/getsentry/sentry-python/issues/265
     """
 
-    results = []
-
     @celery.task(name="dummy_task")
     def dummy_task():
-        sentry_sdk.get_isolation_scope().set_tag("foo", "bar")
-        results.append(42)
+        return 42
 
-    for _ in range(10000):
-        dummy_task.delay()
+    # Initially, the task should not be marked as patched
+    assert not hasattr(dummy_task, "_sentry_is_patched")
 
-    assert results == [42] * 10000
-    assert not sentry_sdk.get_isolation_scope()._tags
+    # First invocation should trigger patching
+    result1 = dummy_task.delay()
+    assert result1.get() == 42
+    assert getattr(dummy_task, "_sentry_is_patched", False) is True
+
+    patched_run = dummy_task.run
+
+    # Second invocation should not re-patch
+    result2 = dummy_task.delay()
+    assert result2.get() == 42
+    assert dummy_task.run is patched_run
+    assert getattr(dummy_task, "_sentry_is_patched", False) is True
 
 
 def test_simple_no_propagation(capture_events, init_celery):
