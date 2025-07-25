@@ -939,6 +939,7 @@ class _Client(BaseClient):
         async def _flush_and_close(
             timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
         ) -> None:
+
             await self._flush_async(timeout=timeout, callback=callback)
             self._close_components()
 
@@ -996,6 +997,9 @@ class _Client(BaseClient):
     async def _flush_async(
         self, timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
     ) -> None:
+
+        if timeout is None:
+            timeout = self.options["shutdown_timeout"]
 
         self.session_flusher.flush()
         if self.log_batcher is not None:
