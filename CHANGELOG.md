@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.33.2
+
+### Various fixes & improvements
+
+- ref(spotlight): Do not import `sentry_sdk.spotlight` unless enabled (#4607) by @sentrivana
+- ref(gnu-integration): update clickhouse stacktrace parsing (#4598) by @MeredithAnya
+
 ## 2.33.1
 
 ### Various fixes & improvements

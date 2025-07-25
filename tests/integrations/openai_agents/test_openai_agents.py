@@ -19,6 +19,11 @@ from agents.items import (
     ResponseFunctionToolCall,
 )
 
+from openai.types.responses.response_usage import (
+    InputTokensDetails,
+    OutputTokensDetails,
+)
+
 test_run_config = agents.RunConfig(tracing_disabled=True)
 
 
@@ -29,8 +34,8 @@ def mock_usage():
         input_tokens=10,
         output_tokens=20,
         total_tokens=30,
-        input_tokens_details=MagicMock(cached_tokens=0),
-        output_tokens_details=MagicMock(reasoning_tokens=5),
+        input_tokens_details=InputTokensDetails(cached_tokens=0),
+        output_tokens_details=OutputTokensDetails(reasoning_tokens=5),
     )
 
 
