@@ -248,6 +248,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
         def new_iterator():
             # type: () -> Iterator[ChatCompletionChunk]
             with capture_internal_exceptions():
+                count_tokens_manually = True
                 for x in old_iterator:
                     # OpenAI chat completion API
                     if hasattr(x, "choices"):
@@ -261,31 +262,48 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                                     data_buf.append([])
                                 data_buf[choice_index].append(content or "")
                             choice_index += 1
+
                     # OpenAI responses API
                     elif hasattr(x, "delta"):
                         if len(data_buf) == 0:
                             data_buf.append([])
                         data_buf[0].append(x.delta or "")
+
+                    # OpenAI responses API end of streaming response
+                    if x.__class__.__name__ == "ResponseCompletedEvent":
+                        _calculate_token_usage(
+                            messages,
+                            x.response,
+                            span,
+                            None,
+                            integration.count_tokens,
+                        )
+                        count_tokens_manually = False
+
                     yield x
+
                 if len(data_buf) > 0:
                     all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
                     if should_send_default_pii() and integration.include_prompts:
                         set_data_normalized(
                             span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                         )
-                    _calculate_token_usage(
-                        messages,
-                        response,
-                        span,
-                        all_responses,
-                        integration.count_tokens,
-                    )
+                    if count_tokens_manually:
+                        _calculate_token_usage(
+                            messages,
+                            response,
+                            span,
+                            all_responses,
+                            integration.count_tokens,
+                        )
+
             if finish_span:
                 span.__exit__(None, None, None)
 
         async def new_iterator_async():
             # type: () -> AsyncIterator[ChatCompletionChunk]
             with capture_internal_exceptions():
+                count_tokens_manually = True
                 async for x in old_iterator:
                     # OpenAI chat completion API
                     if hasattr(x, "choices"):
@@ -299,25 +317,40 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                                     data_buf.append([])
                                 data_buf[choice_index].append(content or "")
                             choice_index += 1
+
                     # OpenAI responses API
                     elif hasattr(x, "delta"):
                         if len(data_buf) == 0:
                             data_buf.append([])
                         data_buf[0].append(x.delta or "")
+
+                    # OpenAI responses API end of streaming response
+                    if x.__class__.__name__ == "ResponseCompletedEvent":
+                        _calculate_token_usage(
+                            messages,
+                            x.response,
+                            span,
+                            None,
+                            integration.count_tokens,
+                        )
+                        count_tokens_manually = False
+
                     yield x
+
                 if len(data_buf) > 0:
                     all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
                     if should_send_default_pii() and integration.include_prompts:
                         set_data_normalized(
                             span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
                         )
-                    _calculate_token_usage(
-                        messages,
-                        response,
-                        span,
-                        all_responses,
-                        integration.count_tokens,
-                    )
+                    if count_tokens_manually:
+                        _calculate_token_usage(
+                            messages,
+                            response,
+                            span,
+                            all_responses,
+                            integration.count_tokens,
+                        )
             if finish_span:
                 span.__exit__(None, None, None)
 
