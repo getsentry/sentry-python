@@ -1291,6 +1291,7 @@ else:
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_streaming_responses_api(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
@@ -1345,6 +1346,7 @@ def test_streaming_responses_api(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_async(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
