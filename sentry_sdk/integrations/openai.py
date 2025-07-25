@@ -160,8 +160,8 @@ def _calculate_token_usage(
 def _set_input_data(span, kwargs, operation, integration):
     # type: (Span, dict[str, Any], str, OpenAIIntegration) -> None
     # Input messages (the prompt or data sent to the model)
-    messages = kwargs.get("messages")
-    if messages is None:
+    messages = kwargs.get("messages", [])
+    if messages == []:
         messages = kwargs.get("input")
 
     if isinstance(messages, str):
@@ -207,8 +207,10 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
-    messages = kwargs.get("messages")
-    if messages is None:
+    # Input messages (the prompt or data sent to the model)
+    # used for the token usage calculation
+    messages = kwargs.get("messages", [])
+    if messages == []:
         messages = kwargs.get("input")
 
     if isinstance(messages, str):
