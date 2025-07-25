@@ -123,7 +123,7 @@ def test_empty_realurl(sentry_init):
     """
 
     sentry_init(dsn="")
-    HTTPConnection("example.com", port=443).putrequest("POST", None)
+    HTTPConnection("localhost", port=PORT).putrequest("POST", None)
 
 
 def test_httplib_misuse(sentry_init, capture_events, request):
@@ -379,7 +379,7 @@ def test_span_origin(sentry_init, capture_events):
     events = capture_events()
 
     with start_transaction(name="foo"):
-        conn = HTTPConnection("example.com")
+        conn = HTTPConnection("localhost", port=PORT)
         conn.request("GET", "/foo")
         conn.getresponse()
 
@@ -400,7 +400,7 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     with pytest.raises(TimeoutError):
         with start_transaction(op="op", name="name"):
-            conn = HTTPSConnection("www.example.com")
+            conn = HTTPConnection("localhost", port=PORT)
             conn.request("GET", "/bla")
             conn.getresponse()
 
@@ -410,4 +410,4 @@ def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
 
     span = transaction["spans"][0]
     assert span["op"] == "http.client"
-    assert span["description"] == "GET https://www.example.com/bla"
+    assert span["description"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
