@@ -12,8 +12,7 @@ asttokens
 responses
 pysocks
 socksio
-httpcore[http2]<1.0; python_version < "3.8"
-httpcore[http2,asyncio]>=1.0; python_version >= "3.8" # asyncio support only supported for Python 3.8+
+httpcore[http2]
 setuptools
 freezegun
 Brotli
