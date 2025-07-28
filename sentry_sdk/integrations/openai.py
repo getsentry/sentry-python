@@ -32,6 +32,7 @@ RESPONSES_API_ENABLED = True
 try:
     # responses API support was introduced in v1.66.0
     from openai.resources.responses import Responses, AsyncResponses
+    from openai.types.responses.response_completed_event import ResponseCompletedEvent
 except ImportError:
     RESPONSES_API_ENABLED = False
 
@@ -325,7 +326,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         data_buf[0].append(x.delta or "")
 
                     # OpenAI responses API end of streaming response
-                    if x.__class__.__name__ == "ResponseCompletedEvent":
+                    if isinstance(x, ResponseCompletedEvent):
                         _calculate_token_usage(
                             messages,
                             x.response,
