@@ -180,9 +180,9 @@ def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
 
 
 def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
 
-    data = {"foo": "a" * 2000}
+    data = {"foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}
 
     @app.route("/", method="POST")
     def index():
@@ -200,9 +200,14 @@ def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]) == 1024
+    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
 
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
@@ -239,7 +244,10 @@ def test_too_large_raw_request(
 def test_files_and_form(sentry_init, capture_events, app, get_client):
     sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
 
-    data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
+    data = {
+        "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
+        "file": (BytesIO(b"hello"), "hello.txt"),
+    }
 
     @app.route("/", method="POST")
     def index():
@@ -259,9 +267,14 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]) == 1024
+    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
 
     assert event["_meta"]["request"]["data"]["file"] == {
         "": {
