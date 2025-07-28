@@ -344,7 +344,9 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
 
 
 def test_flask_medium_formdata_request(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+    )
 
     data = {"foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}
 
