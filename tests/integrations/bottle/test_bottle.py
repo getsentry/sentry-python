@@ -5,6 +5,7 @@ import logging
 from io import BytesIO
 from bottle import Bottle, debug as set_debug, abort, redirect, HTTPResponse
 from sentry_sdk import capture_message
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.bottle import BottleIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
@@ -121,9 +122,9 @@ def test_errors(
 
 
 def test_large_json_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()])
+    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
 
-    data = {"foo": {"bar": "a" * 2000}}
+    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
 
     @app.route("/", method="POST")
     def index():
@@ -144,9 +145,14 @@ def test_large_json_request(sentry_init, capture_events, app, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
