@@ -28,7 +28,7 @@ import certifi
 
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
-from sentry_sdk.worker import BackgroundWorker
+from sentry_sdk.worker import BackgroundWorker, Worker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 from typing import TYPE_CHECKING
@@ -173,7 +173,7 @@ class HttpTransportCore(Transport):
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
         self.options: Dict[str, Any] = options
-        self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
+        self._worker = self._create_worker(options)
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until: Dict[Optional[str], datetime] = {}
         # We only use this Retry() class for the `get_retry_after` method it exposes
@@ -223,6 +223,10 @@ class HttpTransportCore(Transport):
             self._compression_level = 9
         elif self._compression_algo == "br":
             self._compression_level = 4
+
+    def _create_worker(self: Self, options: Dict[str, Any]) -> Worker:
+        # For now, we only support the threaded sync background worker.
+        return BackgroundWorker(queue_size=options["transport_queue_size"])
 
     def record_lost_event(
         self: Self,
