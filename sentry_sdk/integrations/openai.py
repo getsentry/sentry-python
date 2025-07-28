@@ -100,7 +100,7 @@ def _get_usage(usage, names):
 def _calculate_token_usage(
     messages, response, span, streaming_message_responses, count_tokens
 ):
-    # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
+    # type: (Optional[Iterable[ChatCompletionMessageParam]], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
     input_tokens = 0  # type: Optional[int]
     input_tokens_cached = 0  # type: Optional[int]
     output_tokens = 0  # type: Optional[int]
@@ -126,7 +126,7 @@ def _calculate_token_usage(
 
     # Manually count tokens
     if input_tokens == 0:
-        for message in messages:
+        for message in messages or []:
             if isinstance(message, dict) and "content" in message:
                 input_tokens += count_tokens(message["content"])
             elif isinstance(message, str):
@@ -161,8 +161,8 @@ def _calculate_token_usage(
 def _set_input_data(span, kwargs, operation, integration):
     # type: (Span, dict[str, Any], str, OpenAIIntegration) -> None
     # Input messages (the prompt or data sent to the model)
-    messages = kwargs.get("messages", [])
-    if messages == []:
+    messages = kwargs.get("messages")
+    if messages is None:
         messages = kwargs.get("input")
 
     if isinstance(messages, str):
@@ -196,7 +196,7 @@ def _set_input_data(span, kwargs, operation, integration):
             set_data_normalized(span, attribute, value)
 
     # Input attributes: Tools
-    tools = kwargs.get("tools", [])
+    tools = kwargs.get("tools")
     if tools is not None and len(tools) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
@@ -210,11 +210,11 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
 
     # Input messages (the prompt or data sent to the model)
     # used for the token usage calculation
-    messages = kwargs.get("messages", [])
-    if messages == []:
+    messages = kwargs.get("messages")
+    if messages is None:
         messages = kwargs.get("input")
 
-    if isinstance(messages, str):
+    if messages is not None and isinstance(messages, str):
         messages = [messages]
 
     if hasattr(response, "choices"):
