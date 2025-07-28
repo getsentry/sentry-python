@@ -988,10 +988,10 @@ class _Client(BaseClient):
             else:
                 self.session_flusher.flush()
 
-            if self.log_batcher is not None:
-                self.log_batcher.flush()
+                if self.log_batcher is not None:
+                    self.log_batcher.flush()
 
-            self.transport.flush(timeout=timeout, callback=callback)
+                self.transport.flush(timeout=timeout, callback=callback)
         return None
 
     async def _flush_async(
