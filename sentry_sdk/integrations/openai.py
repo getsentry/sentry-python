@@ -226,6 +226,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                     safe_serialize(response_text),
                 )
+        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -238,6 +239,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                     safe_serialize(response_text),
                 )
+        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -360,10 +362,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
         else:
             response._iterator = new_iterator()
     else:
+        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
         if finish_span:
             span.__exit__(None, None, None)
-
-    _calculate_token_usage(messages, response, span, None, integration.count_tokens)
 
 
 def _new_chat_completion_common(f, *args, **kwargs):
