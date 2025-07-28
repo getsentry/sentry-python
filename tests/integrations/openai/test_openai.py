@@ -1159,11 +1159,11 @@ async def test_ai_client_span_streaming_responses_async_api(
     assert spans[0]["op"] == "gen_ai.responses"
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
-        "ai.streaming": True,
         "gen_ai.operation.name": "responses",
         "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
+        "gen_ai.response.streaming": True,
         "gen_ai.system": "openai",
         "gen_ai.usage.input_tokens": 20,
         "gen_ai.usage.input_tokens.cached": 5,
