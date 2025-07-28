@@ -270,7 +270,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         data_buf[0].append(x.delta or "")
 
                     # OpenAI responses API end of streaming response
-                    if x.__class__.__name__ == "ResponseCompletedEvent":
+                    if isinstance(x, ResponseCompletedEvent):
                         _calculate_token_usage(
                             messages,
                             x.response,
@@ -283,7 +283,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     yield x
 
                 if len(data_buf) > 0:
-                    all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
+                    all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
                         set_data_normalized(
                             span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
@@ -338,7 +338,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     yield x
 
                 if len(data_buf) > 0:
-                    all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
+                    all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
                         set_data_normalized(
                             span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
