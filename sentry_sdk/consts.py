@@ -230,6 +230,7 @@ class SPANDATA:
     AI_STREAMING = "ai.streaming"
     """
     Whether or not the AI model call's response was streamed back asynchronously
+    DEPRECATED: Use GEN_AI_RESPONSE_STREAMING instead.
     Example: true
     """
 
@@ -383,6 +384,12 @@ class SPANDATA:
     """
     Exact model identifier used to generate the response
     Example: gpt-4o-mini-2024-07-18
+    """
+
+    GEN_AI_RESPONSE_STREAMING = "gen_ai.response.streaming"
+    """
+    Whether or not the AI model call's response was streamed back asynchronously
+    Example: true
     """
 
     GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
