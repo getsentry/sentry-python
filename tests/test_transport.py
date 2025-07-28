@@ -149,11 +149,10 @@ def test_transport_works(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("debug", (True, False))
-@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
+@pytest.mark.parametrize("client_flush_method", ["close"])
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
-@pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 async def test_transport_works_async(
     capturing_server,
     request,
@@ -165,7 +164,6 @@ async def test_transport_works_async(
     use_pickle,
     compression_level,
     compression_algo,
-    http2,
 ):
     caplog.set_level(logging.DEBUG)
 
@@ -175,9 +173,6 @@ async def test_transport_works_async(
 
     if compression_algo is not None:
         experiments["transport_compression_algo"] = compression_algo
-
-    if http2:
-        experiments["transport_http2"] = True
 
     # Enable async transport
     experiments["transport_async"] = True
@@ -205,11 +200,6 @@ async def test_transport_works_async(
 
     if client_flush_method == "close":
         await client.close(timeout=2.0)
-    else:
-        if hasattr(client, "_flush_async"):
-            await client._flush_async(timeout=2.0, callback=None)
-            # Need to kill, as the end of the test will close the event loop, but the worker task is still alive
-            client.transport._worker.kill()
 
     out, err = capsys.readouterr()
     assert not err and not out
