@@ -3,7 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
-DEFAULT_MAX_VALUE_LENGTH = 1024
+DEFAULT_MAX_VALUE_LENGTH = 100_000
 
 DEFAULT_MAX_STACK_FRAMES = 100
 DEFAULT_ADD_FULL_STACK = False
