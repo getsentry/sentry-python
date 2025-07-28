@@ -12,7 +12,7 @@ asttokens
 responses
 pysocks
 socksio
-httpcore[http2]
+httpcore[http2,asyncio]>=1.0 # From 1.0, httpcore async is optional
 setuptools
 freezegun
 Brotli

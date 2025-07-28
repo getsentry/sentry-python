@@ -28,6 +28,7 @@ from sentry_sdk._compat import PY38
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     _parse_rate_limits,
+    AsyncHttpTransport,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
@@ -123,6 +124,92 @@ def test_transport_works(
     capture_message("löl")
 
     getattr(client, client_flush_method)()
+
+    out, err = capsys.readouterr()
+    assert not err and not out
+    assert capturing_server.captured
+    should_compress = (
+        # default is to compress with brotli if available, gzip otherwise
+        (compression_level is None)
+        or (
+            # setting compression level to 0 means don't compress
+            compression_level
+            > 0
+        )
+    ) and (
+        # if we couldn't resolve to a known algo, we don't compress
+        compression_algo
+        != "<invalid>"
+    )
+
+    assert capturing_server.captured[0].compressed == should_compress
+
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("debug", (True, False))
+@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
+@pytest.mark.parametrize("use_pickle", (True, False))
+@pytest.mark.parametrize("compression_level", (0, 9, None))
+@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
+@pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
+async def test_transport_works_async(
+    capturing_server,
+    request,
+    capsys,
+    caplog,
+    debug,
+    make_client,
+    client_flush_method,
+    use_pickle,
+    compression_level,
+    compression_algo,
+    http2,
+):
+    caplog.set_level(logging.DEBUG)
+
+    experiments = {}
+    if compression_level is not None:
+        experiments["transport_compression_level"] = compression_level
+
+    if compression_algo is not None:
+        experiments["transport_compression_algo"] = compression_algo
+
+    if http2:
+        experiments["transport_http2"] = True
+
+    # Enable async transport
+    experiments["transport_async"] = True
+
+    client = make_client(
+        debug=debug,
+        _experiments=experiments,
+    )
+
+    if use_pickle:
+        client = pickle.loads(pickle.dumps(client))
+
+    # Verify we're using async transport
+    assert isinstance(
+        client.transport, AsyncHttpTransport
+    ), "Expected AsyncHttpTransport"
+
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
+    capture_message("löl")
+
+    if client_flush_method == "close":
+        await client.close(timeout=2.0)
+    else:
+        if hasattr(client, "_flush_async"):
+            await client._flush_async(timeout=2.0, callback=None)
+            # Need to kill, as the end of the test will close the event loop, but the worker task is still alive
+            client.transport._worker.kill()
 
     out, err = capsys.readouterr()
     assert not err and not out
