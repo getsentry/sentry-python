@@ -227,7 +227,11 @@ class HttpTransportCore(Transport):
 
     def _create_worker(self, options: dict[str, Any]) -> Worker:
         async_enabled = options.get("_experiments", {}).get("transport_async", False)
-        worker_cls = AsyncWorker if async_enabled else BackgroundWorker
+        try:
+            asyncio.get_running_loop()
+            worker_cls = AsyncWorker if async_enabled else BackgroundWorker
+        except RuntimeError:
+            worker_cls = BackgroundWorker
         return worker_cls(queue_size=options["transport_queue_size"])
 
     def record_lost_event(
