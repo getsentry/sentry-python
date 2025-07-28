@@ -169,6 +169,7 @@ class SPANDATA:
     AI_PIPELINE_NAME = "ai.pipeline.name"
     """
     Name of the AI pipeline or chain being executed.
+    DEPRECATED: Use GEN_AI_PIPELINE_NAME instead.
     Example: "qa-pipeline"
     """
 
@@ -370,6 +371,12 @@ class SPANDATA:
     """
     The name of the operation being performed.
     Example: "chat"
+    """
+
+    GEN_AI_PIPELINE_NAME = "gen_ai.pipeline.name"
+    """
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
     """
 
     GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
