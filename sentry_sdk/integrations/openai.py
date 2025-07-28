@@ -271,7 +271,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         data_buf[0].append(x.delta or "")
 
                     # OpenAI responses API end of streaming response
-                    if isinstance(x, ResponseCompletedEvent):
+                    if RESPONSES_API_ENABLED and isinstance(x, ResponseCompletedEvent):
                         _calculate_token_usage(
                             messages,
                             x.response,
@@ -326,7 +326,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         data_buf[0].append(x.delta or "")
 
                     # OpenAI responses API end of streaming response
-                    if isinstance(x, ResponseCompletedEvent):
+                    if RESPONSES_API_ENABLED and isinstance(x, ResponseCompletedEvent):
                         _calculate_token_usage(
                             messages,
                             x.response,
