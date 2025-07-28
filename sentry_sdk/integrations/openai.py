@@ -32,6 +32,7 @@ RESPONSES_API_ENABLED = True
 try:
     # responses API support was introduced in v1.66.0
     from openai.resources.responses import Responses, AsyncResponses
+    from openai.types.responses.response_completed_event import ResponseCompletedEvent
 except ImportError:
     RESPONSES_API_ENABLED = False
 
@@ -99,7 +100,7 @@ def _get_usage(usage, names):
 def _calculate_token_usage(
     messages, response, span, streaming_message_responses, count_tokens
 ):
-    # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
+    # type: (Optional[Iterable[ChatCompletionMessageParam]], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
     input_tokens = 0  # type: Optional[int]
     input_tokens_cached = 0  # type: Optional[int]
     output_tokens = 0  # type: Optional[int]
@@ -125,7 +126,7 @@ def _calculate_token_usage(
 
     # Manually count tokens
     if input_tokens == 0:
-        for message in messages:
+        for message in messages or []:
             if isinstance(message, dict) and "content" in message:
                 input_tokens += count_tokens(message["content"])
             elif isinstance(message, str):
@@ -160,8 +161,8 @@ def _calculate_token_usage(
 def _set_input_data(span, kwargs, operation, integration):
     # type: (Span, dict[str, Any], str, OpenAIIntegration) -> None
     # Input messages (the prompt or data sent to the model)
-    messages = kwargs.get("messages", [])
-    if messages == []:
+    messages = kwargs.get("messages")
+    if messages is None:
         messages = kwargs.get("input")
 
     if isinstance(messages, str):
@@ -195,7 +196,7 @@ def _set_input_data(span, kwargs, operation, integration):
             set_data_normalized(span, attribute, value)
 
     # Input attributes: Tools
-    tools = kwargs.get("tools", [])
+    tools = kwargs.get("tools")
     if tools is not None and len(tools) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
@@ -209,11 +210,11 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
 
     # Input messages (the prompt or data sent to the model)
     # used for the token usage calculation
-    messages = kwargs.get("messages", [])
-    if messages == []:
+    messages = kwargs.get("messages")
+    if messages is None:
         messages = kwargs.get("input")
 
-    if isinstance(messages, str):
+    if messages is not None and isinstance(messages, str):
         messages = [messages]
 
     if hasattr(response, "choices"):
@@ -225,6 +226,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                     safe_serialize(response_text),
                 )
+        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -237,6 +239,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                     safe_serialize(response_text),
                 )
+        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -270,7 +273,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         data_buf[0].append(x.delta or "")
 
                     # OpenAI responses API end of streaming response
-                    if x.__class__.__name__ == "ResponseCompletedEvent":
+                    if RESPONSES_API_ENABLED and isinstance(x, ResponseCompletedEvent):
                         _calculate_token_usage(
                             messages,
                             x.response,
@@ -283,7 +286,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     yield x
 
                 if len(data_buf) > 0:
-                    all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
+                    all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
                         set_data_normalized(
                             span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
@@ -325,7 +328,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                         data_buf[0].append(x.delta or "")
 
                     # OpenAI responses API end of streaming response
-                    if x.__class__.__name__ == "ResponseCompletedEvent":
+                    if RESPONSES_API_ENABLED and isinstance(x, ResponseCompletedEvent):
                         _calculate_token_usage(
                             messages,
                             x.response,
@@ -338,7 +341,7 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
                     yield x
 
                 if len(data_buf) > 0:
-                    all_responses = list(map(lambda chunk: "".join(chunk), data_buf))
+                    all_responses = ["".join(chunk) for chunk in data_buf]
                     if should_send_default_pii() and integration.include_prompts:
                         set_data_normalized(
                             span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
@@ -359,10 +362,9 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
         else:
             response._iterator = new_iterator()
     else:
+        _calculate_token_usage(messages, response, span, None, integration.count_tokens)
         if finish_span:
             span.__exit__(None, None, None)
-
-    _calculate_token_usage(messages, response, span, None, integration.count_tokens)
 
 
 def _new_chat_completion_common(f, *args, **kwargs):
