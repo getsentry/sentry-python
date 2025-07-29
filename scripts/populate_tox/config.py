@@ -96,7 +96,7 @@ TEST_SUITE_CONFIG = {
                 "pytest-asyncio",
                 "python-multipart",
                 "requests",
-                "anyio<4",
+                "anyio>=3,<5",
             ],
             # There's an incompatibility between FastAPI's TestClient, which is
             # actually Starlette's TestClient, which is actually httpx's Client.
