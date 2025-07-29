@@ -1,7 +1,11 @@
 from __future__ import annotations
 from datetime import datetime
+import functools
+import inspect
 import json
 import warnings
+
+import sentry_sdk
 
 from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace import (
@@ -20,6 +24,7 @@ from sentry_sdk.consts import (
     DEFAULT_SPAN_NAME,
     DEFAULT_SPAN_ORIGIN,
     BAGGAGE_HEADER_NAME,
+    OP,
     SENTRY_TRACE_HEADER_NAME,
     SPANSTATUS,
     SPANDATA,
@@ -574,3 +579,95 @@ def trace(
         return start_child_span_decorator(func)
     else:
         return start_child_span_decorator
+
+
+def set_input_attributes(span, as_type, args, kwargs):
+    # depending on `as_type` set some attributes on the span derived from args and kwargs
+    pass
+
+
+def set_output_attributes(span, as_type, result):
+    # depending on `as_type` set some attributes on the span derived from result
+    pass
+
+
+DEFAULT_SPAN_OP = "function"
+
+
+def new_trace(func=None, *, as_type=None, name=None):
+    def span_decorator(f, *a, **kw):
+        @functools.wraps(f)
+        async def async_wrapper(*args, **kwargs):
+            op = kw.get("op", DEFAULT_SPAN_OP)
+            span_name = name or f.__name__
+
+            with sentry_sdk.start_span(
+                op=op,
+                name=span_name,
+            ) as span:
+                set_input_attributes(span, as_type, args, kwargs)
+
+                # run wrapped function
+                result = await f(*args, **kwargs)
+
+                set_output_attributes(span, as_type, result)
+                return result
+
+        @functools.wraps(f)
+        def sync_wrapper(*args, **kwargs):
+            op = kw.get("op", DEFAULT_SPAN_OP)
+            span_name = name or f.__name__
+
+            with sentry_sdk.start_span(
+                op=op,
+                name=span_name,
+            ) as span:
+                set_input_attributes(span, as_type, args, kwargs)
+
+                # run wrapped function
+                result = f(*args, **kwargs)
+
+                set_output_attributes(span, as_type, result)
+                return result
+
+        if inspect.iscoroutinefunction(f):
+            wrapper = async_wrapper
+        else:
+            wrapper = sync_wrapper
+
+        return wrapper
+
+    def ai_chat_decorator(f):
+        return span_decorator(f, op=OP.GEN_AI_CHAT)
+
+    def ai_agent_decorator(f):
+        return span_decorator(f, op=OP.GEN_AI_INVOKE_AGENT)
+
+    def ai_tool_decorator(f):
+        return span_decorator(f, op=OP.GEN_AI_EXECUTE_TOOL)
+
+    decorator_for_type = {
+        "ai_chat": ai_chat_decorator,
+        "ai_agent": ai_agent_decorator,
+        "ai_tool": ai_tool_decorator,
+    }
+    decorator = decorator_for_type.get(as_type, span_decorator)
+
+    if func:
+        return decorator(func)
+    else:
+        return decorator
+
+
+def update_current_span(op=None, name=None, attributes=None) -> None:
+    current_span = sentry_sdk.get_current_span()
+
+    if op is not None:
+        current_span.op = op
+
+    if name is not None:
+        current_span.name = name
+
+    if attributes is not None:
+        for key, value in attributes.items():
+            current_span.set_attribute(key, value)
