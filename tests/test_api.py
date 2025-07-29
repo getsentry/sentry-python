@@ -5,7 +5,6 @@ from unittest import mock
 from sentry_sdk import (
     capture_exception,
     continue_trace,
-    new_trace,
     get_baggage,
     get_client,
     get_current_span,
@@ -95,25 +94,6 @@ def test_continue_trace(sentry_init):
                 "trace_id": "566e3688a61d4bc888951642d6f14a19",
                 "sample_rand": "0.123456",
             }
-
-
-def test_new_trace(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-    events = capture_events()
-
-    with start_span(name="parent"):
-        with start_span(name="child"):
-            with new_trace():
-                with start_span(name="parent2"):
-                    with start_span(name="child2"):
-                        pass
-
-    assert len(events) == 2
-    (tx1, tx2) = events
-    assert tx1["transaction"] == "parent2"
-    assert tx1["spans"][0]["description"] == "child2"
-    assert tx2["transaction"] == "parent"
-    assert tx2["spans"][0]["description"] == "child"
 
 
 def test_is_initialized():

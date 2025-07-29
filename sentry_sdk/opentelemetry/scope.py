@@ -15,7 +15,6 @@ from opentelemetry.trace import (
     TraceFlags,
     TraceState,
     use_span,
-    INVALID_SPAN,
 )
 
 from sentry_sdk.opentelemetry.consts import (
@@ -89,15 +88,6 @@ class PotelScope(Scope):
         else:
             with use_span(NonRecordingSpan(span_context)):
                 yield
-
-    @contextmanager
-    def new_trace(self) -> Generator[None, None, None]:
-        """
-        Force creation of a new trace.
-        """
-        self.generate_propagation_context()
-        with use_span(INVALID_SPAN):
-            yield
 
     def _incoming_otel_span_context(self) -> Optional[SpanContext]:
         if self._propagation_context is None:
