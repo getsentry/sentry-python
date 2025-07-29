@@ -15,18 +15,25 @@
   [`max_value_limit`](https://docs.sentry.io/platforms/python/configuration/options/#max_value_length)
   in your `sentry_sdk.init()`.
 
-- fix(celery): Latency should be in milliseconds, not seconds (#4637) by @sentrivana
-- OpenAI integration update (#4612) by @antonpirker
-- tests: tox.ini update (#4635) by @sentrivana
-- Expose set_transaction_name (#4634) by @sl0thentr0py
-- Fix socket tests to not use example.com (#4627) by @sl0thentr0py
-- Simplify celery double patching test (#4626) by @sl0thentr0py
-- Treat django.template.context.BasicContext as sequence in serializer (#4621) by @sl0thentr0py
-- Remove remote example.com calls (#4622) by @sl0thentr0py
-- Fix `huggingface_hub` CI tests. (#4619) by @antonpirker
-- tests: Update tox (#4609) by @sentrivana
-- Ignore deliberate thread exception warnings (#4611) by @sl0thentr0py
-- Fix threading run patch (#4610) by @sl0thentr0py
+- `OpenAI` integration update (#4612) by @antonpirker
+
+  The `OpenAIIntegration` now supports [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses).
+
+  The data captured will also show up in the new [AI Agents Dashboard](https://docs.sentry.io/product/insights/agents/dashboard/).
+
+  This works out of the box, nothing to do on your side.
+
+- Expose `set_transaction_name` (#4634) by @sl0thentr0py
+- Fix(Celery): Latency should be in milliseconds, not seconds (#4637) by @sentrivana
+- Fix(Django): Treat `django.template.context.BasicContext` as sequence in serializer (#4621) by @sl0thentr0py
+- Fix(Huggingface): Fix `huggingface_hub` CI tests. (#4619) by @antonpirker
+- Fix: Ignore deliberate thread exception warnings (#4611) by @sl0thentr0py
+- Fix: Socket tests to not use example.com (#4627) by @sl0thentr0py
+- Fix: Threading run patch (#4610) by @sl0thentr0py
+- Tests: Simplify celery double patching test (#4626) by @sl0thentr0py
+- Tests: Remove remote example.com calls (#4622) by @sl0thentr0py
+- Tests: tox.ini update (#4635) by @sentrivana
+- Tests: Update tox (#4609) by @sentrivana
 
 ## 2.33.2
 
