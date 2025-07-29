@@ -783,7 +783,7 @@ class AsyncHttpTransport(HttpTransportCore):
 
         return httpcore.AsyncConnectionPool(**opts)
 
-    def kill(self: Self) -> None:
+    def kill(self: Self) -> Optional[asyncio.Task[None]]:  # type: ignore
 
         logger.debug("Killing HTTP transport")
         self._worker.kill()
@@ -791,11 +791,11 @@ class AsyncHttpTransport(HttpTransportCore):
             task.cancel()
         self.background_tasks.clear()
         try:
-            task = self._loop.create_task(self._pool.aclose())  # type: ignore
-            self.background_tasks.add(task)
-            task.add_done_callback(lambda t: self.background_tasks.discard(t))
+            # Return the pool cleanup task so caller can await it if needed
+            return self._loop.create_task(self._pool.aclose())  # type: ignore
         except RuntimeError:
             logger.warning("Event loop not running, aborting kill.")
+            return None
 
 
 class HttpTransport(BaseHttpTransport):
