@@ -616,12 +616,16 @@ def new_trace(func=None, *, as_type=None, name=None):
         @functools.wraps(f)
         def sync_wrapper(*args, **kwargs):
             op = kw.get("op", DEFAULT_SPAN_OP)
-            span_name = name or f.__name__
+            span_name = kw.get("name", f.__name__)
+            attributes = kw.get("attributes", {})
 
             with sentry_sdk.start_span(
                 op=op,
                 name=span_name,
             ) as span:
+                for key, value in attributes.items():
+                    span.set_attribute(key, value)
+
                 set_input_attributes(span, as_type, args, kwargs)
 
                 # run wrapped function
@@ -638,13 +642,44 @@ def new_trace(func=None, *, as_type=None, name=None):
         return wrapper
 
     def ai_chat_decorator(f):
-        return span_decorator(f, op=OP.GEN_AI_CHAT)
+        attributes = {
+            "gen_ai.operation.name": "chat",
+        }
+
+        return span_decorator(
+            f,
+            op=OP.GEN_AI_CHAT,
+            name="chat [MODEL]",
+            attributes=attributes,
+        )
 
     def ai_agent_decorator(f):
-        return span_decorator(f, op=OP.GEN_AI_INVOKE_AGENT)
+        span_name = name or f.__name__
+        attributes = {
+            "gen_ai.agent.name": span_name,
+            "gen_ai.operation.name": "invoke_agent",
+        }
+
+        return span_decorator(
+            f,
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name=f"invoke_agent {span_name}",
+            attributes=attributes,
+        )
 
     def ai_tool_decorator(f):
-        return span_decorator(f, op=OP.GEN_AI_EXECUTE_TOOL)
+        span_name = name or f.__name__
+        attributes = {
+            "gen_ai.tool.name": span_name,
+            "gen_ai.operation.name": "execute_tool",
+        }
+
+        return span_decorator(
+            f,
+            op=OP.GEN_AI_EXECUTE_TOOL,
+            name=f"execute_tool {span_name}",
+            attributes=attributes,
+        )
 
     decorator_for_type = {
         "ai_chat": ai_chat_decorator,
