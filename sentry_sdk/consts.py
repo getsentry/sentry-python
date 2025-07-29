@@ -169,6 +169,7 @@ class SPANDATA:
     AI_PIPELINE_NAME = "ai.pipeline.name"
     """
     Name of the AI pipeline or chain being executed.
+    DEPRECATED: Use GEN_AI_PIPELINE_NAME instead.
     Example: "qa-pipeline"
     """
 
@@ -229,6 +230,7 @@ class SPANDATA:
     AI_STREAMING = "ai.streaming"
     """
     Whether or not the AI model call's response was streamed back asynchronously
+    DEPRECATED: Use GEN_AI_RESPONSE_STREAMING instead.
     Example: true
     """
 
@@ -372,10 +374,22 @@ class SPANDATA:
     Example: "chat"
     """
 
+    GEN_AI_PIPELINE_NAME = "gen_ai.pipeline.name"
+    """
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
+    """
+
     GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
     """
     Exact model identifier used to generate the response
     Example: gpt-4o-mini-2024-07-18
+    """
+
+    GEN_AI_RESPONSE_STREAMING = "gen_ai.response.streaming"
+    """
+    Whether or not the AI model call's response was streamed back asynchronously
+    Example: true
     """
 
     GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"

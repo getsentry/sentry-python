@@ -183,7 +183,7 @@ def _set_input_data(span, kwargs, operation, integration):
     # Input attributes: Optional
     kwargs_keys_to_attributes = {
         "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-        "stream": SPANDATA.AI_STREAMING,
+        "stream": SPANDATA.GEN_AI_RESPONSE_STREAMING,
         "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
         "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
         "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
