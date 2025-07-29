@@ -10,11 +10,13 @@ from unittest.mock import patch
 from werkzeug.test import Client
 
 from django import VERSION as DJANGO_VERSION
+
 from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
 from django.utils.functional import SimpleLazyObject
+from django.template.context import make_context
 
 try:
     from django.urls import reverse
@@ -308,6 +310,27 @@ def test_queryset_repr(sentry_init, capture_events):
     assert frame["vars"]["my_queryset"].startswith(
         "<QuerySet from django.db.models.query at"
     )
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_context_nested_queryset_repr(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
+
+    try:
+        context = make_context({"entries": User.objects.all()})  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    (frame,) = exception["stacktrace"]["frames"]
+    assert "<User: " not in frame["vars"]["context"]
 
 
 def test_custom_error_handler_request_context(sentry_init, client, capture_events):
