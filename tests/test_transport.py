@@ -151,7 +151,7 @@ def test_transport_works(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("debug", (True, False))
-@pytest.mark.parametrize("client_flush_method", ["close"])
+@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
@@ -203,6 +203,8 @@ async def test_transport_works_async(
 
     if client_flush_method == "close":
         await client.close(timeout=2.0)
+    if client_flush_method == "flush":
+        await client.flush(timeout=2.0)
 
     out, err = capsys.readouterr()
     assert not err and not out
@@ -222,8 +224,11 @@ async def test_transport_works_async(
     )
 
     assert capturing_server.captured[0].compressed == should_compress
-
+    # After flush, the worker task is still running, but the end of the test will shut down the event loop
+    # Therefore, we need to explicitly close the client to clean up the worker task
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
+    if client_flush_method == "flush":
+        await client.close(timeout=2.0)
 
 
 @pytest.mark.parametrize(
