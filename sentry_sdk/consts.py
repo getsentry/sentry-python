@@ -3,7 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
-# This is more or less arbitrary large-ish value for now, so that we allow
+# This is more or less an arbitrary large-ish value for now, so that we allow
 # pretty long strings (like LLM prompts), but still have *some* upper limit
 # until we verify that removing the trimming completely is safe.
 DEFAULT_MAX_VALUE_LENGTH = 100_000
