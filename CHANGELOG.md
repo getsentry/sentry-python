@@ -5,6 +5,16 @@
 ### Various fixes & improvements
 
 - Considerably raise `DEFAULT_MAX_VALUE_LENGTH` (#4632) by @sentrivana
+
+  We have increased the string trimming limit considerably, allowing you to see more data
+  without it being truncated. Note that this might, in rare cases, result in issue regrouping,
+  for example if you're capturing message events with very long messages (longer than the
+  default 1024 characters/bytes).
+
+  If you want to adjust the limit, you can set a
+  [`max_value_limit`](https://docs.sentry.io/platforms/python/configuration/options/#max_value_length)
+  in your `sentry_sdk.init()`.
+
 - fix(celery): Latency should be in milliseconds, not seconds (#4637) by @sentrivana
 - OpenAI integration update (#4612) by @antonpirker
 - tests: tox.ini update (#4635) by @sentrivana
