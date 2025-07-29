@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.34.0
+
+### Various fixes & improvements
+
+- Considerably raise `DEFAULT_MAX_VALUE_LENGTH` (#4632) by @sentrivana
+- fix(celery): Latency should be in milliseconds, not seconds (#4637) by @sentrivana
+- OpenAI integration update (#4612) by @antonpirker
+- tests: tox.ini update (#4635) by @sentrivana
+- Expose set_transaction_name (#4634) by @sl0thentr0py
+- Fix socket tests to not use example.com (#4627) by @sl0thentr0py
+- Simplify celery double patching test (#4626) by @sl0thentr0py
+- Treat django.template.context.BasicContext as sequence in serializer (#4621) by @sl0thentr0py
+- Remove remote example.com calls (#4622) by @sl0thentr0py
+- Fix `huggingface_hub` CI tests. (#4619) by @antonpirker
+- tests: Update tox (#4609) by @sentrivana
+- Ignore deliberate thread exception warnings (#4611) by @sl0thentr0py
+- Fix threading run patch (#4610) by @sl0thentr0py
+
 ## 2.33.2
 
 ### Various fixes & improvements
