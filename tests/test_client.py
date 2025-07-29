@@ -773,14 +773,14 @@ def test_databag_string_stripping(sentry_init, capture_events, benchmark):
     def inner():
         del events[:]
         try:
-            a = "A" * DEFAULT_MAX_VALUE_LENGTH * 100  # noqa
+            a = "A" * DEFAULT_MAX_VALUE_LENGTH * 10  # noqa
             1 / 0
         except Exception:
             capture_exception()
 
         (event,) = events
 
-        assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 100
+        assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
 
 
 def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
