@@ -599,12 +599,16 @@ def new_trace(func=None, *, as_type=None, name=None):
         @functools.wraps(f)
         async def async_wrapper(*args, **kwargs):
             op = kw.get("op", DEFAULT_SPAN_OP)
-            span_name = name or f.__name__
+            span_name = kw.get("name", f.__name__)
+            attributes = kw.get("attributes", {})
 
             with sentry_sdk.start_span(
                 op=op,
                 name=span_name,
             ) as span:
+                for key, value in attributes.items():
+                    span.set_attribute(key, value)
+
                 set_input_attributes(span, as_type, args, kwargs)
 
                 # run wrapped function
