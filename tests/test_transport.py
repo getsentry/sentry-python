@@ -876,3 +876,24 @@ async def test_async_transport_rate_limiting_with_concurrency(
     # New request should be dropped due to rate limiting
     assert len(capturing_server.captured) == 0
     await client.close(timeout=2.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_two_way_ssl_authentication():
+    current_dir = os.path.dirname(__file__)
+    cert_file = f"{current_dir}/test.pem"
+    key_file = f"{current_dir}/test.key"
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        cert_file=cert_file,
+        key_file=key_file,
+        _experiments={"transport_async": True},
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    options = client.transport._get_pool_options()
+    assert options["ssl_context"] is not None
+
+    await client.close()
