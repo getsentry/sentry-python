@@ -169,6 +169,7 @@ class SPANDATA:
     AI_PIPELINE_NAME = "ai.pipeline.name"
     """
     Name of the AI pipeline or chain being executed.
+    DEPRECATED: Use GEN_AI_PIPELINE_NAME instead.
     Example: "qa-pipeline"
     """
 
@@ -229,6 +230,7 @@ class SPANDATA:
     AI_STREAMING = "ai.streaming"
     """
     Whether or not the AI model call's response was streamed back asynchronously
+    DEPRECATED: Use GEN_AI_RESPONSE_STREAMING instead.
     Example: true
     """
 
@@ -372,6 +374,24 @@ class SPANDATA:
     Example: "chat"
     """
 
+    GEN_AI_PIPELINE_NAME = "gen_ai.pipeline.name"
+    """
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
+    """
+
+    GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
+    """
+    Exact model identifier used to generate the response
+    Example: gpt-4o-mini-2024-07-18
+    """
+
+    GEN_AI_RESPONSE_STREAMING = "gen_ai.response.streaming"
+    """
+    Whether or not the AI model call's response was streamed back asynchronously
+    Example: true
+    """
+
     GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
     """
     The model's response text messages.
@@ -411,7 +431,7 @@ class SPANDATA:
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
     """
     The model identifier being used for the request.
-    Example: "gpt-4-turbo-preview"
+    Example: "gpt-4-turbo"
     """
 
     GEN_AI_REQUEST_PRESENCE_PENALTY = "gen_ai.request.presence_penalty"
@@ -649,9 +669,11 @@ class OP:
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
     GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
     GEN_AI_HANDOFF = "gen_ai.handoff"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
+    GEN_AI_RESPONSES = "gen_ai.responses"
     GRAPHQL_EXECUTE = "graphql.execute"
     GRAPHQL_MUTATION = "graphql.mutation"
     GRAPHQL_PARSE = "graphql.parse"
@@ -674,8 +696,6 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
-    OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
-    OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )

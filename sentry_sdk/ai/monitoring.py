@@ -40,7 +40,7 @@ def ai_track(description, **span_kwargs):
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_data(k, v)
                 if curr_pipeline:
-                    span.set_data(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
                     return f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -69,7 +69,7 @@ def ai_track(description, **span_kwargs):
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_data(k, v)
                 if curr_pipeline:
-                    span.set_data(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
                     return await f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -108,7 +108,7 @@ def record_token_usage(
     # TODO: move pipeline name elsewhere
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
-        span.set_data(SPANDATA.AI_PIPELINE_NAME, ai_pipeline_name)
+        span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, ai_pipeline_name)
 
     if input_tokens is not None:
         span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
