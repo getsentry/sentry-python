@@ -790,7 +790,7 @@ class AsyncHttpTransport(HttpTransportCore):
         self.background_tasks.clear()
         try:
             # Return the pool cleanup task so caller can await it if needed
-            return self._loop.create_task(self._pool.aclose())  # type: ignore
+            return self.loop.create_task(self._pool.aclose())  # type: ignore
         except RuntimeError:
             logger.warning("Event loop not running, aborting kill.")
             return None

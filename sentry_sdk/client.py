@@ -915,6 +915,14 @@ class _Client(BaseClient):
 
         return self.integrations.get(integration_name)
 
+    def _close_transport(self) -> Optional[asyncio.Task[None]]:
+        """Close transport and return cleanup task if any."""
+        if self.transport is not None:
+            cleanup_task = self.transport.kill()
+            self.transport = None
+            return cleanup_task
+        return None
+
     def _close_components(self) -> None:
         """Kill all client components in the correct order."""
         self.session_flusher.kill()
@@ -922,9 +930,13 @@ class _Client(BaseClient):
             self.log_batcher.kill()
         if self.monitor:
             self.monitor.kill()
-        if self.transport is not None:
-            self.transport.kill()
-            self.transport = None
+
+    async def _close_components_async(self) -> None:
+        """Async version of _close_components that properly awaits transport cleanup."""
+        self._close_components()
+        cleanup_task = self._close_transport()
+        if cleanup_task is not None:
+            await cleanup_task
 
     def close(  # type: ignore[override]
         self,
@@ -941,7 +953,7 @@ class _Client(BaseClient):
         ) -> None:
 
             await self._flush_async(timeout=timeout, callback=callback)
-            self._close_components()
+            await self._close_components_async()
 
         if self.transport is not None:
             if isinstance(self.transport, AsyncHttpTransport):
@@ -959,6 +971,8 @@ class _Client(BaseClient):
             else:
                 self.flush(timeout=timeout, callback=callback)
                 self._close_components()
+                self._close_transport()
+
         return None
 
     def flush(  # type: ignore[override]
