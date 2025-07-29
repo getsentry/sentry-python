@@ -3,6 +3,8 @@ import pickle
 import os
 import socket
 import sys
+import asyncio
+import threading
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -153,6 +155,7 @@ def test_transport_works(
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
+@pytest.mark.skipif(not PY38, reason="Async transport only supported in Python 3.8+")
 async def test_transport_works_async(
     capturing_server,
     request,
@@ -753,3 +756,118 @@ def test_handle_unexpected_status_invokes_handle_request_error(
     client.flush()
 
     assert seen == ["status_500"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_background_thread_capture(
+    capturing_server, make_client, caplog
+):
+    """Test capture_envelope from background threads uses run_coroutine_threadsafe"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments)
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+    captured_from_thread = []
+    exception_from_thread = []
+
+    def background_thread_work():
+        try:
+            # This should use run_coroutine_threadsafe path
+            capture_message("from background thread")
+            captured_from_thread.append(True)
+        except Exception as e:
+            exception_from_thread.append(e)
+
+    thread = threading.Thread(target=background_thread_work)
+    thread.start()
+    thread.join()
+    assert not exception_from_thread
+    assert captured_from_thread
+    await client.close(timeout=2.0)
+    assert capturing_server.captured
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_event_loop_closed_scenario(
+    capturing_server, make_client, caplog
+):
+    """Test behavior when trying to capture after event loop context ends"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments)
+    sentry_sdk.get_global_scope().set_client(client)
+    original_loop = client.transport.loop
+
+    with mock.patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+        with mock.patch.object(client.transport.loop, "is_running", return_value=False):
+            with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+                # This should trigger the "no_async_context" path
+                capture_message("after loop closed")
+
+                mock_logger.warning.assert_called_with(
+                    "Async Transport is not running in an event loop."
+                )
+
+    client.transport.loop = original_loop
+    await client.close(timeout=2.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_concurrent_requests(
+    capturing_server, make_client, caplog
+):
+    """Test multiple simultaneous envelope submissions"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments)
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+
+    num_messages = 15
+
+    async def send_message(i):
+        capture_message(f"concurrent message {i}")
+
+    tasks = [send_message(i) for i in range(num_messages)]
+    await asyncio.gather(*tasks)
+    transport = client.transport
+    await client.close(timeout=2.0)
+    assert len(transport.background_tasks) == 0
+    assert len(capturing_server.captured) == num_messages
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_rate_limiting_with_concurrency(
+    capturing_server, make_client, request
+):
+    """Test async transport rate limiting with concurrent requests"""
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments)
+
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+    capturing_server.respond_with(
+        code=429, headers={"X-Sentry-Rate-Limits": "60:error:organization"}
+    )
+
+    # Send one request first to trigger rate limiting
+    capture_message("initial message")
+    await asyncio.sleep(0.1)  # Wait for request to execute
+    assert client.transport._check_disabled("error") is True
+    capturing_server.clear_captured()
+
+    async def send_message(i):
+        capture_message(f"message {i}")
+        await asyncio.sleep(0.01)
+
+    await asyncio.gather(*[send_message(i) for i in range(5)])
+    await asyncio.sleep(0.1)
+    # New request should be dropped due to rate limiting
+    assert len(capturing_server.captured) == 0
+    await client.close(timeout=2.0)
