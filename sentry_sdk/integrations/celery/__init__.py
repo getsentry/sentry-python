@@ -391,7 +391,7 @@ def _wrap_task_call(task, f):
                         )
 
                 if latency is not None:
-                    latency *= 1000
+                    latency *= 1000  # milliseconds
                     span.set_data(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
 
                 with capture_internal_exceptions():
