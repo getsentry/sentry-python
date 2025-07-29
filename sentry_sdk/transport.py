@@ -781,7 +781,7 @@ class AsyncHttpTransport(HttpTransportCore):
 
         return httpcore.AsyncConnectionPool(**opts)
 
-    def kill(self: Self) -> Optional[asyncio.Task[None]]:  # type: ignore
+    def kill(self: Self) -> Optional[asyncio.Task[None]]:  # type: ignore[override]
 
         logger.debug("Killing HTTP transport")
         self._worker.kill()

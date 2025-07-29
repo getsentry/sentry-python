@@ -918,7 +918,7 @@ class _Client(BaseClient):
     def _close_transport(self) -> Optional[asyncio.Task[None]]:
         """Close transport and return cleanup task if any."""
         if self.transport is not None:
-            cleanup_task = self.transport.kill()
+            cleanup_task = self.transport.kill()  # type: ignore
             self.transport = None
             return cleanup_task
         return None
@@ -963,7 +963,9 @@ class _Client(BaseClient):
                         _flush_and_close(timeout, callback)
                     )
                 except RuntimeError:
+                    # Shutdown the components anyway
                     self._close_components()
+                    self._close_transport()
                     logger.warning("Event loop not running, aborting close.")
                     return None
                 # Enforce flush before shutdown
