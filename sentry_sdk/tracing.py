@@ -1,21 +1,19 @@
 from decimal import Decimal
-import functools
-import inspect
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, OP, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
+from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
     logger,
     nanosecond_time,
     should_be_treated_as_error,
-    qualname_from_function,
 )
 
 from typing import TYPE_CHECKING
@@ -281,7 +279,6 @@ class Span:
         "_local_aggregator",
         "scope",
         "origin",
-        "name",
         "_flags",
         "_flags_capacity",
     )
@@ -351,6 +348,11 @@ class Span:
 
         self.update_active_thread()
         self.set_profiler_id(get_profiler_id())
+
+    @property
+    def name(self):
+        # type: () -> str
+        return self.description
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -1374,144 +1376,20 @@ def trace(func=None):
         return start_child_span_decorator
 
 
-def _set_span_attributes(span, attributes):
-    # type: (Span, dict[str, Any]) -> None
-    """
-    Set the given attributes on the given span.
-
-    :param span: The span to set attributes on.
-    :param attributes: The attributes to set on the span.
-    """
-    for key, value in attributes.items():
-        span.set_data(key, value)
-
-
-def _set_input_attributes(span, template, args, kwargs):
-    """
-    Set LLM input attributes based on given information to the given span.
-
-    :param span: The span to set attributes on.
-    :param template: The template to use to set attributes on the span.
-    :param args: The arguments to the LLM call.
-    :param kwargs: The keyword arguments to the LLM call.
-    """
-    pass
-
-
-def _set_output_attributes(span, template, result):
-    """
-    Set LLM output attributes based on given information to the given span.
-
-    :param span: The span to set attributes on.
-    :param template: The template to use to set attributes on the span.
-    :param result: The result of the LLM call.
-    """
-    pass
-
-
-def new_trace(func=None, *, as_type="span", name=None):
+def new_trace(func=None, *, as_type="span", name=None, attributes=None):
     """
     Decorator to start a child span.
 
     :param func: The function to trace.
     :param as_type: The type of span to create.
-    :param name: The name of the span.
+    :param name: The name of the span. (defaults to the function name)
+    :param attributes: Additional attributes to set on the span.
     """
-
-    def span_decorator(f, *a, **kw):
-        @functools.wraps(f)
-        async def async_wrapper(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-            op = kw.get("op", OP.FUNCTION)
-            span_name = kw.get("name", qualname_from_function(f))
-            attributes = kw.get("attributes", {})
-
-            with sentry_sdk.start_span(
-                op=op,
-                name=span_name,
-            ) as span:
-                _set_span_attributes(span, attributes)
-                _set_input_attributes(span, as_type, args, kwargs)
-                result = await f(*args, **kwargs)
-                _set_output_attributes(span, as_type, result)
-
-                return result
-
-        @functools.wraps(f)
-        def sync_wrapper(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-            op = kw.get("op", OP.FUNCTION)
-            span_name = kw.get("name", qualname_from_function(f))
-            attributes = kw.get("attributes", {})
-
-            with sentry_sdk.start_span(
-                op=op,
-                name=span_name,
-            ) as span:
-                _set_span_attributes(span, attributes)
-                _set_input_attributes(span, as_type, args, kwargs)
-                result = f(*args, **kwargs)
-                _set_output_attributes(span, as_type, result)
-
-                return result
-
-        if inspect.iscoroutinefunction(f):
-            wrapper = async_wrapper
-        else:
-            wrapper = sync_wrapper
-
-        return wrapper
-
-    def ai_chat_decorator(f):
-        # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
-        attributes = {
-            "gen_ai.operation.name": "chat",
-        }
-
-        return span_decorator(
-            f,
-            op=OP.GEN_AI_CHAT,
-            name="chat [MODEL]",
-            attributes=attributes,
-        )
-
-    def ai_agent_decorator(f):
-        # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
-        agent_name = name or qualname_from_function(f)
-        attributes = {
-            "gen_ai.operation.name": "invoke_agent",
-            "gen_ai.agent.name": agent_name,
-        }
-
-        return span_decorator(
-            f,
-            op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent_name}",
-            attributes=attributes,
-        )
-
-    def ai_tool_decorator(f):
-        # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
-        tool_name = name or qualname_from_function(f)
-        attributes = {
-            "gen_ai.operation.name": "execute_tool",
-            "gen_ai.tool.name": tool_name,
-        }
-
-        return span_decorator(
-            f,
-            op=OP.GEN_AI_EXECUTE_TOOL,
-            name=f"execute_tool {tool_name}",
-            attributes=attributes,
-        )
-
-    # Select a type based decorator (with default fallback to span_decorator)
-    decorator_for_type = {
-        "ai_chat": ai_chat_decorator,
-        "ai_agent": ai_agent_decorator,
-        "ai_tool": ai_tool_decorator,
-    }
-    decorator = decorator_for_type.get(as_type, span_decorator)
+    decorator = create_span_decorator(
+        template=as_type,
+        name=name,
+        attributes=attributes,
+    )
 
     if func:
         return decorator(func)

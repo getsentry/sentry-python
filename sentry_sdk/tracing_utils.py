@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import inspect
 import os
 import re
@@ -894,6 +895,164 @@ def _sample_rand_range(parent_sampled, sample_rate):
         return 0.0, sample_rate
     else:  # parent_sampled is False
         return sample_rate, 1.0
+
+
+def _get_span_name(template, name):
+    span_name = name
+    if template == "ai_chat":
+        span_name = "chat [MODEL]"
+    elif template == "ai_agent":
+        span_name = f"invoke_agent {name}"
+    elif template == "ai_tool":
+        span_name = f"execute_tool {name}"
+    return span_name
+
+
+def _get_span_op(template):
+    op = OP.FUNCTION
+
+    if template == "ai_chat":
+        op = OP.GEN_AI_CHAT
+    elif template == "ai_agent":
+        op = OP.GEN_AI_INVOKE_AGENT
+    elif template == "ai_tool":
+        op = OP.GEN_AI_EXECUTE_TOOL
+
+    return op
+
+
+def _set_span_attributes(span, attributes):
+    # type: (Any, dict[str, Any]) -> None
+    """
+    Set the given attributes on the given span.
+
+    :param span: The span to set attributes on.
+    :param attributes: The attributes to set on the span.
+    """
+    attributes = attributes or {}
+
+    for key, value in attributes.items():
+        span.set_data(key, value)
+
+
+def _set_input_attributes(span, template, args, kwargs):
+    """
+    Set span input attributes based on the given template.
+
+    :param span: The span to set attributes on.
+    :param template: The template to use to set attributes on the span.
+    :param args: The arguments to the wrapped function.
+    :param kwargs: The keyword arguments to the wrapped function.
+    """
+    attributes = {}
+
+    if template == "ai_agent":
+        attributes = {
+            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+            SPANDATA.GEN_AI_AGENT_NAME: span.name,
+        }
+    elif template == "ai_chat":
+        attributes = {
+            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+        }
+    elif template == "ai_tool":
+        attributes = {
+            SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
+            SPANDATA.GEN_AI_TOOL_NAME: span.name,
+        }
+
+    _set_span_attributes(span, attributes)
+
+
+def _set_output_attributes(span, template, result):
+    """
+    Set span output attributes based on the given template.
+
+    :param span: The span to set attributes on.
+    :param template: The template to use to set attributes on the span.
+    :param result: The result of the wrapped function.
+    """
+    attributes = {}
+
+    _set_span_attributes(span, attributes)
+
+
+def create_span_decorator(template, op=None, name=None, attributes=None):
+    # type: (str, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
+    """
+    Create a span decorator that can wrap both sync and async functions.
+
+    :param template: The type of span to create (used for input/output attributes).
+    :param op: The operation type for the span.
+    :param name: The name of the span.
+    :param attributes: Additional attributes to set on the span.
+    """
+
+    def span_decorator(f):
+        @functools.wraps(f)
+        async def async_wrapper(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            if get_current_span() is None:
+                logger.debug(
+                    "Cannot create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(f),
+                )
+                return await f(*args, **kwargs)
+
+            with sentry_sdk.start_span(
+                op=_get_span_op(template),
+                name=_get_span_name(template, name or qualname_from_function(f)),
+            ) as span:
+                _set_input_attributes(span, template, args, kwargs)
+
+                result = await f(*args, **kwargs)
+
+                _set_output_attributes(span, template, result)
+                _set_span_attributes(span, attributes)
+
+                return result
+
+        try:
+            async_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+        @functools.wraps(f)
+        def sync_wrapper(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            if get_current_span() is None:
+                logger.debug(
+                    "Cannot create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(f),
+                )
+                return f(*args, **kwargs)
+
+            with sentry_sdk.start_span(
+                op=_get_span_op(template),
+                name=_get_span_name(template, name or qualname_from_function(f)),
+            ) as span:
+                _set_input_attributes(span, template, args, kwargs)
+
+                result = f(*args, **kwargs)
+
+                _set_output_attributes(span, template, result)
+                _set_span_attributes(span, attributes)
+
+                return result
+
+        try:
+            sync_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+        if inspect.iscoroutinefunction(f):
+            return async_wrapper
+        else:
+            return sync_wrapper
+
+    return span_decorator
 
 
 # Circular imports
