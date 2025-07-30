@@ -3,7 +3,7 @@ import re
 import pytest
 
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH, MAX_DATABAG_DEPTH, serialize
+from sentry_sdk.serializer import serialize
 
 try:
     from hypothesis import given
@@ -140,30 +140,14 @@ def test_custom_repr_graceful_fallback_to_safe_repr(extra_normalizer):
     assert "Foo object" in result["foo"]
 
 
-def test_trim_databag_breadth(body_normalizer):
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
+def test_dont_trim_databag_breadth(body_normalizer):
+    data = {"key{}".format(i): "value{}".format(i) for i in range(10**9)}
 
     result = body_normalizer(data)
 
-    assert len(result) == MAX_DATABAG_BREADTH
+    assert len(result) == 10**9
     for key, value in result.items():
         assert data.get(key) == value
-
-
-def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
-    curr = data
-    for _ in range(MAX_DATABAG_DEPTH + 5):
-        curr["nested"] = {}
-        curr = curr["nested"]
-
-    result = body_normalizer(data, max_request_body_size="always")
-
-    assert result == data
 
 
 def test_max_value_length_default(body_normalizer):
