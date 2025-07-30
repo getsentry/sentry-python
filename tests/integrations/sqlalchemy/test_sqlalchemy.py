@@ -277,7 +277,12 @@ def test_large_event_not_truncated(sentry_init, capture_events):
 
     # The _meta for other truncated fields should be there as well.
     assert event["_meta"]["message"] == {
-        "": {"len": 1034, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
 
 

@@ -74,6 +74,7 @@ __all__ = [
     "use_isolation_scope",
     "start_session",
     "end_session",
+    "set_transaction_name",
 ]
 
 
@@ -325,3 +326,9 @@ def start_session(
 @scopemethod
 def end_session() -> None:
     return get_isolation_scope().end_session()
+
+
+@scopemethod
+def set_transaction_name(name, source=None):
+    # type: (str, Optional[str]) -> None
+    return get_current_scope().set_transaction_name(name, source)

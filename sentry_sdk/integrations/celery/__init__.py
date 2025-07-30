@@ -369,6 +369,7 @@ def _wrap_task_call(task: Any, f: F) -> F:
                         )
 
                 if latency is not None:
+                    latency *= 1000  # milliseconds
                     span.set_attribute(
                         SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency
                     )

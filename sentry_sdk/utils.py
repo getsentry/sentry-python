@@ -1873,3 +1873,49 @@ def set_thread_info_from_span(
         data[SPANDATA.THREAD_ID] = span.get_attribute(SPANDATA.THREAD_ID)
         if span.get_attribute(SPANDATA.THREAD_NAME) is not None:
             data[SPANDATA.THREAD_NAME] = span.get_attribute(SPANDATA.THREAD_NAME)
+
+
+def safe_serialize(data):
+    # type: (Any) -> str
+    """Safely serialize to a readable string."""
+
+    def serialize_item(item):
+        # type: (Any) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]
+        if callable(item):
+            try:
+                module = getattr(item, "__module__", None)
+                qualname = getattr(item, "__qualname__", None)
+                name = getattr(item, "__name__", "anonymous")
+
+                if module and qualname:
+                    full_path = f"{module}.{qualname}"
+                elif module and name:
+                    full_path = f"{module}.{name}"
+                else:
+                    full_path = name
+
+                return f"<function {full_path}>"
+            except Exception:
+                return f"<callable {type(item).__name__}>"
+        elif isinstance(item, dict):
+            return {k: serialize_item(v) for k, v in item.items()}
+        elif isinstance(item, (list, tuple)):
+            return [serialize_item(x) for x in item]
+        elif hasattr(item, "__dict__"):
+            try:
+                attrs = {
+                    k: serialize_item(v)
+                    for k, v in vars(item).items()
+                    if not k.startswith("_")
+                }
+                return f"<{type(item).__name__} {attrs}>"
+            except Exception:
+                return repr(item)
+        else:
+            return item
+
+    try:
+        serialized = serialize_item(data)
+        return json.dumps(serialized, default=str)
+    except Exception:
+        return str(data)

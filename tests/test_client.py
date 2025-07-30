@@ -716,14 +716,14 @@ def test_databag_string_stripping(sentry_init, capture_events, benchmark):
     def inner():
         del events[:]
         try:
-            a = "A" * 1000000  # noqa
+            a = "A" * DEFAULT_MAX_VALUE_LENGTH * 10  # noqa
             1 / 0
         except Exception:
             capture_exception()
 
         (event,) = events
 
-        assert len(json.dumps(event)) < 10000
+        assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
 
 
 def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
@@ -1016,7 +1016,10 @@ def test_multiple_positional_args(sentry_init):
     "sdk_options, expected_data_length",
     [
         ({}, DEFAULT_MAX_VALUE_LENGTH),
-        ({"max_value_length": 1800}, 1800),
+        (
+            {"max_value_length": DEFAULT_MAX_VALUE_LENGTH + 1000},
+            DEFAULT_MAX_VALUE_LENGTH + 1000,
+        ),
     ],
 )
 def test_max_value_length_option(
@@ -1025,7 +1028,7 @@ def test_max_value_length_option(
     sentry_init(sdk_options)
     events = capture_events()
 
-    capture_message("a" * 2000)
+    capture_message("a" * (DEFAULT_MAX_VALUE_LENGTH + 2000))
 
     assert len(events[0]["message"]) == expected_data_length
 
