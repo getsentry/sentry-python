@@ -700,7 +700,7 @@ class AsyncHttpTransport(HttpTransportCore):
 
         if timeout > 0:
             self._worker.submit(lambda: self._flush_client_reports(force=True))
-            return self._worker.flush(timeout, callback)
+            return self._worker.flush(timeout, callback)  # type: ignore[func-returns-value]
         return None
 
     def _get_pool_options(self: Self) -> Dict[str, Any]:
