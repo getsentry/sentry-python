@@ -191,7 +191,8 @@ class BackgroundWorker(Worker):
 
 class AsyncWorker(Worker):
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
-        self._queue: asyncio.Queue[Any] = None
+        self._queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=queue_size)
+        self._queue_size = queue_size
         self._task: Optional[asyncio.Task[None]] = None
         # Event loop needs to remain in the same process
         self._task_for_pid: Optional[int] = None
