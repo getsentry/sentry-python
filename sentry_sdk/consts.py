@@ -798,6 +798,7 @@ class ClientConstructor:
         custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
         add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
         max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
+        enable_logs=False,  # type: bool
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1168,7 +1169,6 @@ class ClientConstructor:
 
         :param profile_session_sample_rate:
 
-
         :param enable_tracing:
 
         :param propagate_traces:
@@ -1178,6 +1178,9 @@ class ClientConstructor:
         :param spotlight:
 
         :param instrumenter:
+
+        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
+            Sentry logs. Defaults to False.
 
         :param _experiments:
         """

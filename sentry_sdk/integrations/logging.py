@@ -5,7 +5,7 @@ from fnmatch import fnmatch
 
 import sentry_sdk
 from sentry_sdk.client import BaseClient
-from sentry_sdk.logger import _log_level_to_otel
+from sentry_sdk.logger import _log_level_to_otel, has_logs_enabled
 from sentry_sdk.utils import (
     safe_repr,
     to_string,
@@ -344,7 +344,7 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not client.options["_experiments"].get("enable_logs", False):
+            if not has_logs_enabled(client.options):
                 return
 
             self._capture_log_from_record(client, record)

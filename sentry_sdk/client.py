@@ -37,6 +37,7 @@ from sentry_sdk.consts import (
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
+from sentry_sdk.logger import has_logs_enabled
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -382,7 +383,7 @@ class _Client(BaseClient):
                     )
 
             self.log_batcher = None
-            if experiments.get("enable_logs", False):
+            if has_logs_enabled(self.options):
                 from sentry_sdk._log_batcher import LogBatcher
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
@@ -899,8 +900,7 @@ class _Client(BaseClient):
 
     def _capture_experimental_log(self, log):
         # type: (Log) -> None
-        logs_enabled = self.options["_experiments"].get("enable_logs", False)
-        if not logs_enabled:
+        if not has_logs_enabled(self.options):
             return
 
         current_scope = sentry_sdk.get_current_scope()
