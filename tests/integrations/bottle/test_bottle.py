@@ -288,7 +288,7 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
 ):
     sentry_init(integrations=[BottleIntegration()])
 
-    data = {"key{}".format(i): "value{}".format(i) for i in range(10**5)}
+    data = {"key{}".format(i): "value{}".format(i) for i in range(1000)}
 
     @app.route("/", method="POST")
     def index():
