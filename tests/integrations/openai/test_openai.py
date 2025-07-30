@@ -1392,7 +1392,7 @@ async def test_streaming_responses_api_async(
 
 @pytest.mark.parametrize(
     "tools",
-    [[], None, openai.NOT_GIVEN],
+    [[], None, openai.NOT_GIVEN if hasattr(openai, "NOT_GIVEN") else None],
 )
 def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     sentry_init(
