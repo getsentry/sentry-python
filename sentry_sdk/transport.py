@@ -29,6 +29,8 @@ except ImportError:
     HTTP2_ENABLED = False
 
 try:
+    import anyio  # noqa: F401
+
     ASYNC_TRANSPORT_ENABLED = httpcore is not None
 except ImportError:
     ASYNC_TRANSPORT_ENABLED = False

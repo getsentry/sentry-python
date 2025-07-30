@@ -959,7 +959,9 @@ class _Client(BaseClient):
             await self._close_components_async()
 
         if self.transport is not None:
-            if isinstance(self.transport, AsyncHttpTransport):
+            if isinstance(self.transport, AsyncHttpTransport) and hasattr(
+                self.transport, "loop"
+            ):
 
                 try:
                     flush_task = self.transport.loop.create_task(
@@ -996,7 +998,9 @@ class _Client(BaseClient):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
 
-            if isinstance(self.transport, AsyncHttpTransport):
+            if isinstance(self.transport, AsyncHttpTransport) and hasattr(
+                self.transport, "loop"
+            ):
                 try:
                     return self.transport.loop.create_task(
                         self._flush_async(timeout, callback)
