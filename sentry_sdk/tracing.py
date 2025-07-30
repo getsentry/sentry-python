@@ -351,7 +351,7 @@ class Span:
 
     @property
     def name(self):
-        # type: () -> str
+        # type: () -> Optional[str]
         return self.description
 
     @name.setter
@@ -1382,6 +1382,7 @@ def trace(func=None):
 
 
 def new_trace(func=None, *, as_type="span", name=None, attributes=None):
+    # type: (Optional[Callable[P, R]], str, Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span.
 

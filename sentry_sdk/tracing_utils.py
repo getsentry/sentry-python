@@ -898,6 +898,10 @@ def _sample_rand_range(parent_sampled, sample_rate):
 
 
 def _get_span_name(template, name):
+    # type: (str, str) -> str
+    """
+    Get the name of the span based on the template and the name.
+    """
     span_name = name
 
     if template == "ai_chat":
@@ -911,6 +915,10 @@ def _get_span_name(template, name):
 
 
 def _get_span_op(template):
+    # type: (str) -> str
+    """
+    Get the operation of the span based on the template.
+    """
     op = OP.FUNCTION
 
     if template == "ai_chat":
@@ -924,7 +932,7 @@ def _get_span_op(template):
 
 
 def _set_span_attributes(span, attributes):
-    # type: (Any, dict[str, Any]) -> None
+    # type: (Any, Optional[dict[str, Any]]) -> None
     """
     Set the given attributes on the given span.
 
@@ -938,6 +946,7 @@ def _set_span_attributes(span, attributes):
 
 
 def _set_input_attributes(span, template, args, kwargs):
+    # type: (Span, str, tuple[Any, ...], dict[str, Any]) -> None
     """
     Set span input attributes based on the given template.
 
@@ -946,7 +955,7 @@ def _set_input_attributes(span, template, args, kwargs):
     :param args: The arguments to the wrapped function.
     :param kwargs: The keyword arguments to the wrapped function.
     """
-    attributes = {}
+    attributes = {}  # type: dict[str, Any]
 
     if template == "ai_agent":
         attributes = {
@@ -967,6 +976,7 @@ def _set_input_attributes(span, template, args, kwargs):
 
 
 def _set_output_attributes(span, template, result):
+    # type: (Span, str, Any) -> None
     """
     Set span output attributes based on the given template.
 
@@ -974,7 +984,7 @@ def _set_output_attributes(span, template, result):
     :param template: The template to use to set attributes on the span.
     :param result: The result of the wrapped function.
     """
-    attributes = {}
+    attributes = {}  # type: dict[str, Any]
 
     # TODO: Implement :)
 
@@ -993,6 +1003,11 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
     """
 
     def span_decorator(f):
+        # type: (Any) -> Any
+        """
+        Decorator to create a span for the given function.
+        """
+
         @functools.wraps(f)
         async def async_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
