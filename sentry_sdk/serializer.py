@@ -97,7 +97,6 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
     * Calling safe_repr() on objects appropriately to keep them informative and readable in the final payload.
     * Annotating the payload with the _meta field whenever trimming happens.
 
-    :param max_request_body_size: If set to "always", will never trim request bodies.
     :param max_value_length: The max length to strip strings to, defaults to sentry_sdk.consts.DEFAULT_MAX_VALUE_LENGTH
     :param is_vars: If we're serializing vars early, we want to repr() things that are JSON-serializable to make their type more apparent. For example, it's useful to see the difference between a unicode-string and a bytestring when viewing a stacktrace.
     :param custom_repr: A custom repr function that runs before safe_repr on the object to be serialized. If it returns None or throws internally, we will fallback to safe_repr.

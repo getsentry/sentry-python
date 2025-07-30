@@ -7,7 +7,6 @@ from bottle import Bottle, debug as set_debug, abort, redirect, HTTPResponse
 from sentry_sdk import capture_message
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.bottle import BottleIntegration
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 from sentry_sdk.integrations.logging import LoggingIntegration
 from werkzeug.test import Client
@@ -122,7 +121,7 @@ def test_errors(
 
 
 def test_large_json_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+    sentry_init(integrations=[BottleIntegration()])
 
     data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
 
@@ -180,7 +179,7 @@ def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
 
 
 def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+    sentry_init(integrations=[BottleIntegration()])
 
     data = {"foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}
 
@@ -242,7 +241,7 @@ def test_too_large_raw_request(
 
 
 def test_files_and_form(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+    sentry_init(integrations=[BottleIntegration()])
 
     data = {
         "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
@@ -287,11 +286,9 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
 def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, app, get_client
 ):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+    sentry_init(integrations=[BottleIntegration()])
 
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
+    data = {"key{}".format(i): "value{}".format(i) for i in range(10**5)}
 
     @app.route("/", method="POST")
     def index():

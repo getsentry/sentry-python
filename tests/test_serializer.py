@@ -141,11 +141,11 @@ def test_custom_repr_graceful_fallback_to_safe_repr(extra_normalizer):
 
 
 def test_dont_trim_databag_breadth(body_normalizer):
-    data = {"key{}".format(i): "value{}".format(i) for i in range(10**9)}
+    data = {"key{}".format(i): "value{}".format(i) for i in range(10**5)}
 
     result = body_normalizer(data)
 
-    assert len(result) == 10**9
+    assert len(result) == 10**5
     for key, value in result.items():
         assert data.get(key) == value
 

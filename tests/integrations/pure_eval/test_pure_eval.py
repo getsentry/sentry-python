@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from sentry_sdk import capture_exception, serializer
+from sentry_sdk import capture_exception
 from sentry_sdk.integrations.pure_eval import PureEvalIntegration
 
 
@@ -62,6 +62,14 @@ def test_include_local_variables_enabled(sentry_init, capture_events, integratio
             "i",
             "u",
             "y",
+            "t",
+            "r",
+            "e",
+            "w",
+            "q",
+            "(q, w, e, r, t, y, u, i, o, p, a, s)",
+            "str((q, w, e, r, t, y, u, i, o, p, a, s))",
+            "events",
         ]
         assert list(frame_vars.keys()) == expected_keys
         assert frame_vars["namespace.d"] == {"1": "2"}
@@ -85,4 +93,4 @@ def test_include_local_variables_enabled(sentry_init, capture_events, integratio
             "s",
             "events",
         }
-        assert len(frame_vars) == serializer.MAX_DATABAG_BREADTH
+        assert len(frame_vars) == 14
