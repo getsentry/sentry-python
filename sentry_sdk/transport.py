@@ -23,7 +23,7 @@ try:
     HTTP2_ENABLED = True
 except ImportError:
     HTTP2_ENABLED = False
-    httpcore = None
+    httpcore = None  # type: ignore
 
 try:
     import httpcore  # noqa: F401
@@ -597,7 +597,7 @@ if not ASYNC_TRANSPORT_ENABLED:
 
 else:
 
-    class AsyncHttpTransport(HttpTransportCore):
+    class AsyncHttpTransport(HttpTransportCore):  # type: ignore
         def __init__(self: Self, options: Dict[str, Any]) -> None:
             super().__init__(options)
             # Requires event loop at init time
