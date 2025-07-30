@@ -691,16 +691,17 @@ class AsyncHttpTransport(HttpTransportCore):
                 for item in envelope.items:
                     self.record_lost_event("no_async_context", item=item)
 
-    async def flush_async(
+    def flush(  # type: ignore[override]
         self: Self,
         timeout: float,
         callback: Optional[Callable[[int, float], None]] = None,
-    ) -> None:
+    ) -> Optional[asyncio.Task[None]]:
         logger.debug("Flushing HTTP transport")
 
         if timeout > 0:
             self._worker.submit(lambda: self._flush_client_reports(force=True))
-            await self._worker.flush_async(timeout, callback)  # type: ignore
+            return self._worker.flush(timeout, callback)
+        return None
 
     def _get_pool_options(self: Self) -> Dict[str, Any]:
         options: Dict[str, Any] = {
