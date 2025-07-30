@@ -354,6 +354,11 @@ class Span:
         # type: () -> str
         return self.description
 
+    @name.setter
+    def name(self, value):
+        # type: (str) -> None
+        self.description = value
+
     # TODO this should really live on the Transaction class rather than the Span
     # class
     def init_span_recorder(self, maxlen):
