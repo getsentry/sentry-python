@@ -18,18 +18,18 @@ except ImportError:
 
 try:
     import httpcore
-    import h2  # noqa: F401
-
-    HTTP2_ENABLED = True
 except ImportError:
-    HTTP2_ENABLED = False
     httpcore = None  # type: ignore
 
 try:
-    import httpcore  # noqa: F401
-    import anyio  # noqa: F401
+    import h2  # noqa: F401
 
-    ASYNC_TRANSPORT_ENABLED = True
+    HTTP2_ENABLED = httpcore is not None
+except ImportError:
+    HTTP2_ENABLED = False
+
+try:
+    ASYNC_TRANSPORT_ENABLED = httpcore is not None
 except ImportError:
     ASYNC_TRANSPORT_ENABLED = False
 
@@ -238,7 +238,11 @@ class HttpTransportCore(Transport):
         async_enabled = options.get("_experiments", {}).get("transport_async", False)
         try:
             asyncio.get_running_loop()
-            worker_cls = AsyncWorker if async_enabled else BackgroundWorker
+            worker_cls = (
+                AsyncWorker
+                if async_enabled and ASYNC_TRANSPORT_ENABLED
+                else BackgroundWorker
+            )
         except RuntimeError:
             worker_cls = BackgroundWorker
         return worker_cls(queue_size=options["transport_queue_size"])
