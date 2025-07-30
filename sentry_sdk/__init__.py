@@ -6,7 +6,7 @@ from sentry_sdk.client import Client
 
 from sentry_sdk.api import *  # noqa
 
-from sentry_sdk.tracing import new_trace
+from sentry_sdk.tracing import new_trace, update_current_span
 
 from sentry_sdk.consts import VERSION  # noqa
 
@@ -46,6 +46,7 @@ __all__ = [  # noqa
     "start_transaction",
     "trace",
     "new_trace",
+    "update_current_span",
     "monitor",
     "logger",
     "start_session",
