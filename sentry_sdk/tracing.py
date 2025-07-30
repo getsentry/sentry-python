@@ -1,11 +1,13 @@
 from decimal import Decimal
+import functools
+import inspect
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import INSTRUMENTER, OP, SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
@@ -1369,6 +1371,135 @@ def trace(func=None):
         return start_child_span_decorator(func)
     else:
         return start_child_span_decorator
+
+
+def set_span_attributes(span, attributes):
+    # type: (Span, dict[str, Any]) -> None
+    for key, value in attributes.items():
+        span.set_data(key, value)
+
+
+def set_input_attributes(span, template, args, kwargs):
+    # depending on `template` set some attributes on the span derived from args and kwargs
+    pass
+
+
+def set_output_attributes(span, template, result):
+    # depending on `template` set some attributes on the span derived from result
+    pass
+
+
+def new_trace(func=None, *, as_type="span", name=None):
+    """
+    Decorator to start a child span.
+
+    :param func: The function to trace.
+    :param as_type: The type of span to create.
+    :param name: The name of the span.
+    """
+
+    def span_decorator(f, *a, **kw):
+        @functools.wraps(f)
+        async def async_wrapper(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            op = kw.get("op", OP.FUNCTION)
+            span_name = kw.get("name", f.__name__)
+            attributes = kw.get("attributes", {})
+
+            with sentry_sdk.start_span(
+                op=op,
+                name=span_name,
+            ) as span:
+                set_span_attributes(span, attributes)
+                set_input_attributes(span, as_type, args, kwargs)
+
+                result = await f(*args, **kwargs)
+
+                set_output_attributes(span, as_type, result)
+
+                return result
+
+        @functools.wraps(f)
+        def sync_wrapper(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            op = kw.get("op", OP.FUNCTION)
+            span_name = kw.get("name", f.__name__)
+            attributes = kw.get("attributes", {})
+
+            with sentry_sdk.start_span(
+                op=op,
+                name=span_name,
+            ) as span:
+                set_span_attributes(span, attributes)
+                set_input_attributes(span, as_type, args, kwargs)
+
+                result = f(*args, **kwargs)
+
+                set_output_attributes(span, as_type, result)
+
+                return result
+
+        if inspect.iscoroutinefunction(f):
+            wrapper = async_wrapper
+        else:
+            wrapper = sync_wrapper
+
+        return wrapper
+
+    def ai_chat_decorator(f):
+        # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+        attributes = {
+            "gen_ai.operation.name": "chat",
+        }
+
+        return span_decorator(
+            f,
+            op=OP.GEN_AI_CHAT,
+            name="chat [MODEL]",
+            attributes=attributes,
+        )
+
+    def ai_agent_decorator(f):
+        # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+        span_name = name or f.__name__
+        attributes = {
+            "gen_ai.agent.name": span_name,
+            "gen_ai.operation.name": "invoke_agent",
+        }
+
+        return span_decorator(
+            f,
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name=f"invoke_agent {span_name}",
+            attributes=attributes,
+        )
+
+    def ai_tool_decorator(f):
+        # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+        span_name = name or f.__name__
+        attributes = {
+            "gen_ai.tool.name": span_name,
+            "gen_ai.operation.name": "execute_tool",
+        }
+
+        return span_decorator(
+            f,
+            op=OP.GEN_AI_EXECUTE_TOOL,
+            name=f"execute_tool {span_name}",
+            attributes=attributes,
+        )
+
+    decorator_for_type = {
+        "ai_chat": ai_chat_decorator,
+        "ai_agent": ai_agent_decorator,
+        "ai_tool": ai_tool_decorator,
+    }
+    decorator = decorator_for_type.get(as_type, span_decorator)
+
+    if func:
+        return decorator(func)
+    else:
+        return decorator
 
 
 # Circular imports

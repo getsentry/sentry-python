@@ -6,7 +6,7 @@ from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.tracing import NoOpSpan, Transaction, trace
+from sentry_sdk.tracing import NoOpSpan, Transaction, trace, new_trace
 from sentry_sdk.crons import monitor
 
 from typing import TYPE_CHECKING
@@ -81,10 +81,12 @@ __all__ = [
     "start_span",
     "start_transaction",
     "trace",
+    "new_trace",
     "monitor",
     "start_session",
     "end_session",
     "set_transaction_name",
+    "update_current_span",
 ]
 
 
@@ -473,3 +475,25 @@ def end_session():
 def set_transaction_name(name, source=None):
     # type: (str, Optional[str]) -> None
     return get_current_scope().set_transaction_name(name, source)
+
+
+def update_current_span(op=None, name=None, attributes=None):
+    # type: (Optional[str], Optional[str], Optional[dict[str, Union[str, int, float, bool]]]) -> None
+    """
+    Update the current span with the given parameters.
+
+    :param op: The operation of the span.
+    :param name: The name of the span.
+    :param attributes: The attributes of the span.
+    """
+    current_span = get_current_span()
+
+    if op is not None:
+        current_span.op = op
+
+    if name is not None:
+        current_span.name = name
+
+    if attributes is not None:
+        for key, value in attributes.items():
+            current_span.set_data(key, value)
