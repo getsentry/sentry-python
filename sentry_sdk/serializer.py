@@ -39,16 +39,6 @@ if TYPE_CHECKING:
 serializable_str_types = (str, bytes, bytearray, memoryview)
 
 
-# Maximum length of JSON-serialized event payloads that can be safely sent
-# before the server may reject the event due to its size. This is not intended
-# to reflect actual values defined server-side, but rather only be an upper
-# bound for events sent by the SDK.
-#
-# Can be overwritten if wanting to send more bytes, e.g. with a custom server.
-# When changing this, keep in mind that events may be a little bit larger than
-# this value due to attached metadata, so keep the number conservative.
-MAX_EVENT_BYTES = 10**6
-
 # Maximum depth and breadth of databags. Excess data will be trimmed. If
 # max_request_body_size is "always", request bodies won't be trimmed.
 MAX_DATABAG_DEPTH = 5

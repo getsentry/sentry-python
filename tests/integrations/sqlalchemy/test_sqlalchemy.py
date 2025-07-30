@@ -14,9 +14,7 @@ from sqlalchemy import text
 import sentry_sdk
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_sdk.utils import json_dumps
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -255,8 +253,6 @@ def test_large_event_not_truncated(sentry_init, capture_events):
                 )
 
     (event,) = events
-
-    assert len(json_dumps(event)) > MAX_EVENT_BYTES
 
     # Some spans are discarded.
     assert len(event["spans"]) == 1000
