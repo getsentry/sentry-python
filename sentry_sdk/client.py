@@ -1023,7 +1023,11 @@ class _Client(BaseClient):
         self.session_flusher.flush()
         if self.log_batcher is not None:
             self.log_batcher.flush()
-        await self.transport.flush_async(timeout=timeout, callback=callback)  # type: ignore
+
+        # For async transport, flush() returns a Task that needs to be awaited
+        flush_task = self.transport.flush(timeout=timeout, callback=callback)  # type: ignore
+        if flush_task is not None:
+            await flush_task
 
     def __enter__(self) -> _Client:
         return self
