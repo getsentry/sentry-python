@@ -182,6 +182,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ### Deprecated
 
 - `sentry_sdk.start_transaction()` is deprecated. Use `sentry_sdk.start_span()` instead.
+  - If you want to force creation of a new trace, use the `sentry_sdk.new_trace()` context manager.
 - `Span.set_data()` is deprecated. Use `Span.set_attribute()` instead.
 
 ## Upgrading to 2.0
