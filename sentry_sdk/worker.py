@@ -271,11 +271,10 @@ class AsyncWorker(Worker):
                 pending = self._queue.qsize() + len(self._active_tasks)
                 logger.error("flush timed out, dropped %s events", pending)
 
-    async def flush_async(self, timeout: float, callback: Optional[Any] = None) -> None:
-        logger.debug("background worker got flush request")
-        if self.is_alive and timeout > 0.0:
-            await self._wait_flush(timeout, callback)
-        logger.debug("background worker flushed")
+    def flush(self, timeout: float, callback: Optional[Any] = None) -> Optional[asyncio.Task[None]]:  # type: ignore[override]
+        if self.is_alive and timeout > 0.0 and self._loop and self._loop.is_running():
+            return self._loop.create_task(self._wait_flush(timeout, callback))
+        return None
 
     def submit(self, callback: Callable[[], Any]) -> bool:
         self._ensure_task()
