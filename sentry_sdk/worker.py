@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 import os
 import threading
 import asyncio
-import inspect
 
 from time import sleep, time
 from sentry_sdk._queue import Queue, FullError
@@ -29,10 +28,21 @@ class Worker(ABC):
     @property
     @abstractmethod
     def is_alive(self) -> bool:
+        """
+        Checks whether the worker is alive and running.
+
+        Returns True if the worker is alive, False otherwise.
+        """
         pass
 
     @abstractmethod
     def kill(self) -> None:
+        """
+        Kills the worker.
+
+        This method is used to kill the worker. The queue will be drained up to the point where the worker is killed.
+        The worker will not be able to process any more events.
+        """
         pass
 
     def flush(
@@ -49,6 +59,11 @@ class Worker(ABC):
 
     @abstractmethod
     def full(self) -> bool:
+        """
+        Checks whether the worker's queue is full.
+
+        Returns True if the queue is full, False otherwise.
+        """
         pass
 
     @abstractmethod
@@ -176,7 +191,8 @@ class BackgroundWorker(Worker):
 
 class AsyncWorker(Worker):
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
-        self._queue: asyncio.Queue[Any] = asyncio.Queue(queue_size)
+        self._queue: Optional[asyncio.Queue[Any]] = None
+        self._queue_size = queue_size
         self._task: Optional[asyncio.Task[None]] = None
         # Event loop needs to remain in the same process
         self._task_for_pid: Optional[int] = None
@@ -194,10 +210,11 @@ class AsyncWorker(Worker):
 
     def kill(self) -> None:
         if self._task:
-            try:
-                self._queue.put_nowait(_TERMINATOR)
-            except asyncio.QueueFull:
-                logger.debug("async worker queue full, kill failed")
+            if self._queue is not None:
+                try:
+                    self._queue.put_nowait(_TERMINATOR)
+                except asyncio.QueueFull:
+                    logger.debug("async worker queue full, kill failed")
             # Also cancel any active callback tasks
             # Avoid modifying the set while cancelling tasks
             tasks_to_cancel = set(self._active_tasks)
@@ -212,15 +229,20 @@ class AsyncWorker(Worker):
         if not self.is_alive:
             try:
                 self._loop = asyncio.get_running_loop()
+                if self._queue is None:
+                    self._queue = asyncio.Queue(maxsize=self._queue_size)
                 self._task = self._loop.create_task(self._target())
                 self._task_for_pid = os.getpid()
             except RuntimeError:
                 # There is no event loop running
+                logger.warning("No event loop running, async worker not started")
                 self._loop = None
                 self._task = None
                 self._task_for_pid = None
 
     def full(self) -> bool:
+        if self._queue is None:
+            return True
         return self._queue.full()
 
     def _ensure_task(self) -> None:
@@ -228,7 +250,7 @@ class AsyncWorker(Worker):
             self.start()
 
     async def _wait_flush(self, timeout: float, callback: Optional[Any] = None) -> None:
-        if not self._loop or not self._loop.is_running():
+        if not self._loop or not self._loop.is_running() or self._queue is None:
             return
 
         initial_timeout = min(0.1, timeout)
@@ -237,7 +259,7 @@ class AsyncWorker(Worker):
         try:
             await asyncio.wait_for(self._queue.join(), timeout=initial_timeout)
         except asyncio.TimeoutError:
-            pending = self._queue.qsize() + 1
+            pending = self._queue.qsize() + len(self._active_tasks)
             logger.debug("%d event(s) pending on flush", pending)
             if callback is not None:
                 callback(pending, timeout)
@@ -246,18 +268,18 @@ class AsyncWorker(Worker):
                 remaining_timeout = timeout - initial_timeout
                 await asyncio.wait_for(self._queue.join(), timeout=remaining_timeout)
             except asyncio.TimeoutError:
-                pending = self._queue.qsize() + 1
+                pending = self._queue.qsize() + len(self._active_tasks)
                 logger.error("flush timed out, dropped %s events", pending)
 
-    async def flush_async(self, timeout: float, callback: Optional[Any] = None) -> None:
-        logger.debug("background worker got flush request")
-        if self.is_alive and timeout > 0.0:
-            await self._wait_flush(timeout, callback)
-        logger.debug("background worker flushed")
+    def flush(self, timeout: float, callback: Optional[Any] = None) -> Optional[asyncio.Task[None]]:  # type: ignore[override]
+        if self.is_alive and timeout > 0.0 and self._loop and self._loop.is_running():
+            return self._loop.create_task(self._wait_flush(timeout, callback))
+        return None
 
     def submit(self, callback: Callable[[], Any]) -> bool:
         self._ensure_task()
-
+        if self._queue is None:
+            return False
         try:
             self._queue.put_nowait(callback)
             return True
@@ -265,6 +287,8 @@ class AsyncWorker(Worker):
             return False
 
     async def _target(self) -> None:
+        if self._queue is None:
+            return
         while True:
             callback = await self._queue.get()
             if callback is _TERMINATOR:
@@ -280,12 +304,8 @@ class AsyncWorker(Worker):
             await asyncio.sleep(0)
 
     async def _process_callback(self, callback: Callable[[], Any]) -> None:
-        if inspect.iscoroutinefunction(callback):
-            # Callback is an async coroutine, need to await it
-            await callback()
-        else:
-            # Callback is a sync function, need to call it
-            callback()
+        # Callback is an async coroutine, need to await it
+        await callback()
 
     def _on_task_complete(self, task: asyncio.Task[None]) -> None:
         try:
@@ -295,5 +315,6 @@ class AsyncWorker(Worker):
         finally:
             # Mark the task as done and remove it from the active tasks set
             # This happens only after the task has completed
-            self._queue.task_done()
+            if self._queue is not None:
+                self._queue.task_done()
             self._active_tasks.discard(task)

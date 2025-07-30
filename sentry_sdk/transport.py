@@ -164,7 +164,7 @@ def _parse_rate_limits(
 
 
 class HttpTransportCore(Transport):
-    """The base HTTP transport."""
+    """Shared base class for sync and async transports."""
 
     TIMEOUT = 30  # seconds
 
@@ -402,6 +402,8 @@ class HttpTransportCore(Transport):
     def _prepare_envelope(
         self: Self, envelope: Envelope
     ) -> Optional[Tuple[Envelope, io.BytesIO, Dict[str, str]]]:
+
+        # remove all items from the envelope which are over quota
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
@@ -510,18 +512,18 @@ class HttpTransportCore(Transport):
 
 
 class BaseHttpTransport(HttpTransportCore):
+    """The base HTTP transport."""
 
     def _send_envelope(self: Self, envelope: Envelope) -> None:
         _prepared_envelope = self._prepare_envelope(envelope)
-        if _prepared_envelope is None:
-            return None
-        envelope, body, headers = _prepared_envelope
-        self._send_request(
-            body.getvalue(),
-            headers=headers,
-            endpoint_type=EndpointType.ENVELOPE,
-            envelope=envelope,
-        )
+        if _prepared_envelope is not None:
+            envelope, body, headers = _prepared_envelope
+            self._send_request(
+                body.getvalue(),
+                headers=headers,
+                endpoint_type=EndpointType.ENVELOPE,
+                envelope=envelope,
+            )
         return None
 
     def _send_request(
@@ -579,7 +581,7 @@ class AsyncHttpTransport(HttpTransportCore):
     def __init__(self: Self, options: Dict[str, Any]) -> None:
         super().__init__(options)
         # Requires event loop at init time
-        self.loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        self._loop = asyncio.get_running_loop()
         self.background_tasks: set[asyncio.Task[None]] = set()
 
     def _get_header_value(self: Self, response: Any, header: str) -> Optional[str]:
@@ -677,10 +679,10 @@ class AsyncHttpTransport(HttpTransportCore):
         except RuntimeError:
             # We are in a background thread, not running an event loop,
             # have to launch the task on the loop in a threadsafe way.
-            if self.loop and self.loop.is_running():
+            if self._loop and self._loop.is_running():
                 asyncio.run_coroutine_threadsafe(
                     self._capture_envelope(envelope),
-                    self.loop,
+                    self._loop,
                 )
             else:
                 # The event loop is no longer running
@@ -689,16 +691,17 @@ class AsyncHttpTransport(HttpTransportCore):
                 for item in envelope.items:
                     self.record_lost_event("no_async_context", item=item)
 
-    async def flush_async(
+    def flush(  # type: ignore[override]
         self: Self,
         timeout: float,
         callback: Optional[Callable[[int, float], None]] = None,
-    ) -> None:
+    ) -> Optional[asyncio.Task[None]]:
         logger.debug("Flushing HTTP transport")
 
         if timeout > 0:
             self._worker.submit(lambda: self._flush_client_reports(force=True))
-            await self._worker.flush_async(timeout, callback)  # type: ignore
+            return self._worker.flush(timeout, callback)  # type: ignore[func-returns-value]
+        return None
 
     def _get_pool_options(self: Self) -> Dict[str, Any]:
         options: Dict[str, Any] = {
@@ -781,7 +784,7 @@ class AsyncHttpTransport(HttpTransportCore):
 
         return httpcore.AsyncConnectionPool(**opts)
 
-    def kill(self: Self) -> Optional[asyncio.Task[None]]:  # type: ignore[override]
+    def kill(self: Self) -> Optional[asyncio.Task[None]]:  # type: ignore
 
         logger.debug("Killing HTTP transport")
         self._worker.kill()
@@ -790,7 +793,7 @@ class AsyncHttpTransport(HttpTransportCore):
         self.background_tasks.clear()
         try:
             # Return the pool cleanup task so caller can await it if needed
-            return self.loop.create_task(self._pool.aclose())  # type: ignore
+            return self._loop.create_task(self._pool.aclose())  # type: ignore
         except RuntimeError:
             logger.warning("Event loop not running, aborting kill.")
             return None

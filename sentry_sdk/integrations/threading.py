@@ -106,7 +106,7 @@ def _wrap_run(
         def _run_old_run_func() -> Any:
             try:
                 self = current_thread()
-                return old_run_func(self, *a, **kw)
+                return old_run_func(self, *a[1:], **kw)
             except Exception:
                 reraise(*_capture_exception())
 

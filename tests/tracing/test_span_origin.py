@@ -146,9 +146,9 @@ def test_exclude_span_origins_parent_with_child_spans(sentry_init, capture_event
 
     with start_span(name="parent", origin="auto.http.requests"):
         with start_span(
-            name="db-child", origin="auto.db.postgres", only_if_parent=True
+            name="db-child", origin="auto.db.postgres", only_as_child_span=True
         ):
-            # Note: without only_if_parent, the child span would be promoted to a transaction
+            # Note: without only_as_child_span, the child span would be promoted to a transaction
             pass
 
     assert len(events) == 0

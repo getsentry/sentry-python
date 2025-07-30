@@ -81,7 +81,7 @@ def patch_enqueue_job() -> None:
             op=OP.QUEUE_SUBMIT_ARQ,
             name=function,
             origin=ArqIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 

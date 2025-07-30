@@ -28,10 +28,10 @@ def ai_track(description: str, **span_kwargs: Any) -> Callable[..., Any]:
     def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
         def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
             curr_pipeline = _ai_pipeline_name.get()
-            op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
+            op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
             with start_span(
-                name=description, op=op, only_if_parent=True, **span_kwargs
+                name=description, op=op, only_as_child_span=True, **span_kwargs
             ) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
                     span.set_tag(k, v)
@@ -58,10 +58,10 @@ def ai_track(description: str, **span_kwargs: Any) -> Callable[..., Any]:
 
         async def async_wrapped(*args: Any, **kwargs: Any) -> Any:
             curr_pipeline = _ai_pipeline_name.get()
-            op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
+            op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
             with start_span(
-                name=description, op=op, only_if_parent=True, **span_kwargs
+                name=description, op=op, only_as_child_span=True, **span_kwargs
             ) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
                     span.set_tag(k, v)

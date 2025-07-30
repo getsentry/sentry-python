@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.0a2
+## 3.0.0a3
 
 We're excited to announce that version 3.0 of the Sentry Python SDK is now
 available. This release is the result of a long-term effort to use OpenTelemetry
@@ -20,25 +20,23 @@ for your feedback. How was the migration? Is everything working as expected? Is
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
 [on Discord](https://discord.com/invite/Ww9hbqr).
 
-## 3.0.0a1
+## 2.33.2
 
-We're excited to announce that version 3.0 of the Sentry Python SDK is now
-available. This release is the result of a long-term effort to use OpenTelemetry
-under the hood for tracing. This switch opens the door for us to leverage the
-full power of OpenTelemetry, so stay tuned for more integrations and features
-in future releases.
+### Various fixes & improvements
 
-Looking to upgrade from Sentry SDK 2.x to 3.x? See the
-[full list of changes](MIGRATION_GUIDE.md) for a comprehensive overview
-of what's changed. Looking for a more digestible summary? See the
-[migration guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
-with the most common migration patterns.
+- ref(spotlight): Do not import `sentry_sdk.spotlight` unless enabled (#4607) by @sentrivana
+- ref(gnu-integration): update clickhouse stacktrace parsing (#4598) by @MeredithAnya
 
-⚠️ This is a pre-release. If you feel like taking it for a spin, we'd be grateful
-for your feedback. How was the migration? Is everything working as expected? Is
-*nothing* working as expected? Something in between? Please let us know
-[on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
-[on Discord](https://discord.com/invite/Ww9hbqr).
+## 2.33.1
+
+### Various fixes & improvements
+
+- fix(integrations): allow explicit op parameter in `ai_track` (#4597) by @mshavliuk
+- fix: Fix `abs_path` bug in `serialize_frame` (#4599) by @szokeasaurusrex
+- Remove pyrsistent from test dependencies (#4588) by @musicinmybrain
+- Remove explicit `__del__`'s in threaded classes (#4590) by @sl0thentr0py
+- Remove forked from test_transport, separate gevent tests and generalize capturing_server to be module level (#4577) by @sl0thentr0py
+- Improve token usage recording (#4566) by @antonpirker
 
 ## 2.33.0
 

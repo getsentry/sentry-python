@@ -63,6 +63,14 @@ def add_global_repr_processor(processor: ReprProcessor) -> None:
     global_repr_processors.append(processor)
 
 
+sequence_types = [Sequence, Set]  # type: List[type]
+
+
+def add_repr_sequence_type(ty):
+    # type: (type) -> None
+    sequence_types.append(ty)
+
+
 class Memo:
     __slots__ = ("_ids", "_objs")
 
@@ -318,7 +326,7 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
             return rv_dict
 
         elif not isinstance(obj, serializable_str_types) and isinstance(
-            obj, (Set, Sequence)
+            obj, tuple(sequence_types)
         ):
             rv_list = []
 

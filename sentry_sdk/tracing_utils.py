@@ -143,7 +143,7 @@ def record_sql_queries(
         op=OP.DB,
         name=query,
         origin=span_origin,
-        only_if_parent=True,
+        only_as_child_span=True,
     ) as span:
         for k, v in data.items():
             span.set_attribute(k, v)
@@ -710,7 +710,7 @@ def start_child_span_decorator(func: Any) -> Any:
             with sentry_sdk.start_span(
                 op=OP.FUNCTION,
                 name=qualname_from_function(func),
-                only_if_parent=True,
+                only_as_child_span=True,
             ):
                 return await func(*args, **kwargs)
 
@@ -739,7 +739,7 @@ def start_child_span_decorator(func: Any) -> Any:
             with sentry_sdk.start_span(
                 op=OP.FUNCTION,
                 name=qualname_from_function(func),
-                only_if_parent=True,
+                only_as_child_span=True,
             ):
                 return func(*args, **kwargs)
 

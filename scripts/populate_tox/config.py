@@ -158,6 +158,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio"],
         },
+        "python": ">=3.10",
     },
     "openfeature": {
         "package": "openfeature-sdk",

@@ -173,7 +173,7 @@ class SentryAsyncExtension(SchemaExtension):
             op=op,
             name=description,
             origin=StrawberryIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as graphql_span:
             graphql_span.set_attribute("graphql.operation.type", operation_type)
             graphql_span.set_attribute("graphql.document", self.execution_context.query)

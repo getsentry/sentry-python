@@ -176,7 +176,9 @@ def test_tracing_in_ray_actors():
 
         def increment(self):
             with sentry_sdk.start_span(
-                op="test", name="custom span in actor execution", only_if_parent=True
+                op="test",
+                name="custom span in actor execution",
+                only_as_child_span=True,
             ):
                 self.n += 1
 
@@ -215,7 +217,9 @@ def test_errors_in_ray_actors():
 
         def increment(self):
             with sentry_sdk.start_span(
-                op="test", name="custom span in actor execution", only_if_parent=True
+                op="test",
+                name="custom span in actor execution",
+                only_as_child_span=True,
             ):
                 1 / 0
 
