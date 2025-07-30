@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 import os
 import threading
 import asyncio
-import inspect
 
 from time import sleep, time
 from sentry_sdk._queue import Queue, FullError
@@ -192,7 +191,7 @@ class BackgroundWorker(Worker):
 
 class AsyncWorker(Worker):
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
-        self._queue: asyncio.Queue[Any] = asyncio.Queue(queue_size)
+        self._queue: asyncio.Queue[Any] = None
         self._task: Optional[asyncio.Task[None]] = None
         # Event loop needs to remain in the same process
         self._task_for_pid: Optional[int] = None
@@ -228,10 +227,13 @@ class AsyncWorker(Worker):
         if not self.is_alive:
             try:
                 self._loop = asyncio.get_running_loop()
+                if self._queue is None:
+                    self._queue = asyncio.Queue(maxsize=self._queue_size)
                 self._task = self._loop.create_task(self._target())
                 self._task_for_pid = os.getpid()
             except RuntimeError:
                 # There is no event loop running
+                logger.warning("No event loop running, async worker not started")
                 self._loop = None
                 self._task = None
                 self._task_for_pid = None
@@ -253,7 +255,7 @@ class AsyncWorker(Worker):
         try:
             await asyncio.wait_for(self._queue.join(), timeout=initial_timeout)
         except asyncio.TimeoutError:
-            pending = self._queue.qsize() + 1
+            pending = self._queue.qsize() + len(self._active_tasks)
             logger.debug("%d event(s) pending on flush", pending)
             if callback is not None:
                 callback(pending, timeout)
@@ -262,7 +264,7 @@ class AsyncWorker(Worker):
                 remaining_timeout = timeout - initial_timeout
                 await asyncio.wait_for(self._queue.join(), timeout=remaining_timeout)
             except asyncio.TimeoutError:
-                pending = self._queue.qsize() + 1
+                pending = self._queue.qsize() + len(self._active_tasks)
                 logger.error("flush timed out, dropped %s events", pending)
 
     async def flush_async(self, timeout: float, callback: Optional[Any] = None) -> None:
@@ -296,12 +298,8 @@ class AsyncWorker(Worker):
             await asyncio.sleep(0)
 
     async def _process_callback(self, callback: Callable[[], Any]) -> None:
-        if inspect.iscoroutinefunction(callback):
-            # Callback is an async coroutine, need to await it
-            await callback()
-        else:
-            # Callback is a sync function, need to call it
-            callback()
+        # Callback is an async coroutine, need to await it
+        await callback()
 
     def _on_task_complete(self, task: asyncio.Task[None]) -> None:
         try:
