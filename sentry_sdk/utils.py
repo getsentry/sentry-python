@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    from sentry_sdk._types import Event, ExcInfo
+    from sentry_sdk._types import Event, ExcInfo, Log, Hint
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -1984,3 +1984,24 @@ def safe_serialize(data):
         return json.dumps(serialized, default=str)
     except Exception:
         return str(data)
+
+
+def has_logs_enabled(options):
+    # type: (Optional[dict[str, Any]]) -> bool
+    if options is None:
+        return False
+
+    return bool(
+        options.get("enable_logs", False)
+        or options["_experiments"].get("enable_logs", False)
+    )
+
+
+def get_before_send_log(options):
+    # type: (Optional[dict[str, Any]]) -> Optional[Callable[[Log, Hint], Optional[Log]]]
+    if options is None:
+        return None
+
+    return options.get("before_send_log") or options["_experiments"].get(
+        "before_send_log"
+    )

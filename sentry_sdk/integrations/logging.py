@@ -5,13 +5,14 @@ from fnmatch import fnmatch
 
 import sentry_sdk
 from sentry_sdk.client import BaseClient
-from sentry_sdk.logger import _log_level_to_otel, has_logs_enabled
+from sentry_sdk.logger import _log_level_to_otel
 from sentry_sdk.utils import (
     safe_repr,
     to_string,
     event_from_exception,
     current_stacktrace,
     capture_internal_exceptions,
+    has_logs_enabled,
 )
 from sentry_sdk.integrations import Integration
 

@@ -7,7 +7,8 @@ from sentry_sdk.integrations.logging import (
     EventHandler,
     _BaseHandler,
 )
-from sentry_sdk.logger import _log_level_to_otel, has_logs_enabled
+from sentry_sdk.logger import _log_level_to_otel
+from sentry_sdk.utils import has_logs_enabled
 
 from typing import TYPE_CHECKING
 

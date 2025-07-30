@@ -23,6 +23,8 @@ from sentry_sdk.utils import (
     handle_in_app,
     is_gevent,
     logger,
+    get_before_send_log,
+    has_logs_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -382,8 +384,6 @@ class _Client(BaseClient):
                     )
 
             self.log_batcher = None
-
-            from sentry_sdk.logger import has_logs_enabled
 
             if has_logs_enabled(self.options):
                 from sentry_sdk._log_batcher import LogBatcher
@@ -902,8 +902,6 @@ class _Client(BaseClient):
 
     def _capture_experimental_log(self, log):
         # type: (Optional[Log]) -> None
-        from sentry_sdk.logger import get_before_send_log, has_logs_enabled
-
         if not has_logs_enabled(self.options) or log is None:
             return
 
