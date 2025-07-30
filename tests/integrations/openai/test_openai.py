@@ -1,4 +1,5 @@
 import pytest
+import openai
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
@@ -1387,3 +1388,30 @@ async def test_streaming_responses_api_async(
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.parametrize(
+    "tools",
+    [[], None, openai.NOT_GIVEN],
+)
+def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "hello"}],
+            tools=tools,
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    assert "gen_ai.request.available_tools" not in span["data"]
