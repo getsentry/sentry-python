@@ -20,6 +20,11 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 try:
+    try:
+        from openai import NOT_GIVEN
+    except ImportError:
+        NOT_GIVEN = None
+
     from openai.resources.chat.completions import Completions, AsyncCompletions
     from openai.resources import Embeddings, AsyncEmbeddings
 
@@ -192,12 +197,13 @@ def _set_input_data(span, kwargs, operation, integration):
     }
     for key, attribute in kwargs_keys_to_attributes.items():
         value = kwargs.get(key)
-        if value is not None:
+
+        if value is not NOT_GIVEN and value is not None:
             set_data_normalized(span, attribute, value)
 
     # Input attributes: Tools
     tools = kwargs.get("tools")
-    if tools is not None and len(tools) > 0:
+    if tools is not NOT_GIVEN and tools is not None and len(tools) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
         )
