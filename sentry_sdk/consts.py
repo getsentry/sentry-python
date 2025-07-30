@@ -1183,6 +1183,11 @@ class ClientConstructor:
         :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
             Sentry logs. Defaults to False.
 
+        :param before_send_log: An optional function to modify or filter out logs
+            before they're sent to Sentry. Any modifications to the log in this
+            function will be retained. If the function returns None, the log will
+            not be sent to Sentry.
+
         :param _experiments:
         """
         pass
