@@ -23,9 +23,13 @@ def _normalize_data(data: Any) -> Any:
         return list(_normalize_data(x) for x in data)
     if isinstance(data, dict):
         return {k: _normalize_data(v) for (k, v) in data.items()}
+
     return data
 
 
 def set_data_normalized(span: Span, key: str, value: Any) -> None:
     normalized = _normalize_data(value)
-    span.set_attribute(key, normalized)
+    if isinstance(normalized, (int, float, bool, str)):
+        span.set_attribute(key, normalized)
+    else:
+        span.set_attribute(key, str(normalized))

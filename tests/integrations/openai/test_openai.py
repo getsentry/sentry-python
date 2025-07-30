@@ -1,4 +1,3 @@
-import json
 import pytest
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
@@ -144,11 +143,8 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
-        assert (
-            "the model response"
-            in json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])[0]["content"]
-        )
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -189,11 +185,8 @@ async def test_nonstreaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
-        assert (
-            "the model response"
-            in json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])[0]["content"]
-        )
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -285,7 +278,7 @@ def test_streaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -381,7 +374,7 @@ async def test_streaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]

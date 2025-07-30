@@ -32,7 +32,7 @@ for your feedback. How was the migration? Is everything working as expected? Is
   default 1024 characters/bytes).
 
   If you want to adjust the limit, you can set a
-  [`max_value_limit`](https://docs.sentry.io/platforms/python/configuration/options/#max_value_length)
+  [`max_value_length`](https://docs.sentry.io/platforms/python/configuration/options/#max_value_length)
   in your `sentry_sdk.init()`.
 
 - `OpenAI` integration update (#4612) by @antonpirker
