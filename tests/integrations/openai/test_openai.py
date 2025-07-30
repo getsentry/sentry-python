@@ -404,7 +404,10 @@ def test_bad_chat_completion(sentry_init, capture_events):
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
 
-    (event,) = events
+    (
+        _,
+        event,
+    ) = events
     assert event["level"] == "error"
 
 
@@ -422,7 +425,10 @@ async def test_bad_chat_completion_async(sentry_init, capture_events):
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
 
-    (event,) = events
+    (
+        _,
+        event,
+    ) = events
     assert event["level"] == "error"
 
 
@@ -545,7 +551,10 @@ def test_embeddings_create_raises_error(
     with pytest.raises(OpenAIError):
         client.embeddings.create(input="hello", model="text-embedding-3-large")
 
-    (event,) = events
+    (
+        _,
+        event,
+    ) = events
     assert event["level"] == "error"
 
 
@@ -574,7 +583,10 @@ async def test_embeddings_create_raises_error_async(
     with pytest.raises(OpenAIError):
         await client.embeddings.create(input="hello", model="text-embedding-3-large")
 
-    (event,) = events
+    (
+        _,
+        event,
+    ) = events
     assert event["level"] == "error"
 
 
@@ -995,6 +1007,10 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
+        "sentry.name": "responses gpt-4o",
+        "sentry.op": "gen_ai.responses",
+        "sentry.origin": "auto.ai.openai",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1040,6 +1056,10 @@ def test_ai_client_span_responses_api(sentry_init, capture_events):
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "sentry.name": "responses gpt-4o",
+        "sentry.op": "gen_ai.responses",
+        "sentry.origin": "auto.ai.openai",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1120,6 +1140,10 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "sentry.name": "responses gpt-4o",
+        "sentry.op": "gen_ai.responses",
+        "sentry.origin": "auto.ai.openai",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1167,6 +1191,10 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "sentry.name": "responses gpt-4o",
+        "sentry.op": "gen_ai.responses",
+        "sentry.origin": "auto.ai.openai",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }

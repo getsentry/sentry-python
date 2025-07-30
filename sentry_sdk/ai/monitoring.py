@@ -38,7 +38,7 @@ def ai_track(description: str, **span_kwargs: Any) -> Callable[..., Any]:
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_attribute(k, v)
                 if curr_pipeline:
-                    span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
                     return f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -68,7 +68,7 @@ def ai_track(description: str, **span_kwargs: Any) -> Callable[..., Any]:
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_attribute(k, v)
                 if curr_pipeline:
-                    span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
                     return await f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -105,7 +105,7 @@ def record_token_usage(
     # TODO: move pipeline name elsewhere
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
-        span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, ai_pipeline_name)
+        span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, ai_pipeline_name)
 
     if input_tokens is not None:
         span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
@@ -117,10 +117,10 @@ def record_token_usage(
         )
 
     if output_tokens is not None:
-        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
     if output_tokens_reasoning is not None:
-        span.set_data(
+        span.set_attribute(
             SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
             output_tokens_reasoning,
         )
