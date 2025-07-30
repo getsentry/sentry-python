@@ -234,7 +234,7 @@ def test_recursive_event_scrubber(sentry_init, capture_events):
     capture_event({"extra": complex_structure})
 
     (event,) = events
-    assert event["extra"]["deep"]["deeper"][0]["deepest"]["password"] == "'[Filtered]'"
+    assert event["extra"]["deep"]["deeper"][0]["deepest"]["password"] == "[Filtered]"
 
 
 def test_recursive_scrubber_does_not_override_original(sentry_init, capture_events):
