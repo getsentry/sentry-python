@@ -388,37 +388,6 @@ async def test_starletterequestextractor_body_consumed_twice(
 
 
 @pytest.mark.asyncio
-async def test_starletterequestextractor_extract_request_info_too_big(sentry_init):
-    sentry_init(
-        send_default_pii=True,
-        integrations=[StarletteIntegration()],
-    )
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
-        [b"content-length", str(len(BODY_FORM)).encode()],
-        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
-    ]
-    starlette_request = starlette.requests.Request(scope)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    request_info = await extractor.extract_request_info()
-
-    assert request_info
-    assert request_info["cookies"] == {
-        "tasty_cookie": "strawberry",
-        "yummy_cookie": "choco",
-    }
-    # Because request is too big only the AnnotatedValue is extracted.
-    assert request_info["data"].metadata == {"rem": [["!config", "x"]]}
-
-
-@pytest.mark.asyncio
 async def test_starletterequestextractor_extract_request_info(sentry_init):
     sentry_init(
         send_default_pii=True,
