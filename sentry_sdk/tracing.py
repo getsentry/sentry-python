@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
     should_be_treated_as_error,
+    qualname_from_function,
 )
 
 from typing import TYPE_CHECKING
@@ -1373,19 +1374,38 @@ def trace(func=None):
         return start_child_span_decorator
 
 
-def set_span_attributes(span, attributes):
+def _set_span_attributes(span, attributes):
     # type: (Span, dict[str, Any]) -> None
+    """
+    Set the given attributes on the given span.
+
+    :param span: The span to set attributes on.
+    :param attributes: The attributes to set on the span.
+    """
     for key, value in attributes.items():
         span.set_data(key, value)
 
 
-def set_input_attributes(span, template, args, kwargs):
-    # depending on `template` set some attributes on the span derived from args and kwargs
+def _set_input_attributes(span, template, args, kwargs):
+    """
+    Set LLM input attributes based on given information to the given span.
+
+    :param span: The span to set attributes on.
+    :param template: The template to use to set attributes on the span.
+    :param args: The arguments to the LLM call.
+    :param kwargs: The keyword arguments to the LLM call.
+    """
     pass
 
 
-def set_output_attributes(span, template, result):
-    # depending on `template` set some attributes on the span derived from result
+def _set_output_attributes(span, template, result):
+    """
+    Set LLM output attributes based on given information to the given span.
+
+    :param span: The span to set attributes on.
+    :param template: The template to use to set attributes on the span.
+    :param result: The result of the LLM call.
+    """
     pass
 
 
@@ -1403,19 +1423,17 @@ def new_trace(func=None, *, as_type="span", name=None):
         async def async_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
             op = kw.get("op", OP.FUNCTION)
-            span_name = kw.get("name", f.__name__)
+            span_name = kw.get("name", qualname_from_function(f))
             attributes = kw.get("attributes", {})
 
             with sentry_sdk.start_span(
                 op=op,
                 name=span_name,
             ) as span:
-                set_span_attributes(span, attributes)
-                set_input_attributes(span, as_type, args, kwargs)
-
+                _set_span_attributes(span, attributes)
+                _set_input_attributes(span, as_type, args, kwargs)
                 result = await f(*args, **kwargs)
-
-                set_output_attributes(span, as_type, result)
+                _set_output_attributes(span, as_type, result)
 
                 return result
 
@@ -1423,19 +1441,17 @@ def new_trace(func=None, *, as_type="span", name=None):
         def sync_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
             op = kw.get("op", OP.FUNCTION)
-            span_name = kw.get("name", f.__name__)
+            span_name = kw.get("name", qualname_from_function(f))
             attributes = kw.get("attributes", {})
 
             with sentry_sdk.start_span(
                 op=op,
                 name=span_name,
             ) as span:
-                set_span_attributes(span, attributes)
-                set_input_attributes(span, as_type, args, kwargs)
-
+                _set_span_attributes(span, attributes)
+                _set_input_attributes(span, as_type, args, kwargs)
                 result = f(*args, **kwargs)
-
-                set_output_attributes(span, as_type, result)
+                _set_output_attributes(span, as_type, result)
 
                 return result
 
@@ -1461,34 +1477,35 @@ def new_trace(func=None, *, as_type="span", name=None):
 
     def ai_agent_decorator(f):
         # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
-        span_name = name or f.__name__
+        agent_name = name or qualname_from_function(f)
         attributes = {
-            "gen_ai.agent.name": span_name,
             "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.agent.name": agent_name,
         }
 
         return span_decorator(
             f,
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {span_name}",
+            name=f"invoke_agent {agent_name}",
             attributes=attributes,
         )
 
     def ai_tool_decorator(f):
         # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
-        span_name = name or f.__name__
+        tool_name = name or qualname_from_function(f)
         attributes = {
-            "gen_ai.tool.name": span_name,
             "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": tool_name,
         }
 
         return span_decorator(
             f,
             op=OP.GEN_AI_EXECUTE_TOOL,
-            name=f"execute_tool {span_name}",
+            name=f"execute_tool {tool_name}",
             attributes=attributes,
         )
 
+    # Select a type based decorator (with default fallback to span_decorator)
     decorator_for_type = {
         "ai_chat": ai_chat_decorator,
         "ai_agent": ai_agent_decorator,
