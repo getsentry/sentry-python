@@ -48,6 +48,7 @@ __all__ = [
     "capture_exception",
     "capture_message",
     "continue_trace",
+    "new_trace",
     "flush",
     "get_baggage",
     "get_client",
@@ -313,6 +314,15 @@ def continue_trace(environ_or_headers: dict[str, Any]) -> Generator[None, None, 
     Sets the propagation context from environment or headers to continue an incoming trace.
     """
     with get_isolation_scope().continue_trace(environ_or_headers):
+        yield
+
+
+@contextmanager
+def new_trace() -> Generator[None, None, None]:
+    """
+    Force creation of a new trace.
+    """
+    with get_isolation_scope().new_trace():
         yield
 
 
