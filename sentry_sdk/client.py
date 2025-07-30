@@ -37,7 +37,7 @@ from sentry_sdk.consts import (
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
-from sentry_sdk.logger import has_logs_enabled
+from sentry_sdk.logger import has_logs_enabled, get_before_send_log
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -955,7 +955,7 @@ class _Client(BaseClient):
                 f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
             )
 
-        before_send_log = self.options["_experiments"].get("before_send_log")
+        before_send_log = get_before_send_log(self.options)
         if before_send_log is not None:
             log = before_send_log(log, {})
         if log is None:

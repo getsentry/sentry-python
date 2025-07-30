@@ -799,6 +799,7 @@ class ClientConstructor:
         add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
         max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
         enable_logs=False,  # type: bool
+        before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.

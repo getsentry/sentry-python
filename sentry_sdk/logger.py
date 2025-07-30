@@ -1,10 +1,11 @@
 # NOTE: this is the logger sentry exposes to users, not some generic logger.
 import functools
 import time
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from sentry_sdk import get_client
 from sentry_sdk.utils import safe_repr
+from sentry_sdk.types import Log, Hint
 
 OTEL_RANGES = [
     # ((severity level range), severity text)
@@ -91,4 +92,14 @@ def has_logs_enabled(options):
     return bool(
         options.get("enable_logs", False)
         or options["_experiments"].get("enable_logs", False)
+    )
+
+
+def get_before_send_log(options):
+    # type: (Optional[dict[str, Any]]) -> Optional[Callable[[Log, Hint], Optional[Log]]]
+    if options is None:
+        return None
+
+    return options.get("before_send_log") or options["_experiments"].get(
+        "before_send_log"
     )
