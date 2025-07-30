@@ -30,7 +30,7 @@ def _normalize_data(data):
 def set_data_normalized(span, key, value):
     # type: (Span, str, Any) -> None
     normalized = _normalize_data(value)
-    if type(normalized) in (list, dict, tuple):
+    if isinstance(normalized, (list, dict, tuple)):
         # only primitive types allowed
         span.set_data(key, str(normalized))
     else:
