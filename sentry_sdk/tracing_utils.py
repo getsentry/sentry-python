@@ -899,12 +899,14 @@ def _sample_rand_range(parent_sampled, sample_rate):
 
 def _get_span_name(template, name):
     span_name = name
+
     if template == "ai_chat":
         span_name = "chat [MODEL]"
     elif template == "ai_agent":
         span_name = f"invoke_agent {name}"
     elif template == "ai_tool":
         span_name = f"execute_tool {name}"
+
     return span_name
 
 
@@ -973,6 +975,8 @@ def _set_output_attributes(span, template, result):
     :param result: The result of the wrapped function.
     """
     attributes = {}
+
+    # TODO: Implement :)
 
     _set_span_attributes(span, attributes)
 
