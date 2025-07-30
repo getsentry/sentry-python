@@ -494,7 +494,8 @@ def update_current_span(op=None, name=None, attributes=None):
         current_span.op = op
 
     if name is not None:
-        current_span.name = name
+        # internally it is still description
+        current_span.description = name
 
     if attributes is not None:
         for key, value in attributes.items():

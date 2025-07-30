@@ -279,6 +279,7 @@ class Span:
         "_local_aggregator",
         "scope",
         "origin",
+        "name",
         "_flags",
         "_flags_capacity",
     )
@@ -348,16 +349,6 @@ class Span:
 
         self.update_active_thread()
         self.set_profiler_id(get_profiler_id())
-
-    @property
-    def name(self):
-        # type: () -> Optional[str]
-        return self.description
-
-    @name.setter
-    def name(self, value):
-        # type: (str) -> None
-        self.description = value
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
