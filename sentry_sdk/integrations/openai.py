@@ -104,11 +104,11 @@ def _calculate_token_usage(
     streaming_message_responses: Optional[List[str]],
     count_tokens: Callable[..., Any],
 ) -> None:
-    input_tokens: Optional[int] = 0  # type: Optional[int]
-    input_tokens_cached: Optional[int] = 0  # type: Optional[int]
-    output_tokens: Optional[int] = 0  # type: Optional[int]
-    output_tokens_reasoning: Optional[int] = 0  # type: Optional[int]
-    total_tokens: Optional[int] = 0  # type: Optional[int]
+    input_tokens: Optional[int] = 0
+    input_tokens_cached: Optional[int] = 0
+    output_tokens: Optional[int] = 0
+    output_tokens_reasoning: Optional[int] = 0
+    total_tokens: Optional[int] = 0
 
     if hasattr(response, "usage"):
         input_tokens = _get_usage(response.usage, ["input_tokens", "prompt_tokens"])
