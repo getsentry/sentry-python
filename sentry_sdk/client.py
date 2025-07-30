@@ -901,10 +901,10 @@ class _Client(BaseClient):
         return return_value
 
     def _capture_experimental_log(self, log):
-        # type: (Log) -> None
+        # type: (Optional[Log]) -> None
         from sentry_sdk.logger import get_before_send_log, has_logs_enabled
 
-        if not has_logs_enabled(self.options):
+        if not has_logs_enabled(self.options) or log is None:
             return
 
         current_scope = sentry_sdk.get_current_scope()
@@ -962,6 +962,7 @@ class _Client(BaseClient):
         before_send_log = get_before_send_log(self.options)
         if before_send_log is not None:
             log = before_send_log(log, {})
+
         if log is None:
             return
 
