@@ -890,6 +890,8 @@ def _set_input_attributes(span, template, args, kwargs):
     """
     attributes = {}  # type: dict[str, Any]
 
+    # TODO: Implement actual input parameters for those templates :)
+
     if template == "ai_agent":
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
