@@ -944,7 +944,9 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
         @functools.wraps(f)
         async def async_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            if get_current_span() is None:
+            current_span = get_current_span()
+
+            if current_span is None:
                 logger.debug(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
@@ -952,7 +954,11 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 )
                 return await f(*args, **kwargs)
 
-            with sentry_sdk.start_span(
+            start_span_func = (
+                current_span.start_child if current_span else sentry_sdk.start_span
+            )
+
+            with start_span_func(
                 op=_get_span_op(template),
                 name=_get_span_name(template, name or qualname_from_function(f)),
             ) as span:
@@ -973,7 +979,9 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
         @functools.wraps(f)
         def sync_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            if get_current_span() is None:
+            current_span = get_current_span()
+
+            if current_span is None:
                 logger.debug(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
@@ -981,7 +989,11 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 )
                 return f(*args, **kwargs)
 
-            with sentry_sdk.start_span(
+            start_span_func = (
+                current_span.start_child if current_span else sentry_sdk.start_span
+            )
+
+            with start_span_func(
                 op=_get_span_op(template),
                 name=_get_span_name(template, name or qualname_from_function(f)),
             ) as span:
