@@ -6,7 +6,7 @@ from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.tracing import NoOpSpan, Transaction, trace, new_trace
+from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
 
 from typing import TYPE_CHECKING
@@ -81,7 +81,6 @@ __all__ = [
     "start_span",
     "start_transaction",
     "trace",
-    "new_trace",
     "monitor",
     "start_session",
     "end_session",
