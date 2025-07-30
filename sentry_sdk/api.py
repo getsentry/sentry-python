@@ -487,6 +487,9 @@ def update_current_span(op=None, name=None, attributes=None):
     """
     current_span = get_current_span()
 
+    if current_span is None:
+        return
+
     if op is not None:
         current_span.op = op
 
