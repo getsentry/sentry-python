@@ -191,7 +191,7 @@ class BackgroundWorker(Worker):
 
 class AsyncWorker(Worker):
     def __init__(self, queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
-        self._queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=queue_size)
+        self._queue: Optional[asyncio.Queue[Any]] = None
         self._queue_size = queue_size
         self._task: Optional[asyncio.Task[None]] = None
         # Event loop needs to remain in the same process
@@ -210,10 +210,11 @@ class AsyncWorker(Worker):
 
     def kill(self) -> None:
         if self._task:
-            try:
-                self._queue.put_nowait(_TERMINATOR)
-            except asyncio.QueueFull:
-                logger.debug("async worker queue full, kill failed")
+            if self._queue is not None:
+                try:
+                    self._queue.put_nowait(_TERMINATOR)
+                except asyncio.QueueFull:
+                    logger.debug("async worker queue full, kill failed")
             # Also cancel any active callback tasks
             # Avoid modifying the set while cancelling tasks
             tasks_to_cancel = set(self._active_tasks)
@@ -240,6 +241,8 @@ class AsyncWorker(Worker):
                 self._task_for_pid = None
 
     def full(self) -> bool:
+        if self._queue is None:
+            return True
         return self._queue.full()
 
     def _ensure_task(self) -> None:
@@ -247,7 +250,7 @@ class AsyncWorker(Worker):
             self.start()
 
     async def _wait_flush(self, timeout: float, callback: Optional[Any] = None) -> None:
-        if not self._loop or not self._loop.is_running():
+        if not self._loop or not self._loop.is_running() or self._queue is None:
             return
 
         initial_timeout = min(0.1, timeout)
@@ -276,7 +279,8 @@ class AsyncWorker(Worker):
 
     def submit(self, callback: Callable[[], Any]) -> bool:
         self._ensure_task()
-
+        if self._queue is None:
+            return False
         try:
             self._queue.put_nowait(callback)
             return True
@@ -284,6 +288,8 @@ class AsyncWorker(Worker):
             return False
 
     async def _target(self) -> None:
+        if self._queue is None:
+            return
         while True:
             callback = await self._queue.get()
             if callback is _TERMINATOR:
@@ -310,5 +316,6 @@ class AsyncWorker(Worker):
         finally:
             # Mark the task as done and remove it from the active tasks set
             # This happens only after the task has completed
-            self._queue.task_done()
+            if self._queue is not None:
+                self._queue.task_done()
             self._active_tasks.discard(task)
