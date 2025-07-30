@@ -23,10 +23,14 @@ def _normalize_data(data):
         return list(_normalize_data(x) for x in data)
     if isinstance(data, dict):
         return {k: _normalize_data(v) for (k, v) in data.items()}
+
     return data
 
 
 def set_data_normalized(span, key, value):
     # type: (Span, str, Any) -> None
     normalized = _normalize_data(value)
-    span.set_data(key, normalized)
+    if isinstance(normalized, (int, float, bool, str)):
+        span.set_data(key, normalized)
+    else:
+        span.set_data(key, str(normalized))
