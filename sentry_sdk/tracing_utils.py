@@ -7,7 +7,6 @@ import sys
 from collections.abc import Mapping
 from datetime import timedelta
 from decimal import ROUND_DOWN, Decimal, DefaultContext, localcontext
-from functools import wraps
 from random import Random
 from urllib.parse import quote, unquote
 import uuid
@@ -769,72 +768,6 @@ def normalize_incoming_data(incoming_data):
         data[key] = value
 
     return data
-
-
-def start_child_span_decorator(func):
-    # type: (Any) -> Any
-    """
-    Decorator to add child spans for functions.
-
-    See also ``sentry_sdk.tracing.trace()``.
-    """
-    # Asynchronous case
-    if inspect.iscoroutinefunction(func):
-
-        @wraps(func)
-        async def func_with_tracing(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-
-            span = get_current_span()
-
-            if span is None:
-                logger.debug(
-                    "Cannot create a child span for %s. "
-                    "Please start a Sentry transaction before calling this function.",
-                    qualname_from_function(func),
-                )
-                return await func(*args, **kwargs)
-
-            with span.start_child(
-                op=OP.FUNCTION,
-                name=qualname_from_function(func),
-            ):
-                return await func(*args, **kwargs)
-
-        try:
-            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-    # Synchronous case
-    else:
-
-        @wraps(func)
-        def func_with_tracing(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-
-            span = get_current_span()
-
-            if span is None:
-                logger.debug(
-                    "Cannot create a child span for %s. "
-                    "Please start a Sentry transaction before calling this function.",
-                    qualname_from_function(func),
-                )
-                return func(*args, **kwargs)
-
-            with span.start_child(
-                op=OP.FUNCTION,
-                name=qualname_from_function(func),
-            ):
-                return func(*args, **kwargs)
-
-        try:
-            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-    return func_with_tracing
 
 
 def get_current_span(scope=None):

@@ -1352,36 +1352,7 @@ if TYPE_CHECKING:
         pass
 
 
-def trace(func=None):
-    # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
-    """
-    Decorator to start a child span under the existing current transaction.
-    If there is no current transaction, then nothing will be traced.
-
-    .. code-block::
-        :caption: Usage
-
-        import sentry_sdk
-
-        @sentry_sdk.trace
-        def my_function():
-            ...
-
-        @sentry_sdk.trace
-        async def my_async_function():
-            ...
-    """
-    from sentry_sdk.tracing_utils import start_child_span_decorator
-
-    # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
-    # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278
-    if func:
-        return start_child_span_decorator(func)
-    else:
-        return start_child_span_decorator
-
-
-def new_trace(func=None, *, as_type="span", name=None, attributes=None):
+def trace(func=None, *, as_type="span", name=None, attributes=None):
     # type: (Optional[Callable[P, R]], str, Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span.
