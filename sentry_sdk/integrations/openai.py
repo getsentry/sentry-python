@@ -532,7 +532,7 @@ def _wrap_embeddings_create(f: Any) -> Any:
 
 
 def _wrap_async_embeddings_create(f: Any) -> Any:
-    async def _execute_async(f: Any, *args: Any, **kwargs: Any):
+    async def _execute_async(f: Any, *args: Any, **kwargs: Any) -> Any:
         gen = _new_embeddings_create_common(f, *args, **kwargs)
 
         try:
@@ -618,7 +618,7 @@ def _wrap_responses_create(f: Any) -> Any:
 
 
 def _wrap_async_responses_create(f: Any) -> Any:
-    async def _execute_async(f: Any, *args: Any, **kwargs: Any):
+    async def _execute_async(f: Any, *args: Any, **kwargs: Any) -> Any:
         gen = _new_responses_create_common(f, *args, **kwargs)
 
         try:
