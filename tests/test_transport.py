@@ -641,3 +641,79 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
         "reason": "test",
         "quantity": span_count + 1,
     } in discarded_events
+
+
+def test_handle_unexpected_status_invokes_handle_request_error(
+    make_client, monkeypatch
+):
+    client = make_client()
+    transport = client.transport
+
+    monkeypatch.setattr(transport._worker, "submit", lambda fn: fn() or True)
+
+    def stub_request(method, endpoint, body=None, headers=None):
+        class MockResponse:
+            def __init__(self):
+                self.status = 500  # Integer
+                self.data = b"server error"
+                self.headers = {}
+
+            def close(self):
+                pass
+
+        return MockResponse()
+
+    monkeypatch.setattr(transport, "_request", stub_request)
+
+    seen = []
+    monkeypatch.setattr(
+        transport,
+        "_handle_request_error",
+        lambda envelope, loss_reason: seen.append(loss_reason),
+    )
+
+    client.capture_event({"message": "test"})
+    client.flush()
+
+    assert seen == ["status_500"]
+
+
+def test_handle_request_error_basic_coverage(make_client, monkeypatch):
+    client = make_client()
+    transport = client.transport
+
+    monkeypatch.setattr(transport._worker, "submit", lambda fn: fn() or True)
+
+    # Track method calls
+    calls = []
+
+    def mock_on_dropped_event(reason):
+        calls.append(("on_dropped_event", reason))
+
+    def mock_record_lost_event(reason, data_category=None, item=None):
+        calls.append(("record_lost_event", reason, data_category, item))
+
+    monkeypatch.setattr(transport, "on_dropped_event", mock_on_dropped_event)
+    monkeypatch.setattr(transport, "record_lost_event", mock_record_lost_event)
+
+    # Test case 1: envelope is None
+    transport._handle_request_error(envelope=None, loss_reason="test_reason")
+
+    assert len(calls) == 2
+    assert calls[0] == ("on_dropped_event", "test_reason")
+    assert calls[1] == ("record_lost_event", "network_error", "error", None)
+
+    # Reset
+    calls.clear()
+
+    # Test case 2: envelope with items
+    envelope = Envelope()
+    envelope.add_item(mock.MagicMock())  # Simple mock item
+    envelope.add_item(mock.MagicMock())  # Another mock item
+
+    transport._handle_request_error(envelope=envelope, loss_reason="connection_error")
+
+    assert len(calls) == 3
+    assert calls[0] == ("on_dropped_event", "connection_error")
+    assert calls[1][0:2] == ("record_lost_event", "network_error")
+    assert calls[2][0:2] == ("record_lost_event", "network_error")
