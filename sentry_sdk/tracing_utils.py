@@ -895,7 +895,7 @@ def _set_input_attributes(span, template, args, kwargs):
     if template == "ai_agent":
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            SPANDATA.GEN_AI_AGENT_NAME: span.name,
+            SPANDATA.GEN_AI_AGENT_NAME: span.description,
         }
     elif template == "ai_chat":
         attributes = {
@@ -904,7 +904,7 @@ def _set_input_attributes(span, template, args, kwargs):
     elif template == "ai_tool":
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
-            SPANDATA.GEN_AI_TOOL_NAME: span.name,
+            SPANDATA.GEN_AI_TOOL_NAME: span.description,
         }
 
     _set_span_attributes(span, attributes)
