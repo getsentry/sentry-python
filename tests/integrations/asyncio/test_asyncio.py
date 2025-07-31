@@ -377,3 +377,52 @@ async def test_span_origin(
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.function.asyncio"
+
+
+@minimum_python_38
+def test_loop_close_patching(sentry_init):
+    sentry_init(integrations=[AsyncioIntegration()])
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        with patch("asyncio.get_running_loop", return_value=loop):
+            assert not hasattr(loop, "_sentry_flush_patched")
+            AsyncioIntegration.setup_once()
+            assert hasattr(loop, "_sentry_flush_patched")
+            assert loop._sentry_flush_patched is True
+
+    finally:
+        if not loop.is_closed():
+            loop.close()
+
+
+@minimum_python_38
+def test_loop_close_flushes_async_transport(sentry_init):
+    from sentry_sdk.transport import AsyncHttpTransport
+    from unittest.mock import Mock, AsyncMock
+
+    sentry_init(integrations=[AsyncioIntegration()])
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        with patch("asyncio.get_running_loop", return_value=loop):
+            AsyncioIntegration.setup_once()
+
+        mock_client = Mock()
+        mock_transport = Mock(spec=AsyncHttpTransport)
+        mock_client.transport = mock_transport
+        mock_client.close = AsyncMock(return_value=None)
+
+        with patch("sentry_sdk.get_client", return_value=mock_client):
+            loop.close()
+
+        mock_client.close.assert_called_once()
+        mock_client.close.assert_awaited_once()
+
+    except Exception:
+        if not loop.is_closed():
+            loop.close()

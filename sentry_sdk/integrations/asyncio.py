@@ -30,6 +30,47 @@ def get_name(coro: Any) -> str:
     )
 
 
+def patch_loop_close() -> None:
+    """Patch loop.close to flush pending events before shutdown."""
+    # Atexit shutdown hook happens after the event loop is closed.
+    # Therefore, it is necessary to patch the loop.close method to ensure
+    # that pending events are flushed before the interpreter shuts down.
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop → cannot patch now
+        return
+
+    if getattr(loop, "_sentry_flush_patched", False):
+        return
+
+    async def _flush() -> None:
+        client = sentry_sdk.get_client()
+        if not client:
+            return
+
+        try:
+            if not isinstance(client.transport, AsyncHttpTransport):
+                return
+
+            task = client.close()  # type: ignore
+            if task is not None:
+                await task
+        except Exception:
+            logger.warning("Sentry flush failed during loop shutdown", exc_info=True)
+
+    orig_close = loop.close
+
+    def _patched_close() -> None:
+        try:
+            loop.run_until_complete(_flush())
+        finally:
+            orig_close()
+
+    loop.close = _patched_close  # type: ignore
+    loop._sentry_flush_patched = True  # type: ignore
+
+
 def patch_asyncio() -> None:
     orig_task_factory = None
     try:
@@ -125,46 +166,4 @@ class AsyncioIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         patch_asyncio()
-
-        def _patch_loop_close() -> None:
-            # Atexit shutdown hook happens after the event loop is closed.
-            # Therefore, it is necessary to patch the loop.close method to ensure
-            # that pending events are flushed before the interpreter shuts down.
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                # No running loop → cannot patch now
-                return
-
-            if getattr(loop, "_sentry_flush_patched", False):
-                return
-
-            async def _flush() -> None:
-                client = sentry_sdk.get_client()
-                if not client:
-                    return
-                try:
-
-                    if not isinstance(client.transport, AsyncHttpTransport):
-                        return
-
-                    t = client.close()  # type: ignore
-                    if t is not None:
-                        await t
-                except Exception:
-                    logger.warning(
-                        "Sentry flush failed during loop shutdown", exc_info=True
-                    )
-
-            orig_close = loop.close
-
-            def _patched_close() -> None:
-                try:
-                    loop.run_until_complete(_flush())
-                finally:
-                    orig_close()
-
-            loop.close = _patched_close  # type: ignore
-            loop._sentry_flush_patched = True  # type: ignore
-
-        _patch_loop_close()
+        patch_loop_close()
