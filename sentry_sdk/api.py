@@ -4,7 +4,11 @@ from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
-from sentry_sdk.consts import INSTRUMENTER
+from sentry_sdk.consts import (  # noqa: N811
+    INSTRUMENTER,
+    SpanTemplate,
+    SPANDATA as SpanAttr,
+)
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
@@ -86,6 +90,8 @@ __all__ = [
     "end_session",
     "set_transaction_name",
     "update_current_span",
+    "SpanTemplate",
+    "SpanAttr",
 ]
 
 

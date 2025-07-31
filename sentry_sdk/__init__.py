@@ -51,6 +51,8 @@ __all__ = [  # noqa
     "end_session",
     "set_transaction_name",
     "update_current_span",
+    "SpanTemplate",
+    "SpanAttr",
 ]
 
 # Initialize the debug support after everything is loaded
