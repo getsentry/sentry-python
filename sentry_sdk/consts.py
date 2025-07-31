@@ -17,7 +17,10 @@ if TYPE_CHECKING:
     )
 
 # up top to prevent circular import due to integration import
-DEFAULT_MAX_VALUE_LENGTH = 1024
+# This is more or less an arbitrary large-ish value for now, so that we allow
+# pretty long strings (like LLM prompts), but still have *some* upper limit
+# until we verify that removing the trimming completely is safe.
+DEFAULT_MAX_VALUE_LENGTH = 100_000
 
 DEFAULT_MAX_STACK_FRAMES = 100
 DEFAULT_ADD_FULL_STACK = False
@@ -168,6 +171,7 @@ class SPANDATA:
     AI_PIPELINE_NAME = "ai.pipeline.name"
     """
     Name of the AI pipeline or chain being executed.
+    DEPRECATED: Use GEN_AI_PIPELINE_NAME instead.
     Example: "qa-pipeline"
     """
 
@@ -234,6 +238,7 @@ class SPANDATA:
     AI_STREAMING = "ai.streaming"
     """
     Whether or not the AI model call's response was streamed back asynchronously
+    DEPRECATED: Use GEN_AI_RESPONSE_STREAMING instead.
     Example: true
     """
 
@@ -383,6 +388,24 @@ class SPANDATA:
     Example: "chat"
     """
 
+    GEN_AI_PIPELINE_NAME = "gen_ai.pipeline.name"
+    """
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
+    """
+
+    GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
+    """
+    Exact model identifier used to generate the response
+    Example: gpt-4o-mini-2024-07-18
+    """
+
+    GEN_AI_RESPONSE_STREAMING = "gen_ai.response.streaming"
+    """
+    Whether or not the AI model call's response was streamed back asynchronously
+    Example: true
+    """
+
     GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
     """
     The model's response text messages.
@@ -422,7 +445,7 @@ class SPANDATA:
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
     """
     The model identifier being used for the request.
-    Example: "gpt-4-turbo-preview"
+    Example: "gpt-4-turbo"
     """
 
     GEN_AI_REQUEST_PRESENCE_PENALTY = "gen_ai.request.presence_penalty"
@@ -660,9 +683,11 @@ class OP:
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
     GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
     GEN_AI_HANDOFF = "gen_ai.handoff"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
+    GEN_AI_RESPONSES = "gen_ai.responses"
     GRAPHQL_EXECUTE = "graphql.execute"
     GRAPHQL_MUTATION = "graphql.mutation"
     GRAPHQL_PARSE = "graphql.parse"
@@ -687,8 +712,6 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
-    OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
-    OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
@@ -832,6 +855,8 @@ class ClientConstructor:
         custom_repr: Optional[Callable[..., Optional[str]]] = None,
         add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
         max_stack_frames: Optional[int] = DEFAULT_MAX_STACK_FRAMES,
+        enable_logs: bool = False,
+        before_send_log: Optional[Callable[[Log, Hint], Optional[Log]]] = None,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
@@ -1217,6 +1242,14 @@ class ClientConstructor:
         :param spotlight:
 
         :param instrumenter:
+
+        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
+            Sentry logs. Defaults to False.
+
+        :param before_send_log: An optional function to modify or filter out logs
+            before they're sent to Sentry. Any modifications to the log in this
+            function will be retained. If the function returns None, the log will
+            not be sent to Sentry.
 
         :param _experiments:
         """

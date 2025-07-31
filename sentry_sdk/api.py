@@ -48,6 +48,7 @@ __all__ = [
     "capture_exception",
     "capture_message",
     "continue_trace",
+    "new_trace",
     "flush",
     "get_baggage",
     "get_client",
@@ -74,6 +75,7 @@ __all__ = [
     "use_isolation_scope",
     "start_session",
     "end_session",
+    "set_transaction_name",
 ]
 
 
@@ -315,6 +317,15 @@ def continue_trace(environ_or_headers: dict[str, Any]) -> Generator[None, None, 
         yield
 
 
+@contextmanager
+def new_trace() -> Generator[None, None, None]:
+    """
+    Force creation of a new trace.
+    """
+    with get_isolation_scope().new_trace():
+        yield
+
+
 @scopemethod
 def start_session(
     session_mode: str = "application",
@@ -325,3 +336,9 @@ def start_session(
 @scopemethod
 def end_session() -> None:
     return get_isolation_scope().end_session()
+
+
+@scopemethod
+def set_transaction_name(name, source=None):
+    # type: (str, Optional[str]) -> None
+    return get_current_scope().set_transaction_name(name, source)
