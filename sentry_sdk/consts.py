@@ -812,7 +812,7 @@ class ClientConstructor:
         http_proxy: Optional[str] = None,
         https_proxy: Optional[str] = None,
         ignore_errors: Sequence[Union[type, str]] = [],  # noqa: B006
-        max_request_body_size: str = "medium",
+        max_request_body_size: str = "always",
         socket_options: Optional[List[Tuple[int, int, int | bytes]]] = None,
         keep_alive: Optional[bool] = None,
         before_send: Optional[EventProcessor] = None,

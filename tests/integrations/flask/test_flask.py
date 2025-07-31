@@ -29,7 +29,6 @@ from sentry_sdk import (
 )
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
 login_manager = LoginManager()
@@ -249,9 +248,7 @@ def test_flask_login_configured(
 
 
 def test_flask_large_json_request(sentry_init, capture_events, app):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
-    )
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
 
@@ -344,9 +341,7 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
 
 
 def test_flask_medium_formdata_request(sentry_init, capture_events, app):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
-    )
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {"foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}
 
@@ -452,9 +447,7 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
 
 
 def test_flask_files_and_form(sentry_init, capture_events, app):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
-    )
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {
         "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
@@ -497,13 +490,9 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
 def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, app
 ):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
-    )
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
+    data = {"key{}".format(i): "value{}".format(i) for i in range(10**5)}
 
     @app.route("/", methods=["POST"])
     def index():

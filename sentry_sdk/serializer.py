@@ -38,11 +38,6 @@ if TYPE_CHECKING:
 # Bytes are technically not strings in Python 3, but we can serialize them
 serializable_str_types = (str, bytes, bytearray, memoryview)
 
-
-# Maximum depth and breadth of databags. Excess data will be trimmed. If
-# max_request_body_size is "always", request bodies won't be trimmed.
-MAX_DATABAG_DEPTH = 5
-MAX_DATABAG_BREADTH = 10
 CYCLE_MARKER = "<cyclic>"
 
 
@@ -99,11 +94,9 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
     The algorithm itself is a recursive graph walk down the data structures it encounters.
 
     It has the following responsibilities:
-    * Trimming databags and keeping them within MAX_DATABAG_BREADTH and MAX_DATABAG_DEPTH.
     * Calling safe_repr() on objects appropriately to keep them informative and readable in the final payload.
     * Annotating the payload with the _meta field whenever trimming happens.
 
-    :param max_request_body_size: If set to "always", will never trim request bodies.
     :param max_value_length: The max length to strip strings to, defaults to sentry_sdk.consts.DEFAULT_MAX_VALUE_LENGTH
     :param is_vars: If we're serializing vars early, we want to repr() things that are JSON-serializable to make their type more apparent. For example, it's useful to see the difference between a unicode-string and a bytestring when viewing a stacktrace.
     :param custom_repr: A custom repr function that runs before safe_repr on the object to be serialized. If it returns None or throws internally, we will fallback to safe_repr.
@@ -113,7 +106,6 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
     path: List[Segment] = []
     meta_stack: List[Dict[str, Any]] = []
 
-    keep_request_bodies: bool = kwargs.pop("max_request_body_size", None) == "always"
     max_value_length: Optional[int] = kwargs.pop("max_value_length", None)
     is_vars = kwargs.pop("is_vars", False)
     custom_repr: Callable[..., Optional[str]] = kwargs.pop("custom_repr", None)
@@ -179,11 +171,8 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
     def _serialize_node(
         obj: Any,
         is_databag: Optional[bool] = None,
-        is_request_body: Optional[bool] = None,
         should_repr_strings: Optional[bool] = None,
         segment: Optional[Segment] = None,
-        remaining_breadth: Optional[Union[int, float]] = None,
-        remaining_depth: Optional[Union[int, float]] = None,
     ) -> Any:
         if segment is not None:
             path.append(segment)
@@ -196,10 +185,7 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
                 return _serialize_node_impl(
                     obj,
                     is_databag=is_databag,
-                    is_request_body=is_request_body,
                     should_repr_strings=should_repr_strings,
-                    remaining_depth=remaining_depth,
-                    remaining_breadth=remaining_breadth,
                 )
         except BaseException:
             capture_internal_exception(sys.exc_info())
@@ -222,10 +208,7 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
     def _serialize_node_impl(
         obj: Any,
         is_databag: Optional[bool],
-        is_request_body: Optional[bool],
         should_repr_strings: Optional[bool],
-        remaining_depth: Optional[Union[float, int]],
-        remaining_breadth: Optional[Union[float, int]],
     ) -> Any:
         if isinstance(obj, AnnotatedValue):
             should_repr_strings = False
@@ -235,31 +218,10 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
         if is_databag is None:
             is_databag = _is_databag()
 
-        if is_request_body is None:
-            is_request_body = _is_request_body()
-
-        if is_databag:
-            if is_request_body and keep_request_bodies:
-                remaining_depth = float("inf")
-                remaining_breadth = float("inf")
-            else:
-                if remaining_depth is None:
-                    remaining_depth = MAX_DATABAG_DEPTH
-                if remaining_breadth is None:
-                    remaining_breadth = MAX_DATABAG_BREADTH
-
         obj = _flatten_annotated(obj)
 
-        if remaining_depth is not None and remaining_depth <= 0:
-            _annotate(rem=[["!limit", "x"]])
-            if is_databag:
-                return _flatten_annotated(
-                    strip_string(_safe_repr_wrapper(obj), max_length=max_value_length)
-                )
-            return None
-
         if is_databag and global_repr_processors:
-            hints = {"memo": memo, "remaining_depth": remaining_depth}
+            hints = {"memo": memo}
             for processor in global_repr_processors:
                 result = processor(obj, hints)
                 if result is not NotImplemented:
@@ -294,21 +256,12 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
             i = 0
 
             for k, v in obj.items():
-                if remaining_breadth is not None and i >= remaining_breadth:
-                    _annotate(len=len(obj))
-                    break
-
                 str_k = str(k)
                 v = _serialize_node(
                     v,
                     segment=str_k,
                     should_repr_strings=should_repr_strings,
                     is_databag=is_databag,
-                    is_request_body=is_request_body,
-                    remaining_depth=(
-                        remaining_depth - 1 if remaining_depth is not None else None
-                    ),
-                    remaining_breadth=remaining_breadth,
                 )
                 rv_dict[str_k] = v
                 i += 1
@@ -321,21 +274,12 @@ def serialize(event: Union[Dict[str, Any], Event], **kwargs: Any) -> Dict[str, A
             rv_list = []
 
             for i, v in enumerate(obj):
-                if remaining_breadth is not None and i >= remaining_breadth:
-                    _annotate(len=len(obj))
-                    break
-
                 rv_list.append(
                     _serialize_node(
                         v,
                         segment=i,
                         should_repr_strings=should_repr_strings,
                         is_databag=is_databag,
-                        is_request_body=is_request_body,
-                        remaining_depth=(
-                            remaining_depth - 1 if remaining_depth is not None else None
-                        ),
-                        remaining_breadth=remaining_breadth,
                     )
                 )
 

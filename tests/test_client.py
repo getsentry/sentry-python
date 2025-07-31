@@ -24,7 +24,6 @@ from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 from sentry_sdk.utils import capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
 
 from typing import TYPE_CHECKING
@@ -726,7 +725,7 @@ def test_databag_string_stripping(sentry_init, capture_events, benchmark):
         assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
 
 
-def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
+def test_databag_breadth_no_stripping(sentry_init, capture_events, benchmark):
     sentry_init()
     events = capture_events()
 
@@ -743,9 +742,8 @@ def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
 
         assert (
             len(event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"])
-            == MAX_DATABAG_BREADTH
+            == 1000000
         )
-        assert len(json.dumps(event)) < 10000
 
 
 def test_chained_exceptions(sentry_init, capture_events):

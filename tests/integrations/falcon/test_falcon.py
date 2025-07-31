@@ -208,7 +208,7 @@ def test_http_status(sentry_init, capture_exceptions, capture_events):
 
 
 def test_falcon_large_json_request(sentry_init, capture_events):
-    sentry_init(integrations=[FalconIntegration()], max_request_body_size="always")
+    sentry_init(integrations=[FalconIntegration()])
 
     data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
 

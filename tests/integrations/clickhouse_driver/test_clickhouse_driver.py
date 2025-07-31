@@ -677,7 +677,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
                 "server.address": "localhost",
                 "server.port": 9000,
                 "db.params": {"minv": 150},
-                "db.result": [[["370"]], [["'sum(x)'", "'Int64'"]]],
+                "db.result": [[[370]], [["sum(x)", "Int64"]]],
             },
             "message": "SELECT sum(x) FROM test WHERE x > 150",
             "type": "default",
