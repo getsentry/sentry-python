@@ -1,5 +1,12 @@
-import json
 import pytest
+
+from sentry_sdk.utils import package_version
+
+try:
+    from openai import NOT_GIVEN
+except ImportError:
+    NOT_GIVEN = None
+
 from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
@@ -44,6 +51,7 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
+OPENAI_VERSION = package_version("openai")
 EXAMPLE_CHAT_COMPLETION = ChatCompletion(
     id="chat-id",
     choices=[
@@ -144,11 +152,8 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
-        assert (
-            "the model response"
-            in json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])[0]["content"]
-        )
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -189,11 +194,8 @@ async def test_nonstreaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
-        assert (
-            "the model response"
-            in json.loads(span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])[0]["content"]
-        )
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -285,7 +287,7 @@ def test_streaming_chat_completion(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -381,7 +383,7 @@ async def test_streaming_chat_completion_async(
     assert span["op"] == "gen_ai.chat"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]["content"]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1394,3 +1396,34 @@ async def test_streaming_responses_api_async(
     assert span["data"]["gen_ai.usage.input_tokens"] == 20
     assert span["data"]["gen_ai.usage.output_tokens"] == 10
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the tools parameter.",
+)
+@pytest.mark.parametrize(
+    "tools",
+    [[], None, NOT_GIVEN],
+)
+def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "hello"}],
+            tools=tools,
+        )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    assert "gen_ai.request.available_tools" not in span["data"]
