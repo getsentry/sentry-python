@@ -20,6 +20,13 @@ for your feedback. How was the migration? Is everything working as expected? Is
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
 [on Discord](https://discord.com/invite/Ww9hbqr).
 
+## 2.34.1
+
+### Various fixes & improvements
+
+- Fix: Make sure Span data in AI instrumentations is always a primitive data type (#4643) by @antonpirker
+- Fix: Typo in CHANGELOG.md (#4640) by @jgillard
+
 ## 2.34.0
 
 ### Various fixes & improvements
