@@ -622,15 +622,14 @@ else:
 
         async def _send_envelope(self: Self, envelope: Envelope) -> None:
             _prepared_envelope = self._prepare_envelope(envelope)
-            if _prepared_envelope is None:
-                return None
-            envelope, body, headers = _prepared_envelope
-            await self._send_request(
-                body.getvalue(),
-                headers=headers,
-                endpoint_type=EndpointType.ENVELOPE,
-                envelope=envelope,
-            )
+            if _prepared_envelope is not None:
+                envelope, body, headers = _prepared_envelope
+                await self._send_request(
+                    body.getvalue(),
+                    headers=headers,
+                    endpoint_type=EndpointType.ENVELOPE,
+                    envelope=envelope,
+                )
             return None
 
         async def _send_request(
@@ -678,7 +677,7 @@ else:
                 },
             )
 
-        def _flush_client_reports(self: Self, force: bool = False) -> None:
+        async def _flush_client_reports(self: Self, force: bool = False) -> None:
             client_report = self._fetch_pending_client_report(force=force, interval=60)
             if client_report is not None:
                 self.capture_envelope(Envelope(items=[client_report]))
@@ -687,7 +686,7 @@ else:
             async def send_envelope_wrapper() -> None:
                 with capture_internal_exceptions():
                     await self._send_envelope(envelope)
-                    self._flush_client_reports()
+                    await self._flush_client_reports()
 
             if not self._worker.submit(send_envelope_wrapper):
                 self.on_dropped_event("full_queue")
@@ -713,9 +712,9 @@ else:
                 else:
                     # The event loop is no longer running
                     logger.warning("Async Transport is not running in an event loop.")
-                    self.on_dropped_event("no_async_context")
+                    self.on_dropped_event("internal_sdk_error")
                     for item in envelope.items:
-                        self.record_lost_event("no_async_context", item=item)
+                        self.record_lost_event("internal_sdk_error", item=item)
 
         def flush(  # type: ignore[override]
             self: Self,
