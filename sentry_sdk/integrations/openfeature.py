@@ -25,9 +25,8 @@ class OpenFeatureIntegration(Integration):
 
 
 class OpenFeatureHook(Hook):
-
     def after(self, hook_context, details, hints):
-        # type: (HookContext, FlagEvaluationDetails[bool], HookHints) -> None
+        # type: (HookContext, FlagEvaluationDetails, dict) -> None
         if isinstance(details.value, bool):
             add_feature_flag(details.flag_key, details.value)
 
