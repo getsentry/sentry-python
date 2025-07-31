@@ -22,6 +22,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `Span.finish()` no longer returns the `event_id` if the event is sent to Sentry.
 - We trim events to a much lesser extent in the SDK. Note that your events might still be subject to server-side trimming.
 - The default value of `max_request_body_size` was changed to `"always"`, so request bodies will now be included in events by default, regardless of size.
+- The `hint` parameter in custom repr processors no longer contains a `remaining_depth` key.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
 - A `Profile` object does not have a `.hub` property anymore.
 - `MAX_PROFILE_DURATION_NS`, `PROFILE_MINIMUM_SAMPLES`, `Profile`, `Scheduler`, `ThreadScheduler`, `GeventScheduler`, `has_profiling_enabled`, `setup_profiler`, `teardown_profiler` are no longer accessible from `sentry_sdk.profiler`. They're still accessible from `sentry_sdk.profiler.transaction_profiler`.
