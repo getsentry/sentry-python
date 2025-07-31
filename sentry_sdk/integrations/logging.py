@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     current_stacktrace,
     capture_internal_exceptions,
+    has_logs_enabled,
 )
 from sentry_sdk.integrations import Integration
 
@@ -344,7 +345,7 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not client.options["_experiments"].get("enable_logs", False):
+            if not has_logs_enabled(client.options):
                 return
 
             self._capture_log_from_record(client, record)

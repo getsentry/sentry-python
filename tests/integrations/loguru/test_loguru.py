@@ -141,7 +141,7 @@ def test_sentry_logs_warning(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     logger.warning("this is {} a {}", "just", "template")
@@ -165,7 +165,7 @@ def test_sentry_logs_debug(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     logger.debug("this is %s a template %s", "1", "2")
@@ -182,7 +182,7 @@ def test_sentry_log_levels(
 
     sentry_init(
         integrations=[LoguruIntegration(sentry_logs_level=LoggingLevels.SUCCESS)],
-        _experiments={"enable_logs": True},
+        enable_logs=True,
     )
     envelopes = capture_envelopes()
 
@@ -216,7 +216,7 @@ def test_disable_loguru_logs(
 
     sentry_init(
         integrations=[LoguruIntegration(sentry_logs_level=None)],
-        _experiments={"enable_logs": True},
+        enable_logs=True,
     )
     envelopes = capture_envelopes()
 
@@ -267,7 +267,7 @@ def test_no_log_infinite_loop(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        _experiments={"enable_logs": True},
+        enable_logs=True,
         integrations=[LoguruIntegration(sentry_logs_level=LoggingLevels.DEBUG)],
         debug=True,
     )
@@ -284,7 +284,7 @@ def test_logging_errors(sentry_init, capture_envelopes, uninstall_integration, r
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     logger.error(Exception("test exc 1"))
@@ -313,7 +313,7 @@ def test_log_strips_project_root(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        _experiments={"enable_logs": True},
+        enable_logs=True,
         project_root="/custom/test",
     )
     envelopes = capture_envelopes()
@@ -362,7 +362,7 @@ def test_log_keeps_full_path_if_not_in_project_root(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        _experiments={"enable_logs": True},
+        enable_logs=True,
         project_root="/custom/test",
     )
     envelopes = capture_envelopes()
@@ -410,7 +410,7 @@ def test_logger_with_all_attributes(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     logger.warning("log #{}", 1)
