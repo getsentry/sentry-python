@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 import os
 import threading
 import asyncio
-import inspect
 
 from time import sleep, time
 from sentry_sdk._queue import Queue, FullError
@@ -306,11 +305,7 @@ class AsyncWorker(Worker):
 
     async def _process_callback(self, callback: Callable[[], Any]) -> None:
         # Callback is an async coroutine, need to await it
-        if inspect.iscoroutinefunction(callback):
-            await callback()
-        else:
-            # Callback is a sync function, such as _flush_client_reports()
-            callback()
+        await callback()
 
     def _on_task_complete(self, task: asyncio.Task[None]) -> None:
         try:
