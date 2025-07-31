@@ -3,6 +3,7 @@ import contextlib
 import os
 import random
 import sys
+from typing import Any, Iterable, Optional, Container
 from unittest.mock import Mock
 
 import pytest
@@ -26,11 +27,6 @@ try:
 except ImportError:
     ReusableClient = None
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Container
-    from typing import Any, Optional
 
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
 PERFORMANCE_SUPPORTED = SANIC_VERSION >= (21, 9)
@@ -341,13 +337,13 @@ class TransactionTestConfig:
 
     def __init__(
         self,
-        integration_args,
-        url,
-        expected_status,
-        expected_transaction_name,
-        expected_source=None,
-    ):
-        # type: (Iterable[Optional[Container[int]]], str, int, Optional[str], Optional[str]) -> None
+        integration_args: Iterable[Optional[Container[int]]],
+        url: str,
+        expected_status: int,
+        expected_transaction_name: Optional[str],
+        expected_source: Optional[str] = None,
+        has_transaction_event: bool = True,
+    ) -> None:
         """
         expected_transaction_name of None indicates we expect to not receive a transaction
         """
@@ -356,6 +352,7 @@ class TransactionTestConfig:
         self.expected_status = expected_status
         self.expected_transaction_name = expected_transaction_name
         self.expected_source = expected_source
+        self.has_transaction_event = has_transaction_event
 
 
 @pytest.mark.skipif(
@@ -386,6 +383,7 @@ class TransactionTestConfig:
             url="/404",
             expected_status=404,
             expected_transaction_name=None,
+            has_transaction_event=False,
         ),
         TransactionTestConfig(
             # With no ignored HTTP statuses, we should get transactions for 404 errors
@@ -401,11 +399,13 @@ class TransactionTestConfig:
             url="/message",
             expected_status=200,
             expected_transaction_name=None,
+            has_transaction_event=False,
         ),
     ],
 )
-def test_transactions(test_config, sentry_init, app, capture_events):
-    # type: (TransactionTestConfig, Any, Any, Any) -> None
+def test_transactions(
+    test_config: TransactionTestConfig, sentry_init: Any, app: Any, capture_events: Any
+) -> None:
 
     # Init the SanicIntegration with the desired arguments
     sentry_init(
@@ -430,9 +430,7 @@ def test_transactions(test_config, sentry_init, app, capture_events):
     (transaction_event, *_) = [*transaction_events, None]
 
     # We should have no transaction event if and only if we expect no transactions
-    assert (transaction_event is None) == (
-        test_config.expected_transaction_name is None
-    )
+    assert bool(transaction_event) == test_config.has_transaction_event
 
     # If a transaction was expected, ensure it is correct
     assert (

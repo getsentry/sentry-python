@@ -1,6 +1,20 @@
+from __future__ import annotations
 import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import (
+        Optional,
+        Callable,
+        Union,
+        List,
+        Type,
+        Dict,
+        Any,
+        Sequence,
+        Tuple,
+    )
 
 # up top to prevent circular import due to integration import
 # This is more or less an arbitrary large-ish value for now, so that we allow
@@ -29,17 +43,6 @@ class CompressionAlgo(Enum):
 
 
 if TYPE_CHECKING:
-    import sentry_sdk
-
-    from typing import Optional
-    from typing import Callable
-    from typing import Union
-    from typing import List
-    from typing import Type
-    from typing import Dict
-    from typing import Any
-    from typing import Sequence
-    from typing import Tuple
     from typing_extensions import Literal
     from typing_extensions import TypedDict
 
@@ -50,13 +53,12 @@ if TYPE_CHECKING:
         EventProcessor,
         Hint,
         Log,
-        MeasurementUnit,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
-        MetricTags,
-        MetricValue,
     )
+
+    import sentry_sdk
 
     # Experiments are feature flags to enable and disable certain unstable SDK
     # functionality. Changing them from the defaults (`None`) in production
@@ -76,13 +78,6 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
-            "enable_metrics": Optional[bool],
-            "before_emit_metric": Optional[
-                Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
-            ],
-            "metric_code_locations": Optional[bool],
-            "enable_logs": Optional[bool],
-            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
         },
         total=False,
     )
@@ -100,11 +95,6 @@ FALSE_VALUES = [
 ]
 
 
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
-
-
 class SPANDATA:
     """
     Additional information describing the type of the span.
@@ -115,6 +105,12 @@ class SPANDATA:
     """
     References or sources cited by the AI model in its response.
     Example: ["Smith et al. 2020", "Jones 2019"]
+    """
+
+    AI_COMPLETION_TOKENS_USED = "ai.completion_tokens.used"
+    """
+    The number of output completion tokens used by the model.
+    Example: 10
     """
 
     AI_DOCUMENTS = "ai.documents"
@@ -187,6 +183,12 @@ class SPANDATA:
     """
     Used to reduce repetitiveness of generated tokens.
     Example: 0.5
+    """
+
+    AI_PROMPT_TOKENS_USED = "ai.prompt_tokens.used"
+    """
+    The number of input prompt tokens used by the model.
+    Example: 10
     """
 
     AI_RAW_PROMPTING = "ai.raw_prompting"
@@ -275,6 +277,12 @@ class SPANDATA:
     AI_TOOLS = "ai.tools"
     """
     For an AI model call, the functions that are available
+    """
+
+    AI_TOTAL_TOKENS_USED = "ai.total_tokens.used"
+    """
+    The total number of tokens (input + output) used by the request to the model.
+    Example: 20
     """
 
     AI_WARNINGS = "ai.warnings"
@@ -689,6 +697,8 @@ class OP:
     HTTP_CLIENT = "http.client"
     HTTP_CLIENT_STREAM = "http.client.stream"
     HTTP_SERVER = "http.server"
+    HTTP = "http"
+    MESSAGE = "message"
     MIDDLEWARE_DJANGO = "middleware.django"
     MIDDLEWARE_LITESTAR = "middleware.litestar"
     MIDDLEWARE_LITESTAR_RECEIVE = "middleware.litestar.receive"
@@ -718,6 +728,7 @@ class OP:
     QUEUE_TASK_HUEY = "queue.task.huey"
     QUEUE_SUBMIT_RAY = "queue.submit.ray"
     QUEUE_TASK_RAY = "queue.task.ray"
+    RPC = "rpc"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
@@ -729,79 +740,121 @@ class OP:
     SOCKET_DNS = "socket.dns"
 
 
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+
+DEFAULT_SPAN_ORIGIN = "manual"
+DEFAULT_SPAN_NAME = "<unlabeled span>"
+
+
+# Transaction source
+# see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
+class TransactionSource(str, Enum):
+    COMPONENT = "component"
+    CUSTOM = "custom"
+    ROUTE = "route"
+    TASK = "task"
+    URL = "url"
+    VIEW = "view"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# These are typically high cardinality and the server hates them
+LOW_QUALITY_TRANSACTION_SOURCES = [
+    TransactionSource.URL,
+]
+
+SOURCE_FOR_STYLE = {
+    "endpoint": TransactionSource.COMPONENT,
+    "function_name": TransactionSource.COMPONENT,
+    "handler_name": TransactionSource.COMPONENT,
+    "method_and_path_pattern": TransactionSource.ROUTE,
+    "path": TransactionSource.URL,
+    "route_name": TransactionSource.COMPONENT,
+    "route_pattern": TransactionSource.ROUTE,
+    "uri_template": TransactionSource.ROUTE,
+    "url": TransactionSource.ROUTE,
+}
+
+
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor:
 
     def __init__(
         self,
-        dsn=None,  # type: Optional[str]
+        dsn: Optional[str] = None,
         *,
-        max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
-        release=None,  # type: Optional[str]
-        environment=None,  # type: Optional[str]
-        server_name=None,  # type: Optional[str]
-        shutdown_timeout=2,  # type: float
-        integrations=[],  # type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006
-        in_app_include=[],  # type: List[str]  # noqa: B006
-        in_app_exclude=[],  # type: List[str]  # noqa: B006
-        default_integrations=True,  # type: bool
-        dist=None,  # type: Optional[str]
-        transport=None,  # type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]
-        transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
-        sample_rate=1.0,  # type: float
-        send_default_pii=None,  # type: Optional[bool]
-        http_proxy=None,  # type: Optional[str]
-        https_proxy=None,  # type: Optional[str]
-        ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
-        max_request_body_size="medium",  # type: str
-        socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
-        keep_alive=None,  # type: Optional[bool]
-        before_send=None,  # type: Optional[EventProcessor]
-        before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
-        debug=None,  # type: Optional[bool]
-        attach_stacktrace=False,  # type: bool
-        ca_certs=None,  # type: Optional[str]
-        propagate_traces=True,  # type: bool
-        traces_sample_rate=None,  # type: Optional[float]
-        traces_sampler=None,  # type: Optional[TracesSampler]
-        profiles_sample_rate=None,  # type: Optional[float]
-        profiles_sampler=None,  # type: Optional[TracesSampler]
-        profiler_mode=None,  # type: Optional[ProfilerMode]
-        profile_lifecycle="manual",  # type: Literal["manual", "trace"]
-        profile_session_sample_rate=None,  # type: Optional[float]
-        auto_enabling_integrations=True,  # type: bool
-        disabled_integrations=None,  # type: Optional[Sequence[sentry_sdk.integrations.Integration]]
-        auto_session_tracking=True,  # type: bool
-        send_client_reports=True,  # type: bool
-        _experiments={},  # type: Experiments  # noqa: B006
-        proxy_headers=None,  # type: Optional[Dict[str, str]]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
-        before_send_transaction=None,  # type: Optional[TransactionProcessor]
-        project_root=None,  # type: Optional[str]
-        enable_tracing=None,  # type: Optional[bool]
-        include_local_variables=True,  # type: Optional[bool]
-        include_source_context=True,  # type: Optional[bool]
-        trace_propagation_targets=[  # noqa: B006
-            MATCH_ALL
-        ],  # type: Optional[Sequence[str]]
-        functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
-        event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
-        max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
-        enable_backpressure_handling=True,  # type: bool
-        error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
-        enable_db_query_source=True,  # type: bool
-        db_query_source_threshold_ms=100,  # type: int
-        spotlight=None,  # type: Optional[Union[bool, str]]
-        cert_file=None,  # type: Optional[str]
-        key_file=None,  # type: Optional[str]
-        custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
-        add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
-        max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
-        enable_logs=False,  # type: bool
-        before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
-    ):
-        # type: (...) -> None
+        max_breadcrumbs: int = DEFAULT_MAX_BREADCRUMBS,
+        release: Optional[str] = None,
+        environment: Optional[str] = None,
+        server_name: Optional[str] = None,
+        shutdown_timeout: float = 2,
+        integrations: Sequence[sentry_sdk.integrations.Integration] = [],  # noqa: B006
+        in_app_include: List[str] = [],  # noqa: B006
+        in_app_exclude: List[str] = [],  # noqa: B006
+        default_integrations: bool = True,
+        dist: Optional[str] = None,
+        transport: Optional[
+            Union[
+                sentry_sdk.transport.Transport,
+                Type[sentry_sdk.transport.Transport],
+                Callable[[Event], None],
+            ]
+        ] = None,
+        transport_queue_size: int = DEFAULT_QUEUE_SIZE,
+        sample_rate: float = 1.0,
+        send_default_pii: Optional[bool] = None,
+        http_proxy: Optional[str] = None,
+        https_proxy: Optional[str] = None,
+        ignore_errors: Sequence[Union[type, str]] = [],  # noqa: B006
+        max_request_body_size: str = "medium",
+        socket_options: Optional[List[Tuple[int, int, int | bytes]]] = None,
+        keep_alive: Optional[bool] = None,
+        before_send: Optional[EventProcessor] = None,
+        before_breadcrumb: Optional[BreadcrumbProcessor] = None,
+        debug: Optional[bool] = None,
+        attach_stacktrace: bool = False,
+        ca_certs: Optional[str] = None,
+        traces_sample_rate: Optional[float] = None,
+        traces_sampler: Optional[TracesSampler] = None,
+        profiles_sample_rate: Optional[float] = None,
+        profiles_sampler: Optional[TracesSampler] = None,
+        profiler_mode: Optional[ProfilerMode] = None,
+        profile_lifecycle: Literal["manual", "trace"] = "manual",
+        profile_session_sample_rate: Optional[float] = None,
+        auto_enabling_integrations: bool = True,
+        disabled_integrations: Optional[
+            Sequence[sentry_sdk.integrations.Integration]
+        ] = None,
+        auto_session_tracking: bool = True,
+        send_client_reports: bool = True,
+        _experiments: Experiments = {},  # noqa: B006
+        proxy_headers: Optional[Dict[str, str]] = None,
+        before_send_transaction: Optional[TransactionProcessor] = None,
+        project_root: Optional[str] = None,
+        include_local_variables: Optional[bool] = True,
+        include_source_context: Optional[bool] = True,
+        trace_propagation_targets: Optional[Sequence[str]] = [MATCH_ALL],  # noqa: B006
+        exclude_span_origins: Optional[Sequence[str]] = None,
+        functions_to_trace: Sequence[Dict[str, str]] = [],  # noqa: B006
+        event_scrubber: Optional[sentry_sdk.scrubber.EventScrubber] = None,
+        max_value_length: int = DEFAULT_MAX_VALUE_LENGTH,
+        enable_backpressure_handling: bool = True,
+        error_sampler: Optional[Callable[[Event, Hint], Union[float, bool]]] = None,
+        enable_db_query_source: bool = True,
+        db_query_source_threshold_ms: int = 100,
+        spotlight: Optional[Union[bool, str]] = None,
+        cert_file: Optional[str] = None,
+        key_file: Optional[str] = None,
+        custom_repr: Optional[Callable[..., Optional[str]]] = None,
+        add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
+        max_stack_frames: Optional[int] = DEFAULT_MAX_STACK_FRAMES,
+        enable_logs: bool = False,
+        before_send_log: Optional[Callable[[Log, Hint], Optional[Log]]] = None,
+    ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
         :param dsn: The DSN tells the SDK where to send the events.
@@ -1118,6 +1171,17 @@ class ClientConstructor:
             If `trace_propagation_targets` is not provided, trace data is attached to every outgoing request from the
             instrumented client.
 
+        :param exclude_span_origins: An optional list of strings or regex patterns to disable span creation based
+            on span origin. When a span's origin would match any of the provided patterns, the span will not be
+            created.
+
+            This can be useful to exclude automatic span creation from specific integrations without disabling the
+            entire integration.
+
+            The option may contain a list of strings or regexes against which the span origins are matched.
+            String entries do not have to be full matches, meaning a span origin is matched when it contains
+            a string provided through the option.
+
         :param functions_to_trace: An optional list of functions that should be set up for tracing.
 
             For each function in the list, a span will be created when the function is executed.
@@ -1170,10 +1234,6 @@ class ClientConstructor:
 
         :param profile_session_sample_rate:
 
-        :param enable_tracing:
-
-        :param propagate_traces:
-
         :param auto_session_tracking:
 
         :param spotlight:
@@ -1193,8 +1253,7 @@ class ClientConstructor:
         pass
 
 
-def _get_default_options():
-    # type: () -> dict[str, Any]
+def _get_default_options() -> dict[str, Any]:
     import inspect
 
     a = inspect.getfullargspec(ClientConstructor.__init__)
@@ -1213,4 +1272,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.34.1"
+VERSION = "3.0.0a4"

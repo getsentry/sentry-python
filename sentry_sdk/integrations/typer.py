@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -30,15 +31,16 @@ class TyperIntegration(Integration):
     identifier = "typer"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         typer.main.except_hook = _make_excepthook(typer.main.except_hook)  # type: ignore
 
 
-def _make_excepthook(old_excepthook):
-    # type: (Excepthook) -> Excepthook
-    def sentry_sdk_excepthook(type_, value, traceback):
-        # type: (Type[BaseException], BaseException, Optional[TracebackType]) -> None
+def _make_excepthook(old_excepthook: Excepthook) -> Excepthook:
+    def sentry_sdk_excepthook(
+        type_: Type[BaseException],
+        value: BaseException,
+        traceback: Optional[TracebackType],
+    ) -> None:
         integration = sentry_sdk.get_client().get_integration(TyperIntegration)
 
         # Note: If we replace this with ensure_integration_enabled then

@@ -1,0 +1,79 @@
+from __future__ import annotations
+from opentelemetry import trace
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider, Span, ReadableSpan
+
+from sentry_sdk.consts import VERSION
+from sentry_sdk.opentelemetry import (
+    SentryPropagator,
+    SentrySampler,
+    SentrySpanProcessor,
+)
+from sentry_sdk.opentelemetry.consts import (
+    RESOURCE_SERVICE_NAME,
+    RESOURCE_SERVICE_NAMESPACE,
+    RESOURCE_SERVICE_VERSION,
+)
+from sentry_sdk.utils import logger
+
+
+READABLE_SPAN_PATCHED = False
+
+
+def patch_readable_span() -> None:
+    """
+    We need to pass through sentry specific metadata/objects from Span to ReadableSpan
+    to work with them consistently in the SpanProcessor.
+    """
+    global READABLE_SPAN_PATCHED
+    if not READABLE_SPAN_PATCHED:
+        old_readable_span = Span._readable_span
+
+        def sentry_patched_readable_span(self: Span) -> ReadableSpan:
+            readable_span = old_readable_span(self)
+            readable_span._sentry_meta = getattr(self, "_sentry_meta", {})  # type: ignore[attr-defined]
+            return readable_span
+
+        Span._readable_span = sentry_patched_readable_span  # type: ignore[method-assign]
+        READABLE_SPAN_PATCHED = True
+
+
+def setup_sentry_tracing() -> None:
+    # TracerProvider can only be set once. If we're the first ones setting it,
+    # there's no issue. If it already exists, we need to patch it.
+    from opentelemetry.trace import _TRACER_PROVIDER
+
+    if _TRACER_PROVIDER is not None:
+        logger.debug("[Tracing] Detected an existing TracerProvider, patching")
+        tracer_provider = _TRACER_PROVIDER
+        tracer_provider.sampler = SentrySampler()  # type: ignore[attr-defined]
+
+    else:
+        logger.debug("[Tracing] No TracerProvider set, creating a new one")
+        tracer_provider = TracerProvider(
+            sampler=SentrySampler(),
+            resource=Resource.create(
+                {
+                    RESOURCE_SERVICE_NAME: "sentry-python",
+                    RESOURCE_SERVICE_VERSION: VERSION,
+                    RESOURCE_SERVICE_NAMESPACE: "sentry",
+                }
+            ),
+        )
+        trace.set_tracer_provider(tracer_provider)
+
+    try:
+        existing_span_processors = (
+            tracer_provider._active_span_processor._span_processors  # type: ignore[attr-defined]
+        )
+    except Exception:
+        existing_span_processors = []
+
+    for span_processor in existing_span_processors:
+        if isinstance(span_processor, SentrySpanProcessor):
+            break
+    else:
+        tracer_provider.add_span_processor(SentrySpanProcessor())  # type: ignore[attr-defined]
+
+    set_global_textmap(SentryPropagator())
