@@ -22,8 +22,6 @@ from sentry_sdk.utils import (
     get_default_release,
     handle_in_app,
     logger,
-    get_before_send_log,
-    has_logs_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -326,7 +324,7 @@ class _Client(BaseClient):
 
             self.log_batcher = None
 
-            if has_logs_enabled(self.options):
+            if self.options.get("enable_logs") is True:
                 from sentry_sdk._log_batcher import LogBatcher
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
@@ -823,7 +821,7 @@ class _Client(BaseClient):
         return return_value
 
     def _capture_experimental_log(self, log: Optional[Log]) -> None:
-        if not has_logs_enabled(self.options) or log is None:
+        if self.options.get("enable_logs") is not True or log is None:
             return
 
         current_scope = sentry_sdk.get_current_scope()
@@ -878,7 +876,7 @@ class _Client(BaseClient):
                 f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
             )
 
-        before_send_log = get_before_send_log(self.options)
+        before_send_log = self.options.get("before_send_log")
         if before_send_log is not None:
             log = before_send_log(log, {})
 

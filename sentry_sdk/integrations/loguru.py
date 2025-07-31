@@ -9,7 +9,6 @@ from sentry_sdk.integrations.logging import (
     _BaseHandler,
 )
 from sentry_sdk.logger import _log_level_to_otel
-from sentry_sdk.utils import has_logs_enabled
 
 from typing import TYPE_CHECKING
 
@@ -148,7 +147,7 @@ def loguru_sentry_logs_handler(message: Message) -> None:
     if not client.is_active():
         return
 
-    if not has_logs_enabled(client.options):
+    if client.options.get("enable_logs") is not True:
         return
 
     record = message.record
