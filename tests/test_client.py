@@ -5,10 +5,9 @@ import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
-from collections.abc import Mapping, Callable
 from textwrap import dedent
 from unittest import mock
-from typing import Optional, Union
+from typing import Optional, Union, Mapping, Callable
 
 import pytest
 
