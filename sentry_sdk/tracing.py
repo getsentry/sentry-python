@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA, SpanTemplate
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import (
@@ -1348,18 +1348,22 @@ class NoOpSpan(Span):
 if TYPE_CHECKING:
 
     @overload
-    def trace(func=None, *, template="span", op=None, name=None, attributes=None):
-        # type: (Optional[Callable[P, R]], str, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+    def trace(
+        func=None, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None
+    ):
+        # type: (Optional[Callable[P, R]], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
         pass
 
     @overload
-    def trace(func, *, template="span", op=None, name=None, attributes=None):
-        # type: (Callable[P, R], str, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+    def trace(func, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None):
+        # type: (Callable[P, R], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
         pass
 
 
-def trace(func=None, *, template="span", op=None, name=None, attributes=None):
-    # type: (Optional[Callable[P, R]], str, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+def trace(
+    func=None, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None
+):
+    # type: (Optional[Callable[P, R]], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span.
 

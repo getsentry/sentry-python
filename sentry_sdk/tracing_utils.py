@@ -831,41 +831,41 @@ def _sample_rand_range(parent_sampled, sample_rate):
 
 
 def _get_span_name(template, name):
-    # type: (str, str) -> str
+    # type: (Union[str, "SpanTemplate"], str) -> str
     """
     Get the name of the span based on the template and the name.
     """
     span_name = name
 
-    if template == "ai_chat":
+    if template == SpanTemplate.AI_CHAT:
         span_name = "chat [MODEL]"
-    elif template == "ai_agent":
+    elif template == SpanTemplate.AI_AGENT:
         span_name = f"invoke_agent {name}"
-    elif template == "ai_tool":
+    elif template == SpanTemplate.AI_TOOL:
         span_name = f"execute_tool {name}"
 
     return span_name
 
 
 def _get_span_op(template):
-    # type: (str) -> str
+    # type: (Union[str, "SpanTemplate"]) -> str
     """
     Get the operation of the span based on the template.
     """
     op = OP.FUNCTION
 
-    if template == "ai_chat":
+    if template == SpanTemplate.AI_CHAT:
         op = OP.GEN_AI_CHAT
-    elif template == "ai_agent":
+    elif template == SpanTemplate.AI_AGENT:
         op = OP.GEN_AI_INVOKE_AGENT
-    elif template == "ai_tool":
+    elif template == SpanTemplate.AI_TOOL:
         op = OP.GEN_AI_EXECUTE_TOOL
 
     return op
 
 
 def _set_input_attributes(span, template, args, kwargs):
-    # type: (Span, str, tuple[Any, ...], dict[str, Any]) -> None
+    # type: (Span, Union[str, "SpanTemplate"], tuple[Any, ...], dict[str, Any]) -> None
     """
     Set span input attributes based on the given template.
 
@@ -878,16 +878,16 @@ def _set_input_attributes(span, template, args, kwargs):
 
     # TODO: Implement actual input parameters for those templates :)
 
-    if template == "ai_agent":
+    if template == SpanTemplate.AI_AGENT:
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
             SPANDATA.GEN_AI_AGENT_NAME: span.description,
         }
-    elif template == "ai_chat":
+    elif template == SpanTemplate.AI_CHAT:
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "chat",
         }
-    elif template == "ai_tool":
+    elif template == SpanTemplate.AI_TOOL:
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
             SPANDATA.GEN_AI_TOOL_NAME: span.description,
@@ -897,7 +897,7 @@ def _set_input_attributes(span, template, args, kwargs):
 
 
 def _set_output_attributes(span, template, result):
-    # type: (Span, str, Any) -> None
+    # type: (Span, Union[str, "SpanTemplate"], Any) -> None
     """
     Set span output attributes based on the given template.
 
@@ -913,7 +913,7 @@ def _set_output_attributes(span, template, result):
 
 
 def create_span_decorator(template, op=None, name=None, attributes=None):
-    # type: (str, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
+    # type: (Union[str, "SpanTemplate"], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
     """
     Create a span decorator that can wrap both sync and async functions.
 
@@ -1013,6 +1013,7 @@ from sentry_sdk.tracing import (
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
+from sentry_sdk.consts import SpanTemplate
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
