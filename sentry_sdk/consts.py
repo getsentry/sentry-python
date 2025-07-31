@@ -854,6 +854,8 @@ class ClientConstructor:
         custom_repr: Optional[Callable[..., Optional[str]]] = None,
         add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
         max_stack_frames: Optional[int] = DEFAULT_MAX_STACK_FRAMES,
+        enable_logs: bool = False,
+        before_send_log: Optional[Callable[[Log, Hint], Optional[Log]]] = None,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
@@ -1239,6 +1241,14 @@ class ClientConstructor:
         :param spotlight:
 
         :param instrumenter:
+
+        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
+            Sentry logs. Defaults to False.
+
+        :param before_send_log: An optional function to modify or filter out logs
+            before they're sent to Sentry. Any modifications to the log in this
+            function will be retained. If the function returns None, the log will
+            not be sent to Sentry.
 
         :param _experiments:
         """
