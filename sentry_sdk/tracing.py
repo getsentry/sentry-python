@@ -599,9 +599,24 @@ class Span:
         # type: (str, Any) -> None
         self._tags[key] = value
 
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
-        self._data[key] = value
+    def set_data(self, key, value=None):
+        # type: (Union[str, Dict[str, Any]], Any) -> None
+        """Set data on the span.
+
+        Can be called in two ways:
+        - set_data(key, value) - sets a single key-value pair
+        - set_data({"key": "value"}) - sets multiple key-value pairs from a dict
+        """
+        if isinstance(key, dict):
+            # Dictionary calling pattern: set_data({"key": "value"})
+            for k, v in key.items():
+                self._data[k] = v
+        else:
+            # Traditional calling pattern: set_data(key, value)
+            if value is None:
+                raise ValueError("Value must be provided when key is a string")
+
+            self._data[key] = value
 
     def set_flag(self, flag, result):
         # type: (str, bool) -> None
@@ -1272,8 +1287,8 @@ class NoOpSpan(Span):
         # type: (str, Any) -> None
         pass
 
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
+    def set_data(self, key, value=None):
+        # type: (Union[str, Dict[str, Any]], Any) -> None
         pass
 
     def set_status(self, value):
@@ -1343,18 +1358,20 @@ if TYPE_CHECKING:
         pass
 
 
-def trace(func=None, *, as_type="span", name=None, attributes=None):
-    # type: (Optional[Callable[P, R]], str, Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+def trace(func=None, *, template="span", op=None, name=None, attributes=None):
+    # type: (Optional[Callable[P, R]], str, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span.
 
     :param func: The function to trace.
-    :param as_type: The type of span to create.
+    :param template: The type of span to create.
+    :param op: The operation of the span.
     :param name: The name of the span. (defaults to the function name)
     :param attributes: Additional attributes to set on the span.
     """
     decorator = create_span_decorator(
-        template=as_type,
+        template=template,
+        op=op,
         name=name,
         attributes=attributes,
     )

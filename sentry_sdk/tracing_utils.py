@@ -864,20 +864,6 @@ def _get_span_op(template):
     return op
 
 
-def _set_span_attributes(span, attributes):
-    # type: (Any, Optional[dict[str, Any]]) -> None
-    """
-    Set the given attributes on the given span.
-
-    :param span: The span to set attributes on.
-    :param attributes: The attributes to set on the span.
-    """
-    attributes = attributes or {}
-
-    for key, value in attributes.items():
-        span.set_data(key, value)
-
-
 def _set_input_attributes(span, template, args, kwargs):
     # type: (Span, str, tuple[Any, ...], dict[str, Any]) -> None
     """
@@ -907,7 +893,7 @@ def _set_input_attributes(span, template, args, kwargs):
             SPANDATA.GEN_AI_TOOL_NAME: span.description,
         }
 
-    _set_span_attributes(span, attributes)
+    span.set_data(attributes)
 
 
 def _set_output_attributes(span, template, result):
@@ -923,7 +909,7 @@ def _set_output_attributes(span, template, result):
 
     # TODO: Implement :)
 
-    _set_span_attributes(span, attributes)
+    span.set_data(attributes)
 
 
 def create_span_decorator(template, op=None, name=None, attributes=None):
@@ -969,7 +955,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 result = await f(*args, **kwargs)
 
                 _set_output_attributes(span, template, result)
-                _set_span_attributes(span, attributes)
+                span.set_data(attributes)
 
                 return result
 
@@ -1004,7 +990,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 result = f(*args, **kwargs)
 
                 _set_output_attributes(span, template, result)
-                _set_span_attributes(span, attributes)
+                span.set_data(attributes)
 
                 return result
 
