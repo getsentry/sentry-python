@@ -7,6 +7,7 @@ import socket
 import ssl
 import time
 import asyncio
+
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from urllib.request import getproxies
@@ -29,6 +30,8 @@ except ImportError:
     HTTP2_ENABLED = False
 
 try:
+    import anyio  # noqa: F401
+
     ASYNC_TRANSPORT_ENABLED = httpcore is not None
 except ImportError:
     ASYNC_TRANSPORT_ENABLED = False
