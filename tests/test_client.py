@@ -5,9 +5,10 @@ import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Callable
 from textwrap import dedent
 from unittest import mock
+from typing import Optional, Union
 
 import pytest
 
@@ -26,13 +27,7 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-    from typing import Optional, Union
-    from sentry_sdk._types import Event
+from sentry_sdk._types import Event
 
 
 maximum_python_312 = pytest.mark.skipif(
