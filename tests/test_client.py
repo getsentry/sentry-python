@@ -1133,7 +1133,7 @@ class IssuesSamplerTestConfig:
         expected_events: int,
         sampler_function: Optional[Callable[[Event], Union[float, bool]]] = None,
         sample_rate: Optional[float] = None,
-        exception_to_raise: type[Exception] = Exception,
+        exception_to_raise: type = Exception,
     ) -> None:
         self.sampler_function_mock = (
             None
