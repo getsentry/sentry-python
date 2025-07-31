@@ -3,6 +3,8 @@ import contextlib
 import os
 import random
 import sys
+from typing import Any, Iterable, Optional
+from collections.abc import Container
 from unittest.mock import Mock
 
 import pytest
@@ -26,11 +28,6 @@ try:
 except ImportError:
     ReusableClient = None
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Container
-    from typing import Any, Optional
 
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
 PERFORMANCE_SUPPORTED = SANIC_VERSION >= (21, 9)
@@ -341,14 +338,13 @@ class TransactionTestConfig:
 
     def __init__(
         self,
-        integration_args,
-        url,
-        expected_status,
-        expected_transaction_name,
-        expected_source=None,
-        has_transaction_event=True,
-    ):
-        # type: (Iterable[Optional[Container[int]]], str, int, Optional[str], Optional[str], bool) -> None
+        integration_args: Iterable[Optional[Container[int]]],
+        url: str,
+        expected_status: int,
+        expected_transaction_name: Optional[str],
+        expected_source: Optional[str] = None,
+        has_transaction_event: bool = True,
+    ) -> None:
         """
         expected_transaction_name of None indicates we expect to not receive a transaction
         """
@@ -408,8 +404,9 @@ class TransactionTestConfig:
         ),
     ],
 )
-def test_transactions(test_config, sentry_init, app, capture_events):
-    # type: (TransactionTestConfig, Any, Any, Any) -> None
+def test_transactions(
+    test_config: TransactionTestConfig, sentry_init: Any, app: Any, capture_events: Any
+) -> None:
 
     # Init the SanicIntegration with the desired arguments
     sentry_init(

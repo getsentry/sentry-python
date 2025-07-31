@@ -1875,12 +1875,12 @@ def set_thread_info_from_span(
             data[SPANDATA.THREAD_NAME] = span.get_attribute(SPANDATA.THREAD_NAME)
 
 
-def safe_serialize(data):
-    # type: (Any) -> str
+def safe_serialize(data: Any) -> str:
     """Safely serialize to a readable string."""
 
-    def serialize_item(item):
-        # type: (Any) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]
+    def serialize_item(
+        item: Any,
+    ) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]:
         if callable(item):
             try:
                 module = getattr(item, "__module__", None)

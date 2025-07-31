@@ -339,6 +339,5 @@ def end_session() -> None:
 
 
 @scopemethod
-def set_transaction_name(name, source=None):
-    # type: (str, Optional[str]) -> None
+def set_transaction_name(name: str, source: Optional[str] = None) -> None:
     return get_current_scope().set_transaction_name(name, source)
