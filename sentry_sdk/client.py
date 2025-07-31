@@ -995,9 +995,6 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
-            if timeout is None:
-                timeout = self.options["shutdown_timeout"]
-
             if isinstance(self.transport, AsyncHttpTransport) and hasattr(
                 self.transport, "loop"
             ):
@@ -1009,27 +1006,37 @@ class _Client(BaseClient):
                     logger.warning("Event loop not running, aborting flush.")
                     return None
             else:
-                self.session_flusher.flush()
-
-                if self.log_batcher is not None:
-                    self.log_batcher.flush()
-
-                self.transport.flush(timeout=timeout, callback=callback)
+                self._flush_sync(timeout, callback)
         return None
+
+    def _flush_sync(
+        self, timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
+    ) -> None:
+        """Synchronous flush implementation."""
+        if timeout is None:
+            timeout = self.options["shutdown_timeout"]
+
+        self._flush_components()
+        if self.transport is not None:
+            self.transport.flush(timeout=timeout, callback=callback)
 
     async def _flush_async(
         self, timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
     ) -> None:
-
+        """Asynchronous flush implementation."""
         if timeout is None:
             timeout = self.options["shutdown_timeout"]
 
+        self._flush_components()
+        if self.transport is not None:
+            flush_task = self.transport.flush(timeout=timeout, callback=callback)  # type: ignore
+            if flush_task is not None:
+                await flush_task
+
+    def _flush_components(self) -> None:
         self.session_flusher.flush()
         if self.log_batcher is not None:
             self.log_batcher.flush()
-        flush_task = self.transport.flush(timeout=timeout, callback=callback)  # type: ignore
-        if flush_task is not None:
-            await flush_task
 
     def __enter__(self) -> _Client:
         return self
