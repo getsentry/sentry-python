@@ -112,22 +112,6 @@ def test_logs_basics(sentry_init, capture_envelopes):
 
 
 @minimum_python_37
-def test_logs_experimental_option_still_works(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_logs": True})
-    envelopes = capture_envelopes()
-
-    sentry_sdk.logger.error("This is an error log...")
-
-    get_client().flush()
-
-    logs = envelopes_to_logs(envelopes)
-    assert len(logs) == 1
-
-    assert logs[0].get("severity_text") == "error"
-    assert logs[0].get("severity_number") == 17
-
-
-@minimum_python_37
 def test_logs_before_send_log(sentry_init, capture_envelopes):
     before_log_called = False
 
@@ -171,36 +155,6 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
     assert logs[1]["severity_text"] == "debug"
     assert logs[2]["severity_text"] == "info"
     assert logs[3]["severity_text"] == "warn"
-    assert before_log_called is True
-
-
-@minimum_python_37
-def test_logs_before_send_log_experimental_option_still_works(
-    sentry_init, capture_envelopes
-):
-    before_log_called = False
-
-    def _before_log(record, hint):
-        nonlocal before_log_called
-        before_log_called = True
-
-        return record
-
-    sentry_init(
-        enable_logs=True,
-        _experiments={
-            "before_send_log": _before_log,
-        },
-    )
-    envelopes = capture_envelopes()
-
-    sentry_sdk.logger.error("This is an error log...")
-
-    get_client().flush()
-    logs = envelopes_to_logs(envelopes)
-    assert len(logs) == 1
-
-    assert logs[0]["severity_text"] == "error"
     assert before_log_called is True
 
 

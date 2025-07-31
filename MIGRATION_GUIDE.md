@@ -40,6 +40,9 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `MAX_PROFILE_DURATION_NS`, `PROFILE_MINIMUM_SAMPLES`, `Profile`, `Scheduler`, `ThreadScheduler`, `GeventScheduler`, `has_profiling_enabled`, `setup_profiler`, `teardown_profiler` are no longer accessible from `sentry_sdk.profiler`. They're still accessible from `sentry_sdk.profiler.transaction_profiler`.
 - `DEFAULT_SAMPLING_FREQUENCY`, `MAX_STACK_DEPTH`, `get_frame_name`, `extract_frame`, `extract_stack`, `frame_id` are no longer accessible from `sentry_sdk.profiler`. They're still accessible from `sentry_sdk.profiler.utils`.
 
+#### Logs
+
+- `enable_logs` and `before_send_log` are now regular SDK options. Their original versions under `_experiments` have been removed.
 
 #### Integrations
 - Redis: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
