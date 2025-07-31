@@ -3,8 +3,7 @@ import contextlib
 import os
 import random
 import sys
-from typing import Any, Iterable, Optional
-from collections.abc import Container
+from typing import Any, Iterable, Optional, Container
 from unittest.mock import Mock
 
 import pytest
