@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.0.0a4
+
+### Various fixes & improvements
+
+- Migrate more type comments to annotations (#4651) by @sl0thentr0py
+- ref: Drop experimental logs options in 3.0 (#4653) by @sl0thentr0py
+- Polish migration guide (#4650) by @sl0thentr0py
+- Add `enable_logs`, `before_send_log` as top-level options (#4644) by @sentrivana
+- Add missing return type annotation (#3152) by @sl0thentr0py
+- Fix mypy (#4649) by @sentrivana
+- Better checking for empty tools list (#4647) by @antonpirker
+- ref: Remove `MAX_EVENT_BYTES` (#4630) by @sl0thentr0py
+- update changelog (9276f2a1) by @antonpirker
+- release: 2.34.1 (a71ef66d) by @getsentry-bot
+- typing (#3152) by @sl0thentr0py
+- Update tests (#3152) by @sl0thentr0py
+- Span data is always be a primitive data type (#4643) by @antonpirker
+- Fix typo in CHANGELOG.md (#4640) by @jgillard
+- updated test matrix (#3152) by @sl0thentr0py
+- Add new_trace api to force a new trace (#4642) by @sl0thentr0py
+- Revert "Add new_trace api to force a new trace" (#3152) by @sl0thentr0py
+- Add new_trace api to force a new trace (#3152) by @sl0thentr0py
+- Update changelog (72766a79) by @antonpirker
+- Update CHANGELOG.md (e1848d4f) by @sentrivana
+- release: 2.34.0 (e84f6f30) by @getsentry-bot
+- Considerably raise `DEFAULT_MAX_VALUE_LENGTH` (#4632) by @sentrivana
+- fix(celery): Latency should be in milliseconds, not seconds (#4637) by @sentrivana
+- OpenAI integration update (#4612) by @antonpirker
+
+_Plus 16 more_
+
 ## 3.0.0a3
 
 We're excited to announce that version 3.0 of the Sentry Python SDK is now
