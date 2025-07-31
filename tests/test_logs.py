@@ -17,10 +17,8 @@ minimum_python_37 = pytest.mark.skipif(
 )
 
 
-def otel_attributes_to_dict(otel_attrs):
-    # type: (Mapping[str, Any]) -> Mapping[str, Any]
-    def _convert_attr(attr):
-        # type: (Mapping[str, Union[str, float, bool]]) -> Any
+def otel_attributes_to_dict(otel_attrs: Mapping[str, Any]) -> Mapping[str, Any]:
+    def _convert_attr(attr: Mapping[str, Union[str, float, bool]]) -> Any:
         if attr["type"] == "boolean":
             return attr["value"]
         if attr["type"] == "double":
@@ -38,7 +36,7 @@ def otel_attributes_to_dict(otel_attrs):
 
 
 def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
-    res = []  # type: List[Log]
+    res: List[Log] = []
     for envelope in envelopes:
         for item in envelope.items:
             if item.type == "log":
@@ -54,7 +52,7 @@ def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
                         "attributes": otel_attributes_to_dict(log_json["attributes"]),
                         "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
                         "trace_id": log_json["trace_id"],
-                    }  # type: Log
+                    }
                     res.append(log)
     return res
 

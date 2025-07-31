@@ -3,12 +3,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import TYPE_CHECKING
+from typing import Optional
 
 from sentry_sdk.consts import VERSION as SDK_VERSION
 
-if TYPE_CHECKING:
-    from typing import Optional
 
 DIST_PATH = "dist"  # created by "make dist" that is called by "make aws-lambda-layer"
 PYTHON_SITE_PACKAGES = "python"  # see https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
@@ -17,10 +15,9 @@ PYTHON_SITE_PACKAGES = "python"  # see https://docs.aws.amazon.com/lambda/latest
 class LayerBuilder:
     def __init__(
         self,
-        base_dir,  # type: str
-        out_zip_filename=None,  # type: Optional[str]
-    ):
-        # type: (...) -> None
+        base_dir: str,
+        out_zip_filename: Optional[str] = None,
+    ) -> None:
         self.base_dir = base_dir
         self.python_site_packages = os.path.join(self.base_dir, PYTHON_SITE_PACKAGES)
         self.out_zip_filename = (
@@ -29,12 +26,10 @@ class LayerBuilder:
             else out_zip_filename
         )
 
-    def make_directories(self):
-        # type: (...) -> None
+    def make_directories(self) -> None:
         os.makedirs(self.python_site_packages)
 
-    def install_python_packages(self):
-        # type: (...) -> None
+    def install_python_packages(self) -> None:
         # Install requirements for Lambda Layer (these are more limited than the SDK requirements,
         # because Lambda does not support the newest versions of some packages)
         subprocess.check_call(
@@ -68,8 +63,7 @@ class LayerBuilder:
             check=True,
         )
 
-    def create_init_serverless_sdk_package(self):
-        # type: (...) -> None
+    def create_init_serverless_sdk_package(self) -> None:
         """
         Method that creates the init_serverless_sdk pkg in the
         sentry-python-serverless zip
@@ -84,8 +78,7 @@ class LayerBuilder:
             "scripts/init_serverless_sdk.py", f"{serverless_sdk_path}/__init__.py"
         )
 
-    def zip(self):
-        # type: (...) -> None
+    def zip(self) -> None:
         subprocess.run(
             [
                 "zip",

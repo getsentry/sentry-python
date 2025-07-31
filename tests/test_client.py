@@ -5,9 +5,9 @@ import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
-from collections.abc import Mapping
 from textwrap import dedent
 from unittest import mock
+from typing import Optional, Union, Mapping, Callable
 
 import pytest
 
@@ -26,13 +26,7 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-    from typing import Any, Optional, Union
-    from sentry_sdk._types import Event
+from sentry_sdk.types import Event
 
 
 maximum_python_312 = pytest.mark.skipif(
@@ -1135,12 +1129,11 @@ def test_spotlight_option(
 class IssuesSamplerTestConfig:
     def __init__(
         self,
-        expected_events,
-        sampler_function=None,
-        sample_rate=None,
-        exception_to_raise=Exception,
-    ):
-        # type: (int, Optional[Callable[[Event], Union[float, bool]]], Optional[float], type[Exception]) -> None
+        expected_events: int,
+        sampler_function: Optional[Callable[[Event], Union[float, bool]]] = None,
+        sample_rate: Optional[float] = None,
+        exception_to_raise: type = Exception,
+    ) -> None:
         self.sampler_function_mock = (
             None
             if sampler_function is None
@@ -1150,14 +1143,12 @@ class IssuesSamplerTestConfig:
         self.sample_rate = sample_rate
         self.exception_to_raise = exception_to_raise
 
-    def init_sdk(self, sentry_init):
-        # type: (Callable[[*Any], None]) -> None
+    def init_sdk(self, sentry_init: Callable[..., None]) -> None:
         sentry_init(
             error_sampler=self.sampler_function_mock, sample_rate=self.sample_rate
         )
 
-    def raise_exception(self):
-        # type: () -> None
+    def raise_exception(self) -> None:
         raise self.exception_to_raise()
 
 
