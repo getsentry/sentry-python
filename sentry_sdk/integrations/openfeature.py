@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -8,7 +8,6 @@ try:
     from openfeature.hook import Hook
 
     if TYPE_CHECKING:
-        from openfeature.flag_evaluation import FlagEvaluationDetails
         from openfeature.hook import HookContext, HookHints
 except ImportError:
     raise DidNotEnable("OpenFeature is not installed")
@@ -25,9 +24,8 @@ class OpenFeatureIntegration(Integration):
 
 
 class OpenFeatureHook(Hook):
-
     def after(self, hook_context, details, hints):
-        # type: (HookContext, FlagEvaluationDetails[bool], HookHints) -> None
+        # type: (Any, Any, Any) -> None
         if isinstance(details.value, bool):
             add_feature_flag(details.flag_key, details.value)
 
