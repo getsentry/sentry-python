@@ -4,7 +4,12 @@ from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
-from sentry_sdk.consts import INSTRUMENTER
+from sentry_sdk.consts import (  # noqa: N811
+    INSTRUMENTER,
+    OP as SpanOp,
+    SPANDATA as SpanAttr,
+    SpanTemplate,
+)
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
@@ -85,6 +90,10 @@ __all__ = [
     "start_session",
     "end_session",
     "set_transaction_name",
+    "update_current_span",
+    "SpanTemplate",
+    "SpanAttr",
+    "SpanOp",
 ]
 
 
@@ -473,3 +482,28 @@ def end_session():
 def set_transaction_name(name, source=None):
     # type: (str, Optional[str]) -> None
     return get_current_scope().set_transaction_name(name, source)
+
+
+def update_current_span(op=None, name=None, attributes=None):
+    # type: (Optional[str], Optional[str], Optional[dict[str, Union[str, int, float, bool]]]) -> None
+    """
+    Update the current span with the given parameters.
+
+    :param op: The operation of the span.
+    :param name: The name of the span.
+    :param attributes: The attributes of the span.
+    """
+    current_span = get_current_span()
+
+    if current_span is None:
+        return
+
+    if op is not None:
+        current_span.op = op
+
+    if name is not None:
+        # internally it is still description
+        current_span.description = name
+
+    if attributes is not None:
+        current_span.set_data(attributes)

@@ -5,8 +5,9 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA, SpanTemplate
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
+from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
@@ -598,9 +599,24 @@ class Span:
         # type: (str, Any) -> None
         self._tags[key] = value
 
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
-        self._data[key] = value
+    def set_data(self, key, value=None):
+        # type: (Union[str, Dict[str, Any]], Any) -> None
+        """Set data on the span.
+
+        Can be called in two ways:
+        - set_data(key, value) - sets a single key-value pair
+        - set_data({"key": "value"}) - sets multiple key-value pairs from a dict
+        """
+        if isinstance(key, dict):
+            # Dictionary calling pattern: set_data({"key": "value"})
+            for k, v in key.items():
+                self._data[k] = v
+        elif isinstance(key, str):
+            # Traditional calling pattern: set_data(key, value)
+            if value is None:
+                raise ValueError("Value must be provided when key is a string")
+
+            self._data[key] = value
 
     def set_flag(self, flag, result):
         # type: (str, bool) -> None
@@ -1271,8 +1287,8 @@ class NoOpSpan(Span):
         # type: (str, Any) -> None
         pass
 
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
+    def set_data(self, key, value=None):
+        # type: (Union[str, Dict[str, Any]], Any) -> None
         pass
 
     def set_status(self, value):
@@ -1332,43 +1348,42 @@ class NoOpSpan(Span):
 if TYPE_CHECKING:
 
     @overload
-    def trace(func=None):
-        # type: (None) -> Callable[[Callable[P, R]], Callable[P, R]]
+    def trace(
+        func=None, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None
+    ):
+        # type: (Optional[Callable[P, R]], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
         pass
 
     @overload
-    def trace(func):
-        # type: (Callable[P, R]) -> Callable[P, R]
+    def trace(func, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None):
+        # type: (Callable[P, R], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
         pass
 
 
-def trace(func=None):
-    # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+def trace(
+    func=None, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None
+):
+    # type: (Optional[Callable[P, R]], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
-    Decorator to start a child span under the existing current transaction.
-    If there is no current transaction, then nothing will be traced.
+    Decorator to start a child span.
 
-    .. code-block::
-        :caption: Usage
-
-        import sentry_sdk
-
-        @sentry_sdk.trace
-        def my_function():
-            ...
-
-        @sentry_sdk.trace
-        async def my_async_function():
-            ...
+    :param func: The function to trace.
+    :param template: The type of span to create.
+    :param op: The operation of the span.
+    :param name: The name of the span. (defaults to the function name)
+    :param attributes: Additional attributes to set on the span.
     """
-    from sentry_sdk.tracing_utils import start_child_span_decorator
+    decorator = create_span_decorator(
+        template=template,
+        op=op,
+        name=name,
+        attributes=attributes,
+    )
 
-    # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
-    # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278
     if func:
-        return start_child_span_decorator(func)
+        return decorator(func)
     else:
-        return start_child_span_decorator
+        return decorator
 
 
 # Circular imports
