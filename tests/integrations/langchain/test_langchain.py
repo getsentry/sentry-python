@@ -34,8 +34,8 @@ def get_word_length(word: str) -> int:
     return len(word)
 
 
-global stream_result_mock  # type: Mock
-global llm_type  # type: str
+stream_result_mock: Mock
+llm_type: str
 
 
 class MockOpenAI(ChatOpenAI):

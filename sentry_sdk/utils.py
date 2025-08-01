@@ -59,7 +59,7 @@ if TYPE_CHECKING:
     from gevent.hub import Hub as GeventHub
     from opentelemetry.util.types import AttributeValue
 
-    from sentry_sdk._types import Event, ExcInfo, Log, Hint
+    from sentry_sdk._types import Event, ExcInfo
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -1875,12 +1875,12 @@ def set_thread_info_from_span(
             data[SPANDATA.THREAD_NAME] = span.get_attribute(SPANDATA.THREAD_NAME)
 
 
-def safe_serialize(data):
-    # type: (Any) -> str
+def safe_serialize(data: Any) -> str:
     """Safely serialize to a readable string."""
 
-    def serialize_item(item):
-        # type: (Any) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]
+    def serialize_item(
+        item: Any,
+    ) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]:
         if callable(item):
             try:
                 module = getattr(item, "__module__", None)
@@ -1919,24 +1919,3 @@ def safe_serialize(data):
         return json.dumps(serialized, default=str)
     except Exception:
         return str(data)
-
-
-def has_logs_enabled(options):
-    # type: (Optional[dict[str, Any]]) -> bool
-    if options is None:
-        return False
-
-    return bool(
-        options.get("enable_logs", False)
-        or options["_experiments"].get("enable_logs", False)
-    )
-
-
-def get_before_send_log(options):
-    # type: (Optional[dict[str, Any]]) -> Optional[Callable[[Log, Hint], Optional[Log]]]
-    if options is None:
-        return None
-
-    return options.get("before_send_log") or options["_experiments"].get(
-        "before_send_log"
-    )

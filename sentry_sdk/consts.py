@@ -79,8 +79,6 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "enable_logs": Optional[bool],
-            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
         },
         total=False,
     )
@@ -1275,4 +1273,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "3.0.0a3"
+VERSION = "3.0.0a4"

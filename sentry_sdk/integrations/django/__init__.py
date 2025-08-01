@@ -712,8 +712,7 @@ def _set_db_data(span: Span, cursor_or_db: Any) -> None:
         span.set_attribute(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
 
 
-def add_template_context_repr_sequence():
-    # type: () -> None
+def add_template_context_repr_sequence() -> None:
     try:
         from django.template.context import BaseContext
 
