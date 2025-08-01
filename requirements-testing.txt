@@ -11,7 +11,7 @@ asttokens
 responses
 pysocks
 socksio
-httpcore[http2]
+httpcore[http2,asyncio]
 setuptools
 freezegun
 Brotli
