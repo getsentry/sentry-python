@@ -8,6 +8,7 @@ from sentry_sdk.consts import (  # noqa: N811
     INSTRUMENTER,
     SpanTemplate,
     SPANDATA as SpanAttr,
+    OP as SpanOp,
 )
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
@@ -92,6 +93,7 @@ __all__ = [
     "update_current_span",
     "SpanTemplate",
     "SpanAttr",
+    "SpanOp",
 ]
 
 

@@ -53,6 +53,7 @@ __all__ = [  # noqa
     "update_current_span",
     "SpanTemplate",
     "SpanAttr",
+    "SpanOp",
 ]
 
 # Initialize the debug support after everything is loaded
