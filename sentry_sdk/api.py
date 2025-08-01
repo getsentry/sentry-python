@@ -6,9 +6,9 @@ from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import (  # noqa: N811
     INSTRUMENTER,
-    SpanTemplate,
-    SPANDATA as SpanAttr,
     OP as SpanOp,
+    SPANDATA as SpanAttr,
+    SpanTemplate,
 )
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
