@@ -521,15 +521,13 @@ def test_span_set_data(sentry_init, capture_events):
             span.set_data("key0", "value0")
             span.set_data("key1", "value1")
 
-            span.set_data(
+            span.update_data(
                 {
                     "key1": "updated-value1",
                     "key2": "value2",
                     "key3": "value3",
                 }
             )
-
-            span.set_data(None)
 
     (event,) = events
     span = event["spans"][0]

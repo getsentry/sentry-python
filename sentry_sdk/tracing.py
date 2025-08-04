@@ -598,24 +598,13 @@ class Span:
         # type: (str, Any) -> None
         self._tags[key] = value
 
-    def set_data(self, key=None, value=None):
-        # type: (Optional[Union[str, Dict[str, Any]]], Optional[Any]) -> None
-        """Set data on the span.
-        Can be called in two ways:
-        - set_data(key, value) - sets a single key-value pair
-        - set_data({"key": "value"}) - sets multiple key-value pairs from a dict
-        """
-        if key is None:
-            return
+    def set_data(self, key, value):
+        # type: (str, Any) -> None
+        self._data[key] = value
 
-        if isinstance(key, dict):
-            # Dictionary calling pattern: set_data({"key": "value"})
-            for k, v in key.items():
-                self._data[k] = v
-
-        elif isinstance(key, str):
-            # Traditional calling pattern: set_data(key, value)
-            self._data[key] = value
+    def update_data(self, data):
+        # type: (Dict[str, Any]) -> None
+        self._data.update(data)
 
     def set_flag(self, flag, result):
         # type: (str, bool) -> None
@@ -1286,8 +1275,8 @@ class NoOpSpan(Span):
         # type: (str, Any) -> None
         pass
 
-    def set_data(self, key=None, value=None):
-        # type: (Optional[Union[str, Dict[str, Any]]], Optional[Any]) -> None
+    def set_data(self, key, value):
+        # type: (str, Any) -> None
         pass
 
     def set_status(self, value):
