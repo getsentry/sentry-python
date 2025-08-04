@@ -599,14 +599,17 @@ class Span:
         # type: (str, Any) -> None
         self._tags[key] = value
 
-    def set_data(self, key, value=None):
-        # type: (Union[str, Dict[str, Any]], Any) -> None
+    def set_data(self, key=None, value=None):
+        # type: (Optional[Union[str, Dict[str, Any]]], Optional[Any]) -> None
         """Set data on the span.
 
         Can be called in two ways:
         - set_data(key, value) - sets a single key-value pair
         - set_data({"key": "value"}) - sets multiple key-value pairs from a dict
         """
+        if key is None:
+            return
+
         if isinstance(key, dict):
             # Dictionary calling pattern: set_data({"key": "value"})
             for k, v in key.items():
@@ -1285,8 +1288,8 @@ class NoOpSpan(Span):
         # type: (str, Any) -> None
         pass
 
-    def set_data(self, key, value=None):
-        # type: (Union[str, Dict[str, Any]], Any) -> None
+    def set_data(self, key=None, value=None):
+        # type: (Optional[Union[str, Dict[str, Any]]], Optional[Any]) -> None
         pass
 
     def set_status(self, value):
@@ -1349,19 +1352,19 @@ if TYPE_CHECKING:
     def trace(
         func=None, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None
     ):
-        # type: (Optional[Callable[P, R]], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+        # type: (Optional[Callable[P, R]], SpanTemplate, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[[Callable[P, R]], Callable[P, R]]
         pass
 
     @overload
     def trace(func, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None):
-        # type: (Callable[P, R], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+        # type: (Callable[P, R], SpanTemplate, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[P, R]
         pass
 
 
 def trace(
     func=None, *, template=SpanTemplate.SPAN, op=None, name=None, attributes=None
 ):
-    # type: (Optional[Callable[P, R]], ..., Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+    # type: (Optional[Callable[P, R]], SpanTemplate, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span.
 
