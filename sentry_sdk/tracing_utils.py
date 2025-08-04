@@ -939,15 +939,15 @@ def _get_usage_attributes(usage):
     """
     attributes = {}
 
-    if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
-        attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens
-    elif hasattr(usage, "prompt_tokens") and isinstance(usage.prompt_tokens, int):
+    if hasattr(usage, "prompt_tokens") and isinstance(usage.prompt_tokens, int):
         attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.prompt_tokens
-    elif hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
-        attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens
+    elif hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
+        attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens
     elif hasattr(usage, "completion_tokens") and isinstance(
         usage.completion_tokens, int
     ):
+        attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens
+    elif hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
         attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.completion_tokens
     elif hasattr(usage, "total_tokens") and isinstance(usage.total_tokens, int):
         attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = usage.total_tokens
