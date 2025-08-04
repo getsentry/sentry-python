@@ -906,25 +906,17 @@ def _get_input_attributes(template, send_pii, args, kwargs):
                 )
 
             elif key == "max_tokens" and isinstance(value, int):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, []).append(
-                    value
-                )
+                attributes[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] = value
             elif key == "frequency_penalty" and isinstance(value, float):
-                attributes.setdefault(
-                    SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, []
-                ).append(value)
+                attributes[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] = value
             elif key == "presence_penalty" and isinstance(value, float):
-                attributes.setdefault(
-                    SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, []
-                ).append(value)
+                attributes[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] = value
             elif key == "temperature" and isinstance(value, float):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, []).append(
-                    value
-                )
+                attributes[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] = value
             elif key == "top_p" and isinstance(value, float):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TOP_P, []).append(value)
+                attributes[SPANDATA.GEN_AI_REQUEST_TOP_P] = value
             elif key == "top_k" and isinstance(value, int):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TOP_K, []).append(value)
+                attributes[SPANDATA.GEN_AI_REQUEST_TOP_K] = value
 
     if template == SpanTemplate.AI_TOOL:
         if send_pii:
