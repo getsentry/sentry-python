@@ -509,3 +509,36 @@ def test_transaction_not_started_warning(sentry_init):
         "The transaction will not be sent to Sentry. To fix, start the transaction by"
         "passing it to sentry_sdk.start_transaction."
     )
+
+
+def test_span_set_data(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test-transaction"):
+        with start_span(op="test-span") as span:
+            span.set_data("key0", "value0")
+            span.set_data("key1", "value1")
+
+            span.set_data(
+                {
+                    "key1": "updated-value1",
+                    "key2": "value2",
+                    "key3": "value3",
+                }
+            )
+
+            span.set_data(None)
+
+    (event,) = events
+    span = event["spans"][0]
+
+    assert span["data"] == {
+        "key0": "value0",
+        "key1": "updated-value1",
+        "key2": "value2",
+        "key3": "value3",
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
