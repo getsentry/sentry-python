@@ -830,8 +830,8 @@ def _sample_rand_range(parent_sampled, sample_rate):
         return sample_rate, 1.0
 
 
-def _get_span_name(template, name=None, kwargs=None):
-    # type: (Union[str, "SpanTemplate"], Optional[str], Optional[dict[str, Any]]) -> str
+def _get_span_name(template, name, kwargs=None):
+    # type: (Union[str, "SpanTemplate"], str, Optional[dict[str, Any]]) -> str
     """
     Get the name of the span based on the template and the name.
     """
@@ -854,7 +854,7 @@ def _get_span_name(template, name=None, kwargs=None):
     elif template == SpanTemplate.AI_TOOL:
         span_name = f"execute_tool {name}"
 
-    return span_name or ""
+    return span_name
 
 
 def _get_span_op(template):
@@ -987,8 +987,8 @@ def _get_output_attributes(template, result):
     return attributes
 
 
-def _set_input_attributes(span, template, f, args, kwargs):
-    # type: (Span, Union[str, "SpanTemplate"], Any, tuple[Any, ...], dict[str, Any]) -> None
+def _set_input_attributes(span, template, name, f, args, kwargs):
+    # type: (Span, Union[str, "SpanTemplate"], str, Any, tuple[Any, ...], dict[str, Any]) -> None
     """
     Set span input attributes based on the given span template.
 
@@ -1003,7 +1003,7 @@ def _set_input_attributes(span, template, f, args, kwargs):
     if template == SpanTemplate.AI_AGENT:
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            SPANDATA.GEN_AI_AGENT_NAME: span.description,
+            SPANDATA.GEN_AI_AGENT_NAME: name,
         }
     elif template == SpanTemplate.AI_CHAT:
         attributes = {
@@ -1012,7 +1012,7 @@ def _set_input_attributes(span, template, f, args, kwargs):
     elif template == SpanTemplate.AI_TOOL:
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
-            SPANDATA.GEN_AI_TOOL_NAME: span.description,
+            SPANDATA.GEN_AI_TOOL_NAME: name,
         }
 
         docstring = f.__doc__
@@ -1075,13 +1075,12 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 current_span.start_child if current_span else sentry_sdk.start_span
             )
 
+            function_name = name or qualname_from_function(f) or ""
             with start_span_func(
                 op=_get_span_op(template),
-                name=_get_span_name(
-                    template, name or qualname_from_function(f), kwargs
-                ),
+                name=_get_span_name(template, function_name, kwargs),
             ) as span:
-                _set_input_attributes(span, template, f, args, kwargs)
+                _set_input_attributes(span, template, function_name, f, args, kwargs)
 
                 result = await f(*args, **kwargs)
 
@@ -1112,11 +1111,12 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 current_span.start_child if current_span else sentry_sdk.start_span
             )
 
+            function_name = name or qualname_from_function(f) or ""
             with start_span_func(
                 op=_get_span_op(template),
-                name=_get_span_name(template, name or qualname_from_function(f)),
+                name=_get_span_name(template, function_name),
             ) as span:
-                _set_input_attributes(span, template, f, args, kwargs)
+                _set_input_attributes(span, template, function_name, f, args, kwargs)
 
                 result = f(*args, **kwargs)
 
