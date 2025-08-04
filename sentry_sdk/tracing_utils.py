@@ -935,6 +935,29 @@ def _get_input_attributes(template, send_pii, args, kwargs):
     return attributes
 
 
+def _get_usage_attributes(usage):
+    # type: (Any) -> dict[str, Any]
+    """
+    Get usage attributes.
+    """
+    attributes = {}
+
+    if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
+        attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens
+    elif hasattr(usage, "prompt_tokens") and isinstance(usage.prompt_tokens, int):
+        attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.prompt_tokens
+    elif hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
+        attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens
+    elif hasattr(usage, "completion_tokens") and isinstance(
+        usage.completion_tokens, int
+    ):
+        attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.completion_tokens
+    elif hasattr(usage, "total_tokens") and isinstance(usage.total_tokens, int):
+        attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = usage.total_tokens
+
+    return attributes
+
+
 def _get_output_attributes(template, send_pii, result):
     # type: (Union[str, "SpanTemplate"], bool, Any) -> dict[str, Any]
     """
@@ -943,44 +966,12 @@ def _get_output_attributes(template, send_pii, result):
     attributes = {}  # type: dict[str, Any]
 
     if template in [SpanTemplate.AI_AGENT, SpanTemplate.AI_TOOL, SpanTemplate.AI_CHAT]:
+        attributes.update(_get_usage_attributes(result))
         if hasattr(result, "usage"):
-            if hasattr(result.usage, "input_tokens") and isinstance(
-                result.usage.input_tokens, int
-            ):
-                attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = (
-                    result.usage.input_tokens
-                )
-            elif hasattr(result.usage, "prompt_tokens") and isinstance(
-                result.usage.prompt_tokens, int
-            ):
-                attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = (
-                    result.usage.prompt_tokens
-                )
-            elif hasattr(result.usage, "output_tokens") and isinstance(
-                result.usage.output_tokens, int
-            ):
-                attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = (
-                    result.usage.output_tokens
-                )
-            elif hasattr(result.usage, "completion_tokens") and isinstance(
-                result.usage.completion_tokens, int
-            ):
-                attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = (
-                    result.usage.completion_tokens
-                )
-            elif hasattr(result.usage, "total_tokens") and isinstance(
-                result.usage.total_tokens, int
-            ):
-                attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = (
-                    result.usage.total_tokens
-                )
-
-        elif hasattr(result, "input_tokens") and isinstance(result.input_tokens, int):
-            attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = result.input_tokens
-        elif hasattr(result, "output_tokens") and isinstance(result.output_tokens, int):
-            attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = result.output_tokens
-        elif hasattr(result, "total_tokens") and isinstance(result.total_tokens, int):
-            attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = result.total_tokens
+            attributes.update(_get_usage_attributes(result.usage))
+        elif hasattr(result, "metadata"):
+            if hasattr(result.metadata, "usage"):
+                attributes.update(_get_usage_attributes(result.metadata.usage))
 
         elif hasattr(result, "model") and isinstance(result.model, str):
             attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model
