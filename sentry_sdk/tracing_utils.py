@@ -975,13 +975,14 @@ def _get_output_attributes(template, result):
     return attributes
 
 
-def _set_input_attributes(span, template, args, kwargs):
-    # type: (Span, Union[str, "SpanTemplate"], tuple[Any, ...], dict[str, Any]) -> None
+def _set_input_attributes(span, template, f, args, kwargs):
+    # type: (Span, Union[str, "SpanTemplate"], Any, tuple[Any, ...], dict[str, Any]) -> None
     """
     Set span input attributes based on the given span template.
 
     :param span: The span to set attributes on.
     :param template: The template to use to set attributes on the span.
+    :param f: The wrapped function.
     :param args: The arguments to the wrapped function.
     :param kwargs: The keyword arguments to the wrapped function.
     """
@@ -1001,6 +1002,10 @@ def _set_input_attributes(span, template, args, kwargs):
             SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
             SPANDATA.GEN_AI_TOOL_NAME: span.description,
         }
+
+        docstring = f.__doc__
+        if docstring is not None:
+            attributes[SPANDATA.GEN_AI_TOOL_DESCRIPTION] = docstring
 
     attributes.update(_get_input_attributes(template, kwargs))
     span.set_data(attributes)
@@ -1064,11 +1069,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                     template, name or qualname_from_function(f), kwargs
                 ),
             ) as span:
-                _set_input_attributes(span, template, args, kwargs)
-
-                docstring = getattr(f, "__doc__", None)
-                if template == SpanTemplate.AI_TOOL and docstring is not None:
-                    span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, docstring)
+                _set_input_attributes(span, template, f, args, kwargs)
 
                 result = await f(*args, **kwargs)
 
@@ -1103,7 +1104,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 op=_get_span_op(template),
                 name=_get_span_name(template, name or qualname_from_function(f)),
             ) as span:
-                _set_input_attributes(span, template, args, kwargs)
+                _set_input_attributes(span, template, f, args, kwargs)
 
                 result = f(*args, **kwargs)
 
