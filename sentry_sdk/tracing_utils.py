@@ -918,6 +918,11 @@ def _get_input_attributes(template, send_pii, args, kwargs):
             elif key == "top_k" and isinstance(value, int):
                 attributes[SPANDATA.GEN_AI_REQUEST_TOP_K] = value
 
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in attributes:
+        attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES] = safe_repr(
+            attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+
     if template == SpanTemplate.AI_TOOL:
         if send_pii:
             attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
