@@ -947,11 +947,23 @@ def _get_output_attributes(template, result):
                 attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = (
                     result.usage.input_tokens
                 )
+            elif hasattr(result.usage, "prompt_tokens") and isinstance(
+                result.usage.prompt_tokens, int
+            ):
+                attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = (
+                    result.usage.prompt_tokens
+                )
             elif hasattr(result.usage, "output_tokens") and isinstance(
                 result.usage.output_tokens, int
             ):
                 attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = (
                     result.usage.output_tokens
+                )
+            elif hasattr(result.usage, "completion_tokens") and isinstance(
+                result.usage.completion_tokens, int
+            ):
+                attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = (
+                    result.usage.completion_tokens
                 )
             elif hasattr(result.usage, "total_tokens") and isinstance(
                 result.usage.total_tokens, int
