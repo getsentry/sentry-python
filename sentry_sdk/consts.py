@@ -383,6 +383,18 @@ class SPANDATA:
     Example: "qa-pipeline"
     """
 
+    GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
+    """
+    The reason why the model stopped generating.
+    Example: "COMPLETE"
+    """
+
+    GEN_AI_RESPONSE_ID = "gen_ai.response.id"
+    """
+    Unique identifier for the completion.
+    Example: "gen_123abc"
+    """
+
     GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
     """
     Exact model identifier used to generate the response
@@ -443,10 +455,22 @@ class SPANDATA:
     Example: 0.1
     """
 
+    GEN_AI_REQUEST_SEED = "gen_ai.request.seed"
+    """
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: "1234567890"
+    """
+
     GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
     """
     The temperature parameter used to control randomness in the output.
     Example: 0.7
+    """
+
+    GEN_AI_REQUEST_TOP_K = "gen_ai.request.top_k"
+    """
+    Limits the model to only consider the K most likely next tokens, where K is an integer (e.g., top_k=20 means only the 20 highest probability tokens are considered).
+    Example: 35
     """
 
     GEN_AI_REQUEST_TOP_P = "gen_ai.request.top_p"
