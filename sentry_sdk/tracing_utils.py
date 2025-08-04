@@ -877,8 +877,8 @@ def _get_span_op(template):
     return op
 
 
-def _get_input_attributes(template, args, kwargs):
-    # type: (Union[str, "SpanTemplate"], tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
+def _get_input_attributes(template, send_pii, args, kwargs):
+    # type: (Union[str, "SpanTemplate"], bool, tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
     """
     Get input attributes for the given span template.
     """
@@ -927,15 +927,16 @@ def _get_input_attributes(template, args, kwargs):
                 attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TOP_K, []).append(value)
 
     if template == SpanTemplate.AI_TOOL:
-        attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
-            {"args": args, "kwargs": kwargs}
-        )
+        if send_pii:
+            attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
+                {"args": args, "kwargs": kwargs}
+            )
 
     return attributes
 
 
-def _get_output_attributes(template, result):
-    # type: (Union[str, "SpanTemplate"], Any) -> dict[str, Any]
+def _get_output_attributes(template, send_pii, result):
+    # type: (Union[str, "SpanTemplate"], bool, Any) -> dict[str, Any]
     """
     Get output attributes for the given span template.
     """
@@ -987,18 +988,20 @@ def _get_output_attributes(template, result):
             attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
 
     if template == SpanTemplate.AI_TOOL:
-        attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
+        if send_pii:
+            attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
 
     return attributes
 
 
-def _set_input_attributes(span, template, name, f, args, kwargs):
-    # type: (Span, Union[str, "SpanTemplate"], str, Any, tuple[Any, ...], dict[str, Any]) -> None
+def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
+    # type: (Span, Union[str, "SpanTemplate"], bool, str, Any, tuple[Any, ...], dict[str, Any]) -> None
     """
     Set span input attributes based on the given span template.
 
     :param span: The span to set attributes on.
     :param template: The template to use to set attributes on the span.
+    :param send_pii: Whether to send PII data.
     :param f: The wrapped function.
     :param args: The arguments to the wrapped function.
     :param kwargs: The keyword arguments to the wrapped function.
@@ -1024,17 +1027,18 @@ def _set_input_attributes(span, template, name, f, args, kwargs):
         if docstring is not None:
             attributes[SPANDATA.GEN_AI_TOOL_DESCRIPTION] = docstring
 
-    attributes.update(_get_input_attributes(template, args, kwargs))
+    attributes.update(_get_input_attributes(template, send_pii, args, kwargs))
     span.set_data(attributes)
 
 
-def _set_output_attributes(span, template, result):
-    # type: (Span, Union[str, "SpanTemplate"], Any) -> None
+def _set_output_attributes(span, template, send_pii, result):
+    # type: (Span, Union[str, "SpanTemplate"], bool, Any) -> None
     """
     Set span output attributes based on the given span template.
 
     :param span: The span to set attributes on.
     :param template: The template to use to set attributes on the span.
+    :param send_pii: Whether to send PII data.
     :param result: The result of the wrapped function.
     """
     attributes = {}  # type: dict[str, Any]
@@ -1042,7 +1046,7 @@ def _set_output_attributes(span, template, result):
     if template == SpanTemplate.AI_AGENT and isinstance(result, str):
         attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = result
 
-    attributes.update(_get_output_attributes(template, result))
+    attributes.update(_get_output_attributes(template, send_pii, result))
     span.set_data(attributes)
 
 
@@ -1056,6 +1060,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
     :param name: The name of the span.
     :param attributes: Additional attributes to set on the span.
     """
+    from sentry_sdk.scope import should_send_default_pii
 
     def span_decorator(f):
         # type: (Any) -> Any
@@ -1081,15 +1086,20 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
             )
 
             function_name = name or qualname_from_function(f) or ""
+            send_pii = should_send_default_pii()
+
             with start_span_func(
                 op=_get_span_op(template),
                 name=_get_span_name(template, function_name, kwargs),
             ) as span:
-                _set_input_attributes(span, template, function_name, f, args, kwargs)
+
+                _set_input_attributes(
+                    span, template, send_pii, function_name, f, args, kwargs
+                )
 
                 result = await f(*args, **kwargs)
 
-                _set_output_attributes(span, template, result)
+                _set_output_attributes(span, template, send_pii, result)
                 span.set_data(attributes)
 
                 return result
@@ -1117,15 +1127,19 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
             )
 
             function_name = name or qualname_from_function(f) or ""
+            send_pii = should_send_default_pii()
+
             with start_span_func(
                 op=_get_span_op(template),
                 name=_get_span_name(template, function_name, kwargs),
             ) as span:
-                _set_input_attributes(span, template, function_name, f, args, kwargs)
+                _set_input_attributes(
+                    span, template, send_pii, function_name, f, args, kwargs
+                )
 
                 result = f(*args, **kwargs)
 
-                _set_output_attributes(span, template, result)
+                _set_output_attributes(span, template, send_pii, result)
                 span.set_data(attributes)
 
                 return result
@@ -1144,12 +1158,12 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
 
 
 # Circular imports
+from sentry_sdk.consts import SpanTemplate
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
 )
-from sentry_sdk.consts import SpanTemplate
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
