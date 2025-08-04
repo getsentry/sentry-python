@@ -830,21 +830,31 @@ def _sample_rand_range(parent_sampled, sample_rate):
         return sample_rate, 1.0
 
 
-def _get_span_name(template, name):
-    # type: (Union[str, "SpanTemplate"], str) -> str
+def _get_span_name(template, name=None, kwargs=None):
+    # type: (Union[str, "SpanTemplate"], Optional[str], Optional[dict[str, Any]]) -> str
     """
     Get the name of the span based on the template and the name.
     """
     span_name = name
 
     if template == SpanTemplate.AI_CHAT:
-        span_name = "chat [MODEL]"
+        model = None
+        if kwargs and "model" in kwargs and isinstance(kwargs["model"], str):
+            model = kwargs["model"]
+        elif (
+            kwargs and "model_name" in kwargs and isinstance(kwargs["model_name"], str)
+        ):
+            model = kwargs["model_name"]
+
+        span_name = f"chat {model}" if model else "chat"
+
     elif template == SpanTemplate.AI_AGENT:
         span_name = f"invoke_agent {name}"
+
     elif template == SpanTemplate.AI_TOOL:
         span_name = f"execute_tool {name}"
 
-    return span_name
+    return span_name or ""
 
 
 def _get_span_op(template):
@@ -856,18 +866,119 @@ def _get_span_op(template):
 
     if template == SpanTemplate.AI_CHAT:
         op = OP.GEN_AI_CHAT
+
     elif template == SpanTemplate.AI_AGENT:
         op = OP.GEN_AI_INVOKE_AGENT
+
     elif template == SpanTemplate.AI_TOOL:
         op = OP.GEN_AI_EXECUTE_TOOL
 
     return op
 
 
+def _get_input_attributes(template, kwargs):
+    # type: (Union[str, "SpanTemplate"], dict[str, Any]) -> dict[str, Any]
+    """
+    Get input attributes for the given span template.
+    """
+    attributes = {}  # type: dict[str, Any]
+
+    for key, value in list(kwargs.items()):
+        if template in [
+            SpanTemplate.AI_AGENT,
+            SpanTemplate.AI_TOOL,
+            SpanTemplate.AI_CHAT,
+        ]:
+            if key == "model" and isinstance(value, str):
+                attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
+            elif key == "model_name" and isinstance(value, str):
+                attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
+
+            elif key == "agent" and isinstance(value, str):
+                attributes[SPANDATA.GEN_AI_AGENT_NAME] = value
+            elif key == "agent_name" and isinstance(value, str):
+                attributes[SPANDATA.GEN_AI_AGENT_NAME] = value
+
+            elif key == "prompt" and isinstance(value, str):
+                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
+                    {"role": "user", "content": value}
+                )
+            elif key == "system_prompt" and isinstance(value, str):
+                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
+                    {"role": "system", "content": value}
+                )
+
+            elif key == "max_tokens" and isinstance(value, int):
+                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, []).append(
+                    value
+                )
+            elif key == "frequency_penalty" and isinstance(value, float):
+                attributes.setdefault(
+                    SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, []
+                ).append(value)
+            elif key == "presence_penalty" and isinstance(value, float):
+                attributes.setdefault(
+                    SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, []
+                ).append(value)
+            elif key == "temperature" and isinstance(value, float):
+                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, []).append(
+                    value
+                )
+            elif key == "top_p" and isinstance(value, float):
+                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TOP_P, []).append(value)
+            elif key == "top_k" and isinstance(value, int):
+                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TOP_K, []).append(value)
+
+    return attributes
+
+
+def _get_output_attributes(template, result):
+    # type: (Union[str, "SpanTemplate"], Any) -> dict[str, Any]
+    """
+    Get output attributes for the given span template.
+    """
+    attributes = {}  # type: dict[str, Any]
+
+    if template in [SpanTemplate.AI_AGENT, SpanTemplate.AI_TOOL, SpanTemplate.AI_CHAT]:
+        if hasattr(result, "usage"):
+            if hasattr(result.usage, "input_tokens") and isinstance(
+                result.usage.input_tokens, int
+            ):
+                attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = (
+                    result.usage.input_tokens
+                )
+            elif hasattr(result.usage, "output_tokens") and isinstance(
+                result.usage.output_tokens, int
+            ):
+                attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = (
+                    result.usage.output_tokens
+                )
+            elif hasattr(result.usage, "total_tokens") and isinstance(
+                result.usage.total_tokens, int
+            ):
+                attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = (
+                    result.usage.total_tokens
+                )
+
+        elif hasattr(result, "input_tokens") and isinstance(result.input_tokens, int):
+            attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = result.input_tokens
+        elif hasattr(result, "output_tokens") and isinstance(result.output_tokens, int):
+            attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = result.output_tokens
+        elif hasattr(result, "total_tokens") and isinstance(result.total_tokens, int):
+            attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = result.total_tokens
+
+        elif hasattr(result, "model") and isinstance(result.model, str):
+            attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model
+        elif hasattr(result, "model_name") and isinstance(result.model_name, str):
+            attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
+
+    return attributes
+
+
 def _set_input_attributes(span, template, args, kwargs):
     # type: (Span, Union[str, "SpanTemplate"], tuple[Any, ...], dict[str, Any]) -> None
     """
-    Set span input attributes based on the given template.
+    Set span input attributes based on the given span template.
 
     :param span: The span to set attributes on.
     :param template: The template to use to set attributes on the span.
@@ -875,8 +986,6 @@ def _set_input_attributes(span, template, args, kwargs):
     :param kwargs: The keyword arguments to the wrapped function.
     """
     attributes = {}  # type: dict[str, Any]
-
-    # TODO: Implement actual input parameters for those templates :)
 
     if template == SpanTemplate.AI_AGENT:
         attributes = {
@@ -893,13 +1002,14 @@ def _set_input_attributes(span, template, args, kwargs):
             SPANDATA.GEN_AI_TOOL_NAME: span.description,
         }
 
+    attributes.update(_get_input_attributes(template, kwargs))
     span.set_data(attributes)
 
 
 def _set_output_attributes(span, template, result):
     # type: (Span, Union[str, "SpanTemplate"], Any) -> None
     """
-    Set span output attributes based on the given template.
+    Set span output attributes based on the given span template.
 
     :param span: The span to set attributes on.
     :param template: The template to use to set attributes on the span.
@@ -907,8 +1017,10 @@ def _set_output_attributes(span, template, result):
     """
     attributes = {}  # type: dict[str, Any]
 
-    # TODO: Implement :)
+    if template == SpanTemplate.AI_AGENT and isinstance(result, str):
+        attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = result
 
+    attributes.update(_get_output_attributes(template, result))
     span.set_data(attributes)
 
 
@@ -948,9 +1060,15 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
 
             with start_span_func(
                 op=_get_span_op(template),
-                name=_get_span_name(template, name or qualname_from_function(f)),
+                name=_get_span_name(
+                    template, name or qualname_from_function(f), kwargs
+                ),
             ) as span:
                 _set_input_attributes(span, template, args, kwargs)
+
+                docstring = getattr(f, "__doc__", None)
+                if template == SpanTemplate.AI_TOOL and docstring is not None:
+                    span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, docstring)
 
                 result = await f(*args, **kwargs)
 
