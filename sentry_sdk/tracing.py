@@ -611,11 +611,9 @@ class Span:
             # Dictionary calling pattern: set_data({"key": "value"})
             for k, v in key.items():
                 self._data[k] = v
+
         elif isinstance(key, str):
             # Traditional calling pattern: set_data(key, value)
-            if value is None:
-                raise ValueError("Value must be provided when key is a string")
-
             self._data[key] = value
 
     def set_flag(self, flag, result):
