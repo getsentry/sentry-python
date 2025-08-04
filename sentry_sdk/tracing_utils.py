@@ -20,6 +20,7 @@ from sentry_sdk.utils import (
     logger,
     match_regex_list,
     qualname_from_function,
+    safe_repr,
     to_string,
     try_convert,
     is_sentry_url,
@@ -876,19 +877,15 @@ def _get_span_op(template):
     return op
 
 
-def _get_input_attributes(template, kwargs):
-    # type: (Union[str, "SpanTemplate"], dict[str, Any]) -> dict[str, Any]
+def _get_input_attributes(template, args, kwargs):
+    # type: (Union[str, "SpanTemplate"], tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
     """
     Get input attributes for the given span template.
     """
     attributes = {}  # type: dict[str, Any]
 
-    for key, value in list(kwargs.items()):
-        if template in [
-            SpanTemplate.AI_AGENT,
-            SpanTemplate.AI_TOOL,
-            SpanTemplate.AI_CHAT,
-        ]:
+    if template in [SpanTemplate.AI_AGENT, SpanTemplate.AI_TOOL, SpanTemplate.AI_CHAT]:
+        for key, value in list(kwargs.items()):
             if key == "model" and isinstance(value, str):
                 attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
             elif key == "model_name" and isinstance(value, str):
@@ -928,6 +925,11 @@ def _get_input_attributes(template, kwargs):
                 attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TOP_P, []).append(value)
             elif key == "top_k" and isinstance(value, int):
                 attributes.setdefault(SPANDATA.GEN_AI_REQUEST_TOP_K, []).append(value)
+
+    if template == SpanTemplate.AI_TOOL:
+        attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
+            {"args": args, "kwargs": kwargs}
+        )
 
     return attributes
 
@@ -984,6 +986,9 @@ def _get_output_attributes(template, result):
         elif hasattr(result, "model_name") and isinstance(result.model_name, str):
             attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
 
+    if template == SpanTemplate.AI_TOOL:
+        attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
+
     return attributes
 
 
@@ -1019,7 +1024,7 @@ def _set_input_attributes(span, template, name, f, args, kwargs):
         if docstring is not None:
             attributes[SPANDATA.GEN_AI_TOOL_DESCRIPTION] = docstring
 
-    attributes.update(_get_input_attributes(template, kwargs))
+    attributes.update(_get_input_attributes(template, args, kwargs))
     span.set_data(attributes)
 
 
@@ -1114,7 +1119,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
             function_name = name or qualname_from_function(f) or ""
             with start_span_func(
                 op=_get_span_op(template),
-                name=_get_span_name(template, function_name),
+                name=_get_span_name(template, function_name, kwargs),
             ) as span:
                 _set_input_attributes(span, template, function_name, f, args, kwargs)
 
