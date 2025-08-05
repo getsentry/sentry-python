@@ -1016,7 +1016,7 @@ def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
             attributes[SPANDATA.GEN_AI_TOOL_DESCRIPTION] = docstring
 
     attributes.update(_get_input_attributes(template, send_pii, args, kwargs))
-    span.udpate_data(attributes)
+    span.update_data(attributes)
 
 
 def _set_output_attributes(span, template, send_pii, result):
@@ -1035,7 +1035,7 @@ def _set_output_attributes(span, template, send_pii, result):
         attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = result
 
     attributes.update(_get_output_attributes(template, send_pii, result))
-    span.udpate_data(attributes)
+    span.update_data(attributes)
 
 
 def create_span_decorator(template, op=None, name=None, attributes=None):
@@ -1088,7 +1088,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 result = await f(*args, **kwargs)
 
                 _set_output_attributes(span, template, send_pii, result)
-                span.udpate_data(attributes)
+                span.update_data(attributes)
 
                 return result
 
@@ -1128,7 +1128,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
                 result = f(*args, **kwargs)
 
                 _set_output_attributes(span, template, send_pii, result)
-                span.udpate_data(attributes)
+                span.update_data(attributes)
 
                 return result
 
