@@ -460,12 +460,6 @@ class SPANDATA:
     Example: 0.7
     """
 
-    GEN_AI_REQUEST_TOP_K = "gen_ai.request.top_k"
-    """
-    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
-    Example: 35
-    """
-
     GEN_AI_REQUEST_TOP_P = "gen_ai.request.top_p"
     """
     The top_p parameter used to control diversity via nucleus sampling.
