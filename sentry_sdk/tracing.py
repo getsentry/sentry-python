@@ -1279,6 +1279,10 @@ class NoOpSpan(Span):
         # type: (str, Any) -> None
         pass
 
+    def update_data(self, data):
+        # type: (Dict[str, Any]) -> None
+        pass
+
     def set_status(self, value):
         # type: (str) -> None
         pass
