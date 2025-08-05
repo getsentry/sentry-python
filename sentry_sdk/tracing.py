@@ -619,6 +619,10 @@ class Span:
             # Traditional calling pattern: set_data(key, value)
             self._data[key] = value
 
+    def update_data(self, data):
+        # type: (Dict[str, Any]) -> None
+        self._data.update(data)
+
     def set_flag(self, flag, result):
         # type: (str, bool) -> None
         if len(self._flags) < self._flags_capacity:
@@ -1290,6 +1294,10 @@ class NoOpSpan(Span):
 
     def set_data(self, key=None, value=None):
         # type: (Optional[Union[str, Dict[str, Any]]], Optional[Any]) -> None
+        pass
+
+    def update_data(self, data):
+        # type: (Dict[str, Any]) -> None
         pass
 
     def set_status(self, value):
