@@ -46,7 +46,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 #### Integrations
 
-- AWS Lambda: The message of the warning the SDK optionally emits if a Lambda function is about to time out has changed.
+- AWS Lambda, GCP: The message of the warning the SDK optionally emits if a function is about to time out has changed.
 - Redis: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
 - clickhouse-driver: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - Logging: By default, the SDK won't capture Sentry issues anymore when calling `logging.error()`, `logging.critical()` or `logging.exception()`. If you want to preserve the old behavior use `sentry_sdk.init(integrations=[LoggingIntegration(event_level="ERROR")])`.

@@ -214,7 +214,7 @@ def test_timeout_error(run_cloud_function):
     assert exception["type"] == "ServerlessTimeoutWarning"
     assert (
         exception["value"]
-        == "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds."
+        == "WARNING: Function is about to time out."
     )
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
