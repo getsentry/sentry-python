@@ -1341,13 +1341,15 @@ class NoOpSpan(Span):
 if TYPE_CHECKING:
 
     @overload
-    def trace(*, op=None, name=None, attributes=None):
-        # type: (Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[[Callable[P, R]], Callable[P, R]]
+    def trace(func):
+        # type: (Callable[P, R]) -> Callable[P, R]
+        # Handles: @trace
         pass
 
     @overload
-    def trace(func):
-        # type: (Callable[P, R]) -> Callable[P, R]
+    def trace(func=None, *, op=None, name=None, attributes=None):
+        # type: (None, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[[Callable[P, R]], Callable[P, R]]
+        # Handles: @trace() and @trace(op="custom")
         pass
 
 
