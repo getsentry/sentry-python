@@ -23,6 +23,7 @@ from sentry_sdk import (
 from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 from sentry_sdk.utils import capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.transport import Transport, AsyncHttpTransport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
@@ -1687,7 +1688,10 @@ async def test_async_proxy(monkeypatch, testcase):
     if testcase.get("env_no_proxy") is not None:
         monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
 
-    kwargs = {"_experiments": {"transport_async": True}}
+    kwargs = {
+        "_experiments": {"transport_async": True},
+        "integrations": [AsyncioIntegration()],
+    }
 
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
@@ -1789,7 +1793,10 @@ async def test_async_socks_proxy(testcase):
     # These are just the same tests as the sync ones, but they need to be run in an event loop
     # and respect the shutdown behavior of the async transport
 
-    kwargs = {"_experiments": {"transport_async": True}}
+    kwargs = {
+        "_experiments": {"transport_async": True},
+        "integrations": [AsyncioIntegration()],
+    }
 
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
