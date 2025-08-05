@@ -42,7 +42,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Callable
     from typing import Dict
     from typing import Optional
     from typing import Tuple
@@ -102,6 +101,7 @@ class SentryAsgiMiddleware:
         mechanism_type="asgi",  # type: str
         span_origin="manual",  # type: str
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: Tuple[str, ...]
+        asgi_version=None,  # type: Optional[int]
     ):
         # type: (...) -> None
         """
@@ -140,9 +140,15 @@ class SentryAsgiMiddleware:
         self.app = app
         self.http_methods_to_capture = http_methods_to_capture
 
-        if _looks_like_asgi3(app):
-            self.__call__ = self._run_asgi3  # type: Callable[..., Any]
-        else:
+        if asgi_version is None:
+            if _looks_like_asgi3(app):
+                asgi_version = 3
+            else:
+                asgi_version = 2
+
+        if asgi_version == 3:
+            self.__call__ = self._run_asgi3
+        elif asgi_version == 2:
             self.__call__ = self._run_asgi2
 
     def _capture_lifespan_exception(self, exc):

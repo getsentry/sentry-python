@@ -403,9 +403,9 @@ def patch_asgi_app():
                 if integration
                 else DEFAULT_HTTP_METHODS_TO_CAPTURE
             ),
+            asgi_version=3,
         )
 
-        middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 
     Starlette.__call__ = _sentry_patched_asgi_app
