@@ -1074,16 +1074,28 @@ def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
     use_http2_transport = options.get("_experiments", {}).get("transport_http2", False)
     use_async_transport = options.get("_experiments", {}).get("transport_async", False)
     # By default, we use the http transport class
+    sync_transport_cls = Http2Transport if use_http2_transport else HttpTransport
     if use_async_transport:
         try:
             asyncio.get_running_loop()
-            transport_cls: Type[Transport] = AsyncHttpTransport
+
+            # Asyncio Integration is necessary for AsyncHttpTransport, as it patches the event loop close for this transport.
+            if any(
+                integration.__class__.__name__ == "AsyncioIntegration"
+                for integration in options.get("integrations", [])
+            ):
+                transport_cls: Type[Transport] = AsyncHttpTransport
+            else:
+                logger.warning(
+                    "AsyncHttpTransport requires the AsyncioIntegration to be enabled, falling back to sync transport."
+                )
+                transport_cls = sync_transport_cls
         except RuntimeError:
             # No event loop running, fall back to sync transport
             logger.warning("No event loop running, falling back to sync transport.")
-            transport_cls = Http2Transport if use_http2_transport else HttpTransport
+            transport_cls = sync_transport_cls
     else:
-        transport_cls = Http2Transport if use_http2_transport else HttpTransport
+        transport_cls = sync_transport_cls
 
     if isinstance(ref_transport, Transport):
         return ref_transport
