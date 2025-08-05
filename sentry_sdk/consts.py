@@ -100,14 +100,6 @@ FALSE_VALUES = [
 ]
 
 
-class SPANTEMPLATE(str, Enum):
-    SPAN = "span"
-
-    def __str__(self):
-        # type: () -> str
-        return self.value
-
-
 class INSTRUMENTER:
     SENTRY = "sentry"
     OTEL = "otel"
