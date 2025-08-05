@@ -511,7 +511,7 @@ def test_transaction_not_started_warning(sentry_init):
     )
 
 
-def test_span_update_data_set_dat(sentry_init, capture_events):
+def test_span_set_data_update_data(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
 
     events = capture_events()
