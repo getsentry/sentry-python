@@ -20,7 +20,6 @@ from sentry_sdk.utils import (
     logger,
     match_regex_list,
     qualname_from_function,
-    safe_repr,
     to_string,
     try_convert,
     is_sentry_url,
@@ -831,213 +830,6 @@ def _sample_rand_range(parent_sampled, sample_rate):
         return sample_rate, 1.0
 
 
-def _get_span_name(template, name, kwargs=None):
-    # type: (Union[str, "SPANTEMPLATE"], str, Optional[dict[str, Any]]) -> str
-    """
-    Get the name of the span based on the template and the name.
-    """
-    span_name = name
-
-    if template == SPANTEMPLATE.AI_CHAT:
-        model = None
-        if kwargs and "model" in kwargs and isinstance(kwargs["model"], str):
-            model = kwargs["model"]
-        elif (
-            kwargs and "model_name" in kwargs and isinstance(kwargs["model_name"], str)
-        ):
-            model = kwargs["model_name"]
-
-        span_name = f"chat {model}" if model else "chat"
-
-    elif template == SPANTEMPLATE.AI_AGENT:
-        span_name = f"invoke_agent {name}"
-
-    elif template == SPANTEMPLATE.AI_TOOL:
-        span_name = f"execute_tool {name}"
-
-    return span_name
-
-
-def _get_span_op(template):
-    # type: (Union[str, "SPANTEMPLATE"]) -> str
-    """
-    Get the operation of the span based on the template.
-    """
-    op = OP.FUNCTION
-
-    if template == SPANTEMPLATE.AI_CHAT:
-        op = OP.GEN_AI_CHAT
-
-    elif template == SPANTEMPLATE.AI_AGENT:
-        op = OP.GEN_AI_INVOKE_AGENT
-
-    elif template == SPANTEMPLATE.AI_TOOL:
-        op = OP.GEN_AI_EXECUTE_TOOL
-
-    return op
-
-
-def _get_input_attributes(template, send_pii, args, kwargs):
-    # type: (Union[str, "SPANTEMPLATE"], bool, tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
-    """
-    Get input attributes for the given span template.
-    """
-    attributes = {}  # type: dict[str, Any]
-
-    if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
-        for key, value in list(kwargs.items()):
-            if key == "model" and isinstance(value, str):
-                attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
-            elif key == "model_name" and isinstance(value, str):
-                attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
-
-            elif key == "agent" and isinstance(value, str):
-                attributes[SPANDATA.GEN_AI_AGENT_NAME] = value
-            elif key == "agent_name" and isinstance(value, str):
-                attributes[SPANDATA.GEN_AI_AGENT_NAME] = value
-
-            elif key == "prompt" and isinstance(value, str):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
-                    {"role": "user", "content": value}
-                )
-            elif key == "system_prompt" and isinstance(value, str):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
-                    {"role": "system", "content": value}
-                )
-
-            elif key == "max_tokens" and isinstance(value, int):
-                attributes[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] = value
-            elif key == "frequency_penalty" and isinstance(value, float):
-                attributes[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] = value
-            elif key == "presence_penalty" and isinstance(value, float):
-                attributes[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] = value
-            elif key == "temperature" and isinstance(value, float):
-                attributes[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] = value
-            elif key == "top_p" and isinstance(value, float):
-                attributes[SPANDATA.GEN_AI_REQUEST_TOP_P] = value
-            elif key == "top_k" and isinstance(value, int):
-                attributes[SPANDATA.GEN_AI_REQUEST_TOP_K] = value
-
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in attributes:
-        attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES] = safe_repr(
-            attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-
-    if template == SPANTEMPLATE.AI_TOOL:
-        if send_pii:
-            attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
-                {"args": args, "kwargs": kwargs}
-            )
-
-    return attributes
-
-
-def _get_usage_attributes(usage):
-    # type: (Any) -> dict[str, Any]
-    """
-    Get usage attributes.
-    """
-    attributes = {}
-
-    if hasattr(usage, "prompt_tokens") and isinstance(usage.prompt_tokens, int):
-        attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.prompt_tokens
-    elif hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
-        attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens
-    elif hasattr(usage, "completion_tokens") and isinstance(
-        usage.completion_tokens, int
-    ):
-        attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens
-    elif hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
-        attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.completion_tokens
-    elif hasattr(usage, "total_tokens") and isinstance(usage.total_tokens, int):
-        attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = usage.total_tokens
-
-    return attributes
-
-
-def _get_output_attributes(template, send_pii, result):
-    # type: (Union[str, "SPANTEMPLATE"], bool, Any) -> dict[str, Any]
-    """
-    Get output attributes for the given span template.
-    """
-    attributes = {}  # type: dict[str, Any]
-
-    if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
-        attributes.update(_get_usage_attributes(result))
-        if hasattr(result, "usage"):
-            attributes.update(_get_usage_attributes(result.usage))
-        elif hasattr(result, "metadata"):
-            if hasattr(result.metadata, "usage"):
-                attributes.update(_get_usage_attributes(result.metadata.usage))
-
-        elif hasattr(result, "model") and isinstance(result.model, str):
-            attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model
-        elif hasattr(result, "model_name") and isinstance(result.model_name, str):
-            attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
-
-    if template == SPANTEMPLATE.AI_TOOL:
-        if send_pii:
-            attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
-
-    return attributes
-
-
-def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
-    # type: (Span, Union[str, "SPANTEMPLATE"], bool, str, Any, tuple[Any, ...], dict[str, Any]) -> None
-    """
-    Set span input attributes based on the given span template.
-
-    :param span: The span to set attributes on.
-    :param template: The template to use to set attributes on the span.
-    :param send_pii: Whether to send PII data.
-    :param f: The wrapped function.
-    :param args: The arguments to the wrapped function.
-    :param kwargs: The keyword arguments to the wrapped function.
-    """
-    attributes = {}  # type: dict[str, Any]
-
-    if template == SPANTEMPLATE.AI_AGENT:
-        attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            SPANDATA.GEN_AI_AGENT_NAME: name,
-        }
-    elif template == SPANTEMPLATE.AI_CHAT:
-        attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-        }
-    elif template == SPANTEMPLATE.AI_TOOL:
-        attributes = {
-            SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
-            SPANDATA.GEN_AI_TOOL_NAME: name,
-        }
-
-        docstring = f.__doc__
-        if docstring is not None:
-            attributes[SPANDATA.GEN_AI_TOOL_DESCRIPTION] = docstring
-
-    attributes.update(_get_input_attributes(template, send_pii, args, kwargs))
-    span.update_data(attributes or {})
-
-
-def _set_output_attributes(span, template, send_pii, result):
-    # type: (Span, Union[str, "SPANTEMPLATE"], bool, Any) -> None
-    """
-    Set span output attributes based on the given span template.
-
-    :param span: The span to set attributes on.
-    :param template: The template to use to set attributes on the span.
-    :param send_pii: Whether to send PII data.
-    :param result: The result of the wrapped function.
-    """
-    attributes = {}  # type: dict[str, Any]
-
-    if template == SPANTEMPLATE.AI_AGENT and isinstance(result, str):
-        attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = result
-
-    attributes.update(_get_output_attributes(template, send_pii, result))
-    span.update_data(attributes or {})
-
-
 def create_span_decorator(template, op=None, name=None, attributes=None):
     # type: (Union[str, "SPANTEMPLATE"], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
     """
@@ -1048,7 +840,6 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
     :param name: The name of the span.
     :param attributes: Additional attributes to set on the span.
     """
-    from sentry_sdk.scope import should_send_default_pii
 
     def span_decorator(f):
         # type: (Any) -> Any
@@ -1074,22 +865,12 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
             )
 
             function_name = name or qualname_from_function(f) or ""
-            send_pii = should_send_default_pii()
 
             with start_span_func(
-                op=_get_span_op(template),
-                name=_get_span_name(template, function_name, kwargs),
-            ) as span:
-
-                _set_input_attributes(
-                    span, template, send_pii, function_name, f, args, kwargs
-                )
-
+                op=OP.FUNCTION,
+                name=function_name,
+            ):
                 result = await f(*args, **kwargs)
-
-                _set_output_attributes(span, template, send_pii, result)
-                span.update_data(attributes or {})
-
                 return result
 
         try:
@@ -1115,21 +896,12 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
             )
 
             function_name = name or qualname_from_function(f) or ""
-            send_pii = should_send_default_pii()
 
             with start_span_func(
-                op=_get_span_op(template),
-                name=_get_span_name(template, function_name, kwargs),
-            ) as span:
-                _set_input_attributes(
-                    span, template, send_pii, function_name, f, args, kwargs
-                )
-
+                op=OP.FUNCTION,
+                name=function_name,
+            ):
                 result = f(*args, **kwargs)
-
-                _set_output_attributes(span, template, send_pii, result)
-                span.update_data(attributes or {})
-
                 return result
 
         try:

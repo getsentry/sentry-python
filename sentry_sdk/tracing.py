@@ -1341,22 +1341,18 @@ class NoOpSpan(Span):
 if TYPE_CHECKING:
 
     @overload
-    def trace(
-        func=None, *, template=SPANTEMPLATE.SPAN, op=None, name=None, attributes=None
-    ):
-        # type: (Optional[Callable[P, R]], SPANTEMPLATE, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[[Callable[P, R]], Callable[P, R]]
+    def trace(func=None, *, op=None, name=None, attributes=None):
+        # type: (Optional[Callable[P, R]], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[[Callable[P, R]], Callable[P, R]]
         pass
 
     @overload
-    def trace(func, *, template=SPANTEMPLATE.SPAN, op=None, name=None, attributes=None):
-        # type: (Callable[P, R], SPANTEMPLATE, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[P, R]
+    def trace(func, *, op=None, name=None, attributes=None):
+        # type: (Callable[P, R], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[P, R]
         pass
 
 
-def trace(
-    func=None, *, template=SPANTEMPLATE.SPAN, op=None, name=None, attributes=None
-):
-    # type: (Optional[Callable[P, R]], SPANTEMPLATE, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+def trace(func=None, *, op=None, name=None, attributes=None):
+    # type: (Optional[Callable[P, R]], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span around a function call.
 
@@ -1367,13 +1363,6 @@ def trace(
         this is the function being decorated. When used with parameters (e.g.,
         ``@trace(op="custom")``, this should be None.
     :type func: Callable or None
-
-    :param template: The type of span to create. This determines what kind of
-        span instrumentation and data collection will be applied. Use predefined
-        constants from :py:class:`sentry_sdk.consts.SPANTEMPLATE`.
-        The default is `SPANTEMPLATE.SPAN` which is the right choice for most
-        use cases.
-    :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
 
     :param op: The operation name for the span. This is a high-level description
         of what the span represents (e.g., "http.client", "db.query").
@@ -1399,7 +1388,7 @@ def trace(
     Example::
 
         import sentry_sdk
-        from sentry_sdk.consts import OP, SPANTEMPLATE
+        from sentry_sdk.consts import OP
 
         # Simple usage with default values
         @sentry_sdk.trace
@@ -1416,15 +1405,9 @@ def trace(
         def make_db_query(sql):
             # Function implementation
             pass
-
-        # With a custom template
-        @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
-        def calculate_interest_rate(amount, rate, years):
-            # Function implementation
-            pass
     """
     decorator = create_span_decorator(
-        template=template,
+        template=SPANTEMPLATE.SPAN,
         op=op,
         name=name,
         attributes=attributes,

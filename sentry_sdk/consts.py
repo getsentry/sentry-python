@@ -102,9 +102,6 @@ FALSE_VALUES = [
 
 class SPANTEMPLATE(str, Enum):
     SPAN = "span"
-    AI_AGENT = "ai_agent"
-    AI_TOOL = "ai_tool"
-    AI_CHAT = "ai_chat"
 
     def __str__(self):
         # type: () -> str
