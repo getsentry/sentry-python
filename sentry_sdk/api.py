@@ -476,8 +476,8 @@ def set_transaction_name(name, source=None):
     return get_current_scope().set_transaction_name(name, source)
 
 
-def update_current_span(op=None, name=None, attributes=None):
-    # type: (Optional[str], Optional[str], Optional[dict[str, Union[str, int, float, bool]]]) -> None
+def update_current_span(op=None, name=None, attributes=None, data=None):
+    # type: (Optional[str], Optional[str], Optional[dict[str, Union[str, int, float, bool]]], Optional[dict[str, Any]]) -> None
     """
     Update the current active span with the provided parameters.
 
@@ -496,6 +496,15 @@ def update_current_span(op=None, name=None, attributes=None):
         "SELECT * FROM users"). If not provided, the span's name will remain unchanged.
     :type name: str or None
 
+    :param data: A dictionary of key-value pairs to add as data to the span. This
+        data will be merged with any existing span data. If not provided,
+        no data will be added.
+
+        .. deprecated:: 2.35.0
+            Use ``attributes`` instead. The ``data`` parameter will be removed
+            in a future version.
+    :type data: dict[str, Union[str, int, float, bool]] or None
+
     :param attributes: A dictionary of key-value pairs to add as attributes to the span.
         Attribute values must be strings, integers, floats, or booleans. These
         attributes will be merged with any existing span data. If not provided,
@@ -504,7 +513,7 @@ def update_current_span(op=None, name=None, attributes=None):
 
     :returns: None
 
-    .. versionadded:: 2.0.0
+    .. versionadded:: 2.35.0
 
     Example::
 
@@ -528,6 +537,19 @@ def update_current_span(op=None, name=None, attributes=None):
     if name is not None:
         # internally it is still description
         current_span.description = name
+
+    if data is not None and attributes is not None:
+        raise ValueError(
+            "Cannot provide both `data` and `attributes`. Please use only `attributes`."
+        )
+
+    if data is not None:
+        warnings.warn(
+            "The `data` parameter is deprecated. Please use `attributes` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        attributes = data
 
     if attributes is not None:
         current_span.update_data(attributes)
