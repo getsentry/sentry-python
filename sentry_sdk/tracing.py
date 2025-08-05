@@ -1401,7 +1401,7 @@ def trace(
         import sentry_sdk
         from sentry_sdk.consts import OP, SPANTEMPLATE
 
-        # Simple usage with default template
+        # Simple usage with default values
         @sentry_sdk.trace
         def process_data():
             # Function implementation
@@ -1409,12 +1409,17 @@ def trace(
 
         # With custom parameters
         @sentry_sdk.trace(
-            template=SPANTEMPLATE.AI_CHAT,
-            op=OP.GEN_AI_CHAT,
-            name="user_chat_completion",
-            attributes={"model": "gpt-4", "temperature": 0.7}
+            op=OP.DB_QUERY,
+            name="Get user data",
+            attributes={"postgres": True}
         )
-        def generate_response(prompt):
+        def make_db_query(sql):
+            # Function implementation
+            pass
+
+        # With a custom template
+        @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
+        def calculate_interest_rate(amount, rate, years):
             # Function implementation
             pass
     """
