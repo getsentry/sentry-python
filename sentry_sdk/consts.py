@@ -100,7 +100,7 @@ FALSE_VALUES = [
 ]
 
 
-class SpanTemplate(str, Enum):
+class SPANTEMPLATE(str, Enum):
     SPAN = "span"
     AI_AGENT = "ai_agent"
     AI_TOOL = "ai_tool"

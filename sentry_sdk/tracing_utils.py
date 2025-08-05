@@ -832,13 +832,13 @@ def _sample_rand_range(parent_sampled, sample_rate):
 
 
 def _get_span_name(template, name, kwargs=None):
-    # type: (Union[str, "SpanTemplate"], str, Optional[dict[str, Any]]) -> str
+    # type: (Union[str, "SPANTEMPLATE"], str, Optional[dict[str, Any]]) -> str
     """
     Get the name of the span based on the template and the name.
     """
     span_name = name
 
-    if template == SpanTemplate.AI_CHAT:
+    if template == SPANTEMPLATE.AI_CHAT:
         model = None
         if kwargs and "model" in kwargs and isinstance(kwargs["model"], str):
             model = kwargs["model"]
@@ -849,42 +849,42 @@ def _get_span_name(template, name, kwargs=None):
 
         span_name = f"chat {model}" if model else "chat"
 
-    elif template == SpanTemplate.AI_AGENT:
+    elif template == SPANTEMPLATE.AI_AGENT:
         span_name = f"invoke_agent {name}"
 
-    elif template == SpanTemplate.AI_TOOL:
+    elif template == SPANTEMPLATE.AI_TOOL:
         span_name = f"execute_tool {name}"
 
     return span_name
 
 
 def _get_span_op(template):
-    # type: (Union[str, "SpanTemplate"]) -> str
+    # type: (Union[str, "SPANTEMPLATE"]) -> str
     """
     Get the operation of the span based on the template.
     """
     op = OP.FUNCTION
 
-    if template == SpanTemplate.AI_CHAT:
+    if template == SPANTEMPLATE.AI_CHAT:
         op = OP.GEN_AI_CHAT
 
-    elif template == SpanTemplate.AI_AGENT:
+    elif template == SPANTEMPLATE.AI_AGENT:
         op = OP.GEN_AI_INVOKE_AGENT
 
-    elif template == SpanTemplate.AI_TOOL:
+    elif template == SPANTEMPLATE.AI_TOOL:
         op = OP.GEN_AI_EXECUTE_TOOL
 
     return op
 
 
 def _get_input_attributes(template, send_pii, args, kwargs):
-    # type: (Union[str, "SpanTemplate"], bool, tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
+    # type: (Union[str, "SPANTEMPLATE"], bool, tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
     """
     Get input attributes for the given span template.
     """
     attributes = {}  # type: dict[str, Any]
 
-    if template in [SpanTemplate.AI_AGENT, SpanTemplate.AI_TOOL, SpanTemplate.AI_CHAT]:
+    if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
         for key, value in list(kwargs.items()):
             if key == "model" and isinstance(value, str):
                 attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
@@ -923,7 +923,7 @@ def _get_input_attributes(template, send_pii, args, kwargs):
             attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
 
-    if template == SpanTemplate.AI_TOOL:
+    if template == SPANTEMPLATE.AI_TOOL:
         if send_pii:
             attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
                 {"args": args, "kwargs": kwargs}
@@ -956,13 +956,13 @@ def _get_usage_attributes(usage):
 
 
 def _get_output_attributes(template, send_pii, result):
-    # type: (Union[str, "SpanTemplate"], bool, Any) -> dict[str, Any]
+    # type: (Union[str, "SPANTEMPLATE"], bool, Any) -> dict[str, Any]
     """
     Get output attributes for the given span template.
     """
     attributes = {}  # type: dict[str, Any]
 
-    if template in [SpanTemplate.AI_AGENT, SpanTemplate.AI_TOOL, SpanTemplate.AI_CHAT]:
+    if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
         attributes.update(_get_usage_attributes(result))
         if hasattr(result, "usage"):
             attributes.update(_get_usage_attributes(result.usage))
@@ -975,7 +975,7 @@ def _get_output_attributes(template, send_pii, result):
         elif hasattr(result, "model_name") and isinstance(result.model_name, str):
             attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
 
-    if template == SpanTemplate.AI_TOOL:
+    if template == SPANTEMPLATE.AI_TOOL:
         if send_pii:
             attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
 
@@ -983,7 +983,7 @@ def _get_output_attributes(template, send_pii, result):
 
 
 def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
-    # type: (Span, Union[str, "SpanTemplate"], bool, str, Any, tuple[Any, ...], dict[str, Any]) -> None
+    # type: (Span, Union[str, "SPANTEMPLATE"], bool, str, Any, tuple[Any, ...], dict[str, Any]) -> None
     """
     Set span input attributes based on the given span template.
 
@@ -996,16 +996,16 @@ def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
     """
     attributes = {}  # type: dict[str, Any]
 
-    if template == SpanTemplate.AI_AGENT:
+    if template == SPANTEMPLATE.AI_AGENT:
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
             SPANDATA.GEN_AI_AGENT_NAME: name,
         }
-    elif template == SpanTemplate.AI_CHAT:
+    elif template == SPANTEMPLATE.AI_CHAT:
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "chat",
         }
-    elif template == SpanTemplate.AI_TOOL:
+    elif template == SPANTEMPLATE.AI_TOOL:
         attributes = {
             SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
             SPANDATA.GEN_AI_TOOL_NAME: name,
@@ -1020,7 +1020,7 @@ def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
 
 
 def _set_output_attributes(span, template, send_pii, result):
-    # type: (Span, Union[str, "SpanTemplate"], bool, Any) -> None
+    # type: (Span, Union[str, "SPANTEMPLATE"], bool, Any) -> None
     """
     Set span output attributes based on the given span template.
 
@@ -1031,7 +1031,7 @@ def _set_output_attributes(span, template, send_pii, result):
     """
     attributes = {}  # type: dict[str, Any]
 
-    if template == SpanTemplate.AI_AGENT and isinstance(result, str):
+    if template == SPANTEMPLATE.AI_AGENT and isinstance(result, str):
         attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = result
 
     attributes.update(_get_output_attributes(template, send_pii, result))
@@ -1039,7 +1039,7 @@ def _set_output_attributes(span, template, send_pii, result):
 
 
 def create_span_decorator(template, op=None, name=None, attributes=None):
-    # type: (Union[str, "SpanTemplate"], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
+    # type: (Union[str, "SPANTEMPLATE"], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
     """
     Create a span decorator that can wrap both sync and async functions.
 
@@ -1146,7 +1146,7 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
 
 
 # Circular imports
-from sentry_sdk.consts import SpanTemplate
+from sentry_sdk.consts import SPANTEMPLATE
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
