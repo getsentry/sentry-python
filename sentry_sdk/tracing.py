@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA, SPANTEMPLATE
+from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import (
@@ -1407,7 +1407,6 @@ def trace(func=None, *, op=None, name=None, attributes=None):
             pass
     """
     decorator = create_span_decorator(
-        template=SPANTEMPLATE.SPAN,
         op=op,
         name=name,
         attributes=attributes,

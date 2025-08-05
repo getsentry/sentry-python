@@ -830,12 +830,11 @@ def _sample_rand_range(parent_sampled, sample_rate):
         return sample_rate, 1.0
 
 
-def create_span_decorator(template, op=None, name=None, attributes=None):
-    # type: (Union[str, "SPANTEMPLATE"], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
+def create_span_decorator(op=None, name=None, attributes=None):
+    # type: (Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
     """
     Create a span decorator that can wrap both sync and async functions.
 
-    :param template: The type of span to create (used for input/output attributes).
     :param op: The operation type for the span.
     :param name: The name of the span.
     :param attributes: Additional attributes to set on the span.
@@ -918,7 +917,6 @@ def create_span_decorator(template, op=None, name=None, attributes=None):
 
 
 # Circular imports
-from sentry_sdk.consts import SPANTEMPLATE
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,

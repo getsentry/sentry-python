@@ -24,7 +24,7 @@ def test_trace_decorator():
         fake_start_child.assert_not_called()
         assert result == "return_of_sync_function"
 
-        start_child_span_decorator = create_span_decorator(template="span")
+        start_child_span_decorator = create_span_decorator()
         result2 = start_child_span_decorator(my_example_function)()
         fake_start_child.assert_called_once_with(
             op="function", name="test_decorator.my_example_function"
@@ -39,7 +39,7 @@ def test_trace_decorator_no_trx():
             fake_debug.assert_not_called()
             assert result == "return_of_sync_function"
 
-            start_child_span_decorator = create_span_decorator(template="span")
+            start_child_span_decorator = create_span_decorator()
             result2 = start_child_span_decorator(my_example_function)()
             fake_debug.assert_called_once_with(
                 "Cannot create a child span for %s. "
@@ -57,7 +57,7 @@ async def test_trace_decorator_async():
         fake_start_child.assert_not_called()
         assert result == "return_of_async_function"
 
-        start_child_span_decorator = create_span_decorator(template="span")
+        start_child_span_decorator = create_span_decorator()
         result2 = await start_child_span_decorator(my_async_example_function)()
         fake_start_child.assert_called_once_with(
             op="function",
@@ -74,7 +74,7 @@ async def test_trace_decorator_async_no_trx():
             fake_debug.assert_not_called()
             assert result == "return_of_async_function"
 
-            start_child_span_decorator = create_span_decorator(template="span")
+            start_child_span_decorator = create_span_decorator()
             result2 = await start_child_span_decorator(my_async_example_function)()
             fake_debug.assert_called_once_with(
                 "Cannot create a child span for %s. "
