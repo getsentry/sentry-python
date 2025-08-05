@@ -770,66 +770,6 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
-def get_current_span(scope=None):
-    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
-    """
-    Returns the currently active span if there is one running, otherwise `None`
-    """
-    scope = scope or sentry_sdk.get_current_scope()
-    current_span = scope.span
-    return current_span
-
-
-def _generate_sample_rand(
-    trace_id,  # type: Optional[str]
-    *,
-    interval=(0.0, 1.0),  # type: tuple[float, float]
-):
-    # type: (...) -> Decimal
-    """Generate a sample_rand value from a trace ID.
-
-    The generated value will be pseudorandomly chosen from the provided
-    interval. Specifically, given (lower, upper) = interval, the generated
-    value will be in the range [lower, upper). The value has 6-digit precision,
-    so when printing with .6f, the value will never be rounded up.
-
-    The pseudorandom number generator is seeded with the trace ID.
-    """
-    lower, upper = interval
-    if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
-        raise ValueError("Invalid interval: lower must be less than upper")
-
-    rng = Random(trace_id)
-    sample_rand = upper
-    while sample_rand >= upper:
-        sample_rand = rng.uniform(lower, upper)
-
-    # Round down to exactly six decimal-digit precision.
-    # Setting the context is needed to avoid an InvalidOperation exception
-    # in case the user has changed the default precision or set traps.
-    with localcontext(DefaultContext) as ctx:
-        ctx.prec = 6
-        return Decimal(sample_rand).quantize(
-            Decimal("0.000001"),
-            rounding=ROUND_DOWN,
-        )
-
-
-def _sample_rand_range(parent_sampled, sample_rate):
-    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
-    """
-    Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
-    that a generated sample_rand value must fall into, given the parent_sampled and
-    sample_rate values.
-    """
-    if parent_sampled is None or sample_rate is None:
-        return 0.0, 1.0
-    elif parent_sampled is True:
-        return 0.0, sample_rate
-    else:  # parent_sampled is False
-        return sample_rate, 1.0
-
-
 def create_span_decorator(op=None, name=None, attributes=None):
     # type: (Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
     """
@@ -910,6 +850,66 @@ def create_span_decorator(op=None, name=None, attributes=None):
             return sync_wrapper
 
     return span_decorator
+
+
+def get_current_span(scope=None):
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    scope = scope or sentry_sdk.get_current_scope()
+    current_span = scope.span
+    return current_span
+
+
+def _generate_sample_rand(
+    trace_id,  # type: Optional[str]
+    *,
+    interval=(0.0, 1.0),  # type: tuple[float, float]
+):
+    # type: (...) -> Decimal
+    """Generate a sample_rand value from a trace ID.
+
+    The generated value will be pseudorandomly chosen from the provided
+    interval. Specifically, given (lower, upper) = interval, the generated
+    value will be in the range [lower, upper). The value has 6-digit precision,
+    so when printing with .6f, the value will never be rounded up.
+
+    The pseudorandom number generator is seeded with the trace ID.
+    """
+    lower, upper = interval
+    if not lower < upper:  # using `if lower >= upper` would handle NaNs incorrectly
+        raise ValueError("Invalid interval: lower must be less than upper")
+
+    rng = Random(trace_id)
+    sample_rand = upper
+    while sample_rand >= upper:
+        sample_rand = rng.uniform(lower, upper)
+
+    # Round down to exactly six decimal-digit precision.
+    # Setting the context is needed to avoid an InvalidOperation exception
+    # in case the user has changed the default precision or set traps.
+    with localcontext(DefaultContext) as ctx:
+        ctx.prec = 6
+        return Decimal(sample_rand).quantize(
+            Decimal("0.000001"),
+            rounding=ROUND_DOWN,
+        )
+
+
+def _sample_rand_range(parent_sampled, sample_rate):
+    # type: (Optional[bool], Optional[float]) -> tuple[float, float]
+    """
+    Compute the lower (inclusive) and upper (exclusive) bounds of the range of values
+    that a generated sample_rand value must fall into, given the parent_sampled and
+    sample_rate values.
+    """
+    if parent_sampled is None or sample_rate is None:
+        return 0.0, 1.0
+    elif parent_sampled is True:
+        return 0.0, sample_rate
+    else:  # parent_sampled is False
+        return sample_rate, 1.0
 
 
 # Circular imports
