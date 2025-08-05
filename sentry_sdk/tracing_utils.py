@@ -863,12 +863,14 @@ def create_span_decorator(op=None, name=None, attributes=None):
                 current_span.start_child if current_span else sentry_sdk.start_span
             )
 
-            function_name = name or qualname_from_function(f) or ""
+            span_op = op or OP.FUNCTION
+            span_name = name or qualname_from_function(f) or ""
 
             with start_span_func(
-                op=OP.FUNCTION,
-                name=function_name,
-            ):
+                op=span_op,
+                name=span_name,
+            ) as span:
+                span.update_data(attributes or {})
                 result = await f(*args, **kwargs)
                 return result
 
@@ -894,12 +896,14 @@ def create_span_decorator(op=None, name=None, attributes=None):
                 current_span.start_child if current_span else sentry_sdk.start_span
             )
 
-            function_name = name or qualname_from_function(f) or ""
+            span_op = op or OP.FUNCTION
+            span_name = name or qualname_from_function(f) or ""
 
             with start_span_func(
-                op=OP.FUNCTION,
-                name=function_name,
-            ):
+                op=span_op,
+                name=span_name,
+            ) as span:
+                span.update_data(attributes or {})
                 result = f(*args, **kwargs)
                 return result
 
