@@ -1,6 +1,5 @@
 import contextlib
 import inspect
-import math
 import os
 import re
 import sys
@@ -867,13 +866,9 @@ def _generate_sample_rand(
         raise ValueError("Invalid interval: lower must be less than upper")
 
     rng = Random(trace_id)
-    sample_rand = upper
-    while sample_rand >= upper:
-        sample_rand = rng.uniform(lower, upper)
+    sample_rand_scaled = rng.randrange(int(lower * 1000000), int(upper * 1000000))
 
-    # Round down to exactly six decimal-digit precision.
-    # Using floor to ensure we always round down, similar to ROUND_DOWN
-    return math.floor(sample_rand * 1000000) / 1000000
+    return sample_rand_scaled / 1000000
 
 
 def _sample_rand_range(parent_sampled, sample_rate):
