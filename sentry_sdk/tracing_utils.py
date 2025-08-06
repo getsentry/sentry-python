@@ -1094,18 +1094,31 @@ def _get_output_attributes(template, send_pii, result):
 
     if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
         attributes.update(_get_usage_attributes(result))
-        if hasattr(result, "usage"):
-            attributes.update(_get_usage_attributes(result.usage))
-        elif hasattr(result, "metadata"):
-            if hasattr(result.metadata, "usage"):
-                attributes.update(_get_usage_attributes(result.metadata.usage))
-        elif isinstance(result, dict) and "usage" in result:
-            attributes.update(_get_usage_attributes(result["usage"]))
 
-        elif hasattr(result, "model") and isinstance(result.model, str):
-            attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model
-        elif hasattr(result, "model_name") and isinstance(result.model_name, str):
-            attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
+        if isinstance(result, dict):
+            if "usage" in result:
+                attributes.update(_get_usage_attributes(result["usage"]))
+            if (
+                "metadata" in result
+                and result["metadata"]
+                and "usage" in result["metadata"]
+            ):
+                attributes.update(_get_usage_attributes(result["metadata"]["usage"]))
+            if "model" in result:
+                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result["model"]
+            if "model_name" in result:
+                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result["model_name"]
+        else:
+            if hasattr(result, "usage"):
+                attributes.update(_get_usage_attributes(result.usage))
+            if hasattr(result, "metadata") and hasattr(result.metadata, "usage"):
+                attributes.update(_get_usage_attributes(result.metadata.usage))
+            if isinstance(result, dict) and "usage" in result:
+                attributes.update(_get_usage_attributes(result["usage"]))
+            if hasattr(result, "model") and isinstance(result.model, str):
+                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model
+            if hasattr(result, "model_name") and isinstance(result.model_name, str):
+                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
 
     if template == SPANTEMPLATE.AI_TOOL:
         if send_pii:
