@@ -812,7 +812,7 @@ def create_span_decorator(
                 )
                 return await f(*args, **kwargs)
 
-            span_op = _get_span_op(template)
+            span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
             send_pii = should_send_default_pii()
@@ -850,7 +850,7 @@ def create_span_decorator(
                 )
                 return f(*args, **kwargs)
 
-            span_op = _get_span_op(template)
+            span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
             send_pii = should_send_default_pii()
@@ -1113,8 +1113,6 @@ def _get_output_attributes(template, send_pii, result):
                 attributes.update(_get_usage_attributes(result.usage))
             if hasattr(result, "metadata") and hasattr(result.metadata, "usage"):
                 attributes.update(_get_usage_attributes(result.metadata.usage))
-            if isinstance(result, dict) and "usage" in result:
-                attributes.update(_get_usage_attributes(result["usage"]))
             if hasattr(result, "model") and isinstance(result.model, str):
                 attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model
             if hasattr(result, "model_name") and isinstance(result.model_name, str):
