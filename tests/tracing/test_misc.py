@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, ANY
 
 import sentry_sdk
 from sentry_sdk import start_span, get_current_scope
@@ -194,3 +194,87 @@ def test_should_propagate_trace_to_sentry(
     client.transport.parsed_dsn = Dsn(dsn)
 
     assert should_propagate_trace(client, url) == expected_propagation_decision
+
+
+def test_span_set_attributes(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with sentry_sdk.start_span(name="test-root-span"):
+        with start_span(op="test-span", name="test-span-name") as span:
+            span.set_data("key0", "value0")
+            span.set_data("key1", "value1")
+
+            span.set_attributes(
+                {
+                    "key1": "updated-value1",
+                    "key2": "value2",
+                    "key3": "value3",
+                }
+            )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    assert span["data"] == {
+        "key0": "value0",
+        "key1": "updated-value1",
+        "key2": "value2",
+        "key3": "value3",
+        "sentry.name": "test-span-name",
+        "sentry.op": "test-span",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
+        "thread.id": ANY,
+        "thread.name": ANY,
+    }
+
+
+def test_update_current_span(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with sentry_sdk.start_span(name="test-root-span"):
+        with start_span(op="test-span-op", name="test-span-name"):
+            sentry_sdk.update_current_span(
+                op="updated-span-op",
+                name="updated-span-name",
+                attributes={
+                    "key0": "value0",
+                    "key1": "value1",
+                },
+            )
+
+            sentry_sdk.update_current_span(
+                op="updated-span-op-2",
+            )
+
+            sentry_sdk.update_current_span(
+                name="updated-span-name-3",
+            )
+
+            sentry_sdk.update_current_span(
+                attributes={
+                    "key1": "updated-value-4",
+                    "key2": "value2",
+                },
+            )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    assert span["op"] == "updated-span-op-2"
+    assert span["description"] == "updated-span-name-3"
+    assert span["data"] == {
+        "key0": "value0",
+        "key1": "updated-value-4",
+        "key2": "value2",
+        "sentry.name": "updated-span-name-3",
+        "sentry.op": "updated-span-op-2",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
+        "thread.id": ANY,
+        "thread.name": ANY,
+    }

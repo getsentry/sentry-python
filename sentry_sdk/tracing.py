@@ -352,7 +352,8 @@ class Span:
         return self.get_attribute(SentrySpanAttribute.NAME)
 
     @name.setter
-    def name(self, value: Optional[str]) -> None:
+    def name(self, value: str) -> None:
+        self._otel_span.update_name(value)
         self.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property
@@ -449,6 +450,10 @@ class Span:
             return
 
         self._otel_span.set_attribute(key, serialized_value)
+
+    def set_attributes(self, attributes: dict[str, Any]) -> None:
+        for key, value in attributes.items():
+            self.set_attribute(key, value)
 
     @property
     def status(self) -> Optional[str]:
