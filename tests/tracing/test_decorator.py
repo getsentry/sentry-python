@@ -3,6 +3,8 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
+from sentry_sdk.consts import SPANTEMPLATE
 from sentry_sdk.tracing import trace
 from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import logger
@@ -117,3 +119,69 @@ async def test_functions_to_trace_signature_unchanged_async(sentry_init):
     assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
         _some_function_traced, 1, 2, 3
     )
+
+
+def test_span_templates(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
+    def my_tool(arg1, arg2):
+        return "my_tool_result"
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_CHAT)
+    def my_chat():
+        return {
+            "content": "my_chat_result",
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "total_tokens": 30,
+            },
+        }
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_AGENT)
+    def my_agent():
+        my_tool(1, 2)
+        my_chat()
+
+    with sentry_sdk.start_transaction(name="test-transaction"):
+        my_agent()
+
+    (event,) = events
+    (agent_span, tool_span, chat_span) = event["spans"]
+
+    assert agent_span["op"] == "gen_ai.invoke_agent"
+    assert (
+        agent_span["description"]
+        == "invoke_agent test_decorator.test_span_templates.<locals>.my_agent"
+    )
+    assert agent_span["data"] == {
+        "gen_ai.agent.name": "test_decorator.test_span_templates.<locals>.my_agent",
+        "gen_ai.operation.name": "invoke_agent",
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    assert tool_span["op"] == "gen_ai.execute_tool"
+    assert (
+        tool_span["description"]
+        == "execute_tool test_decorator.test_span_templates.<locals>.my_tool"
+    )
+    assert tool_span["data"] == {
+        "gen_ai.tool.name": "test_decorator.test_span_templates.<locals>.my_tool",
+        "gen_ai.operation.name": "execute_tool",
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    assert chat_span["op"] == "gen_ai.chat"
+    assert chat_span["description"] == "chat"
+    assert chat_span["data"] == {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.usage.input_tokens": 10,
+        "gen_ai.usage.output_tokens": 20,
+        "gen_ai.usage.total_tokens": 30,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
