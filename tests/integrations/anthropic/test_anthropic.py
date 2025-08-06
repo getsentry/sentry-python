@@ -20,7 +20,7 @@ from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
-from sentry_sdk.integrations.anthropic import _add_ai_data_to_span, _collect_ai_data
+from sentry_sdk.integrations.anthropic import _set_output_data, _collect_ai_data
 from sentry_sdk.utils import package_version
 
 try:
@@ -117,10 +117,14 @@ def test_nonstreaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == messages
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == [
-            {"type": "text", "text": "Hi, I'm Claude."}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "Hi, I\'m Claude.", "type": "text"}]'
+        )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -185,10 +189,14 @@ async def test_nonstreaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == messages
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == [
-            {"type": "text", "text": "Hi, I'm Claude."}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "Hi, I\'m Claude.", "type": "text"}]'
+        )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -284,10 +292,14 @@ def test_streaming_create_message(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == messages
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == [
-            {"type": "text", "text": "Hi! I'm Claude!"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "Hi! I\'m Claude!", "type": "text"}]'
+        )
 
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -387,10 +399,14 @@ async def test_streaming_create_message_async(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == messages
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == [
-            {"type": "text", "text": "Hi! I'm Claude!"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "Hi! I\'m Claude!", "type": "text"}]'
+        )
 
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -517,10 +533,14 @@ def test_streaming_create_message_with_input_json_delta(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == messages
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == [
-            {"text": "{'location': 'San Francisco, CA'}", "type": "text"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "{\'location\': \'San Francisco, CA\'}", "type": "text"}]'
+        )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -653,10 +673,14 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == messages
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == [
-            {"text": "{'location': 'San Francisco, CA'}", "type": "text"}
-        ]
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+        )
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "{\'location\': \'San Francisco, CA\'}", "type": "text"}]'
+        )
 
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -770,15 +794,16 @@ def test_collect_ai_data_with_input_json_delta():
         index=0,
         type="content_block_delta",
     )
-
+    model = None
     input_tokens = 10
     output_tokens = 20
     content_blocks = []
 
-    new_input_tokens, new_output_tokens, new_content_blocks = _collect_ai_data(
-        event, input_tokens, output_tokens, content_blocks
+    model, new_input_tokens, new_output_tokens, new_content_blocks = _collect_ai_data(
+        event, model, input_tokens, output_tokens, content_blocks
     )
 
+    assert model is None
     assert new_input_tokens == input_tokens
     assert new_output_tokens == output_tokens
     assert new_content_blocks == ["test"]
@@ -788,7 +813,7 @@ def test_collect_ai_data_with_input_json_delta():
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta.",
 )
-def test_add_ai_data_to_span_with_input_json_delta(sentry_init):
+def test_set_output_data_with_input_json_delta(sentry_init):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -799,18 +824,19 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init):
         span = start_span()
         integration = AnthropicIntegration()
 
-        _add_ai_data_to_span(
+        _set_output_data(
             span,
             integration,
+            model="",
             input_tokens=10,
             output_tokens=20,
             content_blocks=["{'test': 'data',", "'more': 'json'}"],
         )
 
-        assert span._data.get("ai.responses") == [
-            {"type": "text", "text": "{'test': 'data','more': 'json'}"}
-        ]
-        assert span._data.get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
+        assert (
+            span._data.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
+            == "[\"{'test': 'data',\", \"'more': 'json'}\"]"
+        )
         assert span._data.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
         assert span._data.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
         assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
