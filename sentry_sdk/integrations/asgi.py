@@ -7,7 +7,7 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 import asyncio
 import inspect
 from copy import deepcopy
-from functools import partial
+from functools import lru_cache, partial
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
@@ -67,6 +67,7 @@ def _capture_exception(exc, mechanism_type="asgi"):
     sentry_sdk.capture_event(event, hint=hint)
 
 
+@lru_cache(maxsize=5)
 def _looks_like_asgi3(app):
     # type: (Any) -> bool
     """
