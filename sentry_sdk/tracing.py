@@ -450,6 +450,10 @@ class Span:
 
         self._otel_span.set_attribute(key, serialized_value)
 
+    def set_attributes(self, attributes: dict[str, Any]) -> None:
+        for key, value in attributes.items():
+            self.set_attribute(key, value)
+
     @property
     def status(self) -> Optional[str]:
         """
