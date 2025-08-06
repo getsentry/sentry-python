@@ -1,4 +1,5 @@
 from functools import wraps
+import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -112,18 +113,23 @@ def _set_input_data(span, kwargs, integration):
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize(messages)
+        )
+
+    set_data_normalized(
+        span, SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False)
+    )
 
     kwargs_keys_to_attributes = {
         "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
         "model": SPANDATA.GEN_AI_REQUEST_MODEL,
-        "stream": SPANDATA.GEN_AI_RESPONSE_STREAMING,
         "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
         "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
     }
     for key, attribute in kwargs_keys_to_attributes.items():
         value = kwargs.get(key)
-        if value is not NOT_GIVEN or value is not None:
+        if value is not NOT_GIVEN and value is not None:
             set_data_normalized(span, attribute, value)
 
     # Input attributes: Tools
@@ -141,14 +147,19 @@ def _set_output_data(
     input_tokens,
     output_tokens,
     content_blocks,
-    finish_span=True,
+    finish_span=False,
 ):
     # type: (Span, AnthropicIntegration, str | None, int | None, int | None, list[Any], bool) -> None
     """
     Set output data for the span based on the AI response."""
     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
     if should_send_default_pii() and integration.include_prompts:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, content_blocks)
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_RESPONSE_TEXT,
+            json.dumps(content_blocks),
+            unpack=False,
+        )
 
     record_token_usage(
         span,
@@ -196,7 +207,9 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 getattr(result, "model", None),
                 input_tokens,
                 output_tokens,
-                content_blocks=result.content,
+                content_blocks=[
+                    content_block.to_dict() for content_block in result.content
+                ],
                 finish_span=True,
             )
 
@@ -225,7 +238,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     model=model,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
-                    content_blocks=content_blocks,
+                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                 )
 
@@ -250,7 +263,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     model=model,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
-                    content_blocks=content_blocks,
+                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
                     finish_span=True,
                 )
 
