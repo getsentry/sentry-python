@@ -352,7 +352,8 @@ class Span:
         return self.get_attribute(SentrySpanAttribute.NAME)
 
     @name.setter
-    def name(self, value: Optional[str]) -> None:
+    def name(self, value: str) -> None:
+        self._otel_span.update_name(value)
         self.set_attribute(SentrySpanAttribute.NAME, value)
 
     @property

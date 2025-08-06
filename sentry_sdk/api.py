@@ -394,8 +394,7 @@ def update_current_span(op=None, name=None, attributes=None):
         current_span.op = op
 
     if name is not None:
-        # internally it is still description
-        current_span.description = name
+        current_span.name = name
 
     if attributes is not None:
         current_span.set_attributes(attributes)
