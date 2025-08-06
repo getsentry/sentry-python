@@ -121,31 +121,128 @@ async def test_functions_to_trace_signature_unchanged_async(sentry_init):
     )
 
 
-def test_span_templates(sentry_init, capture_events):
+def test_span_templates_ai_dicts(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
+    def my_tool(arg1, arg2):
+        return {
+            "output": "my_tool_result",
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "total_tokens": 30,
+            },
+        }
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_CHAT)
+    def my_chat(model=None, **kwargs):
+        return {
+            "content": "my_chat_result",
+            "usage": {
+                "input_tokens": 11,
+                "output_tokens": 22,
+                "total_tokens": 33,
+            },
+            "model": f"{model}-v123",
+        }
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_AGENT)
+    def my_agent():
+        my_tool(1, 2)
+        my_chat(
+            model="my-gpt-4o-mini",
+            prompt="What is the weather in Tokyo?",
+            system_prompt="You are a helpful assistant that can answer questions about the weather.",
+            max_tokens=100,
+            temperature=0.5,
+            top_p=0.9,
+            top_k=40,
+            frequency_penalty=1.0,
+            presence_penalty=2.0,
+        )
+
+    with sentry_sdk.start_transaction(name="test-transaction"):
+        my_agent()
+
+    (event,) = events
+    (agent_span, tool_span, chat_span) = event["spans"]
+
+    assert agent_span["op"] == "gen_ai.invoke_agent"
+    assert (
+        agent_span["description"]
+        == "invoke_agent test_decorator.test_span_templates_ai_dicts.<locals>.my_agent"
+    )
+    assert agent_span["data"] == {
+        "gen_ai.agent.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_agent",
+        "gen_ai.operation.name": "invoke_agent",
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    assert tool_span["op"] == "gen_ai.execute_tool"
+    assert (
+        tool_span["description"]
+        == "execute_tool test_decorator.test_span_templates_ai_dicts.<locals>.my_tool"
+    )
+    assert tool_span["data"] == {
+        "gen_ai.tool.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_tool",
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.usage.input_tokens": 10,
+        "gen_ai.usage.output_tokens": 20,
+        "gen_ai.usage.total_tokens": 30,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    assert chat_span["op"] == "gen_ai.chat"
+    assert chat_span["description"] == "chat my-gpt-4o-mini"
+    assert chat_span["data"] == {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.frequency_penalty": 1.0,
+        "gen_ai.request.max_tokens": 100,
+        "gen_ai.request.messages": "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, {'role': 'system', 'content': 'You are a helpful assistant that can answer questions about the weather.'}]",
+        "gen_ai.request.model": "my-gpt-4o-mini",
+        "gen_ai.request.presence_penalty": 2.0,
+        "gen_ai.request.temperature": 0.5,
+        "gen_ai.request.top_k": 40,
+        "gen_ai.request.top_p": 0.9,
+        "gen_ai.response.model": "my-gpt-4o-mini-v123",
+        "gen_ai.usage.input_tokens": 11,
+        "gen_ai.usage.output_tokens": 22,
+        "gen_ai.usage.total_tokens": 33,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+
+def test_span_templates_ai_objects(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2):
         mock_usage = mock.Mock()
-        mock_usage.input_tokens = 11
-        mock_usage.output_tokens = 22
-        mock_usage.total_tokens = 33
+        mock_usage.prompt_tokens = 10
+        mock_usage.completion_tokens = 20
+        mock_usage.total_tokens = 30
 
-        return {
-            "output": "my_tool_result",
-            "usage": mock_usage,
-        }
+        mock_result = mock.Mock()
+        mock_result.output = "my_tool_result"
+        mock_result.usage = mock_usage
+
+        return mock_result
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_CHAT)
     def my_chat(model=None, **kwargs):
         mock_result = mock.Mock()
         mock_result.content = "my_chat_result"
-        mock_result.usage = {
-            "prompt_tokens": 10,
-            "completion_tokens": 20,
-            "total_tokens": 30,
-        }
+        mock_result.usage = mock.Mock(
+            input_tokens=11,
+            output_tokens=22,
+            total_tokens=33,
+        )
         mock_result.model = f"{model}-v123"
 
         return mock_result
@@ -174,10 +271,10 @@ def test_span_templates(sentry_init, capture_events):
     assert agent_span["op"] == "gen_ai.invoke_agent"
     assert (
         agent_span["description"]
-        == "invoke_agent test_decorator.test_span_templates.<locals>.my_agent"
+        == "invoke_agent test_decorator.test_span_templates_ai_objects.<locals>.my_agent"
     )
     assert agent_span["data"] == {
-        "gen_ai.agent.name": "test_decorator.test_span_templates.<locals>.my_agent",
+        "gen_ai.agent.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_agent",
         "gen_ai.operation.name": "invoke_agent",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
@@ -186,14 +283,14 @@ def test_span_templates(sentry_init, capture_events):
     assert tool_span["op"] == "gen_ai.execute_tool"
     assert (
         tool_span["description"]
-        == "execute_tool test_decorator.test_span_templates.<locals>.my_tool"
+        == "execute_tool test_decorator.test_span_templates_ai_objects.<locals>.my_tool"
     )
     assert tool_span["data"] == {
-        "gen_ai.tool.name": "test_decorator.test_span_templates.<locals>.my_tool",
+        "gen_ai.tool.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_tool",
         "gen_ai.operation.name": "execute_tool",
-        "gen_ai.usage.input_tokens": 11,
-        "gen_ai.usage.output_tokens": 22,
-        "gen_ai.usage.total_tokens": 33,
+        "gen_ai.usage.input_tokens": 10,
+        "gen_ai.usage.output_tokens": 20,
+        "gen_ai.usage.total_tokens": 30,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -211,9 +308,9 @@ def test_span_templates(sentry_init, capture_events):
         "gen_ai.request.top_k": 40,
         "gen_ai.request.top_p": 0.9,
         "gen_ai.response.model": "my-gpt-4o-mini-v123",
-        "gen_ai.usage.input_tokens": 10,
-        "gen_ai.usage.output_tokens": 20,
-        "gen_ai.usage.total_tokens": 30,
+        "gen_ai.usage.input_tokens": 11,
+        "gen_ai.usage.output_tokens": 22,
+        "gen_ai.usage.total_tokens": 33,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
