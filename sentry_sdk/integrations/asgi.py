@@ -223,10 +223,6 @@ class SentryAsgiMiddleware:
                                 source=transaction_source,
                                 origin=self.span_origin,
                             )
-                            logger.debug(
-                                "[ASGI] Created transaction (continuing trace): %s",
-                                transaction,
-                            )
                     else:
                         transaction = Transaction(
                             op=OP.HTTP_SERVER,
@@ -234,17 +230,9 @@ class SentryAsgiMiddleware:
                             source=transaction_source,
                             origin=self.span_origin,
                         )
-                        logger.debug(
-                            "[ASGI] Created transaction (new): %s", transaction
-                        )
 
                     if transaction:
                         transaction.set_tag("asgi.type", ty)
-                        logger.debug(
-                            "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
-                            transaction.name,
-                            transaction.source,
-                        )
 
                     with (
                         sentry_sdk.start_transaction(
@@ -254,7 +242,6 @@ class SentryAsgiMiddleware:
                         if transaction is not None
                         else nullcontext()
                     ):
-                        logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:
 
                             async def _sentry_wrapped_send(event):
@@ -308,12 +295,6 @@ class SentryAsgiMiddleware:
             )
             event["transaction"] = name
             event["transaction_info"] = {"source": source}
-
-            logger.debug(
-                "[ASGI] Set transaction name and source in event_processor: '%s' / '%s'",
-                event["transaction"],
-                event["transaction_info"]["source"],
-            )
 
         return event
 
