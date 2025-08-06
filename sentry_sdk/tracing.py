@@ -822,7 +822,6 @@ class Transaction(Span):
         **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None
-
         super().__init__(**kwargs)
 
         self.name = name
