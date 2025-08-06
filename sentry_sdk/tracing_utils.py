@@ -1000,34 +1000,34 @@ def _get_input_attributes(template, send_pii, args, kwargs):
         for key, value in list(kwargs.items()):
             if key == "model" and isinstance(value, str):
                 attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
-            elif key == "model_name" and isinstance(value, str):
+            if key == "model_name" and isinstance(value, str):
                 attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
 
-            elif key == "agent" and isinstance(value, str):
+            if key == "agent" and isinstance(value, str):
                 attributes[SPANDATA.GEN_AI_AGENT_NAME] = value
-            elif key == "agent_name" and isinstance(value, str):
+            if key == "agent_name" and isinstance(value, str):
                 attributes[SPANDATA.GEN_AI_AGENT_NAME] = value
 
-            elif key == "prompt" and isinstance(value, str):
+            if key == "prompt" and isinstance(value, str):
                 attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
                     {"role": "user", "content": value}
                 )
-            elif key == "system_prompt" and isinstance(value, str):
+            if key == "system_prompt" and isinstance(value, str):
                 attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
                     {"role": "system", "content": value}
                 )
 
-            elif key == "max_tokens" and isinstance(value, int):
+            if key == "max_tokens" and isinstance(value, int):
                 attributes[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] = value
-            elif key == "frequency_penalty" and isinstance(value, float):
+            if key == "frequency_penalty" and isinstance(value, float):
                 attributes[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] = value
-            elif key == "presence_penalty" and isinstance(value, float):
+            if key == "presence_penalty" and isinstance(value, float):
                 attributes[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] = value
-            elif key == "temperature" and isinstance(value, float):
+            if key == "temperature" and isinstance(value, float):
                 attributes[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] = value
-            elif key == "top_p" and isinstance(value, float):
+            if key == "top_p" and isinstance(value, float):
                 attributes[SPANDATA.GEN_AI_REQUEST_TOP_P] = value
-            elif key == "top_k" and isinstance(value, int):
+            if key == "top_k" and isinstance(value, int):
                 attributes[SPANDATA.GEN_AI_REQUEST_TOP_K] = value
 
     if SPANDATA.GEN_AI_REQUEST_MESSAGES in attributes:
