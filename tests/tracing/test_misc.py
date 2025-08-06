@@ -540,3 +540,48 @@ def test_span_set_data_update_data(sentry_init, capture_events):
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+
+
+def test_update_current_span(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="test-transaction"):
+        with start_span(op="test-span-op", name="test-span-name"):
+            sentry_sdk.update_current_span(
+                op="updated-span-op",
+                name="updated-span-name",
+                attributes={
+                    "key0": "value0",
+                    "key1": "value1",
+                },
+            )
+
+            sentry_sdk.update_current_span(
+                op="updated-span-op-2",
+            )
+
+            sentry_sdk.update_current_span(
+                name="updated-span-name-3",
+            )
+
+            sentry_sdk.update_current_span(
+                attributes={
+                    "key1": "updated-value-4",
+                    "key2": "value2",
+                },
+            )
+
+    (event,) = events
+    span = event["spans"][0]
+
+    assert span["op"] == "updated-span-op-2"
+    assert span["description"] == "updated-span-name-3"
+    assert span["data"] == {
+        "key0": "value0",
+        "key1": "updated-value-4",
+        "key2": "value2",
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
