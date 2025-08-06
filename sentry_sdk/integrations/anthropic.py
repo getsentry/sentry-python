@@ -16,7 +16,11 @@ from sentry_sdk.utils import (
 )
 
 try:
-    from anthropic import NOT_GIVEN
+    try:
+        from anthropic import NOT_GIVEN
+    except ImportError:
+        NOT_GIVEN = None
+
     from anthropic.resources import AsyncMessages, Messages
 
     if TYPE_CHECKING:
