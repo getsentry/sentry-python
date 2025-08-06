@@ -1171,10 +1171,7 @@ def _set_output_attributes(span, template, send_pii, result):
     :param send_pii: Whether to send PII data.
     :param result: The result of the wrapped function.
     """
-    attributes = {}  # type: dict[str, Any]
-
-    attributes.update(_get_output_attributes(template, send_pii, result))
-    span.update_data(attributes or {})
+    span.update_data(_get_output_attributes(template, send_pii, result) or {})
 
 
 # Circular imports
