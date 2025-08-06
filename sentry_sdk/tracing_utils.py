@@ -779,11 +779,11 @@ def create_span_decorator(
     Create a span decorator that can wrap both sync and async functions.
 
     :param op: The operation type for the span.
-    :type op: :py:class:`sentry_sdk.consts.OP`
+    :type op: str or :py:class:`sentry_sdk.consts.OP` or None
     :param name: The name of the span.
-    :type name: :py:class:`str`
+    :type name: str or None
     :param attributes: Additional attributes to set on the span.
-    :type attributes: :py:class:`dict[str, Any]`
+    :type attributes: dict or None
     :param template: The type of span to create. This determines what kind of
         span instrumentation and data collection will be applied. Use predefined
         constants from :py:class:`sentry_sdk.consts.SPANTEMPLATE`.
