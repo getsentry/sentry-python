@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, TypeVar, Union
 
 
@@ -18,32 +20,27 @@ class AnnotatedValue:
 
     __slots__ = ("value", "metadata")
 
-    def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
+    def __init__(self, value: Optional[Any], metadata: Dict[str, Any]) -> None:
         self.value = value
         self.metadata = metadata
 
-    def __eq__(self, other):
-        # type: (Any) -> bool
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, AnnotatedValue):
             return False
 
         return self.value == other.value and self.metadata == other.metadata
 
-    def __str__(self):
-        # type: (AnnotatedValue) -> str
+    def __str__(self) -> str:
         return str({"value": str(self.value), "metadata": str(self.metadata)})
 
-    def __len__(self):
-        # type: (AnnotatedValue) -> int
+    def __len__(self) -> int:
         if self.value is not None:
             return len(self.value)
         else:
             return 0
 
     @classmethod
-    def removed_because_raw_data(cls):
-        # type: () -> AnnotatedValue
+    def removed_because_raw_data(cls) -> AnnotatedValue:
         """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
         return AnnotatedValue(
             value="",
@@ -58,8 +55,7 @@ class AnnotatedValue:
         )
 
     @classmethod
-    def removed_because_over_size_limit(cls, value=""):
-        # type: (Any) -> AnnotatedValue
+    def removed_because_over_size_limit(cls, value: Any = "") -> AnnotatedValue:
         """
         The actual value was removed because the size of the field exceeded the configured maximum size,
         for example specified with the max_request_body_size sdk option.
@@ -77,8 +73,7 @@ class AnnotatedValue:
         )
 
     @classmethod
-    def substituted_because_contains_sensitive_data(cls):
-        # type: () -> AnnotatedValue
+    def substituted_because_contains_sensitive_data(cls) -> AnnotatedValue:
         """The actual value was removed because it contained sensitive information."""
         return AnnotatedValue(
             value=SENSITIVE_DATA_SUBSTITUTE,
@@ -107,9 +102,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Mapping
-    from typing import NotRequired
     from typing import Optional
-    from typing import Tuple
     from typing import Type
     from typing_extensions import Literal, TypedDict
 
@@ -120,45 +113,6 @@ if TYPE_CHECKING:
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
-
-    DurationUnit = Literal[
-        "nanosecond",
-        "microsecond",
-        "millisecond",
-        "second",
-        "minute",
-        "hour",
-        "day",
-        "week",
-    ]
-
-    InformationUnit = Literal[
-        "bit",
-        "byte",
-        "kilobyte",
-        "kibibyte",
-        "megabyte",
-        "mebibyte",
-        "gigabyte",
-        "gibibyte",
-        "terabyte",
-        "tebibyte",
-        "petabyte",
-        "pebibyte",
-        "exabyte",
-        "exbibyte",
-    ]
-
-    FractionUnit = Literal["ratio", "percent"]
-    MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
-
-    MeasurementValue = TypedDict(
-        "MeasurementValue",
-        {
-            "value": float,
-            "unit": NotRequired[Optional[MeasurementUnit]],
-        },
-    )
 
     Event = TypedDict(
         "Event",
@@ -181,7 +135,6 @@ if TYPE_CHECKING:
             "level": LogLevelStr,
             "logentry": Mapping[str, object],
             "logger": str,
-            "measurements": dict[str, MeasurementValue],
             "message": str,
             "modules": dict[str, str],
             "monitor_config": Mapping[str, object],
@@ -210,7 +163,6 @@ if TYPE_CHECKING:
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
             "_dropped_spans": int,
-            "_metrics_summary": dict[str, object],
         },
         total=False,
     )
@@ -266,7 +218,6 @@ if TYPE_CHECKING:
         "internal",
         "profile",
         "profile_chunk",
-        "metric_bucket",
         "monitor",
         "span",
         "log",
@@ -275,26 +226,6 @@ if TYPE_CHECKING:
 
     ContinuousProfilerMode = Literal["thread", "gevent", "unknown"]
     ProfilerMode = Union[ContinuousProfilerMode, Literal["sleep"]]
-
-    # Type of the metric.
-    MetricType = Literal["d", "s", "g", "c"]
-
-    # Value of the metric.
-    MetricValue = Union[int, float, str]
-
-    # Internal representation of tags as a tuple of tuples (this is done in order to allow for the same key to exist
-    # multiple times).
-    MetricTagsInternal = Tuple[Tuple[str, str], ...]
-
-    # External representation of tags as a dictionary.
-    MetricTagValue = Union[str, int, float, None]
-    MetricTags = Mapping[str, MetricTagValue]
-
-    # Value inside the generator for the metric value.
-    FlushedMetricValue = Union[int, float]
-
-    BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
-    MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]
 
     MonitorConfigScheduleType = Literal["crontab", "interval"]
     MonitorConfigScheduleUnit = Literal[

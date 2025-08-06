@@ -9,14 +9,10 @@ Then the Handler function sstring should be replaced with
 import os
 import sys
 import re
+from typing import Any
 
 import sentry_sdk
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from typing import Any
 
 
 # Configure Sentry SDK
@@ -50,8 +46,8 @@ class AWSLambdaModuleLoader:
             module_name = module_path.split(os.path.sep)[-1]
             module_file_path = module_path + ".py"
 
-            # Supported python versions are 3.6, 3.7, 3.8
-            if py_version >= (3, 6):
+            # Supported python versions are 3.7, 3.8
+            if py_version >= (3, 7):
                 import importlib.util
 
                 spec = importlib.util.spec_from_file_location(
@@ -70,8 +66,7 @@ class AWSLambdaModuleLoader:
         return getattr(self.lambda_function_module, self.handler_name)
 
 
-def sentry_lambda_handler(event, context):
-    # type: (Any, Any) -> None
+def sentry_lambda_handler(event: Any, context: Any) -> None:
     """
     Handler function that invokes a lambda handler which path is defined in
     environment variables as "SENTRY_INITIAL_HANDLER"

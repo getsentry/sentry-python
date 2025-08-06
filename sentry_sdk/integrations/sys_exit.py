@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 import sys
 
@@ -24,23 +25,19 @@ class SysExitIntegration(Integration):
 
     identifier = "sys_exit"
 
-    def __init__(self, *, capture_successful_exits=False):
-        # type: (bool) -> None
+    def __init__(self, *, capture_successful_exits: bool = False) -> None:
         self._capture_successful_exits = capture_successful_exits
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         SysExitIntegration._patch_sys_exit()
 
     @staticmethod
-    def _patch_sys_exit():
-        # type: () -> None
-        old_exit = sys.exit  # type: Callable[[Union[str, int, None]], NoReturn]
+    def _patch_sys_exit() -> None:
+        old_exit: Callable[[Union[str, int, None]], NoReturn] = sys.exit
 
         @functools.wraps(old_exit)
-        def sentry_patched_exit(__status=0):
-            # type: (Union[str, int, None]) -> NoReturn
+        def sentry_patched_exit(__status: Union[str, int, None] = 0) -> NoReturn:
             # @ensure_integration_enabled ensures that this is non-None
             integration = sentry_sdk.get_client().get_integration(SysExitIntegration)
             if integration is None:
@@ -60,8 +57,7 @@ class SysExitIntegration(Integration):
         sys.exit = sentry_patched_exit
 
 
-def _capture_exception(exc):
-    # type: (SystemExit) -> None
+def _capture_exception(exc: SystemExit) -> None:
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,

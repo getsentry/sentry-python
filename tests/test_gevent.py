@@ -3,7 +3,7 @@ import pickle
 from datetime import datetime, timezone
 
 import sentry_sdk
-from sentry_sdk._compat import PY37, PY38
+from sentry_sdk._compat import PY38
 
 import pytest
 from tests.conftest import CapturingServer
@@ -50,7 +50,7 @@ def make_client(request, capturing_server):
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize(
     "compression_algo",
-    (("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)),
+    ("gzip", "br", "<invalid>", None),
 )
 @pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works_gevent(
