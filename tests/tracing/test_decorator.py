@@ -127,7 +127,6 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2):
-        """This is a tool function."""
         return {
             "output": "my_tool_result",
             "usage": {
@@ -189,7 +188,6 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
     )
     assert tool_span["data"] == {
         "gen_ai.tool.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_tool",
-        "gen_ai.tool.description": "This is a tool function.",
         "gen_ai.operation.name": "execute_tool",
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 20,
@@ -197,6 +195,7 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+    assert "gen_ai.tool.description" not in tool_span["data"]
 
     assert chat_span["op"] == "gen_ai.chat"
     assert chat_span["description"] == "chat my-gpt-4o-mini"
