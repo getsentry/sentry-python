@@ -201,7 +201,7 @@ def test_span_set_data_update_data(sentry_init, capture_events):
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
+    with sentry_sdk.start_span(name="test-root-span"):
         with start_span(op="test-span") as span:
             span.set_data("key0", "value0")
             span.set_data("key1", "value1")
@@ -232,7 +232,7 @@ def test_update_current_span(sentry_init, capture_events):
 
     events = capture_events()
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
+    with sentry_sdk.start_span(name="test-root-span"):
         with start_span(op="test-span-op", name="test-span-name"):
             sentry_sdk.update_current_span(
                 op="updated-span-op",
