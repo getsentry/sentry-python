@@ -202,11 +202,11 @@ def test_span_set_data_update_data(sentry_init, capture_events):
     events = capture_events()
 
     with sentry_sdk.start_span(name="test-root-span"):
-        with start_span(op="test-span") as span:
+        with start_span(op="test-span", name="test-span-name") as span:
             span.set_data("key0", "value0")
             span.set_data("key1", "value1")
 
-            span.update_data(
+            span.set_attributes(
                 {
                     "key1": "updated-value1",
                     "key2": "value2",
@@ -222,6 +222,10 @@ def test_span_set_data_update_data(sentry_init, capture_events):
         "key1": "updated-value1",
         "key2": "value2",
         "key3": "value3",
+        "sentry.name": "test-span-name",
+        "sentry.op": "test-span",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
         "thread.id": ANY,
         "thread.name": ANY,
     }
@@ -267,6 +271,10 @@ def test_update_current_span(sentry_init, capture_events):
         "key0": "value0",
         "key1": "updated-value-4",
         "key2": "value2",
+        "sentry.name": "updated-span-name-3",
+        "sentry.op": "updated-span-op-2",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
         "thread.id": ANY,
         "thread.name": ANY,
     }
