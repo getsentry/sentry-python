@@ -1035,7 +1035,7 @@ def _get_input_attributes(template, send_pii, args, kwargs):
             attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
 
-    if template == SPANTEMPLATE.AI_TOOL:
+    if template == SPANTEMPLATE.AI_TOOL and send_pii:
         if send_pii:
             attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
                 {"args": args, "kwargs": kwargs}
@@ -1120,9 +1120,8 @@ def _get_output_attributes(template, send_pii, result):
             if hasattr(result, "model_name") and isinstance(result.model_name, str):
                 attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
 
-    if template == SPANTEMPLATE.AI_TOOL:
-        if send_pii:
-            attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
+    if template == SPANTEMPLATE.AI_TOOL and send_pii:
+        attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
 
     return attributes
 
@@ -1175,9 +1174,6 @@ def _set_output_attributes(span, template, send_pii, result):
     :param result: The result of the wrapped function.
     """
     attributes = {}  # type: dict[str, Any]
-
-    if template == SPANTEMPLATE.AI_AGENT and isinstance(result, str):
-        attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = result
 
     attributes.update(_get_output_attributes(template, send_pii, result))
     span.update_data(attributes or {})

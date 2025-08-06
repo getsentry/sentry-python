@@ -127,6 +127,7 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2):
+        """This is a tool function."""
         return {
             "output": "my_tool_result",
             "usage": {
@@ -188,6 +189,7 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
     )
     assert tool_span["data"] == {
         "gen_ai.tool.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_tool",
+        "gen_ai.tool.description": "This is a tool function.",
         "gen_ai.operation.name": "execute_tool",
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 20,
@@ -223,6 +225,7 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
 
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2):
+        """This is a tool function."""
         mock_usage = mock.Mock()
         mock_usage.prompt_tokens = 10
         mock_usage.completion_tokens = 20
@@ -287,6 +290,7 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
     )
     assert tool_span["data"] == {
         "gen_ai.tool.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_tool",
+        "gen_ai.tool.description": "This is a tool function.",
         "gen_ai.operation.name": "execute_tool",
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 20,
@@ -314,3 +318,50 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_span_templates_ai_pii(sentry_init, capture_events, send_default_pii):
+    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    events = capture_events()
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
+    def my_tool(arg1, arg2, **kwargs):
+        """This is a tool function."""
+        return "tool_output"
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_CHAT)
+    def my_chat(model=None, **kwargs):
+        return "chat_output"
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_AGENT)
+    def my_agent(*args, **kwargs):
+        my_tool(1, 2, tool_arg1="3", tool_arg2="4")
+        my_chat(
+            model="my-gpt-4o-mini",
+            prompt="What is the weather in Tokyo?",
+            system_prompt="You are a helpful assistant that can answer questions about the weather.",
+            max_tokens=100,
+            temperature=0.5,
+            top_p=0.9,
+            top_k=40,
+            frequency_penalty=1.0,
+            presence_penalty=2.0,
+        )
+        return "agent_output"
+
+    with sentry_sdk.start_transaction(name="test-transaction"):
+        my_agent(22, 33, arg1=44, arg2=55)
+
+    (event,) = events
+    (_, tool_span, _) = event["spans"]
+
+    if send_default_pii:
+        assert (
+            tool_span["data"]["gen_ai.tool.input"]
+            == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
+        )
+        assert tool_span["data"]["gen_ai.tool.output"] == "'tool_output'"
+    else:
+        assert "gen_ai.tool.input" not in tool_span["data"]
+        assert "gen_ai.tool.output" not in tool_span["data"]
