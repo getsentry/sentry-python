@@ -538,6 +538,12 @@ class SPANDATA:
     Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
     """
 
+    GEN_AI_REQUEST_METADATA = "gen_ai.request.metadata"
+    """
+    The metadata passed to the model.
+    Example: {"tag1": "value1", "tag2": "value2"}
+    """
+
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
     """
     The model identifier being used for the request.
