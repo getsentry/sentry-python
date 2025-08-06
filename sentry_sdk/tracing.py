@@ -7,7 +7,6 @@ from enum import Enum
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
-from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
@@ -1408,6 +1407,8 @@ def trace(func=None, *, op=None, name=None, attributes=None):
             # Function implementation
             pass
     """
+    from sentry_sdk.tracing_utils import create_span_decorator
+
     decorator = create_span_decorator(
         op=op,
         name=name,
