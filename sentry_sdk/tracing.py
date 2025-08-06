@@ -1,4 +1,3 @@
-from decimal import Decimal
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -1223,7 +1222,7 @@ class Transaction(Span):
             return
 
         # Now we roll the dice.
-        self.sampled = self._sample_rand < Decimal.from_float(self.sample_rate)
+        self.sampled = self._sample_rand < self.sample_rate
 
         if self.sampled:
             logger.debug(
