@@ -212,7 +212,12 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                 input_tokens,
                 output_tokens,
                 content_blocks=[
-                    content_block.to_dict() for content_block in result.content
+                    (
+                        content_block.to_dict()
+                        if hasattr(content_block, "to_dict")
+                        else content_block.model_dump()
+                    )
+                    for content_block in result.content
                 ],
                 finish_span=True,
             )
