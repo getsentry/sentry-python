@@ -29,7 +29,6 @@ from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
 )
 
-# Global cache for database configurations to avoid connection pool interference
 _cached_db_configs = {}  # type: Dict[str, Dict[str, Any]]
 
 try:
@@ -157,12 +156,9 @@ class DjangoIntegration(Integration):
     def setup_once():
         # type: () -> None
         _check_minimum_version(DjangoIntegration, DJANGO_VERSION)
-
-        # Cache database configurations to avoid connection pool interference
         _cache_database_configurations()
 
         install_sql_hook()
-        # Patch in our custom middleware.
 
         # logs an error for every 500
         ignore_logger("django.server")
@@ -621,7 +617,9 @@ def _set_user_info(request, event):
 
 def _cache_database_configurations():
     # type: () -> None
-    """Cache database configurations from Django settings to avoid connection pool interference."""
+    """
+    Cache database configurations from Django settings to avoid connection pool interference.
+    """
     global _cached_db_configs
 
     try:
@@ -632,39 +630,24 @@ def _cache_database_configurations():
             if not db_config:  # Skip empty default configs
                 continue
 
-            try:
-                # Get database wrapper to access vendor info
-                db_wrapper = connections[alias]
-
+            with capture_internal_exceptions():
                 _cached_db_configs[alias] = {
                     "db_name": db_config.get("NAME"),
                     "host": db_config.get("HOST", "localhost"),
                     "port": db_config.get("PORT"),
-                    "vendor": (
-                        db_wrapper.vendor if hasattr(db_wrapper, "vendor") else None
-                    ),
                     "unix_socket": db_config.get("OPTIONS", {}).get("unix_socket"),
                     "engine": db_config.get("ENGINE"),
                 }
 
-                logger.debug(
-                    "Cached database configuration for %s: %s",
-                    alias,
-                    {
-                        k: v
-                        for k, v in _cached_db_configs[alias].items()
-                        if k != "vendor"
-                    },
-                )
+                db_wrapper = connections.get(alias)
+                if db_wrapper is None:
+                    continue
 
-            except Exception as e:
-                logger.debug(
-                    "Failed to cache database configuration for %s: %s", alias, e
-                )
+                if hasattr(db_wrapper, "vendor"):
+                    _cached_db_configs[alias]["vendor"] = db_wrapper.vendor
 
     except Exception as e:
         logger.debug("Failed to cache database configurations: %s", e)
-        # Graceful fallback - cache remains empty
         _cached_db_configs = {}
 
 
@@ -722,7 +705,6 @@ def install_sql_hook():
             span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
-
             result = real_executemany(self, sql, param_list)
 
         with capture_internal_exceptions():
@@ -754,22 +736,22 @@ def install_sql_hook():
 def _set_db_data(span, cursor_or_db):
     # type: (Span, Any) -> None
     """
-    Improved version that avoids connection pool interference by using cached
-    database configurations and specific exception handling.
+    Set database connection data to the span.
+
+    Tries first to use pre-cached configuration.
+    If that fails, it uses get_connection_params() to get the database connection
+    parameters.
     """
     from django.core.exceptions import ImproperlyConfigured
 
-    # Get database wrapper
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
+    db_alias = db.alias if hasattr(db, "alias") else None
 
-    # Set vendor (always safe, no connection access)
-    span.set_data(SPANDATA.DB_SYSTEM, db.vendor)
+    if hasattr(db, "vendor"):
+        span.set_data(SPANDATA.DB_SYSTEM, db.vendor)
 
-    # Get the database alias (supports .using() queries)
-    db_alias = db.alias
-
-    # Method 1: Use pre-cached configuration (FASTEST, NO CONNECTION ACCESS)
-    cached_config = _cached_db_configs.get(db_alias)
+    # Use pre-cached configuration
+    cached_config = _cached_db_configs.get(db_alias) if db_alias else None
     if cached_config:
         if cached_config["db_name"]:
             span.set_data(SPANDATA.DB_NAME, cached_config["db_name"])
@@ -781,38 +763,28 @@ def _set_db_data(span, cursor_or_db):
             span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, cached_config["unix_socket"])
         return
 
-    # Method 2: Dynamic fallback using get_connection_params() (NO CONNECTION ACCESS)
+    # Fallback to using get_connection_params()
     try:
         connection_params = db.get_connection_params()
 
-        # Extract database name
         db_name = connection_params.get("dbname") or connection_params.get("database")
         if db_name:
             span.set_data(SPANDATA.DB_NAME, db_name)
 
-        # Extract host
         host = connection_params.get("host")
         if host:
             span.set_data(SPANDATA.SERVER_ADDRESS, host)
 
-        # Extract port
         port = connection_params.get("port")
         if port:
             span.set_data(SPANDATA.SERVER_PORT, str(port))
 
-        # Extract unix socket
         unix_socket = connection_params.get("unix_socket")
         if unix_socket:
             span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, unix_socket)
 
     except (KeyError, ImproperlyConfigured, AttributeError) as e:
-        # Specific exceptions that get_connection_params() can raise:
-        # - KeyError: Missing required database settings (most common)
-        # - ImproperlyConfigured: Django configuration problems
-        # - AttributeError: Missing methods on database wrapper
         logger.debug("Failed to get database connection params for %s: %s", db_alias, e)
-        # Skip database metadata rather than risk connection issues
-        pass
 
 
 def add_template_context_repr_sequence():
