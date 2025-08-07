@@ -779,6 +779,9 @@ def _set_db_data(span, cursor_or_db):
             span.set_data(SPANDATA.SERVER_PORT, str(cached_config["port"]))
         if cached_config.get("unix_socket"):
             span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, cached_config["unix_socket"])
+        if cached_config.get("vendor"):
+            span.set_data(SPANDATA.DB_SYSTEM, cached_config["vendor"])
+
         return  # Success - exit early
 
     # Fallback to dynamic database metadata collection.
