@@ -24,7 +24,20 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The default of `traces_sample_rate` changed to `0`. Meaning: Incoming traces will be continued by default. For example, if your frontend sends a `sentry-trace/baggage` headers pair, your SDK will create Spans and send them to Sentry. (The default used to be `None` meaning by default no Spans where created, no matter what headers the frontend sent to your project.) See also: https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate
 - `sentry_sdk.start_span` now only takes keyword arguments.
 - `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
-- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
+- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager. 
+
+    - Use it to continue an upstream trace with the `sentry-trace` and `baggage` headers.
+
+    ```python
+    headers = {"sentry-trace": "{trace_id}-{span_id}-{sampled_flag}", "baggage": "{baggage header}"}
+    with sentry_sdk.continue_trace(headers):
+        with sentry_sdk.start_span(name="continued span in trace"):
+            pass
+    ```
+
+    - If the headers are empty, a new trace will be started.
+    - If you want to force creation of a new trace, use the `sentry_sdk.new_trace` context manager.
+
 - You can no longer change the sampled status of a span with `span.sampled = False` after starting it. The sampling decision needs to be either be made in the `traces_sampler`, or you need to pass an explicit `sampled` parameter to `start_span`.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
@@ -227,7 +240,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ### Deprecated
 
 - `sentry_sdk.start_transaction()` is deprecated. Use `sentry_sdk.start_span()` instead.
-  - If you want to force creation of a new trace, use the `sentry_sdk.new_trace()` context manager.
 - `Span.set_data()` is deprecated. Use `Span.set_attribute()` instead.
 
 
