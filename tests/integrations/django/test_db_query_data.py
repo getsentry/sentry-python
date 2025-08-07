@@ -642,7 +642,7 @@ def test_set_db_data_fallback_to_connection_params(sentry_init):
     # Verify fallback was used
     mock_db.get_connection_params.assert_called_once()
     mock_logger.debug.assert_called_with(
-        "Cached db connection config retrieval failed for %s. Trying db.get_connection_params().",
+        "Cached db connection params retrieval failed for %s. Trying db.get_connection_params().",
         "uncached_db",
     )
 
@@ -732,7 +732,7 @@ def test_set_db_data_fallback_to_direct_connection_psycopg2(sentry_init):
     # Verify logging
     assert mock_logger.debug.call_count == 2
     mock_logger.debug.assert_any_call(
-        "Cached db connection config retrieval failed for %s. Trying db.get_connection_params().",
+        "Cached db connection params retrieval failed for %s. Trying db.get_connection_params().",
         "direct_db",
     )
     mock_logger.debug.assert_any_call(
