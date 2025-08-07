@@ -129,6 +129,7 @@ def _set_input_data(span, kwargs, integration):
         "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
         "model": SPANDATA.GEN_AI_REQUEST_MODEL,
         "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+        "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
         "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
     }
     for key, attribute in kwargs_keys_to_attributes.items():
