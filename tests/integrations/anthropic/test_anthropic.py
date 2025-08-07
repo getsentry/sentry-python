@@ -112,7 +112,7 @@ def test_nonstreaming_create_message(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
+    assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "Anthropic messages create"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -184,7 +184,7 @@ async def test_nonstreaming_create_message_async(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
+    assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "Anthropic messages create"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -287,7 +287,7 @@ def test_streaming_create_message(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
+    assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "Anthropic messages create"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -394,7 +394,7 @@ async def test_streaming_create_message_async(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
+    assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "Anthropic messages create"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -528,7 +528,7 @@ def test_streaming_create_message_with_input_json_delta(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
+    assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "Anthropic messages create"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
@@ -668,7 +668,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
+    assert span["op"] == OP.GEN_AI_CHAT
     assert span["description"] == "Anthropic messages create"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
