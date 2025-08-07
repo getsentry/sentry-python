@@ -225,6 +225,7 @@ class SentrySpanProcessor(SpanProcessor):
         if span.resource.attributes:
             contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
 
+        event.setdefault("tags", {})
         event.update(
             {
                 "type": "transaction",
