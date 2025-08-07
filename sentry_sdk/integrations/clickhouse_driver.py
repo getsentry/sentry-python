@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, TypeVar
 # without introducing a hard dependency on `typing_extensions`
 # from: https://stackoverflow.com/a/71944042/300572
 if TYPE_CHECKING:
-    from typing import ParamSpec, Callable
+    from collections.abc import Iterator
+    from typing import Any, ParamSpec, Callable
 else:
     # Fake ParamSpec
     class ParamSpec:
@@ -139,7 +140,24 @@ def _wrap_send_data() -> None:
 
             if should_send_default_pii():
                 db_params = span._data.get("db.params", [])
-                db_params.extend(data)
+
+                if isinstance(data, (list, tuple)):
+                    db_params.extend(data)
+
+                else:  # data is a generic iterator
+                    orig_data = data
+
+                    # Wrap the generator to add items to db.params as they are yielded.
+                    # This allows us to send the params to Sentry without needing to allocate
+                    # memory for the entire generator at once.
+                    def wrapped_generator() -> "Iterator[Any]":
+                        for item in orig_data:
+                            db_params.append(item)
+                            yield item
+
+                    # Replace the original iterator with the wrapped one.
+                    data = wrapped_generator()
+
                 span.set_data("db.params", db_params)
 
         return original_send_data(
