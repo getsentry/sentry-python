@@ -177,12 +177,12 @@ def test_langchain_agent(
     tx = events[0]
     assert tx["type"] == "transaction"
     chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "ai.tool.langchain")
+    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
 
     assert len(chat_spans) == 2
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
-    assert len(list(x for x in tx["spans"] if x["op"] == "ai.run.langchain")) > 0
+    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.run")) > 0
 
     if use_unknown_llm_type:
         assert "gen_ai.usage.input_tokens" in chat_spans[0]["data"]

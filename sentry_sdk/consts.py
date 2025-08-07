@@ -807,7 +807,9 @@ class OP:
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
     GEN_AI_HANDOFF = "gen_ai.handoff"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
+    GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_RESPONSES = "gen_ai.responses"
+    GEN_AI_RUN = "gen_ai.run"
     GRAPHQL_EXECUTE = "graphql.execute"
     GRAPHQL_MUTATION = "graphql.mutation"
     GRAPHQL_PARSE = "graphql.parse"
@@ -833,10 +835,6 @@ class OP:
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
-    LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
-    LANGCHAIN_RUN = "ai.run.langchain"
-    LANGCHAIN_TOOL = "ai.tool.langchain"
-    LANGCHAIN_AGENT = "ai.agent.langchain"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"

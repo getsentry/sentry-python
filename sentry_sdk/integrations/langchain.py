@@ -186,7 +186,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_RUN,
+                op=OP.GEN_AI_,
                 name=kwargs.get("name") or "Langchain LLM call",
                 origin=LangchainIntegration.origin,
             )
@@ -309,9 +309,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=(
-                    OP.LANGCHAIN_RUN
+                    OP.GEN_AI_RUN
                     if kwargs.get("parent_run_id") is not None
-                    else OP.LANGCHAIN_PIPELINE
+                    else OP.GEN_AI_PIPELINE
                 ),
                 name=kwargs.get("name") or "Chain execution",
                 origin=LangchainIntegration.origin,
@@ -347,7 +347,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_AGENT,
+                op=OP.GEN_AI_INVOKE_AGENT,
                 name=action.tool or "AI tool usage",
                 origin=LangchainIntegration.origin,
             )
@@ -384,7 +384,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_TOOL,
+                op=OP.GEN_AI_EXECUTE_TOOL,
                 name=serialized.get("name") or kwargs.get("name") or "AI tool usage",
                 origin=LangchainIntegration.origin,
             )
