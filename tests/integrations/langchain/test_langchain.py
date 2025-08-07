@@ -176,9 +176,7 @@ def test_langchain_agent(
 
     tx = events[0]
     assert tx["type"] == "transaction"
-    chat_spans = list(
-        x for x in tx["spans"] if x["op"] == "ai.chat_completions.create.langchain"
-    )
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
     tool_exec_span = next(x for x in tx["spans"] if x["op"] == "ai.tool.langchain")
 
     assert len(chat_spans) == 2
