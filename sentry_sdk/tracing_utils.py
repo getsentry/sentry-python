@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import inspect
 import os
 import re
@@ -6,7 +7,6 @@ import sys
 from collections.abc import Mapping
 from datetime import timedelta
 from decimal import ROUND_DOWN, Decimal, DefaultContext, localcontext
-from functools import wraps
 from random import Random
 from urllib.parse import quote, unquote
 import uuid
@@ -770,70 +770,86 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
-def start_child_span_decorator(func):
-    # type: (Any) -> Any
+def create_span_decorator(op=None, name=None, attributes=None):
+    # type: (Optional[str], Optional[str], Optional[dict[str, Any]]) -> Any
     """
-    Decorator to add child spans for functions.
+    Create a span decorator that can wrap both sync and async functions.
 
-    See also ``sentry_sdk.tracing.trace()``.
+    :param op: The operation type for the span.
+    :param name: The name of the span.
+    :param attributes: Additional attributes to set on the span.
     """
-    # Asynchronous case
-    if inspect.iscoroutinefunction(func):
 
-        @wraps(func)
-        async def func_with_tracing(*args, **kwargs):
+    def span_decorator(f):
+        # type: (Any) -> Any
+        """
+        Decorator to create a span for the given function.
+        """
+
+        @functools.wraps(f)
+        async def async_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
+            current_span = get_current_span()
 
-            span = get_current_span()
-
-            if span is None:
+            if current_span is None:
                 logger.debug(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
-                    qualname_from_function(func),
+                    qualname_from_function(f),
                 )
-                return await func(*args, **kwargs)
+                return await f(*args, **kwargs)
 
-            with span.start_child(
-                op=OP.FUNCTION,
-                name=qualname_from_function(func),
-            ):
-                return await func(*args, **kwargs)
+            span_op = op or OP.FUNCTION
+            span_name = name or qualname_from_function(f) or ""
+
+            with current_span.start_child(
+                op=span_op,
+                name=span_name,
+            ) as span:
+                span.update_data(attributes or {})
+                result = await f(*args, **kwargs)
+                return result
 
         try:
-            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+            async_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
         except Exception:
             pass
 
-    # Synchronous case
-    else:
-
-        @wraps(func)
-        def func_with_tracing(*args, **kwargs):
+        @functools.wraps(f)
+        def sync_wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
+            current_span = get_current_span()
 
-            span = get_current_span()
-
-            if span is None:
+            if current_span is None:
                 logger.debug(
                     "Cannot create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
-                    qualname_from_function(func),
+                    qualname_from_function(f),
                 )
-                return func(*args, **kwargs)
+                return f(*args, **kwargs)
 
-            with span.start_child(
-                op=OP.FUNCTION,
-                name=qualname_from_function(func),
-            ):
-                return func(*args, **kwargs)
+            span_op = op or OP.FUNCTION
+            span_name = name or qualname_from_function(f) or ""
+
+            with current_span.start_child(
+                op=span_op,
+                name=span_name,
+            ) as span:
+                span.update_data(attributes or {})
+                result = f(*args, **kwargs)
+                return result
 
         try:
-            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+            sync_wrapper.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
         except Exception:
             pass
 
-    return func_with_tracing
+        if inspect.iscoroutinefunction(f):
+            return async_wrapper
+        else:
+            return sync_wrapper
+
+    return span_decorator
 
 
 def get_current_span(scope=None):
