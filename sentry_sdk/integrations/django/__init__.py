@@ -649,7 +649,7 @@ def _cache_database_configurations():
 
                     _cached_db_configs[alias] = {
                         "db_name": db_config.get("NAME"),
-                        "host": db_config.get("HOST", "localhost"),
+                        "host": db_config.get("HOST"),
                         "port": db_config.get("PORT"),
                         "unix_socket": db_config.get("OPTIONS", {}).get("unix_socket"),
                         "engine": db_config.get("ENGINE"),
@@ -743,7 +743,7 @@ def install_sql_hook():
             with capture_internal_exceptions():
                 _set_db_data(span, self)
 
-        return connection
+            return connection
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
