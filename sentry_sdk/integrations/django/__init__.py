@@ -652,8 +652,9 @@ def _cache_database_configurations():
                         "engine": db_config.get("ENGINE"),
                     }
 
-                    db_wrapper = connections.get(alias)
-                    if db_wrapper is None:
+                    try:
+                        db_wrapper = connections[alias]
+                    except (KeyError, Exception):
                         continue
 
                     if hasattr(db_wrapper, "vendor"):

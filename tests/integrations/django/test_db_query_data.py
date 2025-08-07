@@ -1,4 +1,5 @@
 import os
+import threading
 
 import pytest
 from datetime import datetime
@@ -7,6 +8,7 @@ from unittest import mock
 from django import VERSION as DJANGO_VERSION
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
+
 
 try:
     from django.urls import reverse
@@ -17,10 +19,12 @@ from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations import django as django_integration
 from sentry_sdk.integrations.django import (
     DjangoIntegration,
     _set_db_data,
     _cached_db_configs,
+    _cache_database_configurations,
 )
 from sentry_sdk.tracing_utils import record_sql_queries
 
@@ -986,3 +990,153 @@ def test_set_db_data_empty_cached_values(sentry_init):
 
     for call in not_expected_calls:
         assert call not in span.set_data.call_args_list
+
+
+def test_cache_database_configurations_basic(sentry_init):
+    """Test _cache_database_configurations caches Django database settings."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+    django_integration._cache_initialized = False
+
+    _cache_database_configurations()
+
+    # Verify cache was populated
+    assert django_integration._cache_initialized is True
+    assert len(_cached_db_configs) > 0
+
+    # Verify default database was cached
+    assert "default" in _cached_db_configs
+    default_config = _cached_db_configs["default"]
+
+    # Check expected keys exist
+    expected_keys = ["db_name", "host", "port", "unix_socket", "engine"]
+    for key in expected_keys:
+        assert key in default_config
+
+    # Verify the vendor was added from the database wrapper
+    if "vendor" in default_config:
+        assert isinstance(default_config["vendor"], str)
+
+
+def test_cache_database_configurations_idempotent(sentry_init):
+    """Test _cache_database_configurations is idempotent and thread-safe."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+    django_integration._cache_initialized = False
+
+    _cache_database_configurations()
+    first_call_result = dict(_cached_db_configs)
+    first_call_initialized = django_integration._cache_initialized
+
+    _cache_database_configurations()
+    second_call_result = dict(_cached_db_configs)
+    second_call_initialized = django_integration._cache_initialized
+
+    # Verify idempotency
+    assert first_call_initialized is True
+    assert second_call_initialized is True
+    assert first_call_result == second_call_result
+
+
+def test_cache_database_configurations_thread_safety(sentry_init):
+    """Test _cache_database_configurations is thread-safe."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+    django_integration._cache_initialized = False
+
+    results = []
+    exceptions = []
+
+    def cache_in_thread():
+        try:
+            _cache_database_configurations()
+            results.append(dict(_cached_db_configs))
+        except Exception as e:
+            exceptions.append(e)
+
+    threads = []
+    for _ in range(5):
+        thread = threading.Thread(target=cache_in_thread)
+        threads.append(thread)
+
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    assert len(exceptions) == 0, f"Exceptions occurred: {exceptions}"
+
+    assert len(results) == 5
+    first_result = results[0]
+    for result in results[1:]:
+        assert result == first_result
+
+    assert django_integration._cache_initialized is True
+
+
+def test_cache_database_configurations_with_custom_settings(sentry_init):
+    """Test _cache_database_configurations handles custom database settings."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    # Mock custom database settings
+    with mock.patch("django.conf.settings") as mock_settings:
+        mock_settings.DATABASES = {
+            "custom_db": {
+                "NAME": "test_db",
+                "HOST": "db.example.com",
+                "PORT": 5432,
+                "ENGINE": "django.db.backends.postgresql",
+                "OPTIONS": {"unix_socket": "/tmp/postgres.sock"},
+            },
+            "empty_db": {},  # Should be skipped
+        }
+
+        # Mock connections to avoid actual database access
+        with mock.patch("django.db.connections") as mock_connections:
+            mock_wrapper = mock.Mock()
+            mock_wrapper.vendor = "postgresql"
+            mock_connections.__getitem__.return_value = mock_wrapper
+
+            # Reset cache and call function
+            _cached_db_configs.clear()
+            django_integration._cache_initialized = False
+
+            _cache_database_configurations()
+
+            # Verify custom database was cached correctly
+            assert "custom_db" in _cached_db_configs
+            custom_config = _cached_db_configs["custom_db"]
+
+            assert custom_config["db_name"] == "test_db"
+            assert custom_config["host"] == "db.example.com"
+            assert custom_config["port"] == 5432
+            assert custom_config["unix_socket"] == "/tmp/postgres.sock"
+            assert custom_config["engine"] == "django.db.backends.postgresql"
+            assert custom_config["vendor"] == "postgresql"
+
+            # Verify empty database was skipped
+            assert "empty_db" not in _cached_db_configs
+
+
+def test_cache_database_configurations_exception_handling(sentry_init):
+    """Test _cache_database_configurations handles exceptions gracefully."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    # Mock settings to raise an exception
+    with mock.patch("django.conf.settings") as mock_settings:
+        mock_settings.DATABASES.items.side_effect = Exception("Settings error")
+
+        # Reset cache and call function
+        _cached_db_configs.clear()
+        django_integration._cache_initialized = False
+
+        # Should not raise an exception
+        _cache_database_configurations()
+
+        # Verify cache was cleared on exception
+        assert _cached_db_configs == {}
+        assert django_integration._cache_initialized is False
