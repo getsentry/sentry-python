@@ -192,7 +192,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         return f(*args, **kwargs)
 
     span = sentry_sdk.start_span(
-        op=OP.ANTHROPIC_MESSAGES_CREATE,
+        op=OP.GEN_AI_CHAT,
         description="Anthropic messages create",
         origin=AnthropicIntegration.origin,
     )
