@@ -837,7 +837,6 @@ class OP:
     LANGCHAIN_RUN = "ai.run.langchain"
     LANGCHAIN_TOOL = "ai.tool.langchain"
     LANGCHAIN_AGENT = "ai.agent.langchain"
-    LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"

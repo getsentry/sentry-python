@@ -208,7 +208,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
+                op=OP.GEN_AI_CHAT,
                 name=kwargs.get("name") or "Langchain Chat Model",
                 origin=LangchainIntegration.origin,
             )
