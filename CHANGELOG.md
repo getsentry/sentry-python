@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.0.0a5
+
+### Various fixes & improvements
+
+- Add empty tags by default to transaction (#4683) by @sl0thentr0py
+- Force creation of a new trace in continue_trace with empty headers (#4682) by @sl0thentr0py
+- mypy (#3152) by @sl0thentr0py
+- Add `update_current_span` to SDK 3 (#4679) by @sl0thentr0py
+- feat(tracing): Add convenience function `update_current_span`. (#4673) by @antonpirker
+- Update `gen_ai.*` and `ai.*` attributes (#4665) by @antonpirker
+- Add `update_data` to `Span`. (#4666) by @antonpirker
+- Fix plugins key codecov (#4655) by @sl0thentr0py
+
 ## 3.0.0a4
 
 ### Various fixes & improvements
