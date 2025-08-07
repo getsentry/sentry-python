@@ -640,7 +640,9 @@ def _cache_database_configurations():
                     "db_name": db_config.get("NAME"),
                     "host": db_config.get("HOST", "localhost"),
                     "port": db_config.get("PORT"),
-                    "vendor": db_wrapper.vendor,
+                    "vendor": (
+                        db_wrapper.vendor if hasattr(db_wrapper, "vendor") else None
+                    ),
                     "unix_socket": db_config.get("OPTIONS", {}).get("unix_socket"),
                     "engine": db_config.get("ENGINE"),
                 }
@@ -739,8 +741,9 @@ def install_sql_hook():
             name="connect",
             origin=DjangoIntegration.origin_db,
         ) as span:
+            connection = real_connect(self)
             _set_db_data(span, self)
-            return real_connect(self)
+            return connection
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
