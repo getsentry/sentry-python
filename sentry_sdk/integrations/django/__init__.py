@@ -740,8 +740,10 @@ def install_sql_hook():
             origin=DjangoIntegration.origin_db,
         ) as span:
             connection = real_connect(self)
-            _set_db_data(span, self)
-            return connection
+            with capture_internal_exceptions():
+                _set_db_data(span, self)
+
+        return connection
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
