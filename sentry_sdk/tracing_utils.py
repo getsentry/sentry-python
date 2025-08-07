@@ -355,11 +355,12 @@ def _format_sql(cursor, sql):
             real_sql = cursor.mogrify(sql)
             if isinstance(real_sql, bytes):
                 # Use UTF-8 as default, with latin1 fallback for edge cases
+                bytes_sql = real_sql  # make pypy happy (type narrowing to bytes)
                 try:
-                    real_sql = real_sql.decode("utf-8")
+                    real_sql = bytes_sql.decode("utf-8")
                 except UnicodeDecodeError:
                     # If UTF-8 fails, try latin1 as fallback
-                    real_sql = real_sql.decode("latin1", errors="replace")
+                    real_sql = bytes_sql.decode("latin1", errors="replace")
     except Exception:
         real_sql = None
 
