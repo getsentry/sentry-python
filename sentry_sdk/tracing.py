@@ -278,6 +278,14 @@ class Span:
         self.finish()
         self.deactivate()
 
+    async def __aenter__(self) -> Span:
+        return self.__enter__()
+
+    async def __aexit__(
+        self, ty: Optional[Any], value: Optional[Any], tb: Optional[Any]
+    ) -> None:
+        return self.__exit__(ty, value, tb)
+
     @property
     def description(self) -> Optional[str]:
         return self.get_attribute(SentrySpanAttribute.DESCRIPTION)

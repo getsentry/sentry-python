@@ -1,5 +1,6 @@
 import re
 import sys
+import asyncio
 from unittest import mock
 
 import pytest
@@ -280,3 +281,26 @@ def test_good_sysexit_doesnt_fail_transaction(
     assert "status" not in span.get("tags", {})
     assert "status" not in event.get("tags", {})
     assert event["contexts"]["trace"]["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_async_context_manager(sentry_init, capture_events):
+    """Test that spans work as async context managers"""
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    async with start_span(name="async_transaction") as transaction:
+        transaction.set_status(SPANSTATUS.OK)
+        async with start_span(op="async.task", name="async_operation") as span:
+            span.set_tag("test", "async")
+            await asyncio.sleep(0.001)
+
+    assert len(events) == 1
+    event = events[0]
+    assert event["transaction"] == "async_transaction"
+    assert event["contexts"]["trace"]["status"] == "ok"
+    assert len(event["spans"]) == 1
+    span = event["spans"][0]
+    assert span["op"] == "async.task"
+    assert span["description"] == "async_operation"
+    assert span["tags"]["test"] == "async"
