@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Top Level API - sentry-python 3.0.0a4 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Top Level API - sentry-python 3.0.0a5 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=397bb51e" />
@@ -95,6 +95,7 @@ data-aria-dark="Switch to auto color mode">
 <li><a class="reference internal" href="#sentry_sdk.api.get_current_span"><code class="docutils literal notranslate"><span class="pre">get_current_span()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.api.start_span"><code class="docutils literal notranslate"><span class="pre">start_span()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.api.start_transaction"><code class="docutils literal notranslate"><span class="pre">start_transaction()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.api.update_current_span"><code class="docutils literal notranslate"><span class="pre">update_current_span()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#distributed-tracing">Distributed Tracing</a><ul>
@@ -709,6 +710,52 @@ available arguments.</p></li>
 </dl>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="sentry_sdk.api.update_current_span">
+<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">update_current_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">op</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attributes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#update_current_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.update_current_span" title="Link to this definition">¶</a></dt>
+<dd><p>Update the current active span with the provided parameters.</p>
+<p>This function allows you to modify properties of the currently active span.
+If no span is currently active, this function will do nothing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>op</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em> or </em><em>None</em>) – The operation name for the span. This is a high-level description
+of what the span represents (e.g., “http.client”, “db.query”).
+You can use predefined constants from <code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.consts.OP</span></code>
+or provide your own string. If not provided, the span’s operation will
+remain unchanged.</p></li>
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em> or </em><em>None</em>) – The human-readable name/description for the span. This provides
+more specific details about what the span represents (e.g., “GET /api/users”,
+“SELECT * FROM users”). If not provided, the span’s name will remain unchanged.</p></li>
+<li><p><strong>attributes</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><em>Union</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.13)"><em>float</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><em>bool</em></a><em>]</em><em>] or </em><em>None</em>) – A dictionary of key-value pairs to add as attributes to the span.
+Attribute values must be strings, integers, floats, or booleans. These
+attributes will be merged with any existing span data. If not provided,
+no attributes will be added.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 2.35.0.</span></p>
+</div>
+<p>Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk</span>
+</span><span data-line="2"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.consts</span><span class="w"> </span><span class="kn">import</span> <span class="n">OP</span>
+</span><span data-line="3">
+</span><span data-line="4"><span class="n">sentry_sdk</span><span class="o">.</span><span class="n">update_current_span</span><span class="p">(</span>
+</span><span data-line="5">    <span class="n">op</span><span class="o">=</span><span class="n">OP</span><span class="o">.</span><span class="n">FUNCTION</span><span class="p">,</span>
+</span><span data-line="6">    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;process_user_data&quot;</span><span class="p">,</span>
+</span><span data-line="7">    <span class="n">attributes</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="mi">123</span><span class="p">,</span> <span class="s2">&quot;batch_size&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">}</span>
+</span><span data-line="8"><span class="p">)</span>
+</span></pre></div>
+</div>
+</dd></dl>
+
 </section>
 <section id="distributed-tracing">
 <h2>Distributed Tracing<a class="headerlink" href="#distributed-tracing" title="Link to this heading">¶</a></h2>
@@ -826,7 +873,7 @@ If no client is available a <a class="reference internal" href="apidocs.html#sen
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=dc030f12"></script>
+      <script src="_static/documentation_options.js?v=787b8b0b"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=c477d091"></script></body>

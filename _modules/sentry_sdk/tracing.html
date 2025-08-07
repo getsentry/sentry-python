@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.tracing - sentry-python 3.0.0a4 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.tracing - sentry-python 3.0.0a5 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
@@ -462,232 +462,237 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="352">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_attribute</span><span class="p">(</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">NAME</span><span class="p">)</span>
 </span><span data-line="353">
 </span><span data-line="354">    <span class="nd">@name</span><span class="o">.</span><span class="n">setter</span>
-</span><span data-line="355">    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="356">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">NAME</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-</span><span data-line="357">
-</span><span data-line="358">    <span class="nd">@property</span>
-</span><span data-line="359">    <span class="k">def</span><span class="w"> </span><span class="nf">source</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="360">        <span class="k">return</span> <span class="p">(</span>
-</span><span data-line="361">            <span class="bp">self</span><span class="o">.</span><span class="n">get_attribute</span><span class="p">(</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">SOURCE</span><span class="p">)</span> <span class="ow">or</span> <span class="n">TransactionSource</span><span class="o">.</span><span class="n">CUSTOM</span>
-</span><span data-line="362">        <span class="p">)</span>
-</span><span data-line="363">
-</span><span data-line="364">    <span class="nd">@source</span><span class="o">.</span><span class="n">setter</span>
-</span><span data-line="365">    <span class="k">def</span><span class="w"> </span><span class="nf">source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="366">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">SOURCE</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-</span><span data-line="367">
-</span><span data-line="368">    <span class="nd">@property</span>
-</span><span data-line="369">    <span class="k">def</span><span class="w"> </span><span class="nf">start_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]:</span>
-</span><span data-line="370">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
-</span><span data-line="371">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="372">
-</span><span data-line="373">        <span class="n">start_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">start_time</span>
-</span><span data-line="374">        <span class="k">if</span> <span class="n">start_time</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="375">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="376">
-</span><span data-line="377">        <span class="k">return</span> <span class="n">convert_from_otel_timestamp</span><span class="p">(</span><span class="n">start_time</span><span class="p">)</span>
-</span><span data-line="378">
-</span><span data-line="379">    <span class="nd">@property</span>
-</span><span data-line="380">    <span class="k">def</span><span class="w"> </span><span class="nf">timestamp</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]:</span>
-</span><span data-line="381">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
-</span><span data-line="382">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="383">
-</span><span data-line="384">        <span class="n">end_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">end_time</span>
-</span><span data-line="385">        <span class="k">if</span> <span class="n">end_time</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="386">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="387">
-</span><span data-line="388">        <span class="k">return</span> <span class="n">convert_from_otel_timestamp</span><span class="p">(</span><span class="n">end_time</span><span class="p">)</span>
-</span><span data-line="389">
-</span><span data-line="390">    <span class="k">def</span><span class="w"> </span><span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Span</span><span class="p">:</span>
-</span><span data-line="391">        <span class="k">return</span> <span class="n">Span</span><span class="p">(</span><span class="n">parent_span</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-</span><span data-line="392">
-</span><span data-line="393">    <span class="k">def</span><span class="w"> </span><span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
-</span><span data-line="394">        <span class="k">yield</span> <span class="n">SENTRY_TRACE_HEADER_NAME</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
-</span><span data-line="395">        <span class="k">yield</span> <span class="n">BAGGAGE_HEADER_NAME</span><span class="p">,</span> <span class="n">serialize_trace_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trace_state</span><span class="p">)</span>
-</span><span data-line="396">
-</span><span data-line="397">    <span class="k">def</span><span class="w"> </span><span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="398">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
-</span><span data-line="399">            <span class="n">sampled</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
-</span><span data-line="400">        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
-</span><span data-line="401">            <span class="n">sampled</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
-</span><span data-line="402">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="403">            <span class="n">sampled</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span data-line="404">
-</span><span data-line="405">        <span class="n">traceparent</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">-</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">span_id</span><span class="p">)</span>
-</span><span data-line="406">        <span class="k">if</span> <span class="n">sampled</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="407">            <span class="n">traceparent</span> <span class="o">+=</span> <span class="s2">&quot;-</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">sampled</span><span class="p">,)</span>
-</span><span data-line="408">
-</span><span data-line="409">        <span class="k">return</span> <span class="n">traceparent</span>
-</span><span data-line="410">
-</span><span data-line="411">    <span class="nd">@property</span>
-</span><span data-line="412">    <span class="k">def</span><span class="w"> </span><span class="nf">trace_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TraceState</span><span class="p">:</span>
-</span><span data-line="413">        <span class="k">return</span> <span class="n">get_trace_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">)</span>
-</span><span data-line="414">
-</span><span data-line="415">    <span class="k">def</span><span class="w"> </span><span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Baggage</span><span class="p">:</span>
-</span><span data-line="416">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
-</span><span data-line="417">
-</span><span data-line="418">    <span class="k">def</span><span class="w"> </span><span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Baggage</span><span class="p">:</span>
-</span><span data-line="419">        <span class="k">return</span> <span class="n">baggage_from_trace_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trace_state</span><span class="p">)</span>
-</span><span data-line="420">
-</span><span data-line="421">    <span class="k">def</span><span class="w"> </span><span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="422">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">TAG</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-</span><span data-line="423">
-</span><span data-line="424">    <span class="k">def</span><span class="w"> </span><span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="425">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-</span><span data-line="426">            <span class="s2">&quot;`Span.set_data` is deprecated. Please use `Span.set_attribute` instead.&quot;</span><span class="p">,</span>
-</span><span data-line="427">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
-</span><span data-line="428">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span data-line="429">        <span class="p">)</span>
-</span><span data-line="430">
-</span><span data-line="431">        <span class="c1"># TODO-neel-potel we cannot add dicts here</span>
-</span><span data-line="432">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-</span><span data-line="433">
-</span><span data-line="434">    <span class="k">def</span><span class="w"> </span><span class="nf">get_attribute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
-</span><span data-line="435">        <span class="k">if</span> <span class="p">(</span>
-</span><span data-line="436">            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">)</span>
-</span><span data-line="437">            <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">attributes</span>
-</span><span data-line="438">        <span class="p">):</span>
-</span><span data-line="439">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="440">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">attributes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-</span><span data-line="441">
-</span><span data-line="442">    <span class="k">def</span><span class="w"> </span><span class="nf">set_attribute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="443">        <span class="c1"># otel doesn&#39;t support None as values, preferring to not set the key</span>
-</span><span data-line="444">        <span class="c1"># at all instead</span>
-</span><span data-line="445">        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="446">            <span class="k">return</span>
-</span><span data-line="447">        <span class="n">serialized_value</span> <span class="o">=</span> <span class="n">_serialize_span_attribute</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-</span><span data-line="448">        <span class="k">if</span> <span class="n">serialized_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="449">            <span class="k">return</span>
-</span><span data-line="450">
-</span><span data-line="451">        <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">serialized_value</span><span class="p">)</span>
-</span><span data-line="452">
-</span><span data-line="453">    <span class="nd">@property</span>
-</span><span data-line="454">    <span class="k">def</span><span class="w"> </span><span class="nf">status</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-</span><span data-line="455"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="456"><span class="sd">        Return the Sentry `SPANSTATUS` corresponding to the underlying OTel status.</span>
-</span><span data-line="457"><span class="sd">        Because differences in possible values in OTel `StatusCode` and</span>
-</span><span data-line="458"><span class="sd">        Sentry `SPANSTATUS` it can not be guaranteed that the status</span>
-</span><span data-line="459"><span class="sd">        set in `set_status()` will be the same as the one returned here.</span>
-</span><span data-line="460"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="461">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
-</span><span data-line="462">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="463">
-</span><span data-line="464">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="n">StatusCode</span><span class="o">.</span><span class="n">UNSET</span><span class="p">:</span>
-</span><span data-line="465">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="466">        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="n">StatusCode</span><span class="o">.</span><span class="n">OK</span><span class="p">:</span>
-</span><span data-line="467">            <span class="k">return</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">OK</span>
-</span><span data-line="468">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="469">            <span class="k">return</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">UNKNOWN_ERROR</span>
-</span><span data-line="470">
-</span><span data-line="471">    <span class="k">def</span><span class="w"> </span><span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="472">        <span class="k">if</span> <span class="n">status</span> <span class="o">==</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">OK</span><span class="p">:</span>
-</span><span data-line="473">            <span class="n">otel_status</span> <span class="o">=</span> <span class="n">StatusCode</span><span class="o">.</span><span class="n">OK</span>
-</span><span data-line="474">            <span class="n">otel_description</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span data-line="475">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="476">            <span class="n">otel_status</span> <span class="o">=</span> <span class="n">StatusCode</span><span class="o">.</span><span class="n">ERROR</span>
-</span><span data-line="477">            <span class="n">otel_description</span> <span class="o">=</span> <span class="n">status</span>
-</span><span data-line="478">
-</span><span data-line="479">        <span class="k">if</span> <span class="n">_OTEL_VERSION</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">_OTEL_VERSION</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
-</span><span data-line="480">            <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="n">otel_status</span><span class="p">,</span> <span class="n">otel_description</span><span class="p">)</span>
-</span><span data-line="481">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="482">            <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="n">Status</span><span class="p">(</span><span class="n">otel_status</span><span class="p">,</span> <span class="n">otel_description</span><span class="p">))</span>
+</span><span data-line="355">    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="356">        <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">update_name</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</span><span data-line="357">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">NAME</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</span><span data-line="358">
+</span><span data-line="359">    <span class="nd">@property</span>
+</span><span data-line="360">    <span class="k">def</span><span class="w"> </span><span class="nf">source</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="361">        <span class="k">return</span> <span class="p">(</span>
+</span><span data-line="362">            <span class="bp">self</span><span class="o">.</span><span class="n">get_attribute</span><span class="p">(</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">SOURCE</span><span class="p">)</span> <span class="ow">or</span> <span class="n">TransactionSource</span><span class="o">.</span><span class="n">CUSTOM</span>
+</span><span data-line="363">        <span class="p">)</span>
+</span><span data-line="364">
+</span><span data-line="365">    <span class="nd">@source</span><span class="o">.</span><span class="n">setter</span>
+</span><span data-line="366">    <span class="k">def</span><span class="w"> </span><span class="nf">source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="367">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">SOURCE</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</span><span data-line="368">
+</span><span data-line="369">    <span class="nd">@property</span>
+</span><span data-line="370">    <span class="k">def</span><span class="w"> </span><span class="nf">start_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]:</span>
+</span><span data-line="371">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
+</span><span data-line="372">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="373">
+</span><span data-line="374">        <span class="n">start_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">start_time</span>
+</span><span data-line="375">        <span class="k">if</span> <span class="n">start_time</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="376">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="377">
+</span><span data-line="378">        <span class="k">return</span> <span class="n">convert_from_otel_timestamp</span><span class="p">(</span><span class="n">start_time</span><span class="p">)</span>
+</span><span data-line="379">
+</span><span data-line="380">    <span class="nd">@property</span>
+</span><span data-line="381">    <span class="k">def</span><span class="w"> </span><span class="nf">timestamp</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]:</span>
+</span><span data-line="382">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
+</span><span data-line="383">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="384">
+</span><span data-line="385">        <span class="n">end_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">end_time</span>
+</span><span data-line="386">        <span class="k">if</span> <span class="n">end_time</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="387">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="388">
+</span><span data-line="389">        <span class="k">return</span> <span class="n">convert_from_otel_timestamp</span><span class="p">(</span><span class="n">end_time</span><span class="p">)</span>
+</span><span data-line="390">
+</span><span data-line="391">    <span class="k">def</span><span class="w"> </span><span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Span</span><span class="p">:</span>
+</span><span data-line="392">        <span class="k">return</span> <span class="n">Span</span><span class="p">(</span><span class="n">parent_span</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span data-line="393">
+</span><span data-line="394">    <span class="k">def</span><span class="w"> </span><span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+</span><span data-line="395">        <span class="k">yield</span> <span class="n">SENTRY_TRACE_HEADER_NAME</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
+</span><span data-line="396">        <span class="k">yield</span> <span class="n">BAGGAGE_HEADER_NAME</span><span class="p">,</span> <span class="n">serialize_trace_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trace_state</span><span class="p">)</span>
+</span><span data-line="397">
+</span><span data-line="398">    <span class="k">def</span><span class="w"> </span><span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="399">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+</span><span data-line="400">            <span class="n">sampled</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+</span><span data-line="401">        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+</span><span data-line="402">            <span class="n">sampled</span> <span class="o">=</span> <span class="s2">&quot;0&quot;</span>
+</span><span data-line="403">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="404">            <span class="n">sampled</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="405">
+</span><span data-line="406">        <span class="n">traceparent</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">-</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">span_id</span><span class="p">)</span>
+</span><span data-line="407">        <span class="k">if</span> <span class="n">sampled</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="408">            <span class="n">traceparent</span> <span class="o">+=</span> <span class="s2">&quot;-</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">sampled</span><span class="p">,)</span>
+</span><span data-line="409">
+</span><span data-line="410">        <span class="k">return</span> <span class="n">traceparent</span>
+</span><span data-line="411">
+</span><span data-line="412">    <span class="nd">@property</span>
+</span><span data-line="413">    <span class="k">def</span><span class="w"> </span><span class="nf">trace_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TraceState</span><span class="p">:</span>
+</span><span data-line="414">        <span class="k">return</span> <span class="n">get_trace_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">)</span>
+</span><span data-line="415">
+</span><span data-line="416">    <span class="k">def</span><span class="w"> </span><span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Baggage</span><span class="p">:</span>
+</span><span data-line="417">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
+</span><span data-line="418">
+</span><span data-line="419">    <span class="k">def</span><span class="w"> </span><span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Baggage</span><span class="p">:</span>
+</span><span data-line="420">        <span class="k">return</span> <span class="n">baggage_from_trace_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trace_state</span><span class="p">)</span>
+</span><span data-line="421">
+</span><span data-line="422">    <span class="k">def</span><span class="w"> </span><span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="423">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">TAG</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</span><span data-line="424">
+</span><span data-line="425">    <span class="k">def</span><span class="w"> </span><span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="426">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+</span><span data-line="427">            <span class="s2">&quot;`Span.set_data` is deprecated. Please use `Span.set_attribute` instead.&quot;</span><span class="p">,</span>
+</span><span data-line="428">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+</span><span data-line="429">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span data-line="430">        <span class="p">)</span>
+</span><span data-line="431">
+</span><span data-line="432">        <span class="c1"># TODO-neel-potel we cannot add dicts here</span>
+</span><span data-line="433">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</span><span data-line="434">
+</span><span data-line="435">    <span class="k">def</span><span class="w"> </span><span class="nf">get_attribute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
+</span><span data-line="436">        <span class="k">if</span> <span class="p">(</span>
+</span><span data-line="437">            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">)</span>
+</span><span data-line="438">            <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">attributes</span>
+</span><span data-line="439">        <span class="p">):</span>
+</span><span data-line="440">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="441">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">attributes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+</span><span data-line="442">
+</span><span data-line="443">    <span class="k">def</span><span class="w"> </span><span class="nf">set_attribute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="444">        <span class="c1"># otel doesn&#39;t support None as values, preferring to not set the key</span>
+</span><span data-line="445">        <span class="c1"># at all instead</span>
+</span><span data-line="446">        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="447">            <span class="k">return</span>
+</span><span data-line="448">        <span class="n">serialized_value</span> <span class="o">=</span> <span class="n">_serialize_span_attribute</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</span><span data-line="449">        <span class="k">if</span> <span class="n">serialized_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="450">            <span class="k">return</span>
+</span><span data-line="451">
+</span><span data-line="452">        <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">serialized_value</span><span class="p">)</span>
+</span><span data-line="453">
+</span><span data-line="454">    <span class="k">def</span><span class="w"> </span><span class="nf">set_attributes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attributes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="455">        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">attributes</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span data-line="456">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</span><span data-line="457">
+</span><span data-line="458">    <span class="nd">@property</span>
+</span><span data-line="459">    <span class="k">def</span><span class="w"> </span><span class="nf">status</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+</span><span data-line="460"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="461"><span class="sd">        Return the Sentry `SPANSTATUS` corresponding to the underlying OTel status.</span>
+</span><span data-line="462"><span class="sd">        Because differences in possible values in OTel `StatusCode` and</span>
+</span><span data-line="463"><span class="sd">        Sentry `SPANSTATUS` it can not be guaranteed that the status</span>
+</span><span data-line="464"><span class="sd">        set in `set_status()` will be the same as the one returned here.</span>
+</span><span data-line="465"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="466">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
+</span><span data-line="467">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="468">
+</span><span data-line="469">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="n">StatusCode</span><span class="o">.</span><span class="n">UNSET</span><span class="p">:</span>
+</span><span data-line="470">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="471">        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="n">StatusCode</span><span class="o">.</span><span class="n">OK</span><span class="p">:</span>
+</span><span data-line="472">            <span class="k">return</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">OK</span>
+</span><span data-line="473">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="474">            <span class="k">return</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">UNKNOWN_ERROR</span>
+</span><span data-line="475">
+</span><span data-line="476">    <span class="k">def</span><span class="w"> </span><span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="477">        <span class="k">if</span> <span class="n">status</span> <span class="o">==</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">OK</span><span class="p">:</span>
+</span><span data-line="478">            <span class="n">otel_status</span> <span class="o">=</span> <span class="n">StatusCode</span><span class="o">.</span><span class="n">OK</span>
+</span><span data-line="479">            <span class="n">otel_description</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span data-line="480">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="481">            <span class="n">otel_status</span> <span class="o">=</span> <span class="n">StatusCode</span><span class="o">.</span><span class="n">ERROR</span>
+</span><span data-line="482">            <span class="n">otel_description</span> <span class="o">=</span> <span class="n">status</span>
 </span><span data-line="483">
-</span><span data-line="484">    <span class="k">def</span><span class="w"> </span><span class="nf">set_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">thread_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="485">        <span class="k">if</span> <span class="n">thread_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="486">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">THREAD_ID</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">thread_id</span><span class="p">))</span>
-</span><span data-line="487">
-</span><span data-line="488">            <span class="k">if</span> <span class="n">thread_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="489">                <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">THREAD_NAME</span><span class="p">,</span> <span class="n">thread_name</span><span class="p">)</span>
-</span><span data-line="490">
-</span><span data-line="491">    <span class="k">def</span><span class="w"> </span><span class="nf">update_active_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="492">        <span class="n">thread_id</span><span class="p">,</span> <span class="n">thread_name</span> <span class="o">=</span> <span class="n">get_current_thread_meta</span><span class="p">()</span>
-</span><span data-line="493">        <span class="bp">self</span><span class="o">.</span><span class="n">set_thread</span><span class="p">(</span><span class="n">thread_id</span><span class="p">,</span> <span class="n">thread_name</span><span class="p">)</span>
-</span><span data-line="494">
-</span><span data-line="495">    <span class="k">def</span><span class="w"> </span><span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="496">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">HTTP_STATUS_CODE</span><span class="p">,</span> <span class="n">http_status</span><span class="p">)</span>
-</span><span data-line="497">        <span class="bp">self</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="n">get_span_status_from_http_code</span><span class="p">(</span><span class="n">http_status</span><span class="p">))</span>
-</span><span data-line="498">
-</span><span data-line="499">    <span class="k">def</span><span class="w"> </span><span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span data-line="500">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">OK</span>
-</span><span data-line="501">
-</span><span data-line="502">    <span class="k">def</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">end_timestamp</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">datetime</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="503">        <span class="k">if</span> <span class="n">end_timestamp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="504">            <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">end</span><span class="p">(</span><span class="n">convert_to_otel_timestamp</span><span class="p">(</span><span class="n">end_timestamp</span><span class="p">))</span>
-</span><span data-line="505">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="506">            <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">end</span><span class="p">()</span>
-</span><span data-line="507">
+</span><span data-line="484">        <span class="k">if</span> <span class="n">_OTEL_VERSION</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">_OTEL_VERSION</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+</span><span data-line="485">            <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="n">otel_status</span><span class="p">,</span> <span class="n">otel_description</span><span class="p">)</span>
+</span><span data-line="486">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="487">            <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="n">Status</span><span class="p">(</span><span class="n">otel_status</span><span class="p">,</span> <span class="n">otel_description</span><span class="p">))</span>
+</span><span data-line="488">
+</span><span data-line="489">    <span class="k">def</span><span class="w"> </span><span class="nf">set_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thread_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">thread_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="490">        <span class="k">if</span> <span class="n">thread_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="491">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">THREAD_ID</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">thread_id</span><span class="p">))</span>
+</span><span data-line="492">
+</span><span data-line="493">            <span class="k">if</span> <span class="n">thread_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="494">                <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">THREAD_NAME</span><span class="p">,</span> <span class="n">thread_name</span><span class="p">)</span>
+</span><span data-line="495">
+</span><span data-line="496">    <span class="k">def</span><span class="w"> </span><span class="nf">update_active_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="497">        <span class="n">thread_id</span><span class="p">,</span> <span class="n">thread_name</span> <span class="o">=</span> <span class="n">get_current_thread_meta</span><span class="p">()</span>
+</span><span data-line="498">        <span class="bp">self</span><span class="o">.</span><span class="n">set_thread</span><span class="p">(</span><span class="n">thread_id</span><span class="p">,</span> <span class="n">thread_name</span><span class="p">)</span>
+</span><span data-line="499">
+</span><span data-line="500">    <span class="k">def</span><span class="w"> </span><span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="501">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">HTTP_STATUS_CODE</span><span class="p">,</span> <span class="n">http_status</span><span class="p">)</span>
+</span><span data-line="502">        <span class="bp">self</span><span class="o">.</span><span class="n">set_status</span><span class="p">(</span><span class="n">get_span_status_from_http_code</span><span class="p">(</span><span class="n">http_status</span><span class="p">))</span>
+</span><span data-line="503">
+</span><span data-line="504">    <span class="k">def</span><span class="w"> </span><span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="505">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">SPANSTATUS</span><span class="o">.</span><span class="n">OK</span>
+</span><span data-line="506">
+</span><span data-line="507">    <span class="k">def</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">end_timestamp</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">datetime</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="508">        <span class="k">if</span> <span class="n">end_timestamp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="509">            <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">end</span><span class="p">(</span><span class="n">convert_to_otel_timestamp</span><span class="p">(</span><span class="n">end_timestamp</span><span class="p">))</span>
+</span><span data-line="510">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="511">            <span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">end</span><span class="p">()</span>
+</span><span data-line="512">
 <div class="viewcode-block" id="Span.to_json">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.tracing.Span.to_json">[docs]</a>
-</span><span data-line="508">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-</span><span data-line="509"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="510"><span class="sd">        Only meant for testing. Not used internally anymore.</span>
-</span><span data-line="511"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="512">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
-</span><span data-line="513">            <span class="k">return</span> <span class="p">{}</span>
-</span><span data-line="514">        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">to_json</span><span class="p">())</span></div>
-
-</span><span data-line="515">
-</span><span data-line="516">    <span class="k">def</span><span class="w"> </span><span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span data-line="513">    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span data-line="514"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="515"><span class="sd">        Only meant for testing. Not used internally anymore.</span>
+</span><span data-line="516"><span class="sd">        &quot;&quot;&quot;</span>
 </span><span data-line="517">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
 </span><span data-line="518">            <span class="k">return</span> <span class="p">{}</span>
-</span><span data-line="519">
-</span><span data-line="520">        <span class="k">return</span> <span class="n">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">)</span>
-</span><span data-line="521">
-</span><span data-line="522">    <span class="k">def</span><span class="w"> </span><span class="nf">set_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="523">        <span class="c1"># TODO-neel-potel we cannot add dicts here</span>
-</span><span data-line="524">
-</span><span data-line="525">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">CONTEXT</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-</span><span data-line="526">
-</span><span data-line="527">    <span class="k">def</span><span class="w"> </span><span class="nf">set_flag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flag</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="528">        <span class="n">flag_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_attribute</span><span class="p">(</span><span class="s2">&quot;_flag.count&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span>
-</span><span data-line="529">        <span class="k">if</span> <span class="n">flag_count</span> <span class="o">&lt;</span> <span class="n">_FLAGS_CAPACITY</span><span class="p">:</span>
-</span><span data-line="530">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;flag.evaluation.</span><span class="si">{</span><span class="n">flag</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-</span><span data-line="531">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="s2">&quot;_flag.count&quot;</span><span class="p">,</span> <span class="n">flag_count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span></div>
+</span><span data-line="519">        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="o">.</span><span class="n">to_json</span><span class="p">())</span></div>
 
-</span><span data-line="532">
-</span><span data-line="533">
-</span><span data-line="534"><span class="c1"># TODO-neel-potel add deprecation</span>
-</span><span data-line="535"><span class="n">Transaction</span> <span class="o">=</span> <span class="n">Span</span>
-</span><span data-line="536">
+</span><span data-line="520">
+</span><span data-line="521">    <span class="k">def</span><span class="w"> </span><span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span data-line="522">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">,</span> <span class="n">ReadableSpan</span><span class="p">):</span>
+</span><span data-line="523">            <span class="k">return</span> <span class="p">{}</span>
+</span><span data-line="524">
+</span><span data-line="525">        <span class="k">return</span> <span class="n">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_otel_span</span><span class="p">)</span>
+</span><span data-line="526">
+</span><span data-line="527">    <span class="k">def</span><span class="w"> </span><span class="nf">set_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="528">        <span class="c1"># TODO-neel-potel we cannot add dicts here</span>
+</span><span data-line="529">
+</span><span data-line="530">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">SentrySpanAttribute</span><span class="o">.</span><span class="n">CONTEXT</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</span><span data-line="531">
+</span><span data-line="532">    <span class="k">def</span><span class="w"> </span><span class="nf">set_flag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flag</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="533">        <span class="n">flag_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_attribute</span><span class="p">(</span><span class="s2">&quot;_flag.count&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span>
+</span><span data-line="534">        <span class="k">if</span> <span class="n">flag_count</span> <span class="o">&lt;</span> <span class="n">_FLAGS_CAPACITY</span><span class="p">:</span>
+</span><span data-line="535">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;flag.evaluation.</span><span class="si">{</span><span class="n">flag</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+</span><span data-line="536">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="s2">&quot;_flag.count&quot;</span><span class="p">,</span> <span class="n">flag_count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span></div>
+
 </span><span data-line="537">
-</span><span data-line="538"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="539">
-</span><span data-line="540">    <span class="nd">@overload</span>
-</span><span data-line="541">    <span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]],</span> <span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]]:</span>
-</span><span data-line="542">        <span class="k">pass</span>
-</span><span data-line="543">
-</span><span data-line="544">    <span class="nd">@overload</span>
-</span><span data-line="545">    <span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]:</span>
-</span><span data-line="546">        <span class="k">pass</span>
-</span><span data-line="547">
+</span><span data-line="538">
+</span><span data-line="539"><span class="c1"># TODO-neel-potel add deprecation</span>
+</span><span data-line="540"><span class="n">Transaction</span> <span class="o">=</span> <span class="n">Span</span>
+</span><span data-line="541">
+</span><span data-line="542">
+</span><span data-line="543"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span data-line="544">
+</span><span data-line="545">    <span class="nd">@overload</span>
+</span><span data-line="546">    <span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]],</span> <span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]]:</span>
+</span><span data-line="547">        <span class="k">pass</span>
 </span><span data-line="548">
-</span><span data-line="549"><span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span>
-</span><span data-line="550">    <span class="n">func</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="551"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">],</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]],</span> <span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]]]:</span>
-</span><span data-line="552"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="553"><span class="sd">    Decorator to start a child span under the existing current transaction.</span>
-</span><span data-line="554"><span class="sd">    If there is no current transaction, then nothing will be traced.</span>
-</span><span data-line="555">
-</span><span data-line="556"><span class="sd">    .. code-block::</span>
-</span><span data-line="557"><span class="sd">        :caption: Usage</span>
-</span><span data-line="558">
-</span><span data-line="559"><span class="sd">        import sentry_sdk</span>
+</span><span data-line="549">    <span class="nd">@overload</span>
+</span><span data-line="550">    <span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]:</span>
+</span><span data-line="551">        <span class="k">pass</span>
+</span><span data-line="552">
+</span><span data-line="553">
+</span><span data-line="554"><span class="k">def</span><span class="w"> </span><span class="nf">trace</span><span class="p">(</span>
+</span><span data-line="555">    <span class="n">func</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="556"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">],</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]],</span> <span class="n">Callable</span><span class="p">[</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]]]:</span>
+</span><span data-line="557"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="558"><span class="sd">    Decorator to start a child span under the existing current transaction.</span>
+</span><span data-line="559"><span class="sd">    If there is no current transaction, then nothing will be traced.</span>
 </span><span data-line="560">
-</span><span data-line="561"><span class="sd">        @sentry_sdk.trace</span>
-</span><span data-line="562"><span class="sd">        def my_function():</span>
-</span><span data-line="563"><span class="sd">            ...</span>
-</span><span data-line="564">
-</span><span data-line="565"><span class="sd">        @sentry_sdk.trace</span>
-</span><span data-line="566"><span class="sd">        async def my_async_function():</span>
-</span><span data-line="567"><span class="sd">            ...</span>
-</span><span data-line="568"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="569">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.tracing_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">start_child_span_decorator</span>
-</span><span data-line="570">
-</span><span data-line="571">    <span class="c1"># This patterns allows usage of both @sentry_traced and @sentry_traced(...)</span>
-</span><span data-line="572">    <span class="c1"># See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278</span>
-</span><span data-line="573">    <span class="k">if</span> <span class="n">func</span><span class="p">:</span>
-</span><span data-line="574">        <span class="k">return</span> <span class="n">start_child_span_decorator</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
-</span><span data-line="575">    <span class="k">else</span><span class="p">:</span>
-</span><span data-line="576">        <span class="k">return</span> <span class="n">start_child_span_decorator</span>
+</span><span data-line="561"><span class="sd">    .. code-block::</span>
+</span><span data-line="562"><span class="sd">        :caption: Usage</span>
+</span><span data-line="563">
+</span><span data-line="564"><span class="sd">        import sentry_sdk</span>
+</span><span data-line="565">
+</span><span data-line="566"><span class="sd">        @sentry_sdk.trace</span>
+</span><span data-line="567"><span class="sd">        def my_function():</span>
+</span><span data-line="568"><span class="sd">            ...</span>
+</span><span data-line="569">
+</span><span data-line="570"><span class="sd">        @sentry_sdk.trace</span>
+</span><span data-line="571"><span class="sd">        async def my_async_function():</span>
+</span><span data-line="572"><span class="sd">            ...</span>
+</span><span data-line="573"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="574">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.tracing_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">start_child_span_decorator</span>
+</span><span data-line="575">
+</span><span data-line="576">    <span class="c1"># This patterns allows usage of both @sentry_traced and @sentry_traced(...)</span>
+</span><span data-line="577">    <span class="c1"># See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278</span>
+</span><span data-line="578">    <span class="k">if</span> <span class="n">func</span><span class="p">:</span>
+</span><span data-line="579">        <span class="k">return</span> <span class="n">start_child_span_decorator</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+</span><span data-line="580">    <span class="k">else</span><span class="p">:</span>
+</span><span data-line="581">        <span class="k">return</span> <span class="n">start_child_span_decorator</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -718,7 +723,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=dc030f12"></script>
+      <script src="../../_static/documentation_options.js?v=787b8b0b"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=c477d091"></script></body>

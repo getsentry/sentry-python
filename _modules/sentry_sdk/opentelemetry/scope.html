@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.opentelemetry.scope - sentry-python 3.0.0a4 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.opentelemetry.scope - sentry-python 3.0.0a5 documentation</title><link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=397bb51e" />
@@ -193,149 +193,151 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="85">
 </span><span data-line="86">        <span class="n">span_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_incoming_otel_span_context</span><span class="p">()</span>
 </span><span data-line="87">        <span class="k">if</span> <span class="n">span_context</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="88">            <span class="k">yield</span>
-</span><span data-line="89">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="90">            <span class="k">with</span> <span class="n">use_span</span><span class="p">(</span><span class="n">NonRecordingSpan</span><span class="p">(</span><span class="n">span_context</span><span class="p">)):</span>
-</span><span data-line="91">                <span class="k">yield</span>
-</span><span data-line="92">
-</span><span data-line="93">    <span class="nd">@contextmanager</span>
-</span><span data-line="94">    <span class="k">def</span><span class="w"> </span><span class="nf">new_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-</span><span data-line="95"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="96"><span class="sd">        Force creation of a new trace.</span>
-</span><span data-line="97"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="98">        <span class="bp">self</span><span class="o">.</span><span class="n">generate_propagation_context</span><span class="p">()</span>
-</span><span data-line="99">        <span class="k">with</span> <span class="n">use_span</span><span class="p">(</span><span class="n">INVALID_SPAN</span><span class="p">):</span>
-</span><span data-line="100">            <span class="k">yield</span>
-</span><span data-line="101">
-</span><span data-line="102">    <span class="k">def</span><span class="w"> </span><span class="nf">_incoming_otel_span_context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SpanContext</span><span class="p">]:</span>
-</span><span data-line="103">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="104">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="105">        <span class="c1"># If sentry-trace extraction didn&#39;t have a parent_span_id, we don&#39;t have an upstream header</span>
-</span><span data-line="106">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">parent_span_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="107">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="108">
-</span><span data-line="109">        <span class="n">trace_flags</span> <span class="o">=</span> <span class="n">TraceFlags</span><span class="p">(</span>
-</span><span data-line="110">            <span class="n">TraceFlags</span><span class="o">.</span><span class="n">SAMPLED</span>
-</span><span data-line="111">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">parent_sampled</span>
-</span><span data-line="112">            <span class="k">else</span> <span class="n">TraceFlags</span><span class="o">.</span><span class="n">DEFAULT</span>
-</span><span data-line="113">        <span class="p">)</span>
-</span><span data-line="114">
-</span><span data-line="115">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">baggage</span><span class="p">:</span>
-</span><span data-line="116">            <span class="n">trace_state</span> <span class="o">=</span> <span class="n">trace_state_from_baggage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">baggage</span><span class="p">)</span>
-</span><span data-line="117">        <span class="k">else</span><span class="p">:</span>
-</span><span data-line="118">            <span class="n">trace_state</span> <span class="o">=</span> <span class="n">TraceState</span><span class="p">()</span>
-</span><span data-line="119">
-</span><span data-line="120">        <span class="c1"># for twp to work, we also need to consider deferred sampling when the sampling</span>
-</span><span data-line="121">        <span class="c1"># flag is not present, so the above TraceFlags are not sufficient</span>
-</span><span data-line="122">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">parent_sampled</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="123">            <span class="n">trace_state</span> <span class="o">=</span> <span class="n">trace_state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">TRACESTATE_SAMPLED_KEY</span><span class="p">,</span> <span class="s2">&quot;deferred&quot;</span><span class="p">)</span>
-</span><span data-line="124">
-</span><span data-line="125">        <span class="n">span_context</span> <span class="o">=</span> <span class="n">SpanContext</span><span class="p">(</span>
-</span><span data-line="126">            <span class="n">trace_id</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
-</span><span data-line="127">            <span class="n">span_id</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">parent_span_id</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
-</span><span data-line="128">            <span class="n">is_remote</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span data-line="129">            <span class="n">trace_flags</span><span class="o">=</span><span class="n">trace_flags</span><span class="p">,</span>
-</span><span data-line="130">            <span class="n">trace_state</span><span class="o">=</span><span class="n">trace_state</span><span class="p">,</span>
-</span><span data-line="131">        <span class="p">)</span>
-</span><span data-line="132">
-</span><span data-line="133">        <span class="k">return</span> <span class="n">span_context</span>
+</span><span data-line="88">            <span class="c1"># force a new trace since no incoming stuff</span>
+</span><span data-line="89">            <span class="k">with</span> <span class="n">use_span</span><span class="p">(</span><span class="n">INVALID_SPAN</span><span class="p">):</span>
+</span><span data-line="90">                <span class="k">yield</span>
+</span><span data-line="91">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="92">            <span class="k">with</span> <span class="n">use_span</span><span class="p">(</span><span class="n">NonRecordingSpan</span><span class="p">(</span><span class="n">span_context</span><span class="p">)):</span>
+</span><span data-line="93">                <span class="k">yield</span>
+</span><span data-line="94">
+</span><span data-line="95">    <span class="nd">@contextmanager</span>
+</span><span data-line="96">    <span class="k">def</span><span class="w"> </span><span class="nf">new_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+</span><span data-line="97"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="98"><span class="sd">        Force creation of a new trace.</span>
+</span><span data-line="99"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="100">        <span class="bp">self</span><span class="o">.</span><span class="n">generate_propagation_context</span><span class="p">()</span>
+</span><span data-line="101">        <span class="k">with</span> <span class="n">use_span</span><span class="p">(</span><span class="n">INVALID_SPAN</span><span class="p">):</span>
+</span><span data-line="102">            <span class="k">yield</span>
+</span><span data-line="103">
+</span><span data-line="104">    <span class="k">def</span><span class="w"> </span><span class="nf">_incoming_otel_span_context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SpanContext</span><span class="p">]:</span>
+</span><span data-line="105">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="106">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="107">        <span class="c1"># If sentry-trace extraction didn&#39;t have a parent_span_id, we don&#39;t have an upstream header</span>
+</span><span data-line="108">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">parent_span_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="109">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="110">
+</span><span data-line="111">        <span class="n">trace_flags</span> <span class="o">=</span> <span class="n">TraceFlags</span><span class="p">(</span>
+</span><span data-line="112">            <span class="n">TraceFlags</span><span class="o">.</span><span class="n">SAMPLED</span>
+</span><span data-line="113">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">parent_sampled</span>
+</span><span data-line="114">            <span class="k">else</span> <span class="n">TraceFlags</span><span class="o">.</span><span class="n">DEFAULT</span>
+</span><span data-line="115">        <span class="p">)</span>
+</span><span data-line="116">
+</span><span data-line="117">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">baggage</span><span class="p">:</span>
+</span><span data-line="118">            <span class="n">trace_state</span> <span class="o">=</span> <span class="n">trace_state_from_baggage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">baggage</span><span class="p">)</span>
+</span><span data-line="119">        <span class="k">else</span><span class="p">:</span>
+</span><span data-line="120">            <span class="n">trace_state</span> <span class="o">=</span> <span class="n">TraceState</span><span class="p">()</span>
+</span><span data-line="121">
+</span><span data-line="122">        <span class="c1"># for twp to work, we also need to consider deferred sampling when the sampling</span>
+</span><span data-line="123">        <span class="c1"># flag is not present, so the above TraceFlags are not sufficient</span>
+</span><span data-line="124">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">parent_sampled</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="125">            <span class="n">trace_state</span> <span class="o">=</span> <span class="n">trace_state</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">TRACESTATE_SAMPLED_KEY</span><span class="p">,</span> <span class="s2">&quot;deferred&quot;</span><span class="p">)</span>
+</span><span data-line="126">
+</span><span data-line="127">        <span class="n">span_context</span> <span class="o">=</span> <span class="n">SpanContext</span><span class="p">(</span>
+</span><span data-line="128">            <span class="n">trace_id</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
+</span><span data-line="129">            <span class="n">span_id</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="o">.</span><span class="n">parent_span_id</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
+</span><span data-line="130">            <span class="n">is_remote</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span data-line="131">            <span class="n">trace_flags</span><span class="o">=</span><span class="n">trace_flags</span><span class="p">,</span>
+</span><span data-line="132">            <span class="n">trace_state</span><span class="o">=</span><span class="n">trace_state</span><span class="p">,</span>
+</span><span data-line="133">        <span class="p">)</span>
 </span><span data-line="134">
-</span><span data-line="135">    <span class="k">def</span><span class="w"> </span><span class="nf">start_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Span</span><span class="p">:</span>
-</span><span data-line="136"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="137"><span class="sd">        .. deprecated:: 3.0.0</span>
-</span><span data-line="138"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
-</span><span data-line="139"><span class="sd">            Use :py:meth:`sentry_sdk.start_span` instead.</span>
-</span><span data-line="140"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="141">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-</span><span data-line="142">            <span class="s2">&quot;The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`&quot;</span><span class="p">,</span>
-</span><span data-line="143">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
-</span><span data-line="144">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-</span><span data-line="145">        <span class="p">)</span>
-</span><span data-line="146">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-</span><span data-line="147">
-</span><span data-line="148">    <span class="k">def</span><span class="w"> </span><span class="nf">start_span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Span</span><span class="p">:</span>
-</span><span data-line="149">        <span class="k">return</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-</span><span data-line="150">
-</span><span data-line="151">
-</span><span data-line="152"><span class="n">_INITIAL_CURRENT_SCOPE</span> <span class="o">=</span> <span class="n">PotelScope</span><span class="p">(</span><span class="n">ty</span><span class="o">=</span><span class="n">ScopeType</span><span class="o">.</span><span class="n">CURRENT</span><span class="p">)</span>
-</span><span data-line="153"><span class="n">_INITIAL_ISOLATION_SCOPE</span> <span class="o">=</span> <span class="n">PotelScope</span><span class="p">(</span><span class="n">ty</span><span class="o">=</span><span class="n">ScopeType</span><span class="o">.</span><span class="n">ISOLATION</span><span class="p">)</span>
-</span><span data-line="154">
-</span><span data-line="155">
-</span><span data-line="156"><span class="k">def</span><span class="w"> </span><span class="nf">setup_initial_scopes</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="157">    <span class="k">global</span> <span class="n">_INITIAL_CURRENT_SCOPE</span><span class="p">,</span> <span class="n">_INITIAL_ISOLATION_SCOPE</span>
-</span><span data-line="158">    <span class="n">_INITIAL_CURRENT_SCOPE</span> <span class="o">=</span> <span class="n">PotelScope</span><span class="p">(</span><span class="n">ty</span><span class="o">=</span><span class="n">ScopeType</span><span class="o">.</span><span class="n">CURRENT</span><span class="p">)</span>
-</span><span data-line="159">    <span class="n">_INITIAL_ISOLATION_SCOPE</span> <span class="o">=</span> <span class="n">PotelScope</span><span class="p">(</span><span class="n">ty</span><span class="o">=</span><span class="n">ScopeType</span><span class="o">.</span><span class="n">ISOLATION</span><span class="p">)</span>
-</span><span data-line="160">
-</span><span data-line="161">    <span class="n">scopes</span> <span class="o">=</span> <span class="p">(</span><span class="n">_INITIAL_CURRENT_SCOPE</span><span class="p">,</span> <span class="n">_INITIAL_ISOLATION_SCOPE</span><span class="p">)</span>
-</span><span data-line="162">    <span class="n">attach</span><span class="p">(</span><span class="n">set_value</span><span class="p">(</span><span class="n">SENTRY_SCOPES_KEY</span><span class="p">,</span> <span class="n">scopes</span><span class="p">))</span>
-</span><span data-line="163">
-</span><span data-line="164">
-</span><span data-line="165"><span class="k">def</span><span class="w"> </span><span class="nf">setup_scope_context_management</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="166">    <span class="kn">import</span><span class="w"> </span><span class="nn">opentelemetry.context</span>
-</span><span data-line="167">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.opentelemetry.contextvars_context</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span data-line="168">        <span class="n">SentryContextVarsRuntimeContext</span><span class="p">,</span>
-</span><span data-line="169">    <span class="p">)</span>
-</span><span data-line="170">
-</span><span data-line="171">    <span class="n">opentelemetry</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">_RUNTIME_CONTEXT</span> <span class="o">=</span> <span class="n">SentryContextVarsRuntimeContext</span><span class="p">()</span>
-</span><span data-line="172">    <span class="n">setup_initial_scopes</span><span class="p">()</span>
-</span><span data-line="173">
-</span><span data-line="174">
-</span><span data-line="175"><span class="nd">@contextmanager</span>
-</span><span data-line="176"><span class="k">def</span><span class="w"> </span><span class="nf">isolation_scope</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-</span><span data-line="177">    <span class="n">context</span> <span class="o">=</span> <span class="n">set_value</span><span class="p">(</span><span class="n">SENTRY_FORK_ISOLATION_SCOPE_KEY</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-</span><span data-line="178">    <span class="n">token</span> <span class="o">=</span> <span class="n">attach</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
-</span><span data-line="179">    <span class="k">try</span><span class="p">:</span>
-</span><span data-line="180">        <span class="k">yield</span> <span class="n">PotelScope</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span>
-</span><span data-line="181">    <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="182">        <span class="n">detach</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
-</span><span data-line="183">
-</span><span data-line="184">
+</span><span data-line="135">        <span class="k">return</span> <span class="n">span_context</span>
+</span><span data-line="136">
+</span><span data-line="137">    <span class="k">def</span><span class="w"> </span><span class="nf">start_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Span</span><span class="p">:</span>
+</span><span data-line="138"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="139"><span class="sd">        .. deprecated:: 3.0.0</span>
+</span><span data-line="140"><span class="sd">            This function is deprecated and will be removed in a future release.</span>
+</span><span data-line="141"><span class="sd">            Use :py:meth:`sentry_sdk.start_span` instead.</span>
+</span><span data-line="142"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="143">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+</span><span data-line="144">            <span class="s2">&quot;The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`&quot;</span><span class="p">,</span>
+</span><span data-line="145">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+</span><span data-line="146">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span data-line="147">        <span class="p">)</span>
+</span><span data-line="148">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span data-line="149">
+</span><span data-line="150">    <span class="k">def</span><span class="w"> </span><span class="nf">start_span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Span</span><span class="p">:</span>
+</span><span data-line="151">        <span class="k">return</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span data-line="152">
+</span><span data-line="153">
+</span><span data-line="154"><span class="n">_INITIAL_CURRENT_SCOPE</span> <span class="o">=</span> <span class="n">PotelScope</span><span class="p">(</span><span class="n">ty</span><span class="o">=</span><span class="n">ScopeType</span><span class="o">.</span><span class="n">CURRENT</span><span class="p">)</span>
+</span><span data-line="155"><span class="n">_INITIAL_ISOLATION_SCOPE</span> <span class="o">=</span> <span class="n">PotelScope</span><span class="p">(</span><span class="n">ty</span><span class="o">=</span><span class="n">ScopeType</span><span class="o">.</span><span class="n">ISOLATION</span><span class="p">)</span>
+</span><span data-line="156">
+</span><span data-line="157">
+</span><span data-line="158"><span class="k">def</span><span class="w"> </span><span class="nf">setup_initial_scopes</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="159">    <span class="k">global</span> <span class="n">_INITIAL_CURRENT_SCOPE</span><span class="p">,</span> <span class="n">_INITIAL_ISOLATION_SCOPE</span>
+</span><span data-line="160">    <span class="n">_INITIAL_CURRENT_SCOPE</span> <span class="o">=</span> <span class="n">PotelScope</span><span class="p">(</span><span class="n">ty</span><span class="o">=</span><span class="n">ScopeType</span><span class="o">.</span><span class="n">CURRENT</span><span class="p">)</span>
+</span><span data-line="161">    <span class="n">_INITIAL_ISOLATION_SCOPE</span> <span class="o">=</span> <span class="n">PotelScope</span><span class="p">(</span><span class="n">ty</span><span class="o">=</span><span class="n">ScopeType</span><span class="o">.</span><span class="n">ISOLATION</span><span class="p">)</span>
+</span><span data-line="162">
+</span><span data-line="163">    <span class="n">scopes</span> <span class="o">=</span> <span class="p">(</span><span class="n">_INITIAL_CURRENT_SCOPE</span><span class="p">,</span> <span class="n">_INITIAL_ISOLATION_SCOPE</span><span class="p">)</span>
+</span><span data-line="164">    <span class="n">attach</span><span class="p">(</span><span class="n">set_value</span><span class="p">(</span><span class="n">SENTRY_SCOPES_KEY</span><span class="p">,</span> <span class="n">scopes</span><span class="p">))</span>
+</span><span data-line="165">
+</span><span data-line="166">
+</span><span data-line="167"><span class="k">def</span><span class="w"> </span><span class="nf">setup_scope_context_management</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="168">    <span class="kn">import</span><span class="w"> </span><span class="nn">opentelemetry.context</span>
+</span><span data-line="169">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.opentelemetry.contextvars_context</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="170">        <span class="n">SentryContextVarsRuntimeContext</span><span class="p">,</span>
+</span><span data-line="171">    <span class="p">)</span>
+</span><span data-line="172">
+</span><span data-line="173">    <span class="n">opentelemetry</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">_RUNTIME_CONTEXT</span> <span class="o">=</span> <span class="n">SentryContextVarsRuntimeContext</span><span class="p">()</span>
+</span><span data-line="174">    <span class="n">setup_initial_scopes</span><span class="p">()</span>
+</span><span data-line="175">
+</span><span data-line="176">
+</span><span data-line="177"><span class="nd">@contextmanager</span>
+</span><span data-line="178"><span class="k">def</span><span class="w"> </span><span class="nf">isolation_scope</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+</span><span data-line="179">    <span class="n">context</span> <span class="o">=</span> <span class="n">set_value</span><span class="p">(</span><span class="n">SENTRY_FORK_ISOLATION_SCOPE_KEY</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+</span><span data-line="180">    <span class="n">token</span> <span class="o">=</span> <span class="n">attach</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+</span><span data-line="181">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="182">        <span class="k">yield</span> <span class="n">PotelScope</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span>
+</span><span data-line="183">    <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="184">        <span class="n">detach</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+</span><span data-line="185">
+</span><span data-line="186">
 <div class="viewcode-block" id="new_scope">
 <a class="viewcode-back" href="../../../api.html#sentry_sdk.api.new_scope">[docs]</a>
-</span><span data-line="185"><span class="nd">@contextmanager</span>
-</span><span data-line="186"><span class="k">def</span><span class="w"> </span><span class="nf">new_scope</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-</span><span data-line="187">    <span class="n">token</span> <span class="o">=</span> <span class="n">attach</span><span class="p">(</span><span class="n">get_current</span><span class="p">())</span>
-</span><span data-line="188">    <span class="k">try</span><span class="p">:</span>
-</span><span data-line="189">        <span class="k">yield</span> <span class="n">PotelScope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
-</span><span data-line="190">    <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="191">        <span class="n">detach</span><span class="p">(</span><span class="n">token</span><span class="p">)</span></div>
+</span><span data-line="187"><span class="nd">@contextmanager</span>
+</span><span data-line="188"><span class="k">def</span><span class="w"> </span><span class="nf">new_scope</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+</span><span data-line="189">    <span class="n">token</span> <span class="o">=</span> <span class="n">attach</span><span class="p">(</span><span class="n">get_current</span><span class="p">())</span>
+</span><span data-line="190">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="191">        <span class="k">yield</span> <span class="n">PotelScope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
+</span><span data-line="192">    <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="193">        <span class="n">detach</span><span class="p">(</span><span class="n">token</span><span class="p">)</span></div>
 
-</span><span data-line="192">
-</span><span data-line="193">
-</span><span data-line="194"><span class="nd">@contextmanager</span>
-</span><span data-line="195"><span class="k">def</span><span class="w"> </span><span class="nf">use_scope</span><span class="p">(</span><span class="n">scope</span><span class="p">:</span> <span class="n">PotelScope</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-</span><span data-line="196">    <span class="n">context</span> <span class="o">=</span> <span class="n">set_value</span><span class="p">(</span><span class="n">SENTRY_USE_CURRENT_SCOPE_KEY</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
-</span><span data-line="197">    <span class="n">token</span> <span class="o">=</span> <span class="n">attach</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
-</span><span data-line="198">
-</span><span data-line="199">    <span class="k">try</span><span class="p">:</span>
-</span><span data-line="200">        <span class="k">yield</span> <span class="n">scope</span>
-</span><span data-line="201">    <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="202">        <span class="n">detach</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
-</span><span data-line="203">
-</span><span data-line="204">
-</span><span data-line="205"><span class="nd">@contextmanager</span>
-</span><span data-line="206"><span class="k">def</span><span class="w"> </span><span class="nf">use_isolation_scope</span><span class="p">(</span>
-</span><span data-line="207">    <span class="n">isolation_scope</span><span class="p">:</span> <span class="n">PotelScope</span><span class="p">,</span>
-</span><span data-line="208"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-</span><span data-line="209">    <span class="n">context</span> <span class="o">=</span> <span class="n">set_value</span><span class="p">(</span><span class="n">SENTRY_USE_ISOLATION_SCOPE_KEY</span><span class="p">,</span> <span class="n">isolation_scope</span><span class="p">)</span>
-</span><span data-line="210">    <span class="n">token</span> <span class="o">=</span> <span class="n">attach</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
-</span><span data-line="211">
-</span><span data-line="212">    <span class="k">try</span><span class="p">:</span>
-</span><span data-line="213">        <span class="k">yield</span> <span class="n">isolation_scope</span>
-</span><span data-line="214">    <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="215">        <span class="n">detach</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
-</span><span data-line="216">
-</span><span data-line="217">
-</span><span data-line="218"><span class="k">def</span><span class="w"> </span><span class="nf">validate_scopes</span><span class="p">(</span><span class="n">scopes</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="n">PotelScope</span><span class="p">]]:</span>
-</span><span data-line="219">    <span class="k">if</span> <span class="p">(</span>
-</span><span data-line="220">        <span class="nb">isinstance</span><span class="p">(</span><span class="n">scopes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
-</span><span data-line="221">        <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">scopes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
-</span><span data-line="222">        <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scopes</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">PotelScope</span><span class="p">)</span>
-</span><span data-line="223">        <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scopes</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">PotelScope</span><span class="p">)</span>
-</span><span data-line="224">    <span class="p">):</span>
-</span><span data-line="225">        <span class="k">return</span> <span class="n">scopes</span>
-</span><span data-line="226">    <span class="k">else</span><span class="p">:</span>
-</span><span data-line="227">        <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="194">
+</span><span data-line="195">
+</span><span data-line="196"><span class="nd">@contextmanager</span>
+</span><span data-line="197"><span class="k">def</span><span class="w"> </span><span class="nf">use_scope</span><span class="p">(</span><span class="n">scope</span><span class="p">:</span> <span class="n">PotelScope</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+</span><span data-line="198">    <span class="n">context</span> <span class="o">=</span> <span class="n">set_value</span><span class="p">(</span><span class="n">SENTRY_USE_CURRENT_SCOPE_KEY</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
+</span><span data-line="199">    <span class="n">token</span> <span class="o">=</span> <span class="n">attach</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+</span><span data-line="200">
+</span><span data-line="201">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="202">        <span class="k">yield</span> <span class="n">scope</span>
+</span><span data-line="203">    <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="204">        <span class="n">detach</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+</span><span data-line="205">
+</span><span data-line="206">
+</span><span data-line="207"><span class="nd">@contextmanager</span>
+</span><span data-line="208"><span class="k">def</span><span class="w"> </span><span class="nf">use_isolation_scope</span><span class="p">(</span>
+</span><span data-line="209">    <span class="n">isolation_scope</span><span class="p">:</span> <span class="n">PotelScope</span><span class="p">,</span>
+</span><span data-line="210"><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+</span><span data-line="211">    <span class="n">context</span> <span class="o">=</span> <span class="n">set_value</span><span class="p">(</span><span class="n">SENTRY_USE_ISOLATION_SCOPE_KEY</span><span class="p">,</span> <span class="n">isolation_scope</span><span class="p">)</span>
+</span><span data-line="212">    <span class="n">token</span> <span class="o">=</span> <span class="n">attach</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+</span><span data-line="213">
+</span><span data-line="214">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="215">        <span class="k">yield</span> <span class="n">isolation_scope</span>
+</span><span data-line="216">    <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="217">        <span class="n">detach</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+</span><span data-line="218">
+</span><span data-line="219">
+</span><span data-line="220"><span class="k">def</span><span class="w"> </span><span class="nf">validate_scopes</span><span class="p">(</span><span class="n">scopes</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">PotelScope</span><span class="p">,</span> <span class="n">PotelScope</span><span class="p">]]:</span>
+</span><span data-line="221">    <span class="k">if</span> <span class="p">(</span>
+</span><span data-line="222">        <span class="nb">isinstance</span><span class="p">(</span><span class="n">scopes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
+</span><span data-line="223">        <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">scopes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+</span><span data-line="224">        <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scopes</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">PotelScope</span><span class="p">)</span>
+</span><span data-line="225">        <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scopes</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">PotelScope</span><span class="p">)</span>
+</span><span data-line="226">    <span class="p">):</span>
+</span><span data-line="227">        <span class="k">return</span> <span class="n">scopes</span>
+</span><span data-line="228">    <span class="k">else</span><span class="p">:</span>
+</span><span data-line="229">        <span class="k">return</span> <span class="kc">None</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -366,7 +368,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../../_static/documentation_options.js?v=dc030f12"></script>
+      <script src="../../../_static/documentation_options.js?v=787b8b0b"></script>
       <script src="../../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../../_static/shibuya.js?v=c477d091"></script></body>
