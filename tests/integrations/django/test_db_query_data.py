@@ -963,10 +963,10 @@ def test_set_db_data_empty_cached_values(sentry_init):
     mock_cursor.db = mock_db
 
     _cached_db_configs["empty_config_db"] = {
-        "db_name": None,  # Should not be set
-        "host": "",  # Should not be set (empty string)
-        "port": None,  # Should not be set
-        "unix_socket": None,  # Should not be set
+        "db_name": None,
+        "host": None,
+        "port": None,
+        "unix_socket": None,
         "engine": "django.db.backends.postgresql",
         "vendor": "postgresql",
     }
@@ -983,7 +983,7 @@ def test_set_db_data_empty_cached_values(sentry_init):
     # Verify empty/None values were not set
     not_expected_calls = [
         mock.call("db.name", None),
-        mock.call("server.address", ""),
+        mock.call("server.address", None),
         mock.call("server.port", None),
         mock.call("server.socket.address", None),
     ]

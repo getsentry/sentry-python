@@ -626,11 +626,9 @@ def _cache_database_configurations():
     """
     global _cached_db_configs, _cache_initialized
 
-    # Fast path: if already initialized, return immediately
     if _cache_initialized:
         return
 
-    # Slow path: acquire lock and check again (double-checked locking)
     with _cache_lock:
         if _cache_initialized:
             return
@@ -644,23 +642,24 @@ def _cache_database_configurations():
                     continue
 
                 with capture_internal_exceptions():
+                    try:
+                        db_wrapper = connections[alias]
+                    except (KeyError, Exception):
+                        db_wrapper = None
+
                     _cached_db_configs[alias] = {
                         "db_name": db_config.get("NAME"),
                         "host": db_config.get("HOST", "localhost"),
                         "port": db_config.get("PORT"),
                         "unix_socket": db_config.get("OPTIONS", {}).get("unix_socket"),
                         "engine": db_config.get("ENGINE"),
+                        "vendor": (
+                            db_wrapper.vendor
+                            if db_wrapper and hasattr(db_wrapper, "vendor")
+                            else None
+                        ),
                     }
 
-                    try:
-                        db_wrapper = connections[alias]
-                    except (KeyError, Exception):
-                        continue
-
-                    if hasattr(db_wrapper, "vendor"):
-                        _cached_db_configs[alias]["vendor"] = db_wrapper.vendor
-
-            # Mark as initialized only after successful completion
             _cache_initialized = True
 
         except Exception as e:
@@ -772,22 +771,22 @@ def _set_db_data(span, cursor_or_db):
     # Use pre-cached configuration
     cached_config = _cached_db_configs.get(db_alias) if db_alias else None
     if cached_config:
-        if cached_config["db_name"]:
+        if cached_config.get("db_name"):
             span.set_data(SPANDATA.DB_NAME, cached_config["db_name"])
-        if cached_config["host"]:
+        if cached_config.get("host"):
             span.set_data(SPANDATA.SERVER_ADDRESS, cached_config["host"])
-        if cached_config["port"]:
+        if cached_config.get("port"):
             span.set_data(SPANDATA.SERVER_PORT, str(cached_config["port"]))
-        if cached_config["unix_socket"]:
+        if cached_config.get("unix_socket"):
             span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, cached_config["unix_socket"])
         return  # Success - exit early
 
     # Fallback to dynamic database metadata collection.
     # This is the edge case where db configuration is not in Django's `DATABASES` setting.
     try:
-        # Method 1: Try db.get_connection_params() first (NO CONNECTION ACCESS)
+        # Fallback 1: Try db.get_connection_params() first (NO CONNECTION ACCESS)
         logger.debug(
-            "Cached db connection config retrieval failed for %s. Trying db.get_connection_params().",
+            "Cached db connection params retrieval failed for %s. Trying db.get_connection_params().",
             db_alias,
         )
         try:
@@ -796,24 +795,24 @@ def _set_db_data(span, cursor_or_db):
             db_name = connection_params.get("dbname") or connection_params.get(
                 "database"
             )
-            if db_name is not None:
+            if db_name:
                 span.set_data(SPANDATA.DB_NAME, db_name)
 
             host = connection_params.get("host")
-            if host is not None:
+            if host:
                 span.set_data(SPANDATA.SERVER_ADDRESS, host)
 
             port = connection_params.get("port")
-            if port is not None:
+            if port:
                 span.set_data(SPANDATA.SERVER_PORT, str(port))
 
             unix_socket = connection_params.get("unix_socket")
-            if unix_socket is not None:
+            if unix_socket:
                 span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, unix_socket)
             return  # Success - exit early to avoid connection access
 
         except (KeyError, ImproperlyConfigured, AttributeError):
-            # Method 2: Last resort - direct connection access (CONNECTION POOL RISK)
+            # Fallback 2: Last resort - direct connection access (CONNECTION POOL RISK)
             logger.debug(
                 "db.get_connection_params() failed for %s, trying direct connection access",
                 db_alias,
@@ -848,19 +847,19 @@ def _set_db_data(span, cursor_or_db):
             db_name = connection_params.get("dbname") or connection_params.get(
                 "database"
             )
-            if db_name is not None:
+            if db_name:
                 span.set_data(SPANDATA.DB_NAME, db_name)
 
             host = connection_params.get("host")
-            if host is not None:
+            if host:
                 span.set_data(SPANDATA.SERVER_ADDRESS, host)
 
             port = connection_params.get("port")
-            if port is not None:
+            if port:
                 span.set_data(SPANDATA.SERVER_PORT, str(port))
 
             unix_socket = connection_params.get("unix_socket")
-            if unix_socket is not None:
+            if unix_socket:
                 span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, unix_socket)
 
     except Exception as e:
