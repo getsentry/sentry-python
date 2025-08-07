@@ -186,7 +186,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.GEN_AI_,
+                op=OP.GEN_AI_RUN,
                 name=kwargs.get("name") or "Langchain LLM call",
                 origin=LangchainIntegration.origin,
             )
@@ -387,6 +387,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 op=OP.GEN_AI_EXECUTE_TOOL,
                 name=serialized.get("name") or kwargs.get("name") or "AI tool usage",
                 origin=LangchainIntegration.origin,
+            )
+            watched_span.span.set_data(
+                SPANDATA.GEN_AI_TOOL_NAME, serialized.get("name")
             )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
