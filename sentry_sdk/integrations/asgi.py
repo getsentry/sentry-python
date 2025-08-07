@@ -12,7 +12,6 @@ from functools import lru_cache, partial
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_request_data,
@@ -150,7 +149,7 @@ class SentryAsgiMiddleware:
         if asgi_version == 3:
             self.__call__ = self._run_asgi3
         elif asgi_version == 2:
-            self.__call__ = self._run_asgi2
+            self.__call__ = self._run_asgi2  # type: ignore
 
     def _capture_lifespan_exception(self, exc):
         # type: (Exception) -> None
