@@ -5,6 +5,7 @@ from datetime import datetime
 from unittest import mock
 
 from django import VERSION as DJANGO_VERSION
+from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
 
 try:
@@ -16,7 +17,11 @@ from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.django import (
+    DjangoIntegration,
+    _set_db_data,
+    _cached_db_configs,
+)
 from sentry_sdk.tracing_utils import record_sql_queries
 
 from tests.conftest import unpack_werkzeug_response
@@ -526,29 +531,20 @@ def test_db_span_origin_executemany(sentry_init, client, capture_events):
     assert event["spans"][0]["origin"] == "auto.db.django"
 
 
-# Tests for _set_db_data function and its caching mechanism
-@pytest.mark.forked
 def test_set_db_data_with_cached_config(sentry_init):
     """Test _set_db_data uses cached database configuration when available."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-    from unittest.mock import Mock
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "test_db"
     mock_db.vendor = "postgresql"
 
-    # Mock cursor with db attribute
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
 
-    # Set up cached configuration
     _cached_db_configs["test_db"] = {
         "db_name": "test_database",
         "host": "localhost",
@@ -558,7 +554,6 @@ def test_set_db_data_with_cached_config(sentry_init):
         "vendor": "postgresql",
     }
 
-    # Call _set_db_data
     _set_db_data(span, mock_cursor)
 
     # Verify span data was set correctly from cache
@@ -576,29 +571,20 @@ def test_set_db_data_with_cached_config(sentry_init):
     assert mock.call("server.socket.address", None) not in span.set_data.call_args_list
 
 
-@pytest.mark.forked
 def test_set_db_data_with_cached_config_unix_socket(sentry_init):
     """Test _set_db_data handles unix socket from cached config."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper without vendor
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "test_db"
     del mock_db.vendor  # Remove vendor attribute
 
-    # Mock cursor with db attribute
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
 
-    # Set up cached configuration with unix socket
     _cached_db_configs["test_db"] = {
         "db_name": "test_database",
         "host": None,
@@ -608,7 +594,6 @@ def test_set_db_data_with_cached_config_unix_socket(sentry_init):
         "vendor": "postgresql",
     }
 
-    # Call _set_db_data
     _set_db_data(span, mock_cursor)
 
     # Verify span data was set correctly from cache
@@ -625,24 +610,16 @@ def test_set_db_data_with_cached_config_unix_socket(sentry_init):
     assert mock.call("server.port", None) not in span.set_data.call_args_list
 
 
-@pytest.mark.forked
 def test_set_db_data_fallback_to_connection_params(sentry_init):
     """Test _set_db_data falls back to db.get_connection_params() when cache misses."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock, patch
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Clear cache to force fallback
     _cached_db_configs.clear()
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "uncached_db"
     mock_db.vendor = "mysql"
     mock_db.get_connection_params.return_value = {
@@ -652,12 +629,10 @@ def test_set_db_data_fallback_to_connection_params(sentry_init):
         "unix_socket": None,
     }
 
-    # Mock cursor with db attribute
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
 
-    # Call _set_db_data
-    with patch("sentry_sdk.integrations.django.logger") as mock_logger:
+    with mock.patch("sentry_sdk.integrations.django.logger") as mock_logger:
         _set_db_data(span, mock_cursor)
 
     # Verify fallback was used
@@ -679,24 +654,16 @@ def test_set_db_data_fallback_to_connection_params(sentry_init):
         assert call in span.set_data.call_args_list
 
 
-@pytest.mark.forked
 def test_set_db_data_fallback_to_connection_params_with_dbname(sentry_init):
     """Test _set_db_data handles 'dbname' key in connection params."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Clear cache to force fallback
     _cached_db_configs.clear()
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "postgres_db"
     mock_db.vendor = "postgresql"
     mock_db.get_connection_params.return_value = {
@@ -706,11 +673,9 @@ def test_set_db_data_fallback_to_connection_params_with_dbname(sentry_init):
         "unix_socket": "/var/run/postgresql/.s.PGSQL.5432",
     }
 
-    # Mock cursor with db attribute
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
 
-    # Call _set_db_data
     _set_db_data(span, mock_cursor)
 
     # Verify span data was set correctly, preferring 'dbname' over 'database'
@@ -726,44 +691,32 @@ def test_set_db_data_fallback_to_connection_params_with_dbname(sentry_init):
         assert call in span.set_data.call_args_list
 
 
-@pytest.mark.forked
 def test_set_db_data_fallback_to_direct_connection_psycopg2(sentry_init):
     """Test _set_db_data falls back to direct connection access for psycopg2."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from django.core.exceptions import ImproperlyConfigured
-    from unittest.mock import Mock, patch
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Clear cache to force fallback
     _cached_db_configs.clear()
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper that fails get_connection_params
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "direct_db"
     mock_db.vendor = "postgresql"
     mock_db.get_connection_params.side_effect = ImproperlyConfigured("Config error")
 
-    # Mock psycopg2-style connection
-    mock_connection = Mock()
+    mock_connection = mock.Mock()
     mock_connection.get_dsn_parameters.return_value = {
         "dbname": "direct_access_db",
         "host": "direct.example.com",
         "port": "5432",
     }
 
-    # Mock cursor with psycopg2-style connection
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
     mock_cursor.connection = mock_connection
 
-    # Call _set_db_data
-    with patch("sentry_sdk.integrations.django.logger") as mock_logger, patch(
+    with mock.patch("sentry_sdk.integrations.django.logger") as mock_logger, mock.patch(
         "sentry_sdk.integrations.django.inspect.isroutine", return_value=True
     ):
         _set_db_data(span, mock_cursor)
@@ -795,48 +748,40 @@ def test_set_db_data_fallback_to_direct_connection_psycopg2(sentry_init):
         assert call in span.set_data.call_args_list
 
 
-@pytest.mark.forked
 def test_set_db_data_fallback_to_direct_connection_psycopg3(sentry_init):
     """Test _set_db_data falls back to direct connection access for psycopg3."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock, patch
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Clear cache to force fallback
     _cached_db_configs.clear()
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper that fails get_connection_params
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "psycopg3_db"
     mock_db.vendor = "postgresql"
     mock_db.get_connection_params.side_effect = AttributeError(
         "No get_connection_params"
     )
 
-    # Mock psycopg3-style connection (no get_dsn_parameters method)
-    mock_connection_info = Mock()
+    mock_connection_info = mock.Mock()
     mock_connection_info.dbname = "psycopg3_db"
     mock_connection_info.port = 5433
     mock_connection_info.host = "psycopg3.example.com"  # Non-Unix socket host
 
-    mock_connection = Mock()
+    mock_connection = mock.Mock()
     mock_connection.info = mock_connection_info
     # Remove get_dsn_parameters to simulate psycopg3
     del mock_connection.get_dsn_parameters
 
-    # Mock cursor with psycopg3-style connection
-    mock_cursor = Mock()
+    # mock.Mock cursor with psycopg3-style connection
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
     mock_cursor.connection = mock_connection
 
-    # Call _set_db_data
-    with patch("sentry_sdk.integrations.django.inspect.isroutine", return_value=False):
+    with mock.patch(
+        "sentry_sdk.integrations.django.inspect.isroutine", return_value=False
+    ):
         _set_db_data(span, mock_cursor)
 
     # Verify span data was set from psycopg3 connection info
@@ -851,47 +796,38 @@ def test_set_db_data_fallback_to_direct_connection_psycopg3(sentry_init):
         assert call in span.set_data.call_args_list
 
 
-@pytest.mark.forked
 def test_set_db_data_psycopg3_unix_socket_filtered(sentry_init):
     """Test _set_db_data filters out Unix socket paths in psycopg3."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock, patch
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Clear cache to force fallback
     _cached_db_configs.clear()
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper that fails get_connection_params
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "unix_socket_db"
     mock_db.vendor = "postgresql"
     mock_db.get_connection_params.side_effect = KeyError("Missing key")
 
-    # Mock psycopg3-style connection with Unix socket path
-    mock_connection_info = Mock()
+    mock_connection_info = mock.Mock()
     mock_connection_info.dbname = "unix_socket_db"
     mock_connection_info.port = 5432
     mock_connection_info.host = (
         "/var/run/postgresql"  # Unix socket path starting with /
     )
 
-    mock_connection = Mock()
+    mock_connection = mock.Mock()
     mock_connection.info = mock_connection_info
     del mock_connection.get_dsn_parameters
 
-    # Mock cursor with psycopg3-style connection
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
     mock_cursor.connection = mock_connection
 
-    # Call _set_db_data
-    with patch("sentry_sdk.integrations.django.inspect.isroutine", return_value=False):
+    with mock.patch(
+        "sentry_sdk.integrations.django.inspect.isroutine", return_value=False
+    ):
         _set_db_data(span, mock_cursor)
 
     # Verify span data was set but host was filtered out (Unix socket)
@@ -911,33 +847,24 @@ def test_set_db_data_psycopg3_unix_socket_filtered(sentry_init):
     )
 
 
-@pytest.mark.forked
 def test_set_db_data_no_alias_db(sentry_init):
     """Test _set_db_data handles database without alias attribute."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock
-
     sentry_init(integrations=[DjangoIntegration()])
 
     # Clear cache
     _cached_db_configs.clear()
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper without alias
-    mock_db = Mock()
+    mock_db = mock.Mock()
     del mock_db.alias  # Remove alias attribute
     mock_db.vendor = "sqlite"
     mock_db.get_connection_params.return_value = {"database": "test.db"}
 
-    # Mock cursor with db attribute
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
 
-    # Call _set_db_data
     _set_db_data(span, mock_cursor)
 
     # Verify it worked despite no alias
@@ -950,24 +877,17 @@ def test_set_db_data_no_alias_db(sentry_init):
         assert call in span.set_data.call_args_list
 
 
-@pytest.mark.forked
 def test_set_db_data_direct_db_object(sentry_init):
     """Test _set_db_data handles direct database object (not cursor)."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock
-
     sentry_init(integrations=[DjangoIntegration()])
 
     # Clear cache
     _cached_db_configs.clear()
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper passed directly (not cursor.db) - use configure_mock for proper setup
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.configure_mock(alias="direct_db", vendor="oracle")
     mock_db.get_connection_params.return_value = {
         "database": "orcl",
@@ -975,7 +895,6 @@ def test_set_db_data_direct_db_object(sentry_init):
         "port": 1521,
     }
 
-    # Call _set_db_data with db directly (no .db attribute)
     _set_db_data(span, mock_db)
 
     # Verify it handled direct db object correctly by checking that span.set_data was called
@@ -986,41 +905,30 @@ def test_set_db_data_direct_db_object(sentry_init):
     # Extract the keys that were called
     call_keys = [call[0][0] for call in call_args_list]
 
-    # Verify that db.system was called (this comes from mock_db.vendor)
     assert "db.system" in call_keys
 
 
-@pytest.mark.forked
 def test_set_db_data_exception_handling(sentry_init):
     """Test _set_db_data handles exceptions gracefully."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock, patch
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Clear cache
     _cached_db_configs.clear()
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper that raises exception
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "error_db"
     mock_db.vendor = "postgresql"
     mock_db.get_connection_params.side_effect = Exception("Database error")
 
-    # Mock cursor that also raises exception on connection access
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
     mock_cursor.connection.get_dsn_parameters.side_effect = Exception(
         "Connection error"
     )
 
-    # Call _set_db_data - should not raise exception
-    with patch("sentry_sdk.integrations.django.logger") as mock_logger:
+    with mock.patch("sentry_sdk.integrations.django.logger") as mock_logger:
         _set_db_data(span, mock_cursor)
 
     # Verify only vendor was set (from initial db.vendor access)
@@ -1031,35 +939,25 @@ def test_set_db_data_exception_handling(sentry_init):
     for call in expected_calls:
         assert call in span.set_data.call_args_list
 
-    # Verify error was logged
     mock_logger.debug.assert_called_with(
         "Failed to get database connection params for %s: %s", "error_db", mock.ANY
     )
 
 
-@pytest.mark.forked
 def test_set_db_data_empty_cached_values(sentry_init):
     """Test _set_db_data handles empty/None values in cached config."""
-    from sentry_sdk.integrations.django import _set_db_data, _cached_db_configs
-
-    from unittest.mock import Mock
-
     sentry_init(integrations=[DjangoIntegration()])
 
-    # Mock span
-    span = Mock()
-    span.set_data = Mock()
+    span = mock.Mock()
+    span.set_data = mock.Mock()
 
-    # Mock database wrapper
-    mock_db = Mock()
+    mock_db = mock.Mock()
     mock_db.alias = "empty_config_db"
     mock_db.vendor = "postgresql"
 
-    # Mock cursor with db attribute
-    mock_cursor = Mock()
+    mock_cursor = mock.Mock()
     mock_cursor.db = mock_db
 
-    # Set up cached configuration with empty/None values
     _cached_db_configs["empty_config_db"] = {
         "db_name": None,  # Should not be set
         "host": "",  # Should not be set (empty string)
@@ -1069,7 +967,6 @@ def test_set_db_data_empty_cached_values(sentry_init):
         "vendor": "postgresql",
     }
 
-    # Call _set_db_data
     _set_db_data(span, mock_cursor)
 
     # Verify only vendor was set (other values are empty/None)
