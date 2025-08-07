@@ -762,25 +762,58 @@ def _set_db_data(span, cursor_or_db):
             span.set_data(SPANDATA.SERVER_PORT, str(cached_config["port"]))
         if cached_config["unix_socket"]:
             span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, cached_config["unix_socket"])
-        return
+        return  # Success - exit early
 
-    # Fallback to using the database connection to get the data.
+    # Fallback to dynamic database metadata collection.
     # This is the edge case where db configuration is not in Django's `DATABASES` setting.
     try:
-        # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
-        # actually has a `connection` and the `connection` has a `get_dsn_parameters`
-        # attribute, only to throw an error once you actually want to call it.
-        # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
-        # function.
-        is_psycopg2 = (
-            hasattr(cursor_or_db, "connection")
-            and hasattr(cursor_or_db.connection, "get_dsn_parameters")
-            and inspect.isroutine(cursor_or_db.connection.get_dsn_parameters)
+        # Method 1: Try db.get_connection_params() first (NO CONNECTION ACCESS)
+        logger.debug(
+            "Cached db connection config retrieval failed for %s. Trying db.get_connection_params().",
+            db_alias,
         )
-        if is_psycopg2:
-            connection_params = cursor_or_db.connection.get_dsn_parameters()
-        else:
-            try:
+        try:
+            connection_params = db.get_connection_params()
+
+            db_name = connection_params.get("dbname") or connection_params.get(
+                "database"
+            )
+            if db_name is not None:
+                span.set_data(SPANDATA.DB_NAME, db_name)
+
+            host = connection_params.get("host")
+            if host is not None:
+                span.set_data(SPANDATA.SERVER_ADDRESS, host)
+
+            port = connection_params.get("port")
+            if port is not None:
+                span.set_data(SPANDATA.SERVER_PORT, str(port))
+
+            unix_socket = connection_params.get("unix_socket")
+            if unix_socket is not None:
+                span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, unix_socket)
+            return  # Success - exit early to avoid connection access
+
+        except (KeyError, ImproperlyConfigured, AttributeError):
+            # Method 2: Last resort - direct connection access (CONNECTION POOL RISK)
+            logger.debug(
+                "db.get_connection_params() failed for %s, trying direct connection access",
+                db_alias,
+            )
+
+            # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
+            # actually has a `connection` and the `connection` has a `get_dsn_parameters`
+            # attribute, only to throw an error once you actually want to call it.
+            # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
+            # function.
+            is_psycopg2 = (
+                hasattr(cursor_or_db, "connection")
+                and hasattr(cursor_or_db.connection, "get_dsn_parameters")
+                and inspect.isroutine(cursor_or_db.connection.get_dsn_parameters)
+            )
+            if is_psycopg2:
+                connection_params = cursor_or_db.connection.get_dsn_parameters()
+            else:
                 # psycopg3, only extract needed params as get_parameters
                 # can be slow because of the additional logic to filter out default
                 # values
@@ -793,27 +826,28 @@ def _set_db_data(span, cursor_or_db):
                 host = cursor_or_db.connection.info.host
                 if host and not host.startswith("/"):
                     connection_params["host"] = host
-            except Exception:
-                connection_params = db.get_connection_params()
 
-        db_name = connection_params.get("dbname") or connection_params.get("database")
-        if db_name is not None:
-            span.set_data(SPANDATA.DB_NAME, db_name)
+            db_name = connection_params.get("dbname") or connection_params.get(
+                "database"
+            )
+            if db_name is not None:
+                span.set_data(SPANDATA.DB_NAME, db_name)
 
-        host = connection_params.get("host")
-        if host is not None:
-            span.set_data(SPANDATA.SERVER_ADDRESS, host)
+            host = connection_params.get("host")
+            if host is not None:
+                span.set_data(SPANDATA.SERVER_ADDRESS, host)
 
-        port = connection_params.get("port")
-        if port is not None:
-            span.set_data(SPANDATA.SERVER_PORT, str(port))
+            port = connection_params.get("port")
+            if port is not None:
+                span.set_data(SPANDATA.SERVER_PORT, str(port))
 
-        unix_socket = connection_params.get("unix_socket")
-        if unix_socket is not None:
-            span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, unix_socket)
+            unix_socket = connection_params.get("unix_socket")
+            if unix_socket is not None:
+                span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, unix_socket)
 
-    except (KeyError, ImproperlyConfigured, AttributeError) as e:
+    except Exception as e:
         logger.debug("Failed to get database connection params for %s: %s", db_alias, e)
+        # Skip database metadata rather than risk further connection issues
 
 
 def add_template_context_repr_sequence():
