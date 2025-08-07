@@ -30,7 +30,10 @@ from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
 )
 
+# Global cache for database configurations to avoid connection pool interference
 _cached_db_configs = {}  # type: Dict[str, Dict[str, Any]]
+_cache_initialized = False  # type: bool
+_cache_lock = threading.Lock()
 
 try:
     from django import VERSION as DJANGO_VERSION
@@ -621,35 +624,47 @@ def _cache_database_configurations():
     """
     Cache database configurations from Django settings to avoid connection pool interference.
     """
-    global _cached_db_configs
+    global _cached_db_configs, _cache_initialized
 
-    try:
-        from django.conf import settings
-        from django.db import connections
+    # Fast path: if already initialized, return immediately
+    if _cache_initialized:
+        return
 
-        for alias, db_config in settings.DATABASES.items():
-            if not db_config:  # Skip empty default configs
-                continue
+    # Slow path: acquire lock and check again (double-checked locking)
+    with _cache_lock:
+        if _cache_initialized:
+            return
 
-            with capture_internal_exceptions():
-                _cached_db_configs[alias] = {
-                    "db_name": db_config.get("NAME"),
-                    "host": db_config.get("HOST", "localhost"),
-                    "port": db_config.get("PORT"),
-                    "unix_socket": db_config.get("OPTIONS", {}).get("unix_socket"),
-                    "engine": db_config.get("ENGINE"),
-                }
+        try:
+            from django.conf import settings
+            from django.db import connections
 
-                db_wrapper = connections.get(alias)
-                if db_wrapper is None:
+            for alias, db_config in settings.DATABASES.items():
+                if not db_config:  # Skip empty default configs
                     continue
 
-                if hasattr(db_wrapper, "vendor"):
-                    _cached_db_configs[alias]["vendor"] = db_wrapper.vendor
+                with capture_internal_exceptions():
+                    _cached_db_configs[alias] = {
+                        "db_name": db_config.get("NAME"),
+                        "host": db_config.get("HOST", "localhost"),
+                        "port": db_config.get("PORT"),
+                        "unix_socket": db_config.get("OPTIONS", {}).get("unix_socket"),
+                        "engine": db_config.get("ENGINE"),
+                    }
 
-    except Exception as e:
-        logger.debug("Failed to cache database configurations: %s", e)
-        _cached_db_configs = {}
+                    db_wrapper = connections.get(alias)
+                    if db_wrapper is None:
+                        continue
+
+                    if hasattr(db_wrapper, "vendor"):
+                        _cached_db_configs[alias]["vendor"] = db_wrapper.vendor
+
+            # Mark as initialized only after successful completion
+            _cache_initialized = True
+
+        except Exception as e:
+            logger.debug("Failed to cache database configurations: %s", e)
+            _cached_db_configs = {}
 
 
 def install_sql_hook():
