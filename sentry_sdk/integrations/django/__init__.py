@@ -1,7 +1,7 @@
+import inspect
 import sys
 import threading
 import weakref
-import inspect
 from importlib import import_module
 
 import sentry_sdk
