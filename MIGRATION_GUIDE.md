@@ -29,7 +29,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
     - Use it to continue an upstream trace with the `sentry-trace` and `baggage` headers.
 
     ```python
-    headers = {"sentry-trace": "{trace_id}-{span_id}-{sampled_flag}>", "baggage": "{baggage header}"}
+    headers = {"sentry-trace": "{trace_id}-{span_id}-{sampled_flag}", "baggage": "{baggage header}"}
     with sentry_sdk.continue_trace(headers):
         with sentry_sdk.start_span(name="continued span in trace"):
             pass
