@@ -196,7 +196,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
 
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
-        name=f"chat {model}",
+        name=f"chat {model}".strip(),
         origin=AnthropicIntegration.origin,
     )
     span.__enter__()
