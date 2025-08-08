@@ -208,20 +208,23 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     with capture_internal_exceptions():
         if hasattr(result, "content"):
             input_tokens, output_tokens = _get_token_usage(result)
+
+            content_blocks = []
+            for content_block in result.content:
+                if hasattr(content_block, "to_dict"):
+                    content_blocks.append(content_block.to_dict())
+                elif hasattr(content_block, "model_dump"):
+                    content_blocks.append(content_block.model_dump())
+                elif hasattr(content_block, "text"):
+                    content_blocks.append({"type": "text", "text": content_block.text})
+
             _set_output_data(
                 span=span,
                 integration=integration,
                 model=getattr(result, "model", None),
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                content_blocks=[
-                    {
-                        "type": "text",
-                        "text": content_block.text,
-                    }
-                    for content_block in result.content
-                    if hasattr(content_block, "text")
-                ],
+                content_blocks=content_blocks,
                 finish_span=True,
             )
 
