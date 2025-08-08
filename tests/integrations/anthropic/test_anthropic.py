@@ -123,7 +123,7 @@ def test_nonstreaming_create_message(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == '[{"text": "Hi, I\'m Claude.", "type": "text"}]'
+            == '[{"type": "text", "text": "Hi, I\'m Claude."}]'
         )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -195,7 +195,7 @@ async def test_nonstreaming_create_message_async(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == '[{"text": "Hi, I\'m Claude.", "type": "text"}]'
+            == '[{"type": "text", "text": "Hi, I\'m Claude."}]'
         )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
