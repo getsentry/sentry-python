@@ -85,6 +85,7 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
             transaction_style="endpoint",
             mechanism_type="asgi",
             span_origin=span_origin,
+            asgi_version=3,
         )
 
     def _capture_request_exception(self, exc):
@@ -116,7 +117,6 @@ def patch_app_init():
             *(kwargs.get("after_exception") or []),
         ]
 
-        SentryLitestarASGIMiddleware.__call__ = SentryLitestarASGIMiddleware._run_asgi3  # type: ignore
         middleware = kwargs.get("middleware") or []
         kwargs["middleware"] = [SentryLitestarASGIMiddleware, *middleware]
         old__init__(self, *args, **kwargs)
