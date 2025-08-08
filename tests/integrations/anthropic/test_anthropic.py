@@ -113,7 +113,7 @@ def test_nonstreaming_create_message(
     (span,) = event["spans"]
 
     assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "Anthropic messages create"
+    assert span["description"] == "chat model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
@@ -185,7 +185,7 @@ async def test_nonstreaming_create_message_async(
     (span,) = event["spans"]
 
     assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "Anthropic messages create"
+    assert span["description"] == "chat model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
@@ -288,7 +288,7 @@ def test_streaming_create_message(
     (span,) = event["spans"]
 
     assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "Anthropic messages create"
+    assert span["description"] == "chat model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
@@ -395,7 +395,7 @@ async def test_streaming_create_message_async(
     (span,) = event["spans"]
 
     assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "Anthropic messages create"
+    assert span["description"] == "chat model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
@@ -529,7 +529,7 @@ def test_streaming_create_message_with_input_json_delta(
     (span,) = event["spans"]
 
     assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "Anthropic messages create"
+    assert span["description"] == "chat model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
@@ -669,7 +669,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     (span,) = event["spans"]
 
     assert span["op"] == OP.GEN_AI_CHAT
-    assert span["description"] == "Anthropic messages create"
+    assert span["description"] == "chat model"
     assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
