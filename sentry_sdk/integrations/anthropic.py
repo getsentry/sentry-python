@@ -192,9 +192,11 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     except TypeError:
         return f(*args, **kwargs)
 
+    model = kwargs.get("model", "")
+
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
-        description="Anthropic messages create",
+        name=f"chat {model}",
         origin=AnthropicIntegration.origin,
     )
     span.__enter__()
@@ -207,11 +209,11 @@ def _sentry_patched_create_common(f, *args, **kwargs):
         if hasattr(result, "content"):
             input_tokens, output_tokens = _get_token_usage(result)
             _set_output_data(
-                span,
-                integration,
-                getattr(result, "model", None),
-                input_tokens,
-                output_tokens,
+                span=span,
+                integration=integration,
+                model=getattr(result, "model", None),
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
                 content_blocks=[
                     (
                         content_block.to_dict()
@@ -243,8 +245,8 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     yield event
 
                 _set_output_data(
-                    span,
-                    integration,
+                    span=span,
+                    integration=integration,
                     model=model,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
@@ -268,8 +270,8 @@ def _sentry_patched_create_common(f, *args, **kwargs):
                     yield event
 
                 _set_output_data(
-                    span,
-                    integration,
+                    span=span,
+                    integration=integration,
                     model=model,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
