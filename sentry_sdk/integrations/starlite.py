@@ -17,7 +17,7 @@ try:
     from starlite.plugins.base import get_plugin_for_value  # type: ignore
     from starlite.routes.http import HTTPRoute  # type: ignore
     from starlite.utils import ConnectionDataExtractor, is_async_callable, Ref  # type: ignore
-    from pydantic import BaseModel
+    from pydantic import BaseModel  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlite is not installed")
 
