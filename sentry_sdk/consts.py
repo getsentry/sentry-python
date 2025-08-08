@@ -474,6 +474,11 @@ class SPANDATA:
     Example: "COMPLETE"
     """
 
+    GEN_AI_RESPONSE_FORMAT = "gen_ai.response.format"
+    """
+    For an AI model call, the format of the response
+    """
+
     GEN_AI_RESPONSE_ID = "gen_ai.response.id"
     """
     Unique identifier for the completion.
@@ -515,6 +520,11 @@ class SPANDATA:
     The frequency penalty parameter used to reduce repetitiveness of generated tokens.
     Example: 0.1
     """
+    GEN_AI_REQUEST_LOGIT_BIAS = "gen_ai.logit_bias"
+    """
+    The logit bias parameter used to control the model's response.
+    Example: {"12345": -100}
+    """
 
     GEN_AI_REQUEST_MAX_TOKENS = "gen_ai.request.max_tokens"
     """
@@ -526,6 +536,12 @@ class SPANDATA:
     """
     The messages passed to the model. The "content" can be a string or an array of objects.
     Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
+    """
+
+    GEN_AI_REQUEST_METADATA = "gen_ai.request.metadata"
+    """
+    The metadata passed to the model.
+    Example: {"tag1": "value1", "tag2": "value2"}
     """
 
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
@@ -544,6 +560,12 @@ class SPANDATA:
     """
     The seed, ideally models given the same seed and same other parameters will produce the exact same output.
     Example: "1234567890"
+    """
+
+    GEN_AI_REQUEST_TAGS = "gen_ai.request.tags"
+    """
+    The tags passed to the model.
+    Example: {"tag1": "value1", "tag2": "value2"}
     """
 
     GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
@@ -785,7 +807,9 @@ class OP:
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
     GEN_AI_HANDOFF = "gen_ai.handoff"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
+    GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_RESPONSES = "gen_ai.responses"
+    GEN_AI_RUN = "gen_ai.run"
     GRAPHQL_EXECUTE = "graphql.execute"
     GRAPHQL_MUTATION = "graphql.mutation"
     GRAPHQL_PARSE = "graphql.parse"
@@ -811,11 +835,6 @@ class OP:
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
-    LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
-    LANGCHAIN_RUN = "ai.run.langchain"
-    LANGCHAIN_TOOL = "ai.tool.langchain"
-    LANGCHAIN_AGENT = "ai.agent.langchain"
-    LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"

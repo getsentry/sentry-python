@@ -32,17 +32,18 @@ except ImportError:
 
 
 DATA_FIELDS = {
-    "temperature": SPANDATA.AI_TEMPERATURE,
-    "top_p": SPANDATA.AI_TOP_P,
-    "top_k": SPANDATA.AI_TOP_K,
-    "function_call": SPANDATA.AI_FUNCTION_CALL,
-    "tool_calls": SPANDATA.AI_TOOL_CALLS,
-    "tools": SPANDATA.AI_TOOLS,
-    "response_format": SPANDATA.AI_RESPONSE_FORMAT,
-    "logit_bias": SPANDATA.AI_LOGIT_BIAS,
-    "tags": SPANDATA.AI_TAGS,
+    "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+    "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+    "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
+    "function_call": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+    "tool_calls": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+    "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+    "response_format": SPANDATA.GEN_AI_RESPONSE_FORMAT,
+    "logit_bias": SPANDATA.GEN_AI_REQUEST_LOGIT_BIAS,
+    "tags": SPANDATA.GEN_AI_REQUEST_TAGS,
 }
 
+# TODO(shellmayr): is this still the case?
 # To avoid double collecting tokens, we do *not* measure
 # token counts for models for which we have an explicit integration
 NO_COLLECT_TOKEN_MODELS = [
@@ -185,13 +186,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_RUN,
+                op=OP.GEN_AI_RUN,
                 name=kwargs.get("name") or "Langchain LLM call",
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
             if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, prompts)
+                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts)
             for k, v in DATA_FIELDS.items():
                 if k in all_params:
                     set_data_normalized(span, v, all_params[k])
@@ -207,7 +208,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
+                op=OP.GEN_AI_CHAT,
                 name=kwargs.get("name") or "Langchain Chat Model",
                 origin=LangchainIntegration.origin,
             )
@@ -222,11 +223,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not model and "anthropic" in all_params.get("_type"):
                 model = "claude-2"
             if model:
-                span.set_data(SPANDATA.AI_MODEL_ID, model)
+                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,
-                    SPANDATA.AI_INPUT_MESSAGES,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
                     [
                         [self._normalize_langchain_message(x) for x in list_]
                         for list_ in messages
@@ -271,7 +272,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span_data.span,
-                    SPANDATA.AI_RESPONSES,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
                     [[x.text for x in list_] for list_ in response.generations],
                 )
 
@@ -308,16 +309,18 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=(
-                    OP.LANGCHAIN_RUN
+                    OP.GEN_AI_RUN
                     if kwargs.get("parent_run_id") is not None
-                    else OP.LANGCHAIN_PIPELINE
+                    else OP.GEN_AI_PIPELINE
                 ),
                 name=kwargs.get("name") or "Chain execution",
                 origin=LangchainIntegration.origin,
             )
             metadata = kwargs.get("metadata")
             if metadata:
-                set_data_normalized(watched_span.span, SPANDATA.AI_METADATA, metadata)
+                set_data_normalized(
+                    watched_span.span, SPANDATA.GEN_AI_REQUEST_METADATA, metadata
+                )
 
     def on_chain_end(self, outputs, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], UUID, Any) -> Any
@@ -344,13 +347,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_AGENT,
+                op=OP.GEN_AI_INVOKE_AGENT,
                 name=action.tool or "AI tool usage",
                 origin=LangchainIntegration.origin,
             )
             if action.tool_input and should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    watched_span.span, SPANDATA.AI_INPUT_MESSAGES, action.tool_input
+                    watched_span.span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    action.tool_input,
                 )
 
     def on_agent_finish(self, finish, *, run_id, **kwargs):
@@ -364,7 +369,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 return
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    span_data.span, SPANDATA.AI_RESPONSES, finish.return_values.items()
+                    span_data.span,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    finish.return_values.items(),
                 )
             self._exit_span(span_data, run_id)
 
@@ -377,19 +384,24 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_TOOL,
+                op=OP.GEN_AI_EXECUTE_TOOL,
                 name=serialized.get("name") or kwargs.get("name") or "AI tool usage",
                 origin=LangchainIntegration.origin,
+            )
+            watched_span.span.set_data(
+                SPANDATA.GEN_AI_TOOL_NAME, serialized.get("name")
             )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     watched_span.span,
-                    SPANDATA.AI_INPUT_MESSAGES,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
                     kwargs.get("inputs", [input_str]),
                 )
                 if kwargs.get("metadata"):
                     set_data_normalized(
-                        watched_span.span, SPANDATA.AI_METADATA, kwargs.get("metadata")
+                        watched_span.span,
+                        SPANDATA.GEN_AI_REQUEST_METADATA,
+                        kwargs.get("metadata"),
                     )
 
     def on_tool_end(self, output, *, run_id, **kwargs):
@@ -403,7 +415,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not span_data:
                 return
             if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(span_data.span, SPANDATA.AI_RESPONSES, output)
+                set_data_normalized(
+                    span_data.span, SPANDATA.GEN_AI_RESPONSE_TEXT, output
+                )
             self._exit_span(span_data, run_id)
 
     def on_tool_error(self, error, *args, run_id, **kwargs):
