@@ -22,7 +22,7 @@ def _normalize_data(data, unpack=True):
             return _normalize_data(data[0], unpack=unpack)  # remove empty dimensions
         return list(_normalize_data(x, unpack=unpack) for x in data)
     if isinstance(data, dict):
-        return {k: _normalize_data(v, unpack) for (k, v) in data.items()}
+        return {k: _normalize_data(v, unpack=unpack) for (k, v) in data.items()}
 
     return data
 
