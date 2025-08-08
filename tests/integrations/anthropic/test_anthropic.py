@@ -823,19 +823,19 @@ def test_set_output_data_with_input_json_delta(sentry_init):
     with start_transaction(name="test"):
         span = start_span()
         integration = AnthropicIntegration()
-
+        json_deltas = ["{'test': 'data',", "'more': 'json'}"]
         _set_output_data(
             span,
             integration,
             model="",
             input_tokens=10,
             output_tokens=20,
-            content_blocks=["{'test': 'data',", "'more': 'json'}"],
+            content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
         )
 
         assert (
             span._data.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
-            == "[\"{'test': 'data',\", \"'more': 'json'}\"]"
+            == "[{\"text\": \"{'test': 'data','more': 'json'}\", \"type\": \"text\"}]"
         )
         assert span._data.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
         assert span._data.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
