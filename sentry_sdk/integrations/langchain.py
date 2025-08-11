@@ -183,14 +183,21 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 return
             all_params = kwargs.get("invocation_params", {})
             all_params.update(serialized.get("kwargs", {}))
+
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.GEN_AI_RUN,
+                op=OP.GEN_AI_PIPELINE,
                 name=kwargs.get("name") or "Langchain LLM call",
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
+            span.set_data(
+                SPANDATA.GEN_AI_REQUEST_MODEL,
+                all_params.get(
+                    "model", all_params.get("model_name", all_params.get("model_id"))
+                ),
+            )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts)
             for k, v in DATA_FIELDS.items():
@@ -305,22 +312,21 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
-            watched_span = self._create_span(
+            """watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=(
-                    OP.GEN_AI_RUN
-                    if kwargs.get("parent_run_id") is not None
-                    else OP.GEN_AI_PIPELINE
-                ),
+                # not sure about this one - it kinda spams the UI with a lot of spans
+                op=OP.GEN_AI_PIPELINE,
                 name=kwargs.get("name") or "Chain execution",
-                origin=LangchainIntegration.origin,
+                origin=LangchainIntegration.origin
             )
+            watched_span.span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model", kwargs.get("model_name", kwargs.get("model_id"))))
             metadata = kwargs.get("metadata")
             if metadata:
                 set_data_normalized(
                     watched_span.span, SPANDATA.GEN_AI_REQUEST_METADATA, metadata
                 )
+            """
 
     def on_chain_end(self, outputs, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], UUID, Any) -> Any
@@ -423,6 +429,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_tool_error(self, error, *args, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when tool errors."""
+        # TODO(shellmayr): how to correctly set the status when the toolfails
+        if run_id and run_id in self.span_map:
+            span_data = self.span_map[run_id]
+            if span_data:
+                span_data.span.set_status("unknown")
         self._handle_error(run_id, error)
 
 
