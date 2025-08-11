@@ -11,11 +11,12 @@ if TYPE_CHECKING:
     from typing import Any
     from sentry_sdk._types import Event
 
-
+# function is everything between index at @
+# and then we match on the @ plus the hex val
 FUNCTION_RE = r"[^@]+?)\s+@\s+0x[0-9a-fA-F]+"
 
 FRAME_RE = r"""
-^(?P<index>\d+)\.\s+(?P<function>{FUNCTION_RE}(?:\s+in\s+(?P<package>.+))?
+^(?P<index>\d+)\.\s+(?P<function>{FUNCTION_RE}(?:\s+in\s+(?P<package>.+))?$
 """.format(
     FUNCTION_RE=FUNCTION_RE,
 )
