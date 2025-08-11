@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 FUNCTION_RE = r"[^@]+?)\s+@\s+0x[0-9a-fA-F]+"
 
 FRAME_RE = r"""
-^(?P<index>\d+)\.\s+(?P<function>{FUNCTION_RE}\s+in\s+(?P<package>.+)$
+^(?P<index>\d+)\.\s+(?P<function>{FUNCTION_RE}(?:\s+in\s+(?P<package>.+))?
 """.format(
     FUNCTION_RE=FUNCTION_RE,
 )
