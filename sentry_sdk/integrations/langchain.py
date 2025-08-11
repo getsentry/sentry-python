@@ -47,7 +47,7 @@ DATA_FIELDS = {
 # To avoid double collecting tokens, we do *not* measure
 # token counts for models for which we have an explicit integration
 NO_COLLECT_TOKEN_MODELS = [
-    "openai-chat",
+    # "openai-chat",
     "anthropic-chat",
     "cohere-chat",
     "huggingface_endpoint",
@@ -62,7 +62,7 @@ class LangchainIntegration(Integration):
     max_spans = 1024
 
     def __init__(
-        self, include_prompts=True, max_spans=1024, tiktoken_encoding_name=None
+        self, include_prompts=True, max_spans=1024, tiktoken_encoding_name="cl100k_base"
     ):
         # type: (LangchainIntegration, bool, int, Optional[str]) -> None
         self.include_prompts = include_prompts
@@ -133,6 +133,47 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         parsed = {"content": message.content, "role": message.type}
         parsed.update(message.additional_kwargs)
         return parsed
+
+    def _extract_token_usage(self, token_usage):
+        # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
+        """Extract input, output, and total tokens from various token usage formats.
+
+        Based on LangChain's callback pattern for token tracking:
+        https://python.langchain.com/docs/how_to/llm_token_usage_tracking/
+        """
+        if not token_usage:
+            return None, None, None
+
+        input_tokens = None
+        output_tokens = None
+        total_tokens = None
+
+        if hasattr(token_usage, "get"):
+            # Dictionary format - common in LangChain callbacks
+            input_tokens = token_usage.get("prompt_tokens") or token_usage.get(
+                "input_tokens"
+            )
+            output_tokens = token_usage.get("completion_tokens") or token_usage.get(
+                "output_tokens"
+            )
+            total_tokens = token_usage.get("total_tokens")
+        else:
+            # Object format - used by some model providers
+            input_tokens = getattr(token_usage, "prompt_tokens", None) or getattr(
+                token_usage, "input_tokens", None
+            )
+            output_tokens = getattr(token_usage, "completion_tokens", None) or getattr(
+                token_usage, "output_tokens", None
+            )
+            total_tokens = getattr(token_usage, "total_tokens", None)
+
+        # LangChain's OpenAI callback uses these specific field names
+        if input_tokens is None and hasattr(token_usage, "get"):
+            input_tokens = token_usage.get("prompt_tokens")
+        if output_tokens is None and hasattr(token_usage, "get"):
+            output_tokens = token_usage.get("completion_tokens")
+
+        return input_tokens, output_tokens, total_tokens
 
     def _create_span(self, run_id, parent_id, **kwargs):
         # type: (SentryLangchainCallback, UUID, Optional[Any], Any) -> WatchedSpan
@@ -250,27 +291,44 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                             message.content
                         ) + self.count_tokens(message.type)
 
-    def on_llm_new_token(self, token, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, str, UUID, Any) -> Any
-        """Run on new LLM token. Only available when streaming is enabled."""
-        with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
-                return
-            span_data = self.span_map[run_id]
-            if not span_data or span_data.no_collect_tokens:
-                return
-            span_data.num_completion_tokens += self.count_tokens(token)
-
-    def on_llm_end(self, response, *, run_id, **kwargs):
+    def on_chat_model_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
-        """Run when LLM ends running."""
+        """Run when Chat Model ends running."""
         with capture_internal_exceptions():
             if not run_id:
                 return
 
-            token_usage = (
-                response.llm_output.get("token_usage") if response.llm_output else None
+            # Extract token usage following LangChain's callback pattern
+            # Reference: https://python.langchain.com/docs/how_to/llm_token_usage_tracking/
+            token_usage = None
+
+            # Debug: Log the response structure to understand what's available
+            logger.debug(
+                "LangChain response structure: llm_output=%s, has_usage=%s",
+                bool(response.llm_output),
+                hasattr(response, "usage"),
             )
+
+            if response.llm_output and "token_usage" in response.llm_output:
+                token_usage = response.llm_output["token_usage"]
+                logger.debug("Found token_usage in llm_output dict: %s", token_usage)
+            elif response.llm_output and hasattr(response.llm_output, "token_usage"):
+                token_usage = response.llm_output.token_usage
+                logger.debug(
+                    "Found token_usage as llm_output attribute: %s", token_usage
+                )
+            elif hasattr(response, "usage"):
+                # Some models might have usage directly on the response (OpenAI-style)
+                token_usage = response.usage
+                logger.debug("Found usage on response: %s", token_usage)
+            elif hasattr(response, "token_usage"):
+                # Direct token_usage attribute
+                token_usage = response.token_usage
+                logger.debug("Found token_usage on response: %s", token_usage)
+            else:
+                logger.debug(
+                    "No token usage found in response, will use manual counting"
+                )
 
             span_data = self.span_map[run_id]
             if not span_data:
@@ -285,17 +343,155 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             if not span_data.no_collect_tokens:
                 if token_usage:
+                    input_tokens, output_tokens, total_tokens = (
+                        self._extract_token_usage(token_usage)
+                    )
+                    # Log token usage for debugging (will be removed in production)
+                    logger.debug(
+                        "LangChain token usage found: input=%s, output=%s, total=%s",
+                        input_tokens,
+                        output_tokens,
+                        total_tokens,
+                    )
                     record_token_usage(
                         span_data.span,
-                        input_tokens=token_usage.get("prompt_tokens"),
-                        output_tokens=token_usage.get("completion_tokens"),
-                        total_tokens=token_usage.get("total_tokens"),
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        total_tokens=total_tokens,
                     )
                 else:
+                    # Fallback to manual token counting when no usage info is available
+                    logger.debug(
+                        "No token usage from LangChain, using manual count: input=%s, output=%s",
+                        span_data.num_prompt_tokens,
+                        span_data.num_completion_tokens,
+                    )
                     record_token_usage(
                         span_data.span,
-                        input_tokens=span_data.num_prompt_tokens,
-                        output_tokens=span_data.num_completion_tokens,
+                        input_tokens=(
+                            span_data.num_prompt_tokens
+                            if span_data.num_prompt_tokens > 0
+                            else None
+                        ),
+                        output_tokens=(
+                            span_data.num_completion_tokens
+                            if span_data.num_completion_tokens > 0
+                            else None
+                        ),
+                    )
+
+            self._exit_span(span_data, run_id)
+
+    def on_llm_new_token(self, token, *, run_id, **kwargs):
+        # type: (SentryLangchainCallback, str, UUID, Any) -> Any
+        """Run on new LLM token. Only available when streaming is enabled.
+
+        Note: LangChain documentation mentions that streaming token counts
+        may not be fully supported for all models. This provides a fallback
+        for manual counting during streaming.
+        """
+        with capture_internal_exceptions():
+            if not run_id or run_id not in self.span_map:
+                return
+            span_data = self.span_map[run_id]
+            if not span_data or span_data.no_collect_tokens:
+                return
+            # Count tokens for each streaming chunk
+            token_count = self.count_tokens(token)
+            span_data.num_completion_tokens += token_count
+            logger.debug(
+                "Streaming token count updated: +%s (total: %s)",
+                token_count,
+                span_data.num_completion_tokens,
+            )
+
+    def on_llm_end(self, response, *, run_id, **kwargs):
+        # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
+        """Run when LLM ends running."""
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+
+            # Extract token usage following LangChain's callback pattern
+            # Reference: https://python.langchain.com/docs/how_to/llm_token_usage_tracking/
+            token_usage = None
+
+            # Debug: Log the response structure to understand what's available
+            logger.debug(
+                "LangChain response structure: llm_output=%s, has_usage=%s",
+                bool(response.llm_output),
+                hasattr(response, "usage"),
+            )
+
+            if response.llm_output and "token_usage" in response.llm_output:
+                token_usage = response.llm_output["token_usage"]
+                logger.debug("Found token_usage in llm_output dict: %s", token_usage)
+            elif response.llm_output and hasattr(response.llm_output, "token_usage"):
+                token_usage = response.llm_output.token_usage
+                logger.debug(
+                    "Found token_usage as llm_output attribute: %s", token_usage
+                )
+            elif hasattr(response, "usage"):
+                # Some models might have usage directly on the response (OpenAI-style)
+                token_usage = response.usage
+                logger.debug("Found usage on response: %s", token_usage)
+            elif hasattr(response, "token_usage"):
+                # Direct token_usage attribute
+                token_usage = response.token_usage
+                logger.debug("Found token_usage on response: %s", token_usage)
+            else:
+                logger.debug(
+                    "No token usage found in response, will use manual counting"
+                )
+
+            span_data = self.span_map[run_id]
+            if not span_data:
+                return
+
+            if should_send_default_pii() and self.include_prompts:
+                set_data_normalized(
+                    span_data.span,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    [[x.text for x in list_] for list_ in response.generations],
+                )
+
+            if not span_data.no_collect_tokens:
+                if token_usage:
+                    input_tokens, output_tokens, total_tokens = (
+                        self._extract_token_usage(token_usage)
+                    )
+                    # Log token usage for debugging (will be removed in production)
+                    logger.debug(
+                        "LangChain token usage found: input=%s, output=%s, total=%s",
+                        input_tokens,
+                        output_tokens,
+                        total_tokens,
+                    )
+                    record_token_usage(
+                        span_data.span,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        total_tokens=total_tokens,
+                    )
+                else:
+                    # Fallback to manual token counting when no usage info is available
+                    logger.debug(
+                        "No token usage from LangChain, using manual count: input=%s, output=%s",
+                        span_data.num_prompt_tokens,
+                        span_data.num_completion_tokens,
+                    )
+                    record_token_usage(
+                        span_data.span,
+                        input_tokens=(
+                            span_data.num_prompt_tokens
+                            if span_data.num_prompt_tokens > 0
+                            else None
+                        ),
+                        output_tokens=(
+                            span_data.num_completion_tokens
+                            if span_data.num_completion_tokens > 0
+                            else None
+                        ),
                     )
 
             self._exit_span(span_data, run_id)
@@ -303,6 +499,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_llm_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when LLM errors."""
+        with capture_internal_exceptions():
+            self._handle_error(run_id, error)
+
+    def on_chat_model_error(self, error, *, run_id, **kwargs):
+        # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
+        """Run when Chat Model errors."""
         with capture_internal_exceptions():
             self._handle_error(run_id, error)
 
