@@ -13,7 +13,7 @@ import time
 from collections import namedtuple
 from datetime import datetime, timezone
 from decimal import Decimal
-from functools import lru_cache, partial, partialmethod, wraps
+from functools import partial, partialmethod, wraps
 from numbers import Real
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
@@ -1858,7 +1858,6 @@ except ImportError:
         return False
 
 
-@lru_cache(maxsize=1)
 def is_gevent():
     # type: () -> bool
     return is_module_patched("threading") or is_module_patched("_thread")
