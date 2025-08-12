@@ -7,6 +7,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ### New Features
 
 - Added `add_attachment()` as a top level API, so you can do now: `sentry_sdk.add_attachment(...)` (up until now it was only available on the `Scope`)
+- Added a new SDK option `exclude_span_origins`. Spans with an `origin` from `exclude_span_origins` won't be created. This can be used for example in dual OpenTelemetry/Sentry setups to filter out spans from specific Sentry instrumentations. Note that using `exclude_span_origins` might potentially lead to surprising results: if, for example, a root span is excluded based on `origin`, all of its children will become root spans, unless they were started with `only_as_child_span=True`.
 
 ### Changed
 
@@ -39,6 +40,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
     - If you want to force creation of a new trace, use the `sentry_sdk.new_trace` context manager.
 
 - You can no longer change the sampled status of a span with `span.sampled = False` after starting it. The sampling decision needs to be either be made in the `traces_sampler`, or you need to pass an explicit `sampled` parameter to `start_span`.
+- `sentry_sdk.start_span` now takes an optional `only_as_child_span` argument. These spans will not be started if they would be root spans -- they can only exist as child spans. You can use this parameter to prevent spans without a parent from becoming root spans.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - `Span.finish()` no longer returns the `event_id` if the event is sent to Sentry.
@@ -269,7 +271,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
 - `sentry_sdk.tracing_utils.add_query_source()`: Removed the `hub` parameter. It is not necessary anymore.
 - `sentry_sdk.tracing_utils.record_sql_queries()`: Removed the `hub` parameter. It is not necessary anymore.
-- `sentry_sdk.tracing_utils.get_current_span()` does now take a `scope` instead of a `hub` as parameter.
+- `sentry_sdk.tracing_utils.get_current_span()` now takes a `scope` instead of a `hub` as parameter.
 - `sentry_sdk.tracing_utils.should_propagate_trace()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils.is_sentry_url()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils._get_contextvars` does not return a tuple with three values, but a tuple with two values. The `copy_context` was removed.
