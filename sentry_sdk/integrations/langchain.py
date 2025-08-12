@@ -136,11 +136,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def _extract_token_usage(self, token_usage):
         # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
-        """Extract input, output, and total tokens from various token usage formats.
-
-        Based on LangChain's callback pattern for token tracking:
-        https://python.langchain.com/docs/how_to/llm_token_usage_tracking/
-        """
+        """Extract input, output, and total tokens from various token usage formats."""
         if not token_usage:
             return None, None, None
 
@@ -149,7 +145,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         total_tokens = None
 
         if hasattr(token_usage, "get"):
-            # Dictionary format - common in LangChain callbacks
             input_tokens = token_usage.get("prompt_tokens") or token_usage.get(
                 "input_tokens"
             )
@@ -158,7 +153,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
             total_tokens = token_usage.get("total_tokens")
         else:
-            # Object format - used by some model providers
             input_tokens = getattr(token_usage, "prompt_tokens", None) or getattr(
                 token_usage, "input_tokens", None
             )
