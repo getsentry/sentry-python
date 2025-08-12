@@ -298,8 +298,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id:
                 return
 
-            # Extract token usage following LangChain's callback pattern
-            # Reference: https://python.langchain.com/docs/how_to/llm_token_usage_tracking/
             token_usage = None
 
             if response.llm_output and "token_usage" in response.llm_output:
@@ -327,13 +325,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     input_tokens, output_tokens, total_tokens = (
                         self._extract_token_usage(token_usage)
                     )
-                    # Log token usage for debugging (will be removed in production)
-                    logger.debug(
-                        "LangChain token usage found: input=%s, output=%s, total=%s",
-                        input_tokens,
-                        output_tokens,
-                        total_tokens,
-                    )
+
                     record_token_usage(
                         span_data.span,
                         input_tokens=input_tokens,
@@ -341,12 +333,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         total_tokens=total_tokens,
                     )
                 else:
-                    # Fallback to manual token counting when no usage info is available
-                    logger.debug(
-                        "No token usage from LangChain, using manual count: input=%s, output=%s",
-                        span_data.num_prompt_tokens,
-                        span_data.num_completion_tokens,
-                    )
                     record_token_usage(
                         span_data.span,
                         input_tokens=(
