@@ -48,7 +48,7 @@ import typing
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, MutableMapping
+    from collections.abc import Mapping
 
     from typing import Any
     from typing import Callable
@@ -683,12 +683,12 @@ class Scope:
         self._level = None  # type: Optional[LogLevelStr]
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
-        self._transaction_info = {}  # type: MutableMapping[str, str]
+        self._transaction_info = {}  # type: dict[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
         self._contexts = {}  # type: Dict[str, Dict[str, Any]]
-        self._extras = {}  # type: MutableMapping[str, Any]
+        self._extras = {}  # type: dict[str, Any]
         self._attachments = []  # type: List[Attachment]
 
         self.clear_breadcrumbs()
