@@ -1424,11 +1424,7 @@ class TimeoutThread(threading.Thread):
             integer_configured_timeout = integer_configured_timeout + 1
 
         # Raising Exception after timeout duration is reached
-        raise ServerlessTimeoutWarning(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                integer_configured_timeout
-            )
-        )
+        raise ServerlessTimeoutWarning("WARNING: Function is about to time out.")
 
 
 def to_base64(original: str) -> Optional[str]:
