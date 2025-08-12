@@ -92,7 +92,7 @@ def test_logging_extra_data(sentry_init, capture_events):
     (event,) = events
 
     assert event["level"] == "fatal"
-    assert event["extra"] == {"bar": 69}
+    assert event["contexts"]["logging"] == {"bar": 69}
     assert any(
         crumb["message"] == "bread" and crumb["data"] == {"foo": 42}
         for crumb in event["breadcrumbs"]["values"]
@@ -110,7 +110,7 @@ def test_logging_extra_data_integer_keys(sentry_init, capture_events):
 
     (event,) = events
 
-    assert event["extra"] == {"1": 1}
+    assert event["contexts"]["logging"] == {"1": 1}
 
 
 @pytest.mark.parametrize(
