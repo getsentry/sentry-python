@@ -60,7 +60,9 @@ LINES_NO_PATH = r"""
 """
 
 
-@pytest.mark.parametrize("input", LINES.strip().splitlines() + LINES_NO_PATH.strip().splitlines())
+@pytest.mark.parametrize(
+    "input", LINES.strip().splitlines() + LINES_NO_PATH.strip().splitlines()
+)
 def test_basic(sentry_init, capture_events, input):
     sentry_init(integrations=[GnuBacktraceIntegration()])
     events = capture_events()
