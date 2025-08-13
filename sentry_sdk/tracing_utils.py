@@ -1046,36 +1046,38 @@ def _get_usage_attributes(usage):
     """
     attributes = {}
 
-    if isinstance(usage, dict):
-        # input tokens
-        if "prompt_tokens" in usage and isinstance(usage["prompt_tokens"], int):
-            attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage["prompt_tokens"]
-        if "input_tokens" in usage and isinstance(usage["input_tokens"], int):
-            attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage["input_tokens"]
-        # output tokens
-        if "completion_tokens" in usage and isinstance(usage["completion_tokens"], int):
-            attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage["completion_tokens"]
-        if "output_tokens" in usage and isinstance(usage["output_tokens"], int):
-            attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage["output_tokens"]
-        # total tokens
-        if "total_tokens" in usage and isinstance(usage["total_tokens"], int):
-            attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = usage["total_tokens"]
-    else:
-        # input tokens
-        if hasattr(usage, "prompt_tokens") and isinstance(usage.prompt_tokens, int):
-            attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.prompt_tokens
-        if hasattr(usage, "input_tokens") and isinstance(usage.input_tokens, int):
-            attributes[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens
-        # output tokens
-        if hasattr(usage, "completion_tokens") and isinstance(
-            usage.completion_tokens, int
-        ):
-            attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.completion_tokens
-        if hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
-            attributes[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens
-        # total tokens
-        if hasattr(usage, "total_tokens") and isinstance(usage.total_tokens, int):
-            attributes[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] = usage.total_tokens
+    def _get_value(source, key):
+        # type: (Any, str) -> Optional[int]
+        value = None
+        if isinstance(source, dict):
+            value = source.get(key)
+        else:
+            if hasattr(source, key):
+                try:
+                    value = getattr(source, key)
+                except Exception:
+                    value = None
+        return value if isinstance(value, int) else None
+
+    def _set_from_keys(target_key, keys):
+        # type: (str, tuple[str, ...]) -> None
+        for key in keys:
+            value = _get_value(usage, key)
+            if value is not None:
+                attributes[target_key] = value
+
+    _set_from_keys(
+        SPANDATA.GEN_AI_USAGE_INPUT_TOKENS,
+        ("prompt_tokens", "input_tokens"),
+    )
+    _set_from_keys(
+        SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS,
+        ("completion_tokens", "output_tokens"),
+    )
+    _set_from_keys(
+        SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
+        ("total_tokens",),
+    )
 
     return attributes
 
