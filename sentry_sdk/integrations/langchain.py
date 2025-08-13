@@ -27,6 +27,8 @@ try:
         Callbacks,
     )
     from langchain_core.agents import AgentAction, AgentFinish
+    from langchain.agents import AgentExecutor
+
 except ImportError:
     raise DidNotEnable("langchain not installed")
 
@@ -63,6 +65,10 @@ class LangchainIntegration(Integration):
     def setup_once():
         # type: () -> None
         manager._configure = _wrap_configure(manager._configure)
+
+        if AgentExecutor is not None:
+            AgentExecutor.invoke = _wrap_agent_executor_invoke(AgentExecutor.invoke)
+            AgentExecutor.stream = _wrap_agent_executor_stream(AgentExecutor.stream)
 
 
 class WatchedSpan:
@@ -257,7 +263,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             watched_span = self._create_span(
                 run_id=run_id,
-                parent_id=kwargs.get("parent_run_id"),
+                parent_id=parent_run_id,
                 op=OP.GEN_AI_PIPELINE,
                 name=kwargs.get("name") or "Langchain LLM call",
                 origin=LangchainIntegration.origin,
@@ -474,22 +480,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def on_agent_action(self, action, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, AgentAction, UUID, Any) -> Any
-        with capture_internal_exceptions():
-            if not run_id:
-                return
-            watched_span = self._create_span(
-                run_id=run_id,
-                parent_id=kwargs.get("parent_run_id"),
-                op=OP.GEN_AI_INVOKE_AGENT,
-                name=action.tool or "AI tool usage",
-                origin=LangchainIntegration.origin,
-            )
-            if action.tool_input and should_send_default_pii() and self.include_prompts:
-                set_data_normalized(
-                    watched_span.span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    action.tool_input,
-                )
+        pass
 
     def on_agent_finish(self, finish, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, AgentFinish, UUID, Any) -> Any
@@ -648,3 +639,63 @@ def _wrap_configure(f):
         )
 
     return new_configure
+
+
+def _wrap_agent_executor_invoke(f):
+    # type: (Callable[..., Any]) -> Callable[..., Any]
+
+    @wraps(f)
+    def new_invoke(self, *args, **kwargs):
+        # type: (Any, Any, Any) -> Any
+
+        integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
+        if integration is None:
+            return f(self, *args, **kwargs)
+
+        # Create a span that will act as the parent for all callback-generated spans
+        with sentry_sdk.start_span(
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name="AgentExecutor.invoke",
+            origin=LangchainIntegration.origin,
+        ) as span:
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            if hasattr(self, "agent") and hasattr(self.agent, "llm"):
+                model_name = getattr(self.agent.llm, "model_name", None) or getattr(
+                    self.agent.llm, "model", None
+                )
+                if model_name:
+                    span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
+            return f(self, *args, **kwargs)
+
+    return new_invoke
+
+
+def _wrap_agent_executor_stream(f):
+    # type: (Callable[..., Any]) -> Callable[..., Any]
+
+    @wraps(f)
+    def new_stream(self, *args, **kwargs):
+        # type: (Any, Any, Any) -> Any
+
+        integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
+        if integration is None:
+            return f(self, *args, **kwargs)
+
+        # Create a span that will act as the parent for all callback-generated spans
+        with sentry_sdk.start_span(
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name="AgentExecutor.stream",
+            origin=LangchainIntegration.origin,
+        ) as span:
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            if hasattr(self, "agent") and hasattr(self.agent, "llm"):
+                model_name = getattr(self.agent.llm, "model_name", None) or getattr(
+                    self.agent.llm, "model", None
+                )
+                if model_name:
+                    span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
+            return f(self, *args, **kwargs)
+
+    return new_stream
