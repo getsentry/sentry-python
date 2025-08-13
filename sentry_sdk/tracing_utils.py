@@ -1095,31 +1095,45 @@ def _get_output_attributes(template, send_pii, result):
     attributes = {}  # type: dict[str, Any]
 
     if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
-        attributes.update(_get_usage_attributes(result))
-
+        # Usage from result, result.usage, and result.metadata.usage
+        usage_candidates = [result]
         if isinstance(result, dict):
-            if "usage" in result:
-                attributes.update(_get_usage_attributes(result["usage"]))
-            if (
-                "metadata" in result
-                and result["metadata"]
-                and "usage" in result["metadata"]
-            ):
-                attributes.update(_get_usage_attributes(result["metadata"]["usage"]))
-            if "model" in result:
-                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result["model"]
-            if "model_name" in result:
-                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result["model_name"]
+            usage_candidates.append(result.get("usage"))
+            meta = result.get("metadata")
         else:
-            if hasattr(result, "usage"):
-                attributes.update(_get_usage_attributes(result.usage))
-            if hasattr(result, "metadata") and hasattr(result.metadata, "usage"):
-                attributes.update(_get_usage_attributes(result.metadata.usage))
-            if hasattr(result, "model") and isinstance(result.model, str):
-                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model
-            if hasattr(result, "model_name") and isinstance(result.model_name, str):
-                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = result.model_name
+            usage_candidates.append(getattr(result, "usage", None))
+            meta = getattr(result, "metadata", None)
 
+        if isinstance(meta, dict):
+            usage_candidates.append(meta.get("usage"))
+        elif meta is not None:
+            usage_candidates.append(getattr(meta, "usage", None))
+
+        for usage_candidate in usage_candidates:
+            if usage_candidate is not None:
+                attributes.update(_get_usage_attributes(usage_candidate))
+
+        # Response model
+        model_name = None
+        if isinstance(result, dict):
+            val = result.get("model")
+            if isinstance(val, str):
+                model_name = val
+            val = result.get("model_name")
+            if isinstance(val, str):
+                model_name = val
+        else:
+            val = getattr(result, "model", None)
+            if isinstance(val, str):
+                model_name = val
+            val = getattr(result, "model_name", None)
+            if isinstance(val, str):
+                model_name = val
+
+        if model_name is not None:
+            attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = model_name
+
+    # Tool output
     if template == SPANTEMPLATE.AI_TOOL and send_pii:
         attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
 
