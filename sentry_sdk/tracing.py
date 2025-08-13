@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA, SPANTEMPLATE
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
@@ -1365,8 +1365,10 @@ class NoOpSpan(Span):
 if TYPE_CHECKING:
 
     @overload
-    def trace(func=None, *, op=None, name=None, attributes=None):
-        # type: (None, Optional[str], Optional[str], Optional[dict[str, Any]]) -> Callable[[Callable[P, R]], Callable[P, R]]
+    def trace(
+        func=None, *, op=None, name=None, attributes=None, template=SPANTEMPLATE.DEFAULT
+    ):
+        # type: (None, Optional[str], Optional[str], Optional[dict[str, Any]], SPANTEMPLATE) -> Callable[[Callable[P, R]], Callable[P, R]]
         # Handles: @trace() and @trace(op="custom")
         pass
 
@@ -1377,8 +1379,10 @@ if TYPE_CHECKING:
         pass
 
 
-def trace(func=None, *, op=None, name=None, attributes=None):
-    # type: (Optional[Callable[P, R]], Optional[str], Optional[str], Optional[dict[str, Any]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+def trace(
+    func=None, *, op=None, name=None, attributes=None, template=SPANTEMPLATE.DEFAULT
+):
+    # type: (Optional[Callable[P, R]], Optional[str], Optional[str], Optional[dict[str, Any]], SPANTEMPLATE) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span around a function call.
 
@@ -1407,6 +1411,13 @@ def trace(func=None, *, op=None, name=None, attributes=None):
         attributes provide additional context about the span's execution.
     :type attributes: dict[str, Any] or None
 
+    :param template: The type of span to create. This determines what kind of
+        span instrumentation and data collection will be applied. Use predefined
+        constants from :py:class:`sentry_sdk.consts.SPANTEMPLATE`.
+        The default is `SPANTEMPLATE.DEFAULT` which is the right choice for most
+        use cases.
+    :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
+
     :returns: When used as ``@trace``, returns the decorated function. When used as
         ``@trace(...)`` with parameters, returns a decorator function.
     :rtype: Callable or decorator function
@@ -1414,7 +1425,7 @@ def trace(func=None, *, op=None, name=None, attributes=None):
     Example::
 
         import sentry_sdk
-        from sentry_sdk.consts import OP
+        from sentry_sdk.consts import OP, SPANTEMPLATE
 
         # Simple usage with default values
         @sentry_sdk.trace
@@ -1431,6 +1442,12 @@ def trace(func=None, *, op=None, name=None, attributes=None):
         def make_db_query(sql):
             # Function implementation
             pass
+
+        # With a custom template
+        @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
+        def calculate_interest_rate(amount, rate, years):
+            # Function implementation
+            pass
     """
     from sentry_sdk.tracing_utils import create_span_decorator
 
@@ -1438,6 +1455,7 @@ def trace(func=None, *, op=None, name=None, attributes=None):
         op=op,
         name=name,
         attributes=attributes,
+        template=template,
     )
 
     if func:
