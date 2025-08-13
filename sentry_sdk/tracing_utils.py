@@ -991,27 +991,27 @@ def _get_input_attributes(template, send_pii, args, kwargs):
     """
     attributes = {}  # type: dict[str, Any]
 
-    mapping = {
-        "model": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
-        "model_name": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
-        "agent": (SPANDATA.GEN_AI_AGENT_NAME, str),
-        "agent_name": (SPANDATA.GEN_AI_AGENT_NAME, str),
-        "max_tokens": (SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, int),
-        "frequency_penalty": (SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, float),
-        "presence_penalty": (SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, float),
-        "temperature": (SPANDATA.GEN_AI_REQUEST_TEMPERATURE, float),
-        "top_p": (SPANDATA.GEN_AI_REQUEST_TOP_P, float),
-        "top_k": (SPANDATA.GEN_AI_REQUEST_TOP_K, int),
-    }
-
-    def _set_from_key(key, value):
-        # type: (str, Any) -> None
-        if key in mapping:
-            (attribute, data_type) = mapping[key]
-            if value is not None and isinstance(value, data_type):
-                attributes[attribute] = value
-
     if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
+        mapping = {
+            "model": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
+            "model_name": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
+            "agent": (SPANDATA.GEN_AI_AGENT_NAME, str),
+            "agent_name": (SPANDATA.GEN_AI_AGENT_NAME, str),
+            "max_tokens": (SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, int),
+            "frequency_penalty": (SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, float),
+            "presence_penalty": (SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, float),
+            "temperature": (SPANDATA.GEN_AI_REQUEST_TEMPERATURE, float),
+            "top_p": (SPANDATA.GEN_AI_REQUEST_TOP_P, float),
+            "top_k": (SPANDATA.GEN_AI_REQUEST_TOP_K, int),
+        }
+
+        def _set_from_key(key, value):
+            # type: (str, Any) -> None
+            if key in mapping:
+                (attribute, data_type) = mapping[key]
+                if value is not None and isinstance(value, data_type):
+                    attributes[attribute] = value
+
         for key, value in list(kwargs.items()):
             if key == "prompt" and isinstance(value, str):
                 attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
@@ -1027,14 +1027,15 @@ def _get_input_attributes(template, send_pii, args, kwargs):
 
             _set_from_key(key, value)
 
-    if SPANDATA.GEN_AI_REQUEST_MESSAGES in attributes:
-        attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES] = safe_repr(
-            attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-
     if template == SPANTEMPLATE.AI_TOOL and send_pii:
         attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
             {"args": args, "kwargs": kwargs}
+        )
+
+    # Coerce to string
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in attributes:
+        attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES] = safe_repr(
+            attributes[SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
 
     return attributes
