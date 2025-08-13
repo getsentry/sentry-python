@@ -944,7 +944,7 @@ def _sample_rand_range(parent_sampled, sample_rate):
 
 
 def _get_span_name(template, name, kwargs=None):
-    # type: (Union[str, "SPANTEMPLATE"], str, Optional[dict[str, Any]]) -> str
+    # type: (Union[str, SPANTEMPLATE], str, Optional[dict[str, Any]]) -> str
     """
     Get the name of the span based on the template and the name.
     """
@@ -970,26 +970,22 @@ def _get_span_name(template, name, kwargs=None):
 
 
 def _get_span_op(template):
-    # type: (Union[str, "SPANTEMPLATE"]) -> str
+    # type: (Union[str, SPANTEMPLATE]) -> str
     """
     Get the operation of the span based on the template.
     """
-    op = OP.FUNCTION
+    mapping = {
+        SPANTEMPLATE.AI_CHAT: OP.GEN_AI_CHAT,
+        SPANTEMPLATE.AI_AGENT: OP.GEN_AI_INVOKE_AGENT,
+        SPANTEMPLATE.AI_TOOL: OP.GEN_AI_EXECUTE_TOOL,
+    }  # type: dict[Union[str, SPANTEMPLATE], Union[str, OP]]
+    op = mapping.get(template, OP.FUNCTION)
 
-    if template == SPANTEMPLATE.AI_CHAT:
-        op = OP.GEN_AI_CHAT
-
-    elif template == SPANTEMPLATE.AI_AGENT:
-        op = OP.GEN_AI_INVOKE_AGENT
-
-    elif template == SPANTEMPLATE.AI_TOOL:
-        op = OP.GEN_AI_EXECUTE_TOOL
-
-    return op
+    return str(op)
 
 
 def _get_input_attributes(template, send_pii, args, kwargs):
-    # type: (Union[str, "SPANTEMPLATE"], bool, tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
+    # type: (Union[str, SPANTEMPLATE], bool, tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
     """
     Get input attributes for the given span template.
     """
@@ -1088,7 +1084,7 @@ def _get_usage_attributes(usage):
 
 
 def _get_output_attributes(template, send_pii, result):
-    # type: (Union[str, "SPANTEMPLATE"], bool, Any) -> dict[str, Any]
+    # type: (Union[str, SPANTEMPLATE], bool, Any) -> dict[str, Any]
     """
     Get output attributes for the given span template.
     """
@@ -1141,7 +1137,7 @@ def _get_output_attributes(template, send_pii, result):
 
 
 def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
-    # type: (Span, Union[str, "SPANTEMPLATE"], bool, str, Any, tuple[Any, ...], dict[str, Any]) -> None
+    # type: (Span, Union[str, SPANTEMPLATE], bool, str, Any, tuple[Any, ...], dict[str, Any]) -> None
     """
     Set span input attributes based on the given span template.
 
@@ -1178,7 +1174,7 @@ def _set_input_attributes(span, template, send_pii, name, f, args, kwargs):
 
 
 def _set_output_attributes(span, template, send_pii, result):
-    # type: (Span, Union[str, "SPANTEMPLATE"], bool, Any) -> None
+    # type: (Span, Union[str, SPANTEMPLATE], bool, Any) -> None
     """
     Set span output attributes based on the given span template.
 
