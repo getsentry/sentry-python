@@ -277,9 +277,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts)
-            for k, v in DATA_FIELDS.items():
-                if k in all_params:
-                    set_data_normalized(span, v, all_params[k])
+
+            for key, attribute in DATA_FIELDS.items():
+                if key in all_params and all_params[key] is not None:
+                    set_data_normalized(span, attribute, all_params[key], unpack=False)
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
@@ -311,7 +312,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
             for key, attribute in DATA_FIELDS.items():
-                if key in all_params:
+                if key in all_params and all_params[key] is not None:
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
 
             if should_send_default_pii() and self.include_prompts:
@@ -327,6 +328,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_chat_model_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
         """Run when Chat Model ends running."""
+        import ipdb
+
+        ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -453,6 +457,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_chat_model_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when Chat Model errors."""
+        import ipdb
+
+        ipdb.set_trace()
         with capture_internal_exceptions():
             self._handle_error(run_id, error)
 
