@@ -38,6 +38,7 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
+from sentry_sdk.utils import mark_sentry_task_internal
 
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import (
@@ -964,9 +965,10 @@ class _Client(BaseClient):
             ):
 
                 try:
-                    flush_task = self.transport.loop.create_task(
-                        _flush_and_close(timeout, callback)
-                    )
+                    with mark_sentry_task_internal():
+                        flush_task = self.transport.loop.create_task(
+                            _flush_and_close(timeout, callback)
+                        )
                 except RuntimeError:
                     # Shutdown the components anyway
                     self._close_components()
@@ -999,9 +1001,10 @@ class _Client(BaseClient):
                 self.transport, "loop"
             ):
                 try:
-                    return self.transport.loop.create_task(
-                        self._flush_async(timeout, callback)
-                    )
+                    with mark_sentry_task_internal():
+                        return self.transport.loop.create_task(
+                            self._flush_async(timeout, callback)
+                        )
                 except RuntimeError:
                     logger.warning("Event loop not running, aborting flush.")
                     return None

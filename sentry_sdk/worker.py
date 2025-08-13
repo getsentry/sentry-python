@@ -6,7 +6,7 @@ import asyncio
 
 from time import sleep, time
 from sentry_sdk._queue import Queue, FullError
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, mark_sentry_task_internal
 from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
 
 from typing import TYPE_CHECKING
@@ -231,7 +231,10 @@ class AsyncWorker(Worker):
                 self._loop = asyncio.get_running_loop()
                 if self._queue is None:
                     self._queue = asyncio.Queue(maxsize=self._queue_size)
-                self._task = self._loop.create_task(self._target())
+                with mark_sentry_task_internal():
+                    self._task = self._loop.create_task(
+                        self._target(), name="sentry_sdk_async_worker"
+                    )
                 self._task_for_pid = os.getpid()
             except RuntimeError:
                 # There is no event loop running
@@ -273,7 +276,11 @@ class AsyncWorker(Worker):
 
     def flush(self, timeout: float, callback: Optional[Any] = None) -> Optional[asyncio.Task[None]]:  # type: ignore[override]
         if self.is_alive and timeout > 0.0 and self._loop and self._loop.is_running():
-            return self._loop.create_task(self._wait_flush(timeout, callback))
+            with mark_sentry_task_internal():
+                return self._loop.create_task(
+                    self._wait_flush(timeout, callback),
+                    name="sentry_sdk_async_worker_flush",
+                )
         return None
 
     def submit(self, callback: Callable[[], Any]) -> bool:
@@ -295,7 +302,11 @@ class AsyncWorker(Worker):
                 self._queue.task_done()
                 break
             # Firing tasks instead of awaiting them allows for concurrent requests
-            task = asyncio.create_task(self._process_callback(callback))
+            with mark_sentry_task_internal():
+                task = asyncio.create_task(
+                    self._process_callback(callback),
+                    name="sentry_sdk_async_worker_process_callback",
+                )
             # Create a strong reference to the task so it can be cancelled on kill
             # and does not get garbage collected while running
             self._active_tasks.add(task)

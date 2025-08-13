@@ -4,7 +4,12 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.utils import event_from_exception, logger, reraise
+from sentry_sdk.utils import (
+    event_from_exception,
+    logger,
+    reraise,
+    _is_sentry_internal_task,
+)
 from sentry_sdk.transport import AsyncHttpTransport
 
 try:
@@ -82,6 +87,18 @@ def patch_asyncio() -> None:
             coro: Coroutine[Any, Any, Any],
             **kwargs: Any,
         ) -> asyncio.Future[Any]:
+
+            # Check if this is an internal Sentry task
+            is_internal = _is_sentry_internal_task.get()
+
+            if is_internal:
+                if orig_task_factory:
+                    return orig_task_factory(loop, coro, **kwargs)
+                else:
+                    task = Task(coro, loop=loop, **kwargs)
+                    if task._source_traceback:  # type: ignore
+                        del task._source_traceback[-1]  # type: ignore
+                    return task
 
             async def _task_with_sentry_span_creation() -> Any:
                 result = None

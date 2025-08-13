@@ -40,7 +40,12 @@ import urllib3
 import certifi
 
 from sentry_sdk.consts import EndpointType
-from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
+from sentry_sdk.utils import (
+    Dsn,
+    logger,
+    capture_internal_exceptions,
+    mark_sentry_task_internal,
+)
 from sentry_sdk.worker import BackgroundWorker, Worker, AsyncWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
@@ -800,7 +805,8 @@ else:
             self.background_tasks.clear()
             try:
                 # Return the pool cleanup task so caller can await it if needed
-                return self.loop.create_task(self._pool.aclose())  # type: ignore
+                with mark_sentry_task_internal():
+                    return self.loop.create_task(self._pool.aclose(), name="sentry_sdk_pool_aclose")  # type: ignore
             except RuntimeError:
                 logger.warning("Event loop not running, aborting kill.")
                 return None
