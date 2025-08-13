@@ -100,6 +100,17 @@ FALSE_VALUES = [
 ]
 
 
+class SPANTEMPLATE(str, Enum):
+    DEFAULT = "default"
+    AI_AGENT = "ai_agent"
+    AI_TOOL = "ai_tool"
+    AI_CHAT = "ai_chat"
+
+    def __str__(self):
+        # type: () -> str
+        return self.value
+
+
 class INSTRUMENTER:
     SENTRY = "sentry"
     OTEL = "otel"
