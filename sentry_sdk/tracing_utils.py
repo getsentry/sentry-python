@@ -1100,6 +1100,7 @@ def _get_output_attributes(template, send_pii, result):
         with capture_internal_exceptions():
             # Usage from result, result.usage, and result.metadata.usage
             usage_candidates = [result]
+
             usage = _get_value(result, "usage")
             usage_candidates.append(usage)
 
