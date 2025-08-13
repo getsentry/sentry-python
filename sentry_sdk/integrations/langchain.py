@@ -257,6 +257,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     ):
         # type: (SentryLangchainCallback, Dict[str, Any], List[str], UUID, Optional[List[str]], Optional[UUID], Optional[Dict[str, Any]], Any) -> Any
         """Run when LLM starts running."""
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -286,6 +287,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
         """Run when Chat Model starts running."""
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -327,6 +329,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_chat_model_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
         """Run when Chat Model ends running."""
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -395,6 +398,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_llm_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
         """Run when LLM ends running."""
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -450,23 +454,27 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_llm_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when LLM errors."""
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             self._handle_error(run_id, error)
 
     def on_chat_model_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when Chat Model errors."""
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             self._handle_error(run_id, error)
 
     def on_chain_start(self, serialized, inputs, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], Dict[str, Any], UUID, Any) -> Any
         """Run when chain starts running."""
+        # import ipdb; ipdb.set_trace()
         pass
 
     def on_chain_end(self, outputs, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], UUID, Any) -> Any
         """Run when chain ends running."""
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
                 return
@@ -479,10 +487,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_chain_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when chain errors."""
+        # import ipdb; ipdb.set_trace()
         self._handle_error(run_id, error)
 
     def on_agent_action(self, action, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, AgentAction, UUID, Any) -> Any
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -502,6 +512,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def on_agent_finish(self, finish, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, AgentFinish, UUID, Any) -> Any
+        # import ipdb; ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -523,28 +534,31 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
+
+            tool_name = serialized.get("name") or kwargs.get("name")
+
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_EXECUTE_TOOL,
-                name=serialized.get("name") or kwargs.get("name") or "AI tool usage",
+                name=f"execute_tool {tool_name}",
                 origin=LangchainIntegration.origin,
             )
-            watched_span.span.set_data(
-                SPANDATA.GEN_AI_TOOL_NAME, serialized.get("name")
-            )
+            span = watched_span.span
+
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
+            span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
+
+            tool_description = serialized.get("description")
+            if tool_description is not None:
+                span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
+
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    watched_span.span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    span,
+                    SPANDATA.GEN_AI_TOOL_INPUT,
                     kwargs.get("inputs", [input_str]),
                 )
-                if kwargs.get("metadata"):
-                    set_data_normalized(
-                        watched_span.span,
-                        SPANDATA.GEN_AI_REQUEST_METADATA,
-                        kwargs.get("metadata"),
-                    )
 
     def on_tool_end(self, output, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
@@ -557,14 +571,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not span_data:
                 return
             if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(
-                    span_data.span, SPANDATA.GEN_AI_RESPONSE_TEXT, output
-                )
+                set_data_normalized(span_data.span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
             self._exit_span(span_data, run_id)
 
     def on_tool_error(self, error, *args, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when tool errors."""
+        # import ipdb; ipdb.set_trace()
         # TODO(shellmayr): how to correctly set the status when the toolfails
         if run_id and run_id in self.span_map:
             span_data = self.span_map[run_id]
