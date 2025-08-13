@@ -235,17 +235,7 @@ class HttpTransportCore(Transport):
             self._compression_level = 4
 
     def _create_worker(self, options: dict[str, Any]) -> Worker:
-        async_enabled = options.get("_experiments", {}).get("transport_async", False)
-        try:
-            asyncio.get_running_loop()
-            worker_cls = (
-                AsyncWorker
-                if async_enabled and ASYNC_TRANSPORT_ENABLED
-                else BackgroundWorker
-            )
-        except RuntimeError:
-            worker_cls = BackgroundWorker
-        return worker_cls(queue_size=options["transport_queue_size"])
+        raise NotImplementedError()
 
     def record_lost_event(
         self: Self,
@@ -562,6 +552,9 @@ class BaseHttpTransport(HttpTransportCore):
         finally:
             response.close()
 
+    def _create_worker(self: Self, options: dict[str, Any]) -> Worker:
+        return BackgroundWorker(queue_size=options["transport_queue_size"])
+
     def _flush_client_reports(self: Self, force: bool = False) -> None:
         client_report = self._fetch_pending_client_report(force=force, interval=60)
         if client_report is not None:
@@ -592,12 +585,7 @@ class BaseHttpTransport(HttpTransportCore):
 
 if not ASYNC_TRANSPORT_ENABLED:
     # Sorry, no AsyncHttpTransport for you
-    class AsyncHttpTransport(BaseHttpTransport):
-        def __init__(self: Self, options: Dict[str, Any]) -> None:
-            super().__init__(options)
-            logger.warning(
-                "You tried to use AsyncHttpTransport but don't have httpcore[asyncio] installed. Falling back to sync transport."
-            )
+    AsyncHttpTransport = BaseHttpTransport
 
 else:
 
@@ -607,6 +595,9 @@ else:
             # Requires event loop at init time
             self.loop = asyncio.get_running_loop()
             self.background_tasks: set[asyncio.Task[None]] = set()
+
+        def _create_worker(self: Self, options: dict[str, Any]) -> Worker:
+            return AsyncWorker(queue_size=options["transport_queue_size"])
 
         def _get_header_value(self: Self, response: Any, header: str) -> Optional[str]:
             return next(
@@ -680,7 +671,7 @@ else:
             if client_report is not None:
                 self.capture_envelope(Envelope(items=[client_report]))
 
-        async def _capture_envelope(self: Self, envelope: Envelope) -> None:
+        def _capture_envelope(self: Self, envelope: Envelope) -> None:
             async def send_envelope_wrapper() -> None:
                 with capture_internal_exceptions():
                     await self._send_envelope(envelope)
@@ -693,26 +684,14 @@ else:
 
         def capture_envelope(self: Self, envelope: Envelope) -> None:
             # Synchronous entry point
-            try:
-                asyncio.get_running_loop()
-                # We are on the main thread running the event loop
-                task = asyncio.create_task(self._capture_envelope(envelope))
-                self.background_tasks.add(task)
-                task.add_done_callback(self.background_tasks.discard)
-            except RuntimeError:
-                # We are in a background thread, not running an event loop,
-                # have to launch the task on the loop in a threadsafe way.
-                if self.loop and self.loop.is_running():
-                    asyncio.run_coroutine_threadsafe(
-                        self._capture_envelope(envelope),
-                        self.loop,
-                    )
-                else:
-                    # The event loop is no longer running
-                    logger.warning("Async Transport is not running in an event loop.")
-                    self.on_dropped_event("internal_sdk_error")
-                    for item in envelope.items:
-                        self.record_lost_event("internal_sdk_error", item=item)
+            if self.loop and self.loop.is_running():
+                self.loop.call_soon_threadsafe(self._capture_envelope, envelope)
+            else:
+                # The event loop is no longer running
+                logger.warning("Async Transport is not running in an event loop.")
+                self.on_dropped_event("internal_sdk_error")
+                for item in envelope.items:
+                    self.record_lost_event("internal_sdk_error", item=item)
 
         def flush(  # type: ignore[override]
             self: Self,
@@ -1071,16 +1050,20 @@ def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
     use_http2_transport = options.get("_experiments", {}).get("transport_http2", False)
     use_async_transport = options.get("_experiments", {}).get("transport_async", False)
     # By default, we use the http transport class
-    if use_async_transport:
+    transport_cls: Type[Transport] = (
+        Http2Transport if use_http2_transport else HttpTransport
+    )
+    if use_async_transport and ASYNC_TRANSPORT_ENABLED:
         try:
             asyncio.get_running_loop()
-            transport_cls: Type[Transport] = AsyncHttpTransport
+            transport_cls = AsyncHttpTransport
         except RuntimeError:
             # No event loop running, fall back to sync transport
             logger.warning("No event loop running, falling back to sync transport.")
-            transport_cls = Http2Transport if use_http2_transport else HttpTransport
-    else:
-        transport_cls = Http2Transport if use_http2_transport else HttpTransport
+    elif use_async_transport:
+        logger.warning(
+            "You tried to use AsyncHttpTransport but don't have httpcore[asyncio] installed. Falling back to sync transport."
+        )
 
     if isinstance(ref_transport, Transport):
         return ref_transport
