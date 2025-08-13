@@ -524,13 +524,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id:
                 return
 
-            tool_name = serialized.get("name") or kwargs.get("name")
+            tool_name = serialized.get("name") or kwargs.get("name") or ""
 
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_EXECUTE_TOOL,
-                name=f"execute_tool {tool_name}",
+                name=f"execute_tool {tool_name}".strip(),
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
