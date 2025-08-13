@@ -261,6 +261,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             all_params = kwargs.get("invocation_params", {})
             all_params.update(serialized.get("kwargs", {}))
 
+            model = (
+                all_params.get("model")
+                or all_params.get("model_name")
+                or all_params.get("model_id")
+                or ""
+            )
+
             watched_span = self._create_span(
                 run_id=run_id,
                 parent_id=parent_run_id,
@@ -269,18 +276,25 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 origin=LangchainIntegration.origin,
             )
             span = watched_span.span
-            span.set_data(
-                SPANDATA.GEN_AI_REQUEST_MODEL,
-                all_params.get(
-                    "model", all_params.get("model_name", all_params.get("model_id"))
-                ),
-            )
-            if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts)
+
+            if model:
+                span.set_data(
+                    SPANDATA.GEN_AI_REQUEST_MODEL,
+                    model,
+                )
+
+            ai_type = all_params.get("_type")
+            if "anthropic" in ai_type:
+                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
+            elif "openai" in ai_type:
+                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
+
+            if should_send_default_pii() and self.include_prompts:
+                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts)
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
@@ -310,6 +324,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
             if model:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+
+            ai_type = all_params.get("_type")
+            if "anthropic" in ai_type:
+                span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
+            elif "openai" in ai_type:
+                span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
@@ -429,7 +449,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     pass
 
                 try:
-                    tool_calls = generation_result.message.get("tool_calls")
+                    tool_calls = getattr(generation_result.message, "tool_calls", None)
                     if tool_calls is not None:
                         set_data_normalized(
                             span,
