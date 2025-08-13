@@ -523,28 +523,31 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
+
+            tool_name = serialized.get("name") or kwargs.get("name")
+
             watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_EXECUTE_TOOL,
-                name=serialized.get("name") or kwargs.get("name") or "AI tool usage",
+                name=f"execute_tool {tool_name}",
                 origin=LangchainIntegration.origin,
             )
-            watched_span.span.set_data(
-                SPANDATA.GEN_AI_TOOL_NAME, serialized.get("name")
-            )
+            span = watched_span.span
+
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "execute_tool")
+            span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
+
+            tool_description = serialized.get("description")
+            if tool_description is not None:
+                span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_description)
+
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    watched_span.span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    span,
+                    SPANDATA.GEN_AI_TOOL_INPUT,
                     kwargs.get("inputs", [input_str]),
                 )
-                if kwargs.get("metadata"):
-                    set_data_normalized(
-                        watched_span.span,
-                        SPANDATA.GEN_AI_REQUEST_METADATA,
-                        kwargs.get("metadata"),
-                    )
 
     def on_tool_end(self, output, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
@@ -557,19 +560,18 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not span_data:
                 return
             if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(
-                    span_data.span, SPANDATA.GEN_AI_RESPONSE_TEXT, output
-                )
+                set_data_normalized(span_data.span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
             self._exit_span(span_data, run_id)
 
     def on_tool_error(self, error, *args, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when tool errors."""
-        # TODO(shellmayr): how to correctly set the status when the toolfails
+        # TODO(shellmayr): how to correctly set the status when the tool fails?
         if run_id and run_id in self.span_map:
             span_data = self.span_map[run_id]
             if span_data:
                 span_data.span.set_status("unknown")
+
         self._handle_error(run_id, error)
 
 
