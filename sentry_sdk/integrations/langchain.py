@@ -304,12 +304,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if model:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            import ipdb
-
-            ipdb.set_trace()
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params:
-                    set_data_normalized(span, attribute, all_params[key])
+                    set_data_normalized(span, attribute, all_params[key], unpack=False)
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
