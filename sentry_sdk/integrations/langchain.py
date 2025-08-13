@@ -447,7 +447,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
                 try:
                     tool_calls = getattr(generation.message, "tool_calls", None)
-                    if tool_calls is not None:
+                    if tool_calls is not None and tool_calls != []:
                         set_data_normalized(
                             span,
                             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
