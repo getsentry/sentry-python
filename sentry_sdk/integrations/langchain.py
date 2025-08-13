@@ -48,7 +48,7 @@ DATA_FIELDS = {
 # token counts for models for which we have an explicit integration
 NO_COLLECT_TOKEN_MODELS = [
     # "openai-chat",
-    "anthropic-chat",
+    # "anthropic-chat",
     "cohere-chat",
     "huggingface_endpoint",
 ]
@@ -61,13 +61,10 @@ class LangchainIntegration(Integration):
     # The most number of spans (e.g., LLM calls) that can be processed at the same time.
     max_spans = 1024
 
-    def __init__(
-        self, include_prompts=True, max_spans=1024, tiktoken_encoding_name="cl100k_base"
-    ):
-        # type: (LangchainIntegration, bool, int, Optional[str]) -> None
+    def __init__(self, include_prompts=True, max_spans=1024):
+        # type: (LangchainIntegration, bool, int) -> None
         self.include_prompts = include_prompts
         self.max_spans = max_spans
-        self.tiktoken_encoding_name = tiktoken_encoding_name
 
     @staticmethod
     def setup_once():
@@ -77,8 +74,6 @@ class LangchainIntegration(Integration):
 
 class WatchedSpan:
     span = None  # type: Span
-    num_completion_tokens = 0  # type: int
-    num_prompt_tokens = 0  # type: int
     no_collect_tokens = False  # type: bool
     children = []  # type: List[WatchedSpan]
     is_pipeline = False  # type: bool
@@ -91,23 +86,11 @@ class WatchedSpan:
 class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     """Base callback handler that can be used to handle callbacks from langchain."""
 
-    def __init__(self, max_span_map_size, include_prompts, tiktoken_encoding_name=None):
-        # type: (int, bool, Optional[str]) -> None
+    def __init__(self, max_span_map_size, include_prompts):
+        # type: (int, bool) -> None
         self.span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
-
-        self.tiktoken_encoding = None
-        if tiktoken_encoding_name is not None:
-            import tiktoken  # type: ignore
-
-            self.tiktoken_encoding = tiktoken.get_encoding(tiktoken_encoding_name)
-
-    def count_tokens(self, s):
-        # type: (str) -> int
-        if self.tiktoken_encoding is not None:
-            return len(self.tiktoken_encoding.encode_ordinary(s))
-        return 0
 
     def gc_span_map(self):
         # type: () -> None
@@ -163,9 +146,70 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
         # LangChain's OpenAI callback uses these specific field names
         if input_tokens is None and hasattr(token_usage, "get"):
-            input_tokens = token_usage.get("prompt_tokens")
+            input_tokens = token_usage.get("prompt_tokens") or token_usage.get(
+                "input_tokens"
+            )
         if output_tokens is None and hasattr(token_usage, "get"):
-            output_tokens = token_usage.get("completion_tokens")
+            output_tokens = token_usage.get("completion_tokens") or token_usage.get(
+                "output_tokens"
+            )
+        if total_tokens is None and hasattr(token_usage, "get"):
+            total_tokens = token_usage.get("total_tokens")
+
+        return input_tokens, output_tokens, total_tokens
+
+    def _extract_token_usage_from_generations(self, generations):
+        # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
+        """Extract token usage from response.generations structure."""
+        if not generations:
+            return None, None, None
+
+        total_input = 0
+        total_output = 0
+        total_total = 0
+        found = False
+
+        for gen_list in generations:
+            for gen in gen_list:
+                usage_metadata = None
+                if (
+                    hasattr(gen, "message")
+                    and getattr(gen, "message", None) is not None
+                    and hasattr(gen.message, "usage_metadata")
+                ):
+                    usage_metadata = getattr(gen.message, "usage_metadata", None)
+                if usage_metadata is None and hasattr(gen, "usage_metadata"):
+                    usage_metadata = getattr(gen, "usage_metadata", None)
+                if usage_metadata:
+                    input_tokens, output_tokens, total_tokens = (
+                        self._extract_token_usage_from_response(usage_metadata)
+                    )
+                    if any([input_tokens, output_tokens, total_tokens]):
+                        found = True
+                        total_input += int(input_tokens)
+                        total_output += int(output_tokens)
+                        total_total += int(total_tokens)
+
+        if not found:
+            return None, None, None
+
+        return (
+            total_input if total_input > 0 else None,
+            total_output if total_output > 0 else None,
+            total_total if total_total > 0 else None,
+        )
+
+    def _extract_token_usage_from_response(self, response):
+        # type: (Any) -> tuple[int, int, int]
+        if response:
+            if hasattr(response, "get"):
+                input_tokens = response.get("input_tokens", 0)
+                output_tokens = response.get("output_tokens", 0)
+                total_tokens = response.get("total_tokens", 0)
+            else:
+                input_tokens = getattr(response, "input_tokens", 0)
+                output_tokens = getattr(response, "output_tokens", 0)
+                total_tokens = getattr(response, "total_tokens", 0)
 
         return input_tokens, output_tokens, total_tokens
 
@@ -278,12 +322,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             for k, v in DATA_FIELDS.items():
                 if k in all_params:
                     set_data_normalized(span, v, all_params[k])
-            if not watched_span.no_collect_tokens:
-                for list_ in messages:
-                    for message in list_:
-                        self.span_map[run_id].num_prompt_tokens += self.count_tokens(
-                            message.content
-                        ) + self.count_tokens(message.type)
+            # no manual token counting
 
     def on_chat_model_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
@@ -294,6 +333,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             token_usage = None
 
+            # Try multiple paths to extract token usage, prioritizing streaming-aware approaches
             if response.llm_output and "token_usage" in response.llm_output:
                 token_usage = response.llm_output["token_usage"]
             elif response.llm_output and hasattr(response.llm_output, "token_usage"):
@@ -302,6 +342,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 token_usage = response.usage
             elif hasattr(response, "token_usage"):
                 token_usage = response.token_usage
+            # Check for usage_metadata in llm_output (common in streaming responses)
+            elif response.llm_output and "usage_metadata" in response.llm_output:
+                token_usage = response.llm_output["usage_metadata"]
+            elif response.llm_output and hasattr(response.llm_output, "usage_metadata"):
+                token_usage = response.llm_output.usage_metadata
+            elif hasattr(response, "usage_metadata"):
+                token_usage = response.usage_metadata
 
             span_data = self.span_map[run_id]
             if not span_data:
@@ -319,26 +366,21 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     input_tokens, output_tokens, total_tokens = (
                         self._extract_token_usage(token_usage)
                     )
+                else:
+                    input_tokens, output_tokens, total_tokens = (
+                        self._extract_token_usage_from_generations(response.generations)
+                    )
 
+                if (
+                    input_tokens is not None
+                    or output_tokens is not None
+                    or total_tokens is not None
+                ):
                     record_token_usage(
                         span_data.span,
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                         total_tokens=total_tokens,
-                    )
-                else:
-                    record_token_usage(
-                        span_data.span,
-                        input_tokens=(
-                            span_data.num_prompt_tokens
-                            if span_data.num_prompt_tokens > 0
-                            else None
-                        ),
-                        output_tokens=(
-                            span_data.num_completion_tokens
-                            if span_data.num_completion_tokens > 0
-                            else None
-                        ),
                     )
 
             self._exit_span(span_data, run_id)
@@ -346,15 +388,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_llm_new_token(self, token, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
         """Run on new LLM token. Only available when streaming is enabled."""
+        # no manual token counting
         with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
-                return
-            span_data = self.span_map[run_id]
-            if not span_data or span_data.no_collect_tokens:
-                return
-            # Count tokens for each streaming chunk
-            token_count = self.count_tokens(token)
-            span_data.num_completion_tokens += token_count
+            return
 
     def on_llm_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
@@ -392,25 +428,21 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     input_tokens, output_tokens, total_tokens = (
                         self._extract_token_usage(token_usage)
                     )
+                else:
+                    input_tokens, output_tokens, total_tokens = (
+                        self._extract_token_usage_from_generations(response.generations)
+                    )
+
+                if (
+                    input_tokens is not None
+                    or output_tokens is not None
+                    or total_tokens is not None
+                ):
                     record_token_usage(
                         span_data.span,
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                         total_tokens=total_tokens,
-                    )
-                else:
-                    record_token_usage(
-                        span_data.span,
-                        input_tokens=(
-                            span_data.num_prompt_tokens
-                            if span_data.num_prompt_tokens > 0
-                            else None
-                        ),
-                        output_tokens=(
-                            span_data.num_completion_tokens
-                            if span_data.num_completion_tokens > 0
-                            else None
-                        ),
                     )
 
             self._exit_span(span_data, run_id)
@@ -602,7 +634,6 @@ def _wrap_configure(f):
             sentry_handler = SentryLangchainCallback(
                 integration.max_spans,
                 integration.include_prompts,
-                integration.tiktoken_encoding_name,
             )
             if isinstance(local_callbacks, BaseCallbackManager):
                 local_callbacks = local_callbacks.copy()
