@@ -772,7 +772,7 @@ def normalize_incoming_data(incoming_data):
 
 
 def create_span_decorator(
-    op=None, name=None, attributes=None, template=SPANTEMPLATE.SPAN
+    op=None, name=None, attributes=None, template=SPANTEMPLATE.DEFAULT
 ):
     # type: (Optional[Union[str, OP]], Optional[str], Optional[dict[str, Any]], SPANTEMPLATE) -> Any
     """
@@ -787,7 +787,7 @@ def create_span_decorator(
     :param template: The type of span to create. This determines what kind of
         span instrumentation and data collection will be applied. Use predefined
         constants from :py:class:`sentry_sdk.consts.SPANTEMPLATE`.
-        The default is `SPANTEMPLATE.SPAN` which is the right choice for most
+        The default is `SPANTEMPLATE.DEFAULT` which is the right choice for most
         use cases.
     :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
     """

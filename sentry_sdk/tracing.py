@@ -1366,7 +1366,7 @@ if TYPE_CHECKING:
 
     @overload
     def trace(
-        func=None, *, op=None, name=None, attributes=None, template=SPANTEMPLATE.SPAN
+        func=None, *, op=None, name=None, attributes=None, template=SPANTEMPLATE.DEFAULT
     ):
         # type: (None, Optional[str], Optional[str], Optional[dict[str, Any]], SPANTEMPLATE) -> Callable[[Callable[P, R]], Callable[P, R]]
         # Handles: @trace() and @trace(op="custom")
@@ -1380,7 +1380,7 @@ if TYPE_CHECKING:
 
 
 def trace(
-    func=None, *, op=None, name=None, attributes=None, template=SPANTEMPLATE.SPAN
+    func=None, *, op=None, name=None, attributes=None, template=SPANTEMPLATE.DEFAULT
 ):
     # type: (Optional[Callable[P, R]], Optional[str], Optional[str], Optional[dict[str, Any]], SPANTEMPLATE) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
@@ -1414,7 +1414,7 @@ def trace(
     :param template: The type of span to create. This determines what kind of
         span instrumentation and data collection will be applied. Use predefined
         constants from :py:class:`sentry_sdk.consts.SPANTEMPLATE`.
-        The default is `SPANTEMPLATE.SPAN` which is the right choice for most
+        The default is `SPANTEMPLATE.DEFAULT` which is the right choice for most
         use cases.
     :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
 
