@@ -945,6 +945,10 @@ def _sample_rand_range(parent_sampled, sample_rate):
 
 def _get_value(source, key):
     # type: (Any, str) -> Optional[Any]
+    """
+    Gets a value from a source object. The source can be a dict or an object.
+    It is checked for dictionary keys and object attributes.
+    """
     value = None
     if isinstance(source, dict):
         value = source.get(key)
