@@ -999,7 +999,7 @@ def _get_span_op(template):
     }  # type: dict[Union[str, SPANTEMPLATE], Union[str, OP]]
     op = mapping.get(template, OP.FUNCTION)
 
-    return op
+    return str(op)
 
 
 def _get_input_attributes(template, send_pii, args, kwargs):
