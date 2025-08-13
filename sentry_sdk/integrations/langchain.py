@@ -102,7 +102,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         if not run_id or run_id not in self.span_map:
             return
 
-        span_data = self.span_map[run_id]
+        span_data = self.span_map.get(run_id)
         if not span_data:
             return
         sentry_sdk.capture_exception(error, span_data.span.scope)
@@ -328,9 +328,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_chat_model_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
         """Run when Chat Model ends running."""
-        import ipdb
-
-        ipdb.set_trace()
         with capture_internal_exceptions():
             if not run_id:
                 return
@@ -353,7 +350,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             elif hasattr(response, "usage_metadata"):
                 token_usage = response.usage_metadata
 
-            span_data = self.span_map[run_id]
+            span_data = self.span_map.get(run_id)
             if not span_data:
                 return
 
@@ -401,6 +398,55 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id:
                 return
 
+            span_data = self.span_map.get(run_id)
+            if not span_data:
+                return
+
+            span = span_data.span
+
+            try:
+                generation_result = response.generations[0][0]
+            except IndexError:
+                generation_result = None
+
+            if generation_result is not None:
+                try:
+                    response_model = generation_result.generation_info.get("model_name")
+                    if response_model is not None:
+                        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+                except AttributeError:
+                    pass
+
+                try:
+                    finish_reason = generation_result.generation_info.get(
+                        "finish_reason"
+                    )
+                    if finish_reason is not None:
+                        span.set_data(
+                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason
+                        )
+                except AttributeError:
+                    pass
+
+                try:
+                    tool_calls = generation_result.message.get("tool_calls")
+                    if tool_calls is not None:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                            tool_calls,
+                            unpack=False,
+                        )
+                except AttributeError:
+                    pass
+
+            if should_send_default_pii() and self.include_prompts:
+                set_data_normalized(
+                    span_data.span,
+                    SPANDATA.GEN_AI_RESPONSE_TEXT,
+                    [[x.text for x in list_] for list_ in response.generations],
+                )
+
             token_usage = None
             if response.llm_output and "token_usage" in response.llm_output:
                 token_usage = response.llm_output["token_usage"]
@@ -413,17 +459,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             elif hasattr(response, "token_usage"):
                 token_usage = response.token_usage
-
-            span_data = self.span_map[run_id]
-            if not span_data:
-                return
-
-            if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(
-                    span_data.span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    [[x.text for x in list_] for list_ in response.generations],
-                )
 
             if token_usage:
                 input_tokens, output_tokens, total_tokens = self._extract_token_usage(
@@ -440,7 +475,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 or total_tokens is not None
             ):
                 record_token_usage(
-                    span_data.span,
+                    span,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     total_tokens=total_tokens,
@@ -457,9 +492,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_chat_model_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when Chat Model errors."""
-        import ipdb
-
-        ipdb.set_trace()
         with capture_internal_exceptions():
             self._handle_error(run_id, error)
 
@@ -475,7 +507,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id or run_id not in self.span_map:
                 return
 
-            span_data = self.span_map[run_id]
+            span_data = self.span_map.get(run_id)
             if not span_data:
                 return
             self._exit_span(span_data, run_id)
@@ -487,7 +519,14 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def on_agent_action(self, action, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, AgentAction, UUID, Any) -> Any
-        pass
+        with capture_internal_exceptions():
+            if not run_id or run_id not in self.span_map:
+                return
+
+            span_data = self.span_map.get(run_id)
+            if not span_data:
+                return
+            self._exit_span(span_data, run_id)
 
     def on_agent_finish(self, finish, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, AgentFinish, UUID, Any) -> Any
@@ -495,7 +534,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id:
                 return
 
-            span_data = self.span_map[run_id]
+            span_data = self.span_map.get(run_id)
             if not span_data:
                 return
             if should_send_default_pii() and self.include_prompts:
@@ -545,7 +584,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id or run_id not in self.span_map:
                 return
 
-            span_data = self.span_map[run_id]
+            span_data = self.span_map.get(run_id)
             if not span_data:
                 return
             if should_send_default_pii() and self.include_prompts:
@@ -557,7 +596,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         """Run when tool errors."""
         # TODO(shellmayr): how to correctly set the status when the tool fails?
         if run_id and run_id in self.span_map:
-            span_data = self.span_map[run_id]
+            span_data = self.span_map.get(run_id)
             if span_data:
                 span_data.span.set_status("unknown")
 
@@ -654,7 +693,6 @@ def _wrap_agent_executor_invoke(f):
     @wraps(f)
     def new_invoke(self, *args, **kwargs):
         # type: (Any, Any, Any) -> Any
-
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
