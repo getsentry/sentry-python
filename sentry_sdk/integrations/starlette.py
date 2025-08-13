@@ -29,7 +29,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    logger,
     parse_version,
     transaction_from_function,
 )
@@ -403,9 +402,9 @@ def patch_asgi_app():
                 if integration
                 else DEFAULT_HTTP_METHODS_TO_CAPTURE
             ),
+            asgi_version=3,
         )
 
-        middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 
     Starlette.__call__ = _sentry_patched_asgi_app
@@ -723,9 +722,6 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         source = TransactionSource.ROUTE
 
     scope.set_transaction_name(name, source=source)
-    logger.debug(
-        "[Starlette] Set transaction name and source on scope: %s / %s", name, source
-    )
 
 
 def _get_transaction_from_middleware(app, asgi_scope, integration):

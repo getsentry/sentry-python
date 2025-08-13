@@ -95,8 +95,8 @@ def patch_asgi_app():
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
             span_origin=QuartIntegration.origin,
+            asgi_version=3,
         )
-        middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 
     Quart.__call__ = sentry_patched_asgi_app

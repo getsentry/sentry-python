@@ -7,8 +7,8 @@ from sentry_sdk.tracing import Span
 from sentry_sdk.utils import logger
 
 
-def _normalize_data(data):
-    # type: (Any) -> Any
+def _normalize_data(data, unpack=True):
+    # type: (Any, bool) -> Any
 
     # convert pydantic data (e.g. OpenAI v1+) to json compatible format
     if hasattr(data, "model_dump"):
@@ -18,18 +18,18 @@ def _normalize_data(data):
             logger.warning("Could not convert pydantic data to JSON: %s", e)
             return data
     if isinstance(data, list):
-        if len(data) == 1:
-            return _normalize_data(data[0])  # remove empty dimensions
-        return list(_normalize_data(x) for x in data)
+        if unpack and len(data) == 1:
+            return _normalize_data(data[0], unpack=unpack)  # remove empty dimensions
+        return list(_normalize_data(x, unpack=unpack) for x in data)
     if isinstance(data, dict):
-        return {k: _normalize_data(v) for (k, v) in data.items()}
+        return {k: _normalize_data(v, unpack=unpack) for (k, v) in data.items()}
 
     return data
 
 
-def set_data_normalized(span, key, value):
-    # type: (Span, str, Any) -> None
-    normalized = _normalize_data(value)
+def set_data_normalized(span, key, value, unpack=True):
+    # type: (Span, str, Any, bool) -> None
+    normalized = _normalize_data(value, unpack=unpack)
     if isinstance(normalized, (int, float, bool, str)):
         span.set_data(key, normalized)
     else:
