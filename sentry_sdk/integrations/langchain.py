@@ -711,6 +711,7 @@ def _wrap_agent_executor_invoke(f):
             origin=LangchainIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+
             if hasattr(self, "agent") and hasattr(self.agent, "llm"):
                 model_name = getattr(self.agent.llm, "model_name", None) or getattr(
                     self.agent.llm, "model", None
@@ -729,7 +730,6 @@ def _wrap_agent_executor_stream(f):
     @wraps(f)
     def new_stream(self, *args, **kwargs):
         # type: (Any, Any, Any) -> Any
-
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
@@ -741,6 +741,7 @@ def _wrap_agent_executor_stream(f):
             origin=LangchainIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+
             if hasattr(self, "agent") and hasattr(self.agent, "llm"):
                 model_name = getattr(self.agent.llm, "model_name", None) or getattr(
                     self.agent.llm, "model", None
