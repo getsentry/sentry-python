@@ -952,12 +952,11 @@ def _get_span_name(template, name, kwargs=None):
 
     if template == SPANTEMPLATE.AI_CHAT:
         model = None
-        if kwargs and "model" in kwargs and isinstance(kwargs["model"], str):
-            model = kwargs["model"]
-        elif (
-            kwargs and "model_name" in kwargs and isinstance(kwargs["model_name"], str)
-        ):
-            model = kwargs["model_name"]
+        if kwargs:
+            for key in ("model", "model_name"):
+                if kwargs.get(key) and isinstance(kwargs[key], str):
+                    model = kwargs[key]
+                    break
 
         span_name = f"chat {model}" if model else "chat"
 
@@ -998,14 +997,10 @@ def _get_input_attributes(template, send_pii, args, kwargs):
 
     if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
         for key, value in list(kwargs.items()):
-            if key == "model" and isinstance(value, str):
-                attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
-            if key == "model_name" and isinstance(value, str):
+            if key in ("model", "model_name") and isinstance(value, str):
                 attributes[SPANDATA.GEN_AI_REQUEST_MODEL] = value
 
-            if key == "agent" and isinstance(value, str):
-                attributes[SPANDATA.GEN_AI_AGENT_NAME] = value
-            if key == "agent_name" and isinstance(value, str):
+            if key in ("agent", "agent_name") and isinstance(value, str):
                 attributes[SPANDATA.GEN_AI_AGENT_NAME] = value
 
             if key == "prompt" and isinstance(value, str):
