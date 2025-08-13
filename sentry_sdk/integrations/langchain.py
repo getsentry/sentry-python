@@ -256,8 +256,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             all_params.update(serialized.get("kwargs", {}))
 
             watched_span = self._create_span(
-                run_id,
-                kwargs.get("parent_run_id"),
+                run_id=run_id,
+                parent_id=kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_PIPELINE,
                 name=kwargs.get("name") or "Langchain LLM call",
                 origin=LangchainIntegration.origin,
@@ -292,8 +292,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
 
             watched_span = self._create_span(
-                run_id,
-                kwargs.get("parent_run_id"),
+                run_id=run_id,
+                parent_id=kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_CHAT,
                 name=f"chat {model}".strip(),
                 origin=LangchainIntegration.origin,
@@ -324,7 +324,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
-
             token_usage = None
 
             # Try multiple paths to extract token usage, prioritizing streaming-aware approaches
@@ -479,8 +478,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id:
                 return
             watched_span = self._create_span(
-                run_id,
-                kwargs.get("parent_run_id"),
+                run_id=run_id,
+                parent_id=kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_INVOKE_AGENT,
                 name=action.tool or "AI tool usage",
                 origin=LangchainIntegration.origin,
@@ -519,8 +518,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             tool_name = serialized.get("name") or kwargs.get("name") or ""
 
             watched_span = self._create_span(
-                run_id,
-                kwargs.get("parent_run_id"),
+                run_id=run_id,
+                parent_id=kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_EXECUTE_TOOL,
                 name=f"execute_tool {tool_name}".strip(),
                 origin=LangchainIntegration.origin,
