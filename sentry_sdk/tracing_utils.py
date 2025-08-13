@@ -943,6 +943,20 @@ def _sample_rand_range(parent_sampled, sample_rate):
         return sample_rate, 1.0
 
 
+def _get_value(source, key):
+    # type: (Any, str) -> Optional[Any]
+    value = None
+    if isinstance(source, dict):
+        value = source.get(key)
+    else:
+        if hasattr(source, key):
+            try:
+                value = getattr(source, key)
+            except Exception:
+                value = None
+    return value
+
+
 def _get_span_name(template, name, kwargs=None):
     # type: (Union[str, SPANTEMPLATE], str, Optional[dict[str, Any]]) -> str
     """
@@ -1048,24 +1062,11 @@ def _get_usage_attributes(usage):
     """
     attributes = {}
 
-    def _get_value(source, key):
-        # type: (Any, str) -> Optional[int]
-        value = None
-        if isinstance(source, dict):
-            value = source.get(key)
-        else:
-            if hasattr(source, key):
-                try:
-                    value = getattr(source, key)
-                except Exception:
-                    value = None
-        return value if isinstance(value, int) else None
-
     def _set_from_keys(attribute, keys):
         # type: (str, tuple[str, ...]) -> None
         for key in keys:
             value = _get_value(usage, key)
-            if value is not None:
+            if value is not None and isinstance(value, int):
                 attributes[attribute] = value
 
     _set_from_keys(
@@ -1095,40 +1096,24 @@ def _get_output_attributes(template, send_pii, result):
         with capture_internal_exceptions():
             # Usage from result, result.usage, and result.metadata.usage
             usage_candidates = [result]
-            if isinstance(result, dict):
-                usage_candidates.append(result.get("usage"))
-                meta = result.get("metadata")
-            else:
-                usage_candidates.append(getattr(result, "usage", None))
-                meta = getattr(result, "metadata", None)
+            usage = _get_value(result, "usage")
+            usage_candidates.append(usage)
 
-            if isinstance(meta, dict):
-                usage_candidates.append(meta.get("usage"))
-            elif meta is not None:
-                usage_candidates.append(getattr(meta, "usage", None))
+            meta = _get_value(usage, "metadata")
+            usage = _get_value(meta, "usage")
+            usage_candidates.append(usage)
 
             for usage_candidate in usage_candidates:
                 if usage_candidate is not None:
                     attributes.update(_get_usage_attributes(usage_candidate))
 
             # Response model
-            model_name = None
-            if isinstance(result, dict):
-                val = result.get("model")
-                if isinstance(val, str):
-                    model_name = val
-                val = result.get("model_name")
-                if isinstance(val, str):
-                    model_name = val
-            else:
-                val = getattr(result, "model", None)
-                if isinstance(val, str):
-                    model_name = val
-                val = getattr(result, "model_name", None)
-                if isinstance(val, str):
-                    model_name = val
+            model_name = _get_value(result, "model")
+            if model_name is not None and isinstance(model_name, str):
+                attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = model_name
 
-            if model_name is not None:
+            model_name = _get_value(result, "model_name")
+            if model_name is not None and isinstance(model_name, str):
                 attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = model_name
 
     # Tool output
