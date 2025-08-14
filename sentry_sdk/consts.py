@@ -485,11 +485,6 @@ class SPANDATA:
     Example: "COMPLETE"
     """
 
-    GEN_AI_RESPONSE_FORMAT = "gen_ai.response.format"
-    """
-    For an AI model call, the format of the response
-    """
-
     GEN_AI_RESPONSE_ID = "gen_ai.response.id"
     """
     Unique identifier for the completion.
@@ -544,12 +539,6 @@ class SPANDATA:
     Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
     """
 
-    GEN_AI_REQUEST_METADATA = "gen_ai.request.metadata"
-    """
-    The metadata passed to the model.
-    Example: {"tag1": "value1", "tag2": "value2"}
-    """
-
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
     """
     The model identifier being used for the request.
@@ -566,12 +555,6 @@ class SPANDATA:
     """
     The seed, ideally models given the same seed and same other parameters will produce the exact same output.
     Example: "1234567890"
-    """
-
-    GEN_AI_REQUEST_TAGS = "gen_ai.request.tags"
-    """
-    The tags passed to the model.
-    Example: {"tag1": "value1", "tag2": "value2"}
     """
 
     GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
