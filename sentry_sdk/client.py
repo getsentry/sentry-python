@@ -939,7 +939,7 @@ class _Client(BaseClient):
     ) -> Optional[asyncio.Task[None]]:
         """
         Close the client and shut down the transport. Arguments have the same
-        semantics as :py:meth:`Client.flush`. When using the async transport, close needs to be awaited to block.
+        semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
             if isinstance(self.transport, AsyncHttpTransport) and hasattr(
@@ -985,7 +985,7 @@ class _Client(BaseClient):
         callback: Optional[Callable[[int, float], None]] = None,
     ) -> Optional[asyncio.Task[None]]:
         """
-        Wait for the current events to be sent. When using the async transport, flush needs to be awaited to block.
+        Wait for the current events to be sent.
 
         :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.
 

@@ -472,13 +472,13 @@ def test_loop_close_flushes_async_transport(sentry_init):
         mock_client = Mock()
         mock_transport = Mock(spec=AsyncHttpTransport)
         mock_client.transport = mock_transport
-        mock_client.close = AsyncMock(return_value=None)
+        mock_client.close_async = AsyncMock(return_value=None)
 
         with patch("sentry_sdk.get_client", return_value=mock_client):
             loop.close()
 
-        mock_client.close.assert_called_once()
-        mock_client.close.assert_awaited_once()
+        mock_client.close_async.assert_called_once()
+        mock_client.close_async.assert_awaited_once()
 
     finally:
         if not loop.is_closed():
