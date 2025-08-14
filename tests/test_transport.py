@@ -204,9 +204,9 @@ async def test_transport_works_async(
     capture_message("löl")
 
     if client_flush_method == "close":
-        await client.close(timeout=2.0)
+        await client.close_async(timeout=2.0)
     if client_flush_method == "flush":
-        await client.flush(timeout=2.0)
+        await client.flush_async(timeout=2.0)
 
     out, err = capsys.readouterr()
     assert not err and not out
@@ -230,7 +230,7 @@ async def test_transport_works_async(
     # Therefore, we need to explicitly close the client to clean up the worker task
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
     if client_flush_method == "flush":
-        await client.close(timeout=2.0)
+        await client.close_async(timeout=2.0)
 
 
 @pytest.mark.parametrize(
@@ -833,7 +833,7 @@ async def test_async_transport_background_thread_capture(
     thread.join()
     assert not exception_from_thread
     assert captured_from_thread
-    await client.close(timeout=2.0)
+    await client.close_async(timeout=2.0)
     assert capturing_server.captured
 
 
@@ -860,7 +860,7 @@ async def test_async_transport_event_loop_closed_scenario(
                 )
 
     client.transport.loop = original_loop
-    await client.close(timeout=2.0)
+    await client.close_async(timeout=2.0)
 
 
 @pytest.mark.asyncio
@@ -882,7 +882,7 @@ async def test_async_transport_concurrent_requests(
 
     tasks = [send_message(i) for i in range(num_messages)]
     await asyncio.gather(*tasks)
-    await client.close(timeout=2.0)
+    await client.close_async(timeout=2.0)
     assert len(capturing_server.captured) == num_messages
 
 
@@ -916,7 +916,7 @@ async def test_async_transport_rate_limiting_with_concurrency(
     await asyncio.sleep(0.1)
     # New request should be dropped due to rate limiting
     assert len(capturing_server.captured) == 0
-    await client.close(timeout=2.0)
+    await client.close_async(timeout=2.0)
 
 
 @pytest.mark.asyncio
@@ -938,4 +938,4 @@ async def test_async_two_way_ssl_authentication():
     options = client.transport._get_pool_options()
     assert options["ssl_context"] is not None
 
-    await client.close()
+    await client.close_async()

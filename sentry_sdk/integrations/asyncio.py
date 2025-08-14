@@ -53,9 +53,7 @@ def patch_loop_close() -> None:
             if not isinstance(client.transport, AsyncHttpTransport):
                 return
 
-            task = client.close()  # type: ignore
-            if task is not None:
-                await task
+            await client.close_async()
         except Exception:
             logger.warning("Sentry flush failed during loop shutdown", exc_info=True)
 
