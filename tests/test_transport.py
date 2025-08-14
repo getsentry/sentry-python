@@ -3,6 +3,8 @@ import pickle
 import os
 import socket
 import sys
+import asyncio
+import threading
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -28,8 +30,10 @@ from sentry_sdk._compat import PY38
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     _parse_rate_limits,
+    AsyncHttpTransport,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 
 
 server = None
@@ -144,6 +148,89 @@ def test_transport_works(
     assert capturing_server.captured[0].compressed == should_compress
 
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("debug", (True, False))
+@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
+@pytest.mark.parametrize("use_pickle", (True, False))
+@pytest.mark.parametrize("compression_level", (0, 9, None))
+@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
+@pytest.mark.skipif(not PY38, reason="Async transport only supported in Python 3.8+")
+async def test_transport_works_async(
+    capturing_server,
+    request,
+    capsys,
+    caplog,
+    debug,
+    make_client,
+    client_flush_method,
+    use_pickle,
+    compression_level,
+    compression_algo,
+):
+    caplog.set_level(logging.DEBUG)
+
+    experiments = {}
+    if compression_level is not None:
+        experiments["transport_compression_level"] = compression_level
+
+    if compression_algo is not None:
+        experiments["transport_compression_algo"] = compression_algo
+
+    # Enable async transport
+    experiments["transport_async"] = True
+
+    client = make_client(
+        debug=debug,
+        _experiments=experiments,
+        integrations=[AsyncioIntegration()],
+    )
+
+    if use_pickle:
+        client = pickle.loads(pickle.dumps(client))
+
+    # Verify we're using async transport
+    assert isinstance(
+        client.transport, AsyncHttpTransport
+    ), "Expected AsyncHttpTransport"
+
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
+    capture_message("löl")
+
+    if client_flush_method == "close":
+        await client.close_async(timeout=2.0)
+    if client_flush_method == "flush":
+        await client.flush_async(timeout=2.0)
+
+    out, err = capsys.readouterr()
+    assert not err and not out
+    assert capturing_server.captured
+    should_compress = (
+        # default is to compress with brotli if available, gzip otherwise
+        (compression_level is None)
+        or (
+            # setting compression level to 0 means don't compress
+            compression_level
+            > 0
+        )
+    ) and (
+        # if we couldn't resolve to a known algo, we don't compress
+        compression_algo
+        != "<invalid>"
+    )
+
+    assert capturing_server.captured[0].compressed == should_compress
+    # After flush, the worker task is still running, but the end of the test will shut down the event loop
+    # Therefore, we need to explicitly close the client to clean up the worker task
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
+    if client_flush_method == "flush":
+        await client.close_async(timeout=2.0)
 
 
 @pytest.mark.parametrize(
@@ -717,3 +804,138 @@ def test_handle_request_error_basic_coverage(make_client, monkeypatch):
     assert calls[0] == ("on_dropped_event", "connection_error")
     assert calls[1][0:2] == ("record_lost_event", "network_error")
     assert calls[2][0:2] == ("record_lost_event", "network_error")
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_background_thread_capture(
+    capturing_server, make_client, caplog
+):
+    """Test capture_envelope from background threads uses run_coroutine_threadsafe"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+    captured_from_thread = []
+    exception_from_thread = []
+
+    def background_thread_work():
+        try:
+            # This should use run_coroutine_threadsafe path
+            capture_message("from background thread")
+            captured_from_thread.append(True)
+        except Exception as e:
+            exception_from_thread.append(e)
+
+    thread = threading.Thread(target=background_thread_work)
+    thread.start()
+    thread.join()
+    assert not exception_from_thread
+    assert captured_from_thread
+    await client.close_async(timeout=2.0)
+    assert capturing_server.captured
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_event_loop_closed_scenario(
+    capturing_server, make_client, caplog
+):
+    """Test behavior when trying to capture after event loop context ends"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
+    sentry_sdk.get_global_scope().set_client(client)
+    original_loop = client.transport.loop
+
+    with mock.patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+        with mock.patch.object(client.transport.loop, "is_running", return_value=False):
+            with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+                # This should trigger the "no_async_context" path
+                capture_message("after loop closed")
+
+                mock_logger.warning.assert_called_with(
+                    "Async Transport is not running in an event loop."
+                )
+
+    client.transport.loop = original_loop
+    await client.close_async(timeout=2.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_concurrent_requests(
+    capturing_server, make_client, caplog
+):
+    """Test multiple simultaneous envelope submissions"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+
+    num_messages = 15
+
+    async def send_message(i):
+        capture_message(f"concurrent message {i}")
+
+    tasks = [send_message(i) for i in range(num_messages)]
+    await asyncio.gather(*tasks)
+    await client.close_async(timeout=2.0)
+    assert len(capturing_server.captured) == num_messages
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_rate_limiting_with_concurrency(
+    capturing_server, make_client, request
+):
+    """Test async transport rate limiting with concurrent requests"""
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
+
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+    capturing_server.respond_with(
+        code=429, headers={"X-Sentry-Rate-Limits": "60:error:organization"}
+    )
+
+    # Send one request first to trigger rate limiting
+    capture_message("initial message")
+    await asyncio.sleep(0.1)  # Wait for request to execute
+    assert client.transport._check_disabled("error") is True
+    capturing_server.clear_captured()
+
+    async def send_message(i):
+        capture_message(f"message {i}")
+        await asyncio.sleep(0.01)
+
+    await asyncio.gather(*[send_message(i) for i in range(5)])
+    await asyncio.sleep(0.1)
+    # New request should be dropped due to rate limiting
+    assert len(capturing_server.captured) == 0
+    await client.close_async(timeout=2.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_two_way_ssl_authentication():
+    current_dir = os.path.dirname(__file__)
+    cert_file = f"{current_dir}/test.pem"
+    key_file = f"{current_dir}/test.key"
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        cert_file=cert_file,
+        key_file=key_file,
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    options = client.transport._get_pool_options()
+    assert options["ssl_context"] is not None
+
+    await client.close_async()
