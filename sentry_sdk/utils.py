@@ -74,19 +74,23 @@ logger = logging.getLogger("sentry_sdk.errors")
 
 _installed_modules = None
 
-is_sentry_internal_task = contextvars.ContextVar(
+_is_sentry_internal_task = contextvars.ContextVar(
     "is_sentry_internal_task", default=False
 )
+
+
+def is_internal_task():
+    return _is_sentry_internal_task.get()
 
 
 @contextmanager
 def mark_sentry_task_internal():
     """Context manager to mark a task as Sentry internal."""
-    token = is_sentry_internal_task.set(True)
+    token = _is_sentry_internal_task.set(True)
     try:
         yield
     finally:
-        is_sentry_internal_task.reset(token)
+        _is_sentry_internal_task.reset(token)
 
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")

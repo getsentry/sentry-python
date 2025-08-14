@@ -8,7 +8,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     logger,
     reraise,
-    is_sentry_internal_task,
+    is_internal_task,
 )
 from sentry_sdk.transport import AsyncHttpTransport
 
@@ -89,16 +89,18 @@ def patch_asyncio() -> None:
         ) -> asyncio.Future[Any]:
 
             # Check if this is an internal Sentry task
-            is_internal = is_sentry_internal_task.get()
+            is_internal = is_internal_task()
 
             if is_internal:
+                task = None
                 if orig_task_factory:
-                    return orig_task_factory(loop, coro, **kwargs)
-                else:
+                    task = orig_task_factory(loop, coro, **kwargs)
+                if task is None:
                     task = Task(coro, loop=loop, **kwargs)
                     if task._source_traceback:  # type: ignore
                         del task._source_traceback[-1]  # type: ignore
-                    return task
+
+                return task
 
             async def _task_with_sentry_span_creation() -> Any:
                 result = None

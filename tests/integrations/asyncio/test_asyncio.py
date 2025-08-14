@@ -433,57 +433,47 @@ def test_loop_close_flushes_async_transport(sentry_init):
 @minimum_python_38
 @pytest.mark.asyncio
 async def test_internal_tasks_not_wrapped(sentry_init, capture_events):
-    """Test that internal Sentry tasks marked with context manager are not wrapped."""
 
-    # Get the event loop and save original task factory
-    loop = asyncio.get_running_loop()
-    original_task_factory = loop.get_task_factory()
+    sentry_init(integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
 
-    try:
-        sentry_init(integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
-        events = capture_events()
+    # Create a user task that should be wrapped
+    async def user_task():
+        await asyncio.sleep(0.01)
+        return "user_result"
 
-        # Create a user task that should be wrapped
-        async def user_task():
-            await asyncio.sleep(0.01)
-            return "user_result"
+    # Create an internal task that should NOT be wrapped
+    async def internal_task():
+        await asyncio.sleep(0.01)
+        return "internal_result"
 
-        # Create an internal task that should NOT be wrapped
-        async def internal_task():
-            await asyncio.sleep(0.01)
-            return "internal_result"
+    with sentry_sdk.start_transaction(name="test_transaction"):
+        user_task_obj = asyncio.create_task(user_task())
 
-        with sentry_sdk.start_transaction(name="test_transaction"):
-            user_task_obj = asyncio.create_task(user_task())
+        with mark_sentry_task_internal():
+            internal_task_obj = asyncio.create_task(internal_task())
 
-            with mark_sentry_task_internal():
-                internal_task_obj = asyncio.create_task(internal_task())
+        user_result = await user_task_obj
+        internal_result = await internal_task_obj
 
-            user_result = await user_task_obj
-            internal_result = await internal_task_obj
+    assert user_result == "user_result"
+    assert internal_result == "internal_result"
 
-        assert user_result == "user_result"
-        assert internal_result == "internal_result"
+    assert len(events) == 1
+    transaction = events[0]
 
-        assert len(events) == 1
-        transaction = events[0]
+    user_spans = []
+    internal_spans = []
 
-        user_spans = []
-        internal_spans = []
+    for span in transaction.get("spans", []):
+        if "user_task" in span.get("description", ""):
+            user_spans.append(span)
+        elif "internal_task" in span.get("description", ""):
+            internal_spans.append(span)
 
-        for span in transaction.get("spans", []):
-            if "user_task" in span.get("description", ""):
-                user_spans.append(span)
-            elif "internal_task" in span.get("description", ""):
-                internal_spans.append(span)
-
-        assert (
-            len(user_spans) > 0
-        ), f"User task should have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
-        assert (
-            len(internal_spans) == 0
-        ), f"Internal task should NOT have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
-
-    finally:
-        # Restore original task factory to avoid interfering with other tests
-        loop.set_task_factory(original_task_factory)
+    assert (
+        len(user_spans) > 0
+    ), f"User task should have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
+    assert (
+        len(internal_spans) == 0
+    ), f"Internal task should NOT have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
