@@ -38,7 +38,6 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.utils import mark_sentry_task_internal
 
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import (
@@ -214,6 +213,12 @@ class BaseClient:
         return None
 
     def flush(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def close_async(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def flush_async(self, *args: Any, **kwargs: Any) -> None:
         return None
 
     def __enter__(self) -> BaseClient:
@@ -919,14 +924,6 @@ class _Client(BaseClient):
 
         return self.integrations.get(integration_name)
 
-    def _close_transport(self) -> Optional[asyncio.Task[None]]:
-        """Close transport and return cleanup task if any."""
-        if self.transport is not None:
-            cleanup_task = self.transport.kill()  # type: ignore
-            self.transport = None
-            return cleanup_task
-        return None
-
     def _close_components(self) -> None:
         """Kill all client components in the correct order."""
         self.session_flusher.kill()
@@ -935,14 +932,7 @@ class _Client(BaseClient):
         if self.monitor:
             self.monitor.kill()
 
-    async def _close_components_async(self) -> None:
-        """Async version of _close_components that properly awaits transport cleanup."""
-        self._close_components()
-        cleanup_task = self._close_transport()
-        if cleanup_task is not None:
-            await cleanup_task
-
-    def close(  # type: ignore[override]
+    def close(
         self,
         timeout: Optional[float] = None,
         callback: Optional[Callable[[int, float], None]] = None,
@@ -951,40 +941,45 @@ class _Client(BaseClient):
         Close the client and shut down the transport. Arguments have the same
         semantics as :py:meth:`Client.flush`. When using the async transport, close needs to be awaited to block.
         """
-
-        async def _flush_and_close(
-            timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
-        ) -> None:
-
-            await self._flush_async(timeout=timeout, callback=callback)
-            await self._close_components_async()
-
         if self.transport is not None:
             if isinstance(self.transport, AsyncHttpTransport) and hasattr(
                 self.transport, "loop"
             ):
+                logger.debug(
+                    "close() used with AsyncHttpTransport, aborting. Please use close_async() instead."
+                )
+                return
+            self.flush(timeout=timeout, callback=callback)
+            self._close_components()
+            self.transport.kill()
+            self.transport = None
 
-                try:
-                    with mark_sentry_task_internal():
-                        flush_task = self.transport.loop.create_task(
-                            _flush_and_close(timeout, callback)
-                        )
-                except RuntimeError:
-                    # Shutdown the components anyway
-                    self._close_components()
-                    self._close_transport()
-                    logger.warning("Event loop not running, aborting close.")
-                    return None
-                # Enforce flush before shutdown
-                return flush_task
-            else:
-                self.flush(timeout=timeout, callback=callback)
-                self._close_components()
-                self._close_transport()
+    async def close_async(
+        self,
+        timeout: Optional[float] = None,
+        callback: Optional[Callable[[int, float], None]] = None,
+    ) -> None:
+        """
+        Asynchronously close the client and shut down the transport. Arguments have the same
+        semantics as :py:meth:`Client.flush_async`.
+        """
+        if self.transport is not None:
+            if not (
+                isinstance(self.transport, AsyncHttpTransport)
+                and hasattr(self.transport, "loop")
+            ):
+                logger.debug(
+                    "close_async() used with non-async transport, aborting. Please use close() instead."
+                )
+                return
+            await self.flush_async(timeout=timeout, callback=callback)
+            self._close_components()
+            kill_task = self.transport.kill()  # type: ignore
+            if kill_task is not None:
+                await kill_task
+            self.transport = None
 
-        return None
-
-    def flush(  # type: ignore[override]
+    def flush(
         self,
         timeout: Optional[float] = None,
         callback: Optional[Callable[[int, float], None]] = None,
@@ -1000,38 +995,40 @@ class _Client(BaseClient):
             if isinstance(self.transport, AsyncHttpTransport) and hasattr(
                 self.transport, "loop"
             ):
-                try:
-                    with mark_sentry_task_internal():
-                        return self.transport.loop.create_task(
-                            self._flush_async(timeout, callback)
-                        )
-                except RuntimeError:
-                    logger.warning("Event loop not running, aborting flush.")
-                    return None
-            else:
-                self._flush_sync(timeout, callback)
-        return None
+                logger.debug(
+                    "flush() used with AsyncHttpTransport, aborting. Please use flush_async() instead."
+                )
+                return
+            if timeout is None:
+                timeout = self.options["shutdown_timeout"]
+            self._flush_components()
 
-    def _flush_sync(
-        self, timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
-    ) -> None:
-        """Synchronous flush implementation."""
-        if timeout is None:
-            timeout = self.options["shutdown_timeout"]
-
-        self._flush_components()
-        if self.transport is not None:
             self.transport.flush(timeout=timeout, callback=callback)
 
-    async def _flush_async(
-        self, timeout: Optional[float], callback: Optional[Callable[[int, float], None]]
+    async def flush_async(
+        self,
+        timeout: Optional[float] = None,
+        callback: Optional[Callable[[int, float], None]] = None,
     ) -> None:
-        """Asynchronous flush implementation."""
-        if timeout is None:
-            timeout = self.options["shutdown_timeout"]
+        """
+        Asynchronously wait for the current events to be sent.
 
-        self._flush_components()
+        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.
+
+        :param callback: Is invoked with the number of pending events and the configured timeout.
+        """
         if self.transport is not None:
+            if not (
+                isinstance(self.transport, AsyncHttpTransport)
+                and hasattr(self.transport, "loop")
+            ):
+                logger.debug(
+                    "flush_async() used with non-async transport, aborting. Please use flush() instead."
+                )
+                return
+            if timeout is None:
+                timeout = self.options["shutdown_timeout"]
+            self._flush_components()
             flush_task = self.transport.flush(timeout=timeout, callback=callback)  # type: ignore
             if flush_task is not None:
                 await flush_task

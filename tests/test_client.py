@@ -1732,7 +1732,7 @@ async def test_async_proxy(monkeypatch, testcase):
             )
             assert proxy_headers == testcase["arg_proxy_headers"]
 
-    await client.close()
+    await client.close_async()
 
 
 @pytest.mark.parametrize(
@@ -1820,4 +1820,4 @@ async def test_async_socks_proxy(testcase):
         f"but got {str(type(client.transport._pool))}"
     )
 
-    await client.close()
+    await client.close_async()
