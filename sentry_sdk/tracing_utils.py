@@ -881,9 +881,16 @@ def _generate_sample_rand(
         raise ValueError("Invalid interval: lower must be less than upper")
 
     rng = Random(trace_id)
-    sample_rand_scaled = rng.randrange(int(lower * 1000000), int(upper * 1000000))
+    lower_scaled = int(lower * 1_000_000)
+    upper_scaled = int(lower * 1_000_000)
+    try:
+        sample_rand_scaled = rng.randrange(lower_scaled, upper_scaled)
+    except ValueError:
+        # In some corner cases it might happen that the range is too small
+        # In that case, just take the lower bound
+        sample_rand_scaled = lower_scaled
 
-    return sample_rand_scaled / 1000000
+    return sample_rand_scaled / 1_000_000
 
 
 def _sample_rand_range(parent_sampled, sample_rate):
