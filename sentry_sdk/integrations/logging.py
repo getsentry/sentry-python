@@ -279,7 +279,8 @@ class EventHandler(_BaseHandler):
             "params": params,
         }
 
-        event["extra"] = self._extra_from_record(record)
+        event.setdefault("contexts", {})
+        event["contexts"]["logging"] = self._extra_from_record(record)
 
         sentry_sdk.capture_event(event, hint=hint)
 

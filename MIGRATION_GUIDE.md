@@ -25,7 +25,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The default of `traces_sample_rate` changed to `0`. Meaning: Incoming traces will be continued by default. For example, if your frontend sends a `sentry-trace/baggage` headers pair, your SDK will create Spans and send them to Sentry. (The default used to be `None` meaning by default no Spans where created, no matter what headers the frontend sent to your project.) See also: https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate
 - `sentry_sdk.start_span` now only takes keyword arguments.
 - `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
-- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager. 
+- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
 
     - Use it to continue an upstream trace with the `sentry-trace` and `baggage` headers.
 
@@ -65,6 +65,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Redis: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
 - clickhouse-driver: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - Logging: By default, the SDK won't capture Sentry issues anymore when calling `logging.error()`, `logging.critical()` or `logging.exception()`. If you want to preserve the old behavior use `sentry_sdk.init(integrations=[LoggingIntegration(event_level="ERROR")])`.
+- Logging: Logger `extra` is now added to events in `event["contexts"]["logging"]` instead of `event["extra"]`.
 - The integration-specific content of the `sampling_context` argument of `traces_sampler` and `profiles_sampler` now looks different.
 
   - The Celery integration doesn't add the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
