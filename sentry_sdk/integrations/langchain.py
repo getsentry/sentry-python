@@ -723,6 +723,17 @@ def _wrap_agent_executor_invoke(f):
         except Exception:
             agent_name = ""
 
+        agent = getattr(self, "agent", None)
+        runnable = getattr(agent, "runnable", None)
+        runnable_config = getattr(runnable, "config", {})
+        # llm = getattr(self, "llm", None) or getattr(agent, "llm", None)
+        tools = (
+            getattr(self, "tools", None)
+            or getattr(agent, "tools", None)
+            or runnable_config.get("tools")
+            or runnable_config.get("available_tools")
+        )
+
         # Create a span that will act as the parent for all callback-generated spans
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
@@ -735,16 +746,10 @@ def _wrap_agent_executor_invoke(f):
             if agent_name != "":
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
-            model_name = ""
-            if hasattr(self, "agent") and hasattr(self.agent, "llm"):
-                model_name = (
-                    getattr(self.agent.llm, "model_name", None)
-                    or getattr(self.agent.llm, "model", None)
-                    or ""
+            if tools is not None and len(tools) > 0:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools, unpack=False
                 )
-
-            if model_name != "":
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
             result = f(self, *args, **kwargs)
 
@@ -786,6 +791,17 @@ def _wrap_agent_executor_stream(f):
         except Exception:
             agent_name = ""
 
+        agent = getattr(self, "agent", None)
+        runnable = getattr(agent, "runnable", None)
+        runnable_config = getattr(runnable, "config", {})
+        # llm = getattr(self, "llm", None) or getattr(agent, "llm", None)
+        tools = (
+            getattr(self, "tools", None)
+            or getattr(agent, "tools", None)
+            or runnable_config.get("tools")
+            or runnable_config.get("available_tools")
+        )
+
         # Create a span that will act as the parent for all callback-generated spans
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
@@ -800,6 +816,11 @@ def _wrap_agent_executor_stream(f):
         if agent_name != "":
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
+        if tools is not None and len(tools) > 0:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools, unpack=False
+            )
+
         input = args[0].get("input") if len(args) > 1 else None
         if input is not None:
             set_data_normalized(
@@ -809,17 +830,6 @@ def _wrap_agent_executor_stream(f):
                     input,
                 ],
             )
-
-        model_name = ""
-        if hasattr(self, "agent") and hasattr(self.agent, "llm"):
-            model_name = (
-                getattr(self.agent.llm, "model_name", None)
-                or getattr(self.agent.llm, "model", None)
-                or ""
-            )
-
-        if model_name != "":
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
         result = f(self, *args, **kwargs)
         old_iterator = result
@@ -839,6 +849,10 @@ def _wrap_agent_executor_stream(f):
             # type: () -> AsyncIterator[Any]
             async for event in old_iterator:
                 yield event
+
+            output = event.get("output")
+            if output is not None:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
 
