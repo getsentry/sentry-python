@@ -590,9 +590,115 @@ class BaseHttpTransport(HttpTransportCore):
             self._worker.flush(timeout, callback)
 
 
+class HttpTransport(BaseHttpTransport):
+    if TYPE_CHECKING:
+        _pool: Union[PoolManager, ProxyManager]
+
+    def _get_pool_options(self: Self) -> Dict[str, Any]:
+
+        num_pools = self.options.get("_experiments", {}).get("transport_num_pools")
+        options = {
+            "num_pools": 2 if num_pools is None else int(num_pools),
+            "cert_reqs": "CERT_REQUIRED",
+            "timeout": urllib3.Timeout(total=self.TIMEOUT),
+        }
+
+        socket_options: Optional[List[Tuple[int, int, int | bytes]]] = None
+
+        if self.options["socket_options"] is not None:
+            socket_options = self.options["socket_options"]
+
+        if self.options["keep_alive"]:
+            if socket_options is None:
+                socket_options = []
+
+            used_options = {(o[0], o[1]) for o in socket_options}
+            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+                if (default_option[0], default_option[1]) not in used_options:
+                    socket_options.append(default_option)
+
+        if socket_options is not None:
+            options["socket_options"] = socket_options
+
+        options["ca_certs"] = (
+            self.options["ca_certs"]  # User-provided bundle from the SDK init
+            or os.environ.get("SSL_CERT_FILE")
+            or os.environ.get("REQUESTS_CA_BUNDLE")
+            or certifi.where()
+        )
+
+        options["cert_file"] = self.options["cert_file"] or os.environ.get(
+            "CLIENT_CERT_FILE"
+        )
+        options["key_file"] = self.options["key_file"] or os.environ.get(
+            "CLIENT_KEY_FILE"
+        )
+
+        return options
+
+    def _make_pool(self: Self) -> Union[PoolManager, ProxyManager]:
+        if self.parsed_dsn is None:
+            raise ValueError("Cannot create HTTP-based transport without valid DSN")
+
+        proxy = None
+        no_proxy = self._in_no_proxy(self.parsed_dsn)
+
+        # try HTTPS first
+        https_proxy = self.options["https_proxy"]
+        if self.parsed_dsn.scheme == "https" and (https_proxy != ""):
+            proxy = https_proxy or (not no_proxy and getproxies().get("https"))
+
+        # maybe fallback to HTTP proxy
+        http_proxy = self.options["http_proxy"]
+        if not proxy and (http_proxy != ""):
+            proxy = http_proxy or (not no_proxy and getproxies().get("http"))
+
+        opts = self._get_pool_options()
+
+        if proxy:
+            proxy_headers = self.options["proxy_headers"]
+            if proxy_headers:
+                opts["proxy_headers"] = proxy_headers
+
+            if proxy.startswith("socks"):
+                use_socks_proxy = True
+                try:
+                    # Check if PySocks dependency is available
+                    from urllib3.contrib.socks import SOCKSProxyManager
+                except ImportError:
+                    use_socks_proxy = False
+                    logger.warning(
+                        "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
+                        proxy,
+                    )
+
+                if use_socks_proxy:
+                    return SOCKSProxyManager(proxy, **opts)
+                else:
+                    return urllib3.PoolManager(**opts)
+            else:
+                return urllib3.ProxyManager(proxy, **opts)
+        else:
+            return urllib3.PoolManager(**opts)
+
+    def _request(
+        self: Self,
+        method: str,
+        endpoint_type: EndpointType,
+        body: Any,
+        headers: Mapping[str, str],
+    ) -> urllib3.BaseHTTPResponse:
+        return self._pool.request(
+            method,
+            self._auth.get_api_url(endpoint_type),
+            body=body,
+            headers=headers,
+        )
+
+
 if not ASYNC_TRANSPORT_ENABLED:
     # Sorry, no AsyncHttpTransport for you
-    AsyncHttpTransport = BaseHttpTransport
+    AsyncHttpTransport = HttpTransport
 
 else:
 
@@ -807,112 +913,6 @@ else:
                 return None
 
 
-class HttpTransport(BaseHttpTransport):
-    if TYPE_CHECKING:
-        _pool: Union[PoolManager, ProxyManager]
-
-    def _get_pool_options(self: Self) -> Dict[str, Any]:
-
-        num_pools = self.options.get("_experiments", {}).get("transport_num_pools")
-        options = {
-            "num_pools": 2 if num_pools is None else int(num_pools),
-            "cert_reqs": "CERT_REQUIRED",
-            "timeout": urllib3.Timeout(total=self.TIMEOUT),
-        }
-
-        socket_options: Optional[List[Tuple[int, int, int | bytes]]] = None
-
-        if self.options["socket_options"] is not None:
-            socket_options = self.options["socket_options"]
-
-        if self.options["keep_alive"]:
-            if socket_options is None:
-                socket_options = []
-
-            used_options = {(o[0], o[1]) for o in socket_options}
-            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
-                if (default_option[0], default_option[1]) not in used_options:
-                    socket_options.append(default_option)
-
-        if socket_options is not None:
-            options["socket_options"] = socket_options
-
-        options["ca_certs"] = (
-            self.options["ca_certs"]  # User-provided bundle from the SDK init
-            or os.environ.get("SSL_CERT_FILE")
-            or os.environ.get("REQUESTS_CA_BUNDLE")
-            or certifi.where()
-        )
-
-        options["cert_file"] = self.options["cert_file"] or os.environ.get(
-            "CLIENT_CERT_FILE"
-        )
-        options["key_file"] = self.options["key_file"] or os.environ.get(
-            "CLIENT_KEY_FILE"
-        )
-
-        return options
-
-    def _make_pool(self: Self) -> Union[PoolManager, ProxyManager]:
-        if self.parsed_dsn is None:
-            raise ValueError("Cannot create HTTP-based transport without valid DSN")
-
-        proxy = None
-        no_proxy = self._in_no_proxy(self.parsed_dsn)
-
-        # try HTTPS first
-        https_proxy = self.options["https_proxy"]
-        if self.parsed_dsn.scheme == "https" and (https_proxy != ""):
-            proxy = https_proxy or (not no_proxy and getproxies().get("https"))
-
-        # maybe fallback to HTTP proxy
-        http_proxy = self.options["http_proxy"]
-        if not proxy and (http_proxy != ""):
-            proxy = http_proxy or (not no_proxy and getproxies().get("http"))
-
-        opts = self._get_pool_options()
-
-        if proxy:
-            proxy_headers = self.options["proxy_headers"]
-            if proxy_headers:
-                opts["proxy_headers"] = proxy_headers
-
-            if proxy.startswith("socks"):
-                use_socks_proxy = True
-                try:
-                    # Check if PySocks dependency is available
-                    from urllib3.contrib.socks import SOCKSProxyManager
-                except ImportError:
-                    use_socks_proxy = False
-                    logger.warning(
-                        "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
-                        proxy,
-                    )
-
-                if use_socks_proxy:
-                    return SOCKSProxyManager(proxy, **opts)
-                else:
-                    return urllib3.PoolManager(**opts)
-            else:
-                return urllib3.ProxyManager(proxy, **opts)
-        else:
-            return urllib3.PoolManager(**opts)
-
-    def _request(
-        self: Self,
-        method: str,
-        endpoint_type: EndpointType,
-        body: Any,
-        headers: Mapping[str, str],
-    ) -> urllib3.BaseHTTPResponse:
-        return self._pool.request(
-            method,
-            self._auth.get_api_url(endpoint_type),
-            body=body,
-            headers=headers,
-        )
-
-
 if not HTTP2_ENABLED:
     # Sorry, no Http2Transport for you
     class Http2Transport(HttpTransport):
@@ -1053,6 +1053,11 @@ def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
 
     use_http2_transport = options.get("_experiments", {}).get("transport_http2", False)
     use_async_transport = options.get("_experiments", {}).get("transport_async", False)
+    async_integration = any(
+        integration.__class__.__name__ == "AsyncioIntegration"
+        for integration in options.get("integrations") or []
+    )
+
     # By default, we use the http transport class
     transport_cls: Type[Transport] = (
         Http2Transport if use_http2_transport else HttpTransport
@@ -1060,7 +1065,12 @@ def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
     if use_async_transport and ASYNC_TRANSPORT_ENABLED:
         try:
             asyncio.get_running_loop()
-            transport_cls = AsyncHttpTransport
+            if async_integration:
+                transport_cls = AsyncHttpTransport
+            else:
+                logger.warning(
+                    "You tried to use AsyncHttpTransport but the AsyncioIntegration is not enabled. Falling back to sync transport."
+                )
         except RuntimeError:
             # No event loop running, fall back to sync transport
             logger.warning("No event loop running, falling back to sync transport.")
