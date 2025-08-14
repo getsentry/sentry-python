@@ -778,7 +778,11 @@ def _wrap_agent_executor_stream(f):
             return f(self, *args, **kwargs)
 
         try:
-            agent_name = self.agent.runnable.config.get("run_name")
+            agent_name = None
+            if len(args) > 1:
+                agent_name = args[1].get("run_name")
+            if agent_name is None:
+                agent_name = self.agent.runnable.config.get("run_name")
         except Exception:
             agent_name = ""
 
@@ -792,6 +796,9 @@ def _wrap_agent_executor_stream(f):
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
+        if agent_name != "":
+            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
         input = args[0].get("input") if len(args) > 1 else None
         if input is not None:
