@@ -4,11 +4,11 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name, record_token_usage
-from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
-from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
 from typing import TYPE_CHECKING
@@ -16,28 +16,28 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import (
         Any,
-        List,
+        AsyncIterator,
         Callable,
         Dict,
-        Union,
-        Optional,
-        AsyncIterator,
         Iterator,
+        List,
+        Optional,
+        Union,
     )
     from uuid import UUID
 
 
 try:
-    from langchain_core.messages import BaseMessage
-    from langchain_core.outputs import LLMResult
+    from langchain.agents import AgentExecutor
+    from langchain_core.agents import AgentAction, AgentFinish
     from langchain_core.callbacks import (
-        manager,
         BaseCallbackHandler,
         BaseCallbackManager,
         Callbacks,
+        manager,
     )
-    from langchain_core.agents import AgentAction, AgentFinish
-    from langchain.agents import AgentExecutor
+    from langchain_core.messages import BaseMessage
+    from langchain_core.outputs import LLMResult
 
 except ImportError:
     raise DidNotEnable("langchain not installed")
@@ -764,7 +764,7 @@ def _wrap_agent_executor_invoke(f):
             result = f(self, *args, **kwargs)
 
             input = result.get("input")
-            if input is not None:
+            if input is not None and should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -774,7 +774,11 @@ def _wrap_agent_executor_invoke(f):
                 )
 
             output = result.get("output")
-            if output is not None:
+            if (
+                output is not None
+                and should_send_default_pii()
+                and self.include_prompts
+            ):
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             return result
@@ -813,7 +817,7 @@ def _wrap_agent_executor_stream(f):
             )
 
         input = args[0].get("input") if len(args) > 1 else None
-        if input is not None:
+        if input is not None and should_send_default_pii() and self.include_prompts:
             set_data_normalized(
                 span,
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -833,7 +837,11 @@ def _wrap_agent_executor_stream(f):
                 yield event
 
             output = event.get("output")
-            if output is not None:
+            if (
+                output is not None
+                and should_send_default_pii()
+                and self.include_prompts
+            ):
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
