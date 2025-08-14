@@ -3,12 +3,13 @@ from collections import OrderedDict
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.ai.monitoring import set_ai_pipeline_name, record_token_usage
+from sentry_sdk.ai.monitoring import set_ai_pipeline_name
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
+from sentry_sdk.tracing_utils import _get_value
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
 from typing import TYPE_CHECKING
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 
 try:
     from langchain.agents import AgentExecutor
-    from langchain_core.agents import AgentAction, AgentFinish
+    from langchain_core.agents import AgentFinish
     from langchain_core.callbacks import (
         BaseCallbackHandler,
         BaseCallbackManager,
@@ -127,102 +128,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         parsed = {"role": message.type, "content": message.content}
         parsed.update(message.additional_kwargs)
         return parsed
-
-    def _extract_token_usage(self, token_usage):
-        # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
-        """Extract input, output, and total tokens from various token usage formats."""
-        if not token_usage:
-            return None, None, None
-
-        input_tokens = None
-        output_tokens = None
-        total_tokens = None
-
-        if hasattr(token_usage, "get"):
-            input_tokens = token_usage.get("prompt_tokens") or token_usage.get(
-                "input_tokens"
-            )
-            output_tokens = token_usage.get("completion_tokens") or token_usage.get(
-                "output_tokens"
-            )
-            total_tokens = token_usage.get("total_tokens")
-        else:
-            input_tokens = getattr(token_usage, "prompt_tokens", None) or getattr(
-                token_usage, "input_tokens", None
-            )
-            output_tokens = getattr(token_usage, "completion_tokens", None) or getattr(
-                token_usage, "output_tokens", None
-            )
-            total_tokens = getattr(token_usage, "total_tokens", None)
-
-        # LangChain's OpenAI callback uses these specific field names
-        if input_tokens is None and hasattr(token_usage, "get"):
-            input_tokens = token_usage.get("prompt_tokens") or token_usage.get(
-                "input_tokens"
-            )
-        if output_tokens is None and hasattr(token_usage, "get"):
-            output_tokens = token_usage.get("completion_tokens") or token_usage.get(
-                "output_tokens"
-            )
-        if total_tokens is None and hasattr(token_usage, "get"):
-            total_tokens = token_usage.get("total_tokens")
-
-        return input_tokens, output_tokens, total_tokens
-
-    def _extract_token_usage_from_generations(self, generations):
-        # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
-        """Extract token usage from response.generations structure."""
-        if not generations:
-            return None, None, None
-
-        total_input = 0
-        total_output = 0
-        total_total = 0
-        found = False
-
-        for gen_list in generations:
-            for gen in gen_list:
-                usage_metadata = None
-                if (
-                    hasattr(gen, "message")
-                    and getattr(gen, "message", None) is not None
-                    and hasattr(gen.message, "usage_metadata")
-                ):
-                    usage_metadata = getattr(gen.message, "usage_metadata", None)
-                if usage_metadata is None and hasattr(gen, "usage_metadata"):
-                    usage_metadata = getattr(gen, "usage_metadata", None)
-                if usage_metadata:
-                    input_tokens, output_tokens, total_tokens = (
-                        self._extract_token_usage_from_response(usage_metadata)
-                    )
-                    if any([input_tokens, output_tokens, total_tokens]):
-                        found = True
-                        total_input += int(input_tokens)
-                        total_output += int(output_tokens)
-                        total_total += int(total_tokens)
-
-        if not found:
-            return None, None, None
-
-        return (
-            total_input if total_input > 0 else None,
-            total_output if total_output > 0 else None,
-            total_total if total_total > 0 else None,
-        )
-
-    def _extract_token_usage_from_response(self, response):
-        # type: (Any) -> tuple[int, int, int]
-        if response:
-            if hasattr(response, "get"):
-                input_tokens = response.get("input_tokens", 0)
-                output_tokens = response.get("output_tokens", 0)
-                total_tokens = response.get("total_tokens", 0)
-            else:
-                input_tokens = getattr(response, "input_tokens", 0)
-                output_tokens = getattr(response, "output_tokens", 0)
-                total_tokens = getattr(response, "total_tokens", 0)
-
-        return input_tokens, output_tokens, total_tokens
 
     def _create_span(self, run_id, parent_id, **kwargs):
         # type: (SentryLangchainCallback, UUID, Optional[Any], Any) -> WatchedSpan
@@ -369,25 +274,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span_data = self.span_map[run_id]
             span = span_data.span
 
-            token_usage = None
-
-            # Try multiple paths to extract token usage, prioritizing streaming-aware approaches
-            if response.llm_output and "token_usage" in response.llm_output:
-                token_usage = response.llm_output["token_usage"]
-            elif response.llm_output and hasattr(response.llm_output, "token_usage"):
-                token_usage = response.llm_output.token_usage
-            elif hasattr(response, "usage"):
-                token_usage = response.usage
-            elif hasattr(response, "token_usage"):
-                token_usage = response.token_usage
-            # Check for usage_metadata in llm_output (common in streaming responses)
-            elif response.llm_output and "usage_metadata" in response.llm_output:
-                token_usage = response.llm_output["usage_metadata"]
-            elif response.llm_output and hasattr(response.llm_output, "usage_metadata"):
-                token_usage = response.llm_output.usage_metadata
-            elif hasattr(response, "usage_metadata"):
-                token_usage = response.usage_metadata
-
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span,
@@ -395,27 +281,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     [[x.text for x in list_] for list_ in response.generations],
                 )
 
-            if token_usage:
-                input_tokens, output_tokens, total_tokens = self._extract_token_usage(
-                    token_usage
-                )
-            else:
-                input_tokens, output_tokens, total_tokens = (
-                    self._extract_token_usage_from_generations(response.generations)
-                )
-
-            if (
-                input_tokens is not None
-                or output_tokens is not None
-                or total_tokens is not None
-            ):
-                record_token_usage(
-                    span,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    total_tokens=total_tokens,
-                )
-
+            _record_token_usage(span, response)
             self._exit_span(span_data, run_id)
 
     def on_llm_end(self, response, *, run_id, **kwargs):
@@ -469,40 +335,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     [[x.text for x in list_] for list_ in response.generations],
                 )
 
-            token_usage = None
-            if response.llm_output and "token_usage" in response.llm_output:
-                token_usage = response.llm_output["token_usage"]
-
-            elif response.llm_output and hasattr(response.llm_output, "token_usage"):
-                token_usage = response.llm_output.token_usage
-
-            elif hasattr(response, "usage"):
-                token_usage = response.usage
-
-            elif hasattr(response, "token_usage"):
-                token_usage = response.token_usage
-
-            if token_usage:
-                input_tokens, output_tokens, total_tokens = self._extract_token_usage(
-                    token_usage
-                )
-            else:
-                input_tokens, output_tokens, total_tokens = (
-                    self._extract_token_usage_from_generations(response.generations)
-                )
-
-            if (
-                input_tokens is not None
-                or output_tokens is not None
-                or total_tokens is not None
-            ):
-                record_token_usage(
-                    span,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    total_tokens=total_tokens,
-                )
-
+            _record_token_usage(span, response)
             self._exit_span(span_data, run_id)
 
     def on_llm_error(self, error, *, run_id, **kwargs):
@@ -514,15 +347,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when Chat Model errors."""
         self._handle_error(run_id, error)
-
-    def on_agent_action(self, action, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, AgentAction, UUID, Any) -> Any
-        with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
-                return
-
-            span_data = self.span_map[run_id]
-            self._exit_span(span_data, run_id)
 
     def on_agent_finish(self, finish, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, AgentFinish, UUID, Any) -> Any
@@ -593,6 +417,98 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when tool errors."""
         self._handle_error(run_id, error)
+
+
+def _extract_tokens(token_usage):
+    # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
+    if not token_usage:
+        return None, None, None
+
+    input_tokens = _get_value(token_usage, "prompt_tokens") or _get_value(
+        token_usage, "input_tokens"
+    )
+    output_tokens = _get_value(token_usage, "completion_tokens") or _get_value(
+        token_usage, "output_tokens"
+    )
+    total_tokens = _get_value(token_usage, "total_tokens")
+
+    return input_tokens, output_tokens, total_tokens
+
+
+def _extract_tokens_from_generations(generations):
+    # type: (Any) -> tuple[Optional[int], Optional[int], Optional[int]]
+    """Extract token usage from response.generations structure."""
+    if not generations:
+        return None, None, None
+
+    total_input = 0
+    total_output = 0
+    total_total = 0
+
+    for gen_list in generations:
+        for gen in gen_list:
+            token_usage = _get_token_usage(gen)
+            input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
+            total_input += input_tokens if input_tokens is not None else 0
+            total_output += output_tokens if output_tokens is not None else 0
+            total_total += total_tokens if total_tokens is not None else 0
+
+    return (
+        total_input if total_input > 0 else None,
+        total_output if total_output > 0 else None,
+        total_total if total_total > 0 else None,
+    )
+
+
+def _get_token_usage(obj):
+    # type: (Any) -> Optional[Dict[str, Any]]
+    """
+    Check multiple paths to extract token usage from different objects.
+    """
+    possible_names = ("usage", "token_usage", "usage_metadata")
+
+    message = _get_value(obj, "message")
+    if message is not None:
+        for name in possible_names:
+            usage = _get_value(message, name)
+            if usage is not None:
+                return usage
+
+    llm_output = _get_value(obj, "llm_output")
+    if llm_output is not None:
+        for name in possible_names:
+            usage = _get_value(llm_output, name)
+            if usage is not None:
+                return usage
+
+    # check for usage in the object itself
+    for name in possible_names:
+        usage = _get_value(obj, name)
+        if usage is not None:
+            return usage
+
+    # no usage found anywhere
+    return None
+
+
+def _record_token_usage(span, response):
+    # type: (Span, Any) -> None
+    token_usage = _get_token_usage(response)
+    if token_usage:
+        input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
+    else:
+        input_tokens, output_tokens, total_tokens = _extract_tokens_from_generations(
+            response.generations
+        )
+
+    if input_tokens is not None:
+        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+
+    if output_tokens is not None:
+        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    if total_tokens is not None:
+        span.set_data(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
 
 
 def _get_request_data(obj, args, kwargs):
@@ -796,7 +712,11 @@ def _wrap_agent_executor_stream(f):
             )
 
         input = args[0].get("input") if len(args) > 1 else None
-        if input is not None and should_send_default_pii() and self.include_prompts:
+        if (
+            input is not None
+            and should_send_default_pii()
+            and integration.include_prompts
+        ):
             set_data_normalized(
                 span,
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -819,7 +739,7 @@ def _wrap_agent_executor_stream(f):
             if (
                 output is not None
                 and should_send_default_pii()
-                and self.include_prompts
+                and integration.include_prompts
             ):
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
@@ -831,7 +751,11 @@ def _wrap_agent_executor_stream(f):
                 yield event
 
             output = event.get("output")
-            if output is not None:
+            if (
+                output is not None
+                and should_send_default_pii()
+                and integration.include_prompts
+            ):
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
