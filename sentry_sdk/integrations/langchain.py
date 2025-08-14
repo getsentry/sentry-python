@@ -620,6 +620,34 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         self._handle_error(run_id, error)
 
 
+def _get_request_data(obj, args, kwargs):
+    # type: (Any, Any, Any) -> tuple[Optional[str], Optional[List[Any]]]
+    """
+    Get the agent name and available tools for the agent.
+    """
+    agent = getattr(obj, "agent", None)
+    runnable = getattr(agent, "runnable", None)
+    runnable_config = getattr(runnable, "config", {})
+    tools = (
+        getattr(obj, "tools", None)
+        or getattr(agent, "tools", None)
+        or runnable_config.get("tools")
+        or runnable_config.get("available_tools")
+    )
+    tools = tools if tools and len(tools) > 0 else None
+
+    try:
+        agent_name = None
+        if len(args) > 1:
+            agent_name = args[1].get("run_name")
+        if agent_name is None:
+            agent_name = runnable_config.get("run_name")
+    except Exception:
+        pass
+
+    return (agent_name, tools)
+
+
 def _wrap_configure(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
 
@@ -702,34 +730,6 @@ def _wrap_configure(f):
         )
 
     return new_configure
-
-
-def _get_request_data(obj, args, kwargs):
-    # type: (Any, Any, Any) -> tuple[Optional[str], Optional[List[Any]]]
-    """
-    Get the agent name and available tools for the agent.
-    """
-    agent = getattr(obj, "agent", None)
-    runnable = getattr(agent, "runnable", None)
-    runnable_config = getattr(runnable, "config", {})
-    tools = (
-        getattr(obj, "tools", None)
-        or getattr(agent, "tools", None)
-        or runnable_config.get("tools")
-        or runnable_config.get("available_tools")
-    )
-    tools = tools if tools and len(tools) > 0 else None
-
-    try:
-        agent_name = None
-        if len(args) > 1:
-            agent_name = args[1].get("run_name")
-        if agent_name is None:
-            agent_name = runnable_config.get("run_name")
-    except Exception:
-        pass
-
-    return (agent_name, tools)
 
 
 def _wrap_agent_executor_invoke(f):
