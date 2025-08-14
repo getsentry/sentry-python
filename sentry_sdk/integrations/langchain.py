@@ -138,11 +138,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         if watched_span is None:
             watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
 
-        if kwargs.get("op", "").startswith("ai.pipeline."):
-            if kwargs.get("name"):
-                set_ai_pipeline_name(kwargs.get("name"))
-            watched_span.is_pipeline = True
-
         watched_span.span.__enter__()
         self.span_map[run_id] = watched_span
         self.gc_span_map()
@@ -184,8 +179,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
 
             watched_span = self._create_span(
-                run_id=run_id,
-                parent_id=parent_run_id,
+                run_id,
+                parent_run_id,
                 op=OP.GEN_AI_PIPELINE,
                 name=kwargs.get("name") or "Langchain LLM call",
                 origin=LangchainIntegration.origin,
@@ -229,8 +224,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
 
             watched_span = self._create_span(
-                run_id=run_id,
-                parent_id=kwargs.get("parent_run_id"),
+                run_id,
+                kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_CHAT,
                 name=f"chat {model}".strip(),
                 origin=LangchainIntegration.origin,
@@ -373,8 +368,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             tool_name = serialized.get("name") or kwargs.get("name") or ""
 
             watched_span = self._create_span(
-                run_id=run_id,
-                parent_id=kwargs.get("parent_run_id"),
+                run_id,
+                kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_EXECUTE_TOOL,
                 name=f"execute_tool {tool_name}".strip(),
                 origin=LangchainIntegration.origin,
