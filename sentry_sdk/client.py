@@ -3,7 +3,6 @@ import os
 import uuid
 import random
 import socket
-import asyncio
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -923,14 +922,6 @@ class _Client(BaseClient):
             raise ValueError("Integration has no name")
 
         return self.integrations.get(integration_name)
-
-    def _close_transport(self) -> Optional[asyncio.Task[None]]:
-        """Close transport and return cleanup task if any."""
-        if self.transport is not None:
-            cleanup_task = self.transport.kill()  # type: ignore
-            self.transport = None
-            return cleanup_task
-        return None
 
     def _close_components(self) -> None:
         """Kill all client components in the correct order."""
