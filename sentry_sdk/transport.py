@@ -7,7 +7,6 @@ import socket
 import ssl
 import time
 import asyncio
-
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from urllib.request import getproxies
@@ -602,7 +601,6 @@ else:
             super().__init__(options)
             # Requires event loop at init time
             self.loop = asyncio.get_running_loop()
-            self.background_tasks: set[asyncio.Task[None]] = set()
 
         def _create_worker(self: Self, options: dict[str, Any]) -> Worker:
             return AsyncWorker(queue_size=options["transport_queue_size"])
@@ -800,9 +798,6 @@ else:
 
             logger.debug("Killing HTTP transport")
             self._worker.kill()
-            for task in self.background_tasks:
-                task.cancel()
-            self.background_tasks.clear()
             try:
                 # Return the pool cleanup task so caller can await it if needed
                 with mark_sentry_task_internal():
