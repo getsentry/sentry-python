@@ -33,6 +33,7 @@ from sentry_sdk.transport import (
     AsyncHttpTransport,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 
 
 server = None
@@ -183,6 +184,7 @@ async def test_transport_works_async(
     client = make_client(
         debug=debug,
         _experiments=experiments,
+        integrations=[AsyncioIntegration()],
     )
 
     if use_pickle:
@@ -812,7 +814,7 @@ async def test_async_transport_background_thread_capture(
     """Test capture_envelope from background threads uses run_coroutine_threadsafe"""
     caplog.set_level(logging.DEBUG)
     experiments = {"transport_async": True}
-    client = make_client(_experiments=experiments)
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
     assert isinstance(client.transport, AsyncHttpTransport)
     sentry_sdk.get_global_scope().set_client(client)
     captured_from_thread = []
@@ -843,7 +845,7 @@ async def test_async_transport_event_loop_closed_scenario(
     """Test behavior when trying to capture after event loop context ends"""
     caplog.set_level(logging.DEBUG)
     experiments = {"transport_async": True}
-    client = make_client(_experiments=experiments)
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
     sentry_sdk.get_global_scope().set_client(client)
     original_loop = client.transport.loop
 
@@ -869,7 +871,7 @@ async def test_async_transport_concurrent_requests(
     """Test multiple simultaneous envelope submissions"""
     caplog.set_level(logging.DEBUG)
     experiments = {"transport_async": True}
-    client = make_client(_experiments=experiments)
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
     assert isinstance(client.transport, AsyncHttpTransport)
     sentry_sdk.get_global_scope().set_client(client)
 
@@ -891,7 +893,7 @@ async def test_async_transport_rate_limiting_with_concurrency(
 ):
     """Test async transport rate limiting with concurrent requests"""
     experiments = {"transport_async": True}
-    client = make_client(_experiments=experiments)
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
 
     assert isinstance(client.transport, AsyncHttpTransport)
     sentry_sdk.get_global_scope().set_client(client)
@@ -929,6 +931,7 @@ async def test_async_two_way_ssl_authentication():
         cert_file=cert_file,
         key_file=key_file,
         _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
     )
     assert isinstance(client.transport, AsyncHttpTransport)
 
