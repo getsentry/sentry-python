@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 
 try:
-    from langchain_core.messages import BaseMessage, MessageStreamEvent
+    from langchain_core.messages import BaseMessage
     from langchain_core.outputs import LLMResult
     from langchain_core.callbacks import (
         manager,
@@ -714,20 +714,31 @@ def _wrap_agent_executor_invoke(f):
         if integration is None:
             return f(self, *args, **kwargs)
 
+        try:
+            agent_name = self.agent.runnable.config.get("run_name")
+        except Exception:
+            agent_name = ""
+
         # Create a span that will act as the parent for all callback-generated spans
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name="AgentExecutor.invoke",
+            name=f"invoke_agent {agent_name}".strip(),
             origin=LangchainIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            if agent_name != "":
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
+            model_name = ""
             if hasattr(self, "agent") and hasattr(self.agent, "llm"):
-                model_name = getattr(self.agent.llm, "model_name", None) or getattr(
-                    self.agent.llm, "model", None
+                model_name = (
+                    getattr(self.agent.llm, "model_name", None)
+                    or getattr(self.agent.llm, "model", None)
+                    or ""
                 )
-                if model_name:
-                    span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
+            if model_name != "":
+                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
             return f(self, *args, **kwargs)
 
@@ -744,35 +755,44 @@ def _wrap_agent_executor_stream(f):
         if integration is None:
             return f(self, *args, **kwargs)
 
+        try:
+            agent_name = self.agent.runnable.config.get("run_name")
+        except Exception:
+            agent_name = ""
+
         # Create a span that will act as the parent for all callback-generated spans
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name="AgentExecutor.stream",
+            name=f"invoke_agent {agent_name}".strip(),
             origin=LangchainIntegration.origin,
         )
         span.__enter__()
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
+        model_name = ""
         if hasattr(self, "agent") and hasattr(self.agent, "llm"):
-            model_name = getattr(self.agent.llm, "model_name", None) or getattr(
-                self.agent.llm, "model", None
+            model_name = (
+                getattr(self.agent.llm, "model_name", None)
+                or getattr(self.agent.llm, "model", None)
+                or ""
             )
-            if model_name:
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
+        if model_name != "":
+            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
         result = f(self, *args, **kwargs)
         old_iterator = result
 
         def new_iterator():
-            # type: () -> Iterator[MessageStreamEvent]
+            # type: () -> Iterator[Any]
             for event in old_iterator:
                 # import ipdb; ipdb.set_trace()
                 yield event
             span.__exit__(None, None, None)
 
         async def new_iterator_async():
-            # type: () -> AsyncIterator[MessageStreamEvent]
+            # type: () -> AsyncIterator[Any]
             async for event in old_iterator:
                 yield event
 
