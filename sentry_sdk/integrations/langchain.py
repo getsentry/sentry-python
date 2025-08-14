@@ -418,11 +418,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             self._exit_span(span_data, run_id)
 
-    def on_llm_new_token(self, token, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, str, UUID, Any) -> Any
-        """Run on new LLM token. Only available when streaming is enabled."""
-        pass
-
     def on_llm_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
         """Run when LLM ends running."""
@@ -518,26 +513,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_chat_model_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when Chat Model errors."""
-        self._handle_error(run_id, error)
-
-    def on_chain_start(self, serialized, inputs, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, Dict[str, Any], Dict[str, Any], UUID, Any) -> Any
-        """Run when chain starts running."""
-        pass
-
-    def on_chain_end(self, outputs, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, Dict[str, Any], UUID, Any) -> Any
-        """Run when chain ends running."""
-        with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
-                return
-
-            span_data = self.span_map[run_id]
-            self._exit_span(span_data, run_id)
-
-    def on_chain_error(self, error, *, run_id, **kwargs):
-        # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
-        """Run when chain errors."""
         self._handle_error(run_id, error)
 
     def on_agent_action(self, action, *, run_id, **kwargs):
@@ -764,7 +739,11 @@ def _wrap_agent_executor_invoke(f):
             result = f(self, *args, **kwargs)
 
             input = result.get("input")
-            if input is not None and should_send_default_pii() and self.include_prompts:
+            if (
+                input is not None
+                and should_send_default_pii()
+                and integration.include_prompts
+            ):
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -777,7 +756,7 @@ def _wrap_agent_executor_invoke(f):
             if (
                 output is not None
                 and should_send_default_pii()
-                and self.include_prompts
+                and integration.include_prompts
             ):
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
