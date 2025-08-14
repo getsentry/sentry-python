@@ -30,6 +30,11 @@ from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
 )
 
+# Global cache for database configurations to avoid connection pool interference
+_cached_db_configs = {}  # type: Dict[str, Dict[str, Any]]
+_cache_initialized = False  # type: bool
+_cache_lock = threading.Lock()
+
 try:
     from django import VERSION as DJANGO_VERSION
     from django.conf import settings as django_settings
@@ -155,9 +160,9 @@ class DjangoIntegration(Integration):
     def setup_once():
         # type: () -> None
         _check_minimum_version(DjangoIntegration, DJANGO_VERSION)
+        _cache_database_configurations()
 
         install_sql_hook()
-        # Patch in our custom middleware.
 
         # logs an error for every 500
         ignore_logger("django.server")
@@ -614,6 +619,54 @@ def _set_user_info(request, event):
         pass
 
 
+def _cache_database_configurations():
+    # type: () -> None
+    """
+    Cache database configurations from Django settings to avoid connection pool interference.
+    """
+    global _cached_db_configs, _cache_initialized
+
+    if _cache_initialized:
+        return
+
+    with _cache_lock:
+        if _cache_initialized:
+            return
+
+        try:
+            from django.conf import settings
+            from django.db import connections
+
+            for alias, db_config in settings.DATABASES.items():
+                if not db_config:  # Skip empty default configs
+                    continue
+
+                with capture_internal_exceptions():
+                    try:
+                        db_wrapper = connections[alias]
+                    except (KeyError, Exception):
+                        db_wrapper = None
+
+                    _cached_db_configs[alias] = {
+                        "db_name": db_config.get("NAME"),
+                        "host": db_config.get("HOST"),
+                        "port": db_config.get("PORT"),
+                        "unix_socket": db_config.get("OPTIONS", {}).get("unix_socket"),
+                        "engine": db_config.get("ENGINE"),
+                        "vendor": (
+                            db_wrapper.vendor
+                            if db_wrapper and hasattr(db_wrapper, "vendor")
+                            else None
+                        ),
+                    }
+
+            _cache_initialized = True
+
+        except Exception as e:
+            logger.debug("Failed to cache database configurations: %s", e)
+            _cached_db_configs = {}
+
+
 def install_sql_hook():
     # type: () -> None
     """If installed this causes Django's queries to be captured."""
@@ -668,7 +721,6 @@ def install_sql_hook():
             span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
-
             result = real_executemany(self, sql, param_list)
 
         with capture_internal_exceptions():
@@ -687,8 +739,11 @@ def install_sql_hook():
             name="connect",
             origin=DjangoIntegration.origin_db,
         ) as span:
-            _set_db_data(span, self)
-            return real_connect(self)
+            connection = real_connect(self)
+            with capture_internal_exceptions():
+                _set_db_data(span, self)
+
+            return connection
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
@@ -698,54 +753,121 @@ def install_sql_hook():
 
 def _set_db_data(span, cursor_or_db):
     # type: (Span, Any) -> None
-    db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
-    vendor = db.vendor
-    span.set_data(SPANDATA.DB_SYSTEM, vendor)
+    """
+    Set database connection data to the span.
 
-    # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
-    # actually has a `connection` and the `connection` has a `get_dsn_parameters`
-    # attribute, only to throw an error once you actually want to call it.
-    # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
-    # function.
-    is_psycopg2 = (
-        hasattr(cursor_or_db, "connection")
-        and hasattr(cursor_or_db.connection, "get_dsn_parameters")
-        and inspect.isroutine(cursor_or_db.connection.get_dsn_parameters)
-    )
-    if is_psycopg2:
-        connection_params = cursor_or_db.connection.get_dsn_parameters()
-    else:
+    Tries first to use pre-cached configuration.
+    If that fails, it uses get_connection_params() to get the database connection
+    parameters.
+    """
+    from django.core.exceptions import ImproperlyConfigured
+
+    db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
+    db_alias = db.alias if hasattr(db, "alias") else None
+
+    if hasattr(db, "vendor"):
+        span.set_data(SPANDATA.DB_SYSTEM, db.vendor)
+
+    # Use pre-cached configuration
+    cached_config = _cached_db_configs.get(db_alias) if db_alias else None
+    if cached_config:
+        if cached_config.get("db_name"):
+            span.set_data(SPANDATA.DB_NAME, cached_config["db_name"])
+        if cached_config.get("host"):
+            span.set_data(SPANDATA.SERVER_ADDRESS, cached_config["host"])
+        if cached_config.get("port"):
+            span.set_data(SPANDATA.SERVER_PORT, str(cached_config["port"]))
+        if cached_config.get("unix_socket"):
+            span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, cached_config["unix_socket"])
+        if cached_config.get("vendor") and span._data.get(SPANDATA.DB_SYSTEM) is None:
+            span.set_data(SPANDATA.DB_SYSTEM, cached_config["vendor"])
+
+        return  # Success - exit early
+
+    # Fallback to dynamic database metadata collection.
+    # This is the edge case where db configuration is not in Django's `DATABASES` setting.
+    try:
+        # Fallback 1: Try db.get_connection_params() first (NO CONNECTION ACCESS)
+        logger.debug(
+            "Cached db connection params retrieval failed for %s. Trying db.get_connection_params().",
+            db_alias,
+        )
         try:
-            # psycopg3, only extract needed params as get_parameters
-            # can be slow because of the additional logic to filter out default
-            # values
-            connection_params = {
-                "dbname": cursor_or_db.connection.info.dbname,
-                "port": cursor_or_db.connection.info.port,
-            }
-            # PGhost returns host or base dir of UNIX socket as an absolute path
-            # starting with /, use it only when it contains host
-            pg_host = cursor_or_db.connection.info.host
-            if pg_host and not pg_host.startswith("/"):
-                connection_params["host"] = pg_host
-        except Exception:
             connection_params = db.get_connection_params()
 
-    db_name = connection_params.get("dbname") or connection_params.get("database")
-    if db_name is not None:
-        span.set_data(SPANDATA.DB_NAME, db_name)
+            db_name = connection_params.get("dbname") or connection_params.get(
+                "database"
+            )
+            if db_name:
+                span.set_data(SPANDATA.DB_NAME, db_name)
 
-    server_address = connection_params.get("host")
-    if server_address is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+            host = connection_params.get("host")
+            if host:
+                span.set_data(SPANDATA.SERVER_ADDRESS, host)
 
-    server_port = connection_params.get("port")
-    if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, str(server_port))
+            port = connection_params.get("port")
+            if port:
+                span.set_data(SPANDATA.SERVER_PORT, str(port))
 
-    server_socket_address = connection_params.get("unix_socket")
-    if server_socket_address is not None:
-        span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
+            unix_socket = connection_params.get("unix_socket")
+            if unix_socket:
+                span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, unix_socket)
+            return  # Success - exit early to avoid connection access
+
+        except (KeyError, ImproperlyConfigured, AttributeError):
+            # Fallback 2: Last resort - direct connection access (CONNECTION POOL RISK)
+            logger.debug(
+                "db.get_connection_params() failed for %s, trying direct connection access",
+                db_alias,
+            )
+
+            # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
+            # actually has a `connection` and the `connection` has a `get_dsn_parameters`
+            # attribute, only to throw an error once you actually want to call it.
+            # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
+            # function.
+            is_psycopg2 = (
+                hasattr(cursor_or_db, "connection")
+                and hasattr(cursor_or_db.connection, "get_dsn_parameters")
+                and inspect.isroutine(cursor_or_db.connection.get_dsn_parameters)
+            )
+            if is_psycopg2:
+                connection_params = cursor_or_db.connection.get_dsn_parameters()
+            else:
+                # psycopg3, only extract needed params as get_parameters
+                # can be slow because of the additional logic to filter out default
+                # values
+                connection_params = {
+                    "dbname": cursor_or_db.connection.info.dbname,
+                    "port": cursor_or_db.connection.info.port,
+                }
+                # PGhost returns host or base dir of UNIX socket as an absolute path
+                # starting with /, use it only when it contains host
+                host = cursor_or_db.connection.info.host
+                if host and not host.startswith("/"):
+                    connection_params["host"] = host
+
+            db_name = connection_params.get("dbname") or connection_params.get(
+                "database"
+            )
+            if db_name:
+                span.set_data(SPANDATA.DB_NAME, db_name)
+
+            host = connection_params.get("host")
+            if host:
+                span.set_data(SPANDATA.SERVER_ADDRESS, host)
+
+            port = connection_params.get("port")
+            if port:
+                span.set_data(SPANDATA.SERVER_PORT, str(port))
+
+            unix_socket = connection_params.get("unix_socket")
+            if unix_socket:
+                span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, unix_socket)
+
+    except Exception as e:
+        logger.debug("Failed to get database connection params for %s: %s", db_alias, e)
+        # Skip database metadata rather than risk further connection issues
 
 
 def add_template_context_repr_sequence():
