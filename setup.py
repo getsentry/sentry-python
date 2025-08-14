@@ -60,6 +60,7 @@ setup(
         "flask": ["flask>=0.11", "blinker>=1.1", "markupsafe"],
         "grpcio": ["grpcio>=1.21.1", "protobuf>=3.8.0"],
         "http2": ["httpcore[http2]==1.*"],
+        "asyncio": ["httpcore[asyncio]==1.*"],
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
         "huggingface_hub": ["huggingface_hub>=0.22"],
