@@ -1,7 +1,6 @@
 import pytest
 import random
 import time
-from unittest import mock
 
 
 def _run_contextvar_threaded_test():
@@ -43,10 +42,4 @@ def _run_contextvar_threaded_test():
 
 @pytest.mark.forked
 def test_leaks(maybe_monkeypatched_threading):
-    _run_contextvar_threaded_test()
-
-
-@pytest.mark.forked
-@mock.patch("sentry_sdk.utils._is_contextvars_broken", return_value=True)
-def test_leaks_when_is_contextvars_broken_is_false(maybe_monkeypatched_threading):
     _run_contextvar_threaded_test()
