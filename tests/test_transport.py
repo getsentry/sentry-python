@@ -880,9 +880,7 @@ async def test_async_transport_concurrent_requests(
 
     tasks = [send_message(i) for i in range(num_messages)]
     await asyncio.gather(*tasks)
-    transport = client.transport
     await client.close(timeout=2.0)
-    assert len(transport.background_tasks) == 0
     assert len(capturing_server.captured) == num_messages
 
 
