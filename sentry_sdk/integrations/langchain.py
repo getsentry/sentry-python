@@ -198,7 +198,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     model,
                 )
 
-            ai_type = all_params.get("_type")
+            ai_type = all_params.get("_type", "")
             if "anthropic" in ai_type:
                 span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
             elif "openai" in ai_type:
@@ -241,7 +241,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if model:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-            ai_type = all_params.get("_type")
+            ai_type = all_params.get("_type", "")
             if "anthropic" in ai_type:
                 span.set_data(SPANDATA.GEN_AI_SYSTEM, "anthropic")
             elif "openai" in ai_type:
@@ -708,7 +708,7 @@ def _wrap_agent_executor_stream(f):
                 span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools, unpack=False
             )
 
-        input = args[0].get("input") if len(args) > 1 else None
+        input = args[0].get("input") if len(args) >= 1 else None
         if (
             input is not None
             and should_send_default_pii()
@@ -732,7 +732,11 @@ def _wrap_agent_executor_stream(f):
             for event in old_iterator:
                 yield event
 
-            output = event.get("output")
+            try:
+                output = event.get("output")
+            except Exception:
+                output = None
+
             if (
                 output is not None
                 and should_send_default_pii()
@@ -747,7 +751,11 @@ def _wrap_agent_executor_stream(f):
             async for event in old_iterator:
                 yield event
 
-            output = event.get("output")
+            try:
+                output = event.get("output")
+            except Exception:
+                output = None
+
             if (
                 output is not None
                 and should_send_default_pii()
