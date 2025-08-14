@@ -8,7 +8,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - Added `add_attachment()` as a top level API, so you can do now: `sentry_sdk.add_attachment(...)` (up until now it was only available on the `Scope`)
 - Added a new SDK option `exclude_span_origins`. Spans with an `origin` from `exclude_span_origins` won't be created. This can be used for example in dual OpenTelemetry/Sentry setups to filter out spans from specific Sentry instrumentations. Note that using `exclude_span_origins` might potentially lead to surprising results: if, for example, a root span is excluded based on `origin`, all of its children will become root spans, unless they were started with `only_as_child_span=True`.
-
+- Added a new experimental fully async Transport using the [httpcore](https://pypi.org/project/httpcore/) library. Requires the [httpcore[asyncio]](https://www.encode.io/httpcore/async/) extension. This will make Network I/O non-blocking in async programs and avoid excessive thread switching overhead in the Transport. The async Transport can only be used when an event loop is running, and additionally requires the AsyncIO integration.
+- Added an asynchronous context manager for spans. This can be used to remove unnessecary nesting for span creation in async programs.
 ### Changed
 
 #### General
