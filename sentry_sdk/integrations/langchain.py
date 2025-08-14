@@ -14,11 +14,21 @@ from sentry_sdk.utils import logger, capture_internal_exceptions
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, List, Callable, Dict, Union, Optional
+    from typing import (
+        Any,
+        List,
+        Callable,
+        Dict,
+        Union,
+        Optional,
+        AsyncIterator,
+        Iterator,
+    )
     from uuid import UUID
 
+
 try:
-    from langchain_core.messages import BaseMessage
+    from langchain_core.messages import BaseMessage, MessageStreamEvent
     from langchain_core.outputs import LLMResult
     from langchain_core.callbacks import (
         manager,
@@ -735,20 +745,44 @@ def _wrap_agent_executor_stream(f):
             return f(self, *args, **kwargs)
 
         # Create a span that will act as the parent for all callback-generated spans
-        with sentry_sdk.start_span(
+        span = sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
             name="AgentExecutor.stream",
             origin=LangchainIntegration.origin,
-        ) as span:
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+        )
+        span.__enter__()
 
-            if hasattr(self, "agent") and hasattr(self.agent, "llm"):
-                model_name = getattr(self.agent.llm, "model_name", None) or getattr(
-                    self.agent.llm, "model", None
-                )
-                if model_name:
-                    span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
-            return f(self, *args, **kwargs)
+        if hasattr(self, "agent") and hasattr(self.agent, "llm"):
+            model_name = getattr(self.agent.llm, "model_name", None) or getattr(
+                self.agent.llm, "model", None
+            )
+            if model_name:
+                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
+        result = f(self, *args, **kwargs)
+        old_iterator = result
+
+        def new_iterator():
+            # type: () -> Iterator[MessageStreamEvent]
+            for event in old_iterator:
+                # import ipdb; ipdb.set_trace()
+                yield event
+            span.__exit__(None, None, None)
+
+        async def new_iterator_async():
+            # type: () -> AsyncIterator[MessageStreamEvent]
+            async for event in old_iterator:
+                yield event
+
+            span.__exit__(None, None, None)
+
+        if str(type(result)) == "<class 'async_generator'>":
+            result = new_iterator_async()
+        else:
+            result = new_iterator()
+
+        return result
 
     return new_stream
