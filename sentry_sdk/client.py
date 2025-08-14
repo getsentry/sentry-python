@@ -982,7 +982,9 @@ class _Client(BaseClient):
                 return
             await self.flush_async(timeout=timeout, callback=callback)
             self._close_components()
-            await self.transport.kill()
+            kill_task = self.transport.kill()  # type: ignore
+            if kill_task is not None:
+                await kill_task
             self.transport = None
 
     def flush(

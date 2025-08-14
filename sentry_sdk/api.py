@@ -227,11 +227,11 @@ def flush(
 
 
 @clientmethod
-def flush_async(
+async def flush_async(
     timeout: Optional[float] = None,
     callback: Optional[Callable[[int, float], None]] = None,
 ) -> None:
-    return get_client().flush_async(timeout=timeout, callback=callback)
+    return await get_client().flush_async(timeout=timeout, callback=callback)
 
 
 def start_span(**kwargs: Any) -> Span:
