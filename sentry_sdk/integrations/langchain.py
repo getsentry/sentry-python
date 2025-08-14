@@ -47,7 +47,6 @@ except ImportError:
 DATA_FIELDS = {
     "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
     "function_call": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-    "logit_bias": SPANDATA.GEN_AI_REQUEST_LOGIT_BIAS,
     "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
     "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
     "response_format": SPANDATA.GEN_AI_RESPONSE_FORMAT,

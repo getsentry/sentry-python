@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Optional, Callable, Any
 
-_ai_pipeline_name = ContextVar(SPANDATA.GEN_AI_PIPELINE_NAME, default=None)
+_ai_pipeline_name = ContextVar("ai_pipeline_name", default=None)
 
 
 def set_ai_pipeline_name(name):

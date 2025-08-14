@@ -531,11 +531,6 @@ class SPANDATA:
     The frequency penalty parameter used to reduce repetitiveness of generated tokens.
     Example: 0.1
     """
-    GEN_AI_REQUEST_LOGIT_BIAS = "gen_ai.logit_bias"
-    """
-    The logit bias parameter used to control the model's response.
-    Example: {"12345": -100}
-    """
 
     GEN_AI_REQUEST_MAX_TOKENS = "gen_ai.request.max_tokens"
     """
