@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.35.0
+
+### Various fixes & improvements
+
+- [Langchain Integration](https://docs.sentry.io/platforms/python/integrations/langchain/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4678) by @shellmayr
+- [Anthropic Integration](https://docs.sentry.io/platforms/python/integrations/anthropic/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4674) by @constantinius
+- AI Agents templates for `@trace` decorator (#4676) by @antonpirker
+- Sentry Logs: Add `enable_logs`, `before_send_log` as top-level `sentry_sdk.init()` options (#4644) by @sentrivana
+- Tracing: Improve `@trace` decorator. Allows to set `span.op`, `span.name`, and `span.attributes` (#4648) by @antonpirker
+- Tracing: Add convenience function `sentry_sdk.update_current_span`. (#4673) by @antonpirker
+- Tracing: Add `Span.update_data()` to update multiple `span.data` items at once. (#4666) by @antonpirker
+- GNU-integration: make path optional (#4688) by @MeredithAnya
+- Clickhouse: Don't eat the generator data (#4669) by @szokeasaurusrex
+- Clickhouse: List `send_data` parameters (#4667) by @szokeasaurusrex
+- Update `gen_ai.*` and `ai.*` attributes (#4665) by @antonpirker
+- Better checking for empty tools list (#4647) by @antonpirker
+- Remove performance paper cuts (#4675) by @sentrivana
+- Help for debugging Cron problems (#4686) by @antonpirker
+- Fix Redis CI (#4691) by @sentrivana
+- Fix plugins key codecov (#4655) by @sl0thentr0py
+- Fix Mypy (#4649) by @sentrivana
+- Update tox.ini (#4689) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 2.0.6 to 2.1.0 (#4684) by @dependabot
+
 ## 2.34.1
 
 ### Various fixes & improvements
