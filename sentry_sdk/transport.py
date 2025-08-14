@@ -1049,7 +1049,7 @@ def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
     use_async_transport = options.get("_experiments", {}).get("transport_async", False)
     async_integration = any(
         integration.__class__.__name__ == "AsyncioIntegration"
-        for integration in options.get("integrations", [])
+        for integration in options.get("integrations") or []
     )
 
     # By default, we use the http transport class
