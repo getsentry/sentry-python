@@ -85,7 +85,9 @@ class PotelScope(Scope):
 
         span_context = self._incoming_otel_span_context()
         if span_context is None:
-            yield
+            # force a new trace since no incoming stuff
+            with use_span(INVALID_SPAN):
+                yield
         else:
             with use_span(NonRecordingSpan(span_context)):
                 yield

@@ -7,6 +7,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ### New Features
 
 - Added `add_attachment()` as a top level API, so you can do now: `sentry_sdk.add_attachment(...)` (up until now it was only available on the `Scope`)
+- Added a new SDK option `exclude_span_origins`. Spans with an `origin` from `exclude_span_origins` won't be created. This can be used for example in dual OpenTelemetry/Sentry setups to filter out spans from specific Sentry instrumentations. Note that using `exclude_span_origins` might potentially lead to surprising results: if, for example, a root span is excluded based on `origin`, all of its children will become root spans, unless they were started with `only_as_child_span=True`.
 
 ### Changed
 
@@ -24,8 +25,22 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The default of `traces_sample_rate` changed to `0`. Meaning: Incoming traces will be continued by default. For example, if your frontend sends a `sentry-trace/baggage` headers pair, your SDK will create Spans and send them to Sentry. (The default used to be `None` meaning by default no Spans where created, no matter what headers the frontend sent to your project.) See also: https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate
 - `sentry_sdk.start_span` now only takes keyword arguments.
 - `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
-- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
+- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager. 
+
+    - Use it to continue an upstream trace with the `sentry-trace` and `baggage` headers.
+
+    ```python
+    headers = {"sentry-trace": "{trace_id}-{span_id}-{sampled_flag}", "baggage": "{baggage header}"}
+    with sentry_sdk.continue_trace(headers):
+        with sentry_sdk.start_span(name="continued span in trace"):
+            pass
+    ```
+
+    - If the headers are empty, a new trace will be started.
+    - If you want to force creation of a new trace, use the `sentry_sdk.new_trace` context manager.
+
 - You can no longer change the sampled status of a span with `span.sampled = False` after starting it. The sampling decision needs to be either be made in the `traces_sampler`, or you need to pass an explicit `sampled` parameter to `start_span`.
+- `sentry_sdk.start_span` now takes an optional `only_as_child_span` argument. These spans will not be started if they would be root spans -- they can only exist as child spans. You can use this parameter to prevent spans without a parent from becoming root spans.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
 - `Span.finish()` does not accept a `hub` parameter anymore.
 - `Span.finish()` no longer returns the `event_id` if the event is sent to Sentry.
@@ -45,6 +60,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `enable_logs` and `before_send_log` are now regular SDK options. Their original versions under `_experiments` have been removed.
 
 #### Integrations
+
+- AWS Lambda, GCP: The message of the warning the SDK optionally emits if a function is about to time out has changed.
 - Redis: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
 - clickhouse-driver: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
 - Logging: By default, the SDK won't capture Sentry issues anymore when calling `logging.error()`, `logging.critical()` or `logging.exception()`. If you want to preserve the old behavior use `sentry_sdk.init(integrations=[LoggingIntegration(event_level="ERROR")])`.
@@ -227,7 +244,6 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ### Deprecated
 
 - `sentry_sdk.start_transaction()` is deprecated. Use `sentry_sdk.start_span()` instead.
-  - If you want to force creation of a new trace, use the `sentry_sdk.new_trace()` context manager.
 - `Span.set_data()` is deprecated. Use `Span.set_attribute()` instead.
 
 
@@ -255,7 +271,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
 - `sentry_sdk.tracing_utils.add_query_source()`: Removed the `hub` parameter. It is not necessary anymore.
 - `sentry_sdk.tracing_utils.record_sql_queries()`: Removed the `hub` parameter. It is not necessary anymore.
-- `sentry_sdk.tracing_utils.get_current_span()` does now take a `scope` instead of a `hub` as parameter.
+- `sentry_sdk.tracing_utils.get_current_span()` now takes a `scope` instead of a `hub` as parameter.
 - `sentry_sdk.tracing_utils.should_propagate_trace()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils.is_sentry_url()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils._get_contextvars` does not return a tuple with three values, but a tuple with two values. The `copy_context` was removed.

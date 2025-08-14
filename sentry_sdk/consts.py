@@ -103,6 +103,9 @@ class SPANDATA:
 
     AI_CITATIONS = "ai.citations"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     References or sources cited by the AI model in its response.
     Example: ["Smith et al. 2020", "Jones 2019"]
     """
@@ -115,65 +118,97 @@ class SPANDATA:
 
     AI_DOCUMENTS = "ai.documents"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Documents or content chunks used as context for the AI model.
     Example: ["doc1.txt", "doc2.pdf"]
     """
 
     AI_FINISH_REASON = "ai.finish_reason"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_FINISH_REASONS instead.
+
     The reason why the model stopped generating.
     Example: "length"
     """
 
     AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_FREQUENCY_PENALTY instead.
+
     Used to reduce repetitiveness of generated tokens.
     Example: 0.5
     """
 
     AI_FUNCTION_CALL = "ai.function_call"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.
+
     For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
     """
 
     AI_GENERATION_ID = "ai.generation_id"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_ID instead.
+
     Unique identifier for the completion.
     Example: "gen_123abc"
     """
 
     AI_INPUT_MESSAGES = "ai.input_messages"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_MESSAGES instead.
+
     The input messages to an LLM call.
     Example: [{"role": "user", "message": "hello"}]
     """
 
     AI_LOGIT_BIAS = "ai.logit_bias"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     For an AI model call, the logit bias
     """
 
     AI_METADATA = "ai.metadata"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Extra metadata passed to an AI pipeline step.
     Example: {"executed_function": "add_integers"}
     """
 
     AI_MODEL_ID = "ai.model_id"
     """
-    The unique descriptor of the model being execugted
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_MODEL or GEN_AI_RESPONSE_MODEL instead.
+
+    The unique descriptor of the model being executed.
     Example: gpt-4
     """
 
     AI_PIPELINE_NAME = "ai.pipeline.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_PIPELINE_NAME instead.
+
     Name of the AI pipeline or chain being executed.
-    DEPRECATED: Use GEN_AI_PIPELINE_NAME instead.
     Example: "qa-pipeline"
     """
 
     AI_PREAMBLE = "ai.preamble"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     For an AI model call, the preamble parameter.
     Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
     Example: "You are now a clown."
@@ -181,6 +216,9 @@ class SPANDATA:
 
     AI_PRESENCE_PENALTY = "ai.presence_penalty"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_PRESENCE_PENALTY instead.
+
     Used to reduce repetitiveness of generated tokens.
     Example: 0.5
     """
@@ -193,89 +231,133 @@ class SPANDATA:
 
     AI_RAW_PROMPTING = "ai.raw_prompting"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Minimize pre-processing done to the prompt sent to the LLM.
     Example: true
     """
 
     AI_RESPONSE_FORMAT = "ai.response_format"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     For an AI model call, the format of the response
     """
 
     AI_RESPONSES = "ai.responses"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TEXT instead.
+
     The responses to an AI model call. Always as a list.
     Example: ["hello", "world"]
     """
 
     AI_SEARCH_QUERIES = "ai.search_queries"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Queries used to search for relevant context or documents.
     Example: ["climate change effects", "renewable energy"]
     """
 
     AI_SEARCH_REQUIRED = "ai.is_search_required"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Boolean indicating if the model needs to perform a search.
     Example: true
     """
 
     AI_SEARCH_RESULTS = "ai.search_results"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Results returned from search queries for context.
     Example: ["Result 1", "Result 2"]
     """
 
     AI_SEED = "ai.seed"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_SEED instead.
+
     The seed, ideally models given the same seed and same other parameters will produce the exact same output.
     Example: 123.45
     """
 
     AI_STREAMING = "ai.streaming"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_STREAMING instead.
+
     Whether or not the AI model call's response was streamed back asynchronously
-    DEPRECATED: Use GEN_AI_RESPONSE_STREAMING instead.
     Example: true
     """
 
     AI_TAGS = "ai.tags"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Tags that describe an AI pipeline step.
     Example: {"executed_function": "add_integers"}
     """
 
     AI_TEMPERATURE = "ai.temperature"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TEMPERATURE instead.
+
     For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.
     Example: 0.5
     """
 
     AI_TEXTS = "ai.texts"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Raw text inputs provided to the model.
     Example: ["What is machine learning?"]
     """
 
     AI_TOP_K = "ai.top_k"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_K instead.
+
     For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
     Example: 35
     """
 
     AI_TOP_P = "ai.top_p"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_P instead.
+
     For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.
     Example: 0.5
     """
 
     AI_TOOL_CALLS = "ai.tool_calls"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.
+
     For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
     """
 
     AI_TOOLS = "ai.tools"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_AVAILABLE_TOOLS instead.
+
     For an AI model call, the functions that are available
     """
 
@@ -287,6 +369,9 @@ class SPANDATA:
 
     AI_WARNINGS = "ai.warnings"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Warning messages generated during model execution.
     Example: ["Token limit exceeded"]
     """
@@ -391,6 +476,18 @@ class SPANDATA:
     Example: "qa-pipeline"
     """
 
+    GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
+    """
+    The reason why the model stopped generating.
+    Example: "COMPLETE"
+    """
+
+    GEN_AI_RESPONSE_ID = "gen_ai.response.id"
+    """
+    Unique identifier for the completion.
+    Example: "gen_123abc"
+    """
+
     GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
     """
     Exact model identifier used to generate the response
@@ -451,10 +548,22 @@ class SPANDATA:
     Example: 0.1
     """
 
+    GEN_AI_REQUEST_SEED = "gen_ai.request.seed"
+    """
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: "1234567890"
+    """
+
     GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
     """
     The temperature parameter used to control randomness in the output.
     Example: 0.7
+    """
+
+    GEN_AI_REQUEST_TOP_K = "gen_ai.request.top_k"
+    """
+    Limits the model to only consider the K most likely next tokens, where K is an integer (e.g., top_k=20 means only the 20 highest probability tokens are considered).
+    Example: 35
     """
 
     GEN_AI_REQUEST_TOP_P = "gen_ai.request.top_p"
@@ -1272,4 +1381,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "3.0.0a4"
+VERSION = "3.0.0a5"
