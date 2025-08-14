@@ -431,7 +431,7 @@ def test_loop_close_flushes_async_transport(sentry_init):
 
 
 @minimum_python_38
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_internal_tasks_not_wrapped(sentry_init, capture_events):
 
     sentry_init(integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
