@@ -1934,8 +1934,11 @@ def try_convert(convert_func, value):
     given function. Return None if the conversion fails, i.e. if the function
     raises an exception.
     """
-    if isinstance(value, convert_func):  # type: ignore
-        return value
+    try:
+        if isinstance(value, convert_func):  # type: ignore
+            return value
+    except TypeError:
+        pass
 
     try:
         return convert_func(value)
