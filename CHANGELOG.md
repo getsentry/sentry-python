@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.35.0
+
+### Various fixes & improvements
+
+- feat(langchain): update integration to from ai.* to gen_ai.* span attributes (#4678) by @shellmayr
+- build(deps): bump actions/create-github-app-token from 2.0.6 to 2.1.0 (#4684) by @dependabot
+- feat(tracing): AI Agents templates for `@trace` decorator (#4676) by @antonpirker
+- Remove performance papercuts (#4675) by @sentrivana
+- ref(gnu-integration): make path optional (#4688) by @MeredithAnya
+- Update tox.ini (#4689) by @sentrivana
+- Fix Redis CI (#4691) by @sentrivana
+- Help for debugging Cron problems (#4686) by @antonpirker
+- feat(anthropic) Update span attributes to use `gen_ai.*` namespace instead of `ai.*` (#4674) by @constantinius
+- fix(clickhouse): Don't eat the generator data (#4669) by @szokeasaurusrex
+- ref(clickhouse): List `send_data` parameters (#4667) by @szokeasaurusrex
+- feat(tracing): Improve `@trace` decorator.  (#4648) by @antonpirker
+- feat(tracing): Add convenience function `update_current_span`. (#4673) by @antonpirker
+- Update `gen_ai.*` and `ai.*` attributes (#4665) by @antonpirker
+- Add `update_data` to `Span`. (#4666) by @antonpirker
+- Fix plugins key codecov (#4655) by @sl0thentr0py
+- Add `enable_logs`, `before_send_log` as top-level options (#4644) by @sentrivana
+- Fix mypy (#4649) by @sentrivana
+- Better checking for empty tools list (#4647) by @antonpirker
+
 ## 2.34.1
 
 ### Various fixes & improvements
