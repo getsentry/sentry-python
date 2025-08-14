@@ -704,6 +704,34 @@ def _wrap_configure(f):
     return new_configure
 
 
+def _get_request_data(obj, args, kwargs):
+    # type: (Any, Any, Any) -> tuple[Optional[str], Optional[List[Any]]]
+    """
+    Get the agent name and available tools for the agent.
+    """
+    agent = getattr(obj, "agent", None)
+    runnable = getattr(agent, "runnable", None)
+    runnable_config = getattr(runnable, "config", {})
+    tools = (
+        getattr(obj, "tools", None)
+        or getattr(agent, "tools", None)
+        or runnable_config.get("tools")
+        or runnable_config.get("available_tools")
+    )
+    tools = tools if tools and len(tools) > 0 else None
+
+    try:
+        agent_name = None
+        if len(args) > 1:
+            agent_name = args[1].get("run_name")
+        if agent_name is None:
+            agent_name = runnable_config.get("run_name")
+    except Exception:
+        pass
+
+    return (agent_name, tools)
+
+
 def _wrap_agent_executor_invoke(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
 
@@ -714,43 +742,25 @@ def _wrap_agent_executor_invoke(f):
         if integration is None:
             return f(self, *args, **kwargs)
 
-        try:
-            agent_name = None
-            if len(args) > 1:
-                agent_name = args[1].get("run_name")
-            if agent_name is None:
-                agent_name = self.agent.runnable.config.get("run_name")
-        except Exception:
-            agent_name = ""
+        agent_name, tools = _get_request_data(self, args, kwargs)
 
-        agent = getattr(self, "agent", None)
-        runnable = getattr(agent, "runnable", None)
-        runnable_config = getattr(runnable, "config", {})
-        # llm = getattr(self, "llm", None) or getattr(agent, "llm", None)
-        tools = (
-            getattr(self, "tools", None)
-            or getattr(agent, "tools", None)
-            or runnable_config.get("tools")
-            or runnable_config.get("available_tools")
-        )
-
-        # Create a span that will act as the parent for all callback-generated spans
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {agent_name}".strip(),
+            name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
         ) as span:
+            if agent_name:
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            if agent_name != "":
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
-
-            if tools is not None and len(tools) > 0:
+            if tools:
                 set_data_normalized(
                     span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools, unpack=False
                 )
 
+            # Run the agent
             result = f(self, *args, **kwargs)
 
             input = result.get("input")
@@ -782,27 +792,8 @@ def _wrap_agent_executor_stream(f):
         if integration is None:
             return f(self, *args, **kwargs)
 
-        try:
-            agent_name = None
-            if len(args) > 1:
-                agent_name = args[1].get("run_name")
-            if agent_name is None:
-                agent_name = self.agent.runnable.config.get("run_name")
-        except Exception:
-            agent_name = ""
+        agent_name, tools = _get_request_data(self, args, kwargs)
 
-        agent = getattr(self, "agent", None)
-        runnable = getattr(agent, "runnable", None)
-        runnable_config = getattr(runnable, "config", {})
-        # llm = getattr(self, "llm", None) or getattr(agent, "llm", None)
-        tools = (
-            getattr(self, "tools", None)
-            or getattr(agent, "tools", None)
-            or runnable_config.get("tools")
-            or runnable_config.get("available_tools")
-        )
-
-        # Create a span that will act as the parent for all callback-generated spans
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=f"invoke_agent {agent_name}".strip(),
@@ -810,13 +801,13 @@ def _wrap_agent_executor_stream(f):
         )
         span.__enter__()
 
+        if agent_name:
+            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
+
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-        if agent_name != "":
-            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
-
-        if tools is not None and len(tools) > 0:
+        if tools:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools, unpack=False
             )
@@ -831,7 +822,9 @@ def _wrap_agent_executor_stream(f):
                 ],
             )
 
+        # Run the agent
         result = f(self, *args, **kwargs)
+
         old_iterator = result
 
         def new_iterator():
