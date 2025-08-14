@@ -715,7 +715,11 @@ def _wrap_agent_executor_invoke(f):
             return f(self, *args, **kwargs)
 
         try:
-            agent_name = self.agent.runnable.config.get("run_name")
+            agent_name = None
+            if len(args) > 1:
+                agent_name = args[1].get("run_name")
+            if agent_name is None:
+                agent_name = self.agent.runnable.config.get("run_name")
         except Exception:
             agent_name = ""
 
@@ -726,6 +730,8 @@ def _wrap_agent_executor_invoke(f):
             origin=LangchainIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+
             if agent_name != "":
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
@@ -740,7 +746,23 @@ def _wrap_agent_executor_invoke(f):
             if model_name != "":
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
-            return f(self, *args, **kwargs)
+            result = f(self, *args, **kwargs)
+
+            input = result.get("input")
+            if input is not None:
+                set_data_normalized(
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    [
+                        input,
+                    ],
+                )
+
+            output = result.get("output")
+            if output is not None:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+            return result
 
     return new_invoke
 
@@ -769,6 +791,17 @@ def _wrap_agent_executor_stream(f):
         span.__enter__()
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
+        input = args[0].get("input") if len(args) > 1 else None
+        if input is not None:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                [
+                    input,
+                ],
+            )
 
         model_name = ""
         if hasattr(self, "agent") and hasattr(self.agent, "llm"):
@@ -787,8 +820,12 @@ def _wrap_agent_executor_stream(f):
         def new_iterator():
             # type: () -> Iterator[Any]
             for event in old_iterator:
-                # import ipdb; ipdb.set_trace()
                 yield event
+
+            output = event.get("output")
+            if output is not None:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
             span.__exit__(None, None, None)
 
         async def new_iterator_async():
