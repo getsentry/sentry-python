@@ -76,6 +76,33 @@ def patch_loop_close() -> None:
     loop._sentry_flush_patched = True  # type: ignore
 
 
+def _create_task_with_factory(
+    orig_task_factory: Any,
+    loop: asyncio.AbstractEventLoop,
+    coro: Coroutine[Any, Any, Any],
+    **kwargs: Any,
+) -> asyncio.Task[Any]:
+    task = None
+
+    # Trying to use user set task factory (if there is one)
+    if orig_task_factory:
+        task = orig_task_factory(loop, coro, **kwargs)
+
+    if task is None:
+        # The default task factory in `asyncio` does not have its own function
+        # but is just a couple of lines in `asyncio.base_events.create_task()`
+        # Those lines are copied here.
+
+        # WARNING:
+        # If the default behavior of the task creation in asyncio changes,
+        # this will break!
+        task = Task(coro, loop=loop, **kwargs)
+        if task._source_traceback:  # type: ignore
+            del task._source_traceback[-1]  # type: ignore
+
+    return task
+
+
 def patch_asyncio() -> None:
     orig_task_factory = None
     try:
@@ -92,15 +119,9 @@ def patch_asyncio() -> None:
             is_internal = is_internal_task()
 
             if is_internal:
-                task = None
-                if orig_task_factory:
-                    task = orig_task_factory(loop, coro, **kwargs)
-                if task is None:
-                    task = Task(coro, loop=loop, **kwargs)
-                    if task._source_traceback:  # type: ignore
-                        del task._source_traceback[-1]  # type: ignore
-
-                return task
+                return _create_task_with_factory(
+                    orig_task_factory, loop, coro, **kwargs
+                )
 
             async def _task_with_sentry_span_creation() -> Any:
                 result = None
@@ -119,25 +140,9 @@ def patch_asyncio() -> None:
 
                 return result
 
-            task = None
-
-            # Trying to use user set task factory (if there is one)
-            if orig_task_factory:
-                task = orig_task_factory(
-                    loop, _task_with_sentry_span_creation(), **kwargs
-                )
-
-            if task is None:
-                # The default task factory in `asyncio` does not have its own function
-                # but is just a couple of lines in `asyncio.base_events.create_task()`
-                # Those lines are copied here.
-
-                # WARNING:
-                # If the default behavior of the task creation in asyncio changes,
-                # this will break!
-                task = Task(_task_with_sentry_span_creation(), loop=loop, **kwargs)
-                if task._source_traceback:  # type: ignore
-                    del task._source_traceback[-1]  # type: ignore
+            task = _create_task_with_factory(
+                orig_task_factory, loop, _task_with_sentry_span_creation(), **kwargs
+            )
 
             # Set the task name to include the original coroutine's name
             try:

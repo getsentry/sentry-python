@@ -806,7 +806,7 @@ else:
             try:
                 # Return the pool cleanup task so caller can await it if needed
                 with mark_sentry_task_internal():
-                    return self.loop.create_task(self._pool.aclose(), name="sentry_sdk_pool_aclose")  # type: ignore
+                    return self.loop.create_task(self._pool.aclose())  # type: ignore
             except RuntimeError:
                 logger.warning("Event loop not running, aborting kill.")
                 return None
