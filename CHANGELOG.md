@@ -4,8 +4,8 @@
 
 ### Various fixes & improvements
 
-- [Langchain Integration](https://docs.sentry.io/platforms/python/integrations/langchain/) now supports Sentry [AI Insights dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4678) by @shellmayr
-- [Anthropic Integration](https://docs.sentry.io/platforms/python/integrations/anthropic/) now supports Sentry [AI Insights dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4674) by @constantinius
+- [Langchain Integration](https://docs.sentry.io/platforms/python/integrations/langchain/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4678) by @shellmayr
+- [Anthropic Integration](https://docs.sentry.io/platforms/python/integrations/anthropic/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4674) by @constantinius
 - AI Agents templates for `@trace` decorator (#4676) by @antonpirker
 - Sentry Logs: Add `enable_logs`, `before_send_log` as top-level `sentry_sdk.init()` options (#4644) by @sentrivana
 - Tracing: Improve `@trace` decorator. Allows to set `span.op`, `span.name`, and `span.attributes` (#4648) by @antonpirker
