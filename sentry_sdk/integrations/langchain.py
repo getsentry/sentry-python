@@ -124,7 +124,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def _normalize_langchain_message(self, message):
         # type: (BaseMessage) -> Any
-        parsed = {"content": message.content, "role": message.type}
+        parsed = {"role": message.type, "content": message.content}
         parsed.update(message.additional_kwargs)
         return parsed
 
