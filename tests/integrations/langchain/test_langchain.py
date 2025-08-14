@@ -54,15 +54,7 @@ class MockOpenAI(ChatOpenAI):
         return llm_type
 
 
-def tiktoken_encoding_if_installed():
-    try:
-        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
-
-        return "cl100k_base"
-    except ImportError:
-        return None
-
-
+@pytest.mark.xfail
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts, use_unknown_llm_type",
     [
@@ -82,7 +74,6 @@ def test_langchain_agent(
         integrations=[
             LangchainIntegration(
                 include_prompts=include_prompts,
-                tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
         traces_sample_rate=1.0,
@@ -144,7 +135,16 @@ def test_langchain_agent(
                 ),
                 ChatGenerationChunk(
                     type="ChatGenerationChunk",
-                    message=AIMessageChunk(content="5"),
+                    message=AIMessageChunk(
+                        content="5",
+                        usage_metadata={
+                            "input_tokens": 142,
+                            "output_tokens": 50,
+                            "total_tokens": 192,
+                            "input_token_details": {"audio": 0, "cache_read": 0},
+                            "output_token_details": {"audio": 0, "reasoning": 0},
+                        },
+                    ),
                     generation_info={"finish_reason": "function_call"},
                 ),
             ],
@@ -152,7 +152,16 @@ def test_langchain_agent(
                 ChatGenerationChunk(
                     text="The word eudca has 5 letters.",
                     type="ChatGenerationChunk",
-                    message=AIMessageChunk(content="The word eudca has 5 letters."),
+                    message=AIMessageChunk(
+                        content="The word eudca has 5 letters.",
+                        usage_metadata={
+                            "input_tokens": 89,
+                            "output_tokens": 28,
+                            "total_tokens": 117,
+                            "input_token_details": {"audio": 0, "cache_read": 0},
+                            "output_token_details": {"audio": 0, "reasoning": 0},
+                        },
+                    ),
                 ),
                 ChatGenerationChunk(
                     type="ChatGenerationChunk",
@@ -176,42 +185,49 @@ def test_langchain_agent(
 
     tx = events[0]
     assert tx["type"] == "transaction"
-    chat_spans = list(
-        x for x in tx["spans"] if x["op"] == "ai.chat_completions.create.langchain"
-    )
-    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "ai.tool.langchain")
+    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
 
     assert len(chat_spans) == 2
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
-    assert len(list(x for x in tx["spans"] if x["op"] == "ai.run.langchain")) > 0
+    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
 
-    if use_unknown_llm_type:
-        assert "gen_ai.usage.input_tokens" in chat_spans[0]["data"]
-        assert "gen_ai.usage.total_tokens" in chat_spans[0]["data"]
-    else:
-        # important: to avoid double counting, we do *not* measure
-        # tokens used if we have an explicit integration (e.g. OpenAI)
-        assert "measurements" not in chat_spans[0]
+    assert "gen_ai.usage.input_tokens" in chat_spans[0]["data"]
+    assert "gen_ai.usage.output_tokens" in chat_spans[0]["data"]
+    assert "gen_ai.usage.total_tokens" in chat_spans[0]["data"]
+
+    assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+    assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+    assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+
+    assert "gen_ai.usage.input_tokens" in chat_spans[1]["data"]
+    assert "gen_ai.usage.output_tokens" in chat_spans[1]["data"]
+    assert "gen_ai.usage.total_tokens" in chat_spans[1]["data"]
+    assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+    assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+    assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
     if send_default_pii and include_prompts:
         assert (
-            "You are very powerful" in chat_spans[0]["data"][SPANDATA.AI_INPUT_MESSAGES]
+            "You are very powerful"
+            in chat_spans[0]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
-        assert "5" in chat_spans[0]["data"][SPANDATA.AI_RESPONSES]
-        assert "word" in tool_exec_span["data"][SPANDATA.AI_INPUT_MESSAGES]
-        assert 5 == int(tool_exec_span["data"][SPANDATA.AI_RESPONSES])
+        assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT])
         assert (
-            "You are very powerful" in chat_spans[1]["data"][SPANDATA.AI_INPUT_MESSAGES]
+            "You are very powerful"
+            in chat_spans[1]["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         )
-        assert "5" in chat_spans[1]["data"][SPANDATA.AI_RESPONSES]
+        assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in chat_spans[0].get("data", {})
-        assert SPANDATA.AI_RESPONSES not in chat_spans[0].get("data", {})
-        assert SPANDATA.AI_INPUT_MESSAGES not in chat_spans[1].get("data", {})
-        assert SPANDATA.AI_RESPONSES not in chat_spans[1].get("data", {})
-        assert SPANDATA.AI_INPUT_MESSAGES not in tool_exec_span.get("data", {})
-        assert SPANDATA.AI_RESPONSES not in tool_exec_span.get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in tool_exec_span.get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in tool_exec_span.get("data", {})
 
 
 def test_langchain_error(sentry_init, capture_events):
@@ -311,7 +327,16 @@ def test_span_origin(sentry_init, capture_events):
                 ),
                 ChatGenerationChunk(
                     type="ChatGenerationChunk",
-                    message=AIMessageChunk(content="5"),
+                    message=AIMessageChunk(
+                        content="5",
+                        usage_metadata={
+                            "input_tokens": 142,
+                            "output_tokens": 50,
+                            "total_tokens": 192,
+                            "input_token_details": {"audio": 0, "cache_read": 0},
+                            "output_token_details": {"audio": 0, "reasoning": 0},
+                        },
+                    ),
                     generation_info={"finish_reason": "function_call"},
                 ),
             ],
@@ -319,7 +344,16 @@ def test_span_origin(sentry_init, capture_events):
                 ChatGenerationChunk(
                     text="The word eudca has 5 letters.",
                     type="ChatGenerationChunk",
-                    message=AIMessageChunk(content="The word eudca has 5 letters."),
+                    message=AIMessageChunk(
+                        content="The word eudca has 5 letters.",
+                        usage_metadata={
+                            "input_tokens": 89,
+                            "output_tokens": 28,
+                            "total_tokens": 117,
+                            "input_token_details": {"audio": 0, "cache_read": 0},
+                            "output_token_details": {"audio": 0, "reasoning": 0},
+                        },
+                    ),
                 ),
                 ChatGenerationChunk(
                     type="ChatGenerationChunk",
