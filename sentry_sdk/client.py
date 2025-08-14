@@ -3,7 +3,6 @@ import os
 import uuid
 import random
 import socket
-import asyncio
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -936,7 +935,7 @@ class _Client(BaseClient):
         self,
         timeout: Optional[float] = None,
         callback: Optional[Callable[[int, float], None]] = None,
-    ) -> Optional[asyncio.Task[None]]:
+    ) -> None:
         """
         Close the client and shut down the transport. Arguments have the same
         semantics as :py:meth:`Client.flush`.
@@ -983,7 +982,7 @@ class _Client(BaseClient):
         self,
         timeout: Optional[float] = None,
         callback: Optional[Callable[[int, float], None]] = None,
-    ) -> Optional[asyncio.Task[None]]:
+    ) -> None:
         """
         Wait for the current events to be sent.
 
