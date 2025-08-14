@@ -913,7 +913,7 @@ def _generate_sample_rand(
 
     rng = Random(trace_id)
     lower_scaled = int(lower * 1_000_000)
-    upper_scaled = int(lower * 1_000_000)
+    upper_scaled = int(upper * 1_000_000)
     try:
         sample_rand_scaled = rng.randrange(lower_scaled, upper_scaled)
     except ValueError:
