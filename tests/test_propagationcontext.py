@@ -136,13 +136,13 @@ def test_sample_rand_filled(parent_sampled, sample_rate, expected_interval):
     else:
         sample_rate_str = ""
 
-    # for convenience, we'll just return the lower bound of the interval
-    mock_uniform = mock.Mock(return_value=expected_interval[0])
+    # for convenience, we'll just return the lower bound of the interval as an integer
+    mock_randrange = mock.Mock(return_value=int(expected_interval[0] * 1000000))
 
     def mock_random_class(seed):
         assert seed == "00000000000000000000000000000000", "seed should be the trace_id"
         rv = Mock()
-        rv.uniform = mock_uniform
+        rv.randrange = mock_randrange
         return rv
 
     with mock.patch("sentry_sdk.tracing_utils.Random", mock_random_class):
@@ -158,17 +158,20 @@ def test_sample_rand_filled(parent_sampled, sample_rate, expected_interval):
         ctx.dynamic_sampling_context["sample_rand"]
         == f"{expected_interval[0]:.6f}"  # noqa: E231
     )
-    assert mock_uniform.call_count == 1
-    assert mock_uniform.call_args[0] == expected_interval
+    assert mock_randrange.call_count == 1
+    assert mock_randrange.call_args[0] == (
+        int(expected_interval[0] * 1000000),
+        int(expected_interval[1] * 1000000),
+    )
 
 
 def test_sample_rand_rounds_down():
     # Mock value that should round down to 0.999_999
-    mock_uniform = mock.Mock(return_value=0.999_999_9)
+    mock_randrange = mock.Mock(return_value=999999)
 
     def mock_random_class(_):
         rv = Mock()
-        rv.uniform = mock_uniform
+        rv.randrange = mock_randrange
         return rv
 
     with mock.patch("sentry_sdk.tracing_utils.Random", mock_random_class):

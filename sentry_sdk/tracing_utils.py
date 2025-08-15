@@ -6,7 +6,6 @@ import re
 import sys
 from collections.abc import Mapping
 from datetime import timedelta
-from decimal import ROUND_DOWN, Decimal, DefaultContext, localcontext
 from random import Random
 from urllib.parse import quote, unquote
 import uuid
@@ -502,7 +501,7 @@ class PropagationContext:
             return
 
         sample_rand = try_convert(
-            Decimal, self.dynamic_sampling_context.get("sample_rand")
+            float, self.dynamic_sampling_context.get("sample_rand")
         )
         if sample_rand is not None and 0 <= sample_rand < 1:
             # sample_rand is present and valid, so don't overwrite it
@@ -650,7 +649,7 @@ class Baggage:
         options = client.options or {}
 
         sentry_items["trace_id"] = transaction.trace_id
-        sentry_items["sample_rand"] = str(transaction._sample_rand)
+        sentry_items["sample_rand"] = f"{transaction._sample_rand:.6f}"  # noqa: E231
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -724,15 +723,15 @@ class Baggage:
         )
 
     def _sample_rand(self):
-        # type: () -> Optional[Decimal]
+        # type: () -> Optional[float]
         """Convenience method to get the sample_rand value from the sentry_items.
 
-        We validate the value and parse it as a Decimal before returning it. The value is considered
-        valid if it is a Decimal in the range [0, 1).
+        We validate the value and parse it as a float before returning it. The value is considered
+        valid if it is a float in the range [0, 1).
         """
-        sample_rand = try_convert(Decimal, self.sentry_items.get("sample_rand"))
+        sample_rand = try_convert(float, self.sentry_items.get("sample_rand"))
 
-        if sample_rand is not None and Decimal(0) <= sample_rand < Decimal(1):
+        if sample_rand is not None and 0.0 <= sample_rand < 1.0:
             return sample_rand
 
         return None
@@ -898,7 +897,7 @@ def _generate_sample_rand(
     *,
     interval=(0.0, 1.0),  # type: tuple[float, float]
 ):
-    # type: (...) -> Decimal
+    # type: (...) -> float
     """Generate a sample_rand value from a trace ID.
 
     The generated value will be pseudorandomly chosen from the provided
@@ -913,19 +912,16 @@ def _generate_sample_rand(
         raise ValueError("Invalid interval: lower must be less than upper")
 
     rng = Random(trace_id)
-    sample_rand = upper
-    while sample_rand >= upper:
-        sample_rand = rng.uniform(lower, upper)
+    lower_scaled = int(lower * 1_000_000)
+    upper_scaled = int(upper * 1_000_000)
+    try:
+        sample_rand_scaled = rng.randrange(lower_scaled, upper_scaled)
+    except ValueError:
+        # In some corner cases it might happen that the range is too small
+        # In that case, just take the lower bound
+        sample_rand_scaled = lower_scaled
 
-    # Round down to exactly six decimal-digit precision.
-    # Setting the context is needed to avoid an InvalidOperation exception
-    # in case the user has changed the default precision or set traps.
-    with localcontext(DefaultContext) as ctx:
-        ctx.prec = 6
-        return Decimal(sample_rand).quantize(
-            Decimal("0.000001"),
-            rounding=ROUND_DOWN,
-        )
+    return sample_rand_scaled / 1_000_000
 
 
 def _sample_rand_range(parent_sampled, sample_rate):
