@@ -61,6 +61,28 @@ def test_basic(sentry_init, crashing_app, capture_events):
     }
 
 
+def test_basic_django(sentry_init, crashing_app, capture_events):
+    sentry_init(send_default_pii=True)
+    app = SentryWsgiMiddleware(crashing_app, use_x_forwarded_for=True)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get("/", environ_overrides={"HTTP_X_FORWARDED_HOST": "localhost:80"})
+
+    (event,) = events
+
+    assert event["transaction"] == "generic WSGI request"
+
+    assert event["request"] == {
+        "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+        "headers": {"Host": "localhost", "X-Forwarded-Host": "localhost:80"},
+        "method": "GET",
+        "query_string": "",
+        "url": "http://localhost/",
+    }
+
+
 @pytest.mark.parametrize("path_info", ("bark/", "/bark/"))
 @pytest.mark.parametrize("script_name", ("woof/woof", "woof/woof/"))
 def test_script_name_is_respected(

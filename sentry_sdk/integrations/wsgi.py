@@ -2,7 +2,8 @@ import sys
 from functools import partial
 
 import sentry_sdk
-from sentry_sdk._werkzeug import get_host, _get_headers
+from werkzeug.datastructures import EnvironHeaders
+from werkzeug.wsgi import get_host
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.scope import should_send_default_pii
@@ -62,9 +63,18 @@ def get_request_url(environ, use_x_forwarded_for=False):
     path_info = environ.get("PATH_INFO", "").lstrip("/")
     path = f"{script_name}/{path_info}"
 
+    if use_x_forwarded_for and "HTTP_X_FORWARDED_HOST" in environ:
+        host = environ["HTTP_X_FORWARDED_HOST"]
+        if environ.get("wsgi.url_scheme") == "http" and host.endswith(":80"):
+            host = host[:-3]
+        elif environ.get("wsgi.url_scheme") == "https" and host.endswith(":443"):
+            host = host[:-4]
+    else:
+        host = get_host(environ)
+
     return "%s://%s/%s" % (
         environ.get("wsgi.url_scheme"),
-        get_host(environ, use_x_forwarded_for),
+        host,
         wsgi_decoding_dance(path).lstrip("/"),
     )
 
@@ -286,7 +296,7 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
     query_string = environ.get("QUERY_STRING")
     method = environ.get("REQUEST_METHOD")
     env = dict(_get_environ(environ))
-    headers = _filter_headers(dict(_get_headers(environ)))
+    headers = _filter_headers(dict(EnvironHeaders(environ)))
 
     def event_processor(event, hint):
         # type: (Event, Dict[str, Any]) -> Event
