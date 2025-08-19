@@ -516,8 +516,9 @@ class _Client(BaseClient):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
+        is_transaction = event.get("type") == "transaction"
+
         if scope is not None:
-            is_transaction = event.get("type") == "transaction"
             spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
@@ -560,7 +561,8 @@ class _Client(BaseClient):
                 )
 
         if (
-            self.options["attach_stacktrace"]
+            not is_transaction
+            and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event
