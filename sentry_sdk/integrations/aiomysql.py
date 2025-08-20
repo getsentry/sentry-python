@@ -41,10 +41,6 @@ class AioMySQLIntegration(Integration):
       aiomysql.Connection.query,
     )
 
-    aiomysql.Connection.cursor = _wrap_cursor_creation(
-      aiomysql.Connection.cursor
-    )
-
     aiomysql.connect = _wrap_connect(aiomysql.connect)
 
 
@@ -104,22 +100,6 @@ def _record(
     span_origin=AioMySQLIntegration.origin,
   ) as span:
     yield span
-
-
-def _wrap_cursor_creation(f: Callable[..., T]) -> Callable[..., T]:
-  @ensure_integration_enabled(AioMySQLIntegration, f)
-  def _inner(*args: Any, **kwargs: Any) -> T:
-    query = args[0]
-    params_list = args[1] if len(args) > 1 else None
-
-    with _record(None, query, params_list, executemany=False) as span:
-      _set_db_data(span, args[0])
-      res = f(*args, **kwargs)
-      span.set_data("db.cursor", res._coro.result())
-
-    return res
-
-  return _inner
 
 
 def _wrap_connect(f: Callable[..., T]) -> Callable[..., T]:
