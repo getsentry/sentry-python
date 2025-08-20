@@ -107,10 +107,10 @@ def _wrap_connect(f: Callable[..., T]) -> Callable[..., T]:
     if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
       return f(*args, **kwargs)
 
-    host = kwargs["host"]
+    host = kwargs.get("host", "localhost")
     port = kwargs.get("port") or 3306
-    user = kwargs["user"]
-    db = kwargs["db"]
+    user = kwargs.get("user")
+    db = kwargs.get("db")
 
     with sentry_sdk.start_span(
       op=OP.DB,
