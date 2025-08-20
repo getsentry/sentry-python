@@ -21,6 +21,7 @@ from sentry_sdk import (
     capture_exception,
     capture_event,
     set_tag,
+    start_transaction,
 )
 from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 from sentry_sdk.utils import capture_internal_exception
@@ -558,6 +559,15 @@ def test_attach_stacktrace_disabled(sentry_init, capture_events):
     events = capture_events()
     capture_message("HI")
 
+    (event,) = events
+    assert "threads" not in event
+
+
+def test_attach_stacktrace_transaction(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, attach_stacktrace=True)
+    events = capture_events()
+    with start_transaction(name="transaction"):
+        pass
     (event,) = events
     assert "threads" not in event
 
