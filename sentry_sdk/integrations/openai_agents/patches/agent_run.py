@@ -1,14 +1,13 @@
 from functools import wraps
 
+import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
-
 from ..spans import invoke_agent_span, update_invoke_agent_span, handoff_span
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional
-
 
 try:
     import agents
@@ -63,24 +62,25 @@ def _patch_agent_run():
         # type: (agents.Runner, *Any, **Any) -> Any
         """Patched _run_single_turn that creates agent invocation spans"""
 
-        agent = kwargs.get("agent")
-        context_wrapper = kwargs.get("context_wrapper")
-        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
+        with sentry_sdk.isolation_scope():
+            agent = kwargs.get("agent")
+            context_wrapper = kwargs.get("context_wrapper")
+            should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")
 
-        # Start agent span when agent starts (but only once per agent)
-        if should_run_agent_start_hooks and agent and context_wrapper:
-            # End any existing span for a different agent
-            if _has_active_agent_span(context_wrapper):
-                current_agent = _get_current_agent(context_wrapper)
-                if current_agent and current_agent != agent:
-                    _end_invoke_agent_span(context_wrapper, current_agent)
+            # Start agent span when agent starts (but only once per agent)
+            if should_run_agent_start_hooks and agent and context_wrapper:
+                # End any existing span for a different agent
+                if _has_active_agent_span(context_wrapper):
+                    current_agent = _get_current_agent(context_wrapper)
+                    if current_agent and current_agent != agent:
+                        _end_invoke_agent_span(context_wrapper, current_agent)
 
-            _start_invoke_agent_span(context_wrapper, agent)
+                _start_invoke_agent_span(context_wrapper, agent)
 
-        # Call original method with all the correct parameters
-        result = await original_run_single_turn(*args, **kwargs)
+            # Call original method with all the correct parameters
+            result = await original_run_single_turn(*args, **kwargs)
 
-        return result
+            return result
 
     @wraps(
         original_execute_handoffs.__func__
