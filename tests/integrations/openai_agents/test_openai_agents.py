@@ -659,7 +659,7 @@ async def test_multiple_agents_asyncio(
                 traces_sample_rate=1.0,
             )
 
-            asyncio.gather(
+            await asyncio.gather(
                 *[
                     agents.Runner.run(
                         test_agent, "Test input", run_config=test_run_config
