@@ -236,7 +236,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
     monkeypatch.setattr(HTTPSConnection, "send", mock_send)
 
     sentry_init(traces_sample_rate=0.5, release="foo")
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
         transaction = Transaction.continue_from_headers({})
 
     with start_transaction(transaction=transaction, name="Head SDK tx") as transaction:

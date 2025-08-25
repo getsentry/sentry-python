@@ -618,7 +618,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
 
     raw_server = await aiohttp_raw_server(handler)
 
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
         with start_transaction(
             name="/interactions/other-dogs/new-dog",
             op="greeting.sniff",
