@@ -80,13 +80,13 @@ def test_agent():
 
 
 @pytest.fixture
-def test_agent_custom_model():
+def test_agent_custom_model() -> Agent:
     """Create a real Agent instance for testing."""
     return Agent(
         name="test_agent_custom_model",
         instructions="You are a helpful test assistant.",
         # the model could be agents.OpenAIChatCompletionsModel()
-        model=MagicMock(model="my-custom-model"),
+        model=MagicMock(spec=agents.Model, model="my-custom-model"),
         model_settings=ModelSettings(
             max_tokens=100,
             temperature=0.7,
