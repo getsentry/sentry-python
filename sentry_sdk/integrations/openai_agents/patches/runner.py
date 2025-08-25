@@ -23,20 +23,21 @@ def _create_run_wrapper(original_func):
     @wraps(original_func)
     async def wrapper(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        agent = args[0]
-        with agent_workflow_span(agent):
-            result = None
-            try:
-                result = await original_func(*args, **kwargs)
-                return result
-            except Exception as exc:
-                _capture_exception(exc)
+        with sentry_sdk.isolation_scope():
+            agent = args[0]
+            with agent_workflow_span(agent):
+                result = None
+                try:
+                    result = await original_func(*args, **kwargs)
+                    return result
+                except Exception as exc:
+                    _capture_exception(exc)
 
-                # It could be that there is a "invoke agent" span still open
-                current_span = sentry_sdk.get_current_span()
-                if current_span is not None and current_span.timestamp is None:
-                    current_span.__exit__(None, None, None)
+                    # It could be that there is a "invoke agent" span still open
+                    current_span = sentry_sdk.get_current_span()
+                    if current_span is not None and current_span.timestamp is None:
+                        current_span.__exit__(None, None, None)
 
-                raise exc from None
+                    raise exc from None
 
     return wrapper

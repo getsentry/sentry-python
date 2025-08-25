@@ -1,3 +1,4 @@
+import asyncio
 import re
 import pytest
 from unittest.mock import MagicMock, patch
@@ -637,3 +638,32 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
     assert ai_client_span["description"] == "chat gpt-4"
     assert ai_client_span["origin"] == "auto.ai.openai_agents"
     assert ai_client_span["tags"]["status"] == "internal_error"
+
+
+@pytest.mark.asyncio
+async def test_multiple_agents_asyncio(
+    sentry_init, capture_events, test_agent, mock_model_response
+):
+    """
+    Test that multiple agents can be run at the same time in asyncio tasks.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            asyncio.gather(
+                *[
+                    agents.Runner.run(
+                        test_agent, "Test input", run_config=test_run_config
+                    )
+                    for _ in range(3)
+                ]
+            )
