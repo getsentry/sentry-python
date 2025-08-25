@@ -1,3 +1,4 @@
+from __future__ import annotations
 from contextlib import contextmanager
 
 import sentry_sdk
@@ -31,22 +32,21 @@ class GrapheneIntegration(Integration):
     identifier = "graphene"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         version = package_version("graphene")
         _check_minimum_version(GrapheneIntegration, version)
 
         _patch_graphql()
 
 
-def _patch_graphql():
-    # type: () -> None
+def _patch_graphql() -> None:
     old_graphql_sync = graphene_schema.graphql_sync
     old_graphql_async = graphene_schema.graphql
 
     @ensure_integration_enabled(GrapheneIntegration, old_graphql_sync)
-    def _sentry_patched_graphql_sync(schema, source, *args, **kwargs):
-        # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
+    def _sentry_patched_graphql_sync(
+        schema: GraphQLSchema, source: Union[str, Source], *args: Any, **kwargs: Any
+    ) -> ExecutionResult:
         scope = sentry_sdk.get_isolation_scope()
         scope.add_event_processor(_event_processor)
 
@@ -68,8 +68,9 @@ def _patch_graphql():
 
         return result
 
-    async def _sentry_patched_graphql_async(schema, source, *args, **kwargs):
-        # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
+    async def _sentry_patched_graphql_async(
+        schema: GraphQLSchema, source: Union[str, Source], *args: Any, **kwargs: Any
+    ) -> ExecutionResult:
         integration = sentry_sdk.get_client().get_integration(GrapheneIntegration)
         if integration is None:
             return await old_graphql_async(schema, source, *args, **kwargs)
@@ -99,8 +100,7 @@ def _patch_graphql():
     graphene_schema.graphql = _sentry_patched_graphql_async
 
 
-def _event_processor(event, hint):
-    # type: (Event, Dict[str, Any]) -> Event
+def _event_processor(event: Event, hint: Dict[str, Any]) -> Event:
     if should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"
@@ -112,8 +112,9 @@ def _event_processor(event, hint):
 
 
 @contextmanager
-def graphql_span(schema, source, kwargs):
-    # type: (GraphQLSchema, Union[str, Source], Dict[str, Any]) -> Generator[None, None, None]
+def graphql_span(
+    schema: GraphQLSchema, source: Union[str, Source], kwargs: Dict[str, Any]
+) -> Generator[None, None, None]:
     operation_name = kwargs.get("operation_name")
 
     operation_type = "query"
@@ -135,17 +136,10 @@ def graphql_span(schema, source, kwargs):
         },
     )
 
-    scope = sentry_sdk.get_current_scope()
-    if scope.span:
-        _graphql_span = scope.span.start_child(op=op, name=operation_name)
-    else:
-        _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
-
-    _graphql_span.set_data("graphql.document", source)
-    _graphql_span.set_data("graphql.operation.name", operation_name)
-    _graphql_span.set_data("graphql.operation.type", operation_type)
-
-    try:
+    with sentry_sdk.start_span(
+        op=op, name=operation_name, only_as_child_span=True
+    ) as graphql_span:
+        graphql_span.set_attribute("graphql.document", source)
+        graphql_span.set_attribute("graphql.operation.name", operation_name)
+        graphql_span.set_attribute("graphql.operation.type", operation_type)
         yield
-    finally:
-        _graphql_span.finish()

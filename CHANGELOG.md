@@ -1,5 +1,68 @@
 # Changelog
 
+## 3.0.0a5
+
+### Various fixes & improvements
+
+- Add empty tags by default to transaction (#4683) by @sl0thentr0py
+- Force creation of a new trace in continue_trace with empty headers (#4682) by @sl0thentr0py
+- mypy (#3152) by @sl0thentr0py
+- Add `update_current_span` to SDK 3 (#4679) by @sl0thentr0py
+- feat(tracing): Add convenience function `update_current_span`. (#4673) by @antonpirker
+- Update `gen_ai.*` and `ai.*` attributes (#4665) by @antonpirker
+- Add `update_data` to `Span`. (#4666) by @antonpirker
+- Fix plugins key codecov (#4655) by @sl0thentr0py
+
+## 3.0.0a4
+
+### Various fixes & improvements
+
+- Migrate more type comments to annotations (#4651) by @sl0thentr0py
+- ref: Drop experimental logs options in 3.0 (#4653) by @sl0thentr0py
+- Polish migration guide (#4650) by @sl0thentr0py
+- Add `enable_logs`, `before_send_log` as top-level options (#4644) by @sentrivana
+- Add missing return type annotation (#3152) by @sl0thentr0py
+- Fix mypy (#4649) by @sentrivana
+- Better checking for empty tools list (#4647) by @antonpirker
+- ref: Remove `MAX_EVENT_BYTES` (#4630) by @sl0thentr0py
+- update changelog (9276f2a1) by @antonpirker
+- release: 2.34.1 (a71ef66d) by @getsentry-bot
+- typing (#3152) by @sl0thentr0py
+- Update tests (#3152) by @sl0thentr0py
+- Span data is always be a primitive data type (#4643) by @antonpirker
+- Fix typo in CHANGELOG.md (#4640) by @jgillard
+- updated test matrix (#3152) by @sl0thentr0py
+- Add new_trace api to force a new trace (#4642) by @sl0thentr0py
+- Revert "Add new_trace api to force a new trace" (#3152) by @sl0thentr0py
+- Add new_trace api to force a new trace (#3152) by @sl0thentr0py
+- Update changelog (72766a79) by @antonpirker
+- Update CHANGELOG.md (e1848d4f) by @sentrivana
+- release: 2.34.0 (e84f6f30) by @getsentry-bot
+- Considerably raise `DEFAULT_MAX_VALUE_LENGTH` (#4632) by @sentrivana
+- fix(celery): Latency should be in milliseconds, not seconds (#4637) by @sentrivana
+- OpenAI integration update (#4612) by @antonpirker
+
+_Plus 16 more_
+
+## 3.0.0a3
+
+We're excited to announce that version 3.0 of the Sentry Python SDK is now
+available. This release is the result of a long-term effort to use OpenTelemetry
+under the hood for tracing. This switch opens the door for us to leverage the
+full power of OpenTelemetry, so stay tuned for more integrations and features
+in future releases.
+
+Looking to upgrade from Sentry SDK 2.x to 3.x? See the
+[full list of changes](MIGRATION_GUIDE.md) for a comprehensive overview
+of what's changed. Looking for a more digestible summary? See the
+[migration guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+with the most common migration patterns.
+
+⚠️ This is a pre-release. If you feel like taking it for a spin, we'd be grateful
+for your feedback. How was the migration? Is everything working as expected? Is
+*nothing* working as expected? Something in between? Please let us know
+[on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
+[on Discord](https://discord.com/invite/Ww9hbqr).
 ## 2.35.0
 
 ### Various fixes & improvements

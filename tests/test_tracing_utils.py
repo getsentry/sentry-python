@@ -5,8 +5,7 @@ from sentry_sdk.tracing_utils import _should_be_included, Baggage
 import pytest
 
 
-def id_function(val):
-    # type: (object) -> str
+def id_function(val: object) -> str:
     if isinstance(val, ShouldBeIncludedTestCase):
         return val.id
 
@@ -88,8 +87,9 @@ class ShouldBeIncludedTestCase:
     ],
     ids=id_function,
 )
-def test_should_be_included(test_case, expected):
-    # type: (ShouldBeIncludedTestCase, bool) -> None
+def test_should_be_included(
+    test_case: ShouldBeIncludedTestCase, expected: bool
+) -> None:
     """Checking logic, see: https://github.com/getsentry/sentry-python/issues/3312"""
     kwargs = asdict(test_case)
     kwargs.pop("id")

@@ -511,7 +511,9 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
+def test_cache_spans_get_many(
+    sentry_init, capture_events, use_django_caching, render_span_tree
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -528,39 +530,35 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
 
     from django.core.cache import cache
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="caches"):
         cache.get_many([f"S{id}", f"S{id+1}"])
         cache.set(f"S{id}", "Sensitive1")
         cache.get_many([f"S{id}", f"S{id+1}"])
 
     (transaction,) = events
+    assert transaction["transaction"] == "caches"
     assert len(transaction["spans"]) == 7
 
-    assert transaction["spans"][0]["op"] == "cache.get"
-    assert transaction["spans"][0]["description"] == f"S{id}, S{id+1}"
-
-    assert transaction["spans"][1]["op"] == "cache.get"
-    assert transaction["spans"][1]["description"] == f"S{id}"
-
-    assert transaction["spans"][2]["op"] == "cache.get"
-    assert transaction["spans"][2]["description"] == f"S{id+1}"
-
-    assert transaction["spans"][3]["op"] == "cache.put"
-    assert transaction["spans"][3]["description"] == f"S{id}"
-
-    assert transaction["spans"][4]["op"] == "cache.get"
-    assert transaction["spans"][4]["description"] == f"S{id}, S{id+1}"
-
-    assert transaction["spans"][5]["op"] == "cache.get"
-    assert transaction["spans"][5]["description"] == f"S{id}"
-
-    assert transaction["spans"][6]["op"] == "cache.get"
-    assert transaction["spans"][6]["description"] == f"S{id+1}"
+    assert (
+        render_span_tree(transaction)
+        == f"""\
+- op=null: description=null
+  - op="cache.get": description="S{id}, S{id+1}"
+    - op="cache.get": description="S{id}"
+    - op="cache.get": description="S{id+1}"
+  - op="cache.put": description="S{id}"
+  - op="cache.get": description="S{id}, S{id+1}"
+    - op="cache.get": description="S{id}"
+    - op="cache.get": description="S{id+1}"\
+"""  # noqa:  E221
+    )
 
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
+def test_cache_spans_set_many(
+    sentry_init, capture_events, use_django_caching, render_span_tree
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -577,24 +575,24 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
 
     from django.core.cache import cache
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.start_span(name="caches"):
         cache.set_many({f"S{id}": "Sensitive1", f"S{id+1}": "Sensitive2"})
         cache.get(f"S{id}")
 
     (transaction,) = events
+    assert transaction["transaction"] == "caches"
     assert len(transaction["spans"]) == 4
 
-    assert transaction["spans"][0]["op"] == "cache.put"
-    assert transaction["spans"][0]["description"] == f"S{id}, S{id+1}"
-
-    assert transaction["spans"][1]["op"] == "cache.put"
-    assert transaction["spans"][1]["description"] == f"S{id}"
-
-    assert transaction["spans"][2]["op"] == "cache.put"
-    assert transaction["spans"][2]["description"] == f"S{id+1}"
-
-    assert transaction["spans"][3]["op"] == "cache.get"
-    assert transaction["spans"][3]["description"] == f"S{id}"
+    assert (
+        render_span_tree(transaction)
+        == f"""\
+- op=null: description=null
+  - op="cache.put": description="S{id}, S{id+1}"
+    - op="cache.put": description="S{id}"
+    - op="cache.put": description="S{id+1}"
+  - op="cache.get": description="S{id}"\
+"""  # noqa:  E221
+    )
 
 
 @pytest.mark.forked

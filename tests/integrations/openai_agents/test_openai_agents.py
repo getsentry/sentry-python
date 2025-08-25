@@ -80,13 +80,13 @@ def test_agent():
 
 
 @pytest.fixture
-def test_agent_custom_model():
+def test_agent_custom_model() -> Agent:
     """Create a real Agent instance for testing."""
     return Agent(
         name="test_agent_custom_model",
         instructions="You are a helpful test assistant.",
         # the model could be agents.OpenAIChatCompletionsModel()
-        model=MagicMock(model="my-custom-model"),
+        model=MagicMock(spec=agents.Model, model="my-custom-model"),
         model_settings=ModelSettings(
             max_tokens=100,
             temperature=0.7,
@@ -322,10 +322,10 @@ async def test_handoff_span(sentry_init, capture_events, mock_usage):
 
     (transaction,) = events
     spans = transaction["spans"]
-    handoff_span = spans[2]
 
-    # Verify handoff span was created
-    assert handoff_span is not None
+    # There should be exactly one handoff span
+    (handoff_span,) = [span for span in spans if span["op"] == "gen_ai.handoff"]
+
     assert (
         handoff_span["description"] == "handoff from primary_agent to secondary_agent"
     )
@@ -413,12 +413,25 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
 
     (transaction,) = events
     spans = transaction["spans"]
-    (
-        agent_span,
-        ai_client_span1,
-        tool_span,
-        ai_client_span2,
-    ) = spans
+
+    assert len(spans) == 4
+
+    # Find each span by its characteristics
+    agent_span = next(s for s in spans if s["description"] == "invoke_agent test_agent")
+    tool_span = next(
+        s for s in spans if s["description"] == "execute_tool simple_test_tool"
+    )
+    ai_client_span1 = next(
+        s
+        for s in spans
+        if s["description"] == "chat gpt-4"
+        and "gen_ai.response.tool_calls" in s["data"]
+    )
+    ai_client_span2 = next(
+        s
+        for s in spans
+        if s["description"] == "chat gpt-4" and "gen_ai.response.text" in s["data"]
+    )
 
     available_tools = safe_serialize(
         [
@@ -636,4 +649,4 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
 
     assert ai_client_span["description"] == "chat gpt-4"
     assert ai_client_span["origin"] == "auto.ai.openai_agents"
-    assert ai_client_span["tags"]["status"] == "internal_error"
+    assert ai_client_span["status"] == "internal_error"

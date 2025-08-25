@@ -1,6 +1,6 @@
 import socket
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.integrations.socket import SocketIntegration
 from tests.conftest import ApproxDict, create_mock_http_server
 
@@ -11,7 +11,7 @@ def test_getaddrinfo_trace(sentry_init, capture_events):
     sentry_init(integrations=[SocketIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction():
+    with start_span(name="socket"):
         socket.getaddrinfo("localhost", PORT)
 
     (event,) = events
@@ -33,7 +33,7 @@ def test_create_connection_trace(sentry_init, capture_events):
     sentry_init(integrations=[SocketIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction():
+    with start_span(name="socket"):
         socket.create_connection(("localhost", PORT), timeout, None)
 
     (event,) = events
@@ -44,9 +44,9 @@ def test_create_connection_trace(sentry_init, capture_events):
     assert connect_span["description"] == f"localhost:{PORT}"  # noqa: E231
     assert connect_span["data"] == ApproxDict(
         {
-            "address": ["localhost", PORT],
+            "address.host": "localhost",
+            "address.port": PORT,
             "timeout": timeout,
-            "source_address": None,
         }
     )
 
@@ -67,7 +67,7 @@ def test_span_origin(sentry_init, capture_events):
     )
     events = capture_events()
 
-    with start_transaction(name="foo"):
+    with start_span(name="foo"):
         socket.create_connection(("localhost", PORT), 1, None)
 
     (event,) = events

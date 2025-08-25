@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
@@ -16,13 +17,11 @@ class SparkIntegration(Integration):
     identifier = "spark"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         _setup_sentry_tracing()
 
 
-def _set_app_properties():
-    # type: () -> None
+def _set_app_properties() -> None:
     """
     Set properties in driver that propagate to worker processes, allowing for workers to have access to those properties.
     This allows worker integration to have access to app_name and application_id.
@@ -41,8 +40,7 @@ def _set_app_properties():
         )
 
 
-def _start_sentry_listener(sc):
-    # type: (SparkContext) -> None
+def _start_sentry_listener(sc: SparkContext) -> None:
     """
     Start java gateway server to add custom `SparkListener`
     """
@@ -54,13 +52,11 @@ def _start_sentry_listener(sc):
     sc._jsc.sc().addSparkListener(listener)
 
 
-def _add_event_processor(sc):
-    # type: (SparkContext) -> None
+def _add_event_processor(sc: SparkContext) -> None:
     scope = sentry_sdk.get_isolation_scope()
 
     @scope.add_event_processor
-    def process_event(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+    def process_event(event: Event, hint: Hint) -> Optional[Event]:
         with capture_internal_exceptions():
             if sentry_sdk.get_client().get_integration(SparkIntegration) is None:
                 return event
@@ -90,23 +86,22 @@ def _add_event_processor(sc):
         return event
 
 
-def _activate_integration(sc):
-    # type: (SparkContext) -> None
+def _activate_integration(sc: SparkContext) -> None:
 
     _start_sentry_listener(sc)
     _set_app_properties()
     _add_event_processor(sc)
 
 
-def _patch_spark_context_init():
-    # type: () -> None
+def _patch_spark_context_init() -> None:
     from pyspark import SparkContext
 
     spark_context_init = SparkContext._do_init
 
     @ensure_integration_enabled(SparkIntegration, spark_context_init)
-    def _sentry_patched_spark_context_init(self, *args, **kwargs):
-        # type: (SparkContext, *Any, **Any) -> Optional[Any]
+    def _sentry_patched_spark_context_init(
+        self: SparkContext, *args: Any, **kwargs: Any
+    ) -> Optional[Any]:
         rv = spark_context_init(self, *args, **kwargs)
         _activate_integration(self)
         return rv
@@ -114,8 +109,7 @@ def _patch_spark_context_init():
     SparkContext._do_init = _sentry_patched_spark_context_init
 
 
-def _setup_sentry_tracing():
-    # type: () -> None
+def _setup_sentry_tracing() -> None:
     from pyspark import SparkContext
 
     if SparkContext._active_spark_context is not None:
@@ -125,102 +119,76 @@ def _setup_sentry_tracing():
 
 
 class SparkListener:
-    def onApplicationEnd(self, applicationEnd):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onApplicationEnd(self, applicationEnd: Any) -> None:
         pass
 
-    def onApplicationStart(self, applicationStart):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onApplicationStart(self, applicationStart: Any) -> None:
         pass
 
-    def onBlockManagerAdded(self, blockManagerAdded):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onBlockManagerAdded(self, blockManagerAdded: Any) -> None:
         pass
 
-    def onBlockManagerRemoved(self, blockManagerRemoved):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onBlockManagerRemoved(self, blockManagerRemoved: Any) -> None:
         pass
 
-    def onBlockUpdated(self, blockUpdated):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onBlockUpdated(self, blockUpdated: Any) -> None:
         pass
 
-    def onEnvironmentUpdate(self, environmentUpdate):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onEnvironmentUpdate(self, environmentUpdate: Any) -> None:
         pass
 
-    def onExecutorAdded(self, executorAdded):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onExecutorAdded(self, executorAdded: Any) -> None:
         pass
 
-    def onExecutorBlacklisted(self, executorBlacklisted):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onExecutorBlacklisted(self, executorBlacklisted: Any) -> None:
         pass
 
-    def onExecutorBlacklistedForStage(  # noqa: N802
-        self, executorBlacklistedForStage  # noqa: N803
-    ):
-        # type: (Any) -> None
+    def onExecutorBlacklistedForStage(self, executorBlacklistedForStage: Any) -> None:
         pass
 
-    def onExecutorMetricsUpdate(self, executorMetricsUpdate):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onExecutorMetricsUpdate(self, executorMetricsUpdate: Any) -> None:
         pass
 
-    def onExecutorRemoved(self, executorRemoved):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onExecutorRemoved(self, executorRemoved: Any) -> None:
         pass
 
-    def onJobEnd(self, jobEnd):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onJobEnd(self, jobEnd: Any) -> None:
         pass
 
-    def onJobStart(self, jobStart):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onJobStart(self, jobStart: Any) -> None:
         pass
 
-    def onNodeBlacklisted(self, nodeBlacklisted):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onNodeBlacklisted(self, nodeBlacklisted: Any) -> None:
         pass
 
-    def onNodeBlacklistedForStage(self, nodeBlacklistedForStage):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onNodeBlacklistedForStage(self, nodeBlacklistedForStage: Any) -> None:
         pass
 
-    def onNodeUnblacklisted(self, nodeUnblacklisted):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onNodeUnblacklisted(self, nodeUnblacklisted: Any) -> None:
         pass
 
-    def onOtherEvent(self, event):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onOtherEvent(self, event: Any) -> None:
         pass
 
-    def onSpeculativeTaskSubmitted(self, speculativeTask):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onSpeculativeTaskSubmitted(self, speculativeTask: Any) -> None:
         pass
 
-    def onStageCompleted(self, stageCompleted):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onStageCompleted(self, stageCompleted: Any) -> None:
         pass
 
-    def onStageSubmitted(self, stageSubmitted):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onStageSubmitted(self, stageSubmitted: Any) -> None:
         pass
 
-    def onTaskEnd(self, taskEnd):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onTaskEnd(self, taskEnd: Any) -> None:
         pass
 
-    def onTaskGettingResult(self, taskGettingResult):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onTaskGettingResult(self, taskGettingResult: Any) -> None:
         pass
 
-    def onTaskStart(self, taskStart):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onTaskStart(self, taskStart: Any) -> None:
         pass
 
-    def onUnpersistRDD(self, unpersistRDD):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onUnpersistRDD(self, unpersistRDD: Any) -> None:
         pass
 
     class Java:
@@ -230,25 +198,22 @@ class SparkListener:
 class SentryListener(SparkListener):
     def _add_breadcrumb(
         self,
-        level,  # type: str
-        message,  # type: str
-        data=None,  # type: Optional[dict[str, Any]]
-    ):
-        # type: (...) -> None
+        level: str,
+        message: str,
+        data: Optional[dict[str, Any]] = None,
+    ) -> None:
         sentry_sdk.get_isolation_scope().add_breadcrumb(
             level=level, message=message, data=data
         )
 
-    def onJobStart(self, jobStart):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onJobStart(self, jobStart: Any) -> None:
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         message = "Job {} Started".format(jobStart.jobId())
         self._add_breadcrumb(level="info", message=message)
         _set_app_properties()
 
-    def onJobEnd(self, jobEnd):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onJobEnd(self, jobEnd: Any) -> None:
         level = ""
         message = ""
         data = {"result": jobEnd.jobResult().toString()}
@@ -262,8 +227,7 @@ class SentryListener(SparkListener):
 
         self._add_breadcrumb(level=level, message=message, data=data)
 
-    def onStageSubmitted(self, stageSubmitted):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onStageSubmitted(self, stageSubmitted: Any) -> None:
         stage_info = stageSubmitted.stageInfo()
         message = "Stage {} Submitted".format(stage_info.stageId())
 
@@ -275,8 +239,7 @@ class SentryListener(SparkListener):
         self._add_breadcrumb(level="info", message=message, data=data)
         _set_app_properties()
 
-    def onStageCompleted(self, stageCompleted):  # noqa: N802,N803
-        # type: (Any) -> None
+    def onStageCompleted(self, stageCompleted: Any) -> None:
         from py4j.protocol import Py4JJavaError  # type: ignore
 
         stage_info = stageCompleted.stageInfo()
@@ -300,8 +263,7 @@ class SentryListener(SparkListener):
         self._add_breadcrumb(level=level, message=message, data=data)
 
 
-def _get_attempt_id(stage_info):
-    # type: (Any) -> Optional[int]
+def _get_attempt_id(stage_info: Any) -> Optional[int]:
     try:
         return stage_info.attemptId()
     except Exception:

@@ -212,10 +212,7 @@ def test_timeout_error(run_cloud_function):
     (exception,) = envelope_items[0]["exception"]["values"]
 
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert (
-        exception["value"]
-        == "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds."
-    )
+    assert exception["value"] == "WARNING: Function is about to time out."
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
 
@@ -293,35 +290,32 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         dedent(
             """
             functionhandler = None
-            event = {
-                "type": "chase",
-                "chasers": ["Maisey", "Charlie"],
-                "num_squirrels": 2,
-            }
+
+            from collections import namedtuple
+            GCPEvent = namedtuple("GCPEvent", ["headers"])
+            event = GCPEvent(headers={"Custom-Header": "Custom Value"})
+
             def cloud_function(functionhandler, event):
                 # this runs after the transaction has started, which means we
                 # can make assertions about traces_sampler
                 try:
                     traces_sampler.assert_any_call(
                         DictionaryContaining({
-                            "gcp_env": DictionaryContaining({
-                                "function_name": "chase_into_tree",
-                                "function_region": "dogpark",
-                                "function_project": "SquirrelChasing",
-                            }),
-                            "gcp_event": {
-                                "type": "chase",
-                                "chasers": ["Maisey", "Charlie"],
-                                "num_squirrels": 2,
-                            },
+                            "faas.name": "chase_into_tree",
+                            "faas.region": "dogpark",
+                            "gcp.function.identity": "func_ID",
+                            "gcp.function.entry_point": "cloud_function",
+                            "gcp.function.project": "SquirrelChasing",
+                            "cloud.provider": "gcp",
+                            "http.request.header.custom-header": "Custom Value",
                         })
                     )
                 except AssertionError:
                     # catch the error and return it because the error itself will
                     # get swallowed by the SDK as an "internal exception"
-                    return {"AssertionError raised": True,}
+                    return {"AssertionError raised": True}
 
-                return {"AssertionError raised": False,}
+                return {"AssertionError raised": False}
             """
         )
         + FUNCTIONS_PRELUDE
