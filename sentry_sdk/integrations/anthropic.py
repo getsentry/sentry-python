@@ -159,7 +159,7 @@ def _set_output_data(
 ) -> None:
     """
     Set output data for the span based on the AI response."""
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
     if should_send_default_pii() and integration.include_prompts:
         set_data_normalized(
             span,

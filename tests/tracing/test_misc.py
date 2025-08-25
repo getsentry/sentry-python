@@ -203,8 +203,8 @@ def test_span_set_attributes(sentry_init, capture_events):
 
     with sentry_sdk.start_span(name="test-root-span"):
         with start_span(op="test-span", name="test-span-name") as span:
-            span.set_data("key0", "value0")
-            span.set_data("key1", "value1")
+            span.set_attribute("key0", "value0")
+            span.set_attribute("key1", "value1")
 
             span.set_attributes(
                 {
