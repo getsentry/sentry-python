@@ -20,7 +20,7 @@ from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
-from sentry_sdk.integrations.anthropic import _add_ai_data_to_span, _collect_ai_data
+from sentry_sdk.integrations.anthropic import _set_output_data, _collect_ai_data
 from sentry_sdk.utils import package_version
 
 try:
@@ -692,7 +692,6 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.forked
 def test_exception_message_create(sentry_init, capture_events):
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -814,7 +813,7 @@ def test_collect_ai_data_with_input_json_delta():
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta.",
 )
-def test_add_ai_data_to_span_with_input_json_delta(sentry_init, capture_events):
+def test_set_output_data_with_input_json_delta(sentry_init, capture_events):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -825,24 +824,24 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init, capture_events):
     with start_span(name="test"):
         with start_span(name="anthropic") as span:
             integration = AnthropicIntegration()
-
-            _add_ai_data_to_span(
+            json_deltas = ["{'test': 'data',", "'more': 'json'}"]
+            _set_output_data(
                 span,
                 integration,
+                model="",
                 input_tokens=10,
                 output_tokens=20,
-                content_blocks=["{'test': 'data',", "'more': 'json'}"],
+                content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
             )
 
-    (event,) = events
-
-    assert len(event["spans"]) == 1
-    (span,) = event["spans"]
+    assert len(events) == 1
+    root_span = events[0]
+    span = root_span["spans"][0]
 
     assert (
-        span._data.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
+        span["data"].get(SPANDATA.GEN_AI_RESPONSE_TEXT)
         == "[{\"text\": \"{'test': 'data','more': 'json'}\", \"type\": \"text\"}]"
     )
-    assert span._data.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
-    assert span._data.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
-    assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
