@@ -23,6 +23,7 @@ from sentry_sdk.consts import (
     SENTRY_TRACE_HEADER_NAME,
     SPANSTATUS,
     SPANDATA,
+    SPANTEMPLATE,
     TransactionSource,
 )
 from sentry_sdk.opentelemetry.consts import (
@@ -551,39 +552,107 @@ Transaction = Span
 if TYPE_CHECKING:
 
     @overload
-    def trace(func: None = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def trace(
+        func: Optional[Callable[P, R]] = None,
+        *,
+        op: Optional[str] = None,
+        name: Optional[str] = None,
+        attributes: Optional[dict[str, Any]] = None,
+        template: SPANTEMPLATE = SPANTEMPLATE.DEFAULT,
+    ) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]:
+        # Handles: @trace() and @trace(op="custom")
         pass
 
     @overload
     def trace(func: Callable[P, R]) -> Callable[P, R]:
+        # Handles: @trace
         pass
 
 
 def trace(
     func: Optional[Callable[P, R]] = None,
+    *,
+    op: Optional[str] = None,
+    name: Optional[str] = None,
+    attributes: Optional[dict[str, Any]] = None,
+    template: SPANTEMPLATE = SPANTEMPLATE.DEFAULT,
 ) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]:
     """
-    Decorator to start a child span under the existing current transaction.
-    If there is no current transaction, then nothing will be traced.
+    Decorator to start a child span around a function call.
 
-    .. code-block::
-        :caption: Usage
+    This decorator automatically creates a new span when the decorated function
+    is called, and finishes the span when the function returns or raises an exception.
+
+    :param func: The function to trace. When used as a decorator without parentheses,
+        this is the function being decorated. When used with parameters (e.g.,
+        ``@trace(op="custom")``, this should be None.
+    :type func: Callable or None
+
+    :param op: The operation name for the span. This is a high-level description
+        of what the span represents (e.g., "http.client", "db.query").
+        You can use predefined constants from :py:class:`sentry_sdk.consts.OP`
+        or provide your own string. If not provided, a default operation will
+        be assigned based on the template.
+    :type op: str or None
+
+    :param name: The human-readable name/description for the span. If not provided,
+        defaults to the function name. This provides more specific details about
+        what the span represents (e.g., "GET /api/users", "process_user_data").
+    :type name: str or None
+
+    :param attributes: A dictionary of key-value pairs to add as attributes to the span.
+        Attribute values must be strings, integers, floats, or booleans. These
+        attributes provide additional context about the span's execution.
+    :type attributes: dict[str, Any] or None
+
+    :param template: The type of span to create. This determines what kind of
+        span instrumentation and data collection will be applied. Use predefined
+        constants from :py:class:`sentry_sdk.consts.SPANTEMPLATE`.
+        The default is `SPANTEMPLATE.DEFAULT` which is the right choice for most
+        use cases.
+    :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
+
+    :returns: When used as ``@trace``, returns the decorated function. When used as
+        ``@trace(...)`` with parameters, returns a decorator function.
+    :rtype: Callable or decorator function
+
+    Example::
 
         import sentry_sdk
+        from sentry_sdk.consts import OP, SPANTEMPLATE
 
+        # Simple usage with default values
         @sentry_sdk.trace
-        def my_function():
-            ...
+        def process_data():
+            # Function implementation
+            pass
 
-        @sentry_sdk.trace
-        async def my_async_function():
-            ...
+        # With custom parameters
+        @sentry_sdk.trace(
+            op=OP.DB_QUERY,
+            name="Get user data",
+            attributes={"postgres": True}
+        )
+        def make_db_query(sql):
+            # Function implementation
+            pass
+
+        # With a custom template
+        @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
+        def calculate_interest_rate(amount, rate, years):
+            # Function implementation
+            pass
     """
-    from sentry_sdk.tracing_utils import start_child_span_decorator
+    from sentry_sdk.tracing_utils import create_span_decorator
 
-    # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
-    # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278
+    decorator = create_span_decorator(
+        op=op,
+        name=name,
+        attributes=attributes,
+        template=template,
+    )
+
     if func:
-        return start_child_span_decorator(func)
+        return decorator(func)
     else:
-        return start_child_span_decorator
+        return decorator

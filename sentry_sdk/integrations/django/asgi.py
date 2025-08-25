@@ -157,7 +157,7 @@ def patch_channels_asgi_handler_impl(cls: Any) -> None:
                 http_methods_to_capture=integration.http_methods_to_capture,
             )
 
-            return await middleware(self.scope)(receive, send)
+            return await middleware(self.scope)(receive, send)  # type: ignore
 
         cls.__call__ = sentry_patched_asgi_handler
 

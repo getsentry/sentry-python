@@ -488,7 +488,8 @@ class _Client(BaseClient):
                 )
 
         if (
-            self.options["attach_stacktrace"]
+            not is_transaction
+            and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event

@@ -13,7 +13,8 @@ from sentry_sdk.utils import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import ParamSpec, Callable, Any, Dict, TypeVar
+    from collections.abc import Iterator
+    from typing import Any, ParamSpec, Callable, TypeVar
 
     P = ParamSpec("P")
     T = TypeVar("T")
@@ -40,9 +41,7 @@ class ClickhouseDriverIntegration(Integration):
         )
 
         # If the query contains parameters then the send_data function is used to send those parameters to clickhouse
-        clickhouse_driver.client.Client.send_data = _wrap_send_data(
-            clickhouse_driver.client.Client.send_data
-        )
+        _wrap_send_data()
 
         # Every query ends either with the Client's `receive_end_of_query` (no result expected)
         # or its `receive_result` (result expected)
@@ -134,36 +133,57 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
     return _inner_end
 
 
-def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
-    def _inner_send_data(*args: P.args, **kwargs: P.kwargs) -> T:
-        client = args[0]
-        if not isinstance(client, clickhouse_driver.client.Client):
-            return f(*args, **kwargs)
+def _wrap_send_data() -> None:
+    original_send_data = clickhouse_driver.client.Client.send_data
 
-        connection = client.connection
-        span = getattr(connection, "_sentry_span", None)
+    def _inner_send_data(
+        self,
+        sample_block: Any,
+        data: Any,
+        types_check: bool = False,
+        columnar: bool = False,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
+        span = getattr(self.connection, "_sentry_span", None)
 
         if span is not None:
-            data = _get_db_data(connection)
+            data = _get_db_data(self.connection)
             _set_on_span(span, data)
 
             if should_send_default_pii():
                 saved_db_data: dict[str, Any] = getattr(
-                    connection, "_sentry_db_data", {}
+                    self.connection, "_sentry_db_data", {}
                 )
                 db_params: list[Any] = saved_db_data.get("db.params") or []
-                db_params_data = args[2]
-                if isinstance(db_params_data, list):
-                    db_params.extend(db_params_data)
-                saved_db_data["db.params"] = db_params
+
+                if isinstance(data, (list, tuple)):
+                    db_params.extend(data)
+
+                else:  # data is a generic iterator
+                    orig_data = data
+
+                    # Wrap the generator to add items to db.params as they are yielded.
+                    # This allows us to send the params to Sentry without needing to allocate
+                    # memory for the entire generator at once.
+                    def wrapped_generator() -> "Iterator[Any]":
+                        for item in orig_data:
+                            db_params.append(item)
+                            yield item
+
+                    # Replace the original iterator with the wrapped one.
+                    data = wrapped_generator()
+
                 span.set_attribute("db.params", _serialize_span_attribute(db_params))
 
-        return f(*args, **kwargs)
+        return original_send_data(
+            self, sample_block, data, types_check, columnar, *args, **kwargs
+        )
 
-    return _inner_send_data
+    clickhouse_driver.client.Client.send_data = _inner_send_data
 
 
-def _get_db_data(connection: clickhouse_driver.connection.Connection) -> Dict[str, str]:
+def _get_db_data(connection: clickhouse_driver.connection.Connection) -> dict[str, str]:
     return {
         SPANDATA.DB_SYSTEM: "clickhouse",
         SPANDATA.SERVER_ADDRESS: connection.host,
@@ -173,6 +193,6 @@ def _get_db_data(connection: clickhouse_driver.connection.Connection) -> Dict[st
     }
 
 
-def _set_on_span(span: Span, data: Dict[str, Any]) -> None:
+def _set_on_span(span: Span, data: dict[str, Any]) -> None:
     for key, value in data.items():
         span.set_attribute(key, _serialize_span_attribute(value))
