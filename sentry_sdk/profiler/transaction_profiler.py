@@ -45,6 +45,7 @@ from sentry_sdk.profiler.utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exception,
+    capture_internal_exceptions,
     get_current_thread_meta,
     is_gevent,
     is_valid_sample_rate,
@@ -369,12 +370,13 @@ class Profile:
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        self.stop()
+        with capture_internal_exceptions():
+            self.stop()
 
-        scope, old_profile = self._context_manager_state
-        del self._context_manager_state
+            scope, old_profile = self._context_manager_state
+            del self._context_manager_state
 
-        scope.profile = old_profile
+            scope.profile = old_profile
 
     def write(self, ts, sample):
         # type: (int, ExtractedSample) -> None
