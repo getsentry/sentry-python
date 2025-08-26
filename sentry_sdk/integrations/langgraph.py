@@ -114,16 +114,17 @@ def _wrap_pregel_invoke(f):
         graph_name, node_names = _get_graph_metadata(self)
 
         with sentry_sdk.start_span(
-            op=OP.GEN_AI_PIPELINE,
-            name=f"langgraph {graph_name}".strip() if graph_name else "langgraph",
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             origin=LanggraphIntegration.origin,
         ) as span:
-            # Set pipeline metadata
+            # Set agent metadata
             if graph_name:
                 set_ai_pipeline_name(graph_name)
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
             # Capture input state if PII is allowed
@@ -167,16 +168,17 @@ def _wrap_pregel_ainvoke(f):
         graph_name, node_names = _get_graph_metadata(self)
 
         with sentry_sdk.start_span(
-            op=OP.GEN_AI_PIPELINE,
-            name=f"langgraph {graph_name}".strip() if graph_name else "langgraph",
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             origin=LanggraphIntegration.origin,
         ) as span:
-            # Set pipeline metadata
+            # Set agent metadata
             if graph_name:
                 set_ai_pipeline_name(graph_name)
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
+                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "ainvoke")
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
             # Capture input state if PII is allowed
@@ -221,18 +223,19 @@ def _wrap_pregel_stream(f):
         graph_name, node_names = _get_graph_metadata(self)
 
         span = sentry_sdk.start_span(
-            op=OP.GEN_AI_PIPELINE,
-            name=f"langgraph {graph_name}".strip() if graph_name else "langgraph",
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             origin=LanggraphIntegration.origin,
         )
         span.__enter__()
 
-        # Set pipeline metadata
+        # Set agent metadata
         if graph_name:
             set_ai_pipeline_name(graph_name)
             span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
+            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "stream")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
         # Capture input state if PII is allowed
@@ -294,18 +297,19 @@ def _wrap_pregel_astream(f):
         graph_name, node_names = _get_graph_metadata(self)
 
         span = sentry_sdk.start_span(
-            op=OP.GEN_AI_PIPELINE,
-            name=f"langgraph {graph_name}".strip() if graph_name else "langgraph",
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
             origin=LanggraphIntegration.origin,
         )
         span.__enter__()
 
-        # Set pipeline metadata
+        # Set agent metadata
         if graph_name:
             set_ai_pipeline_name(graph_name)
             span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
+            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "astream")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
         # Capture input state if PII is allowed
