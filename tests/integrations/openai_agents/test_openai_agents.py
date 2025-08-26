@@ -645,7 +645,8 @@ async def test_multiple_agents_asyncio(
     sentry_init, capture_events, test_agent, mock_model_response
 ):
     """
-    Test that multiple agents can be run at the same time in asyncio tasks.
+    Test that multiple agents can be run at the same time in asyncio tasks
+    without interfering with each other.
     """
 
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
@@ -659,11 +660,23 @@ async def test_multiple_agents_asyncio(
                 traces_sample_rate=1.0,
             )
 
-            await asyncio.gather(
-                *[
-                    agents.Runner.run(
-                        test_agent, "Test input", run_config=test_run_config
-                    )
-                    for _ in range(3)
-                ]
-            )
+            events = capture_events()
+
+            async def run():
+                await agents.Runner.run(
+                    starting_agent=test_agent,
+                    input="Test input",
+                    run_config=test_run_config,
+                )
+
+            await asyncio.gather(*[run() for _ in range(3)])
+
+    assert len(events) == 3
+    txn1, txn2, txn3 = events
+
+    assert txn1["type"] == "transaction"
+    assert txn1["transaction"] == "test_agent workflow"
+    assert txn2["type"] == "transaction"
+    assert txn2["transaction"] == "test_agent workflow"
+    assert txn3["type"] == "transaction"
+    assert txn3["transaction"] == "test_agent workflow"
