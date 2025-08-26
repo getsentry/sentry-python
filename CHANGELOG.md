@@ -63,6 +63,14 @@ for your feedback. How was the migration? Is everything working as expected? Is
 *nothing* working as expected? Something in between? Please let us know
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
 [on Discord](https://discord.com/invite/Ww9hbqr).
+
+## 2.35.1
+
+### Various fixes & improvements
+
+- OpenAI Agents: Isolate agent run (#4720) by @sentrivana
+- Tracing: Do not attach stacktrace to transaction (#4713) by @Zylphrex
+
 ## 2.35.0
 
 ### Various fixes & improvements

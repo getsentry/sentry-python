@@ -3,14 +3,12 @@ from __future__ import annotations
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
-
 from ..spans import invoke_agent_span, update_invoke_agent_span, handoff_span
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional
-
 
 try:
     import agents
