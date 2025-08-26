@@ -146,39 +146,46 @@ def _wrap_send_data() -> None:
         **kwargs: Any,
     ) -> Any:
         span = getattr(self.connection, "_sentry_span", None)
+        if span is None:
+            return original_send_data(
+                self, sample_block, data, types_check, columnar, *args, **kwargs
+            )
 
-        if span is not None:
-            data = _get_db_data(self.connection)
-            _set_on_span(span, data)
+        db_data = _get_db_data(self.connection)
+        _set_on_span(span, db_data)
 
-            if should_send_default_pii():
-                saved_db_data: dict[str, Any] = getattr(
-                    self.connection, "_sentry_db_data", {}
-                )
-                db_params: list[Any] = saved_db_data.get("db.params") or []
+        saved_db_data: dict[str, Any] = getattr(self.connection, "_sentry_db_data", {})
+        db_params: list[Any] = saved_db_data.get("db.params") or []
 
-                if isinstance(data, (list, tuple)):
-                    db_params.extend(data)
+        if should_send_default_pii():
+            if isinstance(data, (list, tuple)):
+                db_params.extend(data)
 
-                else:  # data is a generic iterator
-                    orig_data = data
+            else:  # data is a generic iterator
+                orig_data = data
 
-                    # Wrap the generator to add items to db.params as they are yielded.
-                    # This allows us to send the params to Sentry without needing to allocate
-                    # memory for the entire generator at once.
-                    def wrapped_generator() -> "Iterator[Any]":
-                        for item in orig_data:
-                            db_params.append(item)
-                            yield item
+                # Wrap the generator to add items to db.params as they are yielded.
+                # This allows us to send the params to Sentry without needing to allocate
+                # memory for the entire generator at once.
+                def wrapped_generator() -> "Iterator[Any]":
+                    for item in orig_data:
+                        db_params.append(item)
+                        yield item
 
-                    # Replace the original iterator with the wrapped one.
-                    data = wrapped_generator()
+                # Replace the original iterator with the wrapped one.
+                data = wrapped_generator()
 
-                span.set_attribute("db.params", _serialize_span_attribute(db_params))
-
-        return original_send_data(
+        rv = original_send_data(
             self, sample_block, data, types_check, columnar, *args, **kwargs
         )
+
+        if should_send_default_pii() and db_params:
+            # need to do this after the original function call to make sure
+            # db_params is populated correctly
+            saved_db_data["db.params"] = db_params
+            span.set_attribute("db.params", _serialize_span_attribute(db_params))
+
+        return rv
 
     clickhouse_driver.client.Client.send_data = _inner_send_data
 

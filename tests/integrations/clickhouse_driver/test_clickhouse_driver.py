@@ -383,7 +383,7 @@ def test_clickhouse_spans_with_generator(sentry_init, capture_events):
         span for span in spans if span["description"] == "INSERT INTO test (x) VALUES"
     ]
 
-    assert span["data"]["db.params"] == [{"x": 0}, {"x": 1}, {"x": 2}]
+    assert span["data"]["db.params"] == '[{"x": 0}, {"x": 1}, {"x": 2}]'
 
 
 def test_clickhouse_client_spans_with_pii(
