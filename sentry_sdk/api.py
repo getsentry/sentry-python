@@ -344,8 +344,11 @@ def set_transaction_name(name: str, source: Optional[str] = None) -> None:
     return get_current_scope().set_transaction_name(name, source)
 
 
-def update_current_span(op=None, name=None, attributes=None):
-    # type: (Optional[str], Optional[str], Optional[dict[str, Union[str, int, float, bool]]]) -> None
+def update_current_span(
+    op: Optional[str] = None,
+    name: Optional[str] = None,
+    attributes: Optional[dict[str, Union[str, int, float, bool]]] = None,
+) -> None:
     """
     Update the current active span with the provided parameters.
 

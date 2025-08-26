@@ -152,7 +152,7 @@ class SentryAsgiMiddleware:
         if asgi_version == 3:
             self.__call__: Callable[..., Any] = self._run_asgi3
         elif asgi_version == 2:
-            self.__call__: Callable[..., Any] = self._run_asgi2
+            self.__call__: Callable[..., Any] = self._run_asgi2  # type: ignore
 
     def _capture_lifespan_exception(self, exc: Exception) -> None:
         """Capture exceptions raise in application lifespan handlers.

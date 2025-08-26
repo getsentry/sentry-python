@@ -137,7 +137,7 @@ def _wrap_send_data() -> None:
     original_send_data = clickhouse_driver.client.Client.send_data
 
     def _inner_send_data(
-        self,
+        self: clickhouse_driver.client.Client,
         sample_block: Any,
         data: Any,
         types_check: bool = False,

@@ -154,7 +154,7 @@ def _set_output_data(
     model: str | None,
     input_tokens: int,
     output_tokens: int,
-    content_blocks: list[str],
+    content_blocks: list[Any],
     finish_span: bool = False,
 ) -> None:
     """

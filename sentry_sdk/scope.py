@@ -61,7 +61,7 @@ if TYPE_CHECKING:
         Self,
     )
 
-    from collections.abc import Mapping, MutableMapping
+    from collections.abc import Mapping
 
     import sentry_sdk
     from sentry_sdk._types import (
@@ -627,12 +627,12 @@ class Scope:
         self._level: Optional[LogLevelStr] = None
         self._fingerprint: Optional[List[str]] = None
         self._transaction: Optional[str] = None
-        self._transaction_info: MutableMapping[str, str] = {}
+        self._transaction_info: Dict[str, str] = {}
         self._user: Optional[Dict[str, Any]] = None
 
         self._tags: Dict[str, Any] = {}
         self._contexts: Dict[str, Dict[str, Any]] = {}
-        self._extras: MutableMapping[str, Any] = {}
+        self._extras: Dict[str, Any] = {}
         self._attachments: List[Attachment] = []
 
         self.clear_breadcrumbs()
