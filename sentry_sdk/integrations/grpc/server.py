@@ -1,8 +1,9 @@
+from __future__ import annotations
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.tracing import Transaction, TransactionSource
+from sentry_sdk.tracing import TransactionSource
 
 from typing import TYPE_CHECKING
 
@@ -18,39 +19,41 @@ except ImportError:
 
 
 class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
-    def __init__(self, find_name=None):
-        # type: (ServerInterceptor, Optional[Callable[[ServicerContext], str]]) -> None
+    def __init__(
+        self: ServerInterceptor,
+        find_name: Optional[Callable[[ServicerContext], str]] = None,
+    ) -> None:
         self._find_method_name = find_name or ServerInterceptor._find_name
 
         super().__init__()
 
-    def intercept_service(self, continuation, handler_call_details):
-        # type: (ServerInterceptor, Callable[[HandlerCallDetails], RpcMethodHandler], HandlerCallDetails) -> RpcMethodHandler
+    def intercept_service(
+        self: ServerInterceptor,
+        continuation: Callable[[HandlerCallDetails], RpcMethodHandler],
+        handler_call_details: HandlerCallDetails,
+    ) -> RpcMethodHandler:
         handler = continuation(handler_call_details)
         if not handler or not handler.unary_unary:
             return handler
 
-        def behavior(request, context):
-            # type: (Message, ServicerContext) -> Message
+        def behavior(request: Message, context: ServicerContext) -> Message:
             with sentry_sdk.isolation_scope():
                 name = self._find_method_name(context)
 
                 if name:
                     metadata = dict(context.invocation_metadata())
 
-                    transaction = Transaction.continue_from_headers(
-                        metadata,
-                        op=OP.GRPC_SERVER,
-                        name=name,
-                        source=TransactionSource.CUSTOM,
-                        origin=SPAN_ORIGIN,
-                    )
-
-                    with sentry_sdk.start_transaction(transaction=transaction):
-                        try:
-                            return handler.unary_unary(request, context)
-                        except BaseException as e:
-                            raise e
+                    with sentry_sdk.continue_trace(metadata):
+                        with sentry_sdk.start_span(
+                            op=OP.GRPC_SERVER,
+                            name=name,
+                            source=TransactionSource.CUSTOM,
+                            origin=SPAN_ORIGIN,
+                        ):
+                            try:
+                                return handler.unary_unary(request, context)
+                            except BaseException as e:
+                                raise e
                 else:
                     return handler.unary_unary(request, context)
 
@@ -61,6 +64,5 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
 
     @staticmethod
-    def _find_name(context):
-        # type: (ServicerContext) -> str
+    def _find_name(context: ServicerContext) -> str:
         return context._rpc_event.call_details.method.decode()

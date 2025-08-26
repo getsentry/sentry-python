@@ -44,7 +44,7 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk import start_transaction, start_span
+from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import AnthropicIntegration
 
@@ -92,7 +92,7 @@ def test_nonstreaming_create_message(
         }
     ]
 
-    with start_transaction(name="anthropic"):
+    with start_span(name="anthropic"):
         response = client.messages.create(
             max_tokens=1024, messages=messages, model="model"
         )
@@ -164,7 +164,7 @@ async def test_nonstreaming_create_message_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
+    with start_span(name="anthropic"):
         response = await client.messages.create(
             max_tokens=1024, messages=messages, model="model"
         )
@@ -269,7 +269,7 @@ def test_streaming_create_message(
         }
     ]
 
-    with start_transaction(name="anthropic"):
+    with start_span(name="anthropic"):
         message = client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -376,7 +376,7 @@ async def test_streaming_create_message_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
+    with start_span(name="anthropic"):
         message = await client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -510,7 +510,7 @@ def test_streaming_create_message_with_input_json_delta(
         }
     ]
 
-    with start_transaction(name="anthropic"):
+    with start_span(name="anthropic"):
         message = client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -650,7 +650,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         }
     ]
 
-    with start_transaction(name="anthropic"):
+    with start_span(name="anthropic"):
         message = await client.messages.create(
             max_tokens=1024, messages=messages, model="model", stream=True
         )
@@ -748,7 +748,7 @@ def test_span_origin(sentry_init, capture_events):
         }
     ]
 
-    with start_transaction(name="anthropic"):
+    with start_span(name="anthropic"):
         client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     (event,) = events
@@ -775,7 +775,7 @@ async def test_span_origin_async(sentry_init, capture_events):
         }
     ]
 
-    with start_transaction(name="anthropic"):
+    with start_span(name="anthropic"):
         await client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     (event,) = events
@@ -813,30 +813,35 @@ def test_collect_ai_data_with_input_json_delta():
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta.",
 )
-def test_set_output_data_with_input_json_delta(sentry_init):
+def test_set_output_data_with_input_json_delta(sentry_init, capture_events):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+    events = capture_events()
 
-    with start_transaction(name="test"):
-        span = start_span()
-        integration = AnthropicIntegration()
-        json_deltas = ["{'test': 'data',", "'more': 'json'}"]
-        _set_output_data(
-            span,
-            integration,
-            model="",
-            input_tokens=10,
-            output_tokens=20,
-            content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
-        )
+    with start_span(name="test"):
+        with start_span(name="anthropic") as span:
+            integration = AnthropicIntegration()
+            json_deltas = ["{'test': 'data',", "'more': 'json'}"]
+            _set_output_data(
+                span,
+                integration,
+                model="",
+                input_tokens=10,
+                output_tokens=20,
+                content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
+            )
 
-        assert (
-            span._data.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
-            == "[{\"text\": \"{'test': 'data','more': 'json'}\", \"type\": \"text\"}]"
-        )
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
-        assert span._data.get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30
+    assert len(events) == 1
+    root_span = events[0]
+    span = root_span["spans"][0]
+
+    assert (
+        span["data"].get(SPANDATA.GEN_AI_RESPONSE_TEXT)
+        == "[{\"text\": \"{'test': 'data','more': 'json'}\", \"type\": \"text\"}]"
+    )
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30

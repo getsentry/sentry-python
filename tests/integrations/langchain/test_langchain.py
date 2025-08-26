@@ -19,7 +19,7 @@ from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_span
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
@@ -34,8 +34,8 @@ def get_word_length(word: str) -> int:
     return len(word)
 
 
-global stream_result_mock  # type: Mock
-global llm_type  # type: str
+stream_result_mock: Mock
+llm_type: str
 
 
 class MockOpenAI(ChatOpenAI):
@@ -180,7 +180,7 @@ def test_langchain_agent(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction():
+    with start_span(name="agent"):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     tx = events[0]
@@ -259,7 +259,7 @@ def test_langchain_error(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction(), pytest.raises(Exception):
+    with start_span(name="agent"), pytest.raises(Exception):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     error = events[0]
@@ -372,7 +372,7 @@ def test_span_origin(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction():
+    with start_span(name="agent"):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     (event,) = events

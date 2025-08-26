@@ -1,51 +1,42 @@
+from __future__ import annotations
 import inspect
-import warnings
 from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._init_implementation import init
-from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.tracing import NoOpSpan, Transaction, trace
+from sentry_sdk.tracing import trace
 from sentry_sdk.crons import monitor
+
+# TODO-neel-potel make 2 scope strategies/impls and switch
+from sentry_sdk.scope import Scope as BaseScope
+from sentry_sdk.opentelemetry.scope import (
+    PotelScope as Scope,
+    new_scope,
+    isolation_scope,
+    use_scope,
+    use_isolation_scope,
+)
+
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from typing import Any
-    from typing import Dict
-    from typing import Generator
-    from typing import Optional
-    from typing import overload
-    from typing import Callable
-    from typing import TypeVar
-    from typing import ContextManager
-    from typing import Union
-
-    from typing_extensions import Unpack
-
-    from sentry_sdk.client import BaseClient
-    from sentry_sdk._types import (
-        Event,
-        Hint,
-        Breadcrumb,
-        BreadcrumbHint,
-        ExcInfo,
-        MeasurementUnit,
-        LogLevelStr,
-        SamplingContext,
-    )
-    from sentry_sdk.tracing import Span, TransactionKwargs
+    from typing import Any, Optional, Callable, TypeVar, Union, Generator
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
-else:
 
-    def overload(x):
-        # type: (T) -> T
-        return x
+    from collections.abc import Mapping
+    from sentry_sdk.client import BaseClient
+    from sentry_sdk.tracing import Span
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        LogLevelStr,
+        ExcInfo,
+        BreadcrumbHint,
+        Breadcrumb,
+    )
 
 
 # When changing this, update __all__ in __init__.py too
@@ -56,8 +47,8 @@ __all__ = [
     "capture_event",
     "capture_exception",
     "capture_message",
-    "configure_scope",
     "continue_trace",
+    "new_trace",
     "flush",
     "get_baggage",
     "get_client",
@@ -70,11 +61,9 @@ __all__ = [
     "isolation_scope",
     "last_event_id",
     "new_scope",
-    "push_scope",
     "set_context",
     "set_extra",
     "set_level",
-    "set_measurement",
     "set_tag",
     "set_tags",
     "set_user",
@@ -82,6 +71,8 @@ __all__ = [
     "start_transaction",
     "trace",
     "monitor",
+    "use_scope",
+    "use_isolation_scope",
     "start_session",
     "end_session",
     "set_transaction_name",
@@ -89,8 +80,7 @@ __all__ = [
 ]
 
 
-def scopemethod(f):
-    # type: (F) -> F
+def scopemethod(f: F) -> F:
     f.__doc__ = "%s\n\n%s" % (
         "Alias for :py:meth:`sentry_sdk.Scope.%s`" % f.__name__,
         inspect.getdoc(getattr(Scope, f.__name__)),
@@ -98,8 +88,7 @@ def scopemethod(f):
     return f
 
 
-def clientmethod(f):
-    # type: (F) -> F
+def clientmethod(f: F) -> F:
     f.__doc__ = "%s\n\n%s" % (
         "Alias for :py:meth:`sentry_sdk.Client.%s`" % f.__name__,
         inspect.getdoc(getattr(Client, f.__name__)),
@@ -108,13 +97,11 @@ def clientmethod(f):
 
 
 @scopemethod
-def get_client():
-    # type: () -> BaseClient
+def get_client() -> BaseClient:
     return Scope.get_client()
 
 
-def is_initialized():
-    # type: () -> bool
+def is_initialized() -> bool:
     """
     .. versionadded:: 2.0.0
 
@@ -128,26 +115,22 @@ def is_initialized():
 
 
 @scopemethod
-def get_global_scope():
-    # type: () -> Scope
+def get_global_scope() -> BaseScope:
     return Scope.get_global_scope()
 
 
 @scopemethod
-def get_isolation_scope():
-    # type: () -> Scope
+def get_isolation_scope() -> Scope:
     return Scope.get_isolation_scope()
 
 
 @scopemethod
-def get_current_scope():
-    # type: () -> Scope
+def get_current_scope() -> Scope:
     return Scope.get_current_scope()
 
 
 @scopemethod
-def last_event_id():
-    # type: () -> Optional[str]
+def last_event_id() -> Optional[str]:
     """
     See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding
     this method's limitations.
@@ -157,23 +140,21 @@ def last_event_id():
 
 @scopemethod
 def capture_event(
-    event,  # type: Event
-    hint=None,  # type: Optional[Hint]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    event: Event,
+    hint: Optional[Hint] = None,
+    scope: Optional[Any] = None,
+    **scope_kwargs: Any,
+) -> Optional[str]:
     return get_current_scope().capture_event(event, hint, scope=scope, **scope_kwargs)
 
 
 @scopemethod
 def capture_message(
-    message,  # type: str
-    level=None,  # type: Optional[LogLevelStr]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    message: str,
+    level: Optional[LogLevelStr] = None,
+    scope: Optional[Any] = None,
+    **scope_kwargs: Any,
+) -> Optional[str]:
     return get_current_scope().capture_message(
         message, level, scope=scope, **scope_kwargs
     )
@@ -181,23 +162,21 @@ def capture_message(
 
 @scopemethod
 def capture_exception(
-    error=None,  # type: Optional[Union[BaseException, ExcInfo]]
-    scope=None,  # type: Optional[Any]
-    **scope_kwargs,  # type: Any
-):
-    # type: (...) -> Optional[str]
+    error: Optional[Union[BaseException, ExcInfo]] = None,
+    scope: Optional[Any] = None,
+    **scope_kwargs: Any,
+) -> Optional[str]:
     return get_current_scope().capture_exception(error, scope=scope, **scope_kwargs)
 
 
 @scopemethod
 def add_attachment(
-    bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
-    filename=None,  # type: Optional[str]
-    path=None,  # type: Optional[str]
-    content_type=None,  # type: Optional[str]
-    add_to_transactions=False,  # type: bool
-):
-    # type: (...) -> None
+    bytes: Union[None, bytes, Callable[[], bytes]] = None,
+    filename: Optional[str] = None,
+    path: Optional[str] = None,
+    content_type: Optional[str] = None,
+    add_to_transactions: bool = False,
+) -> None:
     return get_isolation_scope().add_attachment(
         bytes, filename, path, content_type, add_to_transactions
     )
@@ -205,171 +184,73 @@ def add_attachment(
 
 @scopemethod
 def add_breadcrumb(
-    crumb=None,  # type: Optional[Breadcrumb]
-    hint=None,  # type: Optional[BreadcrumbHint]
-    **kwargs,  # type: Any
-):
-    # type: (...) -> None
+    crumb: Optional[Breadcrumb] = None,
+    hint: Optional[BreadcrumbHint] = None,
+    **kwargs: Any,
+) -> None:
     return get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
 
-@overload
-def configure_scope():
-    # type: () -> ContextManager[Scope]
-    pass
-
-
-@overload
-def configure_scope(  # noqa: F811
-    callback,  # type: Callable[[Scope], None]
-):
-    # type: (...) -> None
-    pass
-
-
-def configure_scope(  # noqa: F811
-    callback=None,  # type: Optional[Callable[[Scope], None]]
-):
-    # type: (...) -> Optional[ContextManager[Scope]]
-    """
-    Reconfigures the scope.
-
-    :param callback: If provided, call the callback with the current scope.
-
-    :returns: If no callback is provided, returns a context manager that returns the scope.
-    """
-    warnings.warn(
-        "sentry_sdk.configure_scope is deprecated and will be removed in the next major version. "
-        "Please consult our migration guide to learn how to migrate to the new API: "
-        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-configuring",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    scope = get_isolation_scope()
-    scope.generate_propagation_context()
-
-    if callback is not None:
-        # TODO: used to return None when client is None. Check if this changes behavior.
-        callback(scope)
-
-        return None
-
-    @contextmanager
-    def inner():
-        # type: () -> Generator[Scope, None, None]
-        yield scope
-
-    return inner()
-
-
-@overload
-def push_scope():
-    # type: () -> ContextManager[Scope]
-    pass
-
-
-@overload
-def push_scope(  # noqa: F811
-    callback,  # type: Callable[[Scope], None]
-):
-    # type: (...) -> None
-    pass
-
-
-def push_scope(  # noqa: F811
-    callback=None,  # type: Optional[Callable[[Scope], None]]
-):
-    # type: (...) -> Optional[ContextManager[Scope]]
-    """
-    Pushes a new layer on the scope stack.
-
-    :param callback: If provided, this method pushes a scope, calls
-        `callback`, and pops the scope again.
-
-    :returns: If no `callback` is provided, a context manager that should
-        be used to pop the scope again.
-    """
-    warnings.warn(
-        "sentry_sdk.push_scope is deprecated and will be removed in the next major version. "
-        "Please consult our migration guide to learn how to migrate to the new API: "
-        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-pushing",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    if callback is not None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            with push_scope() as scope:
-                callback(scope)
-        return None
-
-    return _ScopeManager()
-
-
 @scopemethod
-def set_tag(key, value):
-    # type: (str, Any) -> None
+def set_tag(key: str, value: Any) -> None:
     return get_isolation_scope().set_tag(key, value)
 
 
 @scopemethod
-def set_tags(tags):
-    # type: (Mapping[str, object]) -> None
+def set_tags(tags: Mapping[str, object]) -> None:
     return get_isolation_scope().set_tags(tags)
 
 
 @scopemethod
-def set_context(key, value):
-    # type: (str, Dict[str, Any]) -> None
+def set_context(key: str, value: dict[str, Any]) -> None:
     return get_isolation_scope().set_context(key, value)
 
 
 @scopemethod
-def set_extra(key, value):
-    # type: (str, Any) -> None
+def set_extra(key: str, value: Any) -> None:
     return get_isolation_scope().set_extra(key, value)
 
 
 @scopemethod
-def set_user(value):
-    # type: (Optional[Dict[str, Any]]) -> None
+def set_user(value: Optional[dict[str, Any]]) -> None:
     return get_isolation_scope().set_user(value)
 
 
 @scopemethod
-def set_level(value):
-    # type: (LogLevelStr) -> None
+def set_level(value: LogLevelStr) -> None:
     return get_isolation_scope().set_level(value)
 
 
 @clientmethod
 def flush(
-    timeout=None,  # type: Optional[float]
-    callback=None,  # type: Optional[Callable[[int, float], None]]
-):
-    # type: (...) -> None
+    timeout: Optional[float] = None,
+    callback: Optional[Callable[[int, float], None]] = None,
+) -> None:
     return get_client().flush(timeout=timeout, callback=callback)
 
 
-@scopemethod
-def start_span(
-    **kwargs,  # type: Any
-):
-    # type: (...) -> Span
+def start_span(**kwargs: Any) -> Span:
+    """
+    Start and return a span.
+
+    This is the entry point to manual tracing instrumentation.
+
+    A tree structure can be built by adding child spans to the span.
+    To start a new child span within the span, call the `start_child()` method.
+
+    When used as a context manager, spans are automatically finished at the end
+    of the `with` block. If not using context managers, call the `finish()`
+    method.
+    """
     return get_current_scope().start_span(**kwargs)
 
 
-@scopemethod
-def start_transaction(
-    transaction=None,  # type: Optional[Transaction]
-    instrumenter=INSTRUMENTER.SENTRY,  # type: str
-    custom_sampling_context=None,  # type: Optional[SamplingContext]
-    **kwargs,  # type: Unpack[TransactionKwargs]
-):
-    # type: (...) -> Union[Transaction, NoOpSpan]
+def start_transaction(transaction: Optional[Span] = None, **kwargs: Any) -> Span:
     """
+    .. deprecated:: 3.0.0
+        This function is deprecated and will be removed in a future release.
+        Use :py:meth:`sentry_sdk.start_span` instead.
+
     Start and return a transaction on the current scope.
 
     Start an existing transaction if given, otherwise create and start a new
@@ -393,47 +274,31 @@ def start_transaction(
 
     :param transaction: The transaction to start. If omitted, we create and
         start a new transaction.
-    :param instrumenter: This parameter is meant for internal use only. It
-        will be removed in the next major version.
-    :param custom_sampling_context: The transaction's custom sampling context.
     :param kwargs: Optional keyword arguments to be passed to the Transaction
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
-    return get_current_scope().start_transaction(
-        transaction, instrumenter, custom_sampling_context, **kwargs
+    return start_span(
+        span=transaction,
+        **kwargs,
     )
 
 
-def set_measurement(name, value, unit=""):
-    # type: (str, float, MeasurementUnit) -> None
-    """
-    .. deprecated:: 2.28.0
-        This function is deprecated and will be removed in the next major release.
-    """
-    transaction = get_current_scope().transaction
-    if transaction is not None:
-        transaction.set_measurement(name, value, unit)
-
-
-def get_current_span(scope=None):
-    # type: (Optional[Scope]) -> Optional[Span]
+def get_current_span(scope: Optional[Scope] = None) -> Optional[Span]:
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
     return tracing_utils.get_current_span(scope)
 
 
-def get_traceparent():
-    # type: () -> Optional[str]
+def get_traceparent() -> Optional[str]:
     """
     Returns the traceparent either from the active span or from the scope.
     """
     return get_current_scope().get_traceparent()
 
 
-def get_baggage():
-    # type: () -> Optional[str]
+def get_baggage() -> Optional[str]:
     """
     Returns Baggage either from the active span or from the scope.
     """
@@ -444,40 +309,46 @@ def get_baggage():
     return None
 
 
-def continue_trace(
-    environ_or_headers, op=None, name=None, source=None, origin="manual"
-):
-    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+@contextmanager
+def continue_trace(environ_or_headers: dict[str, Any]) -> Generator[None, None, None]:
     """
-    Sets the propagation context from environment or headers and returns a transaction.
+    Sets the propagation context from environment or headers to continue an incoming trace.
     """
-    return get_isolation_scope().continue_trace(
-        environ_or_headers, op, name, source, origin
-    )
+    with get_isolation_scope().continue_trace(environ_or_headers):
+        yield
+
+
+@contextmanager
+def new_trace() -> Generator[None, None, None]:
+    """
+    Force creation of a new trace.
+    """
+    with get_isolation_scope().new_trace():
+        yield
 
 
 @scopemethod
 def start_session(
-    session_mode="application",  # type: str
-):
-    # type: (...) -> None
+    session_mode: str = "application",
+) -> None:
     return get_isolation_scope().start_session(session_mode=session_mode)
 
 
 @scopemethod
-def end_session():
-    # type: () -> None
+def end_session() -> None:
     return get_isolation_scope().end_session()
 
 
 @scopemethod
-def set_transaction_name(name, source=None):
-    # type: (str, Optional[str]) -> None
+def set_transaction_name(name: str, source: Optional[str] = None) -> None:
     return get_current_scope().set_transaction_name(name, source)
 
 
-def update_current_span(op=None, name=None, attributes=None, data=None):
-    # type: (Optional[str], Optional[str], Optional[dict[str, Union[str, int, float, bool]]], Optional[dict[str, Any]]) -> None
+def update_current_span(
+    op: Optional[str] = None,
+    name: Optional[str] = None,
+    attributes: Optional[dict[str, Union[str, int, float, bool]]] = None,
+) -> None:
     """
     Update the current active span with the provided parameters.
 
@@ -495,15 +366,6 @@ def update_current_span(op=None, name=None, attributes=None, data=None):
         more specific details about what the span represents (e.g., "GET /api/users",
         "SELECT * FROM users"). If not provided, the span's name will remain unchanged.
     :type name: str or None
-
-    :param data: A dictionary of key-value pairs to add as data to the span. This
-        data will be merged with any existing span data. If not provided,
-        no data will be added.
-
-        .. deprecated:: 2.35.0
-            Use ``attributes`` instead. The ``data`` parameter will be removed
-            in a future version.
-    :type data: dict[str, Union[str, int, float, bool]] or None
 
     :param attributes: A dictionary of key-value pairs to add as attributes to the span.
         Attribute values must be strings, integers, floats, or booleans. These
@@ -535,21 +397,7 @@ def update_current_span(op=None, name=None, attributes=None, data=None):
         current_span.op = op
 
     if name is not None:
-        # internally it is still description
-        current_span.description = name
-
-    if data is not None and attributes is not None:
-        raise ValueError(
-            "Cannot provide both `data` and `attributes`. Please use only `attributes`."
-        )
-
-    if data is not None:
-        warnings.warn(
-            "The `data` parameter is deprecated. Please use `attributes` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        attributes = data
+        current_span.name = name
 
     if attributes is not None:
-        current_span.update_data(attributes)
+        current_span.set_attributes(attributes)

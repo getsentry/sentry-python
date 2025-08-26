@@ -33,7 +33,7 @@ try:
 except ImportError:
     SKIP_RESPONSES_TESTS = True
 
-from sentry_sdk import start_transaction
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
@@ -136,7 +136,7 @@ def test_nonstreaming_chat_completion(
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response = (
             client.chat.completions.create(
                 model="some-model", messages=[{"role": "system", "content": "hello"}]
@@ -181,7 +181,7 @@ async def test_nonstreaming_chat_completion_async(
     client = AsyncOpenAI(api_key="z")
     client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response = await client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -273,7 +273,7 @@ def test_streaming_chat_completion(
     ]
 
     client.chat.completions._post = mock.Mock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response_stream = client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -367,7 +367,7 @@ async def test_streaming_chat_completion_async(
     )
 
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response_stream = await client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -399,6 +399,7 @@ async def test_streaming_chat_completion_async(
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
+@pytest.mark.forked
 def test_bad_chat_completion(sentry_init, capture_events):
     sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -412,7 +413,10 @@ def test_bad_chat_completion(sentry_init, capture_events):
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
 
-    (event,) = events
+    (
+        _,
+        event,
+    ) = events
     assert event["level"] == "error"
 
 
@@ -430,7 +434,10 @@ async def test_bad_chat_completion_async(sentry_init, capture_events):
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
 
-    (event,) = events
+    (
+        _,
+        event,
+    ) = events
     assert event["level"] == "error"
 
 
@@ -461,7 +468,7 @@ def test_embeddings_create(
     )
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response = client.embeddings.create(
             input="hello", model="text-embedding-3-large"
         )
@@ -509,7 +516,7 @@ async def test_embeddings_create_async(
     )
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response = await client.embeddings.create(
             input="hello", model="text-embedding-3-large"
         )
@@ -529,6 +536,7 @@ async def test_embeddings_create_async(
     assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
@@ -552,10 +560,14 @@ def test_embeddings_create_raises_error(
     with pytest.raises(OpenAIError):
         client.embeddings.create(input="hello", model="text-embedding-3-large")
 
-    (event,) = events
+    (
+        _,
+        event,
+    ) = events
     assert event["level"] == "error"
 
 
+@pytest.mark.forked
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -580,7 +592,10 @@ async def test_embeddings_create_raises_error_async(
     with pytest.raises(OpenAIError):
         await client.embeddings.create(input="hello", model="text-embedding-3-large")
 
-    (event,) = events
+    (
+        _,
+        event,
+    ) = events
     assert event["level"] == "error"
 
 
@@ -594,7 +609,7 @@ def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -616,7 +631,7 @@ async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_events):
     client = AsyncOpenAI(api_key="z")
     client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         await client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -673,7 +688,7 @@ def test_span_origin_streaming_chat(sentry_init, capture_events):
     ]
 
     client.chat.completions._post = mock.Mock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response_stream = client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -737,7 +752,7 @@ async def test_span_origin_streaming_chat_async(sentry_init, capture_events):
     )
 
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response_stream = await client.chat.completions.create(
             model="some-model", messages=[{"role": "system", "content": "hello"}]
         )
@@ -772,7 +787,7 @@ def test_span_origin_embeddings(sentry_init, capture_events):
     )
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         client.embeddings.create(input="hello", model="text-embedding-3-large")
 
     (event,) = events
@@ -802,7 +817,7 @@ async def test_span_origin_embeddings_async(sentry_init, capture_events):
     )
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         await client.embeddings.create(input="hello", model="text-embedding-3-large")
 
     (event,) = events
@@ -978,7 +993,7 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
     client = OpenAI(api_key="z")
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         client.responses.create(
             model="gpt-4o",
             instructions="You are a coding assistant that talks like a pirate.",
@@ -1001,6 +1016,10 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
+        "sentry.name": "responses gpt-4o",
+        "sentry.op": "gen_ai.responses",
+        "sentry.origin": "auto.ai.openai",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1021,7 +1040,7 @@ def test_ai_client_span_responses_api(sentry_init, capture_events):
     client = OpenAI(api_key="z")
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         client.responses.create(
             model="gpt-4o",
             instructions="You are a coding assistant that talks like a pirate.",
@@ -1046,6 +1065,10 @@ def test_ai_client_span_responses_api(sentry_init, capture_events):
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "sentry.name": "responses gpt-4o",
+        "sentry.op": "gen_ai.responses",
+        "sentry.origin": "auto.ai.openai",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1065,7 +1088,7 @@ def test_error_in_responses_api(sentry_init, capture_events):
         side_effect=OpenAIError("API rate limit reached")
     )
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         with pytest.raises(OpenAIError):
             client.responses.create(
                 model="gpt-4o",
@@ -1101,7 +1124,7 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
     client = AsyncOpenAI(api_key="z")
     client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         await client.responses.create(
             model="gpt-4o",
             instructions="You are a coding assistant that talks like a pirate.",
@@ -1126,6 +1149,10 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "sentry.name": "responses gpt-4o",
+        "sentry.op": "gen_ai.responses",
+        "sentry.origin": "auto.ai.openai",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1146,7 +1173,7 @@ async def test_ai_client_span_streaming_responses_async_api(
     client = AsyncOpenAI(api_key="z")
     client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         await client.responses.create(
             model="gpt-4o",
             instructions="You are a coding assistant that talks like a pirate.",
@@ -1173,6 +1200,10 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
         "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "sentry.name": "responses gpt-4o",
+        "sentry.op": "gen_ai.responses",
+        "sentry.origin": "auto.ai.openai",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1193,7 +1224,7 @@ async def test_error_in_responses_async_api(sentry_init, capture_events):
         side_effect=OpenAIError("API rate limit reached")
     )
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         with pytest.raises(OpenAIError):
             await client.responses.create(
                 model="gpt-4o",
@@ -1313,7 +1344,7 @@ def test_streaming_responses_api(
     returned_stream._iterator = EXAMPLE_RESPONSES_STREAM
     client.responses._post = mock.Mock(return_value=returned_stream)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response_stream = client.responses.create(
             model="some-model",
             input="hello",
@@ -1368,7 +1399,7 @@ async def test_streaming_responses_api_async(
     returned_stream._iterator = async_iterator(EXAMPLE_RESPONSES_STREAM)
     client.responses._post = AsyncMock(return_value=returned_stream)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         response_stream = await client.responses.create(
             model="some-model",
             input="hello",
@@ -1416,7 +1447,7 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    with start_transaction(name="openai tx"):
+    with sentry_sdk.start_span(name="openai tx"):
         client.chat.completions.create(
             model="some-model",
             messages=[{"role": "system", "content": "hello"}],

@@ -4,11 +4,10 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk.consts import SPANTEMPLATE
 from sentry_sdk.tracing import trace
+from sentry_sdk.consts import SPANTEMPLATE
 from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import logger
-from tests.conftest import patch_start_tracing_child
 
 
 def my_example_function():
@@ -19,71 +18,84 @@ async def my_async_example_function():
     return "return_of_async_function"
 
 
-@pytest.mark.forked
-def test_trace_decorator():
-    with patch_start_tracing_child() as fake_start_child:
+def test_trace_decorator(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with sentry_sdk.start_span(name="test"):
         result = my_example_function()
-        fake_start_child.assert_not_called()
         assert result == "return_of_sync_function"
 
-        start_child_span_decorator = create_span_decorator()
-        result2 = start_child_span_decorator(my_example_function)()
-        fake_start_child.assert_called_once_with(
-            op="function", name="test_decorator.my_example_function"
+        decorator = create_span_decorator()
+        result2 = decorator(my_example_function)()
+        assert result2 == "return_of_sync_function"
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["op"] == "function"
+    assert span["description"] == "test_decorator.my_example_function"
+
+
+def test_trace_decorator_no_trx(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
+        result = my_example_function()
+        fake_debug.assert_not_called()
+        assert result == "return_of_sync_function"
+
+        decorator = create_span_decorator()
+        result2 = decorator(my_example_function)()
+        fake_debug.assert_called_once_with(
+            "Cannot create a child span for %s. "
+            "Please start a Sentry transaction before calling this function.",
+            "test_decorator.my_example_function",
         )
         assert result2 == "return_of_sync_function"
 
-
-def test_trace_decorator_no_trx():
-    with patch_start_tracing_child(fake_transaction_is_none=True):
-        with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
-            result = my_example_function()
-            fake_debug.assert_not_called()
-            assert result == "return_of_sync_function"
-
-            start_child_span_decorator = create_span_decorator()
-            result2 = start_child_span_decorator(my_example_function)()
-            fake_debug.assert_called_once_with(
-                "Cannot create a child span for %s. "
-                "Please start a Sentry transaction before calling this function.",
-                "test_decorator.my_example_function",
-            )
-            assert result2 == "return_of_sync_function"
+    assert len(events) == 0
 
 
-@pytest.mark.forked
 @pytest.mark.asyncio
-async def test_trace_decorator_async():
-    with patch_start_tracing_child() as fake_start_child:
+async def test_trace_decorator_async(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with sentry_sdk.start_span(name="test"):
         result = await my_async_example_function()
-        fake_start_child.assert_not_called()
         assert result == "return_of_async_function"
 
-        start_child_span_decorator = create_span_decorator()
-        result2 = await start_child_span_decorator(my_async_example_function)()
-        fake_start_child.assert_called_once_with(
-            op="function",
-            name="test_decorator.my_async_example_function",
+        decorator = create_span_decorator()
+        result2 = await decorator(my_async_example_function)()
+        assert result2 == "return_of_async_function"
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["op"] == "function"
+    assert span["description"] == "test_decorator.my_async_example_function"
+
+
+@pytest.mark.asyncio
+async def test_trace_decorator_async_no_trx(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
+        result = await my_async_example_function()
+        fake_debug.assert_not_called()
+        assert result == "return_of_async_function"
+
+        decorator = create_span_decorator()
+        result2 = await decorator(my_async_example_function)()
+        fake_debug.assert_called_once_with(
+            "Cannot create a child span for %s. "
+            "Please start a Sentry transaction before calling this function.",
+            "test_decorator.my_async_example_function",
         )
         assert result2 == "return_of_async_function"
 
-
-@pytest.mark.asyncio
-async def test_trace_decorator_async_no_trx():
-    with patch_start_tracing_child(fake_transaction_is_none=True):
-        with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
-            result = await my_async_example_function()
-            fake_debug.assert_not_called()
-            assert result == "return_of_async_function"
-
-            start_child_span_decorator = create_span_decorator()
-            result2 = await start_child_span_decorator(my_async_example_function)()
-            fake_debug.assert_called_once_with(
-                "Cannot create a child span for %s. "
-                "Please start a Sentry transaction before calling this function.",
-                "test_decorator.my_async_example_function",
-            )
-            assert result2 == "return_of_async_function"
+    assert len(events) == 0
 
 
 def test_functions_to_trace_signature_unchanged_sync(sentry_init):
@@ -163,7 +175,7 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
             presence_penalty=2.0,
         )
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
+    with sentry_sdk.start_span(name="test-transaction"):
         my_agent()
 
     (event,) = events
@@ -177,6 +189,10 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
     assert agent_span["data"] == {
         "gen_ai.agent.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_agent",
         "gen_ai.operation.name": "invoke_agent",
+        "sentry.name": "invoke_agent test_decorator.test_span_templates_ai_dicts.<locals>.my_agent",
+        "sentry.op": "gen_ai.invoke_agent",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -192,6 +208,10 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 20,
         "gen_ai.usage.total_tokens": 30,
+        "sentry.name": "execute_tool test_decorator.test_span_templates_ai_dicts.<locals>.my_tool",
+        "sentry.op": "gen_ai.execute_tool",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -213,6 +233,10 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
         "gen_ai.usage.input_tokens": 11,
         "gen_ai.usage.output_tokens": 22,
         "gen_ai.usage.total_tokens": 33,
+        "sentry.name": "chat my-gpt-4o-mini",
+        "sentry.op": "gen_ai.chat",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -264,7 +288,7 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
             presence_penalty=2.0,
         )
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
+    with sentry_sdk.start_span(name="test-transaction"):
         my_agent()
 
     (event,) = events
@@ -278,6 +302,10 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
     assert agent_span["data"] == {
         "gen_ai.agent.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_agent",
         "gen_ai.operation.name": "invoke_agent",
+        "sentry.name": "invoke_agent test_decorator.test_span_templates_ai_objects.<locals>.my_agent",
+        "sentry.op": "gen_ai.invoke_agent",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -294,6 +322,10 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 20,
         "gen_ai.usage.total_tokens": 30,
+        "sentry.name": "execute_tool test_decorator.test_span_templates_ai_objects.<locals>.my_tool",
+        "sentry.op": "gen_ai.execute_tool",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -314,6 +346,10 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
         "gen_ai.usage.input_tokens": 11,
         "gen_ai.usage.output_tokens": 22,
         "gen_ai.usage.total_tokens": 33,
+        "sentry.name": "chat my-gpt-4o-mini",
+        "sentry.op": "gen_ai.chat",
+        "sentry.origin": "manual",
+        "sentry.source": "custom",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -349,7 +385,7 @@ def test_span_templates_ai_pii(sentry_init, capture_events, send_default_pii):
         )
         return "agent_output"
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
+    with sentry_sdk.start_span(name="test-transaction"):
         my_agent(22, 33, arg1=44, arg2=55)
 
     (event,) = events

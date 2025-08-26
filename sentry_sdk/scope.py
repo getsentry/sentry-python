@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import sys
 import warnings
@@ -11,27 +12,23 @@ from itertools import chain
 
 from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
-from sentry_sdk.profiler.continuous_profiler import (
-    get_profiler_id,
-    try_autostart_continuous_profiler,
-    try_profile_lifecycle_trace_start,
+from sentry_sdk.consts import (
+    DEFAULT_MAX_BREADCRUMBS,
+    FALSE_VALUES,
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
 )
+from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
     has_tracing_enabled,
-    normalize_incoming_data,
     PropagationContext,
 )
 from sentry_sdk.tracing import (
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
     NoOpSpan,
     Span,
-    Transaction,
 )
 from sentry_sdk.utils import (
     capture_internal_exception,
@@ -42,29 +39,31 @@ from sentry_sdk.utils import (
     event_from_exception,
     exc_info_from_error,
     logger,
+    safe_str,
 )
 
-import typing
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import (
+        Any,
+        Callable,
+        Deque,
+        Dict,
+        Generator,
+        Iterator,
+        List,
+        Optional,
+        ParamSpec,
+        Tuple,
+        TypeVar,
+        Union,
+        Self,
+    )
+
     from collections.abc import Mapping
 
-    from typing import Any
-    from typing import Callable
-    from typing import Deque
-    from typing import Dict
-    from typing import Generator
-    from typing import Iterator
-    from typing import List
-    from typing import Optional
-    from typing import ParamSpec
-    from typing import Tuple
-    from typing import TypeVar
-    from typing import Union
-
-    from typing_extensions import Unpack
-
+    import sentry_sdk
     from sentry_sdk._types import (
         Breadcrumb,
         BreadcrumbHint,
@@ -74,13 +73,8 @@ if TYPE_CHECKING:
         ExcInfo,
         Hint,
         LogLevelStr,
-        SamplingContext,
         Type,
     )
-
-    from sentry_sdk.tracing import TransactionKwargs
-
-    import sentry_sdk
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -93,7 +87,7 @@ if TYPE_CHECKING:
 # In case this is a http server (think web framework) with multiple users
 # the data will be added to events of all users.
 # Typically this is used for process wide data such as the release.
-_global_scope = None  # type: Optional[Scope]
+_global_scope: Optional[Scope] = None
 
 # Holds data for the active request.
 # This is used to isolate data for different requests or users.
@@ -105,7 +99,7 @@ _isolation_scope = ContextVar("isolation_scope", default=None)
 # This can be used to manually add additional data to a span.
 _current_scope = ContextVar("current_scope", default=None)
 
-global_event_processors = []  # type: List[EventProcessor]
+global_event_processors: List[EventProcessor] = []
 
 
 class ScopeType(Enum):
@@ -115,43 +109,17 @@ class ScopeType(Enum):
     MERGED = "merged"
 
 
-class _ScopeManager:
-    def __init__(self, hub=None):
-        # type: (Optional[Any]) -> None
-        self._old_scopes = []  # type: List[Scope]
-
-    def __enter__(self):
-        # type: () -> Scope
-        isolation_scope = Scope.get_isolation_scope()
-
-        self._old_scopes.append(isolation_scope)
-
-        forked_scope = isolation_scope.fork()
-        _isolation_scope.set(forked_scope)
-
-        return forked_scope
-
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
-        old_scope = self._old_scopes.pop()
-        _isolation_scope.set(old_scope)
-
-
-def add_global_event_processor(processor):
-    # type: (EventProcessor) -> None
+def add_global_event_processor(processor: EventProcessor) -> None:
     global_event_processors.append(processor)
 
 
-def _attr_setter(fn):
-    # type: (Any) -> Any
+def _attr_setter(fn: Any) -> Any:
     return property(fset=fn, doc=fn.__doc__)
 
 
-def _disable_capture(fn):
-    # type: (F) -> F
+def _disable_capture(fn: F) -> F:
     @wraps(fn)
-    def wrapper(self, *args, **kwargs):
-        # type: (Any, *Dict[str, Any], **Any) -> Any
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         if not self._should_capture:
             return
         try:
@@ -203,34 +171,29 @@ class Scope:
         "_flags",
     )
 
-    def __init__(self, ty=None, client=None):
-        # type: (Optional[ScopeType], Optional[sentry_sdk.Client]) -> None
+    def __init__(self, ty: Optional[ScopeType] = None) -> None:
         self._type = ty
 
-        self._event_processors = []  # type: List[EventProcessor]
-        self._error_processors = []  # type: List[ErrorProcessor]
+        self._event_processors: List[EventProcessor] = []
+        self._error_processors: List[ErrorProcessor] = []
 
-        self._name = None  # type: Optional[str]
-        self._propagation_context = None  # type: Optional[PropagationContext]
-        self._n_breadcrumbs_truncated = 0  # type: int
+        self._name: Optional[str] = None
+        self._propagation_context: Optional[PropagationContext] = None
+        self._n_breadcrumbs_truncated: int = 0
 
-        self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
-
-        if client is not None:
-            self.set_client(client)
+        self.client: sentry_sdk.client.BaseClient = NonRecordingClient()
 
         self.clear()
 
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
-    def __copy__(self):
-        # type: () -> Scope
+    def __copy__(self) -> Self:
         """
         Returns a copy of this scope.
         This also creates a copy of all referenced data structures.
         """
-        rv = object.__new__(self.__class__)  # type: Scope
+        rv: Self = object.__new__(self.__class__)
 
         rv._type = self._type
         rv.client = self.client
@@ -266,14 +229,13 @@ class Scope:
         return rv
 
     @classmethod
-    def get_current_scope(cls):
-        # type: () -> Scope
+    def get_current_scope(cls) -> Scope:
         """
         .. versionadded:: 2.0.0
 
         Returns the current scope.
         """
-        current_scope = _current_scope.get()
+        current_scope = cls._get_current_scope()
         if current_scope is None:
             current_scope = Scope(ty=ScopeType.CURRENT)
             _current_scope.set(current_scope)
@@ -281,8 +243,14 @@ class Scope:
         return current_scope
 
     @classmethod
-    def set_current_scope(cls, new_current_scope):
-        # type: (Scope) -> None
+    def _get_current_scope(cls) -> Optional[Scope]:
+        """
+        Returns the current scope without creating a new one. Internal use only.
+        """
+        return _current_scope.get()
+
+    @classmethod
+    def set_current_scope(cls, new_current_scope: Scope) -> None:
         """
         .. versionadded:: 2.0.0
 
@@ -292,14 +260,13 @@ class Scope:
         _current_scope.set(new_current_scope)
 
     @classmethod
-    def get_isolation_scope(cls):
-        # type: () -> Scope
+    def get_isolation_scope(cls) -> Scope:
         """
         .. versionadded:: 2.0.0
 
         Returns the isolation scope.
         """
-        isolation_scope = _isolation_scope.get()
+        isolation_scope = cls._get_isolation_scope()
         if isolation_scope is None:
             isolation_scope = Scope(ty=ScopeType.ISOLATION)
             _isolation_scope.set(isolation_scope)
@@ -307,8 +274,14 @@ class Scope:
         return isolation_scope
 
     @classmethod
-    def set_isolation_scope(cls, new_isolation_scope):
-        # type: (Scope) -> None
+    def _get_isolation_scope(cls) -> Optional[Scope]:
+        """
+        Returns the isolation scope without creating a new one. Internal use only.
+        """
+        return _isolation_scope.get()
+
+    @classmethod
+    def set_isolation_scope(cls, new_isolation_scope: Scope) -> None:
         """
         .. versionadded:: 2.0.0
 
@@ -318,8 +291,7 @@ class Scope:
         _isolation_scope.set(new_isolation_scope)
 
     @classmethod
-    def get_global_scope(cls):
-        # type: () -> Scope
+    def get_global_scope(cls) -> Scope:
         """
         .. versionadded:: 2.0.0
 
@@ -332,8 +304,7 @@ class Scope:
         return _global_scope
 
     @classmethod
-    def last_event_id(cls):
-        # type: () -> Optional[str]
+    def last_event_id(cls) -> Optional[str]:
         """
         .. versionadded:: 2.2.0
 
@@ -348,8 +319,11 @@ class Scope:
         """
         return cls.get_isolation_scope()._last_event_id
 
-    def _merge_scopes(self, additional_scope=None, additional_scope_kwargs=None):
-        # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
+    def _merge_scopes(
+        self,
+        additional_scope: Optional[Scope] = None,
+        additional_scope_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> Self:
         """
         Merges global, isolation and current scope into a new scope and
         adds the given additional scope or additional scope kwargs to it.
@@ -357,16 +331,17 @@ class Scope:
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
 
-        final_scope = copy(_global_scope) if _global_scope is not None else Scope()
+        final_scope = self.__class__()
         final_scope._type = ScopeType.MERGED
 
-        isolation_scope = _isolation_scope.get()
-        if isolation_scope is not None:
-            final_scope.update_from_scope(isolation_scope)
+        global_scope = self.get_global_scope()
+        final_scope.update_from_scope(global_scope)
 
-        current_scope = _current_scope.get()
-        if current_scope is not None:
-            final_scope.update_from_scope(current_scope)
+        isolation_scope = self.get_isolation_scope()
+        final_scope.update_from_scope(self.get_isolation_scope())
+
+        current_scope = self.get_current_scope()
+        final_scope.update_from_scope(current_scope)
 
         if self != current_scope and self != isolation_scope:
             final_scope.update_from_scope(self)
@@ -383,8 +358,7 @@ class Scope:
         return final_scope
 
     @classmethod
-    def get_client(cls):
-        # type: () -> sentry_sdk.client.BaseClient
+    def get_client(cls) -> sentry_sdk.client.BaseClient:
         """
         .. versionadded:: 2.0.0
 
@@ -392,7 +366,7 @@ class Scope:
         This checks the current scope, the isolation scope and the global scope for a client.
         If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
         """
-        current_scope = _current_scope.get()
+        current_scope = cls.get_current_scope()
         try:
             client = current_scope.client
         except AttributeError:
@@ -401,7 +375,7 @@ class Scope:
         if client is not None and client.is_active():
             return client
 
-        isolation_scope = _isolation_scope.get()
+        isolation_scope = cls.get_isolation_scope()
         try:
             client = isolation_scope.client
         except AttributeError:
@@ -410,18 +384,18 @@ class Scope:
         if client is not None and client.is_active():
             return client
 
-        try:
-            client = _global_scope.client  # type: ignore
-        except AttributeError:
-            client = None
+        if _global_scope:
+            try:
+                client = _global_scope.client
+            except AttributeError:
+                client = None
 
         if client is not None and client.is_active():
             return client
 
         return NonRecordingClient()
 
-    def set_client(self, client=None):
-        # type: (Optional[sentry_sdk.client.BaseClient]) -> None
+    def set_client(self, client: Optional[sentry_sdk.client.BaseClient] = None) -> None:
         """
         .. versionadded:: 2.0.0
 
@@ -433,8 +407,7 @@ class Scope:
         """
         self.client = client if client is not None else NonRecordingClient()
 
-    def fork(self):
-        # type: () -> Scope
+    def fork(self) -> Self:
         """
         .. versionadded:: 2.0.0
 
@@ -443,8 +416,7 @@ class Scope:
         forked_scope = copy(self)
         return forked_scope
 
-    def _load_trace_data_from_env(self):
-        # type: () -> Optional[Dict[str, str]]
+    def _load_trace_data_from_env(self) -> Optional[Dict[str, str]]:
         """
         Load Sentry trace id and baggage from environment variables.
         Can be disabled by setting SENTRY_USE_ENVIRONMENT to "false".
@@ -470,15 +442,15 @@ class Scope:
 
         return incoming_trace_information or None
 
-    def set_new_propagation_context(self):
-        # type: () -> None
+    def set_new_propagation_context(self) -> None:
         """
         Creates a new propagation context and sets it as `_propagation_context`. Overwriting existing one.
         """
         self._propagation_context = PropagationContext()
 
-    def generate_propagation_context(self, incoming_data=None):
-        # type: (Optional[Dict[str, str]]) -> None
+    def generate_propagation_context(
+        self, incoming_data: Optional[dict[str, str]] = None
+    ) -> None:
         """
         Makes sure the propagation context is set on the scope.
         If there is `incoming_data` overwrite existing propagation context.
@@ -493,25 +465,14 @@ class Scope:
             if self._propagation_context is None:
                 self.set_new_propagation_context()
 
-    def get_dynamic_sampling_context(self):
-        # type: () -> Optional[Dict[str, str]]
+    def get_dynamic_sampling_context(self) -> Optional[Dict[str, str]]:
         """
-        Returns the Dynamic Sampling Context from the Propagation Context.
-        If not existing, creates a new one.
+        Returns the Dynamic Sampling Context from the baggage or populates one.
         """
-        if self._propagation_context is None:
-            return None
-
         baggage = self.get_baggage()
-        if baggage is not None:
-            self._propagation_context.dynamic_sampling_context = (
-                baggage.dynamic_sampling_context()
-            )
+        return baggage.dynamic_sampling_context() if baggage else None
 
-        return self._propagation_context.dynamic_sampling_context
-
-    def get_traceparent(self, *args, **kwargs):
-        # type: (Any, Any) -> Optional[str]
+    def get_traceparent(self, *args: Any, **kwargs: Any) -> Optional[str]:
         """
         Returns the Sentry "sentry-trace" header (aka the traceparent) from the
         currently active span or the scopes Propagation Context.
@@ -519,74 +480,67 @@ class Scope:
         client = self.get_client()
 
         # If we have an active span, return traceparent from there
-        if has_tracing_enabled(client.options) and self.span is not None:
+        if (
+            has_tracing_enabled(client.options)
+            and self.span is not None
+            and self.span.is_valid
+        ):
             return self.span.to_traceparent()
 
         # If this scope has a propagation context, return traceparent from there
         if self._propagation_context is not None:
-            traceparent = "%s-%s" % (
-                self._propagation_context.trace_id,
-                self._propagation_context.span_id,
-            )
-            return traceparent
+            return self._propagation_context.to_traceparent()
 
         # Fall back to isolation scope's traceparent. It always has one
         return self.get_isolation_scope().get_traceparent()
 
-    def get_baggage(self, *args, **kwargs):
-        # type: (Any, Any) -> Optional[Baggage]
+    def get_baggage(self, *args: Any, **kwargs: Any) -> Optional[Baggage]:
         """
         Returns the Sentry "baggage" header containing trace information from the
         currently active span or the scopes Propagation Context.
+        If not existing, creates a new one.
         """
         client = self.get_client()
 
         # If we have an active span, return baggage from there
-        if has_tracing_enabled(client.options) and self.span is not None:
+        if (
+            has_tracing_enabled(client.options)
+            and self.span is not None
+            and self.span.is_valid
+        ):
             return self.span.to_baggage()
 
         # If this scope has a propagation context, return baggage from there
+        # populate a fresh one if it doesn't exist
         if self._propagation_context is not None:
-            dynamic_sampling_context = (
-                self._propagation_context.dynamic_sampling_context
-            )
-            if dynamic_sampling_context is None:
-                return Baggage.from_options(self)
-            else:
-                return Baggage(dynamic_sampling_context)
+            if self._propagation_context.baggage is None:
+                self._propagation_context.baggage = Baggage.from_options(self)
+            return self._propagation_context.baggage
 
         # Fall back to isolation scope's baggage. It always has one
         return self.get_isolation_scope().get_baggage()
 
-    def get_trace_context(self):
-        # type: () -> Any
+    def get_trace_context(self) -> Any:
         """
         Returns the Sentry "trace" context from the Propagation Context.
         """
         if self._propagation_context is None:
             return None
 
-        trace_context = {
+        trace_context: Dict[str, Any] = {
             "trace_id": self._propagation_context.trace_id,
             "span_id": self._propagation_context.span_id,
             "parent_span_id": self._propagation_context.parent_span_id,
             "dynamic_sampling_context": self.get_dynamic_sampling_context(),
-        }  # type: Dict[str, Any]
+        }
 
         return trace_context
 
-    def trace_propagation_meta(self, *args, **kwargs):
-        # type: (*Any, **Any) -> str
+    def trace_propagation_meta(self, *args: Any, **kwargs: Any) -> str:
         """
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """
-        span = kwargs.pop("span", None)
-        if span is not None:
-            logger.warning(
-                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
-            )
-
         meta = ""
 
         sentry_trace = self.get_traceparent()
@@ -605,8 +559,7 @@ class Scope:
 
         return meta
 
-    def iter_headers(self):
-        # type: () -> Iterator[Tuple[str, str]]
+    def iter_headers(self) -> Iterator[Tuple[str, str]]:
         """
         Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
         """
@@ -615,13 +568,13 @@ class Scope:
             if traceparent is not None:
                 yield SENTRY_TRACE_HEADER_NAME, traceparent
 
-            dsc = self.get_dynamic_sampling_context()
-            if dsc is not None:
-                baggage = Baggage(dsc).serialize()
-                yield BAGGAGE_HEADER_NAME, baggage
+            baggage = self.get_baggage()
+            if baggage is not None:
+                yield BAGGAGE_HEADER_NAME, baggage.serialize()
 
-    def iter_trace_propagation_headers(self, *args, **kwargs):
-        # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
+    def iter_trace_propagation_headers(
+        self, *args: Any, **kwargs: Any
+    ) -> Generator[Tuple[str, str], None, None]:
         """
         Return HTTP headers which allow propagation of trace data.
 
@@ -629,18 +582,11 @@ class Scope:
         If no span is given, the trace data is taken from the scope.
         """
         client = self.get_client()
-        if not client.options.get("propagate_traces"):
-            warnings.warn(
-                "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return
 
         span = kwargs.pop("span", None)
         span = span or self.span
 
-        if has_tracing_enabled(client.options) and span is not None:
+        if has_tracing_enabled(client.options) and span is not None and span.is_valid:
             for header in span.iter_headers():
                 yield header
         else:
@@ -662,8 +608,7 @@ class Scope:
                         for header in isolation_scope.iter_headers():
                             yield header
 
-    def get_active_propagation_context(self):
-        # type: () -> Optional[PropagationContext]
+    def get_active_propagation_context(self) -> Optional[PropagationContext]:
         if self._propagation_context is not None:
             return self._propagation_context
 
@@ -677,54 +622,35 @@ class Scope:
 
         return None
 
-    def clear(self):
-        # type: () -> None
+    def clear(self) -> None:
         """Clears the entire scope."""
-        self._level = None  # type: Optional[LogLevelStr]
-        self._fingerprint = None  # type: Optional[List[str]]
-        self._transaction = None  # type: Optional[str]
-        self._transaction_info = {}  # type: dict[str, str]
-        self._user = None  # type: Optional[Dict[str, Any]]
+        self._level: Optional[LogLevelStr] = None
+        self._fingerprint: Optional[List[str]] = None
+        self._transaction: Optional[str] = None
+        self._transaction_info: Dict[str, str] = {}
+        self._user: Optional[Dict[str, Any]] = None
 
-        self._tags = {}  # type: Dict[str, Any]
-        self._contexts = {}  # type: Dict[str, Dict[str, Any]]
-        self._extras = {}  # type: dict[str, Any]
-        self._attachments = []  # type: List[Attachment]
+        self._tags: Dict[str, Any] = {}
+        self._contexts: Dict[str, Dict[str, Any]] = {}
+        self._extras: Dict[str, Any] = {}
+        self._attachments: List[Attachment] = []
 
         self.clear_breadcrumbs()
-        self._should_capture = True  # type: bool
+        self._should_capture: bool = True
 
-        self._span = None  # type: Optional[Span]
-        self._session = None  # type: Optional[Session]
-        self._force_auto_session_tracking = None  # type: Optional[bool]
+        self._span: Optional[Span] = None
+        self._session: Optional[Session] = None
+        self._force_auto_session_tracking: Optional[bool] = None
 
-        self._profile = None  # type: Optional[Profile]
+        self._profile: Optional[Profile] = None
 
         self._propagation_context = None
 
         # self._last_event_id is only applicable to isolation scopes
-        self._last_event_id = None  # type: Optional[str]
-        self._flags = None  # type: Optional[FlagBuffer]
+        self._last_event_id: Optional[str] = None
+        self._flags: Optional[FlagBuffer] = None
 
-    @_attr_setter
-    def level(self, value):
-        # type: (LogLevelStr) -> None
-        """
-        When set this overrides the level.
-
-        .. deprecated:: 1.0.0
-            Use :func:`set_level` instead.
-
-        :param value: The level to set.
-        """
-        logger.warning(
-            "Deprecated: use .set_level() instead. This will be removed in the future."
-        )
-
-        self._level = value
-
-    def set_level(self, value):
-        # type: (LogLevelStr) -> None
+    def set_level(self, value: LogLevelStr) -> None:
         """
         Sets the level for the scope.
 
@@ -733,80 +659,39 @@ class Scope:
         self._level = value
 
     @_attr_setter
-    def fingerprint(self, value):
-        # type: (Optional[List[str]]) -> None
+    def fingerprint(self, value: Optional[List[str]]) -> None:
         """When set this overrides the default fingerprint."""
         self._fingerprint = value
 
     @property
-    def transaction(self):
-        # type: () -> Any
-        # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
-        """Return the transaction (root span) in the scope, if any."""
-
-        # there is no span/transaction on the scope
+    def root_span(self) -> Optional[Span]:
+        """Return the root span in the scope, if any."""
         if self._span is None:
             return None
 
-        # there is an orphan span on the scope
-        if self._span.containing_transaction is None:
-            return None
+        return self._span.root_span
 
-        # there is either a transaction (which is its own containing
-        # transaction) or a non-orphan span on the scope
-        return self._span.containing_transaction
-
-    @transaction.setter
-    def transaction(self, value):
-        # type: (Any) -> None
-        # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
-        """When set this forces a specific transaction name to be set.
-
-        Deprecated: use set_transaction_name instead."""
-
-        # XXX: the docstring above is misleading. The implementation of
-        # apply_to_event prefers an existing value of event.transaction over
-        # anything set in the scope.
-        # XXX: note that with the introduction of the Scope.transaction getter,
-        # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a Transaction, the setter sets a transaction name.
-        # Without breaking version compatibility, we could make the setter set a
-        # transaction name or transaction (self._span) depending on the type of
-        # the value argument.
-
-        logger.warning(
-            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
-        )
-        self._transaction = value
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = value
-
-    def set_transaction_name(self, name, source=None):
-        # type: (str, Optional[str]) -> None
+    def set_transaction_name(self, name: str, source: Optional[str] = None) -> None:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
 
-        if self._span and self._span.containing_transaction:
-            self._span.containing_transaction.name = name
+        if self._span and self._span.root_span:
+            self._span.root_span.name = name
             if source:
-                self._span.containing_transaction.source = source
+                self._span.root_span.source = source
 
         if source:
             self._transaction_info["source"] = source
 
-    @_attr_setter
-    def user(self, value):
-        # type: (Optional[Dict[str, Any]]) -> None
-        """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
-        warnings.warn(
-            "The `Scope.user` setter is deprecated in favor of `Scope.set_user()`.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self.set_user(value)
+    @property
+    def transaction_name(self) -> Optional[str]:
+        return self._transaction
 
-    def set_user(self, value):
-        # type: (Optional[Dict[str, Any]]) -> None
+    @property
+    def transaction_source(self) -> Optional[str]:
+        return self._transaction_info.get("source")
+
+    def set_user(self, value: Optional[Dict[str, Any]]) -> None:
         """Sets a user for the scope."""
         self._user = value
         session = self.get_isolation_scope()._session
@@ -814,37 +699,20 @@ class Scope:
             session.update(user=value)
 
     @property
-    def span(self):
-        # type: () -> Optional[Span]
-        """Get/set current tracing span or transaction."""
+    def span(self) -> Optional[Span]:
+        """Get current tracing span."""
         return self._span
 
-    @span.setter
-    def span(self, span):
-        # type: (Optional[Span]) -> None
-        self._span = span
-        # XXX: this differs from the implementation in JS, there Scope.setSpan
-        # does not set Scope._transactionName.
-        if isinstance(span, Transaction):
-            transaction = span
-            if transaction.name:
-                self._transaction = transaction.name
-                if transaction.source:
-                    self._transaction_info["source"] = transaction.source
-
     @property
-    def profile(self):
-        # type: () -> Optional[Profile]
+    def profile(self) -> Optional[Profile]:
         return self._profile
 
     @profile.setter
-    def profile(self, profile):
-        # type: (Optional[Profile]) -> None
+    def profile(self, profile: Optional[Profile]) -> None:
 
         self._profile = profile
 
-    def set_tag(self, key, value):
-        # type: (str, Any) -> None
+    def set_tag(self, key: str, value: Any) -> None:
         """
         Sets a tag for a key to a specific value.
 
@@ -854,8 +722,7 @@ class Scope:
         """
         self._tags[key] = value
 
-    def set_tags(self, tags):
-        # type: (Mapping[str, object]) -> None
+    def set_tags(self, tags: Mapping[str, object]) -> None:
         """Sets multiple tags at once.
 
         This method updates multiple tags at once. The tags are passed as a dictionary
@@ -873,8 +740,7 @@ class Scope:
         """
         self._tags.update(tags)
 
-    def remove_tag(self, key):
-        # type: (str) -> None
+    def remove_tag(self, key: str) -> None:
         """
         Removes a specific tag.
 
@@ -884,53 +750,46 @@ class Scope:
 
     def set_context(
         self,
-        key,  # type: str
-        value,  # type: Dict[str, Any]
-    ):
-        # type: (...) -> None
+        key: str,
+        value: Dict[str, Any],
+    ) -> None:
         """
         Binds a context at a certain key to a specific value.
         """
         self._contexts[key] = value
 
     def remove_context(
-        self, key  # type: str
-    ):
-        # type: (...) -> None
+        self,
+        key: str,
+    ) -> None:
         """Removes a context."""
         self._contexts.pop(key, None)
 
     def set_extra(
         self,
-        key,  # type: str
-        value,  # type: Any
-    ):
-        # type: (...) -> None
+        key: str,
+        value: Any,
+    ) -> None:
         """Sets an extra key to a specific value."""
         self._extras[key] = value
 
-    def remove_extra(
-        self, key  # type: str
-    ):
-        # type: (...) -> None
+    def remove_extra(self, key: str) -> None:
         """Removes a specific extra key."""
         self._extras.pop(key, None)
 
-    def clear_breadcrumbs(self):
-        # type: () -> None
+    def clear_breadcrumbs(self) -> None:
         """Clears breadcrumb buffer."""
-        self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
+        self._breadcrumbs: Deque[Breadcrumb] = deque()
         self._n_breadcrumbs_truncated = 0
 
     def add_attachment(
         self,
-        bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
-        filename=None,  # type: Optional[str]
-        path=None,  # type: Optional[str]
-        content_type=None,  # type: Optional[str]
-        add_to_transactions=False,  # type: bool
-    ):
-        # type: (...) -> None
+        bytes: Union[None, bytes, Callable[[], bytes]] = None,
+        filename: Optional[str] = None,
+        path: Optional[str] = None,
+        content_type: Optional[str] = None,
+        add_to_transactions: bool = False,
+    ) -> None:
         """Adds an attachment to future events sent from this scope.
 
         The parameters are the same as for the :py:class:`sentry_sdk.attachments.Attachment` constructor.
@@ -945,8 +804,12 @@ class Scope:
             )
         )
 
-    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
+    def add_breadcrumb(
+        self,
+        crumb: Optional[Breadcrumb] = None,
+        hint: Optional[BreadcrumbHint] = None,
+        **kwargs: Any,
+    ) -> None:
         """
         Adds a breadcrumb.
 
@@ -964,12 +827,12 @@ class Scope:
         before_breadcrumb = client.options.get("before_breadcrumb")
         max_breadcrumbs = client.options.get("max_breadcrumbs", DEFAULT_MAX_BREADCRUMBS)
 
-        crumb = dict(crumb or ())  # type: Breadcrumb
+        crumb: Breadcrumb = dict(crumb or ())
         crumb.update(kwargs)
         if not crumb:
             return
 
-        hint = dict(hint or ())  # type: Hint
+        hint: Hint = dict(hint or ())
 
         if crumb.get("timestamp") is None:
             crumb["timestamp"] = datetime.now(timezone.utc)
@@ -990,198 +853,48 @@ class Scope:
             self._breadcrumbs.popleft()
             self._n_breadcrumbs_truncated += 1
 
-    def start_transaction(
-        self,
-        transaction=None,
-        instrumenter=INSTRUMENTER.SENTRY,
-        custom_sampling_context=None,
-        **kwargs,
-    ):
-        # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+    def start_transaction(self, **kwargs: Any) -> Union[NoOpSpan, Span]:
         """
-        Start and return a transaction.
-
-        Start an existing transaction if given, otherwise create and start a new
-        transaction with kwargs.
-
-        This is the entry point to manual tracing instrumentation.
-
-        A tree structure can be built by adding child spans to the transaction,
-        and child spans to other spans. To start a new child span within the
-        transaction or any span, call the respective `.start_child()` method.
-
-        Every child span must be finished before the transaction is finished,
-        otherwise the unfinished spans are discarded.
-
-        When used as context managers, spans and transactions are automatically
-        finished at the end of the `with` block. If not using context managers,
-        call the `.finish()` method.
-
-        When the transaction is finished, it will be sent to Sentry with all its
-        finished child spans.
-
-        :param transaction: The transaction to start. If omitted, we create and
-            start a new transaction.
-        :param instrumenter: This parameter is meant for internal use only. It
-            will be removed in the next major version.
-        :param custom_sampling_context: The transaction's custom sampling context.
-        :param kwargs: Optional keyword arguments to be passed to the Transaction
-            constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
-            available arguments.
+        .. deprecated:: 3.0.0
+            This function is deprecated and will be removed in a future release.
+            Use :py:meth:`sentry_sdk.start_span` instead.
         """
-        kwargs.setdefault("scope", self)
+        warnings.warn(
+            "The `start_transaction` method is deprecated, please use `sentry_sdk.start_span instead.`",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return NoOpSpan(**kwargs)
 
-        client = self.get_client()
-
-        configuration_instrumenter = client.options["instrumenter"]
-
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
-
-        try_autostart_continuous_profiler()
-
-        custom_sampling_context = custom_sampling_context or {}
-
-        # kwargs at this point has type TransactionKwargs, since we have removed
-        # the client and custom_sampling_context from it.
-        transaction_kwargs = kwargs  # type: TransactionKwargs
-
-        # if we haven't been given a transaction, make one
-        if transaction is None:
-            transaction = Transaction(**transaction_kwargs)
-
-        # use traces_sample_rate, traces_sampler, and/or inheritance to make a
-        # sampling decision
-        sampling_context = {
-            "transaction_context": transaction.to_json(),
-            "parent_sampled": transaction.parent_sampled,
-        }
-        sampling_context.update(custom_sampling_context)
-        transaction._set_initial_sampling_decision(sampling_context=sampling_context)
-
-        # update the sample rate in the dsc
-        if transaction.sample_rate is not None:
-            propagation_context = self.get_active_propagation_context()
-            if propagation_context:
-                dsc = propagation_context.dynamic_sampling_context
-                if dsc is not None:
-                    dsc["sample_rate"] = str(transaction.sample_rate)
-            if transaction._baggage:
-                transaction._baggage.sentry_items["sample_rate"] = str(
-                    transaction.sample_rate
-                )
-
-        if transaction.sampled:
-            profile = Profile(
-                transaction.sampled, transaction._start_timestamp_monotonic_ns
-            )
-            profile._set_initial_sampling_decision(sampling_context=sampling_context)
-
-            transaction._profile = profile
-
-            transaction._continuous_profile = try_profile_lifecycle_trace_start()
-
-            # Typically, the profiler is set when the transaction is created. But when
-            # using the auto lifecycle, the profiler isn't running when the first
-            # transaction is started. So make sure we update the profiler id on it.
-            if transaction._continuous_profile is not None:
-                transaction.set_profiler_id(get_profiler_id())
-
-            # we don't bother to keep spans if we already know we're not going to
-            # send the transaction
-            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
-
-        return transaction
-
-    def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, Any) -> Span
+    def start_span(self, **kwargs: Any) -> Union[NoOpSpan, Span]:
         """
-        Start a span whose parent is the currently active span or transaction, if any.
+        Start a span whose parent is the currently active span, if any.
 
         The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
         typically used as a context manager to start and stop timing in a `with`
         block.
 
-        Only spans contained in a transaction are sent to Sentry. Most
-        integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use
-        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
-        one is not already in progress.
-
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
-
-        The instrumenter parameter is deprecated for user code, and it will
-        be removed in the next major version. Going forward, it should only
-        be used by the SDK itself.
         """
-        if kwargs.get("description") is not None:
-            warnings.warn(
-                "The `description` parameter is deprecated. Please use `name` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
+        return NoOpSpan(**kwargs)
 
-        with new_scope():
-            kwargs.setdefault("scope", self)
-
-            client = self.get_client()
-
-            configuration_instrumenter = client.options["instrumenter"]
-
-            if instrumenter != configuration_instrumenter:
-                return NoOpSpan()
-
-            # get current span or transaction
-            span = self.span or self.get_isolation_scope().span
-
-            if span is None:
-                # New spans get the `trace_id` from the scope
-                if "trace_id" not in kwargs:
-                    propagation_context = self.get_active_propagation_context()
-                    if propagation_context is not None:
-                        kwargs["trace_id"] = propagation_context.trace_id
-
-                span = Span(**kwargs)
-            else:
-                # Children take `trace_id`` from the parent span.
-                span = span.start_child(**kwargs)
-
-            return span
-
+    @contextmanager
     def continue_trace(
-        self, environ_or_headers, op=None, name=None, source=None, origin="manual"
-    ):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
+        self, environ_or_headers: Dict[str, Any]
+    ) -> Generator[None, None, None]:
         """
-        Sets the propagation context from environment or headers and returns a transaction.
+        Sets the propagation context from environment or headers to continue an incoming trace.
         """
         self.generate_propagation_context(environ_or_headers)
+        yield
 
-        # When we generate the propagation context, the sample_rand value is set
-        # if missing or invalid (we use the original value if it's valid).
-        # We want the transaction to use the same sample_rand value. Due to duplicated
-        # propagation logic in the transaction, we pass it in to avoid recomputing it
-        # in the transaction.
-        # TYPE SAFETY: self.generate_propagation_context() ensures that self._propagation_context
-        # is not None.
-        sample_rand = typing.cast(
-            PropagationContext, self._propagation_context
-        )._sample_rand()
-
-        transaction = Transaction.continue_from_headers(
-            normalize_incoming_data(environ_or_headers),
-            _sample_rand=sample_rand,
-            op=op,
-            origin=origin,
-            name=name,
-            source=source,
-        )
-
-        return transaction
-
-    def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
-        # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
+    def capture_event(
+        self,
+        event: Event,
+        hint: Optional[Hint] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """
         Captures an event.
 
@@ -1212,8 +925,13 @@ class Scope:
 
         return event_id
 
-    def capture_message(self, message, level=None, scope=None, **scope_kwargs):
-        # type: (str, Optional[LogLevelStr], Optional[Scope], Any) -> Optional[str]
+    def capture_message(
+        self,
+        message: str,
+        level: Optional[LogLevelStr] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """
         Captures a message.
 
@@ -1236,15 +954,19 @@ class Scope:
         if level is None:
             level = "info"
 
-        event = {
+        event: Event = {
             "message": message,
             "level": level,
-        }  # type: Event
+        }
 
         return self.capture_event(event, scope=scope, **scope_kwargs)
 
-    def capture_exception(self, error=None, scope=None, **scope_kwargs):
-        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
+    def capture_exception(
+        self,
+        error: Optional[Union[BaseException, ExcInfo]] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """Captures an exception.
 
         :param error: An exception to capture. If `None`, `sys.exc_info()` will be used.
@@ -1277,8 +999,7 @@ class Scope:
 
         return None
 
-    def start_session(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def start_session(self, *args: Any, **kwargs: Any) -> None:
         """Starts a new session."""
         session_mode = kwargs.pop("session_mode", "application")
 
@@ -1292,8 +1013,7 @@ class Scope:
             session_mode=session_mode,
         )
 
-    def end_session(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def end_session(self, *args: Any, **kwargs: Any) -> None:
         """Ends the current session if there is one."""
         session = self._session
         self._session = None
@@ -1302,8 +1022,7 @@ class Scope:
             session.close()
             self.get_client().capture_session(session)
 
-    def stop_auto_session_tracking(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def stop_auto_session_tracking(self, *args: Any, **kwargs: Any) -> None:
         """Stops automatic session tracking.
 
         This temporarily session tracking for the current scope when called.
@@ -1312,18 +1031,14 @@ class Scope:
         self.end_session()
         self._force_auto_session_tracking = False
 
-    def resume_auto_session_tracking(self):
-        # type: (...) -> None
+    def resume_auto_session_tracking(self) -> None:
         """Resumes automatic session tracking for the current scope if
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
         """
         self._force_auto_session_tracking = None
 
-    def add_event_processor(
-        self, func  # type: EventProcessor
-    ):
-        # type: (...) -> None
+    def add_event_processor(self, func: EventProcessor) -> None:
         """Register a scope local event processor on the scope.
 
         :param func: This function behaves like `before_send.`
@@ -1339,10 +1054,9 @@ class Scope:
 
     def add_error_processor(
         self,
-        func,  # type: ErrorProcessor
-        cls=None,  # type: Optional[Type[BaseException]]
-    ):
-        # type: (...) -> None
+        func: ErrorProcessor,
+        cls: Optional[Type[BaseException]] = None,
+    ) -> None:
         """Register a scope local error processor on the scope.
 
         :param func: A callback that works similar to an event processor but is invoked with the original exception info triple as second argument.
@@ -1353,8 +1067,7 @@ class Scope:
             cls_ = cls  # For mypy.
             real_func = func
 
-            def func(event, exc_info):
-                # type: (Event, ExcInfo) -> Optional[Event]
+            def wrapped_func(event: Event, exc_info: ExcInfo) -> Optional[Event]:
                 try:
                     is_inst = isinstance(exc_info[1], cls_)
                 except Exception:
@@ -1363,15 +1076,17 @@ class Scope:
                     return real_func(event, exc_info)
                 return event
 
-        self._error_processors.append(func)
+        self._error_processors.append(wrapped_func)
 
-    def _apply_level_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_level_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if self._level is not None:
             event["level"] = self._level
 
-    def _apply_breadcrumbs_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_breadcrumbs_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         event.setdefault("breadcrumbs", {})
 
         # This check is just for mypy -
@@ -1393,38 +1108,47 @@ class Scope:
             logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
 
-    def _apply_user_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_user_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 
-    def _apply_transaction_name_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_transaction_name_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if event.get("transaction") is None and self._transaction is not None:
             event["transaction"] = self._transaction
 
-    def _apply_transaction_info_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_transaction_info_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if event.get("transaction_info") is None and self._transaction_info is not None:
             event["transaction_info"] = self._transaction_info
 
-    def _apply_fingerprint_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_fingerprint_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if event.get("fingerprint") is None and self._fingerprint is not None:
             event["fingerprint"] = self._fingerprint
 
-    def _apply_extra_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_extra_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if self._extras:
             event.setdefault("extra", {}).update(self._extras)
 
-    def _apply_tags_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_tags_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if self._tags:
-            event.setdefault("tags", {}).update(self._tags)
+            event.setdefault("tags", {}).update(
+                {k: safe_str(v) for k, v in self._tags.items()}
+            )
 
-    def _apply_contexts_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_contexts_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
@@ -1432,26 +1156,30 @@ class Scope:
 
         # Add "trace" context
         if contexts.get("trace") is None:
-            if has_tracing_enabled(options) and self._span is not None:
+            if (
+                options is not None
+                and has_tracing_enabled(options)
+                and self._span is not None
+                and self._span.is_valid
+            ):
                 contexts["trace"] = self._span.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()
 
-    def _apply_flags_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_flags_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         flags = self.flags.get()
         if len(flags) > 0:
             event.setdefault("contexts", {}).setdefault("flags", {}).update(
                 {"values": flags}
             )
 
-    def _drop(self, cause, ty):
-        # type: (Any, str) -> Optional[Any]
+    def _drop(self, cause: Any, ty: str) -> Optional[Any]:
         logger.info("%s (%s) dropped event", ty, cause)
         return None
 
-    def run_error_processors(self, event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+    def run_error_processors(self, event: Event, hint: Hint) -> Optional[Event]:
         """
         Runs the error processors on the event and returns the modified event.
         """
@@ -1472,8 +1200,7 @@ class Scope:
 
         return event
 
-    def run_event_processors(self, event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+    def run_event_processors(self, event: Event, hint: Hint) -> Optional[Event]:
         """
         Runs the event processors on the event and returns the modified event.
         """
@@ -1482,8 +1209,8 @@ class Scope:
 
         if not is_check_in:
             # Get scopes without creating them to prevent infinite recursion
-            isolation_scope = _isolation_scope.get()
-            current_scope = _current_scope.get()
+            isolation_scope = self._get_isolation_scope()
+            current_scope = self._get_current_scope()
 
             event_processors = chain(
                 global_event_processors,
@@ -1493,7 +1220,7 @@ class Scope:
             )
 
             for event_processor in event_processors:
-                new_event = event
+                new_event: Optional[Event] = event
                 with capture_internal_exceptions():
                     new_event = event_processor(event, hint)
                 if new_event is None:
@@ -1505,11 +1232,10 @@ class Scope:
     @_disable_capture
     def apply_to_event(
         self,
-        event,  # type: Event
-        hint,  # type: Hint
-        options=None,  # type: Optional[Dict[str, Any]]
-    ):
-        # type: (...) -> Optional[Event]
+        event: Event,
+        hint: Hint,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Event]:
         """Applies the information contained on the scope to the given event."""
         ty = event.get("type")
         is_transaction = ty == "transaction"
@@ -1555,8 +1281,7 @@ class Scope:
 
         return event
 
-    def update_from_scope(self, scope):
-        # type: (Scope) -> None
+    def update_from_scope(self, scope: Scope) -> None:
         """Update the scope with another scope's data."""
         if scope._level is not None:
             self._level = scope._level
@@ -1599,14 +1324,13 @@ class Scope:
 
     def update_from_kwargs(
         self,
-        user=None,  # type: Optional[Any]
-        level=None,  # type: Optional[LogLevelStr]
-        extras=None,  # type: Optional[Dict[str, Any]]
-        contexts=None,  # type: Optional[Dict[str, Dict[str, Any]]]
-        tags=None,  # type: Optional[Dict[str, str]]
-        fingerprint=None,  # type: Optional[List[str]]
-    ):
-        # type: (...) -> None
+        user: Optional[Any] = None,
+        level: Optional[LogLevelStr] = None,
+        extras: Optional[Dict[str, Any]] = None,
+        contexts: Optional[Dict[str, Dict[str, Any]]] = None,
+        tags: Optional[Dict[str, str]] = None,
+        fingerprint: Optional[List[str]] = None,
+    ) -> None:
         """Update the scope's attributes."""
         if level is not None:
             self._level = level
@@ -1621,8 +1345,7 @@ class Scope:
         if fingerprint is not None:
             self._fingerprint = fingerprint
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return "<%s id=%s name=%s type=%s>" % (
             self.__class__.__name__,
             hex(id(self)),
@@ -1631,8 +1354,7 @@ class Scope:
         )
 
     @property
-    def flags(self):
-        # type: () -> FlagBuffer
+    def flags(self) -> FlagBuffer:
         if self._flags is None:
             max_flags = (
                 self.get_client().options["_experiments"].get("max_flags")
@@ -1643,8 +1365,7 @@ class Scope:
 
 
 @contextmanager
-def new_scope():
-    # type: () -> Generator[Scope, None, None]
+def new_scope() -> Generator[Scope, None, None]:
     """
     .. versionadded:: 2.0.0
 
@@ -1681,8 +1402,7 @@ def new_scope():
 
 
 @contextmanager
-def use_scope(scope):
-    # type: (Scope) -> Generator[Scope, None, None]
+def use_scope(scope: Scope) -> Generator[Scope, None, None]:
     """
     .. versionadded:: 2.0.0
 
@@ -1719,8 +1439,7 @@ def use_scope(scope):
 
 
 @contextmanager
-def isolation_scope():
-    # type: () -> Generator[Scope, None, None]
+def isolation_scope() -> Generator[Scope, None, None]:
     """
     .. versionadded:: 2.0.0
 
@@ -1768,8 +1487,7 @@ def isolation_scope():
 
 
 @contextmanager
-def use_isolation_scope(isolation_scope):
-    # type: (Scope) -> Generator[Scope, None, None]
+def use_isolation_scope(isolation_scope: Scope) -> Generator[Scope, None, None]:
     """
     .. versionadded:: 2.0.0
 
@@ -1814,14 +1532,10 @@ def use_isolation_scope(isolation_scope):
             capture_internal_exception(sys.exc_info())
 
 
-def should_send_default_pii():
-    # type: () -> bool
+def should_send_default_pii() -> bool:
     """Shortcut for `Scope.get_client().should_send_default_pii()`."""
     return Scope.get_client().should_send_default_pii()
 
 
 # Circular imports
 from sentry_sdk.client import NonRecordingClient
-
-if TYPE_CHECKING:
-    import sentry_sdk.client

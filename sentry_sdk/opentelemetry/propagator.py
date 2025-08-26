@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from opentelemetry import trace
 from opentelemetry.context import (
     Context,
     get_current,
+    get_value,
     set_value,
 )
 from opentelemetry.propagators.textmap import (
@@ -17,19 +20,24 @@ from opentelemetry.trace import (
     SpanContext,
     TraceFlags,
 )
+from opentelemetry.semconv.trace import SpanAttributes
 
-from sentry_sdk.integrations.opentelemetry.consts import (
-    SENTRY_BAGGAGE_KEY,
-    SENTRY_TRACE_KEY,
-)
-from sentry_sdk.integrations.opentelemetry.span_processor import (
-    SentrySpanProcessor,
-)
-from sentry_sdk.tracing import (
+import sentry_sdk
+from sentry_sdk.consts import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
 )
-from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
+from sentry_sdk.opentelemetry.consts import (
+    SENTRY_BAGGAGE_KEY,
+    SENTRY_TRACE_KEY,
+    SENTRY_SCOPES_KEY,
+)
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    extract_sentrytrace_data,
+    should_propagate_trace,
+)
+from sentry_sdk.opentelemetry.scope import validate_scopes
 
 from typing import TYPE_CHECKING
 
@@ -42,11 +50,16 @@ class SentryPropagator(TextMapPropagator):
     Propagates tracing headers for Sentry's tracing system in a way OTel understands.
     """
 
-    def extract(self, carrier, context=None, getter=default_getter):
-        # type: (CarrierT, Optional[Context], Getter[CarrierT]) -> Context
+    def extract(
+        self,
+        carrier: CarrierT,
+        context: Optional[Context] = None,
+        getter: Getter[CarrierT] = default_getter,
+    ) -> Context:
         if context is None:
             context = get_current()
 
+        # TODO-neel-potel cleanup with continue_trace / isolation_scope
         sentry_trace = getter.get(carrier, SENTRY_TRACE_HEADER_NAME)
         if not sentry_trace:
             return context
@@ -84,34 +97,29 @@ class SentryPropagator(TextMapPropagator):
         modified_context = trace.set_span_in_context(span, context)
         return modified_context
 
-    def inject(self, carrier, context=None, setter=default_setter):
-        # type: (CarrierT, Optional[Context], Setter[CarrierT]) -> None
-        if context is None:
-            context = get_current()
-
-        current_span = trace.get_current_span(context)
-        current_span_context = current_span.get_span_context()
-
-        if not current_span_context.is_valid:
+    def inject(
+        self,
+        carrier: CarrierT,
+        context: Optional[Context] = None,
+        setter: Setter[CarrierT] = default_setter,
+    ) -> None:
+        scopes = validate_scopes(get_value(SENTRY_SCOPES_KEY, context))
+        if not scopes:
             return
 
-        span_id = trace.format_span_id(current_span_context.span_id)
+        (current_scope, _) = scopes
 
-        span_map = SentrySpanProcessor().otel_span_map
-        sentry_span = span_map.get(span_id, None)
-        if not sentry_span:
-            return
+        span = current_scope.span
+        if span:
+            span_url = span.get_attribute(SpanAttributes.HTTP_URL)
+            if span_url and not should_propagate_trace(
+                sentry_sdk.get_client(), span_url
+            ):
+                return
 
-        setter.set(carrier, SENTRY_TRACE_HEADER_NAME, sentry_span.to_traceparent())
-
-        if sentry_span.containing_transaction:
-            baggage = sentry_span.containing_transaction.get_baggage()
-            if baggage:
-                baggage_data = baggage.serialize()
-                if baggage_data:
-                    setter.set(carrier, BAGGAGE_HEADER_NAME, baggage_data)
+        for key, value in current_scope.iter_trace_propagation_headers():
+            setter.set(carrier, key, value)
 
     @property
-    def fields(self):
-        # type: () -> Set[str]
+    def fields(self) -> Set[str]:
         return {SENTRY_TRACE_HEADER_NAME, BAGGAGE_HEADER_NAME}

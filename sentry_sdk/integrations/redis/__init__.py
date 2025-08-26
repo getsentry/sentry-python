@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.redis.consts import _DEFAULT_MAX_DATA_SIZE
 from sentry_sdk.integrations.redis.rb import _patch_rb
@@ -15,14 +16,16 @@ if TYPE_CHECKING:
 class RedisIntegration(Integration):
     identifier = "redis"
 
-    def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE, cache_prefixes=None):
-        # type: (int, Optional[list[str]]) -> None
+    def __init__(
+        self,
+        max_data_size: int = _DEFAULT_MAX_DATA_SIZE,
+        cache_prefixes: Optional[list[str]] = None,
+    ) -> None:
         self.max_data_size = max_data_size
         self.cache_prefixes = cache_prefixes if cache_prefixes is not None else []
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         try:
             from redis import StrictRedis, client
         except ImportError:
