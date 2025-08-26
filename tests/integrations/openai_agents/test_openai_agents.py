@@ -87,7 +87,7 @@ def test_agent_custom_model():
         name="test_agent_custom_model",
         instructions="You are a helpful test assistant.",
         # the model could be agents.OpenAIChatCompletionsModel()
-        model=MagicMock(model="my-custom-model"),
+        model="my-custom-model",
         model_settings=ModelSettings(
             max_tokens=100,
             temperature=0.7,
