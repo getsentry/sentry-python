@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.35.1
+
+### Various fixes & improvements
+
+- fix(openai-agents): Isolate agent run (#4720) by @sentrivana
+- build(deps): bump actions/checkout from 4.2.2 to 5.0.0 (#4709) by @dependabot
+- build(deps): bump actions/setup-java from 4 to 5 (#4716) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.4.3 to 5.5.0 (#4717) by @dependabot
+- build(deps): bump actions/create-github-app-token from 2.1.0 to 2.1.1 (#4710) by @dependabot
+- fix(tracing): Do not attach stacktrace to transaction (#4713) by @Zylphrex
+
 ## 2.35.0
 
 ### Various fixes & improvements
