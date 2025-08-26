@@ -442,12 +442,12 @@ class _Client(BaseClient):
 
         previous_total_spans: Optional[int] = None
         previous_total_breadcrumbs: Optional[int] = None
+        is_transaction = event.get("type") == "transaction"
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
-            is_transaction = event.get("type") == "transaction"
             spans_before = len(event.get("spans", []))
             event_ = scope.apply_to_event(event, hint, self.options)
 
