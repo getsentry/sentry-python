@@ -111,7 +111,6 @@ def _wrap_create_react_agent(f):
             origin=LanggraphIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
             return f(*args, **kwargs)
 
     return new_create_react_agent
@@ -119,19 +118,61 @@ def _wrap_create_react_agent(f):
 
 def _wrap_state_graph_compile(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
-    """Wrap StateGraph.compile to add instrumentation to the resulting compiled graph."""
-
     @wraps(f)
     def new_compile(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> Any
-        # Compile the graph normally
+        integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
+
+        # import ipdb; ipdb.set_trace()
+        def get_tools(graph):
+            tools = []
+            edges = getattr(graph, "edges", None)
+            if edges:
+                if isinstance(edges, dict):
+                    if "tools" in edges:
+                        tools.append("tools")
+                elif hasattr(edges, "__iter__"):
+                    for edge in edges:
+                        if getattr(edge, "name", None) == "tools" or edge == "tools":
+                            tools.append("tools")
+            cond_edges = getattr(graph, "conditional_edges", None)
+            if cond_edges:
+                if isinstance(cond_edges, dict):
+                    if "tools" in cond_edges:
+                        tools.append("tools")
+                elif hasattr(cond_edges, "__iter__"):
+                    for edge in cond_edges:
+                        if getattr(edge, "name", None) == "tools" or edge == "tools":
+                            tools.append("tools")
+            return tools
+
         compiled_graph = f(self, *args, **kwargs)
+        if integration is None:
+            return compiled_graph
 
-        # Store metadata on the compiled graph for later use
-        if hasattr(self, "__dict__"):
-            compiled_graph._sentry_source_graph = self
-
-        return compiled_graph
+        with sentry_sdk.start_span(
+            op=OP.GEN_AI_CREATE_AGENT,
+            name="create_agent",
+            origin=LanggraphIntegration.origin,
+        ) as span:
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
+            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
+            # import ipdb; ipdb.set_trace()
+            tools = None
+            graph = getattr(compiled_graph, "get_graph", None)
+            if callable(graph):
+                graph_obj = graph()
+                nodes = getattr(graph_obj, "nodes", None)
+                if nodes and isinstance(nodes, dict):
+                    tools_node = nodes.get("tools")
+                    if tools_node:
+                        data = getattr(tools_node, "data", None)
+                        if data and hasattr(data, "tools_by_name"):
+                            tools = list(data.tools_by_name.keys())
+            span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
+            compiled_graph = f(self, *args, **kwargs)
+            if hasattr(self, "__dict__"):
+                compiled_graph._sentry_source_graph = self
+            return compiled_graph
 
     return new_compile
 
