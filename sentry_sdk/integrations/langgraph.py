@@ -35,15 +35,28 @@ class LanggraphIntegration(Integration):
             Pregel.invoke = _wrap_pregel_invoke(Pregel.invoke)
         if hasattr(Pregel, "ainvoke"):
             Pregel.ainvoke = _wrap_pregel_ainvoke(Pregel.ainvoke)
-        if hasattr(Pregel, "stream"):
-            Pregel.stream = _wrap_pregel_stream(Pregel.stream)
-        if hasattr(Pregel, "astream"):
-            Pregel.astream = _wrap_pregel_astream(Pregel.astream)
+        # if hasattr(Pregel, "stream"):
+        #     Pregel.stream = _wrap_pregel_stream(Pregel.stream)
+        # if hasattr(Pregel, "astream"):
+        #     Pregel.astream = _wrap_pregel_astream(Pregel.astream)
+
+        # Wrap prebuilt agent creation functions
+        import langgraph.prebuilt as prebuilt
+
+        if hasattr(prebuilt, "create_react_agent"):
+            prebuilt.create_react_agent = _wrap_create_react_agent(
+                prebuilt.create_react_agent
+            )
+            print("Wrapped create_react_agent")
 
 
 def _get_graph_name(graph_obj):
     # type: (Any) -> Optional[str]
     """Extract graph name from various possible attributes."""
+    # Check for Sentry-specific agent name first
+    if hasattr(graph_obj, "_sentry_agent_name"):
+        return graph_obj._sentry_agent_name
+
     # Try to get name from different possible attributes
     for attr in ["name", "graph_name", "__name__", "_name"]:
         if hasattr(graph_obj, attr):
@@ -82,6 +95,28 @@ def _get_graph_metadata(graph_obj):
     return graph_name, node_names
 
 
+def _wrap_create_react_agent(f):
+    # type: (Callable[..., Any]) -> Callable[..., Any]
+    """Wrap create_react_agent to create a create_agent span."""
+
+    @wraps(f)
+    def new_create_react_agent(*args, **kwargs):
+        # type: (Any, Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
+        if integration is None:
+            return f(*args, **kwargs)
+        with sentry_sdk.start_span(
+            op=OP.GEN_AI_CREATE_AGENT,
+            name="create_agent",
+            origin=LanggraphIntegration.origin,
+        ) as span:
+            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
+            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
+            return f(*args, **kwargs)
+
+    return new_create_react_agent
+
+
 def _wrap_state_graph_compile(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     """Wrap StateGraph.compile to add instrumentation to the resulting compiled graph."""
@@ -115,7 +150,11 @@ def _wrap_pregel_invoke(f):
 
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
+            name=(
+                f"invoke_agent invoke {graph_name}".strip()
+                if graph_name
+                else "invoke_agent"
+            ),
             origin=LanggraphIntegration.origin,
         ) as span:
             # Set agent metadata
@@ -169,7 +208,11 @@ def _wrap_pregel_ainvoke(f):
 
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
+            name=(
+                f"invoke_agent ainvoke {graph_name}".strip()
+                if graph_name
+                else "invoke_agent"
+            ),
             origin=LanggraphIntegration.origin,
         ) as span:
             # Set agent metadata
@@ -224,7 +267,11 @@ def _wrap_pregel_stream(f):
 
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
+            name=(
+                f"invoke_agent stream {graph_name}".strip()
+                if graph_name
+                else "invoke_agent"
+            ),
             origin=LanggraphIntegration.origin,
         )
         span.__enter__()
@@ -298,7 +345,11 @@ def _wrap_pregel_astream(f):
 
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent",
+            name=(
+                f"invoke_agent astream {graph_name}".strip()
+                if graph_name
+                else "invoke_agent"
+            ),
             origin=LanggraphIntegration.origin,
         )
         span.__enter__()
