@@ -122,29 +122,6 @@ def _wrap_state_graph_compile(f):
     def new_compile(self, *args, **kwargs):
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
 
-        # import ipdb; ipdb.set_trace()
-        def get_tools(graph):
-            tools = []
-            edges = getattr(graph, "edges", None)
-            if edges:
-                if isinstance(edges, dict):
-                    if "tools" in edges:
-                        tools.append("tools")
-                elif hasattr(edges, "__iter__"):
-                    for edge in edges:
-                        if getattr(edge, "name", None) == "tools" or edge == "tools":
-                            tools.append("tools")
-            cond_edges = getattr(graph, "conditional_edges", None)
-            if cond_edges:
-                if isinstance(cond_edges, dict):
-                    if "tools" in cond_edges:
-                        tools.append("tools")
-                elif hasattr(cond_edges, "__iter__"):
-                    for edge in cond_edges:
-                        if getattr(edge, "name", None) == "tools" or edge == "tools":
-                            tools.append("tools")
-            return tools
-
         compiled_graph = f(self, *args, **kwargs)
         if integration is None:
             return compiled_graph
@@ -156,7 +133,6 @@ def _wrap_state_graph_compile(f):
         ) as span:
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
             span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
-            # import ipdb; ipdb.set_trace()
             tools = None
             graph = getattr(compiled_graph, "get_graph", None)
             if callable(graph):
