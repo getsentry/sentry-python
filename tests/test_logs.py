@@ -254,23 +254,40 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     sentry_sdk.logger.error(
         "The recorded error was '{error}'", error=Exception("some error")
     )
+    sentry_sdk.logger.warning("The recorded value was hardcoded.")
 
     get_client().flush()
     logs = envelopes_to_logs(envelopes)
 
     assert logs[0]["body"] == "The recorded value was '1'"
     assert logs[0]["attributes"]["sentry.message.parameter.int_var"] == 1
+    assert (
+        logs[0]["attributes"]["sentry.message.template"]
+        == "The recorded value was '{int_var}'"
+    )
 
     assert logs[1]["body"] == "The recorded value was '2.0'"
     assert logs[1]["attributes"]["sentry.message.parameter.float_var"] == 2.0
+    assert (
+        logs[1]["attributes"]["sentry.message.template"]
+        == "The recorded value was '{float_var}'"
+    )
 
     assert logs[2]["body"] == "The recorded value was 'False'"
     assert logs[2]["attributes"]["sentry.message.parameter.bool_var"] is False
+    assert (
+        logs[2]["attributes"]["sentry.message.template"]
+        == "The recorded value was '{bool_var}'"
+    )
 
     assert logs[3]["body"] == "The recorded value was 'some string value'"
     assert (
         logs[3]["attributes"]["sentry.message.parameter.string_var"]
         == "some string value"
+    )
+    assert (
+        logs[3]["attributes"]["sentry.message.template"]
+        == "The recorded value was '{string_var}'"
     )
 
     assert logs[4]["body"] == "The recorded error was 'some error'"
@@ -278,6 +295,13 @@ def test_logs_message_params(sentry_init, capture_envelopes):
         logs[4]["attributes"]["sentry.message.parameter.error"]
         == "Exception('some error')"
     )
+    assert (
+        logs[4]["attributes"]["sentry.message.template"]
+        == "The recorded error was '{error}'"
+    )
+
+    assert logs[5]["body"] == "The recorded value was hardcoded."
+    assert "sentry.message.template" not in logs[5]["attributes"]
 
 
 @minimum_python_37
