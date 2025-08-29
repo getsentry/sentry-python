@@ -589,4 +589,4 @@ def test_sentry_logs_no_parameters_no_template(sentry_init, capture_envelopes):
     assert len(logs) == 1
 
     attrs = logs[0]["attributes"]
-    assert "sentry.message.message.template" not in attrs
+    assert "sentry.message.template" not in attrs
