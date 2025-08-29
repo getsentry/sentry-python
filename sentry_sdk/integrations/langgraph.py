@@ -7,6 +7,7 @@ from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import safe_serialize
 
 
 try:
@@ -82,6 +83,66 @@ def _get_graph_metadata(graph_obj):
     return graph_name, node_names
 
 
+def _parse_langgraph_messages(state):
+    # type: (Any) -> Optional[List[Any]]
+    role_map = {
+        "human": "user",
+        "ai": "assistant",
+    }
+    if not state:
+        return None
+
+    messages = None
+
+    if isinstance(state, dict):
+        messages = state.get("messages")
+    elif hasattr(state, "messages"):
+        messages = state.messages
+    elif hasattr(state, "get") and callable(state.get):
+        try:
+            messages = state.get("messages")
+        except Exception:
+            pass
+
+    if not messages or not isinstance(messages, (list, tuple)):
+        return None
+
+    normalized_messages = []
+    for message in messages:
+        try:
+            if isinstance(message, dict):
+                role = message.get("role") or message.get("type")
+                if role in role_map:
+                    message = dict(message)
+                    message["role"] = role_map[role]
+                normalized_messages.append(message)
+            elif hasattr(message, "type") and hasattr(message, "content"):
+                role = getattr(message, "type", None)
+                mapped_role = role_map.get(role, role)
+                parsed = {"role": mapped_role, "content": message.content}
+                if hasattr(message, "additional_kwargs"):
+                    parsed.update(message.additional_kwargs)
+                normalized_messages.append(parsed)
+            elif hasattr(message, "role") and hasattr(message, "content"):
+                role = getattr(message, "role", None)
+                mapped_role = role_map.get(role, role)
+                parsed = {"role": mapped_role, "content": message.content}
+                for attr in ["name", "tool_calls", "function_call"]:
+                    if hasattr(message, attr):
+                        value = getattr(message, attr)
+                        if value is not None:
+                            parsed[attr] = value
+                normalized_messages.append(parsed)
+            elif hasattr(message, "__dict__"):
+                normalized_messages.append(vars(message))
+            else:
+                normalized_messages.append({"content": str(message)})
+        except Exception:
+            continue
+
+    return normalized_messages if normalized_messages else None
+
+
 def _wrap_state_graph_compile(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     @wraps(f)
@@ -153,13 +214,19 @@ def _wrap_pregel_invoke(f):
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            # Capture input state if PII is allowed
+            # Capture input messages if PII is allowed
             if (
                 len(args) > 0
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, args[0])
+                # import ipdb; ipdb.set_trace()
+                parsed_messages = _parse_langgraph_messages(args[0])
+                if parsed_messages:
+                    span.set_data(
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        safe_serialize(parsed_messages),
+                    )
 
             # Execute the graph
             try:
@@ -211,13 +278,18 @@ def _wrap_pregel_ainvoke(f):
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            # Capture input state if PII is allowed
+            # Capture input messages if PII is allowed
             if (
                 len(args) > 0
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, args[0])
+                parsed_messages = _parse_langgraph_messages(args[0])
+                if parsed_messages:
+                    span.set_data(
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        safe_serialize(parsed_messages),
+                    )
 
             # Execute the graph
             try:
