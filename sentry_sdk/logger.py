@@ -22,13 +22,14 @@ def _capture_log(severity_text, severity_number, template, **kwargs):
     # type: (str, int, str, **Any) -> None
     client = get_client()
 
-    attrs = {
-        "sentry.message.template": template,
-    }  # type: dict[str, str | bool | float | int]
+    attrs = {}  # type: dict[str, str | bool | float | int]
     if "attributes" in kwargs:
         attrs.update(kwargs.pop("attributes"))
     for k, v in kwargs.items():
         attrs[f"sentry.message.parameter.{k}"] = v
+    if kwargs:
+        # only attach template if there are parameters
+        attrs["sentry.message.template"] = template
 
     attrs = {
         k: (
