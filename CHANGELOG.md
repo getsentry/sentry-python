@@ -2,34 +2,25 @@
 
 ## 3.0.0a6
 
-### Various fixes & improvements
+We're excited to announce that version 3.0 of the Sentry Python SDK is now
+available. This release is the result of a long-term effort to use OpenTelemetry
+under the hood for tracing. This switch opens the door for us to leverage the
+full power of OpenTelemetry, so stay tuned for more integrations and features
+in future releases.
 
-- Add experimental async transport (#4572) by @sl0thentr0py
-- Update tox.ini (#3152) by @sl0thentr0py
-- Fix clickhouse logic for generator case (#4722) by @sl0thentr0py
-- Fix langchain merge (#3152) by @sl0thentr0py
-- Fix some typing after merge (#3152) by @sl0thentr0py
-- Fix is_transaction check in client after merge (#3152) by @sl0thentr0py
-- Update tox.ini (#4721) by @sentrivana
-- Update CHANGELOG.md (fb4faf60) by @sentrivana
-- release: 2.35.1 (c2a21aad) by @getsentry-bot
-- fix(openai-agents): Isolate agent run (#4720) by @sentrivana
-- fixed tests for new openai-agents (#3152) by @sl0thentr0py
-- updated tests (#3152) by @sl0thentr0py
-- Replaced set_data calls with set_attributes (#3152) by @sl0thentr0py
-- build(deps): bump actions/checkout from 4.2.2 to 5.0.0 (#4709) by @dependabot
-- build(deps): bump actions/setup-java from 4 to 5 (#4716) by @dependabot
-- build(deps): bump codecov/codecov-action from 5.4.3 to 5.5.0 (#4717) by @dependabot
-- build(deps): bump actions/create-github-app-token from 2.1.0 to 2.1.1 (#4710) by @dependabot
-- fix(tracing): Do not attach stacktrace to transaction (#4713) by @Zylphrex
-- update changelog (5eafb784) by @antonpirker
-- updated changelog (895c3cd6) by @antonpirker
-- release: 2.35.0 (71f61af1) by @getsentry-bot
-- feat(langchain): update integration to from ai.* to gen_ai.* span attributes (#4678) by @shellmayr
-- Add async span context manager (#4680) by @sl0thentr0py
-- build(deps): bump actions/create-github-app-token from 2.0.6 to 2.1.0 (#4684) by @dependabot
+Looking to upgrade from Sentry SDK 2.x to 3.x? See the
+[full list of changes](MIGRATION_GUIDE.md) for a comprehensive overview
+of what's changed. Looking for a more digestible summary? See the
+[migration guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+with the most common migration patterns.
 
-_Plus 12 more_
+⚠️ This is a pre-release. If you feel like taking it for a spin, we'd be grateful
+for your feedback. How was the migration? Is everything working as expected? Is
+*nothing* working as expected? Something in between? Please let us know
+[on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
+[on Discord](https://discord.com/invite/Ww9hbqr).
+
+This version also adds an experimental async transport option. It can be enabled by passing "transport_async=true" in the experiments dict on sentry_sdk.init().
 
 ## 3.0.0a5
 
