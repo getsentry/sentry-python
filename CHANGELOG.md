@@ -20,7 +20,7 @@ for your feedback. How was the migration? Is everything working as expected? Is
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
 [on Discord](https://discord.com/invite/Ww9hbqr).
 
-This version also adds an experimental async transport option. It can be enabled by passing "transport_async=true" in the experiments dict on sentry_sdk.init().
+This version also adds an experimental async transport option. It can be enabled by passing ``transport_async=true`` in the experiments dict in ``sentry_sdk.init()``. The async transport requires the [asyncio integration](https://docs.sentry.io/platforms/python/integrations/asyncio/) and the [httpcore[asyncio]](https://pypi.org/project/httpcore/) library.
 
 ## 3.0.0a5
 
