@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.35.2
+
+### Various fixes & improvements
+
+- fix(logs): Do not attach template if there are no parameters (#4728) by @sentrivana
+
 ## 2.35.1
 
 ### Various fixes & improvements
