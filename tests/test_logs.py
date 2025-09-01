@@ -17,10 +17,8 @@ minimum_python_37 = pytest.mark.skipif(
 )
 
 
-def otel_attributes_to_dict(otel_attrs):
-    # type: (Mapping[str, Any]) -> Mapping[str, Any]
-    def _convert_attr(attr):
-        # type: (Mapping[str, Union[str, float, bool]]) -> Any
+def otel_attributes_to_dict(otel_attrs: Mapping[str, Any]) -> Mapping[str, Any]:
+    def _convert_attr(attr: Mapping[str, Union[str, float, bool]]) -> Any:
         if attr["type"] == "boolean":
             return attr["value"]
         if attr["type"] == "double":
@@ -38,7 +36,7 @@ def otel_attributes_to_dict(otel_attrs):
 
 
 def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
-    res = []  # type: List[Log]
+    res: List[Log] = []
     for envelope in envelopes:
         for item in envelope.items:
             if item.type == "log":
@@ -54,7 +52,7 @@ def envelopes_to_logs(envelopes: List[Envelope]) -> List[Log]:
                         "attributes": otel_attributes_to_dict(log_json["attributes"]),
                         "time_unix_nano": int(float(log_json["timestamp"]) * 1e9),
                         "trace_id": log_json["trace_id"],
-                    }  # type: Log
+                    }
                     res.append(log)
     return res
 
@@ -80,7 +78,7 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_logs_basics(sentry_init, capture_envelopes):
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     sentry_sdk.logger.trace("This is a 'trace' log...")
@@ -113,9 +111,11 @@ def test_logs_basics(sentry_init, capture_envelopes):
 
 @minimum_python_37
 def test_logs_before_send_log(sentry_init, capture_envelopes):
-    before_log_called = [False]
+    before_log_called = False
 
     def _before_log(record, hint):
+        nonlocal before_log_called
+
         assert set(record.keys()) == {
             "severity_text",
             "severity_number",
@@ -128,15 +128,13 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
         if record["severity_text"] in ["fatal", "error"]:
             return None
 
-        before_log_called[0] = True
+        before_log_called = True
 
         return record
 
     sentry_init(
-        _experiments={
-            "enable_logs": True,
-            "before_send_log": _before_log,
-        }
+        enable_logs=True,
+        before_send_log=_before_log,
     )
     envelopes = capture_envelopes()
 
@@ -155,7 +153,7 @@ def test_logs_before_send_log(sentry_init, capture_envelopes):
     assert logs[1]["severity_text"] == "debug"
     assert logs[2]["severity_text"] == "info"
     assert logs[3]["severity_text"] == "warn"
-    assert before_log_called[0]
+    assert before_log_called is True
 
 
 @minimum_python_37
@@ -163,7 +161,7 @@ def test_logs_attributes(sentry_init, capture_envelopes):
     """
     Passing arbitrary attributes to log messages.
     """
-    sentry_init(_experiments={"enable_logs": True}, server_name="test-server")
+    sentry_init(enable_logs=True, server_name="test-server")
     envelopes = capture_envelopes()
 
     attrs = {
@@ -196,7 +194,7 @@ def test_logs_message_params(sentry_init, capture_envelopes):
     """
     This is the official way of how to pass vars to log messages.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     sentry_sdk.logger.warning("The recorded value was '{int_var}'", int_var=1)
@@ -239,7 +237,7 @@ def test_logs_tied_to_root_spans(sentry_init, capture_envelopes):
     """
     Log messages are also tied to root spans.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_span(name="test-root-span") as trx:
@@ -255,7 +253,7 @@ def test_logs_tied_to_spans(sentry_init, capture_envelopes):
     """
     Log messages are also tied to spans.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_span(name="test-root-span"):
@@ -271,7 +269,7 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     """
     If you log >100 logs, it should automatically trigger a flush.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
@@ -288,7 +286,7 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
 
 def test_log_user_attributes(sentry_init, capture_envelopes):
     """User attributes are sent if enable_logs is True."""
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
 
     sentry_sdk.set_user({"id": "1", "email": "test@example.com", "username": "test"})
     envelopes = capture_envelopes()
@@ -314,7 +312,7 @@ def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     """
     If you log a single log, it should automatically flush after 5 seconds, at most 10 seconds.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")

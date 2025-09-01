@@ -9,6 +9,7 @@ from pyramid.response import Response
 from werkzeug.test import Client
 
 from sentry_sdk import capture_message, add_breadcrumb
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from tests.conftest import unpack_werkzeug_response
@@ -156,9 +157,9 @@ def test_transaction_style(
 
 
 def test_large_json_request(sentry_init, capture_events, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()])
+    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
 
-    data = {"foo": {"bar": "a" * 2000}}
+    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
 
     @route("/")
     def index(request):
@@ -175,9 +176,14 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -230,7 +236,10 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
 def test_files_and_form(sentry_init, capture_events, route, get_client):
     sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
 
-    data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
+    data = {
+        "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
+        "file": (BytesIO(b"hello"), "hello.txt"),
+    }
 
     @route("/")
     def index(request):
@@ -244,9 +253,14 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]) == 1024
+    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
 
     assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]

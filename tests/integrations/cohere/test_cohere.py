@@ -57,9 +57,14 @@ def test_nonstreaming_chat(
     assert span["data"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     if send_default_pii and include_prompts:
-        input_messages = json.loads(span["data"][SPANDATA.AI_INPUT_MESSAGES])
-        assert "some context" in input_messages[0]["content"]
-        assert "hello" in input_messages[1]["content"]
+        assert (
+            "{'role': 'system', 'content': 'some context'}"
+            in span["data"][SPANDATA.AI_INPUT_MESSAGES]
+        )
+        assert (
+            "{'role': 'user', 'content': 'hello'}"
+            in span["data"][SPANDATA.AI_INPUT_MESSAGES]
+        )
         assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
@@ -129,9 +134,14 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
     assert span["data"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     if send_default_pii and include_prompts:
-        input_messages = json.loads(span["data"][SPANDATA.AI_INPUT_MESSAGES])
-        assert "some context" in input_messages[0]["content"]
-        assert "hello" in input_messages[1]["content"]
+        assert (
+            "{'role': 'system', 'content': 'some context'}"
+            in span["data"][SPANDATA.AI_INPUT_MESSAGES]
+        )
+        assert (
+            "{'role': 'user', 'content': 'hello'}"
+            in span["data"][SPANDATA.AI_INPUT_MESSAGES]
+        )
         assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
     else:
         assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]

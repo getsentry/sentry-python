@@ -48,6 +48,7 @@ __all__ = [
     "capture_exception",
     "capture_message",
     "continue_trace",
+    "new_trace",
     "flush",
     "get_baggage",
     "get_client",
@@ -74,6 +75,8 @@ __all__ = [
     "use_isolation_scope",
     "start_session",
     "end_session",
+    "set_transaction_name",
+    "update_current_span",
 ]
 
 
@@ -323,6 +326,15 @@ def continue_trace(environ_or_headers: dict[str, Any]) -> Generator[None, None, 
         yield
 
 
+@contextmanager
+def new_trace() -> Generator[None, None, None]:
+    """
+    Force creation of a new trace.
+    """
+    with get_isolation_scope().new_trace():
+        yield
+
+
 @scopemethod
 def start_session(
     session_mode: str = "application",
@@ -333,3 +345,67 @@ def start_session(
 @scopemethod
 def end_session() -> None:
     return get_isolation_scope().end_session()
+
+
+@scopemethod
+def set_transaction_name(name: str, source: Optional[str] = None) -> None:
+    return get_current_scope().set_transaction_name(name, source)
+
+
+def update_current_span(
+    op: Optional[str] = None,
+    name: Optional[str] = None,
+    attributes: Optional[dict[str, Union[str, int, float, bool]]] = None,
+) -> None:
+    """
+    Update the current active span with the provided parameters.
+
+    This function allows you to modify properties of the currently active span.
+    If no span is currently active, this function will do nothing.
+
+    :param op: The operation name for the span. This is a high-level description
+        of what the span represents (e.g., "http.client", "db.query").
+        You can use predefined constants from :py:class:`sentry_sdk.consts.OP`
+        or provide your own string. If not provided, the span's operation will
+        remain unchanged.
+    :type op: str or None
+
+    :param name: The human-readable name/description for the span. This provides
+        more specific details about what the span represents (e.g., "GET /api/users",
+        "SELECT * FROM users"). If not provided, the span's name will remain unchanged.
+    :type name: str or None
+
+    :param attributes: A dictionary of key-value pairs to add as attributes to the span.
+        Attribute values must be strings, integers, floats, or booleans. These
+        attributes will be merged with any existing span data. If not provided,
+        no attributes will be added.
+    :type attributes: dict[str, Union[str, int, float, bool]] or None
+
+    :returns: None
+
+    .. versionadded:: 2.35.0
+
+    Example::
+
+        import sentry_sdk
+        from sentry_sdk.consts import OP
+
+        sentry_sdk.update_current_span(
+            op=OP.FUNCTION,
+            name="process_user_data",
+            attributes={"user_id": 123, "batch_size": 50}
+        )
+    """
+    current_span = get_current_span()
+
+    if current_span is None:
+        return
+
+    if op is not None:
+        current_span.op = op
+
+    if name is not None:
+        current_span.name = name
+
+    if attributes is not None:
+        current_span.set_attributes(attributes)

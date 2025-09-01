@@ -328,9 +328,9 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            experiments = self.options.get("_experiments", {})
             self.log_batcher = None
-            if experiments.get("enable_logs", False):
+
+            if self.options.get("enable_logs") is True:
                 from sentry_sdk._log_batcher import LogBatcher
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
@@ -448,12 +448,12 @@ class _Client(BaseClient):
 
         previous_total_spans: Optional[int] = None
         previous_total_breadcrumbs: Optional[int] = None
+        is_transaction = event.get("type") == "transaction"
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
-            is_transaction = event.get("type") == "transaction"
             spans_before = len(event.get("spans", []))
             event_ = scope.apply_to_event(event, hint, self.options)
 
@@ -494,7 +494,8 @@ class _Client(BaseClient):
                 )
 
         if (
-            self.options["attach_stacktrace"]
+            not is_transaction
+            and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event
@@ -826,9 +827,8 @@ class _Client(BaseClient):
 
         return return_value
 
-    def _capture_experimental_log(self, log: Log) -> None:
-        logs_enabled = self.options["_experiments"].get("enable_logs", False)
-        if not logs_enabled:
+    def _capture_experimental_log(self, log: Optional[Log]) -> None:
+        if self.options.get("enable_logs") is not True or log is None:
             return
 
         current_scope = sentry_sdk.get_current_scope()
@@ -883,9 +883,10 @@ class _Client(BaseClient):
                 f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
             )
 
-        before_send_log = self.options["_experiments"].get("before_send_log")
+        before_send_log = self.options.get("before_send_log")
         if before_send_log is not None:
             log = before_send_log(log, {})
+
         if log is None:
             return
 

@@ -65,6 +65,7 @@ class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
             transaction_style="endpoint",
             mechanism_type="asgi",
             span_origin=span_origin,
+            asgi_version=3,
         )
 
 
@@ -92,7 +93,6 @@ def patch_app_init() -> None:
             ]
         )
 
-        SentryStarliteASGIMiddleware.__call__ = SentryStarliteASGIMiddleware._run_asgi3  # type: ignore
         middleware = kwargs.get("middleware") or []
         kwargs["middleware"] = [SentryStarliteASGIMiddleware, *middleware]
         old__init__(self, *args, **kwargs)

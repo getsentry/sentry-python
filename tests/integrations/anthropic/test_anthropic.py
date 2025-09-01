@@ -20,8 +20,8 @@ from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
-from sentry_sdk.integrations.anthropic import _add_ai_data_to_span, _collect_ai_data
-from sentry_sdk.utils import _serialize_span_attribute, package_version
+from sentry_sdk.integrations.anthropic import _set_output_data, _collect_ai_data
+from sentry_sdk.utils import package_version
 
 try:
     from anthropic.types import InputJSONDelta
@@ -112,25 +112,27 @@ def test_nonstreaming_create_message(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
-    assert span["description"] == "Anthropic messages create"
-    assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
-            messages
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
-            [{"type": "text", "text": "Hi, I'm Claude."}]
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "Hi, I\'m Claude.", "type": "text"}]'
         )
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
-        assert SPANDATA.AI_RESPONSES not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 10
-    assert span["data"]["gen_ai.usage.output_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
-    assert span["data"]["ai.streaming"] is False
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
 
 @pytest.mark.asyncio
@@ -182,25 +184,27 @@ async def test_nonstreaming_create_message_async(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
-    assert span["description"] == "Anthropic messages create"
-    assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
-            messages
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
-            [{"type": "text", "text": "Hi, I'm Claude."}]
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "Hi, I\'m Claude.", "type": "text"}]'
         )
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
-        assert SPANDATA.AI_RESPONSES not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 10
-    assert span["data"]["gen_ai.usage.output_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
-    assert span["data"]["ai.streaming"] is False
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
 
 @pytest.mark.parametrize(
@@ -283,26 +287,28 @@ def test_streaming_create_message(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
-    assert span["description"] == "Anthropic messages create"
-    assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
-            messages
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
-            [{"type": "text", "text": "Hi! I'm Claude!"}]
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "Hi! I\'m Claude!", "type": "text"}]'
         )
 
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
-        assert SPANDATA.AI_RESPONSES not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 10
-    assert span["data"]["gen_ai.usage.output_tokens"] == 30
-    assert span["data"]["gen_ai.usage.total_tokens"] == 40
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 40
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -388,26 +394,28 @@ async def test_streaming_create_message_async(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
-    assert span["description"] == "Anthropic messages create"
-    assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
-            messages
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
-            [{"type": "text", "text": "Hi! I'm Claude!"}]
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "Hi! I\'m Claude!", "type": "text"}]'
         )
 
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
-        assert SPANDATA.AI_RESPONSES not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 10
-    assert span["data"]["gen_ai.usage.output_tokens"] == 30
-    assert span["data"]["gen_ai.usage.total_tokens"] == 40
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 30
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 40
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.skipif(
@@ -520,26 +528,27 @@ def test_streaming_create_message_with_input_json_delta(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
-    assert span["description"] == "Anthropic messages create"
-    assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
-            messages
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
         )
-        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
-            [{"type": "text", "text": "{'location': 'San Francisco, CA'}"}]
-        )  # we do not record InputJSONDelta because it could contain PII
-
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "{\'location\': \'San Francisco, CA\'}", "type": "text"}]'
+        )
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
-        assert SPANDATA.AI_RESPONSES not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 366
-    assert span["data"]["gen_ai.usage.output_tokens"] == 51
-    assert span["data"]["gen_ai.usage.total_tokens"] == 417
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 51
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 417
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
 @pytest.mark.asyncio
@@ -659,29 +668,30 @@ async def test_streaming_create_message_with_input_json_delta_async(
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
 
-    assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
-    assert span["description"] == "Anthropic messages create"
-    assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
+    assert span["op"] == OP.GEN_AI_CHAT
+    assert span["description"] == "chat model"
+    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == _serialize_span_attribute(
-            messages
+        assert (
+            span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
         )
-        assert span["data"][SPANDATA.AI_RESPONSES] == _serialize_span_attribute(
-            [{"type": "text", "text": "{'location': 'San Francisco, CA'}"}]
-        )  # we do not record InputJSONDelta because it could contain PII
+        assert (
+            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == '[{"text": "{\'location\': \'San Francisco, CA\'}", "type": "text"}]'
+        )
 
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
-        assert SPANDATA.AI_RESPONSES not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 366
-    assert span["data"]["gen_ai.usage.output_tokens"] == 51
-    assert span["data"]["gen_ai.usage.total_tokens"] == 417
-    assert span["data"]["ai.streaming"] is True
+    assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 366
+    assert span["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 51
+    assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 417
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
-@pytest.mark.forked
 def test_exception_message_create(sentry_init, capture_events):
     sentry_init(integrations=[AnthropicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -784,15 +794,16 @@ def test_collect_ai_data_with_input_json_delta():
         index=0,
         type="content_block_delta",
     )
-
+    model = None
     input_tokens = 10
     output_tokens = 20
     content_blocks = []
 
-    new_input_tokens, new_output_tokens, new_content_blocks = _collect_ai_data(
-        event, input_tokens, output_tokens, content_blocks
+    model, new_input_tokens, new_output_tokens, new_content_blocks = _collect_ai_data(
+        event, model, input_tokens, output_tokens, content_blocks
     )
 
+    assert model is None
     assert new_input_tokens == input_tokens
     assert new_output_tokens == output_tokens
     assert new_content_blocks == ["test"]
@@ -802,7 +813,7 @@ def test_collect_ai_data_with_input_json_delta():
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta.",
 )
-def test_add_ai_data_to_span_with_input_json_delta(sentry_init, capture_events):
+def test_set_output_data_with_input_json_delta(sentry_init, capture_events):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
@@ -813,24 +824,24 @@ def test_add_ai_data_to_span_with_input_json_delta(sentry_init, capture_events):
     with start_span(name="test"):
         with start_span(name="anthropic") as span:
             integration = AnthropicIntegration()
-
-            _add_ai_data_to_span(
+            json_deltas = ["{'test': 'data',", "'more': 'json'}"]
+            _set_output_data(
                 span,
                 integration,
+                model="",
                 input_tokens=10,
                 output_tokens=20,
-                content_blocks=["{'test': 'data',", "'more': 'json'}"],
+                content_blocks=[{"text": "".join(json_deltas), "type": "text"}],
             )
 
-    (event,) = events
+    assert len(events) == 1
+    root_span = events[0]
+    span = root_span["spans"][0]
 
-    assert len(event["spans"]) == 1
-    (span,) = event["spans"]
-
-    assert span["data"]["ai.responses"] == _serialize_span_attribute(
-        [{"type": "text", "text": "{'test': 'data','more': 'json'}"}]
+    assert (
+        span["data"].get(SPANDATA.GEN_AI_RESPONSE_TEXT)
+        == "[{\"text\": \"{'test': 'data','more': 'json'}\", \"type\": \"text\"}]"
     )
-    assert span["data"]["ai.streaming"] is True
-    assert span["data"]["gen_ai.usage.input_tokens"] == 10
-    assert span["data"]["gen_ai.usage.output_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20
+    assert span["data"].get(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS) == 30

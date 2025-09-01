@@ -147,7 +147,7 @@ def loguru_sentry_logs_handler(message: Message) -> None:
     if not client.is_active():
         return
 
-    if not client.options["_experiments"].get("enable_logs", False):
+    if client.options.get("enable_logs") is not True:
         return
 
     record = message.record

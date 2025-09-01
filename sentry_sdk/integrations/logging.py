@@ -336,7 +336,7 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not client.options["_experiments"].get("enable_logs", False):
+            if client.options.get("enable_logs") is not True:
                 return
 
             self._capture_log_from_record(client, record)
