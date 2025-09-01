@@ -141,6 +141,7 @@ TEST_SUITE_CONFIG = {
     },
     "openai_base": {
         "package": "openai",
+        "integration_name": "openai",
         "deps": {
             "*": ["pytest-asyncio", "tiktoken"],
             "<1.55": ["httpx<0.28"],
@@ -149,6 +150,7 @@ TEST_SUITE_CONFIG = {
     },
     "openai_notiktoken": {
         "package": "openai",
+        "integration_name": "openai",
         "deps": {
             "*": ["pytest-asyncio"],
             "<1.55": ["httpx<0.28"],
