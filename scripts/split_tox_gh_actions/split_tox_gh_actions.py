@@ -63,6 +63,7 @@ GROUPS = {
         "cohere",
         "langchain",
         "openai",
+        "openai_notiktoken",
         "openai_agents",
         "huggingface_hub",
     ],

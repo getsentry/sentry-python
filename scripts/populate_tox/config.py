@@ -139,6 +139,20 @@ TEST_SUITE_CONFIG = {
     "loguru": {
         "package": "loguru",
     },
+    "openai": {
+        "package": "openai",
+        "deps": {
+            "*": ["pytest-asyncio", "tiktoken"],
+            "<1.55": ["httpx<0.28"],
+        },
+    },
+    "openai_notiktoken": {
+        "package": "openai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+            "<1.55": ["httpx<0.28"],
+        },
+    },
     "openai_agents": {
         "package": "openai-agents",
         "deps": {

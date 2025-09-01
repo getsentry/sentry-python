@@ -76,8 +76,6 @@ IGNORE = {
     "httpx",
     "langchain",
     "langchain_notiktoken",
-    "openai",
-    "openai_notiktoken",
     "pure_eval",
     "quart",
     "ray",
