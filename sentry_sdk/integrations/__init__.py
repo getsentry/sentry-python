@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from threading import Lock
+import sys
 
 from sentry_sdk.utils import logger
 
@@ -71,8 +72,12 @@ _DEFAULT_INTEGRATIONS = [
     "sentry_sdk.integrations.modules.ModulesIntegration",
     "sentry_sdk.integrations.stdlib.StdlibIntegration",
     "sentry_sdk.integrations.threading.ThreadingIntegration",
-    "sentry_sdk.integrations.unraisablehook.UnraisablehookIntegration",
 ]
+
+if sys.version_info >= (3, 8):
+    _DEFAULT_INTEGRATIONS.append(
+        "sentry_sdk.integrations.unraisablehook.UnraisablehookIntegration"
+    )
 
 _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
