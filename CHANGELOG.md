@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.0.0a6
+
+### Various fixes & improvements
+
+- Add experimental async transport (#4572) by @sl0thentr0py
+- Update tox.ini (#3152) by @sl0thentr0py
+- Fix clickhouse logic for generator case (#4722) by @sl0thentr0py
+- Fix langchain merge (#3152) by @sl0thentr0py
+- Fix some typing after merge (#3152) by @sl0thentr0py
+- Fix is_transaction check in client after merge (#3152) by @sl0thentr0py
+- Update tox.ini (#4721) by @sentrivana
+- Update CHANGELOG.md (fb4faf60) by @sentrivana
+- release: 2.35.1 (c2a21aad) by @getsentry-bot
+- fix(openai-agents): Isolate agent run (#4720) by @sentrivana
+- fixed tests for new openai-agents (#3152) by @sl0thentr0py
+- updated tests (#3152) by @sl0thentr0py
+- Replaced set_data calls with set_attributes (#3152) by @sl0thentr0py
+- build(deps): bump actions/checkout from 4.2.2 to 5.0.0 (#4709) by @dependabot
+- build(deps): bump actions/setup-java from 4 to 5 (#4716) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.4.3 to 5.5.0 (#4717) by @dependabot
+- build(deps): bump actions/create-github-app-token from 2.1.0 to 2.1.1 (#4710) by @dependabot
+- fix(tracing): Do not attach stacktrace to transaction (#4713) by @Zylphrex
+- update changelog (5eafb784) by @antonpirker
+- updated changelog (895c3cd6) by @antonpirker
+- release: 2.35.0 (71f61af1) by @getsentry-bot
+- feat(langchain): update integration to from ai.* to gen_ai.* span attributes (#4678) by @shellmayr
+- Add async span context manager (#4680) by @sl0thentr0py
+- build(deps): bump actions/create-github-app-token from 2.0.6 to 2.1.0 (#4684) by @dependabot
+
+_Plus 12 more_
+
 ## 3.0.0a5
 
 ### Various fixes & improvements
