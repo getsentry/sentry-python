@@ -78,6 +78,7 @@ if TYPE_CHECKING:
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
+            "transport_async": Optional[bool],
         },
         total=False,
     )
