@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class UnraisablehookIntegration(Integration):
-    identifier = "unraisable"
+    identifier = "unraisablehook"
 
     @staticmethod
     def setup_once():

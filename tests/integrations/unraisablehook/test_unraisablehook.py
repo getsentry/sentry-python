@@ -12,7 +12,7 @@ if sys.version_info >= (3, 8):
 
 
 @pytest.mark.parametrize("options, transport", TEST_PARAMETERS)
-def test_excepthook(tmpdir, options, transport):
+def test_unraisablehook(tmpdir, options, transport):
     app = tmpdir.join("app.py")
     app.write(
         dedent(
