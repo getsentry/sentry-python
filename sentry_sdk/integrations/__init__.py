@@ -71,6 +71,7 @@ _DEFAULT_INTEGRATIONS = [
     "sentry_sdk.integrations.modules.ModulesIntegration",
     "sentry_sdk.integrations.stdlib.StdlibIntegration",
     "sentry_sdk.integrations.threading.ThreadingIntegration",
+    "sentry_sdk.integrations.unraisablehook.UnraisablehookIntegration",
 ]
 
 _AUTO_ENABLING_INTEGRATIONS = [
