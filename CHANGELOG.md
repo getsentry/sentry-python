@@ -5,7 +5,6 @@
 ### Various fixes & improvements
 
 - fix(logs): Do not attach template if there are no parameters (#4728) by @sentrivana
-- Update tox.ini (#4721) by @sentrivana
 
 ## 2.35.1
 
