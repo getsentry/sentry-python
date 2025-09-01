@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scrubber - sentry-python 2.35.2 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scrubber - sentry-python 3.0.0a6 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
@@ -106,191 +106,187 @@ data-aria-dark="Switch to auto color mode">
       <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.scrubber</h1><div class="highlight"><pre>
-<span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span data-line="2">    <span class="n">capture_internal_exceptions</span><span class="p">,</span>
-</span><span data-line="3">    <span class="n">AnnotatedValue</span><span class="p">,</span>
-</span><span data-line="4">    <span class="n">iter_event_frames</span><span class="p">,</span>
-</span><span data-line="5"><span class="p">)</span>
-</span><span data-line="6">
-</span><span data-line="7"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">cast</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span>
-</span><span data-line="8">
-</span><span data-line="9"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="10">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span>
-</span><span data-line="11">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
-</span><span data-line="12">
+<span></span><span data-line="1"><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span data-line="2"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span data-line="3">    <span class="n">capture_internal_exceptions</span><span class="p">,</span>
+</span><span data-line="4">    <span class="n">AnnotatedValue</span><span class="p">,</span>
+</span><span data-line="5">    <span class="n">iter_event_frames</span><span class="p">,</span>
+</span><span data-line="6"><span class="p">)</span>
+</span><span data-line="7">
+</span><span data-line="8"><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span data-line="9">
+</span><span data-line="10"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span data-line="11">    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+</span><span data-line="12">    <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk._types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span>
 </span><span data-line="13">
-</span><span data-line="14"><span class="n">DEFAULT_DENYLIST</span> <span class="o">=</span> <span class="p">[</span>
-</span><span data-line="15">    <span class="c1"># stolen from relay</span>
-</span><span data-line="16">    <span class="s2">&quot;password&quot;</span><span class="p">,</span>
-</span><span data-line="17">    <span class="s2">&quot;passwd&quot;</span><span class="p">,</span>
-</span><span data-line="18">    <span class="s2">&quot;secret&quot;</span><span class="p">,</span>
-</span><span data-line="19">    <span class="s2">&quot;api_key&quot;</span><span class="p">,</span>
-</span><span data-line="20">    <span class="s2">&quot;apikey&quot;</span><span class="p">,</span>
-</span><span data-line="21">    <span class="s2">&quot;auth&quot;</span><span class="p">,</span>
-</span><span data-line="22">    <span class="s2">&quot;credentials&quot;</span><span class="p">,</span>
-</span><span data-line="23">    <span class="s2">&quot;mysql_pwd&quot;</span><span class="p">,</span>
-</span><span data-line="24">    <span class="s2">&quot;privatekey&quot;</span><span class="p">,</span>
-</span><span data-line="25">    <span class="s2">&quot;private_key&quot;</span><span class="p">,</span>
-</span><span data-line="26">    <span class="s2">&quot;token&quot;</span><span class="p">,</span>
-</span><span data-line="27">    <span class="s2">&quot;session&quot;</span><span class="p">,</span>
-</span><span data-line="28">    <span class="c1"># django</span>
-</span><span data-line="29">    <span class="s2">&quot;csrftoken&quot;</span><span class="p">,</span>
-</span><span data-line="30">    <span class="s2">&quot;sessionid&quot;</span><span class="p">,</span>
-</span><span data-line="31">    <span class="c1"># wsgi</span>
-</span><span data-line="32">    <span class="s2">&quot;x_csrftoken&quot;</span><span class="p">,</span>
-</span><span data-line="33">    <span class="s2">&quot;x_forwarded_for&quot;</span><span class="p">,</span>
-</span><span data-line="34">    <span class="s2">&quot;set_cookie&quot;</span><span class="p">,</span>
-</span><span data-line="35">    <span class="s2">&quot;cookie&quot;</span><span class="p">,</span>
-</span><span data-line="36">    <span class="s2">&quot;authorization&quot;</span><span class="p">,</span>
-</span><span data-line="37">    <span class="s2">&quot;x_api_key&quot;</span><span class="p">,</span>
-</span><span data-line="38">    <span class="c1"># other common names used in the wild</span>
-</span><span data-line="39">    <span class="s2">&quot;aiohttp_session&quot;</span><span class="p">,</span>  <span class="c1"># aiohttp</span>
-</span><span data-line="40">    <span class="s2">&quot;connect.sid&quot;</span><span class="p">,</span>  <span class="c1"># Express</span>
-</span><span data-line="41">    <span class="s2">&quot;csrf_token&quot;</span><span class="p">,</span>  <span class="c1"># Pyramid</span>
-</span><span data-line="42">    <span class="s2">&quot;csrf&quot;</span><span class="p">,</span>  <span class="c1"># (this is a cookie name used in accepted answers on stack overflow)</span>
-</span><span data-line="43">    <span class="s2">&quot;_csrf&quot;</span><span class="p">,</span>  <span class="c1"># Express</span>
-</span><span data-line="44">    <span class="s2">&quot;_csrf_token&quot;</span><span class="p">,</span>  <span class="c1"># Bottle</span>
-</span><span data-line="45">    <span class="s2">&quot;PHPSESSID&quot;</span><span class="p">,</span>  <span class="c1"># PHP</span>
-</span><span data-line="46">    <span class="s2">&quot;_session&quot;</span><span class="p">,</span>  <span class="c1"># Sanic</span>
-</span><span data-line="47">    <span class="s2">&quot;symfony&quot;</span><span class="p">,</span>  <span class="c1"># Symfony</span>
-</span><span data-line="48">    <span class="s2">&quot;user_session&quot;</span><span class="p">,</span>  <span class="c1"># Vue</span>
-</span><span data-line="49">    <span class="s2">&quot;_xsrf&quot;</span><span class="p">,</span>  <span class="c1"># Tornado</span>
-</span><span data-line="50">    <span class="s2">&quot;XSRF-TOKEN&quot;</span><span class="p">,</span>  <span class="c1"># Angular, Laravel</span>
-</span><span data-line="51"><span class="p">]</span>
-</span><span data-line="52">
-</span><span data-line="53"><span class="n">DEFAULT_PII_DENYLIST</span> <span class="o">=</span> <span class="p">[</span>
-</span><span data-line="54">    <span class="s2">&quot;x_forwarded_for&quot;</span><span class="p">,</span>
-</span><span data-line="55">    <span class="s2">&quot;x_real_ip&quot;</span><span class="p">,</span>
-</span><span data-line="56">    <span class="s2">&quot;ip_address&quot;</span><span class="p">,</span>
-</span><span data-line="57">    <span class="s2">&quot;remote_addr&quot;</span><span class="p">,</span>
-</span><span data-line="58"><span class="p">]</span>
-</span><span data-line="59">
+</span><span data-line="14">
+</span><span data-line="15"><span class="n">DEFAULT_DENYLIST</span> <span class="o">=</span> <span class="p">[</span>
+</span><span data-line="16">    <span class="c1"># stolen from relay</span>
+</span><span data-line="17">    <span class="s2">&quot;password&quot;</span><span class="p">,</span>
+</span><span data-line="18">    <span class="s2">&quot;passwd&quot;</span><span class="p">,</span>
+</span><span data-line="19">    <span class="s2">&quot;secret&quot;</span><span class="p">,</span>
+</span><span data-line="20">    <span class="s2">&quot;api_key&quot;</span><span class="p">,</span>
+</span><span data-line="21">    <span class="s2">&quot;apikey&quot;</span><span class="p">,</span>
+</span><span data-line="22">    <span class="s2">&quot;auth&quot;</span><span class="p">,</span>
+</span><span data-line="23">    <span class="s2">&quot;credentials&quot;</span><span class="p">,</span>
+</span><span data-line="24">    <span class="s2">&quot;mysql_pwd&quot;</span><span class="p">,</span>
+</span><span data-line="25">    <span class="s2">&quot;privatekey&quot;</span><span class="p">,</span>
+</span><span data-line="26">    <span class="s2">&quot;private_key&quot;</span><span class="p">,</span>
+</span><span data-line="27">    <span class="s2">&quot;token&quot;</span><span class="p">,</span>
+</span><span data-line="28">    <span class="s2">&quot;session&quot;</span><span class="p">,</span>
+</span><span data-line="29">    <span class="c1"># django</span>
+</span><span data-line="30">    <span class="s2">&quot;csrftoken&quot;</span><span class="p">,</span>
+</span><span data-line="31">    <span class="s2">&quot;sessionid&quot;</span><span class="p">,</span>
+</span><span data-line="32">    <span class="c1"># wsgi</span>
+</span><span data-line="33">    <span class="s2">&quot;x_csrftoken&quot;</span><span class="p">,</span>
+</span><span data-line="34">    <span class="s2">&quot;x_forwarded_for&quot;</span><span class="p">,</span>
+</span><span data-line="35">    <span class="s2">&quot;set_cookie&quot;</span><span class="p">,</span>
+</span><span data-line="36">    <span class="s2">&quot;cookie&quot;</span><span class="p">,</span>
+</span><span data-line="37">    <span class="s2">&quot;authorization&quot;</span><span class="p">,</span>
+</span><span data-line="38">    <span class="s2">&quot;x_api_key&quot;</span><span class="p">,</span>
+</span><span data-line="39">    <span class="c1"># other common names used in the wild</span>
+</span><span data-line="40">    <span class="s2">&quot;aiohttp_session&quot;</span><span class="p">,</span>  <span class="c1"># aiohttp</span>
+</span><span data-line="41">    <span class="s2">&quot;connect.sid&quot;</span><span class="p">,</span>  <span class="c1"># Express</span>
+</span><span data-line="42">    <span class="s2">&quot;csrf_token&quot;</span><span class="p">,</span>  <span class="c1"># Pyramid</span>
+</span><span data-line="43">    <span class="s2">&quot;csrf&quot;</span><span class="p">,</span>  <span class="c1"># (this is a cookie name used in accepted answers on stack overflow)</span>
+</span><span data-line="44">    <span class="s2">&quot;_csrf&quot;</span><span class="p">,</span>  <span class="c1"># Express</span>
+</span><span data-line="45">    <span class="s2">&quot;_csrf_token&quot;</span><span class="p">,</span>  <span class="c1"># Bottle</span>
+</span><span data-line="46">    <span class="s2">&quot;PHPSESSID&quot;</span><span class="p">,</span>  <span class="c1"># PHP</span>
+</span><span data-line="47">    <span class="s2">&quot;_session&quot;</span><span class="p">,</span>  <span class="c1"># Sanic</span>
+</span><span data-line="48">    <span class="s2">&quot;symfony&quot;</span><span class="p">,</span>  <span class="c1"># Symfony</span>
+</span><span data-line="49">    <span class="s2">&quot;user_session&quot;</span><span class="p">,</span>  <span class="c1"># Vue</span>
+</span><span data-line="50">    <span class="s2">&quot;_xsrf&quot;</span><span class="p">,</span>  <span class="c1"># Tornado</span>
+</span><span data-line="51">    <span class="s2">&quot;XSRF-TOKEN&quot;</span><span class="p">,</span>  <span class="c1"># Angular, Laravel</span>
+</span><span data-line="52"><span class="p">]</span>
+</span><span data-line="53">
+</span><span data-line="54"><span class="n">DEFAULT_PII_DENYLIST</span> <span class="o">=</span> <span class="p">[</span>
+</span><span data-line="55">    <span class="s2">&quot;x_forwarded_for&quot;</span><span class="p">,</span>
+</span><span data-line="56">    <span class="s2">&quot;x_real_ip&quot;</span><span class="p">,</span>
+</span><span data-line="57">    <span class="s2">&quot;ip_address&quot;</span><span class="p">,</span>
+</span><span data-line="58">    <span class="s2">&quot;remote_addr&quot;</span><span class="p">,</span>
+</span><span data-line="59"><span class="p">]</span>
 </span><span data-line="60">
+</span><span data-line="61">
 <div class="viewcode-block" id="EventScrubber">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.scrubber.EventScrubber">[docs]</a>
-</span><span data-line="61"><span class="k">class</span><span class="w"> </span><span class="nc">EventScrubber</span><span class="p">:</span>
-</span><span data-line="62">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span data-line="63">        <span class="bp">self</span><span class="p">,</span> <span class="n">denylist</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">recursive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">send_default_pii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">pii_denylist</span><span class="o">=</span><span class="kc">None</span>
-</span><span data-line="64">    <span class="p">):</span>
-</span><span data-line="65">        <span class="c1"># type: (Optional[List[str]], bool, bool, Optional[List[str]]) -&gt; None</span>
-</span><span data-line="66"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="67"><span class="sd">        A scrubber that goes through the event payload and removes sensitive data configured through denylists.</span>
-</span><span data-line="68">
-</span><span data-line="69"><span class="sd">        :param denylist: A security denylist that is always scrubbed, defaults to DEFAULT_DENYLIST.</span>
-</span><span data-line="70"><span class="sd">        :param recursive: Whether to scrub the event payload recursively, default False.</span>
-</span><span data-line="71"><span class="sd">        :param send_default_pii: Whether pii is sending is on, pii fields are not scrubbed.</span>
-</span><span data-line="72"><span class="sd">        :param pii_denylist: The denylist to use for scrubbing when pii is not sent, defaults to DEFAULT_PII_DENYLIST.</span>
-</span><span data-line="73"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="74">        <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span> <span class="o">=</span> <span class="n">DEFAULT_DENYLIST</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">if</span> <span class="n">denylist</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">denylist</span>
-</span><span data-line="75">
-</span><span data-line="76">        <span class="k">if</span> <span class="ow">not</span> <span class="n">send_default_pii</span><span class="p">:</span>
-</span><span data-line="77">            <span class="n">pii_denylist</span> <span class="o">=</span> <span class="p">(</span>
-</span><span data-line="78">                <span class="n">DEFAULT_PII_DENYLIST</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">if</span> <span class="n">pii_denylist</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">pii_denylist</span>
-</span><span data-line="79">            <span class="p">)</span>
-</span><span data-line="80">            <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span> <span class="o">+=</span> <span class="n">pii_denylist</span>
-</span><span data-line="81">
-</span><span data-line="82">        <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span><span class="p">]</span>
-</span><span data-line="83">        <span class="bp">self</span><span class="o">.</span><span class="n">recursive</span> <span class="o">=</span> <span class="n">recursive</span>
-</span><span data-line="84">
+</span><span data-line="62"><span class="k">class</span><span class="w"> </span><span class="nc">EventScrubber</span><span class="p">:</span>
+</span><span data-line="63">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="64">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="65">        <span class="n">denylist</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="66">        <span class="n">recursive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span data-line="67">        <span class="n">send_default_pii</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span data-line="68">        <span class="n">pii_denylist</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="69">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="70"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="71"><span class="sd">        A scrubber that goes through the event payload and removes sensitive data configured through denylists.</span>
+</span><span data-line="72">
+</span><span data-line="73"><span class="sd">        :param denylist: A security denylist that is always scrubbed, defaults to DEFAULT_DENYLIST.</span>
+</span><span data-line="74"><span class="sd">        :param recursive: Whether to scrub the event payload recursively, default False.</span>
+</span><span data-line="75"><span class="sd">        :param send_default_pii: Whether pii is sending is on, pii fields are not scrubbed.</span>
+</span><span data-line="76"><span class="sd">        :param pii_denylist: The denylist to use for scrubbing when pii is not sent, defaults to DEFAULT_PII_DENYLIST.</span>
+</span><span data-line="77"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="78">        <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span> <span class="o">=</span> <span class="n">DEFAULT_DENYLIST</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">if</span> <span class="n">denylist</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">denylist</span>
+</span><span data-line="79">
+</span><span data-line="80">        <span class="k">if</span> <span class="ow">not</span> <span class="n">send_default_pii</span><span class="p">:</span>
+</span><span data-line="81">            <span class="n">pii_denylist</span> <span class="o">=</span> <span class="p">(</span>
+</span><span data-line="82">                <span class="n">DEFAULT_PII_DENYLIST</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">if</span> <span class="n">pii_denylist</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">pii_denylist</span>
+</span><span data-line="83">            <span class="p">)</span>
+</span><span data-line="84">            <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span> <span class="o">+=</span> <span class="n">pii_denylist</span>
+</span><span data-line="85">
+</span><span data-line="86">        <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span><span class="p">]</span>
+</span><span data-line="87">        <span class="bp">self</span><span class="o">.</span><span class="n">recursive</span> <span class="o">=</span> <span class="n">recursive</span>
+</span><span data-line="88">
 <div class="viewcode-block" id="EventScrubber.scrub_list">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.scrubber.EventScrubber.scrub_list">[docs]</a>
-</span><span data-line="85">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lst</span><span class="p">):</span>
-</span><span data-line="86">        <span class="c1"># type: (object) -&gt; None</span>
-</span><span data-line="87"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="88"><span class="sd">        If a list is passed to this method, the method recursively searches the list and any</span>
-</span><span data-line="89"><span class="sd">        nested lists for any dictionaries. The method calls scrub_dict on all dictionaries</span>
-</span><span data-line="90"><span class="sd">        it finds.</span>
-</span><span data-line="91"><span class="sd">        If the parameter passed to this method is not a list, the method does nothing.</span>
-</span><span data-line="92"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="93">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lst</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-</span><span data-line="94">            <span class="k">return</span>
-</span><span data-line="95">
-</span><span data-line="96">        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">lst</span><span class="p">:</span>
-</span><span data-line="97">            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a dict</span>
-</span><span data-line="98">            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_list</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a list</span></div>
+</span><span data-line="89">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lst</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="90"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="91"><span class="sd">        If a list is passed to this method, the method recursively searches the list and any</span>
+</span><span data-line="92"><span class="sd">        nested lists for any dictionaries. The method calls scrub_dict on all dictionaries</span>
+</span><span data-line="93"><span class="sd">        it finds.</span>
+</span><span data-line="94"><span class="sd">        If the parameter passed to this method is not a list, the method does nothing.</span>
+</span><span data-line="95"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="96">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lst</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+</span><span data-line="97">            <span class="k">return</span>
+</span><span data-line="98">
+</span><span data-line="99">        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">lst</span><span class="p">:</span>
+</span><span data-line="100">            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a dict</span>
+</span><span data-line="101">            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_list</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a list</span></div>
 
-</span><span data-line="99">
+</span><span data-line="102">
 <div class="viewcode-block" id="EventScrubber.scrub_dict">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.scrubber.EventScrubber.scrub_dict">[docs]</a>
-</span><span data-line="100">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
-</span><span data-line="101">        <span class="c1"># type: (object) -&gt; None</span>
-</span><span data-line="102"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="103"><span class="sd">        If a dictionary is passed to this method, the method scrubs the dictionary of any</span>
-</span><span data-line="104"><span class="sd">        sensitive data. The method calls itself recursively on any nested dictionaries (</span>
-</span><span data-line="105"><span class="sd">        including dictionaries nested in lists) if self.recursive is True.</span>
-</span><span data-line="106"><span class="sd">        This method does nothing if the parameter passed to it is not a dictionary.</span>
-</span><span data-line="107"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="108">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
-</span><span data-line="109">            <span class="k">return</span>
-</span><span data-line="110">
-</span><span data-line="111">        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-</span><span data-line="112">            <span class="c1"># The cast is needed because mypy is not smart enough to figure out that k must be a</span>
-</span><span data-line="113">            <span class="c1"># string after the isinstance check.</span>
-</span><span data-line="114">            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">k</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span><span class="p">:</span>
-</span><span data-line="115">                <span class="n">d</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">AnnotatedValue</span><span class="o">.</span><span class="n">substituted_because_contains_sensitive_data</span><span class="p">()</span>
-</span><span data-line="116">            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">recursive</span><span class="p">:</span>
-</span><span data-line="117">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a dict</span>
-</span><span data-line="118">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_list</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a list</span></div>
+</span><span data-line="103">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="104"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="105"><span class="sd">        If a dictionary is passed to this method, the method scrubs the dictionary of any</span>
+</span><span data-line="106"><span class="sd">        sensitive data. The method calls itself recursively on any nested dictionaries (</span>
+</span><span data-line="107"><span class="sd">        including dictionaries nested in lists) if self.recursive is True.</span>
+</span><span data-line="108"><span class="sd">        This method does nothing if the parameter passed to it is not a dictionary.</span>
+</span><span data-line="109"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="110">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+</span><span data-line="111">            <span class="k">return</span>
+</span><span data-line="112">
+</span><span data-line="113">        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span data-line="114">            <span class="c1"># The cast is needed because mypy is not smart enough to figure out that k must be a</span>
+</span><span data-line="115">            <span class="c1"># string after the isinstance check.</span>
+</span><span data-line="116">            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">k</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">denylist</span><span class="p">:</span>
+</span><span data-line="117">                <span class="n">d</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">AnnotatedValue</span><span class="o">.</span><span class="n">substituted_because_contains_sensitive_data</span><span class="p">()</span>
+</span><span data-line="118">            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">recursive</span><span class="p">:</span>
+</span><span data-line="119">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a dict</span>
+</span><span data-line="120">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_list</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="c1"># no-op unless v is a list</span></div>
 
-</span><span data-line="119">
-</span><span data-line="120">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="121">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="122">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="123">            <span class="k">if</span> <span class="s2">&quot;request&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-</span><span data-line="124">                <span class="k">if</span> <span class="s2">&quot;headers&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">]:</span>
-</span><span data-line="125">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">][</span><span class="s2">&quot;headers&quot;</span><span class="p">])</span>
-</span><span data-line="126">                <span class="k">if</span> <span class="s2">&quot;cookies&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">]:</span>
-</span><span data-line="127">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">][</span><span class="s2">&quot;cookies&quot;</span><span class="p">])</span>
-</span><span data-line="128">                <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">]:</span>
-</span><span data-line="129">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
-</span><span data-line="130">
-</span><span data-line="131">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_extra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="132">        <span class="c1"># type: (Event) -&gt; None</span>
+</span><span data-line="121">
+</span><span data-line="122">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="123">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="124">            <span class="k">if</span> <span class="s2">&quot;request&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
+</span><span data-line="125">                <span class="k">if</span> <span class="s2">&quot;headers&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">]:</span>
+</span><span data-line="126">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">][</span><span class="s2">&quot;headers&quot;</span><span class="p">])</span>
+</span><span data-line="127">                <span class="k">if</span> <span class="s2">&quot;cookies&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">]:</span>
+</span><span data-line="128">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">][</span><span class="s2">&quot;cookies&quot;</span><span class="p">])</span>
+</span><span data-line="129">                <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">]:</span>
+</span><span data-line="130">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;request&quot;</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
+</span><span data-line="131">
+</span><span data-line="132">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_extra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="133">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
 </span><span data-line="134">            <span class="k">if</span> <span class="s2">&quot;extra&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
 </span><span data-line="135">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">])</span>
 </span><span data-line="136">
-</span><span data-line="137">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="138">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="139">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="140">            <span class="k">if</span> <span class="s2">&quot;user&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-</span><span data-line="141">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">])</span>
-</span><span data-line="142">
-</span><span data-line="143">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="144">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="145">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="146">            <span class="k">if</span> <span class="s2">&quot;breadcrumbs&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-</span><span data-line="147">                <span class="k">if</span> <span class="p">(</span>
-</span><span data-line="148">                    <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">],</span> <span class="n">AnnotatedValue</span><span class="p">)</span>
-</span><span data-line="149">                    <span class="ow">and</span> <span class="s2">&quot;values&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">]</span>
-</span><span data-line="150">                <span class="p">):</span>
-</span><span data-line="151">                    <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">][</span><span class="s2">&quot;values&quot;</span><span class="p">]:</span>
-</span><span data-line="152">                        <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
-</span><span data-line="153">                            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
-</span><span data-line="154">
-</span><span data-line="155">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="156">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="157">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="158">            <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">iter_event_frames</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
-</span><span data-line="159">                <span class="k">if</span> <span class="s2">&quot;vars&quot;</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">:</span>
-</span><span data-line="160">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">&quot;vars&quot;</span><span class="p">])</span>
-</span><span data-line="161">
-</span><span data-line="162">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_spans</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="163">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="164">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="165">            <span class="k">if</span> <span class="s2">&quot;spans&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-</span><span data-line="166">                <span class="k">for</span> <span class="n">span</span> <span class="ow">in</span> <span class="n">cast</span><span class="p">(</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]],</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;spans&quot;</span><span class="p">]):</span>
-</span><span data-line="167">                    <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">span</span><span class="p">:</span>
-</span><span data-line="168">                        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">span</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
-</span><span data-line="169">
-</span><span data-line="170">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
-</span><span data-line="171">        <span class="c1"># type: (Event) -&gt; None</span>
-</span><span data-line="172">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_request</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="173">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_extra</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="174">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_user</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="175">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_breadcrumbs</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="176">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_frames</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span data-line="177">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_spans</span><span class="p">(</span><span class="n">event</span><span class="p">)</span></div>
+</span><span data-line="137">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="138">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="139">            <span class="k">if</span> <span class="s2">&quot;user&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
+</span><span data-line="140">                <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">])</span>
+</span><span data-line="141">
+</span><span data-line="142">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="143">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="144">            <span class="k">if</span> <span class="s2">&quot;breadcrumbs&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
+</span><span data-line="145">                <span class="k">if</span> <span class="p">(</span>
+</span><span data-line="146">                    <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">],</span> <span class="n">AnnotatedValue</span><span class="p">)</span>
+</span><span data-line="147">                    <span class="ow">and</span> <span class="s2">&quot;values&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">]</span>
+</span><span data-line="148">                <span class="p">):</span>
+</span><span data-line="149">                    <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">][</span><span class="s2">&quot;values&quot;</span><span class="p">]:</span>
+</span><span data-line="150">                        <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+</span><span data-line="151">                            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
+</span><span data-line="152">
+</span><span data-line="153">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="154">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="155">            <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">iter_event_frames</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+</span><span data-line="156">                <span class="k">if</span> <span class="s2">&quot;vars&quot;</span> <span class="ow">in</span> <span class="n">frame</span><span class="p">:</span>
+</span><span data-line="157">                    <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">frame</span><span class="p">[</span><span class="s2">&quot;vars&quot;</span><span class="p">])</span>
+</span><span data-line="158">
+</span><span data-line="159">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_spans</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="160">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="161">            <span class="k">if</span> <span class="s2">&quot;spans&quot;</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
+</span><span data-line="162">                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">[</span><span class="s2">&quot;spans&quot;</span><span class="p">],</span> <span class="n">AnnotatedValue</span><span class="p">):</span>
+</span><span data-line="163">                    <span class="k">for</span> <span class="n">span</span> <span class="ow">in</span> <span class="n">event</span><span class="p">[</span><span class="s2">&quot;spans&quot;</span><span class="p">]:</span>
+</span><span data-line="164">                        <span class="k">if</span> <span class="s2">&quot;data&quot;</span> <span class="ow">in</span> <span class="n">span</span><span class="p">:</span>
+</span><span data-line="165">                            <span class="bp">self</span><span class="o">.</span><span class="n">scrub_dict</span><span class="p">(</span><span class="n">span</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">])</span>
+</span><span data-line="166">
+</span><span data-line="167">    <span class="k">def</span><span class="w"> </span><span class="nf">scrub_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="168">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_request</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="169">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_extra</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="170">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_user</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="171">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_breadcrumbs</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="172">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_frames</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span data-line="173">        <span class="bp">self</span><span class="o">.</span><span class="n">scrub_spans</span><span class="p">(</span><span class="n">event</span><span class="p">)</span></div>
 
 </span></pre></div>
         </article><button class="back-to-top" type="button">
@@ -322,7 +318,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=bc6f190d"></script>
+      <script src="../../_static/documentation_options.js?v=4f830161"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=e730760c"></script></body>
