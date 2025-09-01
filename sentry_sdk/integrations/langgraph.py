@@ -2,7 +2,6 @@ from functools import wraps
 from typing import Any, Callable, List, Optional
 
 import sentry_sdk
-from sentry_sdk.ai.monitoring import set_ai_pipeline_name
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -141,29 +140,21 @@ def _wrap_pregel_invoke(f):
 
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=(
-                f"invoke_agent invoke {graph_name}".strip()
-                if graph_name
-                else "invoke_agent"
-            ),
+            name="invoke_agent",
             origin=LanggraphIntegration.origin,
         ) as span:
-            # Set agent metadata
             if graph_name:
-                set_ai_pipeline_name(graph_name)
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            # Capture input messages if PII is allowed
             if (
                 len(args) > 0
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                # import ipdb; ipdb.set_trace()
                 parsed_messages = _parse_langgraph_messages(args[0])
                 if parsed_messages:
                     span.set_data(
@@ -171,22 +162,10 @@ def _wrap_pregel_invoke(f):
                         safe_serialize(parsed_messages),
                     )
 
-            # Execute the graph
-            try:
-                result = f(self, *args, **kwargs)
-
-                # Capture output state if PII is allowed
-                if should_send_default_pii() and integration.include_prompts:
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
-
-                return result
-
-            except Exception:
-                span.set_status("internal_error")
-                raise
-            finally:
-                if graph_name:
-                    set_ai_pipeline_name(None)
+            result = f(self, *args, **kwargs)
+            if should_send_default_pii() and integration.include_prompts:
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+            return result
 
     return new_invoke
 
@@ -209,7 +188,6 @@ def _wrap_pregel_ainvoke(f):
             origin=LanggraphIntegration.origin,
         ) as span:
             if graph_name:
-                set_ai_pipeline_name(graph_name)
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
@@ -227,23 +205,10 @@ def _wrap_pregel_ainvoke(f):
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
                         safe_serialize(parsed_messages),
                     )
-
-            # Execute the graph
-            try:
                 result = await f(self, *args, **kwargs)
-
-                # Capture output state if PII is allowed
                 if should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
-
                 return result
-
-            except Exception:
-                span.set_status("internal_error")
-                raise
-            finally:
-                if graph_name:
-                    set_ai_pipeline_name(None)
 
     new_ainvoke.__wrapped__ = True
     return new_ainvoke
