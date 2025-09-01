@@ -28,10 +28,14 @@ class LanggraphIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        # Wrap StateGraph methods - these get called when the graph is compiled
+        # LangGraph lets users create agents using a StateGraph or the Functional API.
+        # StateGraphs are then compiled to a CompiledStateGraph. Both CompiledStateGraph and
+        # the functional API execute on a Pregel instance. Pregel is the runtime for the graph
+        # and the invocation happens on Pregel, so patching the invoke methods takes care of both.
+        # The streaming methods are not patched, because due to some internal reasons, LangGraph
+        # will automatically patch the streaming methods to run through invoke, and by doing this
+        # we prevent duplicate spans for invocations.
         StateGraph.compile = _wrap_state_graph_compile(StateGraph.compile)
-
-        # Wrap Pregel methods - these are the actual execution methods on compiled graphs
         if hasattr(Pregel, "invoke"):
             Pregel.invoke = _wrap_pregel_invoke(Pregel.invoke)
         if hasattr(Pregel, "ainvoke"):
@@ -40,12 +44,6 @@ class LanggraphIntegration(Integration):
 
 def _get_graph_name(graph_obj):
     # type: (Any) -> Optional[str]
-    """Extract graph name from various possible attributes."""
-    # Check for Sentry-specific agent name first
-    if hasattr(graph_obj, "_sentry_agent_name"):
-        return graph_obj._sentry_agent_name
-
-    # Try to get name from different possible attributes
     for attr in ["name", "graph_name", "__name__", "_name"]:
         if hasattr(graph_obj, attr):
             name = getattr(graph_obj, attr)
@@ -54,41 +52,8 @@ def _get_graph_name(graph_obj):
     return None
 
 
-def _get_graph_metadata(graph_obj):
-    # type: (Any) -> tuple[Optional[str], Optional[List[str]]]
-    """Extract graph name and node names if available."""
-    graph_name = _get_graph_name(graph_obj)
-
-    # Try to get node names from the graph
-    node_names = None
-    if hasattr(graph_obj, "nodes"):
-        try:
-            nodes = graph_obj.nodes
-            if isinstance(nodes, dict):
-                node_names = list(nodes.keys())
-            elif hasattr(nodes, "__iter__"):
-                node_names = list(nodes)
-        except Exception:
-            pass
-    elif hasattr(graph_obj, "graph") and hasattr(graph_obj.graph, "nodes"):
-        try:
-            nodes = graph_obj.graph.nodes
-            if isinstance(nodes, dict):
-                node_names = list(nodes.keys())
-            elif hasattr(nodes, "__iter__"):
-                node_names = list(nodes)
-        except Exception:
-            pass
-
-    return graph_name, node_names
-
-
 def _parse_langgraph_messages(state):
     # type: (Any) -> Optional[List[Any]]
-    role_map = {
-        "human": "user",
-        "ai": "assistant",
-    }
     if not state:
         return None
 
@@ -110,33 +75,15 @@ def _parse_langgraph_messages(state):
     normalized_messages = []
     for message in messages:
         try:
-            if isinstance(message, dict):
-                role = message.get("role") or message.get("type")
-                if role in role_map:
-                    message = dict(message)
-                    message["role"] = role_map[role]
-                normalized_messages.append(message)
-            elif hasattr(message, "type") and hasattr(message, "content"):
-                role = getattr(message, "type", None)
-                mapped_role = role_map.get(role, role)
-                parsed = {"role": mapped_role, "content": message.content}
-                if hasattr(message, "additional_kwargs"):
-                    parsed.update(message.additional_kwargs)
-                normalized_messages.append(parsed)
-            elif hasattr(message, "role") and hasattr(message, "content"):
-                role = getattr(message, "role", None)
-                mapped_role = role_map.get(role, role)
-                parsed = {"role": mapped_role, "content": message.content}
+            if hasattr(message, "content"):
+                parsed = {"content": message.content}
                 for attr in ["name", "tool_calls", "function_call"]:
                     if hasattr(message, attr):
                         value = getattr(message, attr)
                         if value is not None:
                             parsed[attr] = value
                 normalized_messages.append(parsed)
-            elif hasattr(message, "__dict__"):
-                normalized_messages.append(vars(message))
-            else:
-                normalized_messages.append({"content": str(message)})
+
         except Exception:
             continue
 
@@ -158,7 +105,6 @@ def _wrap_state_graph_compile(f):
             name="create_agent",
             origin=LanggraphIntegration.origin,
         ) as span:
-            # import ipdb; ipdb.set_trace()
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
             span.set_data(
                 SPANDATA.GEN_AI_AGENT_NAME, getattr(compiled_graph, "name", None)
@@ -176,9 +122,6 @@ def _wrap_state_graph_compile(f):
                         if data and hasattr(data, "tools_by_name"):
                             tools = list(data.tools_by_name.keys())
             span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
-            compiled_graph = f(self, *args, **kwargs)
-            if hasattr(self, "__dict__"):
-                compiled_graph._sentry_source_graph = self
             return compiled_graph
 
     return new_compile
@@ -194,7 +137,7 @@ def _wrap_pregel_invoke(f):
         if integration is None:
             return f(self, *args, **kwargs)
 
-        graph_name, node_names = _get_graph_metadata(self)
+        graph_name = _get_graph_name(self)
 
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
@@ -258,18 +201,13 @@ def _wrap_pregel_ainvoke(f):
         if integration is None:
             return await f(self, *args, **kwargs)
 
-        graph_name, node_names = _get_graph_metadata(self)
+        graph_name = _get_graph_name(self)
 
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=(
-                f"invoke_agent ainvoke {graph_name}".strip()
-                if graph_name
-                else "invoke_agent"
-            ),
+            name="invoke_agent",
             origin=LanggraphIntegration.origin,
         ) as span:
-            # Set agent metadata
             if graph_name:
                 set_ai_pipeline_name(graph_name)
                 span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
@@ -278,7 +216,6 @@ def _wrap_pregel_ainvoke(f):
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            # Capture input messages if PII is allowed
             if (
                 len(args) > 0
                 and should_send_default_pii()
