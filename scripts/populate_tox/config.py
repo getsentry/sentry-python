@@ -139,7 +139,7 @@ TEST_SUITE_CONFIG = {
     "loguru": {
         "package": "loguru",
     },
-    "openai": {
+    "openai_base": {
         "package": "openai",
         "deps": {
             "*": ["pytest-asyncio", "tiktoken"],

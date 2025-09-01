@@ -62,7 +62,7 @@ GROUPS = {
         "anthropic",
         "cohere",
         "langchain",
-        "openai",
+        "openai_base",
         "openai_notiktoken",
         "openai_agents",
         "huggingface_hub",
