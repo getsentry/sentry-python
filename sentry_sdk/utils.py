@@ -46,6 +46,7 @@ if TYPE_CHECKING:
         Callable,
         ContextManager,
         Dict,
+        Generator,
         Iterator,
         List,
         NoReturn,
@@ -79,12 +80,12 @@ _is_sentry_internal_task = contextvars.ContextVar(
 )
 
 
-def is_internal_task():
+def is_internal_task() -> bool:
     return _is_sentry_internal_task.get()
 
 
 @contextmanager
-def mark_sentry_task_internal():
+def mark_sentry_task_internal() -> Generator[None, None, None]:
     """Context manager to mark a task as Sentry internal."""
     token = _is_sentry_internal_task.set(True)
     try:
