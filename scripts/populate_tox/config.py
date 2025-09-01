@@ -145,6 +145,7 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "tiktoken"],
             "<1.55": ["httpx<0.28"],
         },
+        "python": ">=3.8",
     },
     "openai_notiktoken": {
         "package": "openai",
@@ -152,6 +153,7 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio"],
             "<1.55": ["httpx<0.28"],
         },
+        "python": ">=3.8",
     },
     "openai_agents": {
         "package": "openai-agents",
