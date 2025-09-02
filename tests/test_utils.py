@@ -30,7 +30,6 @@ from sentry_sdk.utils import (
     serialize_frame,
     is_sentry_url,
     _get_installed_modules,
-    _generate_installed_modules,
     ensure_integration_enabled,
     _serialize_span_attribute,
     to_string,
@@ -55,8 +54,7 @@ except ImportError:
     gevent = None
 
 
-def _normalize_distribution_name(name):
-    # type: (str) -> str
+def _normalize_distribution_name(name: str) -> str:
     """Normalize distribution name according to PEP-0503.
 
     See:
@@ -493,7 +491,7 @@ def test_accepts_valid_sample_rate(rate):
     with mock.patch.object(logger, "warning", mock.Mock()):
         result = is_valid_sample_rate(rate, source="Testing")
         assert logger.warning.called is False
-        assert result is True
+        assert result == float(rate)
 
 
 @pytest.mark.parametrize(
@@ -514,7 +512,7 @@ def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
     with mock.patch.object(logger, "warning", mock.Mock()):
         result = is_valid_sample_rate(rate, source="Testing")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
-        assert result is False
+        assert result is None
 
 
 @pytest.mark.parametrize(
@@ -652,47 +650,6 @@ def test_safe_str_fails():
     result = safe_str(obj)
 
     assert result == repr(obj)
-
-
-def test_installed_modules():
-    try:
-        from importlib.metadata import distributions, version
-
-        importlib_available = True
-    except ImportError:
-        importlib_available = False
-
-    try:
-        import pkg_resources
-
-        pkg_resources_available = True
-    except ImportError:
-        pkg_resources_available = False
-
-    installed_distributions = {
-        _normalize_distribution_name(dist): version
-        for dist, version in _generate_installed_modules()
-    }
-
-    if importlib_available:
-        importlib_distributions = {
-            _normalize_distribution_name(dist.metadata.get("Name", None)): version(
-                dist.metadata.get("Name", None)
-            )
-            for dist in distributions()
-            if dist.metadata.get("Name", None) is not None
-            and version(dist.metadata.get("Name", None)) is not None
-        }
-        assert installed_distributions == importlib_distributions
-
-    elif pkg_resources_available:
-        pkg_resources_distributions = {
-            _normalize_distribution_name(dist.key): dist.version
-            for dist in pkg_resources.working_set
-        }
-        assert installed_distributions == pkg_resources_distributions
-    else:
-        pytest.fail("Neither importlib nor pkg_resources is available")
 
 
 def test_installed_modules_caching():

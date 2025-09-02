@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+import re
 
 import pytest
 from loguru import logger
@@ -56,10 +57,10 @@ def test_just_log(
 
     getattr(logger, level.name.lower())("test")
 
-    formatted_message = (
-        " | "
-        + "{:9}".format(level.name.upper())
-        + "| tests.integrations.loguru.test_loguru:test_just_log:57 - test"
+    expected_pattern = (
+        r" \| "
+        + r"{:9}".format(level.name.upper())
+        + r"\| tests\.integrations\.loguru\.test_loguru:test_just_log:\d+ - test"
     )
 
     if not created_event:
@@ -72,7 +73,7 @@ def test_just_log(
             (breadcrumb,) = breadcrumbs
             assert breadcrumb["level"] == expected_sentry_level
             assert breadcrumb["category"] == "tests.integrations.loguru.test_loguru"
-            assert breadcrumb["message"][23:] == formatted_message
+            assert re.fullmatch(expected_pattern, breadcrumb["message"][23:])
         else:
             assert not breadcrumbs
 
@@ -85,7 +86,7 @@ def test_just_log(
     (event,) = events
     assert event["level"] == expected_sentry_level
     assert event["logger"] == "tests.integrations.loguru.test_loguru"
-    assert event["logentry"]["message"][23:] == formatted_message
+    assert re.fullmatch(expected_pattern, event["logentry"]["message"][23:])
 
 
 def test_breadcrumb_format(sentry_init, capture_events, uninstall_integration, request):
@@ -140,7 +141,7 @@ def test_sentry_logs_warning(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     logger.warning("this is {} a {}", "just", "template")
@@ -164,7 +165,7 @@ def test_sentry_logs_debug(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     logger.debug("this is %s a template %s", "1", "2")
@@ -181,7 +182,7 @@ def test_sentry_log_levels(
 
     sentry_init(
         integrations=[LoguruIntegration(sentry_logs_level=LoggingLevels.SUCCESS)],
-        _experiments={"enable_logs": True},
+        enable_logs=True,
     )
     envelopes = capture_envelopes()
 
@@ -215,7 +216,7 @@ def test_disable_loguru_logs(
 
     sentry_init(
         integrations=[LoguruIntegration(sentry_logs_level=None)],
-        _experiments={"enable_logs": True},
+        enable_logs=True,
     )
     envelopes = capture_envelopes()
 
@@ -266,7 +267,7 @@ def test_no_log_infinite_loop(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        _experiments={"enable_logs": True},
+        enable_logs=True,
         integrations=[LoguruIntegration(sentry_logs_level=LoggingLevels.DEBUG)],
         debug=True,
     )
@@ -283,7 +284,7 @@ def test_logging_errors(sentry_init, capture_envelopes, uninstall_integration, r
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     logger.error(Exception("test exc 1"))
@@ -312,7 +313,7 @@ def test_log_strips_project_root(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        _experiments={"enable_logs": True},
+        enable_logs=True,
         project_root="/custom/test",
     )
     envelopes = capture_envelopes()
@@ -361,7 +362,7 @@ def test_log_keeps_full_path_if_not_in_project_root(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        _experiments={"enable_logs": True},
+        enable_logs=True,
         project_root="/custom/test",
     )
     envelopes = capture_envelopes()
@@ -409,7 +410,7 @@ def test_logger_with_all_attributes(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     logger.warning("log #{}", 1)

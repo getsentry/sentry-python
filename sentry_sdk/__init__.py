@@ -22,6 +22,7 @@ __all__ = [  # noqa
     "capture_exception",
     "capture_message",
     "continue_trace",
+    "new_trace",
     "flush",
     "get_baggage",
     "get_client",
@@ -45,6 +46,10 @@ __all__ = [  # noqa
     "trace",
     "monitor",
     "logger",
+    "start_session",
+    "end_session",
+    "set_transaction_name",
+    "update_current_span",
 ]
 
 # Initialize the debug support after everything is loaded

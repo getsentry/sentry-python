@@ -259,8 +259,8 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
     assert events[1]["logentry"]["params"] == []
 
     # Using recwarn suppresses the "third" warning in the test output
-    assert len(recwarn) == 1
-    assert str(recwarn[0].message) == "third"
+    third_warnings = [w for w in recwarn if str(w.message) == "third"]
+    assert len(third_warnings) == 1
 
 
 def test_ignore_logger(sentry_init, capture_events):
@@ -357,7 +357,7 @@ def test_sentry_logs_warning(sentry_init, capture_envelopes):
     """
     The python logger module should create 'warn' sentry logs if the flag is on.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
@@ -382,7 +382,7 @@ def test_sentry_logs_debug(sentry_init, capture_envelopes):
     """
     The python logger module should not create 'debug' sentry logs if the flag is on by default
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
@@ -397,7 +397,7 @@ def test_no_log_infinite_loop(sentry_init, capture_envelopes):
     If 'debug' mode is true, and you set a low log level in the logging integration, there should be no infinite loops.
     """
     sentry_init(
-        _experiments={"enable_logs": True},
+        enable_logs=True,
         integrations=[LoggingIntegration(sentry_logs_level=logging.DEBUG)],
         debug=True,
     )
@@ -414,7 +414,7 @@ def test_logging_errors(sentry_init, capture_envelopes):
     """
     The python logger module should be able to log errors without erroring
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
@@ -449,7 +449,7 @@ def test_log_strips_project_root(sentry_init, capture_envelopes):
     The python logger should strip project roots from the log record path
     """
     sentry_init(
-        _experiments={"enable_logs": True},
+        enable_logs=True,
         project_root="/custom/test",
     )
     envelopes = capture_envelopes()
@@ -478,7 +478,7 @@ def test_logger_with_all_attributes(sentry_init, capture_envelopes):
     """
     The python logger should be able to log all attributes, including extra data.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
@@ -551,7 +551,7 @@ def test_sentry_logs_named_parameters(sentry_init, capture_envelopes):
     """
     The python logger module should capture named parameters from dictionary arguments in Sentry logs.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
@@ -596,7 +596,7 @@ def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_envelo
     """
     The python logger module should handle complex values in named parameters using safe_repr.
     """
-    sentry_init(_experiments={"enable_logs": True})
+    sentry_init(enable_logs=True)
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 import io
 import os
@@ -5,6 +6,7 @@ import gzip
 import socket
 import ssl
 import time
+import asyncio
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from urllib.request import getproxies
@@ -14,28 +16,55 @@ try:
 except ImportError:
     brotli = None
 
+try:
+    import httpcore
+except ImportError:
+    httpcore = None  # type: ignore
+
+try:
+    import h2  # noqa: F401
+
+    HTTP2_ENABLED = httpcore is not None
+except ImportError:
+    HTTP2_ENABLED = False
+
+try:
+    import anyio  # noqa: F401
+
+    ASYNC_TRANSPORT_ENABLED = httpcore is not None
+except ImportError:
+    ASYNC_TRANSPORT_ENABLED = False
+
 import urllib3
 import certifi
 
 from sentry_sdk.consts import EndpointType
-from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
-from sentry_sdk.worker import BackgroundWorker
+from sentry_sdk.utils import (
+    Dsn,
+    logger,
+    capture_internal_exceptions,
+    mark_sentry_task_internal,
+)
+from sentry_sdk.worker import BackgroundWorker, Worker, AsyncWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING, cast, List, Dict
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import DefaultDict
-    from typing import Iterable
-    from typing import Mapping
-    from typing import Optional
-    from typing import Self
-    from typing import Tuple
-    from typing import Type
-    from typing import Union
-
+    from typing import (
+        List,
+        Dict,
+        Any,
+        Callable,
+        DefaultDict,
+        Iterable,
+        Mapping,
+        Optional,
+        Tuple,
+        Type,
+        Union,
+        Self,
+    )
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
@@ -62,10 +91,9 @@ class Transport(ABC):
     A transport is used to send an event to sentry.
     """
 
-    parsed_dsn = None  # type: Optional[Dsn]
+    parsed_dsn: Optional[Dsn] = None
 
-    def __init__(self, options=None):
-        # type: (Self, Optional[Dict[str, Any]]) -> None
+    def __init__(self: Self, options: Optional[Dict[str, Any]] = None) -> None:
         self.options = options
         if options and options["dsn"] is not None and options["dsn"]:
             self.parsed_dsn = Dsn(options["dsn"])
@@ -73,8 +101,7 @@ class Transport(ABC):
             self.parsed_dsn = None
 
     @abstractmethod
-    def capture_envelope(self, envelope):
-        # type: (Self, Envelope) -> None
+    def capture_envelope(self: Self, envelope: Envelope) -> None:
         """
         Send an envelope to Sentry.
 
@@ -85,11 +112,10 @@ class Transport(ABC):
         pass
 
     def flush(
-        self,
-        timeout,
-        callback=None,
-    ):
-        # type: (Self, float, Optional[Any]) -> None
+        self: Self,
+        timeout: float,
+        callback: Optional[Any] = None,
+    ) -> None:
         """
         Wait `timeout` seconds for the current events to be sent out.
 
@@ -98,8 +124,7 @@ class Transport(ABC):
         """
         return None
 
-    def kill(self):
-        # type: (Self) -> None
+    def kill(self: Self) -> None:
         """
         Forcefully kills the transport.
 
@@ -109,14 +134,13 @@ class Transport(ABC):
         return None
 
     def record_lost_event(
-        self,
-        reason,  # type: str
-        data_category=None,  # type: Optional[EventDataCategory]
-        item=None,  # type: Optional[Item]
+        self: Self,
+        reason: str,
+        data_category: Optional[EventDataCategory] = None,
+        item: Optional[Item] = None,
         *,
-        quantity=1,  # type: int
-    ):
-        # type: (...) -> None
+        quantity: int = 1,
+    ) -> None:
         """This increments a counter for event loss by reason and
         data category by the given positive-int quantity (default 1).
 
@@ -133,20 +157,13 @@ class Transport(ABC):
         """
         return None
 
-    def is_healthy(self):
-        # type: (Self) -> bool
+    def is_healthy(self: Self) -> bool:
         return True
 
-    def __del__(self):
-        # type: (Self) -> None
-        try:
-            self.kill()
-        except Exception:
-            pass
 
-
-def _parse_rate_limits(header, now=None):
-    # type: (str, Optional[datetime]) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]
+def _parse_rate_limits(
+    header: str, now: Optional[datetime] = None
+) -> Iterable[Tuple[Optional[str], datetime]]:
     if now is None:
         now = datetime.now(timezone.utc)
 
@@ -157,32 +174,30 @@ def _parse_rate_limits(header, now=None):
 
             retry_after = now + timedelta(seconds=int(retry_after_val))
             for category in categories and categories.split(";") or (None,):
-                category = cast("Optional[EventDataCategory]", category)
                 yield category, retry_after
         except (LookupError, ValueError):
             continue
 
 
-class BaseHttpTransport(Transport):
-    """The base HTTP transport."""
+class HttpTransportCore(Transport):
+    """Shared base class for sync and async transports."""
 
     TIMEOUT = 30  # seconds
 
-    def __init__(self, options):
-        # type: (Self, Dict[str, Any]) -> None
+    def __init__(self: Self, options: Dict[str, Any]) -> None:
         from sentry_sdk.consts import VERSION
 
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
-        self.options = options  # type: Dict[str, Any]
-        self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
+        self.options: Dict[str, Any] = options
+        self._worker = self._create_worker(options)
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._disabled_until = {}  # type: Dict[Optional[EventDataCategory], datetime]
+        self._disabled_until: Dict[Optional[str], datetime] = {}
         # We only use this Retry() class for the `get_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
-        self._discarded_events = defaultdict(
-            int
-        )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
+        self._discarded_events: DefaultDict[Tuple[EventDataCategory, str], int] = (
+            defaultdict(int)
+        )
         self._last_client_report_sent = time.time()
 
         self._pool = self._make_pool()
@@ -226,15 +241,17 @@ class BaseHttpTransport(Transport):
         elif self._compression_algo == "br":
             self._compression_level = 4
 
+    def _create_worker(self, options: dict[str, Any]) -> Worker:
+        raise NotImplementedError()
+
     def record_lost_event(
-        self,
-        reason,  # type: str
-        data_category=None,  # type: Optional[EventDataCategory]
-        item=None,  # type: Optional[Item]
+        self: Self,
+        reason: str,
+        data_category: Optional[EventDataCategory] = None,
+        item: Optional[Item] = None,
         *,
-        quantity=1,  # type: int
-    ):
-        # type: (...) -> None
+        quantity: int = 1,
+    ) -> None:
         if not self.options["send_client_reports"]:
             return
 
@@ -247,9 +264,7 @@ class BaseHttpTransport(Transport):
                 event = item.get_transaction_event() or {}
 
                 # +1 for the transaction itself
-                span_count = (
-                    len(cast(List[Dict[str, object]], event.get("spans") or [])) + 1
-                )
+                span_count = len(event.get("spans") or []) + 1
                 self.record_lost_event(reason, "span", quantity=span_count)
 
             elif data_category == "attachment":
@@ -262,12 +277,12 @@ class BaseHttpTransport(Transport):
 
         self._discarded_events[data_category, reason] += quantity
 
-    def _get_header_value(self, response, header):
-        # type: (Self, Any, str) -> Optional[str]
+    def _get_header_value(self: Self, response: Any, header: str) -> Optional[str]:
         return response.headers.get(header)
 
-    def _update_rate_limits(self, response):
-        # type: (Self, Union[urllib3.BaseHTTPResponse, httpcore.Response]) -> None
+    def _update_rate_limits(
+        self: Self, response: Union[urllib3.BaseHTTPResponse, httpcore.Response]
+    ) -> None:
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
@@ -291,22 +306,48 @@ class BaseHttpTransport(Transport):
                 seconds=retry_after
             )
 
-    def _send_request(
-        self,
-        body,
-        headers,
-        endpoint_type=EndpointType.ENVELOPE,
-        envelope=None,
-    ):
-        # type: (Self, bytes, Dict[str, str], EndpointType, Optional[Envelope]) -> None
-
-        def record_loss(reason):
-            # type: (str) -> None
+    def _handle_request_error(
+        self: Self, envelope: Optional[Envelope], loss_reason: str = "network"
+    ) -> None:
+        def record_loss(reason: str) -> None:
             if envelope is None:
                 self.record_lost_event(reason, data_category="error")
             else:
                 for item in envelope.items:
                     self.record_lost_event(reason, item=item)
+
+        self.on_dropped_event(loss_reason)
+        record_loss("network_error")
+
+    def _handle_response(
+        self: Self,
+        response: Union[urllib3.BaseHTTPResponse, httpcore.Response],
+        envelope: Optional[Envelope],
+    ) -> None:
+        self._update_rate_limits(response)
+
+        if response.status == 429:
+            # if we hit a 429.  Something was rate limited but we already
+            # acted on this in `self._update_rate_limits`.  Note that we
+            # do not want to record event loss here as we will have recorded
+            # an outcome in relay already.
+            self.on_dropped_event("status_429")
+            pass
+
+        elif response.status >= 300 or response.status < 200:
+            logger.error(
+                "Unexpected status code: %s (body: %s)",
+                response.status,
+                getattr(response, "data", getattr(response, "content", None)),
+            )
+            self._handle_request_error(
+                envelope=envelope, loss_reason="status_{}".format(response.status)
+            )
+
+    def _update_headers(
+        self: Self,
+        headers: Dict[str, str],
+    ) -> None:
 
         headers.update(
             {
@@ -314,46 +355,13 @@ class BaseHttpTransport(Transport):
                 "X-Sentry-Auth": str(self._auth.to_header()),
             }
         )
-        try:
-            response = self._request(
-                "POST",
-                endpoint_type,
-                body,
-                headers,
-            )
-        except Exception:
-            self.on_dropped_event("network")
-            record_loss("network_error")
-            raise
 
-        try:
-            self._update_rate_limits(response)
-
-            if response.status == 429:
-                # if we hit a 429.  Something was rate limited but we already
-                # acted on this in `self._update_rate_limits`.  Note that we
-                # do not want to record event loss here as we will have recorded
-                # an outcome in relay already.
-                self.on_dropped_event("status_429")
-                pass
-
-            elif response.status >= 300 or response.status < 200:
-                logger.error(
-                    "Unexpected status code: %s (body: %s)",
-                    response.status,
-                    getattr(response, "data", getattr(response, "content", None)),
-                )
-                self.on_dropped_event("status_{}".format(response.status))
-                record_loss("network_error")
-        finally:
-            response.close()
-
-    def on_dropped_event(self, _reason):
-        # type: (Self, str) -> None
+    def on_dropped_event(self: Self, _reason: str) -> None:
         return None
 
-    def _fetch_pending_client_report(self, force=False, interval=60):
-        # type: (Self, bool, int) -> Optional[Item]
+    def _fetch_pending_client_report(
+        self: Self, force: bool = False, interval: int = 60
+    ) -> Optional[Item]:
         if not self.options["send_client_reports"]:
             return None
 
@@ -383,37 +391,27 @@ class BaseHttpTransport(Transport):
             type="client_report",
         )
 
-    def _flush_client_reports(self, force=False):
-        # type: (Self, bool) -> None
-        client_report = self._fetch_pending_client_report(force=force, interval=60)
-        if client_report is not None:
-            self.capture_envelope(Envelope(items=[client_report]))
-
-    def _check_disabled(self, category):
-        # type: (str) -> bool
-        def _disabled(bucket):
-            # type: (Any) -> bool
+    def _check_disabled(self: Self, category: EventDataCategory) -> bool:
+        def _disabled(bucket: Optional[EventDataCategory]) -> bool:
             ts = self._disabled_until.get(bucket)
             return ts is not None and ts > datetime.now(timezone.utc)
 
         return _disabled(category) or _disabled(None)
 
-    def _is_rate_limited(self):
-        # type: (Self) -> bool
+    def _is_rate_limited(self: Self) -> bool:
         return any(
             ts > datetime.now(timezone.utc) for ts in self._disabled_until.values()
         )
 
-    def _is_worker_full(self):
-        # type: (Self) -> bool
+    def _is_worker_full(self: Self) -> bool:
         return self._worker.full()
 
-    def is_healthy(self):
-        # type: (Self) -> bool
+    def is_healthy(self: Self) -> bool:
         return not (self._is_worker_full() or self._is_rate_limited())
 
-    def _send_envelope(self, envelope):
-        # type: (Self, Envelope) -> None
+    def _prepare_envelope(
+        self: Self, envelope: Envelope
+    ) -> Optional[Tuple[Envelope, io.BytesIO, Dict[str, str]]]:
 
         # remove all items from the envelope which are over quota
         new_items = []
@@ -457,16 +455,11 @@ class BaseHttpTransport(Transport):
         if content_encoding:
             headers["Content-Encoding"] = content_encoding
 
-        self._send_request(
-            body.getvalue(),
-            headers=headers,
-            endpoint_type=EndpointType.ENVELOPE,
-            envelope=envelope,
-        )
-        return None
+        return envelope, body, headers
 
-    def _serialize_envelope(self, envelope):
-        # type: (Self, Envelope) -> tuple[Optional[str], io.BytesIO]
+    def _serialize_envelope(
+        self: Self, envelope: Envelope
+    ) -> tuple[Optional[str], io.BytesIO]:
         content_encoding = None
         body = io.BytesIO()
         if self._compression_level == 0 or self._compression_algo is None:
@@ -487,12 +480,10 @@ class BaseHttpTransport(Transport):
 
         return content_encoding, body
 
-    def _get_pool_options(self):
-        # type: (Self) -> Dict[str, Any]
+    def _get_pool_options(self: Self) -> Dict[str, Any]:
         raise NotImplementedError()
 
-    def _in_no_proxy(self, parsed_dsn):
-        # type: (Self, Dsn) -> bool
+    def _in_no_proxy(self: Self, parsed_dsn: Dsn) -> bool:
         no_proxy = getproxies().get("no")
         if not no_proxy:
             return False
@@ -502,26 +493,82 @@ class BaseHttpTransport(Transport):
                 return True
         return False
 
-    def _make_pool(self):
-        # type: (Self) -> Union[PoolManager, ProxyManager, httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
+    def _make_pool(
+        self: Self,
+    ) -> Union[
+        PoolManager,
+        ProxyManager,
+        httpcore.SOCKSProxy,
+        httpcore.HTTPProxy,
+        httpcore.ConnectionPool,
+        httpcore.AsyncSOCKSProxy,
+        httpcore.AsyncHTTPProxy,
+        httpcore.AsyncConnectionPool,
+    ]:
         raise NotImplementedError()
 
     def _request(
-        self,
-        method,
-        endpoint_type,
-        body,
-        headers,
-    ):
-        # type: (Self, str, EndpointType, Any, Mapping[str, str]) -> Union[urllib3.BaseHTTPResponse, httpcore.Response]
+        self: Self,
+        method: str,
+        endpoint_type: EndpointType,
+        body: Any,
+        headers: Mapping[str, str],
+    ) -> Union[urllib3.BaseHTTPResponse, httpcore.Response]:
         raise NotImplementedError()
 
-    def capture_envelope(
-        self, envelope  # type: Envelope
-    ):
-        # type: (...) -> None
-        def send_envelope_wrapper():
-            # type: () -> None
+    def kill(self: Self) -> None:
+        logger.debug("Killing HTTP transport")
+        self._worker.kill()
+
+
+class BaseHttpTransport(HttpTransportCore):
+    """The base HTTP transport."""
+
+    def _send_envelope(self: Self, envelope: Envelope) -> None:
+        _prepared_envelope = self._prepare_envelope(envelope)
+        if _prepared_envelope is not None:
+            envelope, body, headers = _prepared_envelope
+            self._send_request(
+                body.getvalue(),
+                headers=headers,
+                endpoint_type=EndpointType.ENVELOPE,
+                envelope=envelope,
+            )
+        return None
+
+    def _send_request(
+        self: Self,
+        body: bytes,
+        headers: Dict[str, str],
+        endpoint_type: EndpointType,
+        envelope: Optional[Envelope],
+    ) -> None:
+        self._update_headers(headers)
+        try:
+            response = self._request(
+                "POST",
+                endpoint_type,
+                body,
+                headers,
+            )
+        except Exception:
+            self._handle_request_error(envelope=envelope, loss_reason="network")
+            raise
+        try:
+            self._handle_response(response=response, envelope=envelope)
+        finally:
+            response.close()
+
+    def _create_worker(self: Self, options: dict[str, Any]) -> Worker:
+        return BackgroundWorker(queue_size=options["transport_queue_size"])
+
+    def _flush_client_reports(self: Self, force: bool = False) -> None:
+        client_report = self._fetch_pending_client_report(force=force, interval=60)
+        if client_report is not None:
+            self.capture_envelope(Envelope(items=[client_report]))
+
+    def capture_envelope(self: Self, envelope: Envelope) -> None:
+        def send_envelope_wrapper() -> None:
             with capture_internal_exceptions():
                 self._send_envelope(envelope)
                 self._flush_client_reports()
@@ -532,29 +579,22 @@ class BaseHttpTransport(Transport):
                 self.record_lost_event("queue_overflow", item=item)
 
     def flush(
-        self,
-        timeout,
-        callback=None,
-    ):
-        # type: (Self, float, Optional[Callable[[int, float], None]]) -> None
+        self: Self,
+        timeout: float,
+        callback: Optional[Callable[[int, float], None]] = None,
+    ) -> None:
         logger.debug("Flushing HTTP transport")
 
         if timeout > 0:
             self._worker.submit(lambda: self._flush_client_reports(force=True))
             self._worker.flush(timeout, callback)
 
-    def kill(self):
-        # type: (Self) -> None
-        logger.debug("Killing HTTP transport")
-        self._worker.kill()
-
 
 class HttpTransport(BaseHttpTransport):
     if TYPE_CHECKING:
         _pool: Union[PoolManager, ProxyManager]
 
-    def _get_pool_options(self):
-        # type: (Self) -> Dict[str, Any]
+    def _get_pool_options(self: Self) -> Dict[str, Any]:
 
         num_pools = self.options.get("_experiments", {}).get("transport_num_pools")
         options = {
@@ -563,7 +603,7 @@ class HttpTransport(BaseHttpTransport):
             "timeout": urllib3.Timeout(total=self.TIMEOUT),
         }
 
-        socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
+        socket_options: Optional[List[Tuple[int, int, int | bytes]]] = None
 
         if self.options["socket_options"] is not None:
             socket_options = self.options["socket_options"]
@@ -596,8 +636,7 @@ class HttpTransport(BaseHttpTransport):
 
         return options
 
-    def _make_pool(self):
-        # type: (Self) -> Union[PoolManager, ProxyManager]
+    def _make_pool(self: Self) -> Union[PoolManager, ProxyManager]:
         if self.parsed_dsn is None:
             raise ValueError("Cannot create HTTP-based transport without valid DSN")
 
@@ -643,13 +682,12 @@ class HttpTransport(BaseHttpTransport):
             return urllib3.PoolManager(**opts)
 
     def _request(
-        self,
-        method,
-        endpoint_type,
-        body,
-        headers,
-    ):
-        # type: (Self, str, EndpointType, Any, Mapping[str, str]) -> urllib3.BaseHTTPResponse
+        self: Self,
+        method: str,
+        endpoint_type: EndpointType,
+        body: Any,
+        headers: Mapping[str, str],
+    ) -> urllib3.BaseHTTPResponse:
         return self._pool.request(
             method,
             self._auth.get_api_url(endpoint_type),
@@ -658,33 +696,22 @@ class HttpTransport(BaseHttpTransport):
         )
 
 
-try:
-    import httpcore
-    import h2  # noqa: F401
-except ImportError:
-    # Sorry, no Http2Transport for you
-    class Http2Transport(HttpTransport):
-        def __init__(self, options):
-            # type: (Self, Dict[str, Any]) -> None
-            super().__init__(options)
-            logger.warning(
-                "You tried to use HTTP2Transport but don't have httpcore[http2] installed. Falling back to HTTPTransport."
-            )
+if not ASYNC_TRANSPORT_ENABLED:
+    # Sorry, no AsyncHttpTransport for you
+    AsyncHttpTransport = HttpTransport
 
 else:
 
-    class Http2Transport(BaseHttpTransport):  # type: ignore
-        """The HTTP2 transport based on httpcore."""
+    class AsyncHttpTransport(HttpTransportCore):  # type: ignore
+        def __init__(self: Self, options: Dict[str, Any]) -> None:
+            super().__init__(options)
+            # Requires event loop at init time
+            self.loop = asyncio.get_running_loop()
 
-        TIMEOUT = 15
+        def _create_worker(self: Self, options: dict[str, Any]) -> Worker:
+            return AsyncWorker(queue_size=options["transport_queue_size"])
 
-        if TYPE_CHECKING:
-            _pool: Union[
-                httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool
-            ]
-
-        def _get_header_value(self, response, header):
-            # type: (Self, httpcore.Response, str) -> Optional[str]
+        def _get_header_value(self: Self, response: Any, header: str) -> Optional[str]:
             return next(
                 (
                     val.decode("ascii")
@@ -694,15 +721,49 @@ else:
                 None,
             )
 
-        def _request(
-            self,
-            method,
-            endpoint_type,
-            body,
-            headers,
-        ):
-            # type: (Self, str, EndpointType, Any, Mapping[str, str]) -> httpcore.Response
-            response = self._pool.request(
+        async def _send_envelope(self: Self, envelope: Envelope) -> None:
+            _prepared_envelope = self._prepare_envelope(envelope)
+            if _prepared_envelope is not None:
+                envelope, body, headers = _prepared_envelope
+                await self._send_request(
+                    body.getvalue(),
+                    headers=headers,
+                    endpoint_type=EndpointType.ENVELOPE,
+                    envelope=envelope,
+                )
+            return None
+
+        async def _send_request(
+            self: Self,
+            body: bytes,
+            headers: Dict[str, str],
+            endpoint_type: EndpointType,
+            envelope: Optional[Envelope],
+        ) -> None:
+            self._update_headers(headers)
+            try:
+                response = await self._request(
+                    "POST",
+                    endpoint_type,
+                    body,
+                    headers,
+                )
+            except Exception:
+                self._handle_request_error(envelope=envelope, loss_reason="network")
+                raise
+            try:
+                self._handle_response(response=response, envelope=envelope)
+            finally:
+                await response.aclose()
+
+        async def _request(  # type: ignore[override]
+            self: Self,
+            method: str,
+            endpoint_type: EndpointType,
+            body: Any,
+            headers: Mapping[str, str],
+        ) -> httpcore.Response:
+            return await self._pool.request(
                 method,
                 self._auth.get_api_url(endpoint_type),
                 content=body,
@@ -716,15 +777,51 @@ else:
                     }
                 },
             )
-            return response
 
-        def _get_pool_options(self):
-            # type: (Self) -> Dict[str, Any]
-            options = {
-                "http2": self.parsed_dsn is not None
-                and self.parsed_dsn.scheme == "https",
+        async def _flush_client_reports(self: Self, force: bool = False) -> None:
+            client_report = self._fetch_pending_client_report(force=force, interval=60)
+            if client_report is not None:
+                self.capture_envelope(Envelope(items=[client_report]))
+
+        def _capture_envelope(self: Self, envelope: Envelope) -> None:
+            async def send_envelope_wrapper() -> None:
+                with capture_internal_exceptions():
+                    await self._send_envelope(envelope)
+                    await self._flush_client_reports()
+
+            if not self._worker.submit(send_envelope_wrapper):
+                self.on_dropped_event("full_queue")
+                for item in envelope.items:
+                    self.record_lost_event("queue_overflow", item=item)
+
+        def capture_envelope(self: Self, envelope: Envelope) -> None:
+            # Synchronous entry point
+            if self.loop and self.loop.is_running():
+                self.loop.call_soon_threadsafe(self._capture_envelope, envelope)
+            else:
+                # The event loop is no longer running
+                logger.warning("Async Transport is not running in an event loop.")
+                self.on_dropped_event("internal_sdk_error")
+                for item in envelope.items:
+                    self.record_lost_event("internal_sdk_error", item=item)
+
+        def flush(  # type: ignore[override]
+            self: Self,
+            timeout: float,
+            callback: Optional[Callable[[int, float], None]] = None,
+        ) -> Optional[asyncio.Task[None]]:
+            logger.debug("Flushing HTTP transport")
+
+            if timeout > 0:
+                self._worker.submit(lambda: self._flush_client_reports(force=True))
+                return self._worker.flush(timeout, callback)  # type: ignore[func-returns-value]
+            return None
+
+        def _get_pool_options(self: Self) -> Dict[str, Any]:
+            options: Dict[str, Any] = {
+                "http2": False,  # no HTTP2 for now
                 "retries": 3,
-            }  # type: Dict[str, Any]
+            }
 
             socket_options = (
                 self.options["socket_options"]
@@ -755,8 +852,160 @@ else:
 
             return options
 
-        def _make_pool(self):
-            # type: (Self) -> Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
+        def _make_pool(
+            self: Self,
+        ) -> Union[
+            httpcore.AsyncSOCKSProxy,
+            httpcore.AsyncHTTPProxy,
+            httpcore.AsyncConnectionPool,
+        ]:
+            if self.parsed_dsn is None:
+                raise ValueError("Cannot create HTTP-based transport without valid DSN")
+            proxy = None
+            no_proxy = self._in_no_proxy(self.parsed_dsn)
+
+            # try HTTPS first
+            https_proxy = self.options["https_proxy"]
+            if self.parsed_dsn.scheme == "https" and (https_proxy != ""):
+                proxy = https_proxy or (not no_proxy and getproxies().get("https"))
+
+            # maybe fallback to HTTP proxy
+            http_proxy = self.options["http_proxy"]
+            if not proxy and (http_proxy != ""):
+                proxy = http_proxy or (not no_proxy and getproxies().get("http"))
+
+            opts = self._get_pool_options()
+
+            if proxy:
+                proxy_headers = self.options["proxy_headers"]
+                if proxy_headers:
+                    opts["proxy_headers"] = proxy_headers
+
+                if proxy.startswith("socks"):
+                    try:
+                        if "socket_options" in opts:
+                            socket_options = opts.pop("socket_options")
+                            if socket_options:
+                                logger.warning(
+                                    "You have defined socket_options but using a SOCKS proxy which doesn't support these. We'll ignore socket_options."
+                                )
+                        return httpcore.AsyncSOCKSProxy(proxy_url=proxy, **opts)
+                    except RuntimeError:
+                        logger.warning(
+                            "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support.",
+                            proxy,
+                        )
+                else:
+                    return httpcore.AsyncHTTPProxy(proxy_url=proxy, **opts)
+
+            return httpcore.AsyncConnectionPool(**opts)
+
+        def kill(self: Self) -> Optional[asyncio.Task[None]]:  # type: ignore
+
+            logger.debug("Killing HTTP transport")
+            self._worker.kill()
+            try:
+                # Return the pool cleanup task so caller can await it if needed
+                with mark_sentry_task_internal():
+                    return self.loop.create_task(self._pool.aclose())  # type: ignore
+            except RuntimeError:
+                logger.warning("Event loop not running, aborting kill.")
+                return None
+
+
+if not HTTP2_ENABLED:
+    # Sorry, no Http2Transport for you
+    class Http2Transport(HttpTransport):
+        def __init__(self: Self, options: Dict[str, Any]) -> None:
+            super().__init__(options)
+            logger.warning(
+                "You tried to use HTTP2Transport but don't have httpcore[http2] installed. Falling back to HTTPTransport."
+            )
+
+else:
+
+    class Http2Transport(BaseHttpTransport):  # type: ignore
+        """The HTTP2 transport based on httpcore."""
+
+        TIMEOUT = 15
+
+        if TYPE_CHECKING:
+            _pool: Union[
+                httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool
+            ]
+
+        def _get_header_value(self: Self, response: Any, header: str) -> Optional[str]:
+            return next(
+                (
+                    val.decode("ascii")
+                    for key, val in response.headers
+                    if key.decode("ascii").lower() == header
+                ),
+                None,
+            )
+
+        def _request(
+            self: Self,
+            method: str,
+            endpoint_type: EndpointType,
+            body: Any,
+            headers: Mapping[str, str],
+        ) -> httpcore.Response:
+            response = self._pool.request(
+                method,
+                self._auth.get_api_url(endpoint_type),
+                content=body,
+                headers=headers,  # type: ignore
+                extensions={
+                    "timeout": {
+                        "pool": self.TIMEOUT,
+                        "connect": self.TIMEOUT,
+                        "write": self.TIMEOUT,
+                        "read": self.TIMEOUT,
+                    }
+                },
+            )
+            return response
+
+        def _get_pool_options(self: Self) -> Dict[str, Any]:
+            options: Dict[str, Any] = {
+                "http2": self.parsed_dsn is not None
+                and self.parsed_dsn.scheme == "https",
+                "retries": 3,
+            }
+
+            socket_options = (
+                self.options["socket_options"]
+                if self.options["socket_options"] is not None
+                else []
+            )
+
+            used_options = {(o[0], o[1]) for o in socket_options}
+            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+                if (default_option[0], default_option[1]) not in used_options:
+                    socket_options.append(default_option)
+
+            options["socket_options"] = socket_options
+
+            ssl_context = ssl.create_default_context()
+            ssl_context.load_verify_locations(
+                self.options["ca_certs"]  # User-provided bundle from the SDK init
+                or os.environ.get("SSL_CERT_FILE")
+                or os.environ.get("REQUESTS_CA_BUNDLE")
+                or certifi.where()
+            )
+            cert_file = self.options["cert_file"] or os.environ.get("CLIENT_CERT_FILE")
+            key_file = self.options["key_file"] or os.environ.get("CLIENT_KEY_FILE")
+            if cert_file is not None:
+                ssl_context.load_cert_chain(cert_file, key_file)
+
+            options["ssl_context"] = ssl_context
+
+            return options
+
+        def _make_pool(
+            self: Self,
+        ) -> Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]:
             if self.parsed_dsn is None:
                 raise ValueError("Cannot create HTTP-based transport without valid DSN")
             proxy = None
@@ -799,8 +1048,7 @@ else:
             return httpcore.ConnectionPool(**opts)
 
 
-def make_transport(options):
-    # type: (Dict[str, Any]) -> Optional[Transport]
+def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
     ref_transport = options["transport"]
 
     # We default to using HTTP2 transport if the user also has the required h2
@@ -809,11 +1057,32 @@ def make_transport(options):
     use_http2_transport = options.get("http2") is not False and not issubclass(
         Http2Transport, HttpTransport
     )
+    use_async_transport = options.get("_experiments", {}).get("transport_async", False)
+    async_integration = any(
+        integration.__class__.__name__ == "AsyncioIntegration"
+        for integration in options.get("integrations") or []
+    )
 
     # By default, we use the http transport class
-    transport_cls = (
+    transport_cls: Type[Transport] = (
         Http2Transport if use_http2_transport else HttpTransport
-    )  # type: Type[Transport]
+    )
+    if use_async_transport and ASYNC_TRANSPORT_ENABLED:
+        try:
+            asyncio.get_running_loop()
+            if async_integration:
+                transport_cls = AsyncHttpTransport
+            else:
+                logger.warning(
+                    "You tried to use AsyncHttpTransport but the AsyncioIntegration is not enabled. Falling back to sync transport."
+                )
+        except RuntimeError:
+            # No event loop running, fall back to sync transport
+            logger.warning("No event loop running, falling back to sync transport.")
+    elif use_async_transport:
+        logger.warning(
+            "You tried to use AsyncHttpTransport but don't have httpcore[asyncio] installed. Falling back to sync transport."
+        )
 
     if isinstance(ref_transport, Transport):
         return ref_transport

@@ -211,16 +211,21 @@ def test_passes_parent_sampling_decision_in_sampling_context(
             pass
 
 
-def test_passes_attributes_from_start_span_to_traces_sampler(
-    sentry_init, DictionaryContaining  # noqa: N803
-):
-    traces_sampler = mock.Mock()
+def test_passes_custom_attributes_in_sampling_context(sentry_init):
+    def traces_sampler(sampling_context):
+        assert sampling_context["dog.name"] == "Lily"
+        assert sampling_context["dog.activity"] == "fetch"
+        return 1.0
+
     sentry_init(traces_sampler=traces_sampler)
 
-    with start_span(attributes={"dogs": "yes", "cats": "maybe"}):
-        traces_sampler.assert_called_once_with(
-            DictionaryContaining({"dogs": "yes", "cats": "maybe"})
-        )
+    with sentry_sdk.continue_trace(
+        {"sentry-trace": "12312012123120121231201212312012-1121201211212012-1"}
+    ):
+        with sentry_sdk.start_span(
+            name="dogpark", attributes={"dog.name": "Lily", "dog.activity": "fetch"}
+        ):
+            pass
 
 
 def test_sample_rate_affects_errors(sentry_init, capture_events):
@@ -341,4 +346,21 @@ def test_profiles_sampler_gets_sampling_context(sentry_init, parent_sampling_dec
     )
     with sentry_sdk.continue_trace({"sentry-trace": sentry_trace}):
         with sentry_sdk.start_span(name="dogpark", op="op"):
+            pass
+
+
+def test_passes_custom_attributes_in_profiles_sampling_context(sentry_init):
+    def profiles_sampler(sampling_context):
+        assert sampling_context["dog.name"] == "Lily"
+        assert sampling_context["dog.activity"] == "fetch"
+        return 1.0
+
+    sentry_init(traces_sample_rate=1.0, profiles_sampler=profiles_sampler)
+
+    with sentry_sdk.continue_trace(
+        {"sentry-trace": "12312012123120121231201212312012-1121201211212012-1"}
+    ):
+        with sentry_sdk.start_span(
+            name="dogpark", attributes={"dog.name": "Lily", "dog.activity": "fetch"}
+        ):
             pass

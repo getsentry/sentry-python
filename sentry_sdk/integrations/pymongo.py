@@ -1,3 +1,4 @@
+from __future__ import annotations
 import copy
 
 import sentry_sdk
@@ -41,8 +42,7 @@ SAFE_COMMAND_ATTRIBUTES = [
 ]
 
 
-def _strip_pii(command):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+def _strip_pii(command: Dict[str, Any]) -> Dict[str, Any]:
     for key in command:
         is_safe_field = key in SAFE_COMMAND_ATTRIBUTES
         if is_safe_field:
@@ -84,8 +84,7 @@ def _strip_pii(command):
     return command
 
 
-def _get_db_data(event):
-    # type: (Any) -> Dict[str, Any]
+def _get_db_data(event: Any) -> Dict[str, Any]:
     data = {}
 
     data[SPANDATA.DB_SYSTEM] = "mongodb"
@@ -106,16 +105,16 @@ def _get_db_data(event):
 
 
 class CommandTracer(monitoring.CommandListener):
-    def __init__(self):
-        # type: () -> None
-        self._ongoing_operations = {}  # type: Dict[int, Span]
+    def __init__(self) -> None:
+        self._ongoing_operations: Dict[int, Span] = {}
 
-    def _operation_key(self, event):
-        # type: (Union[CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent]) -> int
+    def _operation_key(
+        self,
+        event: Union[CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent],
+    ) -> int:
         return event.request_id
 
-    def started(self, event):
-        # type: (CommandStartedEvent) -> None
+    def started(self, event: CommandStartedEvent) -> None:
         if sentry_sdk.get_client().get_integration(PyMongoIntegration) is None:
             return
 
@@ -153,7 +152,7 @@ class CommandTracer(monitoring.CommandListener):
                 op=OP.DB,
                 name=query,
                 origin=PyMongoIntegration.origin,
-                only_if_parent=True,
+                only_as_child_span=True,
             )
 
             with capture_internal_exceptions():
@@ -172,8 +171,7 @@ class CommandTracer(monitoring.CommandListener):
 
             self._ongoing_operations[self._operation_key(event)] = span.__enter__()
 
-    def failed(self, event):
-        # type: (CommandFailedEvent) -> None
+    def failed(self, event: CommandFailedEvent) -> None:
         if sentry_sdk.get_client().get_integration(PyMongoIntegration) is None:
             return
 
@@ -184,8 +182,7 @@ class CommandTracer(monitoring.CommandListener):
         except KeyError:
             return
 
-    def succeeded(self, event):
-        # type: (CommandSucceededEvent) -> None
+    def succeeded(self, event: CommandSucceededEvent) -> None:
         if sentry_sdk.get_client().get_integration(PyMongoIntegration) is None:
             return
 
@@ -202,6 +199,5 @@ class PyMongoIntegration(Integration):
     origin = f"auto.db.{identifier}"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         monitoring.register(CommandTracer())

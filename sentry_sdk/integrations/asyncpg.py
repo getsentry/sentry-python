@@ -166,7 +166,7 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
             op=OP.DB,
             name="connect",
             origin=AsyncPGIntegration.origin,
-            only_if_parent=True,
+            only_as_child_span=True,
         ) as span:
             data = _get_db_data(
                 addr=kwargs.get("addr"),

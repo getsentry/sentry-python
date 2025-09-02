@@ -1,6 +1,6 @@
+from __future__ import annotations
 import os
-import time
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 from contextlib import contextmanager
 
 import sentry_sdk
@@ -11,16 +11,17 @@ from sentry_sdk.utils import format_timestamp
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Generator
-    from typing import List
-    from typing import Optional
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        List,
+        Optional,
+        Generator,
+    )
 
 
-def _is_auto_session_tracking_enabled(scope):
-    # type: (sentry_sdk.Scope) -> bool
+def _is_auto_session_tracking_enabled(scope: sentry_sdk.Scope) -> bool:
     """
     Utility function to find out if session tracking is enabled.
     """
@@ -34,8 +35,9 @@ def _is_auto_session_tracking_enabled(scope):
 
 
 @contextmanager
-def track_session(scope, session_mode="application"):
-    # type: (sentry_sdk.Scope, str) -> Generator[None, None, None]
+def track_session(
+    scope: sentry_sdk.Scope, session_mode: str = "application"
+) -> Generator[None, None, None]:
     """
     Start a new session in the provided scope, assuming session tracking is enabled.
     This is a no-op context manager if session tracking is not enabled.
@@ -55,30 +57,27 @@ TERMINAL_SESSION_STATES = ("exited", "abnormal", "crashed")
 MAX_ENVELOPE_ITEMS = 100
 
 
-def make_aggregate_envelope(aggregate_states, attrs):
-    # type: (Any, Any) -> Any
+def make_aggregate_envelope(aggregate_states: Any, attrs: Any) -> Any:
     return {"attrs": dict(attrs), "aggregates": list(aggregate_states.values())}
 
 
 class SessionFlusher:
     def __init__(
         self,
-        capture_func,  # type: Callable[[Envelope], None]
-        flush_interval=60,  # type: int
-    ):
-        # type: (...) -> None
+        capture_func: Callable[[Envelope], None],
+        flush_interval: int = 60,
+    ) -> None:
         self.capture_func = capture_func
         self.flush_interval = flush_interval
-        self.pending_sessions = []  # type: List[Any]
-        self.pending_aggregates = {}  # type: Dict[Any, Any]
-        self._thread = None  # type: Optional[Thread]
+        self.pending_sessions: List[Any] = []
+        self.pending_aggregates: Dict[Any, Any] = {}
+        self._thread: Optional[Thread] = None
         self._thread_lock = Lock()
         self._aggregate_lock = Lock()
-        self._thread_for_pid = None  # type: Optional[int]
-        self._running = True
+        self._thread_for_pid: Optional[int] = None
+        self.__shutdown_requested: Event = Event()
 
-    def flush(self):
-        # type: (...) -> None
+    def flush(self) -> None:
         pending_sessions = self.pending_sessions
         self.pending_sessions = []
 
@@ -104,8 +103,7 @@ class SessionFlusher:
         if len(envelope.items) > 0:
             self.capture_func(envelope)
 
-    def _ensure_running(self):
-        # type: (...) -> None
+    def _ensure_running(self) -> None:
         """
         Check that we have an active thread to run in, or create one if not.
 
@@ -119,12 +117,11 @@ class SessionFlusher:
             if self._thread_for_pid == os.getpid() and self._thread is not None:
                 return None
 
-            def _thread():
-                # type: (...) -> None
-                while self._running:
-                    time.sleep(self.flush_interval)
-                    if self._running:
-                        self.flush()
+            def _thread() -> None:
+                running = True
+                while running:
+                    running = not self.__shutdown_requested.wait(self.flush_interval)
+                    self.flush()
 
             thread = Thread(target=_thread)
             thread.daemon = True
@@ -133,7 +130,7 @@ class SessionFlusher:
             except RuntimeError:
                 # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.
-                self._running = False
+                self.__shutdown_requested.set()
                 return None
 
             self._thread = thread
@@ -141,10 +138,7 @@ class SessionFlusher:
 
         return None
 
-    def add_aggregate_session(
-        self, session  # type: Session
-    ):
-        # type: (...) -> None
+    def add_aggregate_session(self, session: Session) -> None:
         # NOTE on `session.did`:
         # the protocol can deal with buckets that have a distinct-id, however
         # in practice we expect the python SDK to have an extremely high cardinality
@@ -172,20 +166,12 @@ class SessionFlusher:
             else:
                 state["exited"] = state.get("exited", 0) + 1
 
-    def add_session(
-        self, session  # type: Session
-    ):
-        # type: (...) -> None
+    def add_session(self, session: Session) -> None:
         if session.session_mode == "request":
             self.add_aggregate_session(session)
         else:
             self.pending_sessions.append(session.to_json())
         self._ensure_running()
 
-    def kill(self):
-        # type: (...) -> None
-        self._running = False
-
-    def __del__(self):
-        # type: (...) -> None
-        self.kill()
+    def kill(self) -> None:
+        self.__shutdown_requested.set()

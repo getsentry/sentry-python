@@ -2,7 +2,7 @@ import pytest
 from opentelemetry import trace
 
 import sentry_sdk
-from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.consts import SPANSTATUS, VERSION
 from tests.conftest import ApproxDict
 
 
@@ -40,7 +40,6 @@ def test_root_span_transaction_payload_started_with_otel_only(capture_envelopes)
     assert "trace_id" in trace_context
     assert "span_id" in trace_context
     assert trace_context["origin"] == "manual"
-    assert trace_context["op"] == "request"
 
     assert payload["spans"] == []
 
@@ -57,7 +56,6 @@ def test_child_span_payload_started_with_otel_only(capture_envelopes):
     payload = item.payload.json
     (span,) = payload["spans"]
 
-    assert span["op"] == "db"
     assert span["description"] == "db"
     assert span["origin"] == "manual"
     assert span["span_id"] is not None
@@ -82,9 +80,9 @@ def test_children_span_nesting_started_with_otel_only(capture_envelopes):
     payload = item.payload.json
     (db_span, http_span, redis_span) = payload["spans"]
 
-    assert db_span["op"] == "db"
-    assert redis_span["op"] == "redis"
-    assert http_span["op"] == "http"
+    assert db_span["description"] == "db"
+    assert redis_span["description"] == "redis"
+    assert http_span["description"] == "http"
 
     assert db_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
     assert redis_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
@@ -121,7 +119,6 @@ def test_root_span_transaction_payload_started_with_sentry_only(capture_envelope
     assert "trace_id" in trace_context
     assert "span_id" in trace_context
     assert trace_context["origin"] == "manual"
-    assert trace_context["op"] == "request"
     assert trace_context["status"] == "ok"
 
     assert payload["spans"] == []
@@ -139,7 +136,6 @@ def test_child_span_payload_started_with_sentry_only(capture_envelopes):
     payload = item.payload.json
     (span,) = payload["spans"]
 
-    assert span["op"] == "db"
     assert span["description"] == "db"
     assert span["origin"] == "manual"
     assert span["status"] == "ok"
@@ -165,9 +161,9 @@ def test_children_span_nesting_started_with_sentry_only(capture_envelopes):
     payload = item.payload.json
     (db_span, http_span, redis_span) = payload["spans"]
 
-    assert db_span["op"] == "db"
-    assert redis_span["op"] == "redis"
-    assert http_span["op"] == "http"
+    assert db_span["description"] == "db"
+    assert redis_span["description"] == "redis"
+    assert http_span["description"] == "http"
 
     assert db_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
     assert redis_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
@@ -193,9 +189,9 @@ def test_children_span_nesting_mixed(capture_envelopes):
     payload = item.payload.json
     (db_span, http_span, redis_span) = payload["spans"]
 
-    assert db_span["op"] == "db"
-    assert redis_span["op"] == "redis"
-    assert http_span["op"] == "http"
+    assert db_span["description"] == "db"
+    assert redis_span["description"] == "redis"
+    assert http_span["description"] == "http"
 
     assert db_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
     assert redis_span["trace_id"] == payload["contexts"]["trace"]["trace_id"]
@@ -263,7 +259,7 @@ def test_transaction_tags_started_with_otel(capture_envelopes):
     (item,) = envelope.items
     payload = item.payload.json
 
-    assert payload["tags"] == {"tag.global": 99, "tag.inner": "foo"}
+    assert payload["tags"] == {"tag.global": "99", "tag.inner": "foo"}
 
 
 def test_transaction_tags_started_with_sentry(capture_envelopes):
@@ -277,7 +273,7 @@ def test_transaction_tags_started_with_sentry(capture_envelopes):
     (item,) = envelope.items
     payload = item.payload.json
 
-    assert payload["tags"] == {"tag.global": 99, "tag.inner": "foo"}
+    assert payload["tags"] == {"tag.global": "99", "tag.inner": "foo"}
 
 
 def test_multiple_transaction_tags_isolation_scope_started_with_otel(capture_envelopes):
@@ -293,8 +289,8 @@ def test_multiple_transaction_tags_isolation_scope_started_with_otel(capture_env
 
     (payload_a, payload_b) = [envelope.items[0].payload.json for envelope in envelopes]
 
-    assert payload_a["tags"] == {"tag.global": 99, "tag.inner.a": "a"}
-    assert payload_b["tags"] == {"tag.global": 99, "tag.inner.b": "b"}
+    assert payload_a["tags"] == {"tag.global": "99", "tag.inner.a": "a"}
+    assert payload_b["tags"] == {"tag.global": "99", "tag.inner.b": "b"}
 
 
 def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
@@ -312,8 +308,8 @@ def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
 
     (payload_a, payload_b) = [envelope.items[0].payload.json for envelope in envelopes]
 
-    assert payload_a["tags"] == {"tag.global": 99, "tag.inner.a": "a"}
-    assert payload_b["tags"] == {"tag.global": 99, "tag.inner.b": "b"}
+    assert payload_a["tags"] == {"tag.global": "99", "tag.inner.a": "a"}
+    assert payload_b["tags"] == {"tag.global": "99", "tag.inner.b": "b"}
 
 
 def test_potel_span_root_span_references():
@@ -361,3 +357,13 @@ def test_potel_span_status(status_in, status_out):
         span.set_status(status_in)
 
     assert span.status == status_out
+
+
+def test_otel_resource(sentry_init):
+    sentry_init()
+
+    tracer_provider = trace.get_tracer_provider()
+    resource_attrs = tracer_provider.resource.attributes
+    assert resource_attrs["service.name"] == "sentry-python"
+    assert resource_attrs["service.namespace"] == "sentry"
+    assert resource_attrs["service.version"] == VERSION

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 
 import sentry_sdk
@@ -11,24 +12,16 @@ if TYPE_CHECKING:
     from typing import Any
     from sentry_sdk._types import Event
 
-
-MODULE_RE = r"[a-zA-Z0-9/._:\\-]+"
-TYPE_RE = r"[a-zA-Z0-9._:<>,-]+"
-HEXVAL_RE = r"[A-Fa-f0-9]+"
-
+# function is everything between index at @
+# and then we match on the @ plus the hex val
+FUNCTION_RE = r"[^@]+?"
+HEX_ADDRESS = r"\s+@\s+0x[0-9a-fA-F]+"
 
 FRAME_RE = r"""
-^(?P<index>\d+)\.\s
-(?P<package>{MODULE_RE})\(
-  (?P<retval>{TYPE_RE}\ )?
-  ((?P<function>{TYPE_RE})
-    (?P<args>\(.*\))?
-  )?
-  ((?P<constoffset>\ const)?\+0x(?P<offset>{HEXVAL_RE}))?
-\)\s
-\[0x(?P<retaddr>{HEXVAL_RE})\]$
+^(?P<index>\d+)\.\s+(?P<function>{FUNCTION_RE}){HEX_ADDRESS}(?:\s+in\s+(?P<package>.+))?$
 """.format(
-    MODULE_RE=MODULE_RE, HEXVAL_RE=HEXVAL_RE, TYPE_RE=TYPE_RE
+    FUNCTION_RE=FUNCTION_RE,
+    HEX_ADDRESS=HEX_ADDRESS,
 )
 
 FRAME_RE = re.compile(FRAME_RE, re.MULTILINE | re.VERBOSE)
@@ -38,17 +31,14 @@ class GnuBacktraceIntegration(Integration):
     identifier = "gnu_backtrace"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         @add_global_event_processor
-        def process_gnu_backtrace(event, hint):
-            # type: (Event, dict[str, Any]) -> Event
+        def process_gnu_backtrace(event: Event, hint: dict[str, Any]) -> Event:
             with capture_internal_exceptions():
                 return _process_gnu_backtrace(event, hint)
 
 
-def _process_gnu_backtrace(event, hint):
-    # type: (Event, dict[str, Any]) -> Event
+def _process_gnu_backtrace(event: Event, hint: dict[str, Any]) -> Event:
     if sentry_sdk.get_client().get_integration(GnuBacktraceIntegration) is None:
         return event
 

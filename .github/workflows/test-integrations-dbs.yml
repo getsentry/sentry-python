@@ -50,7 +50,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -94,12 +94,12 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@v5.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop
+          plugins: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -136,7 +136,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -180,12 +180,12 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@v5.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop
+          plugins: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -202,6 +202,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-dbs-pinned.result, 'failure') || contains(needs.test-dbs-pinned.result, 'skipped')
+        if: needs.test-dbs-pinned.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

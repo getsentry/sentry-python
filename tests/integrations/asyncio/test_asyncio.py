@@ -8,6 +8,8 @@ import pytest
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asyncio import AsyncioIntegration, patch_asyncio
+from sentry_sdk.utils import mark_sentry_task_internal
+
 
 try:
     from contextvars import Context, ContextVar
@@ -377,3 +379,109 @@ async def test_span_origin(
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.function.asyncio"
+
+
+@minimum_python_38
+@pytest.mark.asyncio(loop_scope="module")
+async def test_internal_tasks_not_wrapped(sentry_init, capture_events):
+
+    sentry_init(integrations=[AsyncioIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    # Create a user task that should be wrapped
+    async def user_task():
+        await asyncio.sleep(0.01)
+        return "user_result"
+
+    # Create an internal task that should NOT be wrapped
+    async def internal_task():
+        await asyncio.sleep(0.01)
+        return "internal_result"
+
+    with sentry_sdk.start_transaction(name="test_transaction"):
+        user_task_obj = asyncio.create_task(user_task())
+
+        with mark_sentry_task_internal():
+            internal_task_obj = asyncio.create_task(internal_task())
+
+        user_result = await user_task_obj
+        internal_result = await internal_task_obj
+
+    assert user_result == "user_result"
+    assert internal_result == "internal_result"
+
+    assert len(events) == 1
+    transaction = events[0]
+
+    user_spans = []
+    internal_spans = []
+
+    for span in transaction.get("spans", []):
+        if "user_task" in span.get("description", ""):
+            user_spans.append(span)
+        elif "internal_task" in span.get("description", ""):
+            internal_spans.append(span)
+
+    assert (
+        len(user_spans) > 0
+    ), f"User task should have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
+    assert (
+        len(internal_spans) == 0
+    ), f"Internal task should NOT have been traced. All spans: {[s.get('description') for s in transaction.get('spans', [])]}"
+
+
+@minimum_python_38
+def test_loop_close_patching(sentry_init):
+    sentry_init(integrations=[AsyncioIntegration()])
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        with patch("asyncio.get_running_loop", return_value=loop):
+            assert not hasattr(loop, "_sentry_flush_patched")
+            AsyncioIntegration.setup_once()
+            assert hasattr(loop, "_sentry_flush_patched")
+            assert loop._sentry_flush_patched is True
+
+    finally:
+        if not loop.is_closed():
+            loop.close()
+
+
+@minimum_python_38
+def test_loop_close_flushes_async_transport(sentry_init):
+    from sentry_sdk.transport import AsyncHttpTransport
+    from unittest.mock import Mock, AsyncMock
+
+    sentry_init(integrations=[AsyncioIntegration()])
+
+    # Save the current event loop to restore it later
+    try:
+        original_loop = asyncio.get_event_loop()
+    except RuntimeError:
+        original_loop = None
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        with patch("asyncio.get_running_loop", return_value=loop):
+            AsyncioIntegration.setup_once()
+
+        mock_client = Mock()
+        mock_transport = Mock(spec=AsyncHttpTransport)
+        mock_client.transport = mock_transport
+        mock_client.close_async = AsyncMock(return_value=None)
+
+        with patch("sentry_sdk.get_client", return_value=mock_client):
+            loop.close()
+
+        mock_client.close_async.assert_called_once()
+        mock_client.close_async.assert_awaited_once()
+
+    finally:
+        if not loop.is_closed():
+            loop.close()
+        if original_loop:
+            asyncio.set_event_loop(original_loop)

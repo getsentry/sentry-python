@@ -127,6 +127,10 @@ module = "langchain_core.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "langchain.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "executing.*"
 ignore_missing_imports = true
 
@@ -183,6 +187,10 @@ ignore_missing_imports = true
 module = "grpc.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "agents.*"
+ignore_missing_imports = true
+
 #
 # Tool: Flake8
 #
@@ -209,4 +217,7 @@ exclude = [
   # gRCP generated files
   "grpc_test_service_pb2.py",
   "grpc_test_service_pb2_grpc.py",
+]
+per-file-ignores = [
+  "sentry_sdk/integrations/spark/*:N802,N803",
 ]

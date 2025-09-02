@@ -106,8 +106,8 @@ def test_rediscluster_pipeline(
         }
     )
     assert span["tags"] == {
-        "redis.transaction": False,  # For Cluster, this is always False
-        "redis.is_cluster": True,
+        "redis.transaction": "False",  # For Cluster, this is always False
+        "redis.is_cluster": "True",
     }
 
 

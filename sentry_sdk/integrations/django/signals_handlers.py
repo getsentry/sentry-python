@@ -1,3 +1,4 @@
+from __future__ import annotations
 from functools import wraps
 
 from django.dispatch import Signal
@@ -13,8 +14,7 @@ if TYPE_CHECKING:
     from typing import Any, Union
 
 
-def _get_receiver_name(receiver):
-    # type: (Callable[..., Any]) -> str
+def _get_receiver_name(receiver: Callable[..., Any]) -> str:
     name = ""
 
     if hasattr(receiver, "__qualname__"):
@@ -38,8 +38,7 @@ def _get_receiver_name(receiver):
     return name
 
 
-def patch_signals():
-    # type: () -> None
+def patch_signals() -> None:
     """
     Patch django signal receivers to create a span.
 
@@ -51,25 +50,27 @@ def patch_signals():
     old_live_receivers = Signal._live_receivers
 
     @wraps(old_live_receivers)
-    def _sentry_live_receivers(self, sender):
-        # type: (Signal, Any) -> Union[tuple[list[Callable[..., Any]], list[Callable[..., Any]]], list[Callable[..., Any]]]
+    def _sentry_live_receivers(self: Signal, sender: Any) -> Union[
+        tuple[list[Callable[..., Any]], list[Callable[..., Any]]],
+        list[Callable[..., Any]],
+    ]:
         if DJANGO_VERSION >= (5, 0):
             sync_receivers, async_receivers = old_live_receivers(self, sender)
         else:
             sync_receivers = old_live_receivers(self, sender)
             async_receivers = []
 
-        def sentry_sync_receiver_wrapper(receiver):
-            # type: (Callable[..., Any]) -> Callable[..., Any]
+        def sentry_sync_receiver_wrapper(
+            receiver: Callable[..., Any],
+        ) -> Callable[..., Any]:
             @wraps(receiver)
-            def wrapper(*args, **kwargs):
-                # type: (Any, Any) -> Any
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
                 signal_name = _get_receiver_name(receiver)
                 with sentry_sdk.start_span(
                     op=OP.EVENT_DJANGO,
                     name=signal_name,
                     origin=DjangoIntegration.origin,
-                    only_if_parent=True,
+                    only_as_child_span=True,
                 ) as span:
                     span.set_attribute("signal", signal_name)
                     return receiver(*args, **kwargs)

@@ -7,30 +7,64 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ### New Features
 
 - Added `add_attachment()` as a top level API, so you can do now: `sentry_sdk.add_attachment(...)` (up until now it was only available on the `Scope`)
+- Added a new SDK option `exclude_span_origins`. Spans with an `origin` from `exclude_span_origins` won't be created. This can be used for example in dual OpenTelemetry/Sentry setups to filter out spans from specific Sentry instrumentations. Note that using `exclude_span_origins` might potentially lead to surprising results: if, for example, a root span is excluded based on `origin`, all of its children will become root spans, unless they were started with `only_as_child_span=True`.
 
 ### Changed
 
+#### General
+
 - The SDK now supports Python 3.7 and higher.
+- Tag values on event dictionaries, which are passed to `before_send` and `before_send_transaction`, now are always `str` values. Previously, despite tag values being typed as `str`, they often had different values. Therefore, if you have configured any `before_send` and `before_send_transaction` functions which perform some logic based on tag values, you need to check and if needed update those functions to correctly handle `str` values.
+
+#### Error Capturing
+
+- We updated how we handle `ExceptionGroup`s. You will now get more data if `ExceptionGroup`s are appearing in chained exceptions. It could happen that after updating the SDK the grouping of issues change because of this. So eventually you will see the same exception in two Sentry issues (one from before the update, one from after the update).
+
+#### Tracing
+
 - The default of `traces_sample_rate` changed to `0`. Meaning: Incoming traces will be continued by default. For example, if your frontend sends a `sentry-trace/baggage` headers pair, your SDK will create Spans and send them to Sentry. (The default used to be `None` meaning by default no Spans where created, no matter what headers the frontend sent to your project.) See also: https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate
 - `sentry_sdk.start_span` now only takes keyword arguments.
 - `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
-- You can no longer change the sampled status of a span with `span.sampled = False` after starting it.
+- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
+
+    - Use it to continue an upstream trace with the `sentry-trace` and `baggage` headers.
+
+    ```python
+    headers = {"sentry-trace": "{trace_id}-{span_id}-{sampled_flag}", "baggage": "{baggage header}"}
+    with sentry_sdk.continue_trace(headers):
+        with sentry_sdk.start_span(name="continued span in trace"):
+            pass
+    ```
+
+    - If the headers are empty, a new trace will be started.
+    - If you want to force creation of a new trace, use the `sentry_sdk.new_trace` context manager.
+
+- You can no longer change the sampled status of a span with `span.sampled = False` after starting it. The sampling decision needs to be either be made in the `traces_sampler`, or you need to pass an explicit `sampled` parameter to `start_span`.
+- `sentry_sdk.start_span` now takes an optional `only_as_child_span` argument. These spans will not be started if they would be root spans -- they can only exist as child spans. You can use this parameter to prevent spans without a parent from becoming root spans.
 - The `Span()` constructor does not accept a `hub` parameter anymore.
-- The `sentry_sdk.Scope()` constructor no longer accepts a `client` parameter.
 - `Span.finish()` does not accept a `hub` parameter anymore.
-- `Span.finish()` no longer returns the `event_id` if the event is sent to sentry.
+- `Span.finish()` no longer returns the `event_id` if the event is sent to Sentry.
+- The `sampling_context` argument of `traces_sampler` now additionally contains all span attributes known at span start.
+- The `SentrySpanProcessor` and `SentryPropagator` are exported from `sentry_sdk.opentelemetry` instead of `sentry_sdk.integrations.opentelemetry`.
+
+#### Profiling
+
+- The `sampling_context` argument of `profiles_sampler` now additionally contains all span attributes known at span start.
 - The `Profile()` constructor does not accept a `hub` parameter anymore.
 - A `Profile` object does not have a `.hub` property anymore.
 - `MAX_PROFILE_DURATION_NS`, `PROFILE_MINIMUM_SAMPLES`, `Profile`, `Scheduler`, `ThreadScheduler`, `GeventScheduler`, `has_profiling_enabled`, `setup_profiler`, `teardown_profiler` are no longer accessible from `sentry_sdk.profiler`. They're still accessible from `sentry_sdk.profiler.transaction_profiler`.
 - `DEFAULT_SAMPLING_FREQUENCY`, `MAX_STACK_DEPTH`, `get_frame_name`, `extract_frame`, `extract_stack`, `frame_id` are no longer accessible from `sentry_sdk.profiler`. They're still accessible from `sentry_sdk.profiler.utils`.
-- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
-- Redis integration: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
-- clickhouse-driver integration: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
-- `sentry_sdk.init` now returns `None` instead of a context manager.
-- The `sampling_context` argument of `traces_sampler` and `profiles_sampler` now additionally contains all span attributes known at span start.
-- We updated how we handle `ExceptionGroup`s. You will now get more data if ExceptionGroups are appearing in chained exceptions. It could happen that after updating the SDK the grouping of issues change because of this. So eventually you will see the same exception in two Sentry issues (one from before the update, one from after the update)
-- The integration for Python `logging` module does not send Sentry issues by default anymore when calling `logging.error()`, `logging.critical()` or `logging.exception()`. If you want to preserve the old behavior use `sentry_sdk.init(integrations=[LoggingIntegration(event_level="ERROR")])`.
-- The `SentrySpanProcessor` and `SentryPropagator` are exported from `sentry_sdk.opentelemetry` instead of `sentry_sdk.integrations.opentelemetry`.
+
+#### Logs
+
+- `enable_logs` and `before_send_log` are now regular SDK options. Their original versions under `_experiments` have been removed.
+
+#### Integrations
+
+- AWS Lambda, GCP: The message of the warning the SDK optionally emits if a function is about to time out has changed.
+- Redis: In Redis pipeline spans there is no `span["data"]["redis.commands"]` that contains a dict `{"count": 3, "first_ten": ["cmd1", "cmd2", ...]}` but instead `span["data"]["redis.commands.count"]` (containing `3`) and `span["data"]["redis.commands.first_ten"]` (containing `["cmd1", "cmd2", ...]`).
+- clickhouse-driver: The query is now available under the `db.query.text` span attribute (only if `send_default_pii` is `True`).
+- Logging: By default, the SDK won't capture Sentry issues anymore when calling `logging.error()`, `logging.critical()` or `logging.exception()`. If you want to preserve the old behavior use `sentry_sdk.init(integrations=[LoggingIntegration(event_level="ERROR")])`.
 - The integration-specific content of the `sampling_context` argument of `traces_sampler` and `profiles_sampler` now looks different.
 
   - The Celery integration doesn't add the `celery_job` dictionary anymore. Instead, the individual keys are now available as:
@@ -135,52 +169,86 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
     | `gcp_event.query_string`          | `url.query`                    |
     | `gcp_event.headers`               | `http.request.header.{header}` |
 
+#### Internals
+
+- The `sentry_sdk.Scope()` constructor no longer accepts a `client` parameter.
+- `sentry_sdk.init` now returns `None` instead of a context manager.
+
 ### Removed
 
+#### General
+
 - Dropped support for Python 3.6.
+- `set_measurement` has been removed.
+- Setting `Scope.user` directly is no longer supported. Use `Scope.set_user()` instead.
+
+#### Tracing
+
 - The `enable_tracing` `init` option has been removed. Configure `traces_sample_rate` directly.
 - The `propagate_traces` `init` option has been removed. Use `trace_propagation_targets` instead.
 - The `custom_sampling_context` parameter of `start_transaction` has been removed. Use `attributes` instead to set key-value pairs of data that should be accessible in the traces sampler. Note that span attributes need to conform to the [OpenTelemetry specification](https://opentelemetry.io/docs/concepts/signals/traces/#attributes), meaning only certain types can be set as values.
-- `set_measurement` has been removed.
-- The PyMongo integration no longer sets tags. The data is still accessible via span attributes.
-- The PyMongo integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
-- `sentry_sdk.metrics` and associated metrics APIs have been removed as Sentry no longer accepts metrics data in this form. See https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics
-- The experimental options `enable_metrics`, `before_emit_metric` and `metric_code_locations` have been removed.
 - When setting span status, the HTTP status code is no longer automatically added as a tag.
-- Class `Hub` has been removed.
-- Class `_ScopeManager` has been removed.
-- The context manager `auto_session_tracking()` has been removed. Use `track_session()` instead.
-- The context manager `auto_session_tracking_scope()` has been removed. Use `track_session()` instead.
-- Utility function `is_auto_session_tracking_enabled()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function) It accepts a `scope` parameter instead of the previously used `hub` parameter.
-- Utility function `is_auto_session_tracking_enabled_scope()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function).
-- Setting `scope.level` has been removed. Use `scope.set_level` instead.
-- `span.containing_transaction` has been removed. Use `span.root_span` instead.
-- `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.
-- `PropagationContext` constructor no longer takes a `dynamic_sampling_context` but takes a `baggage` object instead.
-- `ThreadingIntegration` no longer takes the `propagate_hub` argument.
-- `Baggage.populate_from_transaction` has been removed.
-- `debug.configure_debug_hub` was removed.
-- `profiles_sample_rate` and `profiler_mode` were removed from options available via `_experiments`. Use the top-level `profiles_sample_rate` and `profiler_mode` options instead.
-- `Transport.capture_event` has been removed. Use `Transport.capture_envelope` instead.
-- Function transports are no longer supported. Subclass the `Transport` instead.
-- `start_transaction` (`start_span`) no longer takes the following arguments:
+- `start_transaction` is deprecated and no longer takes the following arguments:
   - `trace_id`, `baggage`: use `continue_trace` for propagation from headers or environment variables
   - `same_process_as_parent`
   - `span_id`
   - `parent_span_id`: you can supply a `parent_span` instead
 - The `Scope.transaction` property has been removed. To obtain the root span (previously transaction), use `Scope.root_span`. To set the root span's (transaction's) name, use `Scope.set_transaction_name()`.
 - The `Scope.span =` setter has been removed. Please use the new `span.activate()` api instead if you want to activate a new span manually instead of using the `start_span` context manager.
-- Passing a list or `None` for `failed_request_status_codes` in the Starlette integration is no longer supported. Pass a set of integers instead.
+- `span.containing_transaction` has been removed. Use `span.root_span` instead.
+- `continue_from_headers`, `continue_from_environ` and `from_traceparent` have been removed, please use top-level API `sentry_sdk.continue_trace` instead.
+- `Baggage.populate_from_transaction` has been removed.
+
+#### Integrations
+
+- PyMongo: The integration no longer sets tags. The data is still accessible via span attributes.
+- PyMongo: The integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
+- Django: Dropped support for Django versions below 2.0.
+- trytond: Dropped support for trytond versions below 5.0.
+- Falcon: Dropped support for Falcon versions below 3.0.
+- eventlet: Dropped support for eventlet completely.
+- Threading: The integration no longer takes the `propagate_hub` argument.
+- Starlette: Passing a list or `None` for `failed_request_status_codes` is no longer supported. Pass a set of integers instead.
+
+#### Profiling
+
+- `profiles_sample_rate` and `profiler_mode` were removed from options available via `_experiments`. Use the top-level `profiles_sample_rate` and `profiler_mode` options instead.
+
+#### Transport
+
+- `Transport.capture_event` has been removed. Use `Transport.capture_envelope` instead.
+- Function transports are no longer supported. Subclass the `Transport` instead.
+
+#### Sessions
+
+- The context manager `auto_session_tracking()` has been removed. Use `track_session()` instead.
+- The context manager `auto_session_tracking_scope()` has been removed. Use `track_session()` instead.
+- Utility function `is_auto_session_tracking_enabled()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function) It accepts a `scope` parameter instead of the previously used `hub` parameter.
+- Utility function `is_auto_session_tracking_enabled_scope()` has been removed. There is no public replacement. There is a private `_is_auto_session_tracking_enabled()` (if you absolutely need this function).
+
+#### Metrics
+
+- `sentry_sdk.metrics` and associated metrics APIs have been removed as Sentry no longer accepts metrics data in this form. See https://sentry.zendesk.com/hc/en-us/articles/26369339769883-Upcoming-API-Changes-to-Metrics
+- The experimental options `enable_metrics`, `before_emit_metric` and `metric_code_locations` have been removed.
+
+#### Internals
+
+- Class `Hub` has been removed.
+- Class `_ScopeManager` has been removed.
+- `PropagationContext` constructor no longer takes a `dynamic_sampling_context` but takes a `baggage` object instead.
+- Setting `scope.level` has been removed. Use `scope.set_level` instead.
+- `debug.configure_debug_hub` was removed.
 - The `span` argument of `Scope.trace_propagation_meta` is no longer supported.
-- Setting `Scope.user` directly is no longer supported. Use `Scope.set_user()` instead.
-- Dropped support for Django versions below 2.0.
-- Dropped support for trytond versions below 5.0.
-- Dropped support for Falcon versions below 3.0.
+
 
 ### Deprecated
 
 - `sentry_sdk.start_transaction()` is deprecated. Use `sentry_sdk.start_span()` instead.
 - `Span.set_data()` is deprecated. Use `Span.set_attribute()` instead.
+
+
+---------------------------------------------------------------------------------
+
 
 ## Upgrading to 2.0
 
@@ -203,7 +271,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
 - `sentry_sdk.tracing_utils.add_query_source()`: Removed the `hub` parameter. It is not necessary anymore.
 - `sentry_sdk.tracing_utils.record_sql_queries()`: Removed the `hub` parameter. It is not necessary anymore.
-- `sentry_sdk.tracing_utils.get_current_span()` does now take a `scope` instead of a `hub` as parameter.
+- `sentry_sdk.tracing_utils.get_current_span()` now takes a `scope` instead of a `hub` as parameter.
 - `sentry_sdk.tracing_utils.should_propagate_trace()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils.is_sentry_url()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils._get_contextvars` does not return a tuple with three values, but a tuple with two values. The `copy_context` was removed.

@@ -5,6 +5,7 @@ from unittest import mock
 from sentry_sdk import (
     capture_exception,
     continue_trace,
+    new_trace,
     get_baggage,
     get_client,
     get_current_span,
@@ -14,13 +15,13 @@ from sentry_sdk import (
     set_tags,
     get_global_scope,
     get_isolation_scope,
+    set_tag,
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
 from tests.conftest import SortedBaggage
 
 
-@pytest.mark.forked
 def test_get_current_span_current_scope_with_span(sentry_init):
     sentry_init()
 
@@ -30,7 +31,6 @@ def test_get_current_span_current_scope_with_span(sentry_init):
         assert get_current_span() == new_span
 
 
-@pytest.mark.forked
 def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
@@ -42,7 +42,6 @@ def test_traceparent_with_tracing_enabled(sentry_init):
         assert get_traceparent() == expected_traceparent
 
 
-@pytest.mark.forked
 def test_traceparent_with_tracing_disabled(sentry_init):
     sentry_init()
 
@@ -54,7 +53,6 @@ def test_traceparent_with_tracing_disabled(sentry_init):
     assert get_traceparent() == expected_traceparent
 
 
-@pytest.mark.forked
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
@@ -66,7 +64,6 @@ def test_baggage_with_tracing_disabled(sentry_init):
     assert get_baggage() == SortedBaggage(expected_baggage)
 
 
-@pytest.mark.forked
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.111111):
@@ -75,7 +72,6 @@ def test_baggage_with_tracing_enabled(sentry_init):
             assert get_baggage() == SortedBaggage(expected_baggage)
 
 
-@pytest.mark.forked
 def test_continue_trace(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
@@ -101,7 +97,44 @@ def test_continue_trace(sentry_init):
             }
 
 
-@pytest.mark.forked
+def test_continue_trace_without_headers_starts_new_trace(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_span(name="parent"):
+        with start_span(name="child"):
+            with continue_trace({}):
+                with start_span(name="parent2"):
+                    with start_span(name="child2"):
+                        pass
+
+    assert len(events) == 2
+    (tx1, tx2) = events
+    assert tx1["transaction"] == "parent2"
+    assert tx1["spans"][0]["description"] == "child2"
+    assert tx2["transaction"] == "parent"
+    assert tx2["spans"][0]["description"] == "child"
+
+
+def test_new_trace(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_span(name="parent"):
+        with start_span(name="child"):
+            with new_trace():
+                with start_span(name="parent2"):
+                    with start_span(name="child2"):
+                        pass
+
+    assert len(events) == 2
+    (tx1, tx2) = events
+    assert tx1["transaction"] == "parent2"
+    assert tx1["spans"][0]["description"] == "child2"
+    assert tx2["transaction"] == "parent"
+    assert tx2["spans"][0]["description"] == "child"
+
+
 def test_is_initialized():
     assert not is_initialized()
 
@@ -110,7 +143,6 @@ def test_is_initialized():
     assert is_initialized()
 
 
-@pytest.mark.forked
 def test_get_client():
     client = get_client()
     assert client is not None
@@ -158,3 +190,54 @@ def test_set_tags(sentry_init, capture_events):
         "tag2": "updated",
         "tag3": "new",
     }, "Updating tags with empty dict changed tags"
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "expected"),
+    [
+        ("int", 123, "123"),
+        ("float", 123.456, "123.456"),
+        ("bool", True, "True"),
+        ("none", None, "None"),
+        ("list", [1, 2, 3], "[1, 2, 3]"),
+    ],
+)
+def test_set_tag_converts_to_string(sentry_init, capture_events, key, value, expected):
+    """Test that the api.set_tag function converts values to strings."""
+    sentry_init()
+    events = capture_events()
+
+    set_tag(key, value)
+    raise_and_capture()
+
+    (event,) = events
+    tags = event.get("tags", {})
+
+    assert tags[key] == expected
+
+
+def test_set_tags_converts_to_string(sentry_init, capture_events):
+    """Test that the api.set_tags function converts values to strings."""
+    sentry_init()
+    events = capture_events()
+
+    set_tags(
+        {
+            "int": 456,
+            "float": 789.012,
+            "bool": False,
+            "tuple": (1, 2, 3),
+            "string": "already_string",
+        }
+    )
+
+    raise_and_capture()
+
+    (*_, event) = events
+    tags = event.get("tags", {})
+
+    assert tags["int"] == "456"
+    assert tags["float"] == "789.012"
+    assert tags["bool"] == "False"
+    assert tags["tuple"] == "(1, 2, 3)"
+    assert tags["string"] == "already_string"

@@ -7,8 +7,6 @@ from opentelemetry.version import __version__ as OTEL_VERSION
 from sentry_sdk.opentelemetry.utils import (
     extract_span_data,
     extract_span_status,
-    span_data_for_db_query,
-    span_data_for_http_method,
 )
 from sentry_sdk.utils import parse_version
 
@@ -23,7 +21,7 @@ OTEL_VERSION = parse_version(OTEL_VERSION)
             Status(StatusCode.UNSET),
             {},
             {
-                "op": "OTel Span Blank",
+                "op": None,
                 "description": "OTel Span Blank",
                 "status": None,
                 "http_status_code": None,
@@ -80,13 +78,13 @@ def test_extract_span_data(name, status, attributes, expected):
     otel_span.status = Status(StatusCode.UNSET)
     otel_span.attributes = attributes
 
-    op, description, status, http_status_code, origin = extract_span_data(otel_span)
+    span_data = extract_span_data(otel_span)
     result = {
-        "op": op,
-        "description": description,
-        "status": status,
-        "http_status_code": http_status_code,
-        "origin": origin,
+        "op": span_data.op,
+        "description": span_data.description,
+        "status": span_data.status,
+        "http_status_code": span_data.http_status,
+        "origin": span_data.origin,
     }
     assert result == expected
 
@@ -180,15 +178,14 @@ def test_span_data_for_http_method(kind, status, attributes, expected):
     otel_span.status = status
     otel_span.attributes = attributes
 
-    op, description, status, http_status_code, origin = span_data_for_http_method(
-        otel_span
-    )
+    span_data = extract_span_data(otel_span)
+
     result = {
-        "op": op,
-        "description": description,
-        "status": status,
-        "http_status_code": http_status_code,
-        "origin": origin,
+        "op": span_data.op,
+        "description": span_data.description,
+        "status": span_data.status,
+        "http_status_code": span_data.http_status,
+        "origin": span_data.origin,
     }
     assert result == expected
 
@@ -197,52 +194,31 @@ def test_span_data_for_db_query():
     otel_span = MagicMock()
     otel_span.name = "OTel Span"
     otel_span.attributes = {}
+    otel_span.status = Status(StatusCode.UNSET)
 
-    op, description, status, http_status, origin = span_data_for_db_query(otel_span)
-    assert op == "db"
-    assert description == "OTel Span"
-    assert status is None
-    assert http_status is None
-    assert origin is None
+    span_data = extract_span_data(otel_span)
+    assert span_data.op is None
+    assert span_data.description == "OTel Span"
+    assert span_data.status is None
+    assert span_data.http_status is None
+    assert span_data.origin is None
 
-    otel_span.attributes = {"db.statement": "SELECT * FROM table;"}
+    otel_span.attributes = {
+        "db.system": "mysql",
+        "db.statement": "SELECT * FROM table;",
+    }
 
-    op, description, status, http_status, origin = span_data_for_db_query(otel_span)
-    assert op == "db"
-    assert description == "SELECT * FROM table;"
-    assert status is None
-    assert http_status is None
-    assert origin is None
+    span_data = extract_span_data(otel_span)
+    assert span_data.op == "db"
+    assert span_data.description == "SELECT * FROM table;"
+    assert span_data.status is None
+    assert span_data.http_status is None
+    assert span_data.origin is None
 
 
 @pytest.mark.parametrize(
     "kind, status, attributes, expected",
     [
-        (
-            SpanKind.CLIENT,
-            None,  # None means unknown error
-            {
-                "http.method": "POST",
-                "http.route": "/some/route",
-            },
-            {
-                "status": "unknown_error",
-                "http_status_code": None,
-            },
-        ),
-        (
-            SpanKind.CLIENT,
-            None,
-            {
-                "http.method": "POST",
-                "http.route": "/some/route",
-                "http.status_code": 502,  # Take this status in case of None status
-            },
-            {
-                "status": "internal_error",
-                "http_status_code": 502,
-            },
-        ),
         (
             SpanKind.SERVER,
             Status(StatusCode.UNSET),
@@ -266,23 +242,6 @@ def test_span_data_for_db_query():
             {
                 "status": "internal_error",
                 "http_status_code": 502,
-            },
-        ),
-        (
-            SpanKind.SERVER,
-            None,
-            {
-                "http.method": "POST",
-                "http.route": "/some/route",
-                "http.status_code": 502,
-                "http.response.status_code": 503,  # this takes precedence over deprecated http.status_code
-            },
-            {
-                "status": "unavailable",
-                "http_status_code": 503,
-                # old otel versions won't take the new attribute into account
-                "status_old": "internal_error",
-                "http_status_code_old": 502,
             },
         ),
         (

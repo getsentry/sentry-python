@@ -1,3 +1,4 @@
+from __future__ import annotations
 import inspect
 from functools import wraps
 
@@ -15,34 +16,29 @@ if TYPE_CHECKING:
 _ai_pipeline_name = ContextVar("ai_pipeline_name", default=None)
 
 
-def set_ai_pipeline_name(name):
-    # type: (Optional[str]) -> None
+def set_ai_pipeline_name(name: Optional[str]) -> None:
     _ai_pipeline_name.set(name)
 
 
-def get_ai_pipeline_name():
-    # type: () -> Optional[str]
+def get_ai_pipeline_name() -> Optional[str]:
     return _ai_pipeline_name.get()
 
 
-def ai_track(description, **span_kwargs):
-    # type: (str, Any) -> Callable[..., Any]
-    def decorator(f):
-        # type: (Callable[..., Any]) -> Callable[..., Any]
-        def sync_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+def ai_track(description: str, **span_kwargs: Any) -> Callable[..., Any]:
+    def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
+        def sync_wrapped(*args: Any, **kwargs: Any) -> Any:
             curr_pipeline = _ai_pipeline_name.get()
-            op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
+            op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
             with start_span(
-                name=description, op=op, only_if_parent=True, **span_kwargs
+                name=description, op=op, only_as_child_span=True, **span_kwargs
             ) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
                     span.set_tag(k, v)
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_attribute(k, v)
                 if curr_pipeline:
-                    span.set_attribute(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
                     return f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -60,20 +56,19 @@ def ai_track(description, **span_kwargs):
                         _ai_pipeline_name.set(None)
                     return res
 
-        async def async_wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+        async def async_wrapped(*args: Any, **kwargs: Any) -> Any:
             curr_pipeline = _ai_pipeline_name.get()
-            op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
+            op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
 
             with start_span(
-                name=description, op=op, only_if_parent=True, **span_kwargs
+                name=description, op=op, only_as_child_span=True, **span_kwargs
             ) as span:
                 for k, v in kwargs.pop("sentry_tags", {}).items():
                     span.set_tag(k, v)
                 for k, v in kwargs.pop("sentry_data", {}).items():
                     span.set_attribute(k, v)
                 if curr_pipeline:
-                    span.set_attribute(SPANDATA.AI_PIPELINE_NAME, curr_pipeline)
+                    span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
                     return await f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
@@ -100,21 +95,38 @@ def ai_track(description, **span_kwargs):
 
 
 def record_token_usage(
-    span, prompt_tokens=None, completion_tokens=None, total_tokens=None
-):
-    # type: (Span, Optional[int], Optional[int], Optional[int]) -> None
+    span: Span,
+    input_tokens: Optional[int] = None,
+    input_tokens_cached: Optional[int] = None,
+    output_tokens: Optional[int] = None,
+    output_tokens_reasoning: Optional[int] = None,
+    total_tokens: Optional[int] = None,
+) -> None:
+    # TODO: move pipeline name elsewhere
     ai_pipeline_name = get_ai_pipeline_name()
     if ai_pipeline_name:
-        span.set_attribute(SPANDATA.AI_PIPELINE_NAME, ai_pipeline_name)
-    if prompt_tokens is not None:
-        span.set_attribute(SPANDATA.AI_PROMPT_TOKENS_USED, prompt_tokens)
-    if completion_tokens is not None:
-        span.set_attribute(SPANDATA.AI_COMPLETION_TOKENS_USED, completion_tokens)
-    if (
-        total_tokens is None
-        and prompt_tokens is not None
-        and completion_tokens is not None
-    ):
-        total_tokens = prompt_tokens + completion_tokens
+        span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, ai_pipeline_name)
+
+    if input_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+
+    if input_tokens_cached is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+            input_tokens_cached,
+        )
+
+    if output_tokens is not None:
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+
+    if output_tokens_reasoning is not None:
+        span.set_attribute(
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            output_tokens_reasoning,
+        )
+
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+
     if total_tokens is not None:
-        span.set_attribute(SPANDATA.AI_TOTAL_TOKENS_USED, total_tokens)
+        span.set_attribute(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)

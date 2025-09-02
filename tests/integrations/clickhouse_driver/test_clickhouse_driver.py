@@ -1,7 +1,7 @@
 """
 Tests need a local clickhouse instance running, this can best be done using
 ```sh
-docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=262144:262144 --rm clickhouse
+docker run -d -e CLICKHOUSE_SKIP_USER_SETUP=1 -p 8123:8123 -p 9000:9000 --name clickhouse-test --ulimit nofile=262144:262144 --rm clickhouse
 ```
 """
 
@@ -354,7 +354,41 @@ def test_clickhouse_client_spans(
     assert event["spans"] == expected_spans
 
 
-def test_clickhouse_client_spans_with_pii(sentry_init, capture_events) -> None:
+def test_clickhouse_spans_with_generator(sentry_init, capture_events):
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    # Use a generator to test that the integration obtains values from the generator,
+    # without consuming the generator.
+    values = ({"x": i} for i in range(3))
+
+    with start_span(name="test_clickhouse_transaction"):
+        client = Client("localhost")
+        client.execute("DROP TABLE IF EXISTS test")
+        client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+        client.execute("INSERT INTO test (x) VALUES", values)
+        res = client.execute("SELECT x FROM test")
+
+    # Verify that the integration did not consume the generator
+    assert res == [(0,), (1,), (2,)]
+
+    (event,) = events
+    spans = event["spans"]
+
+    [span] = [
+        span for span in spans if span["description"] == "INSERT INTO test (x) VALUES"
+    ]
+
+    assert span["data"]["db.params"] == '[{"x": 0}, {"x": 1}, {"x": 2}]'
+
+
+def test_clickhouse_client_spans_with_pii(
+    sentry_init, capture_events, capture_envelopes
+) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         _experiments={"record_sql_params": True},
@@ -822,7 +856,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         span.pop("span_id", None)
         span.pop("start_timestamp", None)
         span.pop("timestamp", None)
-        span.pop("status")
+        span.pop("status", None)
 
     assert event["spans"] == expected_spans
 

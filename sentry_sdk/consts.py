@@ -1,9 +1,26 @@
+from __future__ import annotations
 import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from typing import (
+        Optional,
+        Callable,
+        Union,
+        List,
+        Type,
+        Dict,
+        Any,
+        Sequence,
+        Tuple,
+    )
+
 # up top to prevent circular import due to integration import
-DEFAULT_MAX_VALUE_LENGTH = 1024
+# This is more or less an arbitrary large-ish value for now, so that we allow
+# pretty long strings (like LLM prompts), but still have *some* upper limit
+# until we verify that removing the trimming completely is safe.
+DEFAULT_MAX_VALUE_LENGTH = 100_000
 
 DEFAULT_MAX_STACK_FRAMES = 100
 DEFAULT_ADD_FULL_STACK = False
@@ -26,17 +43,6 @@ class CompressionAlgo(Enum):
 
 
 if TYPE_CHECKING:
-    import sentry_sdk
-
-    from typing import Optional
-    from typing import Callable
-    from typing import Union
-    from typing import List
-    from typing import Type
-    from typing import Dict
-    from typing import Any
-    from typing import Sequence
-    from typing import Tuple
     from typing_extensions import Literal
     from typing_extensions import TypedDict
 
@@ -51,6 +57,8 @@ if TYPE_CHECKING:
         TracesSampler,
         TransactionProcessor,
     )
+
+    import sentry_sdk
 
     # Experiments are feature flags to enable and disable certain unstable SDK
     # functionality. Changing them from the defaults (`None`) in production
@@ -71,6 +79,7 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "enable_logs": Optional[bool],
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
+            "transport_async": Optional[bool],
         },
         total=False,
     )
@@ -88,173 +97,30 @@ FALSE_VALUES = [
 ]
 
 
+class SPANTEMPLATE(str, Enum):
+    DEFAULT = "default"
+    AI_AGENT = "ai_agent"
+    AI_TOOL = "ai_tool"
+    AI_CHAT = "ai_chat"
+
+    def __str__(self):
+        # type: () -> str
+        return self.value
+
+
 class SPANDATA:
     """
     Additional information describing the type of the span.
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
     """
 
-    AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
-    """
-    Used to reduce repetitiveness of generated tokens.
-    Example: 0.5
-    """
-
-    AI_PRESENCE_PENALTY = "ai.presence_penalty"
-    """
-    Used to reduce repetitiveness of generated tokens.
-    Example: 0.5
-    """
-
-    AI_INPUT_MESSAGES = "ai.input_messages"
-    """
-    The input messages to an LLM call.
-    Example: [{"role": "user", "message": "hello"}]
-    """
-
-    AI_MODEL_ID = "ai.model_id"
-    """
-    The unique descriptor of the model being execugted
-    Example: gpt-4
-    """
-
-    AI_METADATA = "ai.metadata"
-    """
-    Extra metadata passed to an AI pipeline step.
-    Example: {"executed_function": "add_integers"}
-    """
-
-    AI_TAGS = "ai.tags"
-    """
-    Tags that describe an AI pipeline step.
-    Example: {"executed_function": "add_integers"}
-    """
-
-    AI_STREAMING = "ai.streaming"
-    """
-    Whether or not the AI model call's repsonse was streamed back asynchronously
-    Example: true
-    """
-
-    AI_TEMPERATURE = "ai.temperature"
-    """
-    For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.
-    Example: 0.5
-    """
-
-    AI_TOP_P = "ai.top_p"
-    """
-    For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.
-    Example: 0.5
-    """
-
-    AI_TOP_K = "ai.top_k"
-    """
-    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
-    Example: 35
-    """
-
-    AI_FUNCTION_CALL = "ai.function_call"
-    """
-    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
-    """
-
-    AI_TOOL_CALLS = "ai.tool_calls"
-    """
-    For an AI model call, the function that was called.
-    """
-
-    AI_TOOLS = "ai.tools"
-    """
-    For an AI model call, the functions that are available
-    """
-
-    AI_RESPONSE_FORMAT = "ai.response_format"
-    """
-    For an AI model call, the format of the response
-    """
-
-    AI_LOGIT_BIAS = "ai.logit_bias"
-    """
-    For an AI model call, the logit bias
-    """
-
-    AI_PREAMBLE = "ai.preamble"
-    """
-    For an AI model call, the preamble parameter.
-    Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
-    Example: "You are now a clown."
-    """
-
-    AI_RAW_PROMPTING = "ai.raw_prompting"
-    """
-    Minimize pre-processing done to the prompt sent to the LLM.
-    Example: true
-    """
-    AI_RESPONSES = "ai.responses"
-    """
-    The responses to an AI model call. Always as a list.
-    Example: ["hello", "world"]
-    """
-
-    AI_SEED = "ai.seed"
-    """
-    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
-    Example: 123.45
-    """
-
     AI_CITATIONS = "ai.citations"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     References or sources cited by the AI model in its response.
     Example: ["Smith et al. 2020", "Jones 2019"]
-    """
-
-    AI_DOCUMENTS = "ai.documents"
-    """
-    Documents or content chunks used as context for the AI model.
-    Example: ["doc1.txt", "doc2.pdf"]
-    """
-
-    AI_SEARCH_QUERIES = "ai.search_queries"
-    """
-    Queries used to search for relevant context or documents.
-    Example: ["climate change effects", "renewable energy"]
-    """
-
-    AI_SEARCH_RESULTS = "ai.search_results"
-    """
-    Results returned from search queries for context.
-    Example: ["Result 1", "Result 2"]
-    """
-
-    AI_GENERATION_ID = "ai.generation_id"
-    """
-    Unique identifier for the completion.
-    Example: "gen_123abc"
-    """
-
-    AI_SEARCH_REQUIRED = "ai.is_search_required"
-    """
-    Boolean indicating if the model needs to perform a search.
-    Example: true
-    """
-
-    AI_FINISH_REASON = "ai.finish_reason"
-    """
-    The reason why the model stopped generating.
-    Example: "length"
-    """
-
-    AI_PIPELINE_NAME = "ai.pipeline.name"
-    """
-    Name of the AI pipeline or chain being executed.
-    Example: "qa-pipeline"
-    """
-
-    AI_PROMPT_TOKENS_USED = "ai.prompt_tokens.used"
-    """
-    The number of input prompt tokens used by the model.
-    Example: 10
     """
 
     AI_COMPLETION_TOKENS_USED = "ai.completion_tokens.used"
@@ -263,56 +129,264 @@ class SPANDATA:
     Example: 10
     """
 
+    AI_DOCUMENTS = "ai.documents"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    Documents or content chunks used as context for the AI model.
+    Example: ["doc1.txt", "doc2.pdf"]
+    """
+
+    AI_FINISH_REASON = "ai.finish_reason"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_FINISH_REASONS instead.
+
+    The reason why the model stopped generating.
+    Example: "length"
+    """
+
+    AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_FREQUENCY_PENALTY instead.
+
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
+    AI_FUNCTION_CALL = "ai.function_call"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.
+
+    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    """
+
+    AI_GENERATION_ID = "ai.generation_id"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_ID instead.
+
+    Unique identifier for the completion.
+    Example: "gen_123abc"
+    """
+
+    AI_INPUT_MESSAGES = "ai.input_messages"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_MESSAGES instead.
+
+    The input messages to an LLM call.
+    Example: [{"role": "user", "message": "hello"}]
+    """
+
+    AI_LOGIT_BIAS = "ai.logit_bias"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    For an AI model call, the logit bias
+    """
+
+    AI_METADATA = "ai.metadata"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    Extra metadata passed to an AI pipeline step.
+    Example: {"executed_function": "add_integers"}
+    """
+
+    AI_MODEL_ID = "ai.model_id"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_MODEL or GEN_AI_RESPONSE_MODEL instead.
+
+    The unique descriptor of the model being executed.
+    Example: gpt-4
+    """
+
+    AI_PIPELINE_NAME = "ai.pipeline.name"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_PIPELINE_NAME instead.
+
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
+    """
+
+    AI_PREAMBLE = "ai.preamble"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    For an AI model call, the preamble parameter.
+    Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
+    Example: "You are now a clown."
+    """
+
+    AI_PRESENCE_PENALTY = "ai.presence_penalty"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_PRESENCE_PENALTY instead.
+
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
+    AI_PROMPT_TOKENS_USED = "ai.prompt_tokens.used"
+    """
+    The number of input prompt tokens used by the model.
+    Example: 10
+    """
+
+    AI_RAW_PROMPTING = "ai.raw_prompting"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    Minimize pre-processing done to the prompt sent to the LLM.
+    Example: true
+    """
+
+    AI_RESPONSE_FORMAT = "ai.response_format"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    For an AI model call, the format of the response
+    """
+
+    AI_RESPONSES = "ai.responses"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TEXT instead.
+
+    The responses to an AI model call. Always as a list.
+    Example: ["hello", "world"]
+    """
+
+    AI_SEARCH_QUERIES = "ai.search_queries"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    Queries used to search for relevant context or documents.
+    Example: ["climate change effects", "renewable energy"]
+    """
+
+    AI_SEARCH_REQUIRED = "ai.is_search_required"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    Boolean indicating if the model needs to perform a search.
+    Example: true
+    """
+
+    AI_SEARCH_RESULTS = "ai.search_results"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    Results returned from search queries for context.
+    Example: ["Result 1", "Result 2"]
+    """
+
+    AI_SEED = "ai.seed"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_SEED instead.
+
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: 123.45
+    """
+
+    AI_STREAMING = "ai.streaming"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_STREAMING instead.
+
+    Whether or not the AI model call's response was streamed back asynchronously
+    Example: true
+    """
+
+    AI_TAGS = "ai.tags"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    Tags that describe an AI pipeline step.
+    Example: {"executed_function": "add_integers"}
+    """
+
+    AI_TEMPERATURE = "ai.temperature"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TEMPERATURE instead.
+
+    For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.
+    Example: 0.5
+    """
+
+    AI_TEXTS = "ai.texts"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
+    Raw text inputs provided to the model.
+    Example: ["What is machine learning?"]
+    """
+
+    AI_TOP_K = "ai.top_k"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_K instead.
+
+    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
+    Example: 35
+    """
+
+    AI_TOP_P = "ai.top_p"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_P instead.
+
+    For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.
+    Example: 0.5
+    """
+
+    AI_TOOL_CALLS = "ai.tool_calls"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.
+
+    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    """
+
+    AI_TOOLS = "ai.tools"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_AVAILABLE_TOOLS instead.
+
+    For an AI model call, the functions that are available
+    """
+
     AI_TOTAL_TOKENS_USED = "ai.total_tokens.used"
     """
     The total number of tokens (input + output) used by the request to the model.
     Example: 20
     """
 
-    AI_TEXTS = "ai.texts"
-    """
-    Raw text inputs provided to the model.
-    Example: ["What is machine learning?"]
-    """
-
     AI_WARNINGS = "ai.warnings"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Warning messages generated during model execution.
     Example: ["Token limit exceeded"]
-    """
-
-    DB_NAME = "db.name"
-    """
-    The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
-    Example: myDatabase
-    """
-
-    DB_USER = "db.user"
-    """
-    The name of the database user used for connecting to the database.
-    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
-    Example: my_user
-    """
-
-    DB_OPERATION = "db.operation"
-    """
-    The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
-    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
-    Example: findAndModify, HMSET, SELECT
-    """
-
-    DB_SYSTEM = "db.system"
-    """
-    An identifier for the database management system (DBMS) product being used.
-    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
-    Example: postgresql
-    """
-
-    DB_MONGODB_COLLECTION = "db.mongodb.collection"
-    """
-    The MongoDB collection being accessed within the database.
-    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
-    Example: public.users; customers
     """
 
     CACHE_HIT = "cache.hit"
@@ -333,22 +407,254 @@ class SPANDATA:
     Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3
     """
 
-    NETWORK_PEER_ADDRESS = "network.peer.address"
+    CODE_FILEPATH = "code.filepath"
     """
-    Peer address of the network connection - IP address or Unix domain socket name.
-    Example: 10.1.2.80, /tmp/my.sock, localhost
-    """
-
-    NETWORK_PEER_PORT = "network.peer.port"
-    """
-    Peer port number of the network connection.
-    Example: 6379
+    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
+    Example: "/app/myapplication/http/handler/server.py"
     """
 
-    HTTP_QUERY = "http.query"
+    CODE_FUNCTION = "code.function"
     """
-    The Query string present in the URL.
-    Example: ?foo=bar&bar=baz
+    The method or function name, or equivalent (usually rightmost part of the code unit's name).
+    Example: "server_request"
+    """
+
+    CODE_LINENO = "code.lineno"
+    """
+    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
+    Example: 42
+    """
+
+    CODE_NAMESPACE = "code.namespace"
+    """
+    The "namespace" within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
+    Example: "http.handler"
+    """
+
+    DB_MONGODB_COLLECTION = "db.mongodb.collection"
+    """
+    The MongoDB collection being accessed within the database.
+    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
+    Example: public.users; customers
+    """
+
+    DB_NAME = "db.name"
+    """
+    The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
+    Example: myDatabase
+    """
+
+    DB_OPERATION = "db.operation"
+    """
+    The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: findAndModify, HMSET, SELECT
+    """
+
+    DB_SYSTEM = "db.system"
+    """
+    An identifier for the database management system (DBMS) product being used.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: postgresql
+    """
+
+    DB_USER = "db.user"
+    """
+    The name of the database user used for connecting to the database.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: my_user
+    """
+
+    GEN_AI_AGENT_NAME = "gen_ai.agent.name"
+    """
+    The name of the agent being used.
+    Example: "ResearchAssistant"
+    """
+
+    GEN_AI_CHOICE = "gen_ai.choice"
+    """
+    The model's response message.
+    Example: "The weather in Paris is rainy and overcast, with temperatures around 57°F"
+    """
+
+    GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
+    """
+    The name of the operation being performed.
+    Example: "chat"
+    """
+
+    GEN_AI_PIPELINE_NAME = "gen_ai.pipeline.name"
+    """
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
+    """
+
+    GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
+    """
+    The reason why the model stopped generating.
+    Example: "COMPLETE"
+    """
+
+    GEN_AI_RESPONSE_ID = "gen_ai.response.id"
+    """
+    Unique identifier for the completion.
+    Example: "gen_123abc"
+    """
+
+    GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
+    """
+    Exact model identifier used to generate the response
+    Example: gpt-4o-mini-2024-07-18
+    """
+
+    GEN_AI_RESPONSE_STREAMING = "gen_ai.response.streaming"
+    """
+    Whether or not the AI model call's response was streamed back asynchronously
+    Example: true
+    """
+
+    GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
+    """
+    The model's response text messages.
+    Example: ["The weather in Paris is rainy and overcast, with temperatures around 57°F", "The weather in London is sunny and warm, with temperatures around 65°F"]
+    """
+
+    GEN_AI_RESPONSE_TOOL_CALLS = "gen_ai.response.tool_calls"
+    """
+    The tool calls in the model's response.
+    Example: [{"name": "get_weather", "arguments": {"location": "Paris"}}]
+    """
+
+    GEN_AI_REQUEST_AVAILABLE_TOOLS = "gen_ai.request.available_tools"
+    """
+    The available tools for the model.
+    Example: [{"name": "get_weather", "description": "Get the weather for a given location"}, {"name": "get_news", "description": "Get the news for a given topic"}]
+    """
+
+    GEN_AI_REQUEST_FREQUENCY_PENALTY = "gen_ai.request.frequency_penalty"
+    """
+    The frequency penalty parameter used to reduce repetitiveness of generated tokens.
+    Example: 0.1
+    """
+
+    GEN_AI_REQUEST_MAX_TOKENS = "gen_ai.request.max_tokens"
+    """
+    The maximum number of tokens to generate in the response.
+    Example: 2048
+    """
+
+    GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
+    """
+    The messages passed to the model. The "content" can be a string or an array of objects.
+    Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
+    """
+
+    GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
+    """
+    The model identifier being used for the request.
+    Example: "gpt-4-turbo"
+    """
+
+    GEN_AI_REQUEST_PRESENCE_PENALTY = "gen_ai.request.presence_penalty"
+    """
+    The presence penalty parameter used to reduce repetitiveness of generated tokens.
+    Example: 0.1
+    """
+
+    GEN_AI_REQUEST_SEED = "gen_ai.request.seed"
+    """
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: "1234567890"
+    """
+
+    GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
+    """
+    The temperature parameter used to control randomness in the output.
+    Example: 0.7
+    """
+
+    GEN_AI_REQUEST_TOP_K = "gen_ai.request.top_k"
+    """
+    Limits the model to only consider the K most likely next tokens, where K is an integer (e.g., top_k=20 means only the 20 highest probability tokens are considered).
+    Example: 35
+    """
+
+    GEN_AI_REQUEST_TOP_P = "gen_ai.request.top_p"
+    """
+    The top_p parameter used to control diversity via nucleus sampling.
+    Example: 1.0
+    """
+
+    GEN_AI_SYSTEM = "gen_ai.system"
+    """
+    The name of the AI system being used.
+    Example: "openai"
+    """
+
+    GEN_AI_TOOL_DESCRIPTION = "gen_ai.tool.description"
+    """
+    The description of the tool being used.
+    Example: "Searches the web for current information about a topic"
+    """
+
+    GEN_AI_TOOL_INPUT = "gen_ai.tool.input"
+    """
+    The input of the tool being used.
+    Example: {"location": "Paris"}
+    """
+
+    GEN_AI_TOOL_NAME = "gen_ai.tool.name"
+    """
+    The name of the tool being used.
+    Example: "web_search"
+    """
+
+    GEN_AI_TOOL_OUTPUT = "gen_ai.tool.output"
+    """
+    The output of the tool being used.
+    Example: "rainy, 57°F"
+    """
+
+    GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
+    """
+    The type of tool being used.
+    Example: "function"
+    """
+
+    GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
+    """
+    The number of tokens in the input.
+    Example: 150
+    """
+
+    GEN_AI_USAGE_INPUT_TOKENS_CACHED = "gen_ai.usage.input_tokens.cached"
+    """
+    The number of cached tokens in the input.
+    Example: 50
+    """
+
+    GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+    """
+    The number of tokens in the output.
+    Example: 250
+    """
+
+    GEN_AI_USAGE_OUTPUT_TOKENS_REASONING = "gen_ai.usage.output_tokens.reasoning"
+    """
+    The number of tokens used for reasoning in the output.
+    Example: 75
+    """
+
+    GEN_AI_USAGE_TOTAL_TOKENS = "gen_ai.usage.total_tokens"
+    """
+    The total number of tokens used (input + output).
+    Example: 400
+    """
+
+    GEN_AI_USER_MESSAGE = "gen_ai.user.message"
+    """
+    The user message passed to the model.
+    Example: "What's the weather in Paris?"
     """
 
     HTTP_FRAGMENT = "http.fragment"
@@ -361,6 +667,12 @@ class SPANDATA:
     """
     The HTTP method used.
     Example: GET
+    """
+
+    HTTP_QUERY = "http.query"
+    """
+    The Query string present in the URL.
+    Example: ?foo=bar&bar=baz
     """
 
     HTTP_STATUS_CODE = "http.response.status_code"
@@ -380,19 +692,37 @@ class SPANDATA:
     The message's identifier.
     """
 
-    MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
-    """
-    Number of retries/attempts to process a message.
-    """
-
     MESSAGING_MESSAGE_RECEIVE_LATENCY = "messaging.message.receive.latency"
     """
     The latency between when the task was enqueued and when it was started to be processed.
     """
 
+    MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
+    """
+    Number of retries/attempts to process a message.
+    """
+
     MESSAGING_SYSTEM = "messaging.system"
     """
     The messaging system's name, e.g. `kafka`, `aws_sqs`
+    """
+
+    NETWORK_PEER_ADDRESS = "network.peer.address"
+    """
+    Peer address of the network connection - IP address or Unix domain socket name.
+    Example: 10.1.2.80, /tmp/my.sock, localhost
+    """
+
+    NETWORK_PEER_PORT = "network.peer.port"
+    """
+    Peer port number of the network connection.
+    Example: 6379
+    """
+
+    PROFILER_ID = "profiler_id"
+    """
+    Label identifying the profiler id that the span occurred in. This should be a string.
+    Example: "5249fbada8d5416482c2f6e47e337372"
     """
 
     SERVER_ADDRESS = "server.address"
@@ -420,30 +750,6 @@ class SPANDATA:
     Example: 16456
     """
 
-    CODE_FILEPATH = "code.filepath"
-    """
-    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
-    Example: "/app/myapplication/http/handler/server.py"
-    """
-
-    CODE_LINENO = "code.lineno"
-    """
-    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
-    Example: 42
-    """
-
-    CODE_FUNCTION = "code.function"
-    """
-    The method or function name, or equivalent (usually rightmost part of the code unit's name).
-    Example: "server_request"
-    """
-
-    CODE_NAMESPACE = "code.namespace"
-    """
-    The "namespace" within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
-    Example: "http.handler"
-    """
-
     THREAD_ID = "thread.id"
     """
     Identifier of a thread from where the span originated. This should be a string.
@@ -454,12 +760,6 @@ class SPANDATA:
     """
     Label identifying a thread from where the span originated. This should be a string.
     Example: "MainThread"
-    """
-
-    PROFILER_ID = "profiler_id"
-    """
-    Label identifying the profiler id that the span occurred in. This should be a string.
-    Example: "5249fbada8d5416482c2f6e47e337372"
     """
 
 
@@ -501,6 +801,13 @@ class OP:
     FUNCTION = "function"
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
+    GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
+    GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
+    GEN_AI_HANDOFF = "gen_ai.handoff"
+    GEN_AI_PIPELINE = "gen_ai.pipeline"
+    GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
+    GEN_AI_RESPONSES = "gen_ai.responses"
     GRAPHQL_EXECUTE = "graphql.execute"
     GRAPHQL_MUTATION = "graphql.mutation"
     GRAPHQL_PARSE = "graphql.parse"
@@ -513,6 +820,8 @@ class OP:
     HTTP_CLIENT = "http.client"
     HTTP_CLIENT_STREAM = "http.client.stream"
     HTTP_SERVER = "http.server"
+    HTTP = "http"
+    MESSAGE = "message"
     MIDDLEWARE_DJANGO = "middleware.django"
     MIDDLEWARE_LITESTAR = "middleware.litestar"
     MIDDLEWARE_LITESTAR_RECEIVE = "middleware.litestar.receive"
@@ -523,16 +832,9 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
-    OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
-    OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
-    LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
-    LANGCHAIN_RUN = "ai.run.langchain"
-    LANGCHAIN_TOOL = "ai.tool.langchain"
-    LANGCHAIN_AGENT = "ai.agent.langchain"
-    LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
@@ -544,6 +846,7 @@ class OP:
     QUEUE_TASK_HUEY = "queue.task.huey"
     QUEUE_SUBMIT_RAY = "queue.submit.ray"
     QUEUE_TASK_RAY = "queue.task.ray"
+    RPC = "rpc"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
@@ -572,8 +875,7 @@ class TransactionSource(str, Enum):
     URL = "url"
     VIEW = "view"
 
-    def __str__(self):
-        # type: () -> str
+    def __str__(self) -> str:
         return self.value
 
 
@@ -601,69 +903,77 @@ class ClientConstructor:
 
     def __init__(
         self,
-        dsn=None,  # type: Optional[str]
+        dsn: Optional[str] = None,
         *,
-        max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
-        release=None,  # type: Optional[str]
-        environment=None,  # type: Optional[str]
-        server_name=None,  # type: Optional[str]
-        shutdown_timeout=2,  # type: float
-        integrations=[],  # type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006
-        in_app_include=[],  # type: List[str]  # noqa: B006
-        in_app_exclude=[],  # type: List[str]  # noqa: B006
-        default_integrations=True,  # type: bool
-        dist=None,  # type: Optional[str]
-        transport=None,  # type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]
-        transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
-        sample_rate=1.0,  # type: float
-        send_default_pii=None,  # type: Optional[bool]
-        http_proxy=None,  # type: Optional[str]
-        https_proxy=None,  # type: Optional[str]
-        ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
-        max_request_body_size="medium",  # type: str
-        socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
-        keep_alive=None,  # type: Optional[bool]
-        before_send=None,  # type: Optional[EventProcessor]
-        before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
-        debug=None,  # type: Optional[bool]
-        attach_stacktrace=False,  # type: bool
-        ca_certs=None,  # type: Optional[str]
-        traces_sample_rate=None,  # type: Optional[float]
-        traces_sampler=None,  # type: Optional[TracesSampler]
-        profiles_sample_rate=None,  # type: Optional[float]
-        profiles_sampler=None,  # type: Optional[TracesSampler]
-        profiler_mode=None,  # type: Optional[ProfilerMode]
-        profile_lifecycle="manual",  # type: Literal["manual", "trace"]
-        profile_session_sample_rate=None,  # type: Optional[float]
-        auto_enabling_integrations=True,  # type: bool
-        disabled_integrations=None,  # type: Optional[Sequence[sentry_sdk.integrations.Integration]]
-        auto_session_tracking=True,  # type: bool
-        send_client_reports=True,  # type: bool
-        _experiments={},  # type: Experiments  # noqa: B006
-        proxy_headers=None,  # type: Optional[Dict[str, str]]
-        before_send_transaction=None,  # type: Optional[TransactionProcessor]
-        project_root=None,  # type: Optional[str]
-        include_local_variables=True,  # type: Optional[bool]
-        include_source_context=True,  # type: Optional[bool]
-        trace_propagation_targets=[  # noqa: B006
-            MATCH_ALL
-        ],  # type: Optional[Sequence[str]]
-        functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
-        event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
-        max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
-        enable_backpressure_handling=True,  # type: bool
-        error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
-        enable_db_query_source=True,  # type: bool
-        db_query_source_threshold_ms=100,  # type: int
-        spotlight=None,  # type: Optional[Union[bool, str]]
-        cert_file=None,  # type: Optional[str]
-        key_file=None,  # type: Optional[str]
-        custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
-        add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
-        max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
-        http2=None,  # type: Optional[bool]
-    ):
-        # type: (...) -> None
+        max_breadcrumbs: int = DEFAULT_MAX_BREADCRUMBS,
+        release: Optional[str] = None,
+        environment: Optional[str] = None,
+        server_name: Optional[str] = None,
+        shutdown_timeout: float = 2,
+        integrations: Sequence[sentry_sdk.integrations.Integration] = [],  # noqa: B006
+        in_app_include: List[str] = [],  # noqa: B006
+        in_app_exclude: List[str] = [],  # noqa: B006
+        default_integrations: bool = True,
+        dist: Optional[str] = None,
+        transport: Optional[
+            Union[
+                sentry_sdk.transport.Transport,
+                Type[sentry_sdk.transport.Transport],
+                Callable[[Event], None],
+            ]
+        ] = None,
+        transport_queue_size: int = DEFAULT_QUEUE_SIZE,
+        sample_rate: float = 1.0,
+        send_default_pii: Optional[bool] = None,
+        http_proxy: Optional[str] = None,
+        https_proxy: Optional[str] = None,
+        ignore_errors: Sequence[Union[type, str]] = [],  # noqa: B006
+        max_request_body_size: str = "medium",
+        socket_options: Optional[List[Tuple[int, int, int | bytes]]] = None,
+        keep_alive: Optional[bool] = None,
+        before_send: Optional[EventProcessor] = None,
+        before_breadcrumb: Optional[BreadcrumbProcessor] = None,
+        debug: Optional[bool] = None,
+        attach_stacktrace: bool = False,
+        ca_certs: Optional[str] = None,
+        traces_sample_rate: Optional[float] = None,
+        traces_sampler: Optional[TracesSampler] = None,
+        profiles_sample_rate: Optional[float] = None,
+        profiles_sampler: Optional[TracesSampler] = None,
+        profiler_mode: Optional[ProfilerMode] = None,
+        profile_lifecycle: Literal["manual", "trace"] = "manual",
+        profile_session_sample_rate: Optional[float] = None,
+        auto_enabling_integrations: bool = True,
+        disabled_integrations: Optional[
+            Sequence[sentry_sdk.integrations.Integration]
+        ] = None,
+        auto_session_tracking: bool = True,
+        send_client_reports: bool = True,
+        _experiments: Experiments = {},  # noqa: B006
+        proxy_headers: Optional[Dict[str, str]] = None,
+        before_send_transaction: Optional[TransactionProcessor] = None,
+        project_root: Optional[str] = None,
+        include_local_variables: Optional[bool] = True,
+        include_source_context: Optional[bool] = True,
+        trace_propagation_targets: Optional[Sequence[str]] = [MATCH_ALL],  # noqa: B006
+        exclude_span_origins: Optional[Sequence[str]] = None,
+        functions_to_trace: Sequence[Dict[str, str]] = [],  # noqa: B006
+        event_scrubber: Optional[sentry_sdk.scrubber.EventScrubber] = None,
+        max_value_length: int = DEFAULT_MAX_VALUE_LENGTH,
+        enable_backpressure_handling: bool = True,
+        error_sampler: Optional[Callable[[Event, Hint], Union[float, bool]]] = None,
+        enable_db_query_source: bool = True,
+        db_query_source_threshold_ms: int = 100,
+        spotlight: Optional[Union[bool, str]] = None,
+        cert_file: Optional[str] = None,
+        key_file: Optional[str] = None,
+        custom_repr: Optional[Callable[..., Optional[str]]] = None,
+        add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
+        max_stack_frames: Optional[int] = DEFAULT_MAX_STACK_FRAMES,
+        enable_logs: bool = False,
+        before_send_log: Optional[Callable[[Log, Hint], Optional[Log]]] = None,
+        http2=None,  # type: Optional[bool],
+    ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
         :param dsn: The DSN tells the SDK where to send the events.
@@ -980,6 +1290,17 @@ class ClientConstructor:
             If `trace_propagation_targets` is not provided, trace data is attached to every outgoing request from the
             instrumented client.
 
+        :param exclude_span_origins: An optional list of strings or regex patterns to disable span creation based
+            on span origin. When a span's origin would match any of the provided patterns, the span will not be
+            created.
+
+            This can be useful to exclude automatic span creation from specific integrations without disabling the
+            entire integration.
+
+            The option may contain a list of strings or regexes against which the span origins are matched.
+            String entries do not have to be full matches, meaning a span origin is matched when it contains
+            a string provided through the option.
+
         :param functions_to_trace: An optional list of functions that should be set up for tracing.
 
             For each function in the list, a span will be created when the function is executed.
@@ -1040,13 +1361,20 @@ class ClientConstructor:
 
         :param instrumenter:
 
+        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
+            Sentry logs. Defaults to False.
+
+        :param before_send_log: An optional function to modify or filter out logs
+            before they're sent to Sentry. Any modifications to the log in this
+            function will be retained. If the function returns None, the log will
+            not be sent to Sentry.
+
         :param _experiments:
         """
         pass
 
 
-def _get_default_options():
-    # type: () -> dict[str, Any]
+def _get_default_options() -> dict[str, Any]:
     import inspect
 
     a = inspect.getfullargspec(ClientConstructor.__init__)
@@ -1065,4 +1393,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "3.0.0a2"
+VERSION = "3.0.0a6"

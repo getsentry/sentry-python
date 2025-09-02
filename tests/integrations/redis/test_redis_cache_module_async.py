@@ -31,14 +31,15 @@ async def test_no_cache_basic(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeRedisAsync()
-    with sentry_sdk.start_span():
+    with sentry_sdk.start_span(name="redis"):
         await connection.get("myasynccachekey")
 
     (event,) = events
+    assert event["transaction"] == "redis"
     assert (
         render_span_tree(event)
         == """\
-- op="<unlabeled span>": description=null
+- op=null: description=null
   - op="db.redis": description="GET 'myasynccachekey'"\
 """
     )
@@ -57,14 +58,15 @@ async def test_cache_basic(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeRedisAsync()
-    with sentry_sdk.start_span():
+    with sentry_sdk.start_span(name="redis"):
         await connection.get("myasynccachekey")
 
     (event,) = events
+    assert event["transaction"] == "redis"
     assert (
         render_span_tree(event)
         == """\
-- op="<unlabeled span>": description=null
+- op=null: description=null
   - op="cache.get": description="myasynccachekey"
     - op="db.redis": description="GET 'myasynccachekey'"\
 """
@@ -84,17 +86,18 @@ async def test_cache_keys(sentry_init, capture_events, render_span_tree):
     events = capture_events()
 
     connection = FakeRedisAsync()
-    with sentry_sdk.start_span():
+    with sentry_sdk.start_span(name="redis"):
         await connection.get("asomethingelse")
         await connection.get("ablub")
         await connection.get("ablubkeything")
         await connection.get("abl")
 
     (event,) = events
+    assert event["transaction"] == "redis"
     assert (
         render_span_tree(event)
         == """\
-- op="<unlabeled span>": description=null
+- op=null: description=null
   - op="db.redis": description="GET 'asomethingelse'"
   - op="cache.get": description="ablub"
     - op="db.redis": description="GET 'ablub'"
@@ -118,12 +121,13 @@ async def test_cache_data(sentry_init, capture_events):
     events = capture_events()
 
     connection = FakeRedisAsync(host="mycacheserver.io", port=6378)
-    with sentry_sdk.start_span():
+    with sentry_sdk.start_span(name="redis"):
         await connection.get("myasynccachekey")
         await connection.set("myasynccachekey", "事实胜于雄辩")
         await connection.get("myasynccachekey")
 
     (event,) = events
+    assert event["transaction"] == "redis"
     spans = sorted(event["spans"], key=lambda x: x["start_timestamp"])
 
     assert len(spans) == 6

@@ -1,0 +1,93 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Testing Guide
+
+## Test Structure
+
+### Test Organization
+- [tests/](mdc:tests) - Main test directory
+- [tests/conftest.py](mdc:tests/conftest.py) - Shared pytest fixtures and configuration
+- [tests/integrations/](mdc:tests/integrations) - Integration-specific tests
+- [tests/tracing/](mdc:tests/tracing) - Performance monitoring tests
+- [tests/utils/](mdc:tests/utils) - Utility and helper tests
+
+### Integration Test Structure
+Each integration has its own test directory:
+- [tests/integrations/django/](mdc:tests/integrations/django) - Django integration tests
+- [tests/integrations/flask/](mdc:tests/integrations/flask) - Flask integration tests
+- [tests/integrations/celery/](mdc:tests/integrations/celery) - Celery integration tests
+- [tests/integrations/aws_lambda/](mdc:tests/integrations/aws_lambda) - AWS Lambda tests
+
+## Running Tests
+
+### Tox Testing Matrix
+
+The [tox.ini](mdc:tox.ini) file defines comprehensive test environments.
+Always run tests via `tox` from the main `.venv`.
+
+```bash
+source .venv/bin/activate
+
+# Run all tox environments, takes a long time
+tox
+
+# Run specific environment
+tox -e py3.11-django-v4.2
+
+# Run environments for specific Python version
+tox -e py3.11-*
+
+# Run environments for specific integration
+tox -e *-django-*
+
+# Run a single test
+tox -e py3.12-common -- project/tests/test_file.py::TestClassName::test_method
+```
+
+### Test Environment Categories
+- **Common tests**: `{py3.6,py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-common`
+- **Integration tests**: `{python_version}-{integration}-v{framework_version}`
+- **Gevent tests**: `{py3.6,py3.8,py3.10,py3.11,py3.12}-gevent`
+
+## Writing Tests
+
+### Test File Structure
+```python
+import pytest
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
+def test_flask_integration(sentry_init, capture_events):
+    """Test Flask integration captures exceptions."""
+    # Test setup
+    sentry_init(integrations=[FlaskIntegration()])
+    events = capture_events()
+    
+    # Test execution
+    # ... test code ...
+    
+    # Assertions
+    assert len(events) == 1
+    assert events[0]["exception"]["values"][0]["type"] == "ValueError"
+```
+
+### Common Test Patterns
+
+## Test Best Practices
+
+### Test Organization
+- **One test per function**: Each test should verify one specific behavior
+- **Descriptive names**: Use clear, descriptive test function names
+- **Arrange-Act-Assert**: Structure tests with setup, execution, and verification
+- **Isolation**: Each test should be independent and not affect others
+- **No mocking**: Never use mocks in tests
+- **Cleanup**: Ensure tests clean up after themselves
+
+## Fixtures
+The most important fixtures for testing are:
+- `sentry_init`: Use in the beginning of a test to simulate initializing the SDK
+- `capture_events`: Intercept the events for testing event payload
+- `capture_envelopes`: Intercept the envelopes for testing envelope headers and payload

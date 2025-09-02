@@ -1,5 +1,4 @@
 from opentelemetry.context import create_key
-from sentry_sdk.tracing_utils import Baggage
 
 
 # propagation keys
@@ -13,13 +12,21 @@ SENTRY_USE_CURRENT_SCOPE_KEY = create_key("sentry_use_current_scope")
 SENTRY_USE_ISOLATION_SCOPE_KEY = create_key("sentry_use_isolation_scope")
 
 # trace state keys
-TRACESTATE_SAMPLED_KEY = Baggage.SENTRY_PREFIX + "sampled"
-TRACESTATE_SAMPLE_RATE_KEY = Baggage.SENTRY_PREFIX + "sample_rate"
-TRACESTATE_SAMPLE_RAND_KEY = Baggage.SENTRY_PREFIX + "sample_rand"
+SENTRY_PREFIX = "sentry-"
+TRACESTATE_SAMPLED_KEY = SENTRY_PREFIX + "sampled"
+TRACESTATE_SAMPLE_RATE_KEY = SENTRY_PREFIX + "sample_rate"
+TRACESTATE_SAMPLE_RAND_KEY = SENTRY_PREFIX + "sample_rand"
 
 # misc
 OTEL_SENTRY_CONTEXT = "otel"
 SPAN_ORIGIN = "auto.otel"
+
+# resource semconv attributes
+# Not all of these are stable yet, so defining them here rather than importing.
+# https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/README.md#service
+RESOURCE_SERVICE_NAME = "service.name"
+RESOURCE_SERVICE_NAMESPACE = "service.namespace"
+RESOURCE_SERVICE_VERSION = "service.version"
 
 
 class SentrySpanAttribute:

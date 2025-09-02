@@ -32,7 +32,7 @@ jobs:
         python-version: ["3.9","3.11","3.12"]
         os: [ubuntu-22.04]
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -59,6 +59,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-latest"
+      - name: Test openai_agents latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai_agents-latest"
       - name: Test huggingface_hub latest
         run: |
           set -x # print commands that are executed
@@ -70,12 +74,12 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@v5.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop
+          plugins: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -94,7 +98,7 @@ jobs:
         python-version: ["3.8","3.9","3.10","3.11","3.12","3.13"]
         os: [ubuntu-22.04]
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -121,6 +125,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai"
+      - name: Test openai_agents pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai_agents"
       - name: Test huggingface_hub pinned
         run: |
           set -x # print commands that are executed
@@ -132,12 +140,12 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@v5.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop
+          plugins: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -154,6 +162,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-ai-pinned.result, 'failure') || contains(needs.test-ai-pinned.result, 'skipped')
+        if: needs.test-ai-pinned.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

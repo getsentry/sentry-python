@@ -153,6 +153,7 @@ deps =
     py3.7-gevent: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
     gevent: pytest-asyncio
+    {py3.10,py3.11}-gevent: zope.event<5.0.0
 
     # === Integrations ===
 
@@ -206,7 +207,7 @@ deps =
     httpx-v0.25: pytest-httpx==0.25.0
     httpx: pytest-httpx
     # anyio is a dep of httpx
-    httpx: anyio<4.0.0
+    httpx: anyio>=3,<5
     httpx-v0.16: httpx~=0.16.0
     httpx-v0.18: httpx~=0.18.0
     httpx-v0.20: httpx~=0.20.0
@@ -273,6 +274,7 @@ deps =
     {py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13}-redis: pytest-asyncio
     redis-v3: redis~=3.0
     redis-v4: redis~=4.0
+    redis-v4: fakeredis<2.31.0
     redis-v5: redis~=5.0
 
     # Requests
@@ -299,6 +301,8 @@ deps =
     sanic: aiohttp
     sanic-v{24.6}: sanic_testing
     sanic-latest: sanic_testing
+    {py3.6}-sanic: aiocontextvars==0.2.1
+    {py3.8}-sanic: tracerite<1.1.2
     sanic-v0.8: sanic~=0.8.0
     sanic-v20: sanic~=20.0
     sanic-v24.6: sanic~=24.6.0
@@ -369,6 +373,7 @@ setenv =
     litestar: TESTPATH=tests/integrations/litestar
     loguru: TESTPATH=tests/integrations/loguru
     openai: TESTPATH=tests/integrations/openai
+    openai_agents: TESTPATH=tests/integrations/openai_agents
     openfeature: TESTPATH=tests/integrations/openfeature
     pure_eval: TESTPATH=tests/integrations/pure_eval
     pymongo: TESTPATH=tests/integrations/pymongo
