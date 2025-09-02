@@ -145,6 +145,8 @@ TEST_SUITE_CONFIG = {
             ">=0.3": ["langchain-community"],
         },
         "include": "<1.0",
+    "langgraph": {
+        "package": "langgraph",
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
