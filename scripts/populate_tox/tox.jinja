@@ -417,7 +417,7 @@ commands =
     ; Running `pytest` as an executable suffers from an import error
     ; when loading tests in scenarios. In particular, django fails to
     ; load the settings from the test module.
-    python -m pytest {env:TESTPATH} -o junit_suite_name={envname} {posargs}
+    python -m pytest -W error::pytest.PytestUnraisableExceptionWarning {env:TESTPATH} -o junit_suite_name={envname} {posargs}
 
 [testenv:linters]
 commands =
