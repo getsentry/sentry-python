@@ -77,12 +77,6 @@ envlist =
     {py3.9,py3.11,py3.12}-httpx-v{0.25,0.27}
     {py3.9,py3.12,py3.13}-httpx-latest
 
-    # Langchain
-    {py3.9,py3.11,py3.12}-langchain-v0.1
-    {py3.9,py3.11,py3.12}-langchain-v0.3
-    {py3.9,py3.11,py3.12}-langchain-latest
-    {py3.9,py3.11,py3.12}-langchain-notiktoken
-
     # OpenTelemetry (OTel)
     {py3.7,py3.9,py3.12,py3.13}-opentelemetry
 
@@ -231,20 +225,6 @@ deps =
     httpx-v0.27: httpx~=0.27.0
     httpx-latest: httpx
 
-    # Langchain
-    langchain-v0.1: openai~=1.0.0
-    langchain-v0.1: langchain~=0.1.11
-    langchain-v0.1: tiktoken~=0.6.0
-    langchain-v0.1: httpx<0.28.0
-    langchain-v0.3: langchain~=0.3.0
-    langchain-v0.3: langchain-community
-    langchain-v0.3: tiktoken
-    langchain-v0.3: openai
-    langchain-{latest,notiktoken}: langchain
-    langchain-{latest,notiktoken}: langchain-openai
-    langchain-{latest,notiktoken}: openai>=1.6.1
-    langchain-latest: tiktoken~=0.6.0
-
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
 
@@ -376,12 +356,13 @@ setenv =
     httpx: TESTPATH=tests/integrations/httpx
     huey: TESTPATH=tests/integrations/huey
     huggingface_hub: TESTPATH=tests/integrations/huggingface_hub
-    langchain: TESTPATH=tests/integrations/langchain
+    langchain-base: TESTPATH=tests/integrations/langchain
+    langchain-notiktoken: TESTPATH=tests/integrations/langchain
     launchdarkly: TESTPATH=tests/integrations/launchdarkly
     litestar: TESTPATH=tests/integrations/litestar
     loguru: TESTPATH=tests/integrations/loguru
-    openai_base: TESTPATH=tests/integrations/openai
-    openai_notiktoken: TESTPATH=tests/integrations/openai
+    openai-base: TESTPATH=tests/integrations/openai
+    openai-notiktoken: TESTPATH=tests/integrations/openai
     openai_agents: TESTPATH=tests/integrations/openai_agents
     openfeature: TESTPATH=tests/integrations/openfeature
     opentelemetry: TESTPATH=tests/integrations/opentelemetry
