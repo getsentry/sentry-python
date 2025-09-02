@@ -147,7 +147,7 @@ _MIN_VERSIONS = {
     "graphene": (3, 3),
     "grpc": (1, 32, 0),  # grpcio
     "huggingface_hub": (0, 22),
-    "langchain": (0, 0, 210),
+    "langchain": (0, 1, 0),
     "launchdarkly": (9, 8, 0),
     "loguru": (0, 7, 0),
     "openai": (1, 0, 0),
