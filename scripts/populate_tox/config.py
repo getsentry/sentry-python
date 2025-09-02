@@ -130,16 +130,18 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai", "tiktoken"],
+            "*": ["openai", "tiktoken", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
+            ">=0.3": ["langchain-community"],
         },
     },
     "langchain-notiktoken": {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["openai"],
+            "*": ["openai", "langchain-openai"],
             "<=0.1": ["httpx<0.28.0"],
+            ">=0.3": ["langchain-community"],
         },
     },
     "launchdarkly": {
