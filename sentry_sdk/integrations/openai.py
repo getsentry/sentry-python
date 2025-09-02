@@ -78,12 +78,12 @@ class OpenAIIntegration(Integration):
         return 0
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc, manual_span_cleanup=True):
+    # type: (Any, bool) -> None
     # Close an eventually open span
     # We need to do this by hand because we are not using the start_span context manager
     current_span = sentry_sdk.get_current_span()
-    if current_span is not None:
+    if manual_span_cleanup and current_span is not None:
         current_span.__exit__(None, None, None)
 
     event, hint = event_from_exception(
@@ -516,7 +516,7 @@ def _wrap_embeddings_create(f):
             try:
                 result = f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
+                _capture_exception(e, manual_span_cleanup=False)
                 raise e from None
 
             return gen.send(result)
@@ -550,7 +550,7 @@ def _wrap_async_embeddings_create(f):
             try:
                 result = await f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
+                _capture_exception(e, manual_span_cleanup=False)
                 raise e from None
 
             return gen.send(result)
