@@ -18,7 +18,7 @@ sentry_sdk.init(
         "transport_async": True,
     },
     integrations=[
-       	sentry_sdk.AsyncIO(),
+       	AsyncioIntegration(),
     ]
 )
 ```
