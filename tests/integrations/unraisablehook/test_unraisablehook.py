@@ -5,12 +5,18 @@ import subprocess
 from textwrap import dedent
 
 
-TEST_PARAMETERS = [("", "HttpTransport")]
+TEST_PARAMETERS = [
+    ("", "HttpTransport"),
+    ('_experiments={"transport_http2": True}', "Http2Transport"),
+]
 
-if sys.version_info >= (3, 8):
-    TEST_PARAMETERS.append(('_experiments={"transport_http2": True}', "Http2Transport"))
+minimum_python_38 = pytest.mark.skipif(
+    sys.version_info < (3, 8),
+    reason="The unraisable exception hook is only available in Python 3.8 and above.",
+)
 
 
+@minimum_python_38
 @pytest.mark.parametrize("options, transport", TEST_PARAMETERS)
 def test_unraisablehook(tmpdir, options, transport):
     app = tmpdir.join("app.py")
