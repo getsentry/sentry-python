@@ -25,6 +25,8 @@ sentry_sdk.init(
 
 - Added an asynchronous context manager for spans. This can be used to remove unnecessary nesting for span creation in async programs.
 - Added `flush_async()` as a top level API. This has to be used when flushing the async transport. `flush_async` is a coroutine and can be awaited if blocking behaviour is desired.
+
+
 ### Changed
 
 #### General
