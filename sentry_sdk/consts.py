@@ -77,8 +77,6 @@ if TYPE_CHECKING:
             "transport_compression_level": Optional[int],
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
-            "enable_logs": Optional[bool],
-            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
             "transport_async": Optional[bool],
         },
         total=False,
