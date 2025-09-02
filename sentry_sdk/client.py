@@ -25,7 +25,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
-from sentry_sdk.transport import BaseHttpTransport, make_transport
+from sentry_sdk.transport import HttpTransportCore, make_transport, AsyncHttpTransport
 from sentry_sdk.consts import (
     SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
@@ -212,6 +212,12 @@ class BaseClient:
         return None
 
     def flush(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def close_async(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    async def flush_async(self, *args: Any, **kwargs: Any) -> None:
         return None
 
     def __enter__(self) -> BaseClient:
@@ -406,7 +412,7 @@ class _Client(BaseClient):
             self.monitor
             or self.log_batcher
             or has_profiling_enabled(self.options)
-            or isinstance(self.transport, BaseHttpTransport)
+            or isinstance(self.transport, HttpTransportCore)
         ):
             # If we have anything on that could spawn a background thread, we
             # need to check if it's safe to use them.
@@ -442,12 +448,12 @@ class _Client(BaseClient):
 
         previous_total_spans: Optional[int] = None
         previous_total_breadcrumbs: Optional[int] = None
+        is_transaction = event.get("type") == "transaction"
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
-            is_transaction = event.get("type") == "transaction"
             spans_before = len(event.get("spans", []))
             event_ = scope.apply_to_event(event, hint, self.options)
 
@@ -488,7 +494,8 @@ class _Client(BaseClient):
                 )
 
         if (
-            self.options["attach_stacktrace"]
+            not is_transaction
+            and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event
@@ -917,6 +924,14 @@ class _Client(BaseClient):
 
         return self.integrations.get(integration_name)
 
+    def _close_components(self) -> None:
+        """Kill all client components in the correct order."""
+        self.session_flusher.kill()
+        if self.log_batcher is not None:
+            self.log_batcher.kill()
+        if self.monitor:
+            self.monitor.kill()
+
     def close(
         self,
         timeout: Optional[float] = None,
@@ -927,17 +942,41 @@ class _Client(BaseClient):
         semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
+            if isinstance(self.transport, AsyncHttpTransport) and hasattr(
+                self.transport, "loop"
+            ):
+                logger.debug(
+                    "close() used with AsyncHttpTransport, aborting. Please use close_async() instead."
+                )
+                return
             self.flush(timeout=timeout, callback=callback)
-
-            self.session_flusher.kill()
-
-            if self.log_batcher is not None:
-                self.log_batcher.kill()
-
-            if self.monitor:
-                self.monitor.kill()
-
+            self._close_components()
             self.transport.kill()
+            self.transport = None
+
+    async def close_async(
+        self,
+        timeout: Optional[float] = None,
+        callback: Optional[Callable[[int, float], None]] = None,
+    ) -> None:
+        """
+        Asynchronously close the client and shut down the transport. Arguments have the same
+        semantics as :py:meth:`Client.flush_async`.
+        """
+        if self.transport is not None:
+            if not (
+                isinstance(self.transport, AsyncHttpTransport)
+                and hasattr(self.transport, "loop")
+            ):
+                logger.debug(
+                    "close_async() used with non-async transport, aborting. Please use close() instead."
+                )
+                return
+            await self.flush_async(timeout=timeout, callback=callback)
+            self._close_components()
+            kill_task = self.transport.kill()  # type: ignore
+            if kill_task is not None:
+                await kill_task
             self.transport = None
 
     def flush(
@@ -953,14 +992,51 @@ class _Client(BaseClient):
         :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
+            if isinstance(self.transport, AsyncHttpTransport) and hasattr(
+                self.transport, "loop"
+            ):
+                logger.debug(
+                    "flush() used with AsyncHttpTransport, aborting. Please use flush_async() instead."
+                )
+                return
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
-            self.session_flusher.flush()
-
-            if self.log_batcher is not None:
-                self.log_batcher.flush()
+            self._flush_components()
 
             self.transport.flush(timeout=timeout, callback=callback)
+
+    async def flush_async(
+        self,
+        timeout: Optional[float] = None,
+        callback: Optional[Callable[[int, float], None]] = None,
+    ) -> None:
+        """
+        Asynchronously wait for the current events to be sent.
+
+        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.
+
+        :param callback: Is invoked with the number of pending events and the configured timeout.
+        """
+        if self.transport is not None:
+            if not (
+                isinstance(self.transport, AsyncHttpTransport)
+                and hasattr(self.transport, "loop")
+            ):
+                logger.debug(
+                    "flush_async() used with non-async transport, aborting. Please use flush() instead."
+                )
+                return
+            if timeout is None:
+                timeout = self.options["shutdown_timeout"]
+            self._flush_components()
+            flush_task = self.transport.flush(timeout=timeout, callback=callback)  # type: ignore
+            if flush_task is not None:
+                await flush_task
+
+    def _flush_components(self) -> None:
+        self.session_flusher.flush()
+        if self.log_batcher is not None:
+            self.log_batcher.flush()
 
     def __enter__(self) -> _Client:
         return self

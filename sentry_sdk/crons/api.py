@@ -2,6 +2,7 @@ from __future__ import annotations
 import uuid
 
 import sentry_sdk
+from sentry_sdk.utils import logger
 
 from typing import TYPE_CHECKING
 
@@ -52,5 +53,9 @@ def capture_checkin(
     )
 
     sentry_sdk.capture_event(check_in_event)
+
+    logger.debug(
+        f"[Crons] Captured check-in ({check_in_event.get('check_in_id')}): {check_in_event.get('monitor_slug')} -> {check_in_event.get('status')}"
+    )
 
     return check_in_event["check_in_id"]

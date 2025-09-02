@@ -1,5 +1,6 @@
 from __future__ import annotations
 import base64
+import contextvars
 import json
 import linecache
 import logging
@@ -12,6 +13,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
@@ -44,6 +46,7 @@ if TYPE_CHECKING:
         Callable,
         ContextManager,
         Dict,
+        Generator,
         Iterator,
         List,
         NoReturn,
@@ -71,6 +74,25 @@ epoch = datetime(1970, 1, 1)
 logger = logging.getLogger("sentry_sdk.errors")
 
 _installed_modules = None
+
+_is_sentry_internal_task = contextvars.ContextVar(
+    "is_sentry_internal_task", default=False
+)
+
+
+def is_internal_task() -> bool:
+    return _is_sentry_internal_task.get()
+
+
+@contextmanager
+def mark_sentry_task_internal() -> Generator[None, None, None]:
+    """Context manager to mark a task as Sentry internal."""
+    token = _is_sentry_internal_task.set(True)
+    try:
+        yield
+    finally:
+        _is_sentry_internal_task.reset(token)
+
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 

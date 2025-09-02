@@ -45,7 +45,7 @@ sentry_sdk.init(
 - The default of `traces_sample_rate` changed to `0`. Meaning: Incoming traces will be continued by default. For example, if your frontend sends a `sentry-trace/baggage` headers pair, your SDK will create Spans and send them to Sentry. (The default used to be `None` meaning by default no Spans where created, no matter what headers the frontend sent to your project.) See also: https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate
 - `sentry_sdk.start_span` now only takes keyword arguments.
 - `sentry_sdk.start_transaction`/`sentry_sdk.start_span` no longer takes the following arguments: `span`, `parent_sampled`, `trace_id`, `span_id` or `parent_span_id`.
-- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager. 
+- `sentry_sdk.continue_trace` no longer returns a `Transaction` and is now a context manager.
 
     - Use it to continue an upstream trace with the `sentry-trace` and `baggage` headers.
 
