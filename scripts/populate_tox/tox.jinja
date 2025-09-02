@@ -83,13 +83,6 @@ envlist =
     {py3.9,py3.11,py3.12}-langchain-latest
     {py3.9,py3.11,py3.12}-langchain-notiktoken
 
-    # OpenAI
-    {py3.9,py3.11,py3.12}-openai-v1.0
-    {py3.9,py3.11,py3.12}-openai-v1.22
-    {py3.9,py3.11,py3.12}-openai-v1.55
-    {py3.9,py3.11,py3.12}-openai-latest
-    {py3.9,py3.11,py3.12}-openai-notiktoken
-
     # OpenTelemetry (OTel)
     {py3.7,py3.9,py3.12,py3.13}-opentelemetry
 
@@ -252,20 +245,6 @@ deps =
     langchain-{latest,notiktoken}: openai>=1.6.1
     langchain-latest: tiktoken~=0.6.0
 
-    # OpenAI
-    openai: pytest-asyncio
-    openai-v1.0: openai~=1.0.0
-    openai-v1.0: tiktoken
-    openai-v1.0: httpx<0.28.0
-    openai-v1.22: openai~=1.22.0
-    openai-v1.22: tiktoken
-    openai-v1.22: httpx<0.28.0
-    openai-v1.55: openai~=1.55.0
-    openai-v1.55: tiktoken
-    openai-latest: openai
-    openai-latest: tiktoken~=0.6.0
-    openai-notiktoken: openai
-
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
 
@@ -401,7 +380,8 @@ setenv =
     launchdarkly: TESTPATH=tests/integrations/launchdarkly
     litestar: TESTPATH=tests/integrations/litestar
     loguru: TESTPATH=tests/integrations/loguru
-    openai: TESTPATH=tests/integrations/openai
+    openai_base: TESTPATH=tests/integrations/openai
+    openai_notiktoken: TESTPATH=tests/integrations/openai
     openai_agents: TESTPATH=tests/integrations/openai_agents
     openfeature: TESTPATH=tests/integrations/openfeature
     opentelemetry: TESTPATH=tests/integrations/opentelemetry
