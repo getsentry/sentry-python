@@ -17,6 +17,7 @@ represent the current tox.ini file. (And if not the CI run fails.)
 
 import configparser
 import hashlib
+import re
 import sys
 from collections import defaultdict
 from functools import reduce
@@ -25,6 +26,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
+VERSION_REGEX = re.compile(r"v{?[0-9.]+.*}?|latest")
 
 OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
@@ -207,10 +209,20 @@ def parse_tox():
         line = line.strip().lower()
 
         try:
-            # parse tox environment definition
-            try:
-                (raw_python_versions, framework, framework_versions) = line.split("-")
-            except ValueError:
+            # Parse tox environment definitions.
+            # The format is pythonversions-integrationname-integrationversions.
+            # Some valid examples:
+            # {pyX.Y,pyX.Z}-integrationname-vA.B.C
+            # {pyX.Y,pyX.Z}-integrationname-v{A.B.C}
+            # {pyX.Y,pyX.Z}-integrationname
+            # No that integrationname can also contain dashes, which makes this a
+            # bit more annoying.
+            raw_python_versions = line.split("-")[0]
+            framework_versions = line.rsplit("-", maxsplit=1)[-1]
+            framework = line[
+                len(raw_python_versions) + 1 : -(len(framework_versions) + 1)
+            ]
+            if not VERSION_REGEX.match(framework_versions):
                 (raw_python_versions, framework) = line.split("-")
                 framework_versions = []
 
