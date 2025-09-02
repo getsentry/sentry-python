@@ -63,6 +63,7 @@ setup(
         "huey": ["huey>=2"],
         "huggingface_hub": ["huggingface_hub>=0.22"],
         "langchain": ["langchain>=0.0.210"],
+        "langgraph": ["langgraph>=0.6.6"],
         "launchdarkly": ["launchdarkly-server-sdk>=9.8.0"],
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
