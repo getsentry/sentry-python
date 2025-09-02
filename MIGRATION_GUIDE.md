@@ -8,7 +8,25 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - Added `add_attachment()` as a top level API, so you can do now: `sentry_sdk.add_attachment(...)` (up until now it was only available on the `Scope`)
 - Added a new SDK option `exclude_span_origins`. Spans with an `origin` from `exclude_span_origins` won't be created. This can be used for example in dual OpenTelemetry/Sentry setups to filter out spans from specific Sentry instrumentations. Note that using `exclude_span_origins` might potentially lead to surprising results: if, for example, a root span is excluded based on `origin`, all of its children will become root spans, unless they were started with `only_as_child_span=True`.
-- Added a new experimental async transport using the [httpcore](https://pypi.org/project/httpcore/) library. Requires the [httpcore[asyncio]](https://www.encode.io/httpcore/async/) extension. The async transport makes Sentry network I/O non-blocking in async programs. The async transport can only be used when an event loop is running, and additionally requires the [asyncio](https://docs.sentry.io/platforms/python/integrations/asyncio/) integration. Can be enabled by passing `transport_async=True` in the `_experiments` dict in `sentry.init()`.
+- Added a new experimental async transport using the [httpcore](https://pypi.org/project/httpcore/) library. Requires the [httpcore[asyncio]](https://www.encode.io/httpcore/async/) extension. The async transport makes Sentry network I/O non-blocking in async programs. The async transport can only be used when an event loop is running, and additionally requires the [asyncio](https://docs.sentry.io/platforms/python/integrations/asyncio/) integration. Can be enabled by passing `transport_async=True` in the `_experiments` dict in `sentry.init()`. It might be worth having a code snippet?
+
+Suggested change
+- Added a new experimental async transport using the [httpcore](https://pypi.org/project/httpcore/) library. Requires the [httpcore[asyncio]](https://www.encode.io/httpcore/async/) extension. The async transport makes Sentry network I/O non-blocking in async programs. The async transport can only be used when an event loop is running, and additionally requires the [asyncio](https://docs.sentry.io/platforms/python/integrations/asyncio/) integration. Can be enabled by passing ``transport_async=true`` in the experiments dict in ``sentry.init()``.
+- Added a new experimental async transport using the [httpcore](https://pypi.org/project/httpcore/) library. Requires the [httpcore[asyncio]](https://www.encode.io/httpcore/async/) extension. The async transport makes Sentry network I/O non-blocking in async programs. The async transport can only be used when an event loop is running. Try it out by initializing Sentry with:
+  
+```python
+import sentry_sdk
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+sentry_sdk.init(
+    _experiments={
+        "transport_async": True,
+    },
+    integrations=[
+       	sentry_sdk.AsyncIO(),
+    ]
+)
+```
+
 - Added an asynchronous context manager for spans. This can be used to remove unnessecary nesting for span creation in async programs.
 - Added `flush_async()` as a top level API. This has to be used when flushing the async transport. `flush_async` is a coroutine and can be awaited if blocking behaviour is desired.
 ### Changed
