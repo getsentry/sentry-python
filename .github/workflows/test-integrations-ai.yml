@@ -58,10 +58,14 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cohere"
-      - name: Test langchain pinned
+      - name: Test langchain-base pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain"
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain-base"
+      - name: Test langchain-notiktoken pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain-notiktoken"
       - name: Test openai-base pinned
         run: |
           set -x # print commands that are executed
