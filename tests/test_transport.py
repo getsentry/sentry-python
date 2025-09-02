@@ -83,7 +83,7 @@ def mock_transaction_envelope(span_count: int) -> Envelope:
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
-@pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
+@pytest.mark.parametrize("http2", [None, False])
 def test_transport_works(
     capturing_server,
     request,
@@ -106,11 +106,9 @@ def test_transport_works(
     if compression_algo is not None:
         experiments["transport_compression_algo"] = compression_algo
 
-    if not http2:
-        experiments["http2"] = False
-
     client = make_client(
         debug=debug,
+        http2=http2,
         _experiments=experiments,
     )
 
