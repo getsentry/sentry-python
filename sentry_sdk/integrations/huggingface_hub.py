@@ -17,7 +17,7 @@ from sentry_sdk.utils import (
 try:
     import huggingface_hub.inference._client
 
-    from huggingface_hub import ChatCompletionStreamOutput, TextGenerationOutput
+    from huggingface_hub import ChatCompletionOutput, TextGenerationOutput
 except ImportError:
     raise DidNotEnable("Huggingface not installed")
 
@@ -38,6 +38,11 @@ class HuggingfaceHubIntegration(Integration):
         huggingface_hub.inference._client.InferenceClient.text_generation = (
             _wrap_text_generation(
                 huggingface_hub.inference._client.InferenceClient.text_generation
+            )
+        )
+        huggingface_hub.inference._client.InferenceClient.chat_completion = (
+            _wrap_text_generation(
+                huggingface_hub.inference._client.InferenceClient.chat_completion
             )
         )
 
@@ -63,12 +68,14 @@ def _wrap_text_generation(f):
 
         if "prompt" in kwargs:
             prompt = kwargs["prompt"]
+        elif "messages" in kwargs:
+            prompt = kwargs["messages"]
         elif len(args) >= 2:
             kwargs["prompt"] = args[1]
             prompt = kwargs["prompt"]
             args = (args[0],) + args[2:]
         else:
-            # invalid call, let it return error
+            # invalid call, dont instrument, let it return error
             return f(*args, **kwargs)
 
         client = args[0]
@@ -95,7 +102,9 @@ def _wrap_text_generation(f):
 
         with capture_internal_exceptions():
             if should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt)
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
+                )
 
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
 
@@ -104,22 +113,45 @@ def _wrap_text_generation(f):
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TEXT,
-                        [res],
+                        res,
                     )
                 span.__exit__(None, None, None)
                 return res
 
             if isinstance(res, TextGenerationOutput):
                 if should_send_default_pii() and integration.include_prompts:
+                    import ipdb
+
+                    ipdb.set_trace()
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TEXT,
-                        [res.generated_text],
+                        res.generated_text,
                     )
                 if res.details is not None and res.details.generated_tokens > 0:
                     record_token_usage(
                         span,
                         total_tokens=res.details.generated_tokens,
+                    )
+                span.__exit__(None, None, None)
+                return res
+
+            if isinstance(res, ChatCompletionOutput):
+                if should_send_default_pii() and integration.include_prompts:
+                    text_response = "".join(
+                        [x.get("message", {}).get("content") for x in res.choices]
+                    )
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_RESPONSE_TEXT,
+                        text_response,
+                    )
+                if hasattr(res, "usage") and res.usage is not None:
+                    record_token_usage(
+                        span,
+                        input_tokens=res.usage.prompt_tokens,
+                        output_tokens=res.usage.completion_tokens,
+                        total_tokens=res.usage.total_tokens,
                     )
                 span.__exit__(None, None, None)
                 return res
@@ -130,9 +162,9 @@ def _wrap_text_generation(f):
                 return res
 
             if kwargs.get("details", False):
-                # res is Iterable[TextGenerationStreamOutput]
+
                 def new_details_iterator():
-                    # type: () -> Iterable[ChatCompletionStreamOutput]
+                    # type: () -> Iterable[Any]
                     with capture_internal_exceptions():
                         tokens_used = 0
                         data_buf: list[str] = []
@@ -150,7 +182,9 @@ def _wrap_text_generation(f):
                             and integration.include_prompts
                         ):
                             set_data_normalized(
-                                span, SPANDATA.GEN_AI_RESPONSE_TEXT, "".join(data_buf)
+                                span,
+                                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                                "".join(data_buf),
                             )
                         if tokens_used > 0:
                             record_token_usage(
@@ -177,7 +211,9 @@ def _wrap_text_generation(f):
                             and integration.include_prompts
                         ):
                             set_data_normalized(
-                                span, SPANDATA.GEN_AI_RESPONSE_TEXT, "".join(data_buf)
+                                span,
+                                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                                "".join(data_buf),
                             )
                         span.__exit__(None, None, None)
 
