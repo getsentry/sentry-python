@@ -223,6 +223,7 @@ sentry_sdk.init(
 - PyMongo: The integration no longer sets tags. The data is still accessible via span attributes.
 - PyMongo: The integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
 - Django: Dropped support for Django versions below 2.0.
+- Django: Removed Spotlight integration for Django. -- See [Spotlight 2.0](https://github.com/getsentry/spotlight/issues/891) for more context.
 - trytond: Dropped support for trytond versions below 5.0.
 - Falcon: Dropped support for Falcon versions below 3.0.
 - eventlet: Dropped support for eventlet completely.
