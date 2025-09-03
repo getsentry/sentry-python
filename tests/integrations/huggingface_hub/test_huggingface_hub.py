@@ -68,7 +68,7 @@ def test_nonstreaming_chat_completion(
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
-    assert span["op"] == "ai.chat_completions.create.huggingface_hub"
+    assert span["op"] == "gen_ai.generate_text"
 
     if send_default_pii and include_prompts:
         assert "hello" in span["data"][SPANDATA.AI_INPUT_MESSAGES]
@@ -127,7 +127,7 @@ def test_streaming_chat_completion(
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
-    assert span["op"] == "ai.chat_completions.create.huggingface_hub"
+    assert span["op"] == "gen_ai.generate_text"
 
     if send_default_pii and include_prompts:
         assert "hello" in span["data"][SPANDATA.AI_INPUT_MESSAGES]
