@@ -1,14 +1,8 @@
 from __future__ import annotations
 import io
 import logging
-import os
-import urllib.parse
-import urllib.request
-import urllib.error
 import urllib3
 import sys
-
-from itertools import chain, product
 
 from typing import TYPE_CHECKING
 
