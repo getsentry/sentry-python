@@ -241,7 +241,6 @@ def parse_tox():
                 py_versions_pinned[framework] |= raw_python_versions
 
         except Exception:
-            raise
             print(f"ERROR reading line {line}")
             parsed_correctly = False
 
