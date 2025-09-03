@@ -85,7 +85,6 @@ def _wrap_text_generation(f):
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "generate_text")
         if model:
             span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
-        span.set_data(SPANDATA.GEN_AI_SYSTEM, "TODO!!!!!")
 
         try:
             res = f(*args, **kwargs)
