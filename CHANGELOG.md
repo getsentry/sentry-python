@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.35.2
+
+### Various fixes & improvements
+
+- fix(logs): Do not attach template if there are no parameters (#4728) by @sentrivana
+
+## 2.35.1
+
+### Various fixes & improvements
+
+- OpenAI Agents: Isolate agent run (#4720) by @sentrivana
+- Tracing: Do not attach stacktrace to transaction (#4713) by @Zylphrex
+
 ## 2.35.0
 
 ### Various fixes & improvements

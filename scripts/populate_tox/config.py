@@ -126,6 +126,26 @@ TEST_SUITE_CONFIG = {
     "huggingface_hub": {
         "package": "huggingface_hub",
     },
+    "langchain-base": {
+        "package": "langchain",
+        "integration_name": "langchain",
+        "deps": {
+            "*": ["openai", "tiktoken", "langchain-openai"],
+            "<=0.1": ["httpx<0.28.0"],
+            ">=0.3": ["langchain-community"],
+        },
+        "include": "<1.0",
+    },
+    "langchain-notiktoken": {
+        "package": "langchain",
+        "integration_name": "langchain",
+        "deps": {
+            "*": ["openai", "langchain-openai"],
+            "<=0.1": ["httpx<0.28.0"],
+            ">=0.3": ["langchain-community"],
+        },
+        "include": "<1.0",
+    },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
@@ -139,10 +159,29 @@ TEST_SUITE_CONFIG = {
     "loguru": {
         "package": "loguru",
     },
+    "openai-base": {
+        "package": "openai",
+        "integration_name": "openai",
+        "deps": {
+            "*": ["pytest-asyncio", "tiktoken"],
+            "<1.55": ["httpx<0.28"],
+        },
+        "python": ">=3.8",
+    },
+    "openai-notiktoken": {
+        "package": "openai",
+        "integration_name": "openai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+            "<1.55": ["httpx<0.28"],
+        },
+        "python": ">=3.8",
+    },
     "openai_agents": {
         "package": "openai-agents",
         "deps": {
             "*": ["pytest-asyncio"],
+            "<=0.2.10": ["openai<1.103.0"],
         },
         "python": ">=3.10",
     },
