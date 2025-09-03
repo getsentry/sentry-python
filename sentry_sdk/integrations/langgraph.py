@@ -102,6 +102,7 @@ def _wrap_state_graph_compile(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     @wraps(f)
     def new_compile(self, *args, **kwargs):
+        # type: (Any, Any, Any) -> Any
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
 
         compiled_graph = f(self, *args, **kwargs)
