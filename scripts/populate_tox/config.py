@@ -29,6 +29,13 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "arq": {
+        "package": "arq",
+        "deps": {
+            "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
+            "<=0.23": ["pydantic<2"],
+        },
+    },
     "bottle": {
         "package": "bottle",
         "deps": {
