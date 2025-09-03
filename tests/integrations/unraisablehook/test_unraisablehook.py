@@ -24,6 +24,7 @@ def test_unraisablehook(tmpdir, options, transport):
         dedent(
             """
     from sentry_sdk import init, transport
+    from sentry_sdk.integrations.unraisablehook import UnraisablehookIntegration
 
     class Undeletable:
         def __del__(self):
@@ -37,7 +38,7 @@ def test_unraisablehook(tmpdir, options, transport):
 
     transport.{transport}.capture_envelope = capture_envelope
 
-    init("http://foobar@localhost/123", {options})
+    init("http://foobar@localhost/123", integrations=[UnraisablehookIntegration()], {options})
 
     undeletable = Undeletable()
     del undeletable
