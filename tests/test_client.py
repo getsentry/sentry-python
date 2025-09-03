@@ -257,8 +257,8 @@ def test_proxy(monkeypatch, testcase, http2):
 
     kwargs = {}
 
-    if http2:
-        kwargs["_experiments"] = {"transport_http2": True}
+    if not http2:
+        kwargs["http2"] = False
 
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]

@@ -33,6 +33,7 @@ sentry_sdk.init(
 
 - The SDK now supports Python 3.7 and higher.
 - Tag values on event dictionaries, which are passed to `before_send` and `before_send_transaction`, now are always `str` values. Previously, despite tag values being typed as `str`, they often had different values. Therefore, if you have configured any `before_send` and `before_send_transaction` functions which perform some logic based on tag values, you need to check and if needed update those functions to correctly handle `str` values.
+- The SDK now uses HTTP/2 for its default transport. This can be disabled via setting `http2=False` in `sentry_sdk.init()`. This change also affects `socket_options` as HTTP/2 requires persistent connections. If you want to disable keep-alive, consider disabling HTTP/2 as passing an empty list to `socket_options` would _not_ disable keep alive.
 
 #### Error Capturing
 

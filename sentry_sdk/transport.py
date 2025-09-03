@@ -1051,7 +1051,12 @@ else:
 def make_transport(options: Dict[str, Any]) -> Optional[Transport]:
     ref_transport = options["transport"]
 
-    use_http2_transport = options.get("_experiments", {}).get("transport_http2", False)
+    # We default to using HTTP2 transport if the user also has the required h2
+    # library installed (through the subclass check). The reason is h2 not being
+    # available on py3.7 which we still support.
+    use_http2_transport = options.get("http2") is not False and not issubclass(
+        Http2Transport, HttpTransport
+    )
     use_async_transport = options.get("_experiments", {}).get("transport_async", False)
     async_integration = any(
         integration.__class__.__name__ == "AsyncioIntegration"
