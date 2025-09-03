@@ -204,6 +204,8 @@ def parse_tox():
     py_versions_pinned = defaultdict(set)
     py_versions_latest = defaultdict(set)
 
+    parsed_correctly = True
+
     for line in lines:
         # normalize lines
         line = line.strip().lower()
@@ -237,6 +239,10 @@ def parse_tox():
 
         except ValueError:
             print(f"ERROR reading line {line}")
+            parsed_correctly = False
+
+    if not parsed_correctly:
+        raise RuntimeError("Failed to parse tox.ini")
 
     py_versions_pinned = _normalize_py_versions(py_versions_pinned)
     py_versions_latest = _normalize_py_versions(py_versions_latest)
