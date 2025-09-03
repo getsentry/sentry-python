@@ -74,10 +74,6 @@ IGNORE = {
     "chalice",
     "gcp",
     "httpx",
-    "langchain",
-    "langchain_notiktoken",
-    "openai",
-    "openai_notiktoken",
     "pure_eval",
     "quart",
     "ray",
@@ -141,7 +137,11 @@ def _prefilter_releases(
     - the list of prefiltered releases
     - an optional prerelease if there is one that should be tested
     """
-    min_supported = _MIN_VERSIONS.get(integration)
+    integration_name = (
+        TEST_SUITE_CONFIG[integration].get("integration_name") or integration
+    )
+
+    min_supported = _MIN_VERSIONS.get(integration_name)
     if min_supported is not None:
         min_supported = Version(".".join(map(str, min_supported)))
     else:

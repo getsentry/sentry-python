@@ -22,85 +22,6 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-ai-latest:
-    name: AI (latest)
-    timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.9","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-22.04]
-    # Use Docker container only for Python 3.6
-    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
-        if: ${{ matrix.python-version != '3.6' }}
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-      - name: Setup Test Env
-        run: |
-          pip install "coverage[toml]" tox
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test anthropic latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-anthropic-latest"
-      - name: Test cohere latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere-latest"
-      - name: Test langchain latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-latest"
-      - name: Test openai latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-latest"
-      - name: Test openai_agents latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai_agents-latest"
-      - name: Test huggingface_hub latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub-latest"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-      - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
-        run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugins: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
-          verbose: true
   test-ai-pinned:
     name: AI (pinned)
     timeout-minutes: 30
@@ -117,7 +38,7 @@ jobs:
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
       - uses: actions/setup-python@v5
         if: ${{ matrix.python-version != '3.6' }}
         with:
@@ -137,14 +58,22 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cohere"
-      - name: Test langchain pinned
+      - name: Test langchain-base pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain"
-      - name: Test openai pinned
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain-base"
+      - name: Test langchain-notiktoken pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai"
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain-notiktoken"
+      - name: Test openai-base pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai-base"
+      - name: Test openai-notiktoken pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai-notiktoken"
       - name: Test openai_agents pinned
         run: |
           set -x # print commands that are executed
@@ -166,7 +95,7 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@v5.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
