@@ -51,6 +51,21 @@ def _get_graph_name(graph_obj):
     return None
 
 
+def _normalize_langgraph_message(message):
+    # type: (Any) -> Any
+    if not hasattr(message, "content"):
+        return None
+    parsed = {"role": getattr(message, "type", None), "content": message.content}
+
+    for attr in ["name", "tool_calls", "function_call", "tool_call_id"]:
+        if hasattr(message, attr):
+            value = getattr(message, attr)
+            if value is not None:
+                parsed[attr] = value
+
+    return parsed
+
+
 def _parse_langgraph_messages(state):
     # type: (Any) -> Optional[List[Any]]
     if not state:
@@ -74,15 +89,9 @@ def _parse_langgraph_messages(state):
     normalized_messages = []
     for message in messages:
         try:
-            if hasattr(message, "content"):
-                parsed = {"content": message.content}
-                for attr in ["name", "tool_calls", "function_call"]:
-                    if hasattr(message, attr):
-                        value = getattr(message, attr)
-                        if value is not None:
-                            parsed[attr] = value
-                normalized_messages.append(parsed)
-
+            normalized = _normalize_langgraph_message(message)
+            if normalized:
+                normalized_messages.append(normalized)
         except Exception:
             continue
 
@@ -150,21 +159,23 @@ def _wrap_pregel_invoke(f):
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
+            # Store input messages to later compare with output
+            input_messages = None
             if (
                 len(args) > 0
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                parsed_messages = _parse_langgraph_messages(args[0])
-                if parsed_messages:
-                    span.set_data(
+                input_messages = _parse_langgraph_messages(args[0])
+                if input_messages:
+                    set_data_normalized(
+                        span,
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        safe_serialize(parsed_messages),
+                        safe_serialize(input_messages),
                     )
 
             result = f(self, *args, **kwargs)
-            if should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+            _set_response_attributes(span, input_messages, result, integration)
             return result
 
     return new_invoke
@@ -194,21 +205,97 @@ def _wrap_pregel_ainvoke(f):
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
+            input_messages = None
             if (
                 len(args) > 0
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                parsed_messages = _parse_langgraph_messages(args[0])
-                if parsed_messages:
-                    span.set_data(
+                input_messages = _parse_langgraph_messages(args[0])
+                if input_messages:
+                    set_data_normalized(
+                        span,
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        safe_serialize(parsed_messages),
+                        safe_serialize(input_messages),
                     )
-                result = await f(self, *args, **kwargs)
-                if should_send_default_pii() and integration.include_prompts:
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
-                return result
+
+            result = await f(self, *args, **kwargs)
+            _set_response_attributes(span, input_messages, result, integration)
+            return result
 
     new_ainvoke.__wrapped__ = True
     return new_ainvoke
+
+
+def _get_new_messages(input_messages, output_messages):
+    # type: (Optional[List[Any]], Optional[List[Any]]) -> Optional[List[Any]]
+    """Extract only the new messages added during this invocation."""
+    if not output_messages:
+        return None
+
+    if not input_messages:
+        return output_messages
+
+    # only return the new messages, aka the output messages that are not in the input messages
+    input_count = len(input_messages)
+    new_messages = (
+        output_messages[input_count:] if len(output_messages) > input_count else []
+    )
+
+    return new_messages if new_messages else None
+
+
+def _extract_llm_response_text(messages):
+    # type: (Optional[List[Any]]) -> Optional[str]
+    if not messages:
+        return None
+
+    for message in reversed(messages):
+        if isinstance(message, dict):
+            role = message.get("role")
+            if role in ["assistant", "ai"]:
+                content = message.get("content")
+                if content and isinstance(content, str):
+                    return content
+
+    return None
+
+
+def _extract_tool_calls(messages):
+    # type: (Optional[List[Any]]) -> Optional[List[Any]]
+    if not messages:
+        return None
+
+    tool_calls = []
+    for message in messages:
+        if isinstance(message, dict):
+            msg_tool_calls = message.get("tool_calls")
+            if msg_tool_calls and isinstance(msg_tool_calls, list):
+                tool_calls.extend(msg_tool_calls)
+
+    return tool_calls if tool_calls else None
+
+
+def _set_response_attributes(span, input_messages, result, integration):
+    # type: (Any, Optional[List[Any]], Any, LanggraphIntegration) -> None
+    if not (should_send_default_pii() and integration.include_prompts):
+        return
+
+    parsed_response_messages = _parse_langgraph_messages(result)
+    new_messages = _get_new_messages(input_messages, parsed_response_messages)
+
+    llm_response_text = _extract_llm_response_text(new_messages)
+    if llm_response_text:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
+    elif new_messages:
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(new_messages)
+        )
+    else:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+
+    tool_calls = _extract_tool_calls(new_messages)
+    if tool_calls:
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
+        )
