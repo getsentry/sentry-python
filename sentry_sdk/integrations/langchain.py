@@ -250,7 +250,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
-                # Flatten the nested list structure to a single list of message dicts
                 normalized_messages = []
                 for list_ in messages:
                     for message in list_:
@@ -479,13 +478,11 @@ def _get_token_usage(obj):
             if usage is not None:
                 return usage
 
-    # check for usage in the object itself
     for name in possible_names:
         usage = _get_value(obj, name)
         if usage is not None:
             return usage
 
-    # no usage found anywhere
     return None
 
 
@@ -686,7 +683,7 @@ def _wrap_configure(f):
                 ]
             elif isinstance(local_callbacks, BaseCallbackHandler):
                 local_callbacks = [local_callbacks, sentry_handler]
-            else:  # local_callbacks is a list
+            else:
                 local_callbacks = [*local_callbacks, sentry_handler]
 
         return f(
