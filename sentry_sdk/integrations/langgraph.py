@@ -224,7 +224,6 @@ def _wrap_pregel_ainvoke(f):
             _set_response_attributes(span, input_messages, result, integration)
             return result
 
-    new_ainvoke.__wrapped__ = True
     return new_ainvoke
 
 
