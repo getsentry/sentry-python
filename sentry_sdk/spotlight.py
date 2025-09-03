@@ -7,12 +7,10 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Optional
+    from typing import Any, Dict, Optional
 
 from sentry_sdk.utils import (
     logger as sentry_logger,
-    env_to_bool,
-    capture_internal_exceptions,
 )
 from sentry_sdk.envelope import Envelope
 
