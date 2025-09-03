@@ -236,7 +236,7 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
     assert len(invoke_spans) == 1
 
     invoke_span = invoke_spans[0]
-    assert "invoke_agent invoke test_graph" in invoke_span["description"]
+    assert invoke_span["description"] == "invoke_agent"
     assert invoke_span["origin"] == "auto.ai.langgraph"
     assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
     assert invoke_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
@@ -656,7 +656,7 @@ def test_pregel_invoke_with_different_graph_names(
     invoke_span = invoke_spans[0]
 
     if graph_name and graph_name.strip():
-        assert f"invoke_agent invoke {graph_name}" in invoke_span["description"]
+        assert invoke_span["description"] == "invoke_agent"
         assert invoke_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == graph_name
         assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == graph_name
     else:
