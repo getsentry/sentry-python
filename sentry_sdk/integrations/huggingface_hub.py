@@ -1,15 +1,14 @@
 from functools import wraps
 
-from sentry_sdk import consts
-from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import SPANDATA
 
 from typing import Any, Iterable, Callable
 
 import sentry_sdk
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.ai.monitoring import record_token_usage
+from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -34,6 +33,8 @@ class HuggingfaceHubIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        # Other tasks that can be called: https://huggingface.co/docs/huggingface_hub/guides/inference#supported-providers-and-tasks
         huggingface_hub.inference._client.InferenceClient.text_generation = (
             _wrap_text_generation(
                 huggingface_hub.inference._client.InferenceClient.text_generation
@@ -70,15 +71,22 @@ def _wrap_text_generation(f):
             # invalid call, let it return error
             return f(*args, **kwargs)
 
-        model = kwargs.get("model")
+        client = args[0]
+        model = client.model or kwargs.get("model") or ""
         streaming = kwargs.get("stream")
 
         span = sentry_sdk.start_span(
-            op=consts.OP.HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE,
-            name="Text Generation",
+            op=OP.GEN_AI_GENERATE_TEXT,
+            name=f"generate_text {model}",
             origin=HuggingfaceHubIntegration.origin,
         )
         span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "generate_text")
+        if model:
+            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        span.set_data(SPANDATA.GEN_AI_SYSTEM, "TODO!!!!!")
+
         try:
             res = f(*args, **kwargs)
         except Exception as e:
@@ -88,16 +96,15 @@ def _wrap_text_generation(f):
 
         with capture_internal_exceptions():
             if should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, prompt)
+                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt)
 
-            set_data_normalized(span, SPANDATA.AI_MODEL_ID, model)
-            set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, streaming)
 
             if isinstance(res, str):
                 if should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span,
-                        SPANDATA.AI_RESPONSES,
+                        SPANDATA.GEN_AI_RESPONSE_TEXT,
                         [res],
                     )
                 span.__exit__(None, None, None)
@@ -107,7 +114,7 @@ def _wrap_text_generation(f):
                 if should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span,
-                        SPANDATA.AI_RESPONSES,
+                        SPANDATA.GEN_AI_RESPONSE_TEXT,
                         [res.generated_text],
                     )
                 if res.details is not None and res.details.generated_tokens > 0:
@@ -120,7 +127,6 @@ def _wrap_text_generation(f):
 
             if not isinstance(res, Iterable):
                 # we only know how to deal with strings and iterables, ignore
-                set_data_normalized(span, "unknown_response", True)
                 span.__exit__(None, None, None)
                 return res
 
@@ -145,7 +151,7 @@ def _wrap_text_generation(f):
                             and integration.include_prompts
                         ):
                             set_data_normalized(
-                                span, SPANDATA.AI_RESPONSES, "".join(data_buf)
+                                span, SPANDATA.GEN_AI_RESPONSE_TEXT, "".join(data_buf)
                             )
                         if tokens_used > 0:
                             record_token_usage(
@@ -172,7 +178,7 @@ def _wrap_text_generation(f):
                             and integration.include_prompts
                         ):
                             set_data_normalized(
-                                span, SPANDATA.AI_RESPONSES, "".join(data_buf)
+                                span, SPANDATA.GEN_AI_RESPONSE_TEXT, "".join(data_buf)
                             )
                         span.__exit__(None, None, None)
 
