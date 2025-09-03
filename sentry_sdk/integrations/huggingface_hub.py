@@ -36,13 +36,15 @@ class HuggingfaceHubIntegration(Integration):
 
         # Other tasks that can be called: https://huggingface.co/docs/huggingface_hub/guides/inference#supported-providers-and-tasks
         huggingface_hub.inference._client.InferenceClient.text_generation = (
-            _wrap_text_generation(
-                huggingface_hub.inference._client.InferenceClient.text_generation
+            _wrap_huggingface_task(
+                huggingface_hub.inference._client.InferenceClient.text_generation,
+                OP.GEN_AI_GENERATE_TEXT,
             )
         )
         huggingface_hub.inference._client.InferenceClient.chat_completion = (
-            _wrap_text_generation(
-                huggingface_hub.inference._client.InferenceClient.chat_completion
+            _wrap_huggingface_task(
+                huggingface_hub.inference._client.InferenceClient.chat_completion,
+                OP.GEN_AI_CHAT,
             )
         )
 
@@ -57,8 +59,8 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _wrap_text_generation(f):
-    # type: (Callable[..., Any]) -> Callable[..., Any]
+def _wrap_huggingface_task(f, op):
+    # type: (Callable[..., Any], str) -> Callable[..., Any]
     @wraps(f)
     def new_text_generation(*args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -81,21 +83,23 @@ def _wrap_text_generation(f):
         client = args[0]
         model = client.model or kwargs.get("model") or ""
         streaming = kwargs.get("stream")
+        operation_name = op.split(".")[-1]
 
         span = sentry_sdk.start_span(
-            op=OP.GEN_AI_GENERATE_TEXT,
-            name=f"generate_text {model}",
+            op=op,
+            name=f"{operation_name} {model}",
             origin=HuggingfaceHubIntegration.origin,
         )
         span.__enter__()
 
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "generate_text")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, operation_name)
         if model:
             span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
         try:
             res = f(*args, **kwargs)
         except Exception as e:
+            span.set_status("error")
             _capture_exception(e)
             span.__exit__(None, None, None)
             raise e from None
@@ -120,9 +124,6 @@ def _wrap_text_generation(f):
 
             if isinstance(res, TextGenerationOutput):
                 if should_send_default_pii() and integration.include_prompts:
-                    import ipdb
-
-                    ipdb.set_trace()
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TEXT,
