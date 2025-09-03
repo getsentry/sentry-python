@@ -73,8 +73,6 @@ IGNORE = {
     "chalice",
     "gcp",
     "httpx",
-    "langchain",
-    "langchain_notiktoken",
     "pure_eval",
     "quart",
     "ray",
