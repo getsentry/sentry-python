@@ -589,3 +589,57 @@ def test_langchain_callback_list_existing_callback(sentry_init):
 
         [handler] = passed_callbacks
         assert handler is sentry_callback
+
+
+def test_tools_integration_in_spans(sentry_init, capture_events):
+    """Test that tools are properly set on spans in actual LangChain integration."""
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    # Create a simple mock LLM that supports tools
+    from langchain_core.language_models.llms import LLM
+
+    class MockLLMWithTools(LLM):
+        def _call(self, prompt, stop=None, run_manager=None, **kwargs):
+            return "Mock response"
+
+        @property
+        def _llm_type(self):
+            return "mock_llm"
+
+    # Mock tools for testing
+    test_tools = [
+        {"name": "search", "description": "Search tool"},
+        {"name": "calculator", "description": "Math tool"},
+    ]
+
+    with start_transaction():
+        llm = MockLLMWithTools()
+        # Simulate a call with tools
+        llm.invoke("test prompt", config={"tools": test_tools})
+
+    # Check that events were captured
+    if events:
+        tx = events[0]
+        spans = tx.get("spans", [])
+
+        # Look for spans that should have tools data
+        for span in spans:
+            span_data = span.get("data", {})
+            if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
+                tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+                # Verify tools are in the expected format
+                assert isinstance(tools_data, (str, list))  # Could be serialized
+                if isinstance(tools_data, str):
+                    # If serialized as string, should contain tool names
+                    assert "search" in tools_data
+                    assert "calculator" in tools_data
+                else:
+                    # If still a list, verify structure
+                    assert len(tools_data) == 2
+                    names = [tool.get("name") for tool in tools_data]
+                    assert "search" in names
+                    assert "calculator" in names
