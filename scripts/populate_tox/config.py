@@ -145,142 +145,143 @@ TEST_SUITE_CONFIG = {
             ">=0.3": ["langchain-community"],
         },
         "include": "<1.0",
-    "langgraph": {
-        "package": "langgraph",
-    },
-    "launchdarkly": {
-        "package": "launchdarkly-server-sdk",
-    },
-    "litestar": {
-        "package": "litestar",
-        "deps": {
-            "*": ["pytest-asyncio", "python-multipart", "requests", "cryptography"],
-            "<2.7": ["httpx<0.28"],
+        "langgraph": {
+            "package": "langgraph",
         },
-    },
-    "loguru": {
-        "package": "loguru",
-    },
-    "openai-base": {
-        "package": "openai",
-        "integration_name": "openai",
-        "deps": {
-            "*": ["pytest-asyncio", "tiktoken"],
-            "<1.55": ["httpx<0.28"],
+        "launchdarkly": {
+            "package": "launchdarkly-server-sdk",
         },
-        "python": ">=3.8",
-    },
-    "openai-notiktoken": {
-        "package": "openai",
-        "integration_name": "openai",
-        "deps": {
-            "*": ["pytest-asyncio"],
-            "<1.55": ["httpx<0.28"],
+        "litestar": {
+            "package": "litestar",
+            "deps": {
+                "*": ["pytest-asyncio", "python-multipart", "requests", "cryptography"],
+                "<2.7": ["httpx<0.28"],
+            },
         },
-        "python": ">=3.8",
-    },
-    "openai_agents": {
-        "package": "openai-agents",
-        "deps": {
-            "*": ["pytest-asyncio"],
-            "<=0.2.10": ["openai<1.103.0"],
+        "loguru": {
+            "package": "loguru",
         },
-        "python": ">=3.10",
-    },
-    "openfeature": {
-        "package": "openfeature-sdk",
-    },
-    "pymongo": {
-        "package": "pymongo",
-        "deps": {
-            "*": ["mockupdb"],
+        "openai-base": {
+            "package": "openai",
+            "integration_name": "openai",
+            "deps": {
+                "*": ["pytest-asyncio", "tiktoken"],
+                "<1.55": ["httpx<0.28"],
+            },
+            "python": ">=3.8",
         },
-    },
-    "pyramid": {
-        "package": "pyramid",
-        "deps": {
-            "*": ["werkzeug<2.1.0"],
+        "openai-notiktoken": {
+            "package": "openai",
+            "integration_name": "openai",
+            "deps": {
+                "*": ["pytest-asyncio"],
+                "<1.55": ["httpx<0.28"],
+            },
+            "python": ">=3.8",
         },
-    },
-    "redis_py_cluster_legacy": {
-        "package": "redis-py-cluster",
-    },
-    "requests": {
-        "package": "requests",
-    },
-    "spark": {
-        "package": "pyspark",
-        "python": ">=3.8",
-    },
-    "sqlalchemy": {
-        "package": "sqlalchemy",
-    },
-    "starlette": {
-        "package": "starlette",
-        "deps": {
-            "*": [
-                "pytest-asyncio",
-                "python-multipart",
-                "requests",
-                "anyio<4.0.0",
-                "jinja2",
-                "httpx",
-            ],
-            # See the comment on FastAPI's httpx bound for more info
-            "<0.37.2": ["httpx<0.28.0"],
-            "<0.15": ["jinja2<3.1"],
-            "py3.6": ["aiocontextvars"],
+        "openai_agents": {
+            "package": "openai-agents",
+            "deps": {
+                "*": ["pytest-asyncio"],
+                "<=0.2.10": ["openai<1.103.0"],
+            },
+            "python": ">=3.10",
         },
-    },
-    "starlite": {
-        "package": "starlite",
-        "deps": {
-            "*": [
-                "pytest-asyncio",
-                "python-multipart",
-                "requests",
-                "cryptography",
-                "pydantic<2.0.0",
-                "httpx<0.28",
-            ],
+        "openfeature": {
+            "package": "openfeature-sdk",
         },
-        "python": "<=3.11",
-        "include": "!=2.0.0a1,!=2.0.0a2",  # these are not relevant as there will never be a stable 2.0 release (starlite continues as litestar)
-    },
-    "statsig": {
-        "package": "statsig",
-        "deps": {
-            "*": ["typing_extensions"],
+        "pymongo": {
+            "package": "pymongo",
+            "deps": {
+                "*": ["mockupdb"],
+            },
         },
-    },
-    "strawberry": {
-        "package": "strawberry-graphql[fastapi,flask]",
-        "deps": {
-            "*": ["httpx"],
-            "<=0.262.5": ["pydantic<2.11"],
+        "pyramid": {
+            "package": "pyramid",
+            "deps": {
+                "*": ["werkzeug<2.1.0"],
+            },
         },
-    },
-    "tornado": {
-        "package": "tornado",
-        "deps": {
-            "*": ["pytest"],
-            "<=6.4.1": [
-                "pytest<8.2"
-            ],  # https://github.com/tornadoweb/tornado/pull/3382
-            "py3.6": ["aiocontextvars"],
+        "redis_py_cluster_legacy": {
+            "package": "redis-py-cluster",
         },
-    },
-    "trytond": {
-        "package": "trytond",
-        "deps": {
-            "*": ["werkzeug"],
-            "<=5.0": ["werkzeug<1.0"],
+        "requests": {
+            "package": "requests",
         },
-    },
-    "typer": {
-        "package": "typer",
-    },
-    "unleash": {
-        "package": "UnleashClient",
+        "spark": {
+            "package": "pyspark",
+            "python": ">=3.8",
+        },
+        "sqlalchemy": {
+            "package": "sqlalchemy",
+        },
+        "starlette": {
+            "package": "starlette",
+            "deps": {
+                "*": [
+                    "pytest-asyncio",
+                    "python-multipart",
+                    "requests",
+                    "anyio<4.0.0",
+                    "jinja2",
+                    "httpx",
+                ],
+                # See the comment on FastAPI's httpx bound for more info
+                "<0.37.2": ["httpx<0.28.0"],
+                "<0.15": ["jinja2<3.1"],
+                "py3.6": ["aiocontextvars"],
+            },
+        },
+        "starlite": {
+            "package": "starlite",
+            "deps": {
+                "*": [
+                    "pytest-asyncio",
+                    "python-multipart",
+                    "requests",
+                    "cryptography",
+                    "pydantic<2.0.0",
+                    "httpx<0.28",
+                ],
+            },
+            "python": "<=3.11",
+            "include": "!=2.0.0a1,!=2.0.0a2",  # these are not relevant as there will never be a stable 2.0 release (starlite continues as litestar)
+        },
+        "statsig": {
+            "package": "statsig",
+            "deps": {
+                "*": ["typing_extensions"],
+            },
+        },
+        "strawberry": {
+            "package": "strawberry-graphql[fastapi,flask]",
+            "deps": {
+                "*": ["httpx"],
+                "<=0.262.5": ["pydantic<2.11"],
+            },
+        },
+        "tornado": {
+            "package": "tornado",
+            "deps": {
+                "*": ["pytest"],
+                "<=6.4.1": [
+                    "pytest<8.2"
+                ],  # https://github.com/tornadoweb/tornado/pull/3382
+                "py3.6": ["aiocontextvars"],
+            },
+        },
+        "trytond": {
+            "package": "trytond",
+            "deps": {
+                "*": ["werkzeug"],
+                "<=5.0": ["werkzeug<1.0"],
+            },
+        },
+        "typer": {
+            "package": "typer",
+        },
+        "unleash": {
+            "package": "UnleashClient",
+        },
     },
 }
