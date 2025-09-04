@@ -118,7 +118,6 @@ def _wrap_state_graph_compile(f):
                 span.name = f"create_agent {compiled_graph_name}"
                 span.description = f"create_agent {compiled_graph_name}"
             else:
-                print("here in the wrong section")
                 span.name = "create_agent"
                 span.description = "create_agent"
             if kwargs.get("model", None) is not None:
@@ -184,6 +183,9 @@ def _wrap_pregel_invoke(f):
 
             result = f(self, *args, **kwargs)
             _set_response_attributes(span, input_messages, result, integration)
+            import ipdb
+
+            ipdb.set_trace()
             return result
 
     return new_invoke
