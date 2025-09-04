@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.36.0
+
+### Various fixes & improvements
+
+- meta: Update instructions on release process (#4755) by @sentrivana
+- tests: Move arq under toxgen (#4739) by @sentrivana
+- tests: Support dashes in test suite names (#4740) by @sentrivana
+- feat(integrations): Add unraisable exception integration (#4733) by @alexander-alderman-webb
+- Don't fail if there is no `_context_manager_state` (#4698) by @sentrivana
+- Wrap span restoration in `__exit__` in `capture_internal_exceptions` (#4719) by @sentrivana
+- fix: Constrain types of ai_track decorator (#4745) by @alexander-alderman-webb
+- Fix `openai_agents` in CI (#4742) by @sentrivana
+- Remove old langchain test suites from ignore list (#4737) by @sentrivana
+- tests: Trigger Pytest failure when an unraisable exception occurs (#4738) by @alexander-alderman-webb
+- fix(openai): Avoid double exit causing an unraisable exception (#4736) by @alexander-alderman-webb
+- tests: Move langchain under toxgen (#4734) by @sentrivana
+- toxgen: Add variants & move OpenAI under toxgen (#4730) by @sentrivana
+- Update tox.ini (#4731) by @sentrivana
+
 ## 2.35.2
 
 ### Various fixes & improvements
