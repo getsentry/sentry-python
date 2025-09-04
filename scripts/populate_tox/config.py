@@ -36,6 +36,10 @@ TEST_SUITE_CONFIG = {
             "<=0.23": ["pydantic<2"],
         },
     },
+    "beam": {
+        "package": "apache-beam",
+        "python": ">=3.7",
+    },
     "bottle": {
         "package": "bottle",
         "deps": {
