@@ -1,5 +1,6 @@
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.ai.utils import get_start_span_function
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
@@ -13,7 +14,8 @@ if TYPE_CHECKING:
 
 def invoke_agent_span(context, agent):
     # type: (agents.RunContextWrapper, agents.Agent) -> sentry_sdk.tracing.Span
-    span = sentry_sdk.start_span(
+    start_span_function = get_start_span_function()
+    span = start_span_function(
         op=OP.GEN_AI_INVOKE_AGENT,
         name=f"invoke_agent {agent.name}",
         origin=SPAN_ORIGIN,

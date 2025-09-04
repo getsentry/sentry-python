@@ -4,7 +4,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -626,8 +626,9 @@ def _wrap_agent_executor_invoke(f):
             return f(self, *args, **kwargs)
 
         agent_name, tools = _get_request_data(self, args, kwargs)
+        start_span_function = get_start_span_function()
 
-        with sentry_sdk.start_span(
+        with start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=f"invoke_agent {agent_name}" if agent_name else "invoke_agent",
             origin=LangchainIntegration.origin,
@@ -684,8 +685,9 @@ def _wrap_agent_executor_stream(f):
             return f(self, *args, **kwargs)
 
         agent_name, tools = _get_request_data(self, args, kwargs)
+        start_span_function = get_start_span_function()
 
-        span = sentry_sdk.start_span(
+        span = start_span_function(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=f"invoke_agent {agent_name}".strip(),
             origin=LangchainIntegration.origin,
