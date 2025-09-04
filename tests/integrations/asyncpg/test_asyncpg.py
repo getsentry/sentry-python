@@ -21,9 +21,6 @@ PG_NAME_BASE = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
 
 
 def _get_db_name():
-    """Get database name, using worker/process ID for parallel test isolation."""
-    # For tox parallel execution or other parallel scenarios, use process ID
-    # This ensures each process gets its own database
     pid = os.getpid()
     thread_id = threading.get_ident()
     return f"{PG_NAME_BASE}_{pid}_{thread_id}"
