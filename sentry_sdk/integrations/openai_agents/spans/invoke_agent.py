@@ -2,7 +2,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data
+from ..utils import _set_agent_data, _set_usage_data
 
 from typing import TYPE_CHECKING
 
@@ -31,4 +31,7 @@ def update_invoke_agent_span(context, agent, output):
     # type: (agents.RunContextWrapper, agents.Agent, Any) -> None
     current_span = sentry_sdk.get_current_span()
     if current_span:
+        if hasattr(context, "usage") and context.usage is not None:
+            _set_usage_data(current_span, context.usage)
+
         current_span.__exit__(None, None, None)
