@@ -62,7 +62,9 @@ CRUMBS_CONNECT = {
 async def _clean_pg():
     # Create the test database if it doesn't exist
     try:
-        default_conn = await connect(PG_CONNECTION_URI)
+        default_conn = await connect(
+            "postgresql://{}:{}@{}".format(PG_USER, PG_PASSWORD, PG_HOST)
+        )
         try:
             # Check if database exists, create if not
             result = await default_conn.fetchval(
