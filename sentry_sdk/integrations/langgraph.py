@@ -118,10 +118,8 @@ def _wrap_state_graph_compile(f):
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, compiled_graph_name)
 
             if compiled_graph_name:
-                span.name = f"create_agent {compiled_graph_name}"
                 span.description = f"create_agent {compiled_graph_name}"
             else:
-                span.name = "create_agent"
                 span.description = "create_agent"
 
             if kwargs.get("model", None) is not None:
@@ -211,6 +209,7 @@ def _wrap_pregel_ainvoke(f):
         span_name = (
             f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent"
         )
+
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=span_name,
