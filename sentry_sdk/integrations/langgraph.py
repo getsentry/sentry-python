@@ -198,10 +198,12 @@ def _wrap_pregel_ainvoke(f):
             return await f(self, *args, **kwargs)
 
         graph_name = _get_graph_name(self)
-
+        span_name = (
+            f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent"
+        )
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name=f"invoke_agent {graph_name}".strip(),
+            name=span_name,
             origin=LanggraphIntegration.origin,
         ) as span:
             if graph_name:
