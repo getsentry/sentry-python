@@ -36,6 +36,12 @@ TEST_SUITE_CONFIG = {
             "<=0.23": ["pydantic<2"],
         },
     },
+    "asyncpg": {
+        "package": "asyncpg",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+    },
     "bottle": {
         "package": "bottle",
         "deps": {
