@@ -36,6 +36,13 @@ TEST_SUITE_CONFIG = {
             "<=0.23": ["pydantic<2"],
         },
     },
+    "asyncpg": {
+        "package": "asyncpg",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.7",
+    },
     "beam": {
         "package": "apache-beam",
         "python": ">=3.7",

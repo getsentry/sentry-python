@@ -39,10 +39,6 @@ envlist =
     # Asgi
     {py3.7,py3.12,py3.13}-asgi
 
-    # asyncpg
-    {py3.7,py3.10}-asyncpg-v{0.23}
-    {py3.8,py3.11,py3.12}-asyncpg-latest
-
     # AWS Lambda
     {py3.8,py3.9,py3.11,py3.13}-aws_lambda
 
@@ -159,11 +155,6 @@ deps =
     # Asgi
     asgi: pytest-asyncio
     asgi: async-asgi-testclient
-
-    # Asyncpg
-    asyncpg-v0.23: asyncpg~=0.23.0
-    asyncpg-latest: asyncpg
-    asyncpg: pytest-asyncio
 
     # AWS Lambda
     aws_lambda: aws-cdk-lib
