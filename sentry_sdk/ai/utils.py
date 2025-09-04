@@ -1,9 +1,11 @@
+import json
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
+    from sentry_sdk.tracing import Span
 
-from sentry_sdk.tracing import Span
 from sentry_sdk.utils import logger
 
 
@@ -33,4 +35,4 @@ def set_data_normalized(span, key, value, unpack=True):
     if isinstance(normalized, (int, float, bool, str)):
         span.set_data(key, normalized)
     else:
-        span.set_data(key, str(normalized))
+        span.set_data(key, json.dumps(normalized))
