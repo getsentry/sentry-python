@@ -183,9 +183,6 @@ def _wrap_pregel_invoke(f):
 
             result = f(self, *args, **kwargs)
             _set_response_attributes(span, input_messages, result, integration)
-            import ipdb
-
-            ipdb.set_trace()
             return result
 
     return new_invoke
