@@ -36,10 +36,6 @@ envlist =
     # At a minimum, we should test against at least the lowest
     # and the latest supported version of a framework.
 
-    # Arq
-    {py3.7,py3.11}-arq-v{0.23}
-    {py3.7,py3.12,py3.13}-arq-latest
-
     # Asgi
     {py3.7,py3.12,py3.13}-asgi
 
@@ -163,14 +159,6 @@ deps =
     {py3.10,py3.11}-gevent: zope.event<5.0.0
 
     # === Integrations ===
-
-    # Arq
-    arq-v0.23: arq~=0.23.0
-    arq-v0.23: pydantic<2
-    arq-latest: arq
-    arq: fakeredis>=2.2.0,<2.8
-    arq: pytest-asyncio
-    arq: async-timeout
 
     # Asgi
     asgi: pytest-asyncio
