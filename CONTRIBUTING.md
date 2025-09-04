@@ -143,7 +143,7 @@ _(only relevant for Python SDK core team)_
 
 This will trigger [Craft](https://github.com/getsentry/craft) to prepare everything needed for a release. (For more information, see [craft prepare](https://github.com/getsentry/craft#craft-prepare-preparing-a-new-release).) At the end of this process a release issue is created in the [Publish](https://github.com/getsentry/publish) repository (example issue: https://github.com/getsentry/publish/issues/815).
 
-At the same time, the action will create a release branch in the `sentry-python` repository called `release/<version>`. You may want to check out this branch and polish the auto-generated `CHANGELOG.md` before proceeding by including code snippets, descriptions, reordering and reformatting entries.
+At the same time, the action will create a release branch in the `sentry-python` repository called `release/<version>`. You may want to check out this branch and polish the auto-generated `CHANGELOG.md` before proceeding by including code snippets, descriptions, reordering and reformatting entries, in order to make the changelog as useful and actionable to users as possible.
 
 CI must be passing on the release branch; if there's any failure, Craft will not create a release.
 
