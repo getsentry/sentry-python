@@ -111,17 +111,21 @@ def _wrap_state_graph_compile(f):
             origin=LanggraphIntegration.origin,
         ) as span:
             compiled_graph = f(self, *args, **kwargs)
+
             compiled_graph_name = getattr(compiled_graph, "name", None)
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, compiled_graph_name)
+
             if compiled_graph_name:
                 span.name = f"create_agent {compiled_graph_name}"
                 span.description = f"create_agent {compiled_graph_name}"
             else:
                 span.name = "create_agent"
                 span.description = "create_agent"
+
             if kwargs.get("model", None) is not None:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
+
             tools = None
             get_graph = getattr(compiled_graph, "get_graph", None)
             if get_graph and callable(get_graph):
@@ -133,8 +137,10 @@ def _wrap_state_graph_compile(f):
                         data = getattr(tools_node, "data", None)
                         if data and hasattr(data, "tools_by_name"):
                             tools = list(data.tools_by_name.keys())
+
             if tools is not None:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
+
             return compiled_graph
 
     return new_compile
@@ -181,7 +187,9 @@ def _wrap_pregel_invoke(f):
                     )
 
             result = f(self, *args, **kwargs)
+
             _set_response_attributes(span, input_messages, result, integration)
+
             return result
 
     return new_invoke
@@ -227,7 +235,9 @@ def _wrap_pregel_ainvoke(f):
                     )
 
             result = await f(self, *args, **kwargs)
+
             _set_response_attributes(span, input_messages, result, integration)
+
             return result
 
     return new_ainvoke
