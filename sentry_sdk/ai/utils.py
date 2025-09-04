@@ -18,10 +18,12 @@ def _normalize_data(data, unpack=True):
         except Exception as e:
             logger.warning("Could not convert pydantic data to JSON: %s", e)
             return data if isinstance(data, (int, float, bool, str)) else str(data)
+
     if isinstance(data, list):
         if unpack and len(data) == 1:
             return _normalize_data(data[0], unpack=unpack)  # remove empty dimensions
         return list(_normalize_data(x, unpack=unpack) for x in data)
+
     if isinstance(data, dict):
         return {k: _normalize_data(v, unpack=unpack) for (k, v) in data.items()}
 
