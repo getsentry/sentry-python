@@ -188,7 +188,6 @@ TEST_SUITE_CONFIG = {
         "package": "openai-agents",
         "deps": {
             "*": ["pytest-asyncio"],
-            "<=0.2.10": ["openai<1.103.0"],
         },
         "python": ">=3.10",
     },
