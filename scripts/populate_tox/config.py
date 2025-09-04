@@ -47,6 +47,12 @@ TEST_SUITE_CONFIG = {
         "package": "apache-beam",
         "python": ">=3.7",
     },
+    "boto3": {
+        "package": "boto3",
+        "deps": {
+            "py3.7,py3.8": ["urllib3<2.0.0"],
+        },
+    },
     "bottle": {
         "package": "bottle",
         "deps": {
