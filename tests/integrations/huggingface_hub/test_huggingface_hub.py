@@ -8,7 +8,6 @@ from huggingface_hub import (
 from huggingface_hub.errors import OverloadedError
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
 
 
@@ -71,11 +70,11 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "gen_ai.generate_text"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "hello" in span["data"]["gen_ai.request.messages"]
+        assert "the model response" in span["data"]["gen_ai.response.text"]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert "gen_ai.request.messages" not in span["data"]
+        assert "gen_ai.response.text" not in span["data"]
 
     if details_arg:
         assert span["data"]["gen_ai.usage.total_tokens"] == 10
@@ -130,11 +129,11 @@ def test_streaming_chat_completion(
     assert span["op"] == "gen_ai.generate_text"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "hello" in span["data"]["gen_ai.request.messages"]
+        assert "the model response" in span["data"]["gen_ai.response.text"]
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert "gen_ai.request.messages" not in span["data"]
+        assert "gen_ai.response.text" not in span["data"]
 
     if details_arg:
         assert span["data"]["gen_ai.usage.total_tokens"] == 10
