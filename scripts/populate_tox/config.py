@@ -157,6 +157,9 @@ TEST_SUITE_CONFIG = {
         },
         "include": "<1.0",
     },
+    "langgraph": {
+        "package": "langgraph",
+    },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
