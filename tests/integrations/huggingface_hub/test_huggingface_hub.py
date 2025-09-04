@@ -71,11 +71,11 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "gen_ai.generate_text"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.AI_INPUT_MESSAGES]
-        assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
-        assert SPANDATA.AI_RESPONSES not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     if details_arg:
         assert span["data"]["gen_ai.usage.total_tokens"] == 10
@@ -130,11 +130,11 @@ def test_streaming_chat_completion(
     assert span["op"] == "gen_ai.generate_text"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"][SPANDATA.AI_INPUT_MESSAGES]
-        assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
     else:
-        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
-        assert SPANDATA.AI_RESPONSES not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
     if details_arg:
         assert span["data"]["gen_ai.usage.total_tokens"] == 10
