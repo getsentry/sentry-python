@@ -8,7 +8,6 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, OP
 
 
-# Mock langgraph modules before importing the integration
 def mock_langgraph_imports():
     """Mock langgraph modules to prevent import errors."""
     mock_state_graph = MagicMock()
@@ -27,11 +26,9 @@ def mock_langgraph_imports():
     return mock_state_graph, mock_pregel
 
 
-# Mock the imports
 mock_state_graph, mock_pregel = mock_langgraph_imports()
 
-# Now we can safely import the integration
-from sentry_sdk.integrations.langgraph import (
+from sentry_sdk.integrations.langgraph import (  # noqa: E402
     LanggraphIntegration,
     _parse_langgraph_messages,
     _wrap_state_graph_compile,
@@ -40,7 +37,6 @@ from sentry_sdk.integrations.langgraph import (
 )
 
 
-# Mock LangGraph dependencies
 class MockStateGraph:
     def __init__(self, schema=None):
         self.name = "test_graph"
@@ -92,11 +88,26 @@ class MockTool:
 
 
 class MockMessage:
-    def __init__(self, content, name=None, tool_calls=None, function_call=None):
+    def __init__(
+        self,
+        content,
+        name=None,
+        tool_calls=None,
+        function_call=None,
+        role=None,
+        type=None,
+    ):
         self.content = content
         self.name = name
         self.tool_calls = tool_calls
         self.function_call = function_call
+        self.role = role
+        # The integration uses getattr(message, "type", None) for the role in _normalize_langgraph_message
+        # Set default type based on name if type not explicitly provided
+        if type is None and name in ["assistant", "ai", "user", "system", "function"]:
+            self.type = name
+        else:
+            self.type = type
 
 
 class MockPregelInstance:
@@ -206,8 +217,25 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
 
     pregel = MockPregelInstance("test_graph")
 
+    expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
     def original_invoke(self, *args, **kwargs):
-        return {"messages": [MockMessage("Response")]}
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+            )
+        ]
+        return {"messages": new_messages}
 
     with start_transaction():
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -243,9 +271,24 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
         assert len(request_messages) == 2
         assert request_messages[0]["content"] == "Hello, can you help me?"
         assert request_messages[1]["content"] == "Of course! How can I assist you?"
+
+        response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert response_text == expected_assistant_response
+
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
+        tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        if isinstance(tool_calls_data, str):
+            import json
+
+            tool_calls_data = json.loads(tool_calls_data)
+
+        assert len(tool_calls_data) == 1
+        assert tool_calls_data[0]["id"] == "call_test_123"
+        assert tool_calls_data[0]["function"]["name"] == "search_tool"
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get("data", {})
 
 
 @pytest.mark.parametrize(
@@ -268,8 +311,25 @@ def test_pregel_ainvoke(sentry_init, capture_events, send_default_pii, include_p
     test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
     pregel = MockPregelInstance("async_graph")
 
+    expected_assistant_response = "It's sunny and 72°F today!"
+    expected_tool_calls = [
+        {
+            "id": "call_weather_456",
+            "type": "function",
+            "function": {"name": "get_weather", "arguments": '{"location": "current"}'},
+        }
+    ]
+
     async def original_ainvoke(self, *args, **kwargs):
-        return {"messages": [MockMessage("It's sunny today!")]}
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content=expected_assistant_response,
+                name="assistant",
+                tool_calls=expected_tool_calls,
+            )
+        ]
+        return {"messages": new_messages}
 
     async def run_test():
         with start_transaction():
@@ -299,9 +359,24 @@ def test_pregel_ainvoke(sentry_init, capture_events, send_default_pii, include_p
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["data"]
+
+        response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert response_text == expected_assistant_response
+
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
+        tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        if isinstance(tool_calls_data, str):
+            import json
+
+            tool_calls_data = json.loads(tool_calls_data)
+
+        assert len(tool_calls_data) == 1
+        assert tool_calls_data[0]["id"] == "call_weather_456"
+        assert tool_calls_data[0]["function"]["name"] == "get_weather"
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get("data", {})
 
 
 def test_pregel_invoke_error(sentry_init, capture_events):
@@ -517,3 +592,76 @@ def test_complex_message_parsing():
     assert result[2]["content"] == "Function call response"
     assert result[2]["name"] == "function"
     assert result[2]["function_call"]["name"] == "search"
+
+
+def test_extraction_functions_complex_scenario(sentry_init, capture_events):
+    """Test extraction functions with complex scenarios including multiple messages and edge cases."""
+    sentry_init(
+        integrations=[LanggraphIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    pregel = MockPregelInstance("complex_graph")
+    test_state = {"messages": [MockMessage("Complex request", name="user")]}
+
+    def original_invoke(self, *args, **kwargs):
+        input_messages = args[0].get("messages", [])
+        new_messages = input_messages + [
+            MockMessage(
+                content="I'll help with multiple tasks",
+                name="assistant",
+                tool_calls=[
+                    {
+                        "id": "call_multi_1",
+                        "type": "function",
+                        "function": {
+                            "name": "search",
+                            "arguments": '{"query": "complex"}',
+                        },
+                    },
+                    {
+                        "id": "call_multi_2",
+                        "type": "function",
+                        "function": {
+                            "name": "calculate",
+                            "arguments": '{"expr": "2+2"}',
+                        },
+                    },
+                ],
+            ),
+            MockMessage("", name="assistant"),
+            MockMessage("Final response", name="ai", type="ai"),
+        ]
+        return {"messages": new_messages}
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
+
+    assert result is not None
+
+    tx = events[0]
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+
+    invoke_span = invoke_spans[0]
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["data"]
+    response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert response_text == "Final response"
+
+    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
+    import json
+
+    tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    if isinstance(tool_calls_data, str):
+        tool_calls_data = json.loads(tool_calls_data)
+
+    assert len(tool_calls_data) == 2
+    assert tool_calls_data[0]["id"] == "call_multi_1"
+    assert tool_calls_data[0]["function"]["name"] == "search"
+    assert tool_calls_data[1]["id"] == "call_multi_2"
+    assert tool_calls_data[1]["function"]["name"] == "calculate"
