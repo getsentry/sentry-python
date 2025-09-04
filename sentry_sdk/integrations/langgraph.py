@@ -55,6 +55,7 @@ def _normalize_langgraph_message(message):
     # type: (Any) -> Any
     if not hasattr(message, "content"):
         return None
+
     parsed = {"role": getattr(message, "type", None), "content": message.content}
 
     for attr in ["name", "tool_calls", "function_call", "tool_call_id"]:
