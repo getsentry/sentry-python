@@ -10,6 +10,7 @@ The tests use the following credentials to establish a database connection.
 """
 
 import os
+import threading
 
 
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
@@ -20,12 +21,12 @@ PG_NAME_BASE = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
 
 
 def _get_db_name():
-    """Get database name, using worker ID for parallel test isolation."""
-    # Check if we're running with pytest-xdist (parallel execution)
-    worker_id = os.getenv("PYTEST_XDIST_WORKER")
-    if worker_id:
-        return f"{PG_NAME_BASE}_{worker_id}"
-    return PG_NAME_BASE
+    """Get database name, using worker/process ID for parallel test isolation."""
+    # For tox parallel execution or other parallel scenarios, use process ID
+    # This ensures each process gets its own database
+    pid = os.getpid()
+    thread_id = threading.get_ident()
+    return f"{PG_NAME_BASE}_{pid}_{thread_id}"
 
 
 PG_NAME = _get_db_name()
