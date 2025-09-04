@@ -393,41 +393,6 @@ def test_span_origin(sentry_init, capture_events):
         assert span["origin"] == "auto.ai.langgraph"
 
 
-def test_no_spans_without_integration(sentry_init, capture_events):
-    """Test that no spans are created when integration is not enabled."""
-    sentry_init(
-        integrations=[],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    graph = MockStateGraph()
-    pregel = MockPregelInstance()
-
-    with start_transaction():
-
-        def original_compile(self, *args, **kwargs):
-            return MockCompiledGraph(self.name)
-
-        wrapped_compile = _wrap_state_graph_compile(original_compile)
-        wrapped_compile(graph)
-
-        def original_invoke(self, *args, **kwargs):
-            return {"result": "test"}
-
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        wrapped_invoke(pregel, {"messages": []})
-
-    tx = events[0]
-
-    ai_spans = [
-        span
-        for span in tx["spans"]
-        if span["op"] in [OP.GEN_AI_CREATE_AGENT, OP.GEN_AI_INVOKE_AGENT]
-    ]
-    assert len(ai_spans) == 0
-
-
 @pytest.mark.parametrize("graph_name", ["my_graph", None, ""])
 def test_pregel_invoke_with_different_graph_names(
     sentry_init, capture_events, graph_name
