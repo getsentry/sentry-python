@@ -175,8 +175,7 @@ def _wrap_pregel_invoke(f):
             ):
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
-                    set_data_normalized(
-                        span,
+                    span.set_data(
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
                         safe_serialize(input_messages),
                     )
