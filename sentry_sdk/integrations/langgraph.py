@@ -108,7 +108,6 @@ def _wrap_state_graph_compile(f):
             return f(self, *args, **kwargs)
         with sentry_sdk.start_span(
             op=OP.GEN_AI_CREATE_AGENT,
-            name="create_agent",
             origin=LanggraphIntegration.origin,
         ) as span:
             compiled_graph = f(self, *args, **kwargs)
@@ -116,7 +115,6 @@ def _wrap_state_graph_compile(f):
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
             span.set_data(SPANDATA.GEN_AI_AGENT_NAME, compiled_graph_name)
             span.set_data("name", f"create_agent {compiled_graph_name}")
-
             if kwargs.get("model", None) is not None:
                 span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
             tools = None
