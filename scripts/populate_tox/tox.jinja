@@ -36,10 +36,6 @@ envlist =
     # At a minimum, we should test against at least the lowest
     # and the latest supported version of a framework.
 
-    # Arq
-    {py3.7,py3.11}-arq-v{0.23}
-    {py3.7,py3.12,py3.13}-arq-latest
-
     # Asgi
     {py3.7,py3.12,py3.13}-asgi
 
@@ -49,10 +45,6 @@ envlist =
 
     # AWS Lambda
     {py3.8,py3.9,py3.11,py3.13}-aws_lambda
-
-    # Beam
-    {py3.7}-beam-v{2.12}
-    {py3.8,py3.11}-beam-latest
 
     # Boto3
     {py3.6,py3.7}-boto3-v{1.12}
@@ -76,12 +68,6 @@ envlist =
     {py3.7,py3.11,py3.12}-httpx-v{0.23,0.24}
     {py3.9,py3.11,py3.12}-httpx-v{0.25,0.27}
     {py3.9,py3.12,py3.13}-httpx-latest
-
-    # Langchain
-    {py3.9,py3.11,py3.12}-langchain-v0.1
-    {py3.9,py3.11,py3.12}-langchain-v0.3
-    {py3.9,py3.11,py3.12}-langchain-latest
-    {py3.9,py3.11,py3.12}-langchain-notiktoken
 
     # OpenTelemetry (OTel)
     {py3.7,py3.9,py3.12,py3.13}-opentelemetry
@@ -170,14 +156,6 @@ deps =
 
     # === Integrations ===
 
-    # Arq
-    arq-v0.23: arq~=0.23.0
-    arq-v0.23: pydantic<2
-    arq-latest: arq
-    arq: fakeredis>=2.2.0,<2.8
-    arq: pytest-asyncio
-    arq: async-timeout
-
     # Asgi
     asgi: pytest-asyncio
     asgi: async-asgi-testclient
@@ -194,10 +172,6 @@ deps =
     aws_lambda: fastapi
     aws_lambda: requests
     aws_lambda: uvicorn
-
-    # Beam
-    beam-v2.12: apache-beam~=2.12.0
-    beam-latest: apache-beam
 
     # Boto3
     boto3-v1.12: boto3~=1.12.0
@@ -230,20 +204,6 @@ deps =
     httpx-v0.25: httpx~=0.25.0
     httpx-v0.27: httpx~=0.27.0
     httpx-latest: httpx
-
-    # Langchain
-    langchain-v0.1: openai~=1.0.0
-    langchain-v0.1: langchain~=0.1.11
-    langchain-v0.1: tiktoken~=0.6.0
-    langchain-v0.1: httpx<0.28.0
-    langchain-v0.3: langchain~=0.3.0
-    langchain-v0.3: langchain-community
-    langchain-v0.3: tiktoken
-    langchain-v0.3: openai
-    langchain-{latest,notiktoken}: langchain
-    langchain-{latest,notiktoken}: langchain-openai
-    langchain-{latest,notiktoken}: openai>=1.6.1
-    langchain-latest: tiktoken~=0.6.0
 
     # OpenTelemetry (OTel)
     opentelemetry: opentelemetry-distro
@@ -376,12 +336,13 @@ setenv =
     httpx: TESTPATH=tests/integrations/httpx
     huey: TESTPATH=tests/integrations/huey
     huggingface_hub: TESTPATH=tests/integrations/huggingface_hub
-    langchain: TESTPATH=tests/integrations/langchain
+    langchain-base: TESTPATH=tests/integrations/langchain
+    langchain-notiktoken: TESTPATH=tests/integrations/langchain
     launchdarkly: TESTPATH=tests/integrations/launchdarkly
     litestar: TESTPATH=tests/integrations/litestar
     loguru: TESTPATH=tests/integrations/loguru
-    openai_base: TESTPATH=tests/integrations/openai
-    openai_notiktoken: TESTPATH=tests/integrations/openai
+    openai-base: TESTPATH=tests/integrations/openai
+    openai-notiktoken: TESTPATH=tests/integrations/openai
     openai_agents: TESTPATH=tests/integrations/openai_agents
     openfeature: TESTPATH=tests/integrations/openfeature
     opentelemetry: TESTPATH=tests/integrations/opentelemetry
@@ -448,7 +409,7 @@ commands =
     ; Running `pytest` as an executable suffers from an import error
     ; when loading tests in scenarios. In particular, django fails to
     ; load the settings from the test module.
-    python -m pytest {env:TESTPATH} -o junit_suite_name={envname} {posargs}
+    python -m pytest -W error::pytest.PytestUnraisableExceptionWarning {env:TESTPATH} -o junit_suite_name={envname} {posargs}
 
 [testenv:linters]
 commands =

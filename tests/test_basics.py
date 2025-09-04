@@ -870,6 +870,7 @@ def test_event_processor_drop_records_client_report(
         (["celery"], "sentry.python"),
         (["dedupe"], "sentry.python"),
         (["excepthook"], "sentry.python"),
+        (["unraisablehook"], "sentry.python"),
         (["executing"], "sentry.python"),
         (["modules"], "sentry.python"),
         (["pure_eval"], "sentry.python"),

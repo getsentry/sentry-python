@@ -17,6 +17,7 @@ represent the current tox.ini file. (And if not the CI run fails.)
 
 import configparser
 import hashlib
+import re
 import sys
 from collections import defaultdict
 from functools import reduce
@@ -25,6 +26,18 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
+TOXENV_REGEX = re.compile(
+    r"""
+    {?(?P<py_versions>(py\d+\.\d+,?)+)}?
+    -(?P<framework>[a-z](?:[a-z_]|-(?!v{?\d|latest))*[a-z0-9])
+    (?:-(
+        (v{?(?P<framework_versions>[0-9.]+[0-9a-z,.]*}?))
+        |
+        (?P<framework_versions_latest>latest)
+    ))?
+""",
+    re.VERBOSE,
+)
 
 OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
@@ -61,9 +74,10 @@ GROUPS = {
     "AI": [
         "anthropic",
         "cohere",
-        "langchain",
-        "openai_base",
-        "openai_notiktoken",
+        "langchain-base",
+        "langchain-notiktoken",
+        "openai-base",
+        "openai-notiktoken",
         "openai_agents",
         "huggingface_hub",
     ],
@@ -201,29 +215,37 @@ def parse_tox():
     py_versions_pinned = defaultdict(set)
     py_versions_latest = defaultdict(set)
 
+    parsed_correctly = True
+
     for line in lines:
         # normalize lines
         line = line.strip().lower()
 
         try:
             # parse tox environment definition
-            try:
-                (raw_python_versions, framework, framework_versions) = line.split("-")
-            except ValueError:
-                (raw_python_versions, framework) = line.split("-")
-                framework_versions = []
+            parsed = TOXENV_REGEX.match(line)
+            if not parsed:
+                print(f"ERROR reading line {line}")
+                raise ValueError("Failed to parse tox environment definition")
+
+            groups = parsed.groupdict()
+            raw_python_versions = groups["py_versions"]
+            framework = groups["framework"]
+            framework_versions_latest = groups.get("framework_versions_latest") or False
 
             # collect python versions to test the framework in
-            raw_python_versions = set(
-                raw_python_versions.replace("{", "").replace("}", "").split(",")
-            )
-            if "latest" in framework_versions:
+            raw_python_versions = set(raw_python_versions.split(","))
+            if framework_versions_latest:
                 py_versions_latest[framework] |= raw_python_versions
             else:
                 py_versions_pinned[framework] |= raw_python_versions
 
-        except ValueError:
+        except Exception:
             print(f"ERROR reading line {line}")
+            parsed_correctly = False
+
+    if not parsed_correctly:
+        raise RuntimeError("Failed to parse tox.ini")
 
     py_versions_pinned = _normalize_py_versions(py_versions_pinned)
     py_versions_latest = _normalize_py_versions(py_versions_latest)

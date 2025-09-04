@@ -29,6 +29,17 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "arq": {
+        "package": "arq",
+        "deps": {
+            "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
+            "<=0.23": ["pydantic<2"],
+        },
+    },
+    "beam": {
+        "package": "apache-beam",
+        "python": ">=3.7",
+    },
     "bottle": {
         "package": "bottle",
         "deps": {
@@ -126,6 +137,26 @@ TEST_SUITE_CONFIG = {
     "huggingface_hub": {
         "package": "huggingface_hub",
     },
+    "langchain-base": {
+        "package": "langchain",
+        "integration_name": "langchain",
+        "deps": {
+            "*": ["openai", "tiktoken", "langchain-openai"],
+            "<=0.1": ["httpx<0.28.0"],
+            ">=0.3": ["langchain-community"],
+        },
+        "include": "<1.0",
+    },
+    "langchain-notiktoken": {
+        "package": "langchain",
+        "integration_name": "langchain",
+        "deps": {
+            "*": ["openai", "langchain-openai"],
+            "<=0.1": ["httpx<0.28.0"],
+            ">=0.3": ["langchain-community"],
+        },
+        "include": "<1.0",
+    },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
@@ -139,7 +170,7 @@ TEST_SUITE_CONFIG = {
     "loguru": {
         "package": "loguru",
     },
-    "openai_base": {
+    "openai-base": {
         "package": "openai",
         "integration_name": "openai",
         "deps": {
@@ -148,7 +179,7 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
-    "openai_notiktoken": {
+    "openai-notiktoken": {
         "package": "openai",
         "integration_name": "openai",
         "deps": {
