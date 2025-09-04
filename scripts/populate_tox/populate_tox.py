@@ -40,7 +40,7 @@ ENV = Environment(
     lstrip_blocks=True,
 )
 
-PYPI_COOLDOWN = 0.15  # seconds to wait between requests to PyPI
+PYPI_COOLDOWN = 0.1  # seconds to wait between requests to PyPI
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
@@ -67,7 +67,6 @@ IGNORE = {
     "potel",
     # Integrations that can be migrated -- we should eventually remove all
     # of these from the IGNORE list
-    "beam",
     "boto3",
     "chalice",
     "gcp",

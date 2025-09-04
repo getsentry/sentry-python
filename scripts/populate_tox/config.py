@@ -41,6 +41,9 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio"],
         },
+    },
+    "beam": {
+        "package": "apache-beam",
         "python": ">=3.7",
     },
     "bottle": {
