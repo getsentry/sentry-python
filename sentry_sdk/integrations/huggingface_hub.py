@@ -207,7 +207,6 @@ def _wrap_huggingface_task(f, op):
                 return res
 
             if not isinstance(res, Iterable):
-                # we only know how to deal with strings and iterables, ignore
                 span.__exit__(None, None, None)
                 return res
 
