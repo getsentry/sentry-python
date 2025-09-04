@@ -60,6 +60,24 @@ CRUMBS_CONNECT = {
 
 @pytest_asyncio.fixture(autouse=True)
 async def _clean_pg():
+    # Create the test database if it doesn't exist
+    try:
+        default_conn = await connect(PG_CONNECTION_URI)
+        try:
+            # Check if database exists, create if not
+            result = await default_conn.fetchval(
+                "SELECT 1 FROM pg_database WHERE datname = $1", PG_NAME
+            )
+            if not result:
+                await default_conn.execute(f'CREATE DATABASE "{PG_NAME}"')
+        finally:
+            await default_conn.close()
+    except Exception:
+        # If we can't connect to default postgres db, assume our test db already exists
+        # or that we're connecting to the same database (PG_NAME == PG_NAME_BASE)
+        pass
+
+    # Now connect to our test database and set up the table
     conn = await connect(PG_CONNECTION_URI)
     await conn.execute("DROP TABLE IF EXISTS users")
     await conn.execute(
