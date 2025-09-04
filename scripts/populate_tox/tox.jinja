@@ -36,10 +36,6 @@ envlist =
     # At a minimum, we should test against at least the lowest
     # and the latest supported version of a framework.
 
-    # Arq
-    {py3.7,py3.11}-arq-v{0.23}
-    {py3.7,py3.12,py3.13}-arq-latest
-
     # Asgi
     {py3.7,py3.12,py3.13}-asgi
 
@@ -49,10 +45,6 @@ envlist =
 
     # AWS Lambda
     {py3.8,py3.9,py3.11,py3.13}-aws_lambda
-
-    # Beam
-    {py3.7}-beam-v{2.12}
-    {py3.8,py3.11}-beam-latest
 
     # Boto3
     {py3.6,py3.7}-boto3-v{1.12}
@@ -164,14 +156,6 @@ deps =
 
     # === Integrations ===
 
-    # Arq
-    arq-v0.23: arq~=0.23.0
-    arq-v0.23: pydantic<2
-    arq-latest: arq
-    arq: fakeredis>=2.2.0,<2.8
-    arq: pytest-asyncio
-    arq: async-timeout
-
     # Asgi
     asgi: pytest-asyncio
     asgi: async-asgi-testclient
@@ -188,10 +172,6 @@ deps =
     aws_lambda: fastapi
     aws_lambda: requests
     aws_lambda: uvicorn
-
-    # Beam
-    beam-v2.12: apache-beam~=2.12.0
-    beam-latest: apache-beam
 
     # Boto3
     boto3-v1.12: boto3~=1.12.0
