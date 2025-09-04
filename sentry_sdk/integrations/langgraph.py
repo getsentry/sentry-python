@@ -104,25 +104,25 @@ def _wrap_state_graph_compile(f):
     def new_compile(self, *args, **kwargs):
         # type: (Any, Any, Any) -> Any
         integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
-
-        compiled_graph = f(self, *args, **kwargs)
         if integration is None:
-            return compiled_graph
-
+            return f(self, *args, **kwargs)
         with sentry_sdk.start_span(
             op=OP.GEN_AI_CREATE_AGENT,
             name="create_agent",
             origin=LanggraphIntegration.origin,
         ) as span:
+            compiled_graph = f(self, *args, **kwargs)
+            compiled_graph_name = getattr(compiled_graph, "name", None)
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "create_agent")
-            span.set_data(
-                SPANDATA.GEN_AI_AGENT_NAME, getattr(compiled_graph, "name", None)
-            )
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
+            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, compiled_graph_name)
+            span.set_data("name", f"create_agent {compiled_graph_name}")
+
+            if kwargs.get("model", None) is not None:
+                span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, kwargs.get("model"))
             tools = None
-            graph = getattr(compiled_graph, "get_graph", None)
-            if callable(graph):
-                graph_obj = graph()
+            get_graph = getattr(compiled_graph, "get_graph", None)
+            if get_graph and callable(get_graph):
+                graph_obj = compiled_graph.get_graph()
                 nodes = getattr(graph_obj, "nodes", None)
                 if nodes and isinstance(nodes, dict):
                     tools_node = nodes.get("tools")
@@ -130,7 +130,8 @@ def _wrap_state_graph_compile(f):
                         data = getattr(tools_node, "data", None)
                         if data and hasattr(data, "tools_by_name"):
                             tools = list(data.tools_by_name.keys())
-            span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
+            if tools is not None:
+                span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
             return compiled_graph
 
     return new_compile
@@ -150,7 +151,7 @@ def _wrap_pregel_invoke(f):
 
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name="invoke_agent",
+            name=f"invoke_agent {graph_name}".strip(),
             origin=LanggraphIntegration.origin,
         ) as span:
             if graph_name:
@@ -158,7 +159,6 @@ def _wrap_pregel_invoke(f):
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
             # Store input messages to later compare with output
             input_messages = None
@@ -196,7 +196,7 @@ def _wrap_pregel_ainvoke(f):
 
         with sentry_sdk.start_span(
             op=OP.GEN_AI_INVOKE_AGENT,
-            name="invoke_agent",
+            name=f"invoke_agent {graph_name}".strip(),
             origin=LanggraphIntegration.origin,
         ) as span:
             if graph_name:
@@ -204,7 +204,6 @@ def _wrap_pregel_ainvoke(f):
                 span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
             input_messages = None
             if (
@@ -292,10 +291,13 @@ def _set_response_attributes(span, input_messages, result, integration):
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(new_messages)
         )
     else:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(result))
 
     tool_calls = _extract_tool_calls(new_messages)
     if tool_calls:
         set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
+            span,
+            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            safe_serialize(tool_calls),
+            unpack=False,
         )
