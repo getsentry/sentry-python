@@ -4,10 +4,24 @@
 
 ### Various fixes & improvements
 
+- **New integration:** Unraisable exceptions (#4733) by @alexander-alderman-webb
+
+  Add the unraisable exception integration to your sentry_sdk.init call:
+```python
+import sentry_sdk
+from sentry_sdk.integrations.unraisablehook import UnraisablehookIntegration
+
+sentry_sdk.init(
+    dsn="...",
+    integrations=[
+        UnraisablehookIntegration(),
+    ]
+)
+```
+
 - meta: Update instructions on release process (#4755) by @sentrivana
 - tests: Move arq under toxgen (#4739) by @sentrivana
 - tests: Support dashes in test suite names (#4740) by @sentrivana
-- feat(integrations): Add unraisable exception integration (#4733) by @alexander-alderman-webb
 - Don't fail if there is no `_context_manager_state` (#4698) by @sentrivana
 - Wrap span restoration in `__exit__` in `capture_internal_exceptions` (#4719) by @sentrivana
 - fix: Constrain types of ai_track decorator (#4745) by @alexander-alderman-webb
