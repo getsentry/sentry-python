@@ -3,7 +3,7 @@ Tests need pytest-asyncio installed.
 
 Tests need a local postgresql instance running, this can best be done using
 ```sh
-docker run --rm --name some-postgres -e POSTGRES_USER=foo -e POSTGRES_PASSWORD=bar -d -p 5432:5432 postgres
+docker run --rm --name some-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=sentry -d -p 5432:5432 postgres
 ```
 
 The tests use the following credentials to establish a database connection.
