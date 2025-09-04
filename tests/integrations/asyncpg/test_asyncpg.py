@@ -10,7 +10,6 @@ The tests use the following credentials to establish a database connection.
 """
 
 import os
-import threading
 import datetime
 from contextlib import contextmanager
 from unittest import mock
@@ -35,8 +34,7 @@ PG_NAME_BASE = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
 
 def _get_db_name():
     pid = os.getpid()
-    thread_id = threading.get_ident()
-    return f"{PG_NAME_BASE}_{pid}_{thread_id}"
+    return f"{PG_NAME_BASE}_{pid}"
 
 
 PG_NAME = _get_db_name()
