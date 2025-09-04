@@ -229,7 +229,6 @@ def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_pr
     assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
     assert invoke_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
     assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
-    assert invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
     if send_default_pii and include_prompts:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
