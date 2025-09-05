@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.37.0
+
+### Various fixes & improvements
+
+- feat(agents): improve instrumentation of input messages (#4750) by @shellmayr
+- tests: Move boto3 tests under toxgen (#4761) by @sentrivana
+- ci: Fix celery (#4765) by @sentrivana
+- Format span attributes in AI integrations (#4762) by @antonpirker
+- tests: Move asyncpg under toxgen (#4757) by @sentrivana
+- feat: Add LangGraph integration (#4727) by @shellmayr
+- tests: Move beam under toxgen (#4759) by @sentrivana
+- tests: Remove openai pin and update tox (#4748) by @sentrivana
+
 ## 2.36.0
 
 ### Various fixes & improvements
