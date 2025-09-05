@@ -58,11 +58,11 @@ def test_nonstreaming_chat(
 
     if send_default_pii and include_prompts:
         assert (
-            "{'role': 'system', 'content': 'some context'}"
+            '{"role": "system", "content": "some context"}'
             in span["data"][SPANDATA.AI_INPUT_MESSAGES]
         )
         assert (
-            "{'role': 'user', 'content': 'hello'}"
+            '{"role": "user", "content": "hello"}'
             in span["data"][SPANDATA.AI_INPUT_MESSAGES]
         )
         assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
@@ -135,11 +135,11 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
 
     if send_default_pii and include_prompts:
         assert (
-            "{'role': 'system', 'content': 'some context'}"
+            '{"role": "system", "content": "some context"}'
             in span["data"][SPANDATA.AI_INPUT_MESSAGES]
         )
         assert (
-            "{'role': 'user', 'content': 'hello'}"
+            '{"role": "user", "content": "hello"}'
             in span["data"][SPANDATA.AI_INPUT_MESSAGES]
         )
         assert "the model response" in span["data"][SPANDATA.AI_RESPONSES]
