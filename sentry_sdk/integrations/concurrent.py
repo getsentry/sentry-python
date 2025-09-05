@@ -52,8 +52,8 @@ def _wrap_submit_call(func):
 
         future = func(self, wrapped_fn, *args, **kwargs)
 
-        def report_exceptions(future: Future):
-            # type: (Future) -> None
+        def report_exceptions(future):
+            # type: (Future[Any]) -> None
             exception = future.exception()
             integration = sentry_sdk.get_client().get_integration(ConcurrentIntegration)
 
