@@ -262,8 +262,9 @@ def pick_releases_to_test(
 ) -> list[Version]:
     """Pick a handful of releases to test from a sorted list of supported releases."""
     # If the package has majors (or major-like releases, even if they don't do
-    # semver), we want to make sure we're testing them all. If not, we just pick
-    # the oldest, the newest, and a couple in between.
+    # semver), we want to make sure we're testing them all (unless there's too
+    # many). If not, we just pick the oldest, the newest, and a couple
+    # in between.
     #
     # If there is a relevant prerelease, also test that in addition to the above.
     has_majors = len(set([v.major for v in releases])) > 1
@@ -283,12 +284,27 @@ def pick_releases_to_test(
             if release > releases_by_major[release.major][1]:
                 releases_by_major[release.major][1] = release
 
-        for i, (min_version, max_version) in enumerate(releases_by_major.values()):
-            filtered_releases.add(max_version)
-            if i == len(releases_by_major) - 1:
-                # If this is the latest major release, also check the lowest
-                # version of this version
-                filtered_releases.add(min_version)
+        if len(releases_by_major) > 5:
+            # This framework has a lot of majors. Pick a selection.
+            releases = sorted(
+                [max_version for (_, max_version) in releases_by_major.values()]
+            )
+            filtered_releases = {
+                releases[0],  # oldest version supported
+                releases[len(releases) // 3],
+                releases[
+                    len(releases) // 3 * 2
+                ],  # two releases in between, roughly evenly spaced
+                releases[-1],  # latest
+            }
+
+        else:
+            for i, (min_version, max_version) in enumerate(releases_by_major.values()):
+                filtered_releases.add(max_version)
+                if i == len(releases_by_major) - 1:
+                    # If this is the latest major release, also check the lowest
+                    # version of this version
+                    filtered_releases.add(min_version)
 
     else:
         filtered_releases = {
