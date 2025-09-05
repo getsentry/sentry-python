@@ -124,13 +124,13 @@ def _set_input_data(span, kwargs, integration):
                 and isinstance(message["content"], (list, tuple))
             ):
                 for item in message["content"]:
-                    if item["type"] == "tool_result":
+                    if item.get("type") == "tool_result":
                         normalized_messages.append(
                             {
                                 "role": "tool",
                                 "content": {
-                                    "tool_use_id": item["tool_use_id"],
-                                    "output": item["content"],
+                                    "tool_use_id": item.get("tool_use_id"),
+                                    "output": item.get("content"),
                                 },
                             }
                         )
