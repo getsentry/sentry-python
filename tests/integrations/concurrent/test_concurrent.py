@@ -89,7 +89,7 @@ def test_concurrent_deduplicates(
         integrations=[
             ExcepthookIntegration(),
             DedupeIntegration(),
-            ConcurrentIntegration(record_exceptions_on_futures=True),
+            ConcurrentIntegration(),
         ],
     )
     events = capture_events()
