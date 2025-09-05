@@ -67,7 +67,6 @@ IGNORE = {
     "potel",
     # Integrations that can be migrated -- we should eventually remove all
     # of these from the IGNORE list
-    "boto3",
     "chalice",
     "gcp",
     "httpx",
@@ -439,7 +438,7 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
                 rendered.append(f"{integration}: {dep}")
         elif constraint.startswith("py3"):
             for dep in deps:
-                rendered.append(f"{constraint}-{integration}: {dep}")
+                rendered.append(f"{{{constraint}}}-{integration}: {dep}")
         else:
             restriction = SpecifierSet(constraint)
             for release in releases:
