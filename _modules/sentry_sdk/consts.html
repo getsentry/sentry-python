@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.consts - sentry-python 2.36.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.consts - sentry-python 2.37.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
@@ -900,550 +900,551 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="792">    <span class="n">FUNCTION_AWS</span> <span class="o">=</span> <span class="s2">&quot;function.aws&quot;</span>
 </span><span data-line="793">    <span class="n">FUNCTION_GCP</span> <span class="o">=</span> <span class="s2">&quot;function.gcp&quot;</span>
 </span><span data-line="794">    <span class="n">GEN_AI_CHAT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.chat&quot;</span>
-</span><span data-line="795">    <span class="n">GEN_AI_EMBEDDINGS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.embeddings&quot;</span>
-</span><span data-line="796">    <span class="n">GEN_AI_EXECUTE_TOOL</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.execute_tool&quot;</span>
-</span><span data-line="797">    <span class="n">GEN_AI_HANDOFF</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.handoff&quot;</span>
-</span><span data-line="798">    <span class="n">GEN_AI_PIPELINE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.pipeline&quot;</span>
-</span><span data-line="799">    <span class="n">GEN_AI_INVOKE_AGENT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.invoke_agent&quot;</span>
-</span><span data-line="800">    <span class="n">GEN_AI_RESPONSES</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.responses&quot;</span>
-</span><span data-line="801">    <span class="n">GRAPHQL_EXECUTE</span> <span class="o">=</span> <span class="s2">&quot;graphql.execute&quot;</span>
-</span><span data-line="802">    <span class="n">GRAPHQL_MUTATION</span> <span class="o">=</span> <span class="s2">&quot;graphql.mutation&quot;</span>
-</span><span data-line="803">    <span class="n">GRAPHQL_PARSE</span> <span class="o">=</span> <span class="s2">&quot;graphql.parse&quot;</span>
-</span><span data-line="804">    <span class="n">GRAPHQL_RESOLVE</span> <span class="o">=</span> <span class="s2">&quot;graphql.resolve&quot;</span>
-</span><span data-line="805">    <span class="n">GRAPHQL_SUBSCRIPTION</span> <span class="o">=</span> <span class="s2">&quot;graphql.subscription&quot;</span>
-</span><span data-line="806">    <span class="n">GRAPHQL_QUERY</span> <span class="o">=</span> <span class="s2">&quot;graphql.query&quot;</span>
-</span><span data-line="807">    <span class="n">GRAPHQL_VALIDATE</span> <span class="o">=</span> <span class="s2">&quot;graphql.validate&quot;</span>
-</span><span data-line="808">    <span class="n">GRPC_CLIENT</span> <span class="o">=</span> <span class="s2">&quot;grpc.client&quot;</span>
-</span><span data-line="809">    <span class="n">GRPC_SERVER</span> <span class="o">=</span> <span class="s2">&quot;grpc.server&quot;</span>
-</span><span data-line="810">    <span class="n">HTTP_CLIENT</span> <span class="o">=</span> <span class="s2">&quot;http.client&quot;</span>
-</span><span data-line="811">    <span class="n">HTTP_CLIENT_STREAM</span> <span class="o">=</span> <span class="s2">&quot;http.client.stream&quot;</span>
-</span><span data-line="812">    <span class="n">HTTP_SERVER</span> <span class="o">=</span> <span class="s2">&quot;http.server&quot;</span>
-</span><span data-line="813">    <span class="n">MIDDLEWARE_DJANGO</span> <span class="o">=</span> <span class="s2">&quot;middleware.django&quot;</span>
-</span><span data-line="814">    <span class="n">MIDDLEWARE_LITESTAR</span> <span class="o">=</span> <span class="s2">&quot;middleware.litestar&quot;</span>
-</span><span data-line="815">    <span class="n">MIDDLEWARE_LITESTAR_RECEIVE</span> <span class="o">=</span> <span class="s2">&quot;middleware.litestar.receive&quot;</span>
-</span><span data-line="816">    <span class="n">MIDDLEWARE_LITESTAR_SEND</span> <span class="o">=</span> <span class="s2">&quot;middleware.litestar.send&quot;</span>
-</span><span data-line="817">    <span class="n">MIDDLEWARE_STARLETTE</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlette&quot;</span>
-</span><span data-line="818">    <span class="n">MIDDLEWARE_STARLETTE_RECEIVE</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlette.receive&quot;</span>
-</span><span data-line="819">    <span class="n">MIDDLEWARE_STARLETTE_SEND</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlette.send&quot;</span>
-</span><span data-line="820">    <span class="n">MIDDLEWARE_STARLITE</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlite&quot;</span>
-</span><span data-line="821">    <span class="n">MIDDLEWARE_STARLITE_RECEIVE</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlite.receive&quot;</span>
-</span><span data-line="822">    <span class="n">MIDDLEWARE_STARLITE_SEND</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlite.send&quot;</span>
-</span><span data-line="823">    <span class="n">HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE</span> <span class="o">=</span> <span class="p">(</span>
-</span><span data-line="824">        <span class="s2">&quot;ai.chat_completions.create.huggingface_hub&quot;</span>
-</span><span data-line="825">    <span class="p">)</span>
-</span><span data-line="826">    <span class="n">QUEUE_PROCESS</span> <span class="o">=</span> <span class="s2">&quot;queue.process&quot;</span>
-</span><span data-line="827">    <span class="n">QUEUE_PUBLISH</span> <span class="o">=</span> <span class="s2">&quot;queue.publish&quot;</span>
-</span><span data-line="828">    <span class="n">QUEUE_SUBMIT_ARQ</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.arq&quot;</span>
-</span><span data-line="829">    <span class="n">QUEUE_TASK_ARQ</span> <span class="o">=</span> <span class="s2">&quot;queue.task.arq&quot;</span>
-</span><span data-line="830">    <span class="n">QUEUE_SUBMIT_CELERY</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.celery&quot;</span>
-</span><span data-line="831">    <span class="n">QUEUE_TASK_CELERY</span> <span class="o">=</span> <span class="s2">&quot;queue.task.celery&quot;</span>
-</span><span data-line="832">    <span class="n">QUEUE_TASK_RQ</span> <span class="o">=</span> <span class="s2">&quot;queue.task.rq&quot;</span>
-</span><span data-line="833">    <span class="n">QUEUE_SUBMIT_HUEY</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.huey&quot;</span>
-</span><span data-line="834">    <span class="n">QUEUE_TASK_HUEY</span> <span class="o">=</span> <span class="s2">&quot;queue.task.huey&quot;</span>
-</span><span data-line="835">    <span class="n">QUEUE_SUBMIT_RAY</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.ray&quot;</span>
-</span><span data-line="836">    <span class="n">QUEUE_TASK_RAY</span> <span class="o">=</span> <span class="s2">&quot;queue.task.ray&quot;</span>
-</span><span data-line="837">    <span class="n">SUBPROCESS</span> <span class="o">=</span> <span class="s2">&quot;subprocess&quot;</span>
-</span><span data-line="838">    <span class="n">SUBPROCESS_WAIT</span> <span class="o">=</span> <span class="s2">&quot;subprocess.wait&quot;</span>
-</span><span data-line="839">    <span class="n">SUBPROCESS_COMMUNICATE</span> <span class="o">=</span> <span class="s2">&quot;subprocess.communicate&quot;</span>
-</span><span data-line="840">    <span class="n">TEMPLATE_RENDER</span> <span class="o">=</span> <span class="s2">&quot;template.render&quot;</span>
-</span><span data-line="841">    <span class="n">VIEW_RENDER</span> <span class="o">=</span> <span class="s2">&quot;view.render&quot;</span>
-</span><span data-line="842">    <span class="n">VIEW_RESPONSE_RENDER</span> <span class="o">=</span> <span class="s2">&quot;view.response.render&quot;</span>
-</span><span data-line="843">    <span class="n">WEBSOCKET_SERVER</span> <span class="o">=</span> <span class="s2">&quot;websocket.server&quot;</span>
-</span><span data-line="844">    <span class="n">SOCKET_CONNECTION</span> <span class="o">=</span> <span class="s2">&quot;socket.connection&quot;</span>
-</span><span data-line="845">    <span class="n">SOCKET_DNS</span> <span class="o">=</span> <span class="s2">&quot;socket.dns&quot;</span>
-</span><span data-line="846">
+</span><span data-line="795">    <span class="n">GEN_AI_CREATE_AGENT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.create_agent&quot;</span>
+</span><span data-line="796">    <span class="n">GEN_AI_EMBEDDINGS</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.embeddings&quot;</span>
+</span><span data-line="797">    <span class="n">GEN_AI_EXECUTE_TOOL</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.execute_tool&quot;</span>
+</span><span data-line="798">    <span class="n">GEN_AI_HANDOFF</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.handoff&quot;</span>
+</span><span data-line="799">    <span class="n">GEN_AI_PIPELINE</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.pipeline&quot;</span>
+</span><span data-line="800">    <span class="n">GEN_AI_INVOKE_AGENT</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.invoke_agent&quot;</span>
+</span><span data-line="801">    <span class="n">GEN_AI_RESPONSES</span> <span class="o">=</span> <span class="s2">&quot;gen_ai.responses&quot;</span>
+</span><span data-line="802">    <span class="n">GRAPHQL_EXECUTE</span> <span class="o">=</span> <span class="s2">&quot;graphql.execute&quot;</span>
+</span><span data-line="803">    <span class="n">GRAPHQL_MUTATION</span> <span class="o">=</span> <span class="s2">&quot;graphql.mutation&quot;</span>
+</span><span data-line="804">    <span class="n">GRAPHQL_PARSE</span> <span class="o">=</span> <span class="s2">&quot;graphql.parse&quot;</span>
+</span><span data-line="805">    <span class="n">GRAPHQL_RESOLVE</span> <span class="o">=</span> <span class="s2">&quot;graphql.resolve&quot;</span>
+</span><span data-line="806">    <span class="n">GRAPHQL_SUBSCRIPTION</span> <span class="o">=</span> <span class="s2">&quot;graphql.subscription&quot;</span>
+</span><span data-line="807">    <span class="n">GRAPHQL_QUERY</span> <span class="o">=</span> <span class="s2">&quot;graphql.query&quot;</span>
+</span><span data-line="808">    <span class="n">GRAPHQL_VALIDATE</span> <span class="o">=</span> <span class="s2">&quot;graphql.validate&quot;</span>
+</span><span data-line="809">    <span class="n">GRPC_CLIENT</span> <span class="o">=</span> <span class="s2">&quot;grpc.client&quot;</span>
+</span><span data-line="810">    <span class="n">GRPC_SERVER</span> <span class="o">=</span> <span class="s2">&quot;grpc.server&quot;</span>
+</span><span data-line="811">    <span class="n">HTTP_CLIENT</span> <span class="o">=</span> <span class="s2">&quot;http.client&quot;</span>
+</span><span data-line="812">    <span class="n">HTTP_CLIENT_STREAM</span> <span class="o">=</span> <span class="s2">&quot;http.client.stream&quot;</span>
+</span><span data-line="813">    <span class="n">HTTP_SERVER</span> <span class="o">=</span> <span class="s2">&quot;http.server&quot;</span>
+</span><span data-line="814">    <span class="n">MIDDLEWARE_DJANGO</span> <span class="o">=</span> <span class="s2">&quot;middleware.django&quot;</span>
+</span><span data-line="815">    <span class="n">MIDDLEWARE_LITESTAR</span> <span class="o">=</span> <span class="s2">&quot;middleware.litestar&quot;</span>
+</span><span data-line="816">    <span class="n">MIDDLEWARE_LITESTAR_RECEIVE</span> <span class="o">=</span> <span class="s2">&quot;middleware.litestar.receive&quot;</span>
+</span><span data-line="817">    <span class="n">MIDDLEWARE_LITESTAR_SEND</span> <span class="o">=</span> <span class="s2">&quot;middleware.litestar.send&quot;</span>
+</span><span data-line="818">    <span class="n">MIDDLEWARE_STARLETTE</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlette&quot;</span>
+</span><span data-line="819">    <span class="n">MIDDLEWARE_STARLETTE_RECEIVE</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlette.receive&quot;</span>
+</span><span data-line="820">    <span class="n">MIDDLEWARE_STARLETTE_SEND</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlette.send&quot;</span>
+</span><span data-line="821">    <span class="n">MIDDLEWARE_STARLITE</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlite&quot;</span>
+</span><span data-line="822">    <span class="n">MIDDLEWARE_STARLITE_RECEIVE</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlite.receive&quot;</span>
+</span><span data-line="823">    <span class="n">MIDDLEWARE_STARLITE_SEND</span> <span class="o">=</span> <span class="s2">&quot;middleware.starlite.send&quot;</span>
+</span><span data-line="824">    <span class="n">HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE</span> <span class="o">=</span> <span class="p">(</span>
+</span><span data-line="825">        <span class="s2">&quot;ai.chat_completions.create.huggingface_hub&quot;</span>
+</span><span data-line="826">    <span class="p">)</span>
+</span><span data-line="827">    <span class="n">QUEUE_PROCESS</span> <span class="o">=</span> <span class="s2">&quot;queue.process&quot;</span>
+</span><span data-line="828">    <span class="n">QUEUE_PUBLISH</span> <span class="o">=</span> <span class="s2">&quot;queue.publish&quot;</span>
+</span><span data-line="829">    <span class="n">QUEUE_SUBMIT_ARQ</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.arq&quot;</span>
+</span><span data-line="830">    <span class="n">QUEUE_TASK_ARQ</span> <span class="o">=</span> <span class="s2">&quot;queue.task.arq&quot;</span>
+</span><span data-line="831">    <span class="n">QUEUE_SUBMIT_CELERY</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.celery&quot;</span>
+</span><span data-line="832">    <span class="n">QUEUE_TASK_CELERY</span> <span class="o">=</span> <span class="s2">&quot;queue.task.celery&quot;</span>
+</span><span data-line="833">    <span class="n">QUEUE_TASK_RQ</span> <span class="o">=</span> <span class="s2">&quot;queue.task.rq&quot;</span>
+</span><span data-line="834">    <span class="n">QUEUE_SUBMIT_HUEY</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.huey&quot;</span>
+</span><span data-line="835">    <span class="n">QUEUE_TASK_HUEY</span> <span class="o">=</span> <span class="s2">&quot;queue.task.huey&quot;</span>
+</span><span data-line="836">    <span class="n">QUEUE_SUBMIT_RAY</span> <span class="o">=</span> <span class="s2">&quot;queue.submit.ray&quot;</span>
+</span><span data-line="837">    <span class="n">QUEUE_TASK_RAY</span> <span class="o">=</span> <span class="s2">&quot;queue.task.ray&quot;</span>
+</span><span data-line="838">    <span class="n">SUBPROCESS</span> <span class="o">=</span> <span class="s2">&quot;subprocess&quot;</span>
+</span><span data-line="839">    <span class="n">SUBPROCESS_WAIT</span> <span class="o">=</span> <span class="s2">&quot;subprocess.wait&quot;</span>
+</span><span data-line="840">    <span class="n">SUBPROCESS_COMMUNICATE</span> <span class="o">=</span> <span class="s2">&quot;subprocess.communicate&quot;</span>
+</span><span data-line="841">    <span class="n">TEMPLATE_RENDER</span> <span class="o">=</span> <span class="s2">&quot;template.render&quot;</span>
+</span><span data-line="842">    <span class="n">VIEW_RENDER</span> <span class="o">=</span> <span class="s2">&quot;view.render&quot;</span>
+</span><span data-line="843">    <span class="n">VIEW_RESPONSE_RENDER</span> <span class="o">=</span> <span class="s2">&quot;view.response.render&quot;</span>
+</span><span data-line="844">    <span class="n">WEBSOCKET_SERVER</span> <span class="o">=</span> <span class="s2">&quot;websocket.server&quot;</span>
+</span><span data-line="845">    <span class="n">SOCKET_CONNECTION</span> <span class="o">=</span> <span class="s2">&quot;socket.connection&quot;</span>
+</span><span data-line="846">    <span class="n">SOCKET_DNS</span> <span class="o">=</span> <span class="s2">&quot;socket.dns&quot;</span>
 </span><span data-line="847">
-</span><span data-line="848"><span class="c1"># This type exists to trick mypy and PyCharm into thinking `init` and `Client`</span>
-</span><span data-line="849"><span class="c1"># take these arguments (even though they take opaque **kwargs)</span>
+</span><span data-line="848">
+</span><span data-line="849"><span class="c1"># This type exists to trick mypy and PyCharm into thinking `init` and `Client`</span>
+</span><span data-line="850"><span class="c1"># take these arguments (even though they take opaque **kwargs)</span>
 <div class="viewcode-block" id="ClientConstructor">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.client.ClientConstructor">[docs]</a>
-</span><span data-line="850"><span class="k">class</span><span class="w"> </span><span class="nc">ClientConstructor</span><span class="p">:</span>
-</span><span data-line="851">
+</span><span data-line="851"><span class="k">class</span><span class="w"> </span><span class="nc">ClientConstructor</span><span class="p">:</span>
+</span><span data-line="852">
 <div class="viewcode-block" id="ClientConstructor.__init__">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.client.ClientConstructor.__init__">[docs]</a>
-</span><span data-line="852">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-</span><span data-line="853">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="854">        <span class="n">dsn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="855">        <span class="o">*</span><span class="p">,</span>
-</span><span data-line="856">        <span class="n">max_breadcrumbs</span><span class="o">=</span><span class="n">DEFAULT_MAX_BREADCRUMBS</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="857">        <span class="n">release</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="858">        <span class="n">environment</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="859">        <span class="n">server_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="860">        <span class="n">shutdown_timeout</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># type: float</span>
-</span><span data-line="861">        <span class="n">integrations</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006</span>
-</span><span data-line="862">        <span class="n">in_app_include</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: List[str]  # noqa: B006</span>
-</span><span data-line="863">        <span class="n">in_app_exclude</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: List[str]  # noqa: B006</span>
-</span><span data-line="864">        <span class="n">default_integrations</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="865">        <span class="n">dist</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="866">        <span class="n">transport</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]</span>
-</span><span data-line="867">        <span class="n">transport_queue_size</span><span class="o">=</span><span class="n">DEFAULT_QUEUE_SIZE</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="868">        <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>  <span class="c1"># type: float</span>
-</span><span data-line="869">        <span class="n">send_default_pii</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="870">        <span class="n">http_proxy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="871">        <span class="n">https_proxy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="872">        <span class="n">ignore_errors</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[Union[type, str]]  # noqa: B006</span>
-</span><span data-line="873">        <span class="n">max_request_body_size</span><span class="o">=</span><span class="s2">&quot;medium&quot;</span><span class="p">,</span>  <span class="c1"># type: str</span>
-</span><span data-line="874">        <span class="n">socket_options</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[List[Tuple[int, int, int | bytes]]]</span>
-</span><span data-line="875">        <span class="n">keep_alive</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="876">        <span class="n">before_send</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[EventProcessor]</span>
-</span><span data-line="877">        <span class="n">before_breadcrumb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[BreadcrumbProcessor]</span>
-</span><span data-line="878">        <span class="n">debug</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="879">        <span class="n">attach_stacktrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="880">        <span class="n">ca_certs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="881">        <span class="n">propagate_traces</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="882">        <span class="n">traces_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span data-line="883">        <span class="n">traces_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TracesSampler]</span>
-</span><span data-line="884">        <span class="n">profiles_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span data-line="885">        <span class="n">profiles_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TracesSampler]</span>
-</span><span data-line="886">        <span class="n">profiler_mode</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[ProfilerMode]</span>
-</span><span data-line="887">        <span class="n">profile_lifecycle</span><span class="o">=</span><span class="s2">&quot;manual&quot;</span><span class="p">,</span>  <span class="c1"># type: Literal[&quot;manual&quot;, &quot;trace&quot;]</span>
-</span><span data-line="888">        <span class="n">profile_session_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span data-line="889">        <span class="n">auto_enabling_integrations</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="890">        <span class="n">disabled_integrations</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Sequence[sentry_sdk.integrations.Integration]]</span>
-</span><span data-line="891">        <span class="n">auto_session_tracking</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="892">        <span class="n">send_client_reports</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="893">        <span class="n">_experiments</span><span class="o">=</span><span class="p">{},</span>  <span class="c1"># type: Experiments  # noqa: B006</span>
-</span><span data-line="894">        <span class="n">proxy_headers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
-</span><span data-line="895">        <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="896">        <span class="n">before_send_transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TransactionProcessor]</span>
-</span><span data-line="897">        <span class="n">project_root</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="898">        <span class="n">enable_tracing</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="899">        <span class="n">include_local_variables</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="900">        <span class="n">include_source_context</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
-</span><span data-line="901">        <span class="n">trace_propagation_targets</span><span class="o">=</span><span class="p">[</span>  <span class="c1"># noqa: B006</span>
-</span><span data-line="902">            <span class="n">MATCH_ALL</span>
-</span><span data-line="903">        <span class="p">],</span>  <span class="c1"># type: Optional[Sequence[str]]</span>
-</span><span data-line="904">        <span class="n">functions_to_trace</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[Dict[str, str]]  # noqa: B006</span>
-</span><span data-line="905">        <span class="n">event_scrubber</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[sentry_sdk.scrubber.EventScrubber]</span>
-</span><span data-line="906">        <span class="n">max_value_length</span><span class="o">=</span><span class="n">DEFAULT_MAX_VALUE_LENGTH</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="907">        <span class="n">enable_backpressure_handling</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="908">        <span class="n">error_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Event, Hint], Union[float, bool]]]</span>
-</span><span data-line="909">        <span class="n">enable_db_query_source</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="910">        <span class="n">db_query_source_threshold_ms</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>  <span class="c1"># type: int</span>
-</span><span data-line="911">        <span class="n">spotlight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[bool, str]]</span>
-</span><span data-line="912">        <span class="n">cert_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="913">        <span class="n">key_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span data-line="914">        <span class="n">custom_repr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[..., Optional[str]]]</span>
-</span><span data-line="915">        <span class="n">add_full_stack</span><span class="o">=</span><span class="n">DEFAULT_ADD_FULL_STACK</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="916">        <span class="n">max_stack_frames</span><span class="o">=</span><span class="n">DEFAULT_MAX_STACK_FRAMES</span><span class="p">,</span>  <span class="c1"># type: Optional[int]</span>
-</span><span data-line="917">        <span class="n">enable_logs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span data-line="918">        <span class="n">before_send_log</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Log, Hint], Optional[Log]]]</span>
-</span><span data-line="919">    <span class="p">):</span>
-</span><span data-line="920">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span data-line="921"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.</span>
-</span><span data-line="922">
-</span><span data-line="923"><span class="sd">        :param dsn: The DSN tells the SDK where to send the events.</span>
-</span><span data-line="924">
-</span><span data-line="925"><span class="sd">            If this option is not set, the SDK will just not send any data.</span>
-</span><span data-line="926">
-</span><span data-line="927"><span class="sd">            The `dsn` config option takes precedence over the environment variable.</span>
-</span><span data-line="928">
-</span><span data-line="929"><span class="sd">            Learn more about `DSN utilization &lt;https://docs.sentry.io/product/sentry-basics/dsn-explainer/#dsn-utilization&gt;`_.</span>
-</span><span data-line="930">
-</span><span data-line="931"><span class="sd">        :param debug: Turns debug mode on or off.</span>
-</span><span data-line="932">
-</span><span data-line="933"><span class="sd">            When `True`, the SDK will attempt to print out debugging information. This can be useful if something goes</span>
-</span><span data-line="934"><span class="sd">            wrong with event sending.</span>
-</span><span data-line="935">
-</span><span data-line="936"><span class="sd">            The default is always `False`. It&#39;s generally not recommended to turn it on in production because of the</span>
-</span><span data-line="937"><span class="sd">            increase in log output.</span>
-</span><span data-line="938">
-</span><span data-line="939"><span class="sd">            The `debug` config option takes precedence over the environment variable.</span>
-</span><span data-line="940">
-</span><span data-line="941"><span class="sd">        :param release: Sets the release.</span>
-</span><span data-line="942">
-</span><span data-line="943"><span class="sd">            If not set, the SDK will try to automatically configure a release out of the box but it&#39;s a better idea to</span>
-</span><span data-line="944"><span class="sd">            manually set it to guarantee that the release is in sync with your deploy integrations.</span>
-</span><span data-line="945">
-</span><span data-line="946"><span class="sd">            Release names are strings, but some formats are detected by Sentry and might be rendered differently.</span>
-</span><span data-line="947">
-</span><span data-line="948"><span class="sd">            See `the releases documentation &lt;https://docs.sentry.io/platforms/python/configuration/releases/&gt;`_ to learn how the SDK tries to</span>
-</span><span data-line="949"><span class="sd">            automatically configure a release.</span>
-</span><span data-line="950">
-</span><span data-line="951"><span class="sd">            The `release` config option takes precedence over the environment variable.</span>
-</span><span data-line="952">
-</span><span data-line="953"><span class="sd">            Learn more about how to send release data so Sentry can tell you about regressions between releases and</span>
-</span><span data-line="954"><span class="sd">            identify the potential source in `the product documentation &lt;https://docs.sentry.io/product/releases/&gt;`_.</span>
-</span><span data-line="955">
-</span><span data-line="956"><span class="sd">        :param environment: Sets the environment. This string is freeform and set to `production` by default.</span>
-</span><span data-line="957">
-</span><span data-line="958"><span class="sd">            A release can be associated with more than one environment to separate them in the UI (think `staging` vs</span>
-</span><span data-line="959"><span class="sd">            `production` or similar).</span>
-</span><span data-line="960">
-</span><span data-line="961"><span class="sd">            The `environment` config option takes precedence over the environment variable.</span>
-</span><span data-line="962">
-</span><span data-line="963"><span class="sd">        :param dist: The distribution of the application.</span>
-</span><span data-line="964">
-</span><span data-line="965"><span class="sd">            Distributions are used to disambiguate build or deployment variants of the same release of an application.</span>
-</span><span data-line="966">
-</span><span data-line="967"><span class="sd">            The dist can be for example a build number.</span>
-</span><span data-line="968">
-</span><span data-line="969"><span class="sd">        :param sample_rate: Configures the sample rate for error events, in the range of `0.0` to `1.0`.</span>
-</span><span data-line="970">
-</span><span data-line="971"><span class="sd">            The default is `1.0`, which means that 100% of error events will be sent. If set to `0.1`, only 10% of</span>
-</span><span data-line="972"><span class="sd">            error events will be sent.</span>
-</span><span data-line="973">
-</span><span data-line="974"><span class="sd">            Events are picked randomly.</span>
-</span><span data-line="975">
-</span><span data-line="976"><span class="sd">        :param error_sampler: Dynamically configures the sample rate for error events on a per-event basis.</span>
-</span><span data-line="977">
-</span><span data-line="978"><span class="sd">            This configuration option accepts a function, which takes two parameters (the `event` and the `hint`), and</span>
-</span><span data-line="979"><span class="sd">            which returns a boolean (indicating whether the event should be sent to Sentry) or a floating-point number</span>
-</span><span data-line="980"><span class="sd">            between `0.0` and `1.0`, inclusive.</span>
-</span><span data-line="981">
-</span><span data-line="982"><span class="sd">            The number indicates the probability the event is sent to Sentry; the SDK will randomly decide whether to</span>
-</span><span data-line="983"><span class="sd">            send the event with the given probability.</span>
-</span><span data-line="984">
-</span><span data-line="985"><span class="sd">            If this configuration option is specified, the `sample_rate` option is ignored.</span>
-</span><span data-line="986">
-</span><span data-line="987"><span class="sd">        :param ignore_errors: A list of exception class names that shouldn&#39;t be sent to Sentry.</span>
-</span><span data-line="988">
-</span><span data-line="989"><span class="sd">            Errors that are an instance of these exceptions or a subclass of them, will be filtered out before they&#39;re</span>
-</span><span data-line="990"><span class="sd">            sent to Sentry.</span>
-</span><span data-line="991">
-</span><span data-line="992"><span class="sd">            By default, all errors are sent.</span>
-</span><span data-line="993">
-</span><span data-line="994"><span class="sd">        :param max_breadcrumbs: This variable controls the total amount of breadcrumbs that should be captured.</span>
-</span><span data-line="995">
-</span><span data-line="996"><span class="sd">            This defaults to `100`, but you can set this to any number.</span>
-</span><span data-line="997">
-</span><span data-line="998"><span class="sd">            However, you should be aware that Sentry has a `maximum payload size &lt;https://develop.sentry.dev/sdk/data-model/envelopes/#size-limits&gt;`_</span>
-</span><span data-line="999"><span class="sd">            and any events exceeding that payload size will be dropped.</span>
-</span><span data-line="1000">
-</span><span data-line="1001"><span class="sd">        :param attach_stacktrace: When enabled, stack traces are automatically attached to all messages logged.</span>
-</span><span data-line="1002">
-</span><span data-line="1003"><span class="sd">            Stack traces are always attached to exceptions; however, when this option is set, stack traces are also</span>
-</span><span data-line="1004"><span class="sd">            sent with messages.</span>
-</span><span data-line="1005">
-</span><span data-line="1006"><span class="sd">            This option means that stack traces appear next to all log messages.</span>
-</span><span data-line="1007">
-</span><span data-line="1008"><span class="sd">            Grouping in Sentry is different for events with stack traces and without. As a result, you will get new</span>
-</span><span data-line="1009"><span class="sd">            groups as you enable or disable this flag for certain events.</span>
-</span><span data-line="1010">
-</span><span data-line="1011"><span class="sd">        :param send_default_pii: If this flag is enabled, `certain personally identifiable information (PII)</span>
-</span><span data-line="1012"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/data-management/data-collected/&gt;`_ is added by active integrations.</span>
-</span><span data-line="1013">
-</span><span data-line="1014"><span class="sd">            If you enable this option, be sure to manually remove what you don&#39;t want to send using our features for</span>
-</span><span data-line="1015"><span class="sd">            managing `Sensitive Data &lt;https://docs.sentry.io/data-management/sensitive-data/&gt;`_.</span>
-</span><span data-line="1016">
-</span><span data-line="1017"><span class="sd">        :param event_scrubber: Scrubs the event payload for sensitive information such as cookies, sessions, and</span>
-</span><span data-line="1018"><span class="sd">            passwords from a `denylist`.</span>
-</span><span data-line="1019">
-</span><span data-line="1020"><span class="sd">            It can additionally be used to scrub from another `pii_denylist` if `send_default_pii` is disabled.</span>
-</span><span data-line="1021">
-</span><span data-line="1022"><span class="sd">            See how to `configure the scrubber here &lt;https://docs.sentry.io/data-management/sensitive-data/#event-scrubber&gt;`_.</span>
-</span><span data-line="1023">
-</span><span data-line="1024"><span class="sd">        :param include_source_context: When enabled, source context will be included in events sent to Sentry.</span>
-</span><span data-line="1025">
-</span><span data-line="1026"><span class="sd">            This source context includes the five lines of code above and below the line of code where an error</span>
-</span><span data-line="1027"><span class="sd">            happened.</span>
-</span><span data-line="1028">
-</span><span data-line="1029"><span class="sd">        :param include_local_variables: When enabled, the SDK will capture a snapshot of local variables to send with</span>
-</span><span data-line="1030"><span class="sd">            the event to help with debugging.</span>
-</span><span data-line="1031">
-</span><span data-line="1032"><span class="sd">        :param add_full_stack: When capturing errors, Sentry stack traces typically only include frames that start the</span>
-</span><span data-line="1033"><span class="sd">            moment an error occurs.</span>
-</span><span data-line="1034">
-</span><span data-line="1035"><span class="sd">            But if the `add_full_stack` option is enabled (set to `True`), all frames from the start of execution will</span>
-</span><span data-line="1036"><span class="sd">            be included in the stack trace sent to Sentry.</span>
-</span><span data-line="1037">
-</span><span data-line="1038"><span class="sd">        :param max_stack_frames: This option limits the number of stack frames that will be captured when</span>
-</span><span data-line="1039"><span class="sd">            `add_full_stack` is enabled.</span>
-</span><span data-line="1040">
-</span><span data-line="1041"><span class="sd">        :param server_name: This option can be used to supply a server name.</span>
-</span><span data-line="1042">
-</span><span data-line="1043"><span class="sd">            When provided, the name of the server is sent along and persisted in the event.</span>
-</span><span data-line="1044">
-</span><span data-line="1045"><span class="sd">            For many integrations, the server name actually corresponds to the device hostname, even in situations</span>
-</span><span data-line="1046"><span class="sd">            where the machine is not actually a server.</span>
-</span><span data-line="1047">
-</span><span data-line="1048"><span class="sd">        :param project_root: The full path to the root directory of your application.</span>
-</span><span data-line="1049">
-</span><span data-line="1050"><span class="sd">            The `project_root` is used to mark frames in a stack trace either as being in your application or outside</span>
-</span><span data-line="1051"><span class="sd">            of the application.</span>
-</span><span data-line="1052">
-</span><span data-line="1053"><span class="sd">        :param in_app_include: A list of string prefixes of module names that belong to the app.</span>
-</span><span data-line="1054">
-</span><span data-line="1055"><span class="sd">            This option takes precedence over `in_app_exclude`.</span>
-</span><span data-line="1056">
-</span><span data-line="1057"><span class="sd">            Sentry differentiates stack frames that are directly related to your application (&quot;in application&quot;) from</span>
-</span><span data-line="1058"><span class="sd">            stack frames that come from other packages such as the standard library, frameworks, or other dependencies.</span>
-</span><span data-line="1059">
-</span><span data-line="1060"><span class="sd">            The application package is automatically marked as `inApp`.</span>
-</span><span data-line="1061">
-</span><span data-line="1062"><span class="sd">            The difference is visible in [sentry.io](https://sentry.io), where only the &quot;in application&quot; frames are</span>
-</span><span data-line="1063"><span class="sd">            displayed by default.</span>
-</span><span data-line="1064">
-</span><span data-line="1065"><span class="sd">        :param in_app_exclude: A list of string prefixes of module names that do not belong to the app, but rather to</span>
-</span><span data-line="1066"><span class="sd">            third-party packages.</span>
-</span><span data-line="1067">
-</span><span data-line="1068"><span class="sd">            Modules considered not part of the app will be hidden from stack traces by default.</span>
-</span><span data-line="1069">
-</span><span data-line="1070"><span class="sd">            This option can be overridden using `in_app_include`.</span>
-</span><span data-line="1071">
-</span><span data-line="1072"><span class="sd">        :param max_request_body_size: This parameter controls whether integrations should capture HTTP request bodies.</span>
-</span><span data-line="1073"><span class="sd">            It can be set to one of the following values:</span>
-</span><span data-line="1074">
-</span><span data-line="1075"><span class="sd">            - `never`: Request bodies are never sent.</span>
-</span><span data-line="1076"><span class="sd">            - `small`: Only small request bodies will be captured. The cutoff for small depends on the SDK (typically</span>
-</span><span data-line="1077"><span class="sd">              4KB).</span>
-</span><span data-line="1078"><span class="sd">            - `medium`: Medium and small requests will be captured (typically 10KB).</span>
-</span><span data-line="1079"><span class="sd">            - `always`: The SDK will always capture the request body as long as Sentry can make sense of it.</span>
-</span><span data-line="1080">
-</span><span data-line="1081"><span class="sd">            Please note that the Sentry server [limits HTTP request body size](https://develop.sentry.dev/sdk/</span>
-</span><span data-line="1082"><span class="sd">            expected-features/data-handling/#variable-size). The server always enforces its size limit, regardless of</span>
-</span><span data-line="1083"><span class="sd">            how you configure this option.</span>
-</span><span data-line="1084">
-</span><span data-line="1085"><span class="sd">        :param max_value_length: The number of characters after which the values containing text in the event payload</span>
-</span><span data-line="1086"><span class="sd">            will be truncated.</span>
-</span><span data-line="1087">
-</span><span data-line="1088"><span class="sd">            WARNING: If the value you set for this is exceptionally large, the event may exceed 1 MiB and will be</span>
-</span><span data-line="1089"><span class="sd">            dropped by Sentry.</span>
-</span><span data-line="1090">
-</span><span data-line="1091"><span class="sd">        :param ca_certs: A path to an alternative CA bundle file in PEM-format.</span>
-</span><span data-line="1092">
-</span><span data-line="1093"><span class="sd">        :param send_client_reports: Set this boolean to `False` to disable sending of client reports.</span>
-</span><span data-line="1094">
-</span><span data-line="1095"><span class="sd">            Client reports allow the client to send status reports about itself to Sentry, such as information about</span>
-</span><span data-line="1096"><span class="sd">            events that were dropped before being sent.</span>
-</span><span data-line="1097">
-</span><span data-line="1098"><span class="sd">        :param integrations: List of integrations to enable in addition to `auto-enabling integrations (overview)</span>
-</span><span data-line="1099"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/integrations&gt;`_.</span>
-</span><span data-line="1100">
-</span><span data-line="1101"><span class="sd">            This setting can be used to override the default config options for a specific auto-enabling integration</span>
-</span><span data-line="1102"><span class="sd">            or to add an integration that is not auto-enabled.</span>
-</span><span data-line="1103">
-</span><span data-line="1104"><span class="sd">        :param disabled_integrations: List of integrations that will be disabled.</span>
-</span><span data-line="1105">
-</span><span data-line="1106"><span class="sd">            This setting can be used to explicitly turn off specific `auto-enabling integrations (list)</span>
-</span><span data-line="1107"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/integrations/#available-integrations&gt;`_ or</span>
-</span><span data-line="1108"><span class="sd">            `default &lt;https://docs.sentry.io/platforms/python/integrations/default-integrations/&gt;`_ integrations.</span>
-</span><span data-line="1109">
-</span><span data-line="1110"><span class="sd">        :param auto_enabling_integrations: Configures whether `auto-enabling integrations (configuration)</span>
-</span><span data-line="1111"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/integrations/#available-integrations&gt;`_ should be enabled.</span>
-</span><span data-line="1112">
-</span><span data-line="1113"><span class="sd">            When set to `False`, no auto-enabling integrations will be enabled by default, even if the corresponding</span>
-</span><span data-line="1114"><span class="sd">            framework/library is detected.</span>
-</span><span data-line="1115">
-</span><span data-line="1116"><span class="sd">        :param default_integrations: Configures whether `default integrations</span>
-</span><span data-line="1117"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/integrations/default-integrations/&gt;`_ should be enabled.</span>
-</span><span data-line="1118">
-</span><span data-line="1119"><span class="sd">            Setting `default_integrations` to `False` disables all default integrations **as well as all auto-enabling</span>
-</span><span data-line="1120"><span class="sd">            integrations**, unless they are specifically added in the `integrations` option, described above.</span>
-</span><span data-line="1121">
-</span><span data-line="1122"><span class="sd">        :param before_send: This function is called with an SDK-specific message or error event object, and can return</span>
-</span><span data-line="1123"><span class="sd">            a modified event object, or `null` to skip reporting the event.</span>
-</span><span data-line="1124">
-</span><span data-line="1125"><span class="sd">            This can be used, for instance, for manual PII stripping before sending.</span>
-</span><span data-line="1126">
-</span><span data-line="1127"><span class="sd">            By the time `before_send` is executed, all scope data has already been applied to the event. Further</span>
-</span><span data-line="1128"><span class="sd">            modification of the scope won&#39;t have any effect.</span>
-</span><span data-line="1129">
-</span><span data-line="1130"><span class="sd">        :param before_send_transaction: This function is called with an SDK-specific transaction event object, and can</span>
-</span><span data-line="1131"><span class="sd">            return a modified transaction event object, or `null` to skip reporting the event.</span>
-</span><span data-line="1132">
-</span><span data-line="1133"><span class="sd">            One way this might be used is for manual PII stripping before sending.</span>
-</span><span data-line="1134">
-</span><span data-line="1135"><span class="sd">        :param before_breadcrumb: This function is called with an SDK-specific breadcrumb object before the breadcrumb</span>
-</span><span data-line="1136"><span class="sd">            is added to the scope.</span>
-</span><span data-line="1137">
-</span><span data-line="1138"><span class="sd">            When nothing is returned from the function, the breadcrumb is dropped.</span>
-</span><span data-line="1139">
-</span><span data-line="1140"><span class="sd">            To pass the breadcrumb through, return the first argument, which contains the breadcrumb object.</span>
-</span><span data-line="1141">
-</span><span data-line="1142"><span class="sd">            The callback typically gets a second argument (called a &quot;hint&quot;) which contains the original object from</span>
-</span><span data-line="1143"><span class="sd">            which the breadcrumb was created to further customize what the breadcrumb should look like.</span>
-</span><span data-line="1144">
-</span><span data-line="1145"><span class="sd">        :param transport: Switches out the transport used to send events.</span>
-</span><span data-line="1146">
-</span><span data-line="1147"><span class="sd">            How this works depends on the SDK. It can, for instance, be used to capture events for unit-testing or to</span>
-</span><span data-line="1148"><span class="sd">            send it through some more complex setup that requires proxy authentication.</span>
-</span><span data-line="1149">
-</span><span data-line="1150"><span class="sd">        :param transport_queue_size: The maximum number of events that will be queued before the transport is forced to</span>
-</span><span data-line="1151"><span class="sd">            flush.</span>
-</span><span data-line="1152">
-</span><span data-line="1153"><span class="sd">        :param http_proxy: When set, a proxy can be configured that should be used for outbound requests.</span>
-</span><span data-line="1154">
-</span><span data-line="1155"><span class="sd">            This is also used for HTTPS requests unless a separate `https_proxy` is configured. However, not all SDKs</span>
-</span><span data-line="1156"><span class="sd">            support a separate HTTPS proxy.</span>
-</span><span data-line="1157">
-</span><span data-line="1158"><span class="sd">            SDKs will attempt to default to the system-wide configured proxy, if possible. For instance, on Unix</span>
-</span><span data-line="1159"><span class="sd">            systems, the `http_proxy` environment variable will be picked up.</span>
-</span><span data-line="1160">
-</span><span data-line="1161"><span class="sd">        :param https_proxy: Configures a separate proxy for outgoing HTTPS requests.</span>
-</span><span data-line="1162">
-</span><span data-line="1163"><span class="sd">            This value might not be supported by all SDKs. When not supported the `http-proxy` value is also used for</span>
-</span><span data-line="1164"><span class="sd">            HTTPS requests at all times.</span>
-</span><span data-line="1165">
-</span><span data-line="1166"><span class="sd">        :param proxy_headers: A dict containing additional proxy headers (usually for authentication) to be forwarded</span>
-</span><span data-line="1167"><span class="sd">            to `urllib3`&#39;s `ProxyManager &lt;https://urllib3.readthedocs.io/en/1.24.3/reference/index.html#urllib3.poolmanager.ProxyManager&gt;`_.</span>
-</span><span data-line="1168">
-</span><span data-line="1169"><span class="sd">        :param shutdown_timeout: Controls how many seconds to wait before shutting down.</span>
-</span><span data-line="1170">
-</span><span data-line="1171"><span class="sd">            Sentry SDKs send events from a background queue. This queue is given a certain amount to drain pending</span>
-</span><span data-line="1172"><span class="sd">            events. The default is SDK specific but typically around two seconds.</span>
-</span><span data-line="1173">
-</span><span data-line="1174"><span class="sd">            Setting this value too low may cause problems for sending events from command line applications.</span>
-</span><span data-line="1175">
-</span><span data-line="1176"><span class="sd">            Setting the value too high will cause the application to block for a long time for users experiencing</span>
-</span><span data-line="1177"><span class="sd">            network connectivity problems.</span>
-</span><span data-line="1178">
-</span><span data-line="1179"><span class="sd">        :param keep_alive: Determines whether to keep the connection alive between requests.</span>
-</span><span data-line="1180">
-</span><span data-line="1181"><span class="sd">            This can be useful in environments where you encounter frequent network issues such as connection resets.</span>
-</span><span data-line="1182">
-</span><span data-line="1183"><span class="sd">        :param cert_file: Path to the client certificate to use.</span>
-</span><span data-line="1184">
-</span><span data-line="1185"><span class="sd">            If set, supersedes the `CLIENT_CERT_FILE` environment variable.</span>
-</span><span data-line="1186">
-</span><span data-line="1187"><span class="sd">        :param key_file: Path to the key file to use.</span>
-</span><span data-line="1188">
-</span><span data-line="1189"><span class="sd">            If set, supersedes the `CLIENT_KEY_FILE` environment variable.</span>
-</span><span data-line="1190">
-</span><span data-line="1191"><span class="sd">        :param socket_options: An optional list of socket options to use.</span>
-</span><span data-line="1192">
-</span><span data-line="1193"><span class="sd">            These provide fine-grained, low-level control over the way the SDK connects to Sentry.</span>
-</span><span data-line="1194">
-</span><span data-line="1195"><span class="sd">            If provided, the options will override the default `urllib3` `socket options</span>
-</span><span data-line="1196"><span class="sd">            &lt;https://urllib3.readthedocs.io/en/stable/reference/urllib3.connection.html#urllib3.connection.HTTPConnection&gt;`_.</span>
-</span><span data-line="1197">
-</span><span data-line="1198"><span class="sd">        :param traces_sample_rate: A number between `0` and `1`, controlling the percentage chance a given transaction</span>
-</span><span data-line="1199"><span class="sd">            will be sent to Sentry.</span>
-</span><span data-line="1200">
-</span><span data-line="1201"><span class="sd">            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.</span>
-</span><span data-line="1202">
-</span><span data-line="1203"><span class="sd">            Either this or `traces_sampler` must be defined to enable tracing.</span>
-</span><span data-line="1204">
-</span><span data-line="1205"><span class="sd">            If `traces_sample_rate` is `0`, this means that no new traces will be created. However, if you have</span>
-</span><span data-line="1206"><span class="sd">            another service (for example a JS frontend) that makes requests to your service that include trace</span>
-</span><span data-line="1207"><span class="sd">            information, those traces will be continued and thus transactions will be sent to Sentry.</span>
-</span><span data-line="1208">
-</span><span data-line="1209"><span class="sd">            If you want to disable all tracing you need to set `traces_sample_rate=None`. In this case, no new traces</span>
-</span><span data-line="1210"><span class="sd">            will be started and no incoming traces will be continued.</span>
-</span><span data-line="1211">
-</span><span data-line="1212"><span class="sd">        :param traces_sampler: A function responsible for determining the percentage chance a given transaction will be</span>
-</span><span data-line="1213"><span class="sd">            sent to Sentry.</span>
-</span><span data-line="1214">
-</span><span data-line="1215"><span class="sd">            It will automatically be passed information about the transaction and the context in which it&#39;s being</span>
-</span><span data-line="1216"><span class="sd">            created, and must return a number between `0` (0% chance of being sent) and `1` (100% chance of being</span>
-</span><span data-line="1217"><span class="sd">            sent).</span>
-</span><span data-line="1218">
-</span><span data-line="1219"><span class="sd">            Can also be used for filtering transactions, by returning `0` for those that are unwanted.</span>
-</span><span data-line="1220">
-</span><span data-line="1221"><span class="sd">            Either this or `traces_sample_rate` must be defined to enable tracing.</span>
-</span><span data-line="1222">
-</span><span data-line="1223"><span class="sd">        :param trace_propagation_targets: An optional property that controls which downstream services receive tracing</span>
-</span><span data-line="1224"><span class="sd">            data, in the form of a `sentry-trace` and a `baggage` header attached to any outgoing HTTP requests.</span>
-</span><span data-line="1225">
-</span><span data-line="1226"><span class="sd">            The option may contain a list of strings or regex against which the URLs of outgoing requests are matched.</span>
-</span><span data-line="1227">
-</span><span data-line="1228"><span class="sd">            If one of the entries in the list matches the URL of an outgoing request, trace data will be attached to</span>
-</span><span data-line="1229"><span class="sd">            that request.</span>
-</span><span data-line="1230">
-</span><span data-line="1231"><span class="sd">            String entries do not have to be full matches, meaning the URL of a request is matched when it _contains_</span>
-</span><span data-line="1232"><span class="sd">            a string provided through the option.</span>
-</span><span data-line="1233">
-</span><span data-line="1234"><span class="sd">            If `trace_propagation_targets` is not provided, trace data is attached to every outgoing request from the</span>
-</span><span data-line="1235"><span class="sd">            instrumented client.</span>
-</span><span data-line="1236">
-</span><span data-line="1237"><span class="sd">        :param functions_to_trace: An optional list of functions that should be set up for tracing.</span>
-</span><span data-line="1238">
-</span><span data-line="1239"><span class="sd">            For each function in the list, a span will be created when the function is executed.</span>
-</span><span data-line="1240">
-</span><span data-line="1241"><span class="sd">            Functions in the list are represented as strings containing the fully qualified name of the function.</span>
-</span><span data-line="1242">
-</span><span data-line="1243"><span class="sd">            This is a convenient option, making it possible to have one central place for configuring what functions</span>
-</span><span data-line="1244"><span class="sd">            to trace, instead of having custom instrumentation scattered all over your code base.</span>
-</span><span data-line="1245">
-</span><span data-line="1246"><span class="sd">            To learn more, see the `Custom Instrumentation &lt;https://docs.sentry.io/platforms/python/tracing/instrumentation/custom-instrumentation/#define-span-creation-in-a-central-place&gt;`_ documentation.</span>
-</span><span data-line="1247">
-</span><span data-line="1248"><span class="sd">        :param enable_backpressure_handling: When enabled, a new monitor thread will be spawned to perform health</span>
-</span><span data-line="1249"><span class="sd">            checks on the SDK.</span>
-</span><span data-line="1250">
-</span><span data-line="1251"><span class="sd">            If the system is unhealthy, the SDK will keep halving the `traces_sample_rate` set by you in 10 second</span>
-</span><span data-line="1252"><span class="sd">            intervals until recovery.</span>
-</span><span data-line="1253">
-</span><span data-line="1254"><span class="sd">            This down sampling helps ensure that the system stays stable and reduces SDK overhead under high load.</span>
-</span><span data-line="1255">
-</span><span data-line="1256"><span class="sd">            This option is enabled by default.</span>
-</span><span data-line="1257">
-</span><span data-line="1258"><span class="sd">        :param enable_db_query_source: When enabled, the source location will be added to database queries.</span>
-</span><span data-line="1259">
-</span><span data-line="1260"><span class="sd">        :param db_query_source_threshold_ms: The threshold in milliseconds for adding the source location to database</span>
-</span><span data-line="1261"><span class="sd">            queries.</span>
-</span><span data-line="1262">
-</span><span data-line="1263"><span class="sd">            The query location will be added to the query for queries slower than the specified threshold.</span>
-</span><span data-line="1264">
-</span><span data-line="1265"><span class="sd">        :param custom_repr: A custom `repr &lt;https://docs.python.org/3/library/functions.html#repr&gt;`_ function to run</span>
-</span><span data-line="1266"><span class="sd">            while serializing an object.</span>
-</span><span data-line="1267">
-</span><span data-line="1268"><span class="sd">            Use this to control how your custom objects and classes are visible in Sentry.</span>
-</span><span data-line="1269">
-</span><span data-line="1270"><span class="sd">            Return a string for that repr value to be used or `None` to continue serializing how Sentry would have</span>
-</span><span data-line="1271"><span class="sd">            done it anyway.</span>
-</span><span data-line="1272">
-</span><span data-line="1273"><span class="sd">        :param profiles_sample_rate: A number between `0` and `1`, controlling the percentage chance a given sampled</span>
-</span><span data-line="1274"><span class="sd">            transaction will be profiled.</span>
-</span><span data-line="1275">
-</span><span data-line="1276"><span class="sd">            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.</span>
-</span><span data-line="1277">
-</span><span data-line="1278"><span class="sd">            This is relative to the tracing sample rate - e.g. `0.5` means 50% of sampled transactions will be</span>
-</span><span data-line="1279"><span class="sd">            profiled.</span>
-</span><span data-line="1280">
-</span><span data-line="1281"><span class="sd">        :param profiles_sampler:</span>
-</span><span data-line="1282">
-</span><span data-line="1283"><span class="sd">        :param profiler_mode:</span>
-</span><span data-line="1284">
-</span><span data-line="1285"><span class="sd">        :param profile_lifecycle:</span>
-</span><span data-line="1286">
-</span><span data-line="1287"><span class="sd">        :param profile_session_sample_rate:</span>
-</span><span data-line="1288">
-</span><span data-line="1289"><span class="sd">        :param enable_tracing:</span>
-</span><span data-line="1290">
-</span><span data-line="1291"><span class="sd">        :param propagate_traces:</span>
-</span><span data-line="1292">
-</span><span data-line="1293"><span class="sd">        :param auto_session_tracking:</span>
-</span><span data-line="1294">
-</span><span data-line="1295"><span class="sd">        :param spotlight:</span>
-</span><span data-line="1296">
-</span><span data-line="1297"><span class="sd">        :param instrumenter:</span>
-</span><span data-line="1298">
-</span><span data-line="1299"><span class="sd">        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit</span>
-</span><span data-line="1300"><span class="sd">            Sentry logs. Defaults to False.</span>
-</span><span data-line="1301">
-</span><span data-line="1302"><span class="sd">        :param before_send_log: An optional function to modify or filter out logs</span>
-</span><span data-line="1303"><span class="sd">            before they&#39;re sent to Sentry. Any modifications to the log in this</span>
-</span><span data-line="1304"><span class="sd">            function will be retained. If the function returns None, the log will</span>
-</span><span data-line="1305"><span class="sd">            not be sent to Sentry.</span>
-</span><span data-line="1306">
-</span><span data-line="1307"><span class="sd">        :param _experiments:</span>
-</span><span data-line="1308"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="1309">        <span class="k">pass</span></div>
+</span><span data-line="853">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+</span><span data-line="854">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="855">        <span class="n">dsn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="856">        <span class="o">*</span><span class="p">,</span>
+</span><span data-line="857">        <span class="n">max_breadcrumbs</span><span class="o">=</span><span class="n">DEFAULT_MAX_BREADCRUMBS</span><span class="p">,</span>  <span class="c1"># type: int</span>
+</span><span data-line="858">        <span class="n">release</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="859">        <span class="n">environment</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="860">        <span class="n">server_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="861">        <span class="n">shutdown_timeout</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># type: float</span>
+</span><span data-line="862">        <span class="n">integrations</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006</span>
+</span><span data-line="863">        <span class="n">in_app_include</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: List[str]  # noqa: B006</span>
+</span><span data-line="864">        <span class="n">in_app_exclude</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: List[str]  # noqa: B006</span>
+</span><span data-line="865">        <span class="n">default_integrations</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="866">        <span class="n">dist</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="867">        <span class="n">transport</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]</span>
+</span><span data-line="868">        <span class="n">transport_queue_size</span><span class="o">=</span><span class="n">DEFAULT_QUEUE_SIZE</span><span class="p">,</span>  <span class="c1"># type: int</span>
+</span><span data-line="869">        <span class="n">sample_rate</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>  <span class="c1"># type: float</span>
+</span><span data-line="870">        <span class="n">send_default_pii</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
+</span><span data-line="871">        <span class="n">http_proxy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="872">        <span class="n">https_proxy</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="873">        <span class="n">ignore_errors</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[Union[type, str]]  # noqa: B006</span>
+</span><span data-line="874">        <span class="n">max_request_body_size</span><span class="o">=</span><span class="s2">&quot;medium&quot;</span><span class="p">,</span>  <span class="c1"># type: str</span>
+</span><span data-line="875">        <span class="n">socket_options</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[List[Tuple[int, int, int | bytes]]]</span>
+</span><span data-line="876">        <span class="n">keep_alive</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
+</span><span data-line="877">        <span class="n">before_send</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[EventProcessor]</span>
+</span><span data-line="878">        <span class="n">before_breadcrumb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[BreadcrumbProcessor]</span>
+</span><span data-line="879">        <span class="n">debug</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
+</span><span data-line="880">        <span class="n">attach_stacktrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="881">        <span class="n">ca_certs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="882">        <span class="n">propagate_traces</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="883">        <span class="n">traces_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+</span><span data-line="884">        <span class="n">traces_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TracesSampler]</span>
+</span><span data-line="885">        <span class="n">profiles_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+</span><span data-line="886">        <span class="n">profiles_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TracesSampler]</span>
+</span><span data-line="887">        <span class="n">profiler_mode</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[ProfilerMode]</span>
+</span><span data-line="888">        <span class="n">profile_lifecycle</span><span class="o">=</span><span class="s2">&quot;manual&quot;</span><span class="p">,</span>  <span class="c1"># type: Literal[&quot;manual&quot;, &quot;trace&quot;]</span>
+</span><span data-line="889">        <span class="n">profile_session_sample_rate</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+</span><span data-line="890">        <span class="n">auto_enabling_integrations</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="891">        <span class="n">disabled_integrations</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Sequence[sentry_sdk.integrations.Integration]]</span>
+</span><span data-line="892">        <span class="n">auto_session_tracking</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="893">        <span class="n">send_client_reports</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="894">        <span class="n">_experiments</span><span class="o">=</span><span class="p">{},</span>  <span class="c1"># type: Experiments  # noqa: B006</span>
+</span><span data-line="895">        <span class="n">proxy_headers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
+</span><span data-line="896">        <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="897">        <span class="n">before_send_transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[TransactionProcessor]</span>
+</span><span data-line="898">        <span class="n">project_root</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="899">        <span class="n">enable_tracing</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
+</span><span data-line="900">        <span class="n">include_local_variables</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
+</span><span data-line="901">        <span class="n">include_source_context</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: Optional[bool]</span>
+</span><span data-line="902">        <span class="n">trace_propagation_targets</span><span class="o">=</span><span class="p">[</span>  <span class="c1"># noqa: B006</span>
+</span><span data-line="903">            <span class="n">MATCH_ALL</span>
+</span><span data-line="904">        <span class="p">],</span>  <span class="c1"># type: Optional[Sequence[str]]</span>
+</span><span data-line="905">        <span class="n">functions_to_trace</span><span class="o">=</span><span class="p">[],</span>  <span class="c1"># type: Sequence[Dict[str, str]]  # noqa: B006</span>
+</span><span data-line="906">        <span class="n">event_scrubber</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[sentry_sdk.scrubber.EventScrubber]</span>
+</span><span data-line="907">        <span class="n">max_value_length</span><span class="o">=</span><span class="n">DEFAULT_MAX_VALUE_LENGTH</span><span class="p">,</span>  <span class="c1"># type: int</span>
+</span><span data-line="908">        <span class="n">enable_backpressure_handling</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="909">        <span class="n">error_sampler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Event, Hint], Union[float, bool]]]</span>
+</span><span data-line="910">        <span class="n">enable_db_query_source</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="911">        <span class="n">db_query_source_threshold_ms</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>  <span class="c1"># type: int</span>
+</span><span data-line="912">        <span class="n">spotlight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[bool, str]]</span>
+</span><span data-line="913">        <span class="n">cert_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="914">        <span class="n">key_file</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span data-line="915">        <span class="n">custom_repr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[..., Optional[str]]]</span>
+</span><span data-line="916">        <span class="n">add_full_stack</span><span class="o">=</span><span class="n">DEFAULT_ADD_FULL_STACK</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="917">        <span class="n">max_stack_frames</span><span class="o">=</span><span class="n">DEFAULT_MAX_STACK_FRAMES</span><span class="p">,</span>  <span class="c1"># type: Optional[int]</span>
+</span><span data-line="918">        <span class="n">enable_logs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span data-line="919">        <span class="n">before_send_log</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Log, Hint], Optional[Log]]]</span>
+</span><span data-line="920">    <span class="p">):</span>
+</span><span data-line="921">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span data-line="922"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.</span>
+</span><span data-line="923">
+</span><span data-line="924"><span class="sd">        :param dsn: The DSN tells the SDK where to send the events.</span>
+</span><span data-line="925">
+</span><span data-line="926"><span class="sd">            If this option is not set, the SDK will just not send any data.</span>
+</span><span data-line="927">
+</span><span data-line="928"><span class="sd">            The `dsn` config option takes precedence over the environment variable.</span>
+</span><span data-line="929">
+</span><span data-line="930"><span class="sd">            Learn more about `DSN utilization &lt;https://docs.sentry.io/product/sentry-basics/dsn-explainer/#dsn-utilization&gt;`_.</span>
+</span><span data-line="931">
+</span><span data-line="932"><span class="sd">        :param debug: Turns debug mode on or off.</span>
+</span><span data-line="933">
+</span><span data-line="934"><span class="sd">            When `True`, the SDK will attempt to print out debugging information. This can be useful if something goes</span>
+</span><span data-line="935"><span class="sd">            wrong with event sending.</span>
+</span><span data-line="936">
+</span><span data-line="937"><span class="sd">            The default is always `False`. It&#39;s generally not recommended to turn it on in production because of the</span>
+</span><span data-line="938"><span class="sd">            increase in log output.</span>
+</span><span data-line="939">
+</span><span data-line="940"><span class="sd">            The `debug` config option takes precedence over the environment variable.</span>
+</span><span data-line="941">
+</span><span data-line="942"><span class="sd">        :param release: Sets the release.</span>
+</span><span data-line="943">
+</span><span data-line="944"><span class="sd">            If not set, the SDK will try to automatically configure a release out of the box but it&#39;s a better idea to</span>
+</span><span data-line="945"><span class="sd">            manually set it to guarantee that the release is in sync with your deploy integrations.</span>
+</span><span data-line="946">
+</span><span data-line="947"><span class="sd">            Release names are strings, but some formats are detected by Sentry and might be rendered differently.</span>
+</span><span data-line="948">
+</span><span data-line="949"><span class="sd">            See `the releases documentation &lt;https://docs.sentry.io/platforms/python/configuration/releases/&gt;`_ to learn how the SDK tries to</span>
+</span><span data-line="950"><span class="sd">            automatically configure a release.</span>
+</span><span data-line="951">
+</span><span data-line="952"><span class="sd">            The `release` config option takes precedence over the environment variable.</span>
+</span><span data-line="953">
+</span><span data-line="954"><span class="sd">            Learn more about how to send release data so Sentry can tell you about regressions between releases and</span>
+</span><span data-line="955"><span class="sd">            identify the potential source in `the product documentation &lt;https://docs.sentry.io/product/releases/&gt;`_.</span>
+</span><span data-line="956">
+</span><span data-line="957"><span class="sd">        :param environment: Sets the environment. This string is freeform and set to `production` by default.</span>
+</span><span data-line="958">
+</span><span data-line="959"><span class="sd">            A release can be associated with more than one environment to separate them in the UI (think `staging` vs</span>
+</span><span data-line="960"><span class="sd">            `production` or similar).</span>
+</span><span data-line="961">
+</span><span data-line="962"><span class="sd">            The `environment` config option takes precedence over the environment variable.</span>
+</span><span data-line="963">
+</span><span data-line="964"><span class="sd">        :param dist: The distribution of the application.</span>
+</span><span data-line="965">
+</span><span data-line="966"><span class="sd">            Distributions are used to disambiguate build or deployment variants of the same release of an application.</span>
+</span><span data-line="967">
+</span><span data-line="968"><span class="sd">            The dist can be for example a build number.</span>
+</span><span data-line="969">
+</span><span data-line="970"><span class="sd">        :param sample_rate: Configures the sample rate for error events, in the range of `0.0` to `1.0`.</span>
+</span><span data-line="971">
+</span><span data-line="972"><span class="sd">            The default is `1.0`, which means that 100% of error events will be sent. If set to `0.1`, only 10% of</span>
+</span><span data-line="973"><span class="sd">            error events will be sent.</span>
+</span><span data-line="974">
+</span><span data-line="975"><span class="sd">            Events are picked randomly.</span>
+</span><span data-line="976">
+</span><span data-line="977"><span class="sd">        :param error_sampler: Dynamically configures the sample rate for error events on a per-event basis.</span>
+</span><span data-line="978">
+</span><span data-line="979"><span class="sd">            This configuration option accepts a function, which takes two parameters (the `event` and the `hint`), and</span>
+</span><span data-line="980"><span class="sd">            which returns a boolean (indicating whether the event should be sent to Sentry) or a floating-point number</span>
+</span><span data-line="981"><span class="sd">            between `0.0` and `1.0`, inclusive.</span>
+</span><span data-line="982">
+</span><span data-line="983"><span class="sd">            The number indicates the probability the event is sent to Sentry; the SDK will randomly decide whether to</span>
+</span><span data-line="984"><span class="sd">            send the event with the given probability.</span>
+</span><span data-line="985">
+</span><span data-line="986"><span class="sd">            If this configuration option is specified, the `sample_rate` option is ignored.</span>
+</span><span data-line="987">
+</span><span data-line="988"><span class="sd">        :param ignore_errors: A list of exception class names that shouldn&#39;t be sent to Sentry.</span>
+</span><span data-line="989">
+</span><span data-line="990"><span class="sd">            Errors that are an instance of these exceptions or a subclass of them, will be filtered out before they&#39;re</span>
+</span><span data-line="991"><span class="sd">            sent to Sentry.</span>
+</span><span data-line="992">
+</span><span data-line="993"><span class="sd">            By default, all errors are sent.</span>
+</span><span data-line="994">
+</span><span data-line="995"><span class="sd">        :param max_breadcrumbs: This variable controls the total amount of breadcrumbs that should be captured.</span>
+</span><span data-line="996">
+</span><span data-line="997"><span class="sd">            This defaults to `100`, but you can set this to any number.</span>
+</span><span data-line="998">
+</span><span data-line="999"><span class="sd">            However, you should be aware that Sentry has a `maximum payload size &lt;https://develop.sentry.dev/sdk/data-model/envelopes/#size-limits&gt;`_</span>
+</span><span data-line="1000"><span class="sd">            and any events exceeding that payload size will be dropped.</span>
+</span><span data-line="1001">
+</span><span data-line="1002"><span class="sd">        :param attach_stacktrace: When enabled, stack traces are automatically attached to all messages logged.</span>
+</span><span data-line="1003">
+</span><span data-line="1004"><span class="sd">            Stack traces are always attached to exceptions; however, when this option is set, stack traces are also</span>
+</span><span data-line="1005"><span class="sd">            sent with messages.</span>
+</span><span data-line="1006">
+</span><span data-line="1007"><span class="sd">            This option means that stack traces appear next to all log messages.</span>
+</span><span data-line="1008">
+</span><span data-line="1009"><span class="sd">            Grouping in Sentry is different for events with stack traces and without. As a result, you will get new</span>
+</span><span data-line="1010"><span class="sd">            groups as you enable or disable this flag for certain events.</span>
+</span><span data-line="1011">
+</span><span data-line="1012"><span class="sd">        :param send_default_pii: If this flag is enabled, `certain personally identifiable information (PII)</span>
+</span><span data-line="1013"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/data-management/data-collected/&gt;`_ is added by active integrations.</span>
+</span><span data-line="1014">
+</span><span data-line="1015"><span class="sd">            If you enable this option, be sure to manually remove what you don&#39;t want to send using our features for</span>
+</span><span data-line="1016"><span class="sd">            managing `Sensitive Data &lt;https://docs.sentry.io/data-management/sensitive-data/&gt;`_.</span>
+</span><span data-line="1017">
+</span><span data-line="1018"><span class="sd">        :param event_scrubber: Scrubs the event payload for sensitive information such as cookies, sessions, and</span>
+</span><span data-line="1019"><span class="sd">            passwords from a `denylist`.</span>
+</span><span data-line="1020">
+</span><span data-line="1021"><span class="sd">            It can additionally be used to scrub from another `pii_denylist` if `send_default_pii` is disabled.</span>
+</span><span data-line="1022">
+</span><span data-line="1023"><span class="sd">            See how to `configure the scrubber here &lt;https://docs.sentry.io/data-management/sensitive-data/#event-scrubber&gt;`_.</span>
+</span><span data-line="1024">
+</span><span data-line="1025"><span class="sd">        :param include_source_context: When enabled, source context will be included in events sent to Sentry.</span>
+</span><span data-line="1026">
+</span><span data-line="1027"><span class="sd">            This source context includes the five lines of code above and below the line of code where an error</span>
+</span><span data-line="1028"><span class="sd">            happened.</span>
+</span><span data-line="1029">
+</span><span data-line="1030"><span class="sd">        :param include_local_variables: When enabled, the SDK will capture a snapshot of local variables to send with</span>
+</span><span data-line="1031"><span class="sd">            the event to help with debugging.</span>
+</span><span data-line="1032">
+</span><span data-line="1033"><span class="sd">        :param add_full_stack: When capturing errors, Sentry stack traces typically only include frames that start the</span>
+</span><span data-line="1034"><span class="sd">            moment an error occurs.</span>
+</span><span data-line="1035">
+</span><span data-line="1036"><span class="sd">            But if the `add_full_stack` option is enabled (set to `True`), all frames from the start of execution will</span>
+</span><span data-line="1037"><span class="sd">            be included in the stack trace sent to Sentry.</span>
+</span><span data-line="1038">
+</span><span data-line="1039"><span class="sd">        :param max_stack_frames: This option limits the number of stack frames that will be captured when</span>
+</span><span data-line="1040"><span class="sd">            `add_full_stack` is enabled.</span>
+</span><span data-line="1041">
+</span><span data-line="1042"><span class="sd">        :param server_name: This option can be used to supply a server name.</span>
+</span><span data-line="1043">
+</span><span data-line="1044"><span class="sd">            When provided, the name of the server is sent along and persisted in the event.</span>
+</span><span data-line="1045">
+</span><span data-line="1046"><span class="sd">            For many integrations, the server name actually corresponds to the device hostname, even in situations</span>
+</span><span data-line="1047"><span class="sd">            where the machine is not actually a server.</span>
+</span><span data-line="1048">
+</span><span data-line="1049"><span class="sd">        :param project_root: The full path to the root directory of your application.</span>
+</span><span data-line="1050">
+</span><span data-line="1051"><span class="sd">            The `project_root` is used to mark frames in a stack trace either as being in your application or outside</span>
+</span><span data-line="1052"><span class="sd">            of the application.</span>
+</span><span data-line="1053">
+</span><span data-line="1054"><span class="sd">        :param in_app_include: A list of string prefixes of module names that belong to the app.</span>
+</span><span data-line="1055">
+</span><span data-line="1056"><span class="sd">            This option takes precedence over `in_app_exclude`.</span>
+</span><span data-line="1057">
+</span><span data-line="1058"><span class="sd">            Sentry differentiates stack frames that are directly related to your application (&quot;in application&quot;) from</span>
+</span><span data-line="1059"><span class="sd">            stack frames that come from other packages such as the standard library, frameworks, or other dependencies.</span>
+</span><span data-line="1060">
+</span><span data-line="1061"><span class="sd">            The application package is automatically marked as `inApp`.</span>
+</span><span data-line="1062">
+</span><span data-line="1063"><span class="sd">            The difference is visible in [sentry.io](https://sentry.io), where only the &quot;in application&quot; frames are</span>
+</span><span data-line="1064"><span class="sd">            displayed by default.</span>
+</span><span data-line="1065">
+</span><span data-line="1066"><span class="sd">        :param in_app_exclude: A list of string prefixes of module names that do not belong to the app, but rather to</span>
+</span><span data-line="1067"><span class="sd">            third-party packages.</span>
+</span><span data-line="1068">
+</span><span data-line="1069"><span class="sd">            Modules considered not part of the app will be hidden from stack traces by default.</span>
+</span><span data-line="1070">
+</span><span data-line="1071"><span class="sd">            This option can be overridden using `in_app_include`.</span>
+</span><span data-line="1072">
+</span><span data-line="1073"><span class="sd">        :param max_request_body_size: This parameter controls whether integrations should capture HTTP request bodies.</span>
+</span><span data-line="1074"><span class="sd">            It can be set to one of the following values:</span>
+</span><span data-line="1075">
+</span><span data-line="1076"><span class="sd">            - `never`: Request bodies are never sent.</span>
+</span><span data-line="1077"><span class="sd">            - `small`: Only small request bodies will be captured. The cutoff for small depends on the SDK (typically</span>
+</span><span data-line="1078"><span class="sd">              4KB).</span>
+</span><span data-line="1079"><span class="sd">            - `medium`: Medium and small requests will be captured (typically 10KB).</span>
+</span><span data-line="1080"><span class="sd">            - `always`: The SDK will always capture the request body as long as Sentry can make sense of it.</span>
+</span><span data-line="1081">
+</span><span data-line="1082"><span class="sd">            Please note that the Sentry server [limits HTTP request body size](https://develop.sentry.dev/sdk/</span>
+</span><span data-line="1083"><span class="sd">            expected-features/data-handling/#variable-size). The server always enforces its size limit, regardless of</span>
+</span><span data-line="1084"><span class="sd">            how you configure this option.</span>
+</span><span data-line="1085">
+</span><span data-line="1086"><span class="sd">        :param max_value_length: The number of characters after which the values containing text in the event payload</span>
+</span><span data-line="1087"><span class="sd">            will be truncated.</span>
+</span><span data-line="1088">
+</span><span data-line="1089"><span class="sd">            WARNING: If the value you set for this is exceptionally large, the event may exceed 1 MiB and will be</span>
+</span><span data-line="1090"><span class="sd">            dropped by Sentry.</span>
+</span><span data-line="1091">
+</span><span data-line="1092"><span class="sd">        :param ca_certs: A path to an alternative CA bundle file in PEM-format.</span>
+</span><span data-line="1093">
+</span><span data-line="1094"><span class="sd">        :param send_client_reports: Set this boolean to `False` to disable sending of client reports.</span>
+</span><span data-line="1095">
+</span><span data-line="1096"><span class="sd">            Client reports allow the client to send status reports about itself to Sentry, such as information about</span>
+</span><span data-line="1097"><span class="sd">            events that were dropped before being sent.</span>
+</span><span data-line="1098">
+</span><span data-line="1099"><span class="sd">        :param integrations: List of integrations to enable in addition to `auto-enabling integrations (overview)</span>
+</span><span data-line="1100"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/integrations&gt;`_.</span>
+</span><span data-line="1101">
+</span><span data-line="1102"><span class="sd">            This setting can be used to override the default config options for a specific auto-enabling integration</span>
+</span><span data-line="1103"><span class="sd">            or to add an integration that is not auto-enabled.</span>
+</span><span data-line="1104">
+</span><span data-line="1105"><span class="sd">        :param disabled_integrations: List of integrations that will be disabled.</span>
+</span><span data-line="1106">
+</span><span data-line="1107"><span class="sd">            This setting can be used to explicitly turn off specific `auto-enabling integrations (list)</span>
+</span><span data-line="1108"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/integrations/#available-integrations&gt;`_ or</span>
+</span><span data-line="1109"><span class="sd">            `default &lt;https://docs.sentry.io/platforms/python/integrations/default-integrations/&gt;`_ integrations.</span>
+</span><span data-line="1110">
+</span><span data-line="1111"><span class="sd">        :param auto_enabling_integrations: Configures whether `auto-enabling integrations (configuration)</span>
+</span><span data-line="1112"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/integrations/#available-integrations&gt;`_ should be enabled.</span>
+</span><span data-line="1113">
+</span><span data-line="1114"><span class="sd">            When set to `False`, no auto-enabling integrations will be enabled by default, even if the corresponding</span>
+</span><span data-line="1115"><span class="sd">            framework/library is detected.</span>
+</span><span data-line="1116">
+</span><span data-line="1117"><span class="sd">        :param default_integrations: Configures whether `default integrations</span>
+</span><span data-line="1118"><span class="sd">            &lt;https://docs.sentry.io/platforms/python/integrations/default-integrations/&gt;`_ should be enabled.</span>
+</span><span data-line="1119">
+</span><span data-line="1120"><span class="sd">            Setting `default_integrations` to `False` disables all default integrations **as well as all auto-enabling</span>
+</span><span data-line="1121"><span class="sd">            integrations**, unless they are specifically added in the `integrations` option, described above.</span>
+</span><span data-line="1122">
+</span><span data-line="1123"><span class="sd">        :param before_send: This function is called with an SDK-specific message or error event object, and can return</span>
+</span><span data-line="1124"><span class="sd">            a modified event object, or `null` to skip reporting the event.</span>
+</span><span data-line="1125">
+</span><span data-line="1126"><span class="sd">            This can be used, for instance, for manual PII stripping before sending.</span>
+</span><span data-line="1127">
+</span><span data-line="1128"><span class="sd">            By the time `before_send` is executed, all scope data has already been applied to the event. Further</span>
+</span><span data-line="1129"><span class="sd">            modification of the scope won&#39;t have any effect.</span>
+</span><span data-line="1130">
+</span><span data-line="1131"><span class="sd">        :param before_send_transaction: This function is called with an SDK-specific transaction event object, and can</span>
+</span><span data-line="1132"><span class="sd">            return a modified transaction event object, or `null` to skip reporting the event.</span>
+</span><span data-line="1133">
+</span><span data-line="1134"><span class="sd">            One way this might be used is for manual PII stripping before sending.</span>
+</span><span data-line="1135">
+</span><span data-line="1136"><span class="sd">        :param before_breadcrumb: This function is called with an SDK-specific breadcrumb object before the breadcrumb</span>
+</span><span data-line="1137"><span class="sd">            is added to the scope.</span>
+</span><span data-line="1138">
+</span><span data-line="1139"><span class="sd">            When nothing is returned from the function, the breadcrumb is dropped.</span>
+</span><span data-line="1140">
+</span><span data-line="1141"><span class="sd">            To pass the breadcrumb through, return the first argument, which contains the breadcrumb object.</span>
+</span><span data-line="1142">
+</span><span data-line="1143"><span class="sd">            The callback typically gets a second argument (called a &quot;hint&quot;) which contains the original object from</span>
+</span><span data-line="1144"><span class="sd">            which the breadcrumb was created to further customize what the breadcrumb should look like.</span>
+</span><span data-line="1145">
+</span><span data-line="1146"><span class="sd">        :param transport: Switches out the transport used to send events.</span>
+</span><span data-line="1147">
+</span><span data-line="1148"><span class="sd">            How this works depends on the SDK. It can, for instance, be used to capture events for unit-testing or to</span>
+</span><span data-line="1149"><span class="sd">            send it through some more complex setup that requires proxy authentication.</span>
+</span><span data-line="1150">
+</span><span data-line="1151"><span class="sd">        :param transport_queue_size: The maximum number of events that will be queued before the transport is forced to</span>
+</span><span data-line="1152"><span class="sd">            flush.</span>
+</span><span data-line="1153">
+</span><span data-line="1154"><span class="sd">        :param http_proxy: When set, a proxy can be configured that should be used for outbound requests.</span>
+</span><span data-line="1155">
+</span><span data-line="1156"><span class="sd">            This is also used for HTTPS requests unless a separate `https_proxy` is configured. However, not all SDKs</span>
+</span><span data-line="1157"><span class="sd">            support a separate HTTPS proxy.</span>
+</span><span data-line="1158">
+</span><span data-line="1159"><span class="sd">            SDKs will attempt to default to the system-wide configured proxy, if possible. For instance, on Unix</span>
+</span><span data-line="1160"><span class="sd">            systems, the `http_proxy` environment variable will be picked up.</span>
+</span><span data-line="1161">
+</span><span data-line="1162"><span class="sd">        :param https_proxy: Configures a separate proxy for outgoing HTTPS requests.</span>
+</span><span data-line="1163">
+</span><span data-line="1164"><span class="sd">            This value might not be supported by all SDKs. When not supported the `http-proxy` value is also used for</span>
+</span><span data-line="1165"><span class="sd">            HTTPS requests at all times.</span>
+</span><span data-line="1166">
+</span><span data-line="1167"><span class="sd">        :param proxy_headers: A dict containing additional proxy headers (usually for authentication) to be forwarded</span>
+</span><span data-line="1168"><span class="sd">            to `urllib3`&#39;s `ProxyManager &lt;https://urllib3.readthedocs.io/en/1.24.3/reference/index.html#urllib3.poolmanager.ProxyManager&gt;`_.</span>
+</span><span data-line="1169">
+</span><span data-line="1170"><span class="sd">        :param shutdown_timeout: Controls how many seconds to wait before shutting down.</span>
+</span><span data-line="1171">
+</span><span data-line="1172"><span class="sd">            Sentry SDKs send events from a background queue. This queue is given a certain amount to drain pending</span>
+</span><span data-line="1173"><span class="sd">            events. The default is SDK specific but typically around two seconds.</span>
+</span><span data-line="1174">
+</span><span data-line="1175"><span class="sd">            Setting this value too low may cause problems for sending events from command line applications.</span>
+</span><span data-line="1176">
+</span><span data-line="1177"><span class="sd">            Setting the value too high will cause the application to block for a long time for users experiencing</span>
+</span><span data-line="1178"><span class="sd">            network connectivity problems.</span>
+</span><span data-line="1179">
+</span><span data-line="1180"><span class="sd">        :param keep_alive: Determines whether to keep the connection alive between requests.</span>
+</span><span data-line="1181">
+</span><span data-line="1182"><span class="sd">            This can be useful in environments where you encounter frequent network issues such as connection resets.</span>
+</span><span data-line="1183">
+</span><span data-line="1184"><span class="sd">        :param cert_file: Path to the client certificate to use.</span>
+</span><span data-line="1185">
+</span><span data-line="1186"><span class="sd">            If set, supersedes the `CLIENT_CERT_FILE` environment variable.</span>
+</span><span data-line="1187">
+</span><span data-line="1188"><span class="sd">        :param key_file: Path to the key file to use.</span>
+</span><span data-line="1189">
+</span><span data-line="1190"><span class="sd">            If set, supersedes the `CLIENT_KEY_FILE` environment variable.</span>
+</span><span data-line="1191">
+</span><span data-line="1192"><span class="sd">        :param socket_options: An optional list of socket options to use.</span>
+</span><span data-line="1193">
+</span><span data-line="1194"><span class="sd">            These provide fine-grained, low-level control over the way the SDK connects to Sentry.</span>
+</span><span data-line="1195">
+</span><span data-line="1196"><span class="sd">            If provided, the options will override the default `urllib3` `socket options</span>
+</span><span data-line="1197"><span class="sd">            &lt;https://urllib3.readthedocs.io/en/stable/reference/urllib3.connection.html#urllib3.connection.HTTPConnection&gt;`_.</span>
+</span><span data-line="1198">
+</span><span data-line="1199"><span class="sd">        :param traces_sample_rate: A number between `0` and `1`, controlling the percentage chance a given transaction</span>
+</span><span data-line="1200"><span class="sd">            will be sent to Sentry.</span>
+</span><span data-line="1201">
+</span><span data-line="1202"><span class="sd">            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.</span>
+</span><span data-line="1203">
+</span><span data-line="1204"><span class="sd">            Either this or `traces_sampler` must be defined to enable tracing.</span>
+</span><span data-line="1205">
+</span><span data-line="1206"><span class="sd">            If `traces_sample_rate` is `0`, this means that no new traces will be created. However, if you have</span>
+</span><span data-line="1207"><span class="sd">            another service (for example a JS frontend) that makes requests to your service that include trace</span>
+</span><span data-line="1208"><span class="sd">            information, those traces will be continued and thus transactions will be sent to Sentry.</span>
+</span><span data-line="1209">
+</span><span data-line="1210"><span class="sd">            If you want to disable all tracing you need to set `traces_sample_rate=None`. In this case, no new traces</span>
+</span><span data-line="1211"><span class="sd">            will be started and no incoming traces will be continued.</span>
+</span><span data-line="1212">
+</span><span data-line="1213"><span class="sd">        :param traces_sampler: A function responsible for determining the percentage chance a given transaction will be</span>
+</span><span data-line="1214"><span class="sd">            sent to Sentry.</span>
+</span><span data-line="1215">
+</span><span data-line="1216"><span class="sd">            It will automatically be passed information about the transaction and the context in which it&#39;s being</span>
+</span><span data-line="1217"><span class="sd">            created, and must return a number between `0` (0% chance of being sent) and `1` (100% chance of being</span>
+</span><span data-line="1218"><span class="sd">            sent).</span>
+</span><span data-line="1219">
+</span><span data-line="1220"><span class="sd">            Can also be used for filtering transactions, by returning `0` for those that are unwanted.</span>
+</span><span data-line="1221">
+</span><span data-line="1222"><span class="sd">            Either this or `traces_sample_rate` must be defined to enable tracing.</span>
+</span><span data-line="1223">
+</span><span data-line="1224"><span class="sd">        :param trace_propagation_targets: An optional property that controls which downstream services receive tracing</span>
+</span><span data-line="1225"><span class="sd">            data, in the form of a `sentry-trace` and a `baggage` header attached to any outgoing HTTP requests.</span>
+</span><span data-line="1226">
+</span><span data-line="1227"><span class="sd">            The option may contain a list of strings or regex against which the URLs of outgoing requests are matched.</span>
+</span><span data-line="1228">
+</span><span data-line="1229"><span class="sd">            If one of the entries in the list matches the URL of an outgoing request, trace data will be attached to</span>
+</span><span data-line="1230"><span class="sd">            that request.</span>
+</span><span data-line="1231">
+</span><span data-line="1232"><span class="sd">            String entries do not have to be full matches, meaning the URL of a request is matched when it _contains_</span>
+</span><span data-line="1233"><span class="sd">            a string provided through the option.</span>
+</span><span data-line="1234">
+</span><span data-line="1235"><span class="sd">            If `trace_propagation_targets` is not provided, trace data is attached to every outgoing request from the</span>
+</span><span data-line="1236"><span class="sd">            instrumented client.</span>
+</span><span data-line="1237">
+</span><span data-line="1238"><span class="sd">        :param functions_to_trace: An optional list of functions that should be set up for tracing.</span>
+</span><span data-line="1239">
+</span><span data-line="1240"><span class="sd">            For each function in the list, a span will be created when the function is executed.</span>
+</span><span data-line="1241">
+</span><span data-line="1242"><span class="sd">            Functions in the list are represented as strings containing the fully qualified name of the function.</span>
+</span><span data-line="1243">
+</span><span data-line="1244"><span class="sd">            This is a convenient option, making it possible to have one central place for configuring what functions</span>
+</span><span data-line="1245"><span class="sd">            to trace, instead of having custom instrumentation scattered all over your code base.</span>
+</span><span data-line="1246">
+</span><span data-line="1247"><span class="sd">            To learn more, see the `Custom Instrumentation &lt;https://docs.sentry.io/platforms/python/tracing/instrumentation/custom-instrumentation/#define-span-creation-in-a-central-place&gt;`_ documentation.</span>
+</span><span data-line="1248">
+</span><span data-line="1249"><span class="sd">        :param enable_backpressure_handling: When enabled, a new monitor thread will be spawned to perform health</span>
+</span><span data-line="1250"><span class="sd">            checks on the SDK.</span>
+</span><span data-line="1251">
+</span><span data-line="1252"><span class="sd">            If the system is unhealthy, the SDK will keep halving the `traces_sample_rate` set by you in 10 second</span>
+</span><span data-line="1253"><span class="sd">            intervals until recovery.</span>
+</span><span data-line="1254">
+</span><span data-line="1255"><span class="sd">            This down sampling helps ensure that the system stays stable and reduces SDK overhead under high load.</span>
+</span><span data-line="1256">
+</span><span data-line="1257"><span class="sd">            This option is enabled by default.</span>
+</span><span data-line="1258">
+</span><span data-line="1259"><span class="sd">        :param enable_db_query_source: When enabled, the source location will be added to database queries.</span>
+</span><span data-line="1260">
+</span><span data-line="1261"><span class="sd">        :param db_query_source_threshold_ms: The threshold in milliseconds for adding the source location to database</span>
+</span><span data-line="1262"><span class="sd">            queries.</span>
+</span><span data-line="1263">
+</span><span data-line="1264"><span class="sd">            The query location will be added to the query for queries slower than the specified threshold.</span>
+</span><span data-line="1265">
+</span><span data-line="1266"><span class="sd">        :param custom_repr: A custom `repr &lt;https://docs.python.org/3/library/functions.html#repr&gt;`_ function to run</span>
+</span><span data-line="1267"><span class="sd">            while serializing an object.</span>
+</span><span data-line="1268">
+</span><span data-line="1269"><span class="sd">            Use this to control how your custom objects and classes are visible in Sentry.</span>
+</span><span data-line="1270">
+</span><span data-line="1271"><span class="sd">            Return a string for that repr value to be used or `None` to continue serializing how Sentry would have</span>
+</span><span data-line="1272"><span class="sd">            done it anyway.</span>
+</span><span data-line="1273">
+</span><span data-line="1274"><span class="sd">        :param profiles_sample_rate: A number between `0` and `1`, controlling the percentage chance a given sampled</span>
+</span><span data-line="1275"><span class="sd">            transaction will be profiled.</span>
+</span><span data-line="1276">
+</span><span data-line="1277"><span class="sd">            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.</span>
+</span><span data-line="1278">
+</span><span data-line="1279"><span class="sd">            This is relative to the tracing sample rate - e.g. `0.5` means 50% of sampled transactions will be</span>
+</span><span data-line="1280"><span class="sd">            profiled.</span>
+</span><span data-line="1281">
+</span><span data-line="1282"><span class="sd">        :param profiles_sampler:</span>
+</span><span data-line="1283">
+</span><span data-line="1284"><span class="sd">        :param profiler_mode:</span>
+</span><span data-line="1285">
+</span><span data-line="1286"><span class="sd">        :param profile_lifecycle:</span>
+</span><span data-line="1287">
+</span><span data-line="1288"><span class="sd">        :param profile_session_sample_rate:</span>
+</span><span data-line="1289">
+</span><span data-line="1290"><span class="sd">        :param enable_tracing:</span>
+</span><span data-line="1291">
+</span><span data-line="1292"><span class="sd">        :param propagate_traces:</span>
+</span><span data-line="1293">
+</span><span data-line="1294"><span class="sd">        :param auto_session_tracking:</span>
+</span><span data-line="1295">
+</span><span data-line="1296"><span class="sd">        :param spotlight:</span>
+</span><span data-line="1297">
+</span><span data-line="1298"><span class="sd">        :param instrumenter:</span>
+</span><span data-line="1299">
+</span><span data-line="1300"><span class="sd">        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit</span>
+</span><span data-line="1301"><span class="sd">            Sentry logs. Defaults to False.</span>
+</span><span data-line="1302">
+</span><span data-line="1303"><span class="sd">        :param before_send_log: An optional function to modify or filter out logs</span>
+</span><span data-line="1304"><span class="sd">            before they&#39;re sent to Sentry. Any modifications to the log in this</span>
+</span><span data-line="1305"><span class="sd">            function will be retained. If the function returns None, the log will</span>
+</span><span data-line="1306"><span class="sd">            not be sent to Sentry.</span>
+</span><span data-line="1307">
+</span><span data-line="1308"><span class="sd">        :param _experiments:</span>
+</span><span data-line="1309"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="1310">        <span class="k">pass</span></div>
 </div>
 
-</span><span data-line="1310">
 </span><span data-line="1311">
-</span><span data-line="1312"><span class="k">def</span><span class="w"> </span><span class="nf">_get_default_options</span><span class="p">():</span>
-</span><span data-line="1313">    <span class="c1"># type: () -&gt; dict[str, Any]</span>
-</span><span data-line="1314">    <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
-</span><span data-line="1315">
-</span><span data-line="1316">    <span class="n">a</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getfullargspec</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="o">.</span><span class="fm">__init__</span><span class="p">)</span>
-</span><span data-line="1317">    <span class="n">defaults</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">defaults</span> <span class="ow">or</span> <span class="p">()</span>
-</span><span data-line="1318">    <span class="n">kwonlydefaults</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">kwonlydefaults</span> <span class="ow">or</span> <span class="p">{}</span>
-</span><span data-line="1319">
-</span><span data-line="1320">    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
-</span><span data-line="1321">        <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span>
-</span><span data-line="1322">            <span class="nb">zip</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">defaults</span><span class="p">)</span> <span class="p">:],</span> <span class="n">defaults</span><span class="p">),</span>
-</span><span data-line="1323">            <span class="n">kwonlydefaults</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
-</span><span data-line="1324">        <span class="p">)</span>
-</span><span data-line="1325">    <span class="p">)</span>
-</span><span data-line="1326">
+</span><span data-line="1312">
+</span><span data-line="1313"><span class="k">def</span><span class="w"> </span><span class="nf">_get_default_options</span><span class="p">():</span>
+</span><span data-line="1314">    <span class="c1"># type: () -&gt; dict[str, Any]</span>
+</span><span data-line="1315">    <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+</span><span data-line="1316">
+</span><span data-line="1317">    <span class="n">a</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getfullargspec</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="o">.</span><span class="fm">__init__</span><span class="p">)</span>
+</span><span data-line="1318">    <span class="n">defaults</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">defaults</span> <span class="ow">or</span> <span class="p">()</span>
+</span><span data-line="1319">    <span class="n">kwonlydefaults</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">kwonlydefaults</span> <span class="ow">or</span> <span class="p">{}</span>
+</span><span data-line="1320">
+</span><span data-line="1321">    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+</span><span data-line="1322">        <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span>
+</span><span data-line="1323">            <span class="nb">zip</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">defaults</span><span class="p">)</span> <span class="p">:],</span> <span class="n">defaults</span><span class="p">),</span>
+</span><span data-line="1324">            <span class="n">kwonlydefaults</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
+</span><span data-line="1325">        <span class="p">)</span>
+</span><span data-line="1326">    <span class="p">)</span>
 </span><span data-line="1327">
-</span><span data-line="1328"><span class="n">DEFAULT_OPTIONS</span> <span class="o">=</span> <span class="n">_get_default_options</span><span class="p">()</span>
-</span><span data-line="1329"><span class="k">del</span> <span class="n">_get_default_options</span>
-</span><span data-line="1330">
+</span><span data-line="1328">
+</span><span data-line="1329"><span class="n">DEFAULT_OPTIONS</span> <span class="o">=</span> <span class="n">_get_default_options</span><span class="p">()</span>
+</span><span data-line="1330"><span class="k">del</span> <span class="n">_get_default_options</span>
 </span><span data-line="1331">
-</span><span data-line="1332"><span class="n">VERSION</span> <span class="o">=</span> <span class="s2">&quot;2.36.0&quot;</span>
+</span><span data-line="1332">
+</span><span data-line="1333"><span class="n">VERSION</span> <span class="o">=</span> <span class="s2">&quot;2.37.0&quot;</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -1474,7 +1475,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=bd90c995"></script>
+      <script src="../../_static/documentation_options.js?v=cc4583cc"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=e730760c"></script></body>
