@@ -1,8 +1,9 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Callable
 
+import sentry_sdk
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import logger
 
@@ -34,3 +35,12 @@ def set_data_normalized(span, key, value, unpack=True):
         span.set_data(key, normalized)
     else:
         span.set_data(key, str(normalized))
+
+
+def get_start_span_function():
+    # type: () -> Callable[..., Any]
+    current_span = sentry_sdk.get_current_span()
+    transaction_exists = (
+        current_span is not None and current_span.containing_transaction == current_span
+    )
+    return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction

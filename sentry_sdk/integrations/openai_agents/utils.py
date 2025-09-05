@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Callable
     from agents import Usage
 
 try:
@@ -26,15 +25,6 @@ def _capture_exception(exc):
         mechanism={"type": "openai_agents", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
-
-
-def _get_start_span_function():
-    # type: () -> Callable[..., Any]
-    current_span = sentry_sdk.get_current_span()
-    transaction_exists = (
-        current_span is not None and current_span.containing_transaction == current_span
-    )
-    return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
 
 
 def _set_agent_data(span, agent):
