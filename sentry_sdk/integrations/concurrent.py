@@ -10,8 +10,9 @@ from sentry_sdk.utils import event_from_exception
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
+    from typing import Any, Callable, TypeVar
+
+    T = TypeVar("T", bound=Any)
 
 
 class ConcurrentIntegration(Integration):
@@ -24,50 +25,55 @@ class ConcurrentIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        old_submit = ThreadPoolExecutor.submit
+        ThreadPoolExecutor.submit = _wrap_submit_call(ThreadPoolExecutor.submit)
 
-        @wraps(old_submit)
-        def sentry_submit(self, fn, *args, **kwargs):
-            # type: (ThreadPoolExecutor, Callable, *Any, **Any) -> Any
+
+def _wrap_submit_call(func):
+    # type: (Callable[..., Future[Any]]) -> Callable[..., Future[Any]]
+    """
+    Wrap task call with a try catch to get exceptions.
+    """
+
+    @wraps(func)
+    def sentry_submit(self, fn, *args, **kwargs):
+        # type: (ThreadPoolExecutor, Callable[..., T], *Any, **Any) -> Future[T]
+        integration = sentry_sdk.get_client().get_integration(ConcurrentIntegration)
+        if integration is None:
+            return func(self, fn, *args, **kwargs)
+
+        isolation_scope = sentry_sdk.get_isolation_scope().fork()
+        current_scope = sentry_sdk.get_current_scope().fork()
+
+        def wrapped_fn(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            with use_isolation_scope(isolation_scope):
+                with use_scope(current_scope):
+                    return fn(*args, **kwargs)
+
+        future = func(self, wrapped_fn, *args, **kwargs)
+
+        def report_exceptions(future: Future):
+            # type: (Future) -> None
+            exception = future.exception()
             integration = sentry_sdk.get_client().get_integration(ConcurrentIntegration)
-            if integration is None:
-                return old_submit(self, fn, *args, **kwargs)
 
-            isolation_scope = sentry_sdk.get_isolation_scope().fork()
-            current_scope = sentry_sdk.get_current_scope().fork()
+            if (
+                exception is None
+                or integration is None
+                or not integration.record_exceptions_on_futures
+            ):
+                return
 
-            def wrapped_fn(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
-                with use_isolation_scope(isolation_scope):
-                    with use_scope(current_scope):
-                        return fn(*args, **kwargs)
+            event, hint = event_from_exception(
+                exception,
+                client_options=sentry_sdk.get_client().options,
+                mechanism={"type": "concurrent", "handled": False},
+            )
+            sentry_sdk.capture_event(event, hint=hint)
 
-            future = old_submit(self, wrapped_fn, *args, **kwargs)
+        if integration.record_exceptions_on_futures:
+            future.add_done_callback(report_exceptions)
 
-            def report_exceptions(future: Future):
-                # type: (Future) -> None
-                exception = future.exception()
-                integration = sentry_sdk.get_client().get_integration(
-                    ConcurrentIntegration
-                )
+        return future
 
-                if (
-                    exception is None
-                    or integration is None
-                    or not integration.record_exceptions_on_futures
-                ):
-                    return
-
-                event, hint = event_from_exception(
-                    exception,
-                    client_options=sentry_sdk.get_client().options,
-                    mechanism={"type": "concurrent", "handled": False},
-                )
-                sentry_sdk.capture_event(event, hint=hint)
-
-            if integration.record_exceptions_on_futures:
-                future.add_done_callback(report_exceptions)
-
-            return future
-
-        ThreadPoolExecutor.submit = sentry_submit
+    return sentry_submit
