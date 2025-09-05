@@ -51,7 +51,6 @@ DATA_FIELDS = {
     "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
     "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
     "tool_calls": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-    "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
     "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
     "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
 }
@@ -203,8 +202,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 if key in all_params and all_params[key] is not None:
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
 
+            _set_tools_on_span(span, all_params.get("tools"))
+
             if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts)
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts, unpack=False
+                )
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
@@ -246,14 +249,20 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 if key in all_params and all_params[key] is not None:
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
 
+            _set_tools_on_span(span, all_params.get("tools"))
+
             if should_send_default_pii() and self.include_prompts:
+                normalized_messages = []
+                for list_ in messages:
+                    for message in list_:
+                        normalized_messages.append(
+                            self._normalize_langchain_message(message)
+                        )
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    [
-                        [self._normalize_langchain_message(x) for x in list_]
-                        for list_ in messages
-                    ],
+                    normalized_messages,
+                    unpack=False,
                 )
 
     def on_chat_model_end(self, response, *, run_id, **kwargs):
@@ -351,9 +360,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    finish.return_values.items(),
+                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, finish.return_values.items()
                 )
 
             self._exit_span(span_data, run_id)
@@ -473,13 +480,11 @@ def _get_token_usage(obj):
             if usage is not None:
                 return usage
 
-    # check for usage in the object itself
     for name in possible_names:
         usage = _get_value(obj, name)
         if usage is not None:
             return usage
 
-    # no usage found anywhere
     return None
 
 
@@ -529,6 +534,87 @@ def _get_request_data(obj, args, kwargs):
         pass
 
     return (agent_name, tools)
+
+
+def _simplify_langchain_tools(tools):
+    # type: (Any) -> Optional[List[Any]]
+    """Parse and simplify tools into a cleaner format."""
+    if not tools:
+        return None
+
+    if not isinstance(tools, (list, tuple)):
+        return None
+
+    simplified_tools = []
+    for tool in tools:
+        try:
+            if isinstance(tool, dict):
+
+                if "function" in tool and isinstance(tool["function"], dict):
+                    func = tool["function"]
+                    simplified_tool = {
+                        "name": func.get("name"),
+                        "description": func.get("description"),
+                    }
+                    if simplified_tool["name"]:
+                        simplified_tools.append(simplified_tool)
+                elif "name" in tool:
+                    simplified_tool = {
+                        "name": tool.get("name"),
+                        "description": tool.get("description"),
+                    }
+                    simplified_tools.append(simplified_tool)
+                else:
+                    name = (
+                        tool.get("name")
+                        or tool.get("tool_name")
+                        or tool.get("function_name")
+                    )
+                    if name:
+                        simplified_tools.append(
+                            {
+                                "name": name,
+                                "description": tool.get("description")
+                                or tool.get("desc"),
+                            }
+                        )
+            elif hasattr(tool, "name"):
+                simplified_tool = {
+                    "name": getattr(tool, "name", None),
+                    "description": getattr(tool, "description", None)
+                    or getattr(tool, "desc", None),
+                }
+                if simplified_tool["name"]:
+                    simplified_tools.append(simplified_tool)
+            elif hasattr(tool, "__name__"):
+                simplified_tools.append(
+                    {
+                        "name": tool.__name__,
+                        "description": getattr(tool, "__doc__", None),
+                    }
+                )
+            else:
+                tool_str = str(tool)
+                if tool_str and tool_str != "":
+                    simplified_tools.append({"name": tool_str, "description": None})
+        except Exception:
+            continue
+
+    return simplified_tools if simplified_tools else None
+
+
+def _set_tools_on_span(span, tools):
+    # type: (Span, Any) -> None
+    """Set available tools data on a span if tools are provided."""
+    if tools is not None:
+        simplified_tools = _simplify_langchain_tools(tools)
+        if simplified_tools:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                simplified_tools,
+                unpack=False,
+            )
 
 
 def _wrap_configure(f):
@@ -601,7 +687,7 @@ def _wrap_configure(f):
                 ]
             elif isinstance(local_callbacks, BaseCallbackHandler):
                 local_callbacks = [local_callbacks, sentry_handler]
-            else:  # local_callbacks is a list
+            else:
                 local_callbacks = [*local_callbacks, sentry_handler]
 
         return f(
@@ -638,10 +724,7 @@ def _wrap_agent_executor_invoke(f):
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
 
-            if tools:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools, unpack=False
-                )
+            _set_tools_on_span(span, tools)
 
             # Run the agent
             result = f(self, *args, **kwargs)
@@ -653,11 +736,7 @@ def _wrap_agent_executor_invoke(f):
                 and integration.include_prompts
             ):
                 set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    [
-                        input,
-                    ],
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
                 )
 
             output = result.get("output")
@@ -666,7 +745,7 @@ def _wrap_agent_executor_invoke(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             return result
 
@@ -698,10 +777,7 @@ def _wrap_agent_executor_stream(f):
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-        if tools:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools, unpack=False
-            )
+        _set_tools_on_span(span, tools)
 
         input = args[0].get("input") if len(args) >= 1 else None
         if (
@@ -710,11 +786,7 @@ def _wrap_agent_executor_stream(f):
             and integration.include_prompts
         ):
             set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                [
-                    input,
-                ],
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
             )
 
         # Run the agent
@@ -737,7 +809,7 @@ def _wrap_agent_executor_stream(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
 
@@ -756,7 +828,7 @@ def _wrap_agent_executor_stream(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
 

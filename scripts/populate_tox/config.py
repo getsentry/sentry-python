@@ -36,9 +36,22 @@ TEST_SUITE_CONFIG = {
             "<=0.23": ["pydantic<2"],
         },
     },
+    "asyncpg": {
+        "package": "asyncpg",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.7",
+    },
     "beam": {
         "package": "apache-beam",
         "python": ">=3.7",
+    },
+    "boto3": {
+        "package": "boto3",
+        "deps": {
+            "py3.7,py3.8": ["urllib3<2.0.0"],
+        },
     },
     "bottle": {
         "package": "bottle",
@@ -49,8 +62,14 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic", "redis"],
+            "*": ["newrelic<10.17.0", "redis"],
             "py3.7": ["importlib-metadata<5.0"],
+        },
+    },
+    "chalice": {
+        "package": "chalice",
+        "deps": {
+            "*": ["pytest-chalice"],
         },
     },
     "clickhouse_driver": {
@@ -156,6 +175,9 @@ TEST_SUITE_CONFIG = {
             ">=0.3": ["langchain-community"],
         },
         "include": "<1.0",
+    },
+    "langgraph": {
+        "package": "langgraph",
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",

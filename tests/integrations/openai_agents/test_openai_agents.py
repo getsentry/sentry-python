@@ -582,8 +582,9 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
-    assert ai_client_span2["data"]["gen_ai.response.text"] == safe_serialize(
-        ["Task completed using the tool"]
+    assert (
+        ai_client_span2["data"]["gen_ai.response.text"]
+        == "Task completed using the tool"
     )
     assert ai_client_span2["data"]["gen_ai.system"] == "openai"
     assert ai_client_span2["data"]["gen_ai.usage.input_tokens.cached"] == 0
