@@ -114,16 +114,9 @@ def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
     ],
 )
 def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling):
-    # setting up the first time should return True to indicate success
-    options = make_options(mode=mode, profile_session_sample_rate=0.0)
-    assert setup_continuous_profiler(
-        options,
-        mock_sdk_info,
-        lambda envelope: None,
-    )
     assert not is_profile_session_sampled()
 
-    # setting up the second time should return True to indicate re-init
+    # setting up the first time should return True to indicate success
     options = make_options(mode=mode, profile_session_sample_rate=1.0)
     assert setup_continuous_profiler(
         options,
@@ -131,6 +124,15 @@ def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling)
         lambda envelope: None,
     )
     assert is_profile_session_sampled()
+
+    # setting up the second time should return True to indicate re-init
+    options = make_options(mode=mode, profile_session_sample_rate=0.0)
+    assert setup_continuous_profiler(
+        options,
+        mock_sdk_info,
+        lambda envelope: None,
+    )
+    assert not is_profile_session_sampled()
 
 
 def assert_single_transaction_with_profile_chunks(
