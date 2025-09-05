@@ -10,7 +10,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import _get_value
-from sentry_sdk.utils import logger, capture_internal_exceptions, safe_serialize
+from sentry_sdk.utils import logger, capture_internal_exceptions
 
 from typing import TYPE_CHECKING
 
@@ -609,9 +609,11 @@ def _set_tools_on_span(span, tools):
     if tools is not None:
         simplified_tools = _simplify_langchain_tools(tools)
         if simplified_tools:
-            span.set_data(
+            set_data_normalized(
+                span,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                safe_serialize(simplified_tools),
+                simplified_tools,
+                unpack=False,
             )
 
 
