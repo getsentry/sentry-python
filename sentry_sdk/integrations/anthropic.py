@@ -124,9 +124,6 @@ def _set_input_data(span, kwargs, integration):
                 and isinstance(message["content"], (list, tuple))
             ):
                 for item in message["content"]:
-                    import ipdb
-
-                    ipdb.set_trace()
                     if item["type"] == "tool_result":
                         normalized_messages.append(
                             {
