@@ -25,7 +25,7 @@ class ConcurrentIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        ThreadPoolExecutor.submit = _wrap_submit_call(ThreadPoolExecutor.submit)
+        ThreadPoolExecutor.submit = _wrap_submit_call(ThreadPoolExecutor.submit)  # type: ignore
 
 
 def _wrap_submit_call(func):
