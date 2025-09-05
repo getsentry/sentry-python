@@ -77,7 +77,7 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
 
     if _scheduler is not None:
         logger.debug("[Profiling] Continuous Profiler is already setup")
-        return False
+        teardown_continuous_profiler()
 
     if is_gevent():
         # If gevent has patched the threading modules then we cannot rely on
@@ -120,6 +120,13 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
     atexit.register(teardown_continuous_profiler)
 
     return True
+
+
+def is_profile_session_sampled():
+    # type: () -> bool
+    if _scheduler is None:
+        return False
+    return _scheduler.sampled
 
 
 def try_autostart_continuous_profiler():
