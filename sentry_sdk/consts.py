@@ -792,6 +792,7 @@ class OP:
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
     GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
     GEN_AI_HANDOFF = "gen_ai.handoff"
@@ -1329,4 +1330,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.35.2"
+VERSION = "2.36.0"

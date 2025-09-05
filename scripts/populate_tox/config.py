@@ -29,6 +29,24 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "arq": {
+        "package": "arq",
+        "deps": {
+            "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
+            "<=0.23": ["pydantic<2"],
+        },
+    },
+    "asyncpg": {
+        "package": "asyncpg",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.7",
+    },
+    "beam": {
+        "package": "apache-beam",
+        "python": ">=3.7",
+    },
     "bottle": {
         "package": "bottle",
         "deps": {
@@ -146,6 +164,9 @@ TEST_SUITE_CONFIG = {
         },
         "include": "<1.0",
     },
+    "langgraph": {
+        "package": "langgraph",
+    },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
@@ -181,7 +202,6 @@ TEST_SUITE_CONFIG = {
         "package": "openai-agents",
         "deps": {
             "*": ["pytest-asyncio"],
-            "<=0.2.10": ["openai<1.103.0"],
         },
         "python": ">=3.10",
     },
