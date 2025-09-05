@@ -62,7 +62,7 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic", "redis"],
+            "*": ["newrelic<10.17.0", "redis"],
             "py3.7": ["importlib-metadata<5.0"],
         },
     },
