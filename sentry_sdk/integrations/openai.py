@@ -179,7 +179,9 @@ def _set_input_data(span, kwargs, operation, integration):
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+        )
 
     # Input attributes: Common
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
@@ -227,25 +229,46 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
         if should_send_default_pii() and integration.include_prompts:
             response_text = [choice.message.dict() for choice in response.choices]
             if len(response_text) > 0:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    safe_serialize(response_text),
-                )
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
+
         _calculate_token_usage(messages, response, span, None, integration.count_tokens)
+
         if finish_span:
             span.__exit__(None, None, None)
 
     elif hasattr(response, "output"):
         if should_send_default_pii() and integration.include_prompts:
-            response_text = [item.to_dict() for item in response.output]
-            if len(response_text) > 0:
+            output_messages = {
+                "response": [],
+                "tool": [],
+            }  # type: (dict[str, list[Any]])
+
+            for output in response.output:
+                if output.type == "function_call":
+                    output_messages["tool"].append(output.dict())
+                elif output.type == "message":
+                    for output_message in output.content:
+                        try:
+                            output_messages["response"].append(output_message.text)
+                        except AttributeError:
+                            # Unknown output message type, just return the json
+                            output_messages["response"].append(output_message.dict())
+
+            if len(output_messages["tool"]) > 0:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    safe_serialize(response_text),
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    output_messages["tool"],
+                    unpack=False,
                 )
+
+            if len(output_messages["response"]) > 0:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+                )
+
         _calculate_token_usage(messages, response, span, None, integration.count_tokens)
+
         if finish_span:
             span.__exit__(None, None, None)
 

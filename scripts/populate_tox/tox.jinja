@@ -42,10 +42,6 @@ envlist =
     # AWS Lambda
     {py3.8,py3.9,py3.11,py3.13}-aws_lambda
 
-    # Chalice
-    {py3.6,py3.9}-chalice-v{1.16}
-    {py3.8,py3.12,py3.13}-chalice-latest
-
     # Cloud Resource Context
     {py3.6,py3.12,py3.13}-cloud_resource_context
 
@@ -151,11 +147,6 @@ deps =
     aws_lambda: fastapi
     aws_lambda: requests
     aws_lambda: uvicorn
-
-    # Chalice
-    chalice: pytest-chalice==0.0.5
-    chalice-v1.16: chalice~=1.16.0
-    chalice-latest: chalice
 
     # HTTPX
     httpx-v0.16: pytest-httpx==0.10.0

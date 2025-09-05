@@ -66,6 +66,12 @@ TEST_SUITE_CONFIG = {
             "py3.7": ["importlib-metadata<5.0"],
         },
     },
+    "chalice": {
+        "package": "chalice",
+        "deps": {
+            "*": ["pytest-chalice"],
+        },
+    },
     "clickhouse_driver": {
         "package": "clickhouse-driver",
     },
