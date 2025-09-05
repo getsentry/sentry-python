@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import use_isolation_scope, use_scope
+from sentry_sdk.utils import event_from_exception
 
 from typing import TYPE_CHECKING
 
@@ -28,7 +29,7 @@ class ConcurrentIntegration(Integration):
 
 
 def _wrap_submit_call(func):
-    # type: (Any) -> Any
+    # type: (Callable[..., Future[Any]]) -> Callable[..., Future[Any]]
     """
     Wrap submit call to propagate scopes on task submission.
     """
@@ -49,6 +50,30 @@ def _wrap_submit_call(func):
                 with use_scope(current_scope):
                     return fn(*args, **kwargs)
 
-        return func(self, wrapped_fn, *args, **kwargs)
+        future = func(self, wrapped_fn, *args, **kwargs)
+
+        def report_exceptions(future):
+            # type: (Future[Any]) -> None
+            exception = future.exception()
+            integration = sentry_sdk.get_client().get_integration(ConcurrentIntegration)
+
+            if (
+                exception is None
+                or integration is None
+                or not integration.record_exceptions_on_futures
+            ):
+                return
+
+            event, hint = event_from_exception(
+                exception,
+                client_options=sentry_sdk.get_client().options,
+                mechanism={"type": "concurrent", "handled": False},
+            )
+            sentry_sdk.capture_event(event, hint=hint)
+
+        if integration.record_exceptions_on_futures:
+            future.add_done_callback(report_exceptions)
+
+        return future
 
     return sentry_submit
