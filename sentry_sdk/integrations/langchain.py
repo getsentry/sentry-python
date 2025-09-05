@@ -205,7 +205,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             _set_tools_on_span(span, all_params.get("tools"))
 
             if should_send_default_pii() and self.include_prompts:
-                span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize(prompts))
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompts, unpack=False
+                )
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
@@ -256,9 +258,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         normalized_messages.append(
                             self._normalize_langchain_message(message)
                         )
-                span.set_data(
+                set_data_normalized(
+                    span,
                     SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    safe_serialize(normalized_messages),
+                    normalized_messages,
+                    unpack=False,
                 )
 
     def on_chat_model_end(self, response, *, run_id, **kwargs):
@@ -356,9 +360,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    finish.return_values.items(),
+                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, finish.return_values.items()
                 )
 
             self._exit_span(span_data, run_id)
@@ -732,7 +734,7 @@ def _wrap_agent_executor_invoke(f):
                 and integration.include_prompts
             ):
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize([input])
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
                 )
 
             output = result.get("output")
@@ -741,7 +743,7 @@ def _wrap_agent_executor_invoke(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             return result
 
@@ -781,7 +783,9 @@ def _wrap_agent_executor_stream(f):
             and should_send_default_pii()
             and integration.include_prompts
         ):
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize([input]))
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, [input], unpack=False
+            )
 
         # Run the agent
         result = f(self, *args, **kwargs)
@@ -803,7 +807,7 @@ def _wrap_agent_executor_stream(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
 
@@ -822,7 +826,7 @@ def _wrap_agent_executor_stream(f):
                 and should_send_default_pii()
                 and integration.include_prompts
             ):
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
             span.__exit__(None, None, None)
 
