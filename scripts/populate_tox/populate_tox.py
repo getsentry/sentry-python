@@ -76,7 +76,6 @@ IGNORE = {
     "redis",
     "requests",
     "rq",
-    "sanic",
 }
 
 

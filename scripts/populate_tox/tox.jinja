@@ -93,12 +93,6 @@ envlist =
     {py3.7,py3.11,py3.12}-rq-v{1.15,1.16}
     {py3.7,py3.12,py3.13}-rq-latest
 
-    # Sanic
-    {py3.6,py3.7}-sanic-v{0.8}
-    {py3.6,py3.8}-sanic-v{20}
-    {py3.8,py3.11,py3.12}-sanic-v{24.6}
-    {py3.9,py3.12,py3.13}-sanic-latest
-
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
     # integration tests there.
@@ -242,18 +236,6 @@ deps =
     rq-v1.15: rq~=1.15.0
     rq-v1.16: rq~=1.16.0
     rq-latest: rq
-
-    # Sanic
-    sanic: websockets<11.0
-    sanic: aiohttp
-    sanic-v{24.6}: sanic_testing
-    sanic-latest: sanic_testing
-    {py3.6}-sanic: aiocontextvars==0.2.1
-    {py3.8}-sanic: tracerite<1.1.2
-    sanic-v0.8: sanic~=0.8.0
-    sanic-v20: sanic~=20.0
-    sanic-v24.6: sanic~=24.6.0
-    sanic-latest: sanic
 
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script. Eventually we should move all
