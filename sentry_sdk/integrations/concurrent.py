@@ -31,7 +31,7 @@ class ConcurrentIntegration(Integration):
 def _wrap_submit_call(func):
     # type: (Callable[..., Future[Any]]) -> Callable[..., Future[Any]]
     """
-    Wrap task call with a try catch to get exceptions.
+    Wrap submit call to propagate scopes on task submission.
     """
 
     @wraps(func)
