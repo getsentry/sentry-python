@@ -1,11 +1,14 @@
 import os
+import threading
 
 import pytest
 from datetime import datetime
 from unittest import mock
 
 from django import VERSION as DJANGO_VERSION
+from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
+
 
 try:
     from django.urls import reverse
@@ -16,7 +19,13 @@ from werkzeug.test import Client
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations import django as django_integration
+from sentry_sdk.integrations.django import (
+    DjangoIntegration,
+    _set_db_data,
+    _cached_db_configs,
+    _cache_database_configurations,
+)
 from sentry_sdk.tracing_utils import record_sql_queries
 
 from tests.conftest import unpack_werkzeug_response
@@ -524,3 +533,610 @@ def test_db_span_origin_executemany(sentry_init, client, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.db.django"
+
+
+def test_set_db_data_with_cached_config(sentry_init):
+    """Test _set_db_data uses cached database configuration when available."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "test_db"
+    mock_db.vendor = "postgresql"
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+
+    _cached_db_configs["test_db"] = {
+        "db_name": "test_database",
+        "host": "localhost",
+        "port": 5432,
+        "unix_socket": None,
+        "engine": "django.db.backends.postgresql",
+        "vendor": "postgresql",
+    }
+
+    _set_db_data(span, mock_cursor)
+
+    # Verify span data was set correctly from cache
+    expected_calls = [
+        mock.call("db.system", "postgresql"),
+        mock.call("db.name", "test_database"),
+        mock.call("server.address", "localhost"),
+        mock.call("server.port", "5432"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+    # Verify unix_socket was not set (it's None)
+    assert mock.call("server.socket.address", None) not in span.set_data.call_args_list
+
+
+def test_set_db_data_with_cached_config_unix_socket(sentry_init):
+    """Test _set_db_data handles unix socket from cached config."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "test_db"
+    del mock_db.vendor  # Remove vendor attribute
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+
+    _cached_db_configs["test_db"] = {
+        "db_name": "test_database",
+        "host": None,
+        "port": None,
+        "unix_socket": "/tmp/postgres.sock",
+        "engine": "django.db.backends.postgresql",
+        "vendor": "postgresql",
+    }
+
+    _set_db_data(span, mock_cursor)
+
+    # Verify span data was set correctly from cache
+    expected_calls = [
+        mock.call("db.name", "test_database"),
+        mock.call("server.socket.address", "/tmp/postgres.sock"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+    # Verify host and port were not set (they're None)
+    assert mock.call("server.address", None) not in span.set_data.call_args_list
+    assert mock.call("server.port", None) not in span.set_data.call_args_list
+
+
+def test_set_db_data_fallback_to_connection_params(sentry_init):
+    """Test _set_db_data falls back to db.get_connection_params() when cache misses."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "uncached_db"
+    mock_db.vendor = "mysql"
+    mock_db.get_connection_params.return_value = {
+        "database": "fallback_db",
+        "host": "mysql.example.com",
+        "port": 3306,
+        "unix_socket": None,
+    }
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+
+    with mock.patch("sentry_sdk.integrations.django.logger") as mock_logger:
+        _set_db_data(span, mock_cursor)
+
+    # Verify fallback was used
+    mock_db.get_connection_params.assert_called_once()
+    mock_logger.debug.assert_called_with(
+        "Cached db connection params retrieval failed for %s. Trying db.get_connection_params().",
+        "uncached_db",
+    )
+
+    # Verify span data was set correctly from connection params
+    expected_calls = [
+        mock.call("db.system", "mysql"),
+        mock.call("db.name", "fallback_db"),
+        mock.call("server.address", "mysql.example.com"),
+        mock.call("server.port", "3306"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+
+def test_set_db_data_fallback_to_connection_params_with_dbname(sentry_init):
+    """Test _set_db_data handles 'dbname' key in connection params."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "postgres_db"
+    mock_db.vendor = "postgresql"
+    mock_db.get_connection_params.return_value = {
+        "dbname": "postgres_fallback",  # PostgreSQL uses 'dbname' instead of 'database'
+        "host": "postgres.example.com",
+        "port": 5432,
+        "unix_socket": "/var/run/postgresql/.s.PGSQL.5432",
+    }
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+
+    _set_db_data(span, mock_cursor)
+
+    # Verify span data was set correctly, preferring 'dbname' over 'database'
+    expected_calls = [
+        mock.call("db.system", "postgresql"),
+        mock.call("db.name", "postgres_fallback"),
+        mock.call("server.address", "postgres.example.com"),
+        mock.call("server.port", "5432"),
+        mock.call("server.socket.address", "/var/run/postgresql/.s.PGSQL.5432"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+
+def test_set_db_data_fallback_to_direct_connection_psycopg2(sentry_init):
+    """Test _set_db_data falls back to direct connection access for psycopg2."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "direct_db"
+    mock_db.vendor = "postgresql"
+    mock_db.get_connection_params.side_effect = ImproperlyConfigured("Config error")
+
+    mock_connection = mock.Mock()
+    mock_connection.get_dsn_parameters.return_value = {
+        "dbname": "direct_access_db",
+        "host": "direct.example.com",
+        "port": "5432",
+    }
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+    mock_cursor.connection = mock_connection
+
+    with mock.patch("sentry_sdk.integrations.django.logger") as mock_logger, mock.patch(
+        "sentry_sdk.integrations.django.inspect.isroutine", return_value=True
+    ):
+        _set_db_data(span, mock_cursor)
+
+    # Verify both fallbacks were attempted
+    mock_db.get_connection_params.assert_called_once()
+    mock_connection.get_dsn_parameters.assert_called_once()
+
+    # Verify logging
+    assert mock_logger.debug.call_count == 2
+    mock_logger.debug.assert_any_call(
+        "Cached db connection params retrieval failed for %s. Trying db.get_connection_params().",
+        "direct_db",
+    )
+    mock_logger.debug.assert_any_call(
+        "db.get_connection_params() failed for %s, trying direct connection access",
+        "direct_db",
+    )
+
+    # Verify span data was set from direct connection access
+    expected_calls = [
+        mock.call("db.system", "postgresql"),
+        mock.call("db.name", "direct_access_db"),
+        mock.call("server.address", "direct.example.com"),
+        mock.call("server.port", "5432"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+
+def test_set_db_data_fallback_to_direct_connection_psycopg3(sentry_init):
+    """Test _set_db_data falls back to direct connection access for psycopg3."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "psycopg3_db"
+    mock_db.vendor = "postgresql"
+    mock_db.get_connection_params.side_effect = AttributeError(
+        "No get_connection_params"
+    )
+
+    mock_connection_info = mock.Mock()
+    mock_connection_info.dbname = "psycopg3_db"
+    mock_connection_info.port = 5433
+    mock_connection_info.host = "psycopg3.example.com"  # Non-Unix socket host
+
+    mock_connection = mock.Mock()
+    mock_connection.info = mock_connection_info
+    # Remove get_dsn_parameters to simulate psycopg3
+    del mock_connection.get_dsn_parameters
+
+    # mock.Mock cursor with psycopg3-style connection
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+    mock_cursor.connection = mock_connection
+
+    with mock.patch(
+        "sentry_sdk.integrations.django.inspect.isroutine", return_value=False
+    ):
+        _set_db_data(span, mock_cursor)
+
+    # Verify span data was set from psycopg3 connection info
+    expected_calls = [
+        mock.call("db.system", "postgresql"),
+        mock.call("db.name", "psycopg3_db"),
+        mock.call("server.address", "psycopg3.example.com"),
+        mock.call("server.port", "5433"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+
+def test_set_db_data_psycopg3_unix_socket_filtered(sentry_init):
+    """Test _set_db_data filters out Unix socket paths in psycopg3."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "unix_socket_db"
+    mock_db.vendor = "postgresql"
+    mock_db.get_connection_params.side_effect = KeyError("Missing key")
+
+    mock_connection_info = mock.Mock()
+    mock_connection_info.dbname = "unix_socket_db"
+    mock_connection_info.port = 5432
+    mock_connection_info.host = (
+        "/var/run/postgresql"  # Unix socket path starting with /
+    )
+
+    mock_connection = mock.Mock()
+    mock_connection.info = mock_connection_info
+    del mock_connection.get_dsn_parameters
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+    mock_cursor.connection = mock_connection
+
+    with mock.patch(
+        "sentry_sdk.integrations.django.inspect.isroutine", return_value=False
+    ):
+        _set_db_data(span, mock_cursor)
+
+    # Verify span data was set but host was filtered out (Unix socket)
+    expected_calls = [
+        mock.call("db.system", "postgresql"),
+        mock.call("db.name", "unix_socket_db"),
+        mock.call("server.port", "5432"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+    # Verify host was NOT set (Unix socket path filtered out)
+    assert (
+        mock.call("server.address", "/var/run/postgresql")
+        not in span.set_data.call_args_list
+    )
+
+
+def test_set_db_data_no_alias_db(sentry_init):
+    """Test _set_db_data handles database without alias attribute."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    # Clear cache
+    _cached_db_configs.clear()
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    del mock_db.alias  # Remove alias attribute
+    mock_db.vendor = "sqlite"
+    mock_db.get_connection_params.return_value = {"database": "test.db"}
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+
+    _set_db_data(span, mock_cursor)
+
+    # Verify it worked despite no alias
+    expected_calls = [
+        mock.call("db.system", "sqlite"),
+        mock.call("db.name", "test.db"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+
+def test_set_db_data_direct_db_object(sentry_init):
+    """Test _set_db_data handles direct database object (not cursor)."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    # Clear cache
+    _cached_db_configs.clear()
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.configure_mock(alias="direct_db", vendor="oracle")
+    mock_db.get_connection_params.return_value = {
+        "database": "orcl",
+        "host": "oracle.example.com",
+        "port": 1521,
+    }
+
+    _set_db_data(span, mock_db)
+
+    # Verify it handled direct db object correctly by checking that span.set_data was called
+    assert span.set_data.called
+    call_args_list = span.set_data.call_args_list
+    assert len(call_args_list) >= 1  # At least db.system should be called
+
+    # Extract the keys that were called
+    call_keys = [call[0][0] for call in call_args_list]
+
+    assert "db.system" in call_keys
+
+
+def test_set_db_data_exception_handling(sentry_init):
+    """Test _set_db_data handles exceptions gracefully."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "error_db"
+    mock_db.vendor = "postgresql"
+    mock_db.get_connection_params.side_effect = Exception("Database error")
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+    mock_cursor.connection.get_dsn_parameters.side_effect = Exception(
+        "Connection error"
+    )
+
+    with mock.patch("sentry_sdk.integrations.django.logger") as mock_logger:
+        _set_db_data(span, mock_cursor)
+
+    # Verify only vendor was set (from initial db.vendor access)
+    expected_calls = [
+        mock.call("db.system", "postgresql"),
+    ]
+
+    for call in expected_calls:
+        assert call in span.set_data.call_args_list
+
+    mock_logger.debug.assert_called_with(
+        "Failed to get database connection params for %s: %s", "error_db", mock.ANY
+    )
+
+
+def test_set_db_data_empty_cached_values(sentry_init):
+    """Test _set_db_data handles empty/None values in cached config."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    span = mock.Mock()
+    span.set_data = mock.Mock()
+
+    mock_db = mock.Mock()
+    mock_db.alias = "empty_config_db"
+    mock_db.vendor = "postgresql"
+
+    mock_cursor = mock.Mock()
+    mock_cursor.db = mock_db
+
+    _cached_db_configs["empty_config_db"] = {
+        "db_name": None,
+        "host": None,
+        "port": None,
+        "unix_socket": None,
+        "engine": "django.db.backends.postgresql",
+        "vendor": "postgresql",
+    }
+
+    _set_db_data(span, mock_cursor)
+
+    # Verify only vendor was set (other values are empty/None)
+    expected_calls = [
+        mock.call("db.system", "postgresql"),
+    ]
+
+    assert span.set_data.call_args_list == expected_calls
+
+    # Verify empty/None values were not set
+    not_expected_calls = [
+        mock.call("db.name", None),
+        mock.call("server.address", None),
+        mock.call("server.port", None),
+        mock.call("server.socket.address", None),
+    ]
+
+    for call in not_expected_calls:
+        assert call not in span.set_data.call_args_list
+
+
+def test_cache_database_configurations_basic(sentry_init):
+    """Test _cache_database_configurations caches Django database settings."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+    django_integration._cache_initialized = False
+
+    _cache_database_configurations()
+
+    # Verify cache was populated
+    assert django_integration._cache_initialized is True
+    assert len(_cached_db_configs) > 0
+
+    # Verify default database was cached
+    assert "default" in _cached_db_configs
+    default_config = _cached_db_configs["default"]
+
+    # Check expected keys exist
+    expected_keys = ["db_name", "host", "port", "unix_socket", "engine"]
+    for key in expected_keys:
+        assert key in default_config
+
+    # Verify the vendor was added from the database wrapper
+    if "vendor" in default_config:
+        assert isinstance(default_config["vendor"], str)
+
+
+def test_cache_database_configurations_idempotent(sentry_init):
+    """Test _cache_database_configurations is idempotent and thread-safe."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+    django_integration._cache_initialized = False
+
+    _cache_database_configurations()
+    first_call_result = dict(_cached_db_configs)
+    first_call_initialized = django_integration._cache_initialized
+
+    _cache_database_configurations()
+    second_call_result = dict(_cached_db_configs)
+    second_call_initialized = django_integration._cache_initialized
+
+    # Verify idempotency
+    assert first_call_initialized is True
+    assert second_call_initialized is True
+    assert first_call_result == second_call_result
+
+
+def test_cache_database_configurations_thread_safety(sentry_init):
+    """Test _cache_database_configurations is thread-safe."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    _cached_db_configs.clear()
+    django_integration._cache_initialized = False
+
+    results = []
+    exceptions = []
+
+    def cache_in_thread():
+        try:
+            _cache_database_configurations()
+            results.append(dict(_cached_db_configs))
+        except Exception as e:
+            exceptions.append(e)
+
+    threads = []
+    for _ in range(5):
+        thread = threading.Thread(target=cache_in_thread)
+        threads.append(thread)
+
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    assert len(exceptions) == 0, f"Exceptions occurred: {exceptions}"
+
+    assert len(results) == 5
+    first_result = results[0]
+    for result in results[1:]:
+        assert result == first_result
+
+    assert django_integration._cache_initialized is True
+
+
+def test_cache_database_configurations_with_custom_settings(sentry_init):
+    """Test _cache_database_configurations handles custom database settings."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    # Mock custom database settings
+    with mock.patch("django.conf.settings") as mock_settings:
+        mock_settings.DATABASES = {
+            "custom_db": {
+                "NAME": "test_db",
+                "HOST": "db.example.com",
+                "PORT": 5432,
+                "ENGINE": "django.db.backends.postgresql",
+                "OPTIONS": {"unix_socket": "/tmp/postgres.sock"},
+            },
+            "empty_db": {},  # Should be skipped
+        }
+
+        # Mock connections to avoid actual database access
+        with mock.patch("django.db.connections") as mock_connections:
+            mock_wrapper = mock.Mock()
+            mock_wrapper.vendor = "postgresql"
+            mock_connections.__getitem__.return_value = mock_wrapper
+
+            # Reset cache and call function
+            _cached_db_configs.clear()
+            django_integration._cache_initialized = False
+
+            _cache_database_configurations()
+
+            # Verify custom database was cached correctly
+            assert "custom_db" in _cached_db_configs
+            custom_config = _cached_db_configs["custom_db"]
+
+            assert custom_config["db_name"] == "test_db"
+            assert custom_config["host"] == "db.example.com"
+            assert custom_config["port"] == 5432
+            assert custom_config["unix_socket"] == "/tmp/postgres.sock"
+            assert custom_config["engine"] == "django.db.backends.postgresql"
+            assert custom_config["vendor"] == "postgresql"
+
+            # Verify empty database was skipped
+            assert "empty_db" not in _cached_db_configs
+
+
+def test_cache_database_configurations_exception_handling(sentry_init):
+    """Test _cache_database_configurations handles exceptions gracefully."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    # Mock settings to raise an exception
+    with mock.patch("django.conf.settings") as mock_settings:
+        mock_settings.DATABASES.items.side_effect = Exception("Settings error")
+
+        # Reset cache and call function
+        _cached_db_configs.clear()
+        django_integration._cache_initialized = False
+
+        # Should not raise an exception
+        _cache_database_configurations()
+
+        # Verify cache was cleared on exception
+        assert _cached_db_configs == {}
+        assert django_integration._cache_initialized is False
