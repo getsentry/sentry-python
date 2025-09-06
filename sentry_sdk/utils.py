@@ -1935,6 +1935,12 @@ def try_convert(convert_func, value):
     raises an exception.
     """
     try:
+        if isinstance(value, convert_func):  # type: ignore
+            return value
+    except TypeError:
+        pass
+
+    try:
         return convert_func(value)
     except Exception:
         return None
