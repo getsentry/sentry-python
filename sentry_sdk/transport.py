@@ -1,10 +1,15 @@
 from abc import ABC, abstractmethod
 import io
+import json
 import os
 import gzip
+import random
 import socket
 import ssl
+import sys
+import threading
 import time
+import traceback
 import warnings
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
@@ -23,6 +28,7 @@ from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk import probe
 
 from typing import TYPE_CHECKING, cast, List, Dict
 
@@ -201,6 +207,7 @@ class BaseHttpTransport(Transport):
         self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[Optional[EventDataCategory], datetime]
+        self._log_point_ids = set()
         # We only use this Retry() class for the `get_retry_after` method it exposes
         self._retry = urllib3.util.Retry()
         self._discarded_events = defaultdict(
@@ -317,6 +324,19 @@ class BaseHttpTransport(Transport):
                 seconds=retry_after
             )
 
+    def _update_log_points(self, response):
+        data = json.loads(response.data)
+
+        log_points = [probe.LogPoint(**lp) for lp in data.get("log_points", [])]
+        log_point_ids = {lp.id for lp in log_points}
+        if self._log_point_ids != log_point_ids:
+            logger.debug("Updating log points...")
+            for log_point_id in self._log_point_ids:
+                probe.registry.remove_log_point(log_point_id)
+            self._log_point_ids = log_point_ids
+            for log_point in log_points:
+                probe.registry.insert_log_point(log_point)
+
     def _send_request(
         self,
         body,
@@ -354,6 +374,7 @@ class BaseHttpTransport(Transport):
 
         try:
             self._update_rate_limits(response)
+            self._update_log_points(response)
 
             if response.status == 429:
                 # if we hit a 429.  Something was rate limited but we already
