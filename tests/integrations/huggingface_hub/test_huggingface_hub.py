@@ -5,11 +5,24 @@ import responses
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
+from sentry_sdk.utils import package_version
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
+
+
+HF_VERSION = package_version("huggingface-hub")
+
+if HF_VERSION and HF_VERSION < (0, 30, 0):
+    MODEL_ENDPOINT = "https://api-inference.huggingface.co/models/{model_name}"
+    INFERENCE_ENDPOINT = "https://api-inference.huggingface.co/models/{model_name}"
+else:
+    MODEL_ENDPOINT = "https://huggingface.co/api/models/{model_name}"
+    INFERENCE_ENDPOINT = (
+        "https://router.huggingface.co/hf-inference/models/{model_name}"
+    )
 
 
 @pytest.fixture
@@ -22,7 +35,7 @@ def mock_hf_text_generation_api():
         # Mock model info endpoint
         rsps.add(
             responses.GET,
-            f"https://huggingface.co/api/models/{model_name}",
+            MODEL_ENDPOINT.format(model_name=model_name),
             json={
                 "id": model_name,
                 "pipeline_tag": "text-generation",
@@ -40,7 +53,7 @@ def mock_hf_text_generation_api():
         # Mock text generation endpoint
         rsps.add(
             responses.POST,
-            f"https://router.huggingface.co/hf-inference/models/{model_name}",
+            INFERENCE_ENDPOINT.format(model_name=model_name),
             json={
                 "generated_text": "Mocked response",
                 "details": {
@@ -66,7 +79,7 @@ def mock_hf_chat_completion_api():
         # Mock model info endpoint
         rsps.add(
             responses.GET,
-            f"https://huggingface.co/api/models/{model_name}",
+            MODEL_ENDPOINT.format(model_name=model_name),
             json={
                 "id": model_name,
                 "pipeline_tag": "conversational",
@@ -84,7 +97,7 @@ def mock_hf_chat_completion_api():
         # Mock chat completion endpoint
         rsps.add(
             responses.POST,
-            f"https://router.huggingface.co/hf-inference/models/{model_name}/v1/chat/completions",
+            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
             json={
                 "id": "xyz-123",
                 "created": 1234567890,
