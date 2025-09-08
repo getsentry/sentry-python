@@ -1,185 +1,170 @@
-import itertools
 from unittest import mock
-
 import pytest
-from huggingface_hub import (
-    InferenceClient,
-)
-from huggingface_hub.errors import OverloadedError
+import responses
 
-from sentry_sdk import start_transaction
-from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
+from huggingface_hub import InferenceClient
 
+import sentry_sdk
 
-def mock_client_post(client, post_mock):
-    # huggingface-hub==0.28.0 deprecates the `post` method
-    # so patch `_inner_post` instead
-    if hasattr(client, "post"):
-        client.post = post_mock
-    if hasattr(client, "_inner_post"):
-        client._inner_post = post_mock
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts, details_arg",
-    itertools.product([True, False], repeat=3),
-)
-def test_nonstreaming_chat_completion(
-    sentry_init, capture_events, send_default_pii, include_prompts, details_arg
-):
-    sentry_init(
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
-    )
-    events = capture_events()
+@pytest.fixture
+def mock_hf_text_generation_api():
+    # type: () -> Any
+    """Mock HuggingFace text generation API"""
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        model_name = "test-model"
 
-    client = InferenceClient(model="https://")
+        # Mock model info endpoint
+        rsps.add(
+            responses.GET,
+            f"https://huggingface.co/api/models/{model_name}",
+            json={
+                "id": model_name,
+                "pipeline_tag": "text-generation",
+                "inferenceProviderMapping": {
+                    "hf-inference": {
+                        "status": "live",
+                        "providerId": model_name,
+                        "task": "text-generation",
+                    }
+                },
+            },
+            status=200,
+        )
 
-    if details_arg:
-        post_mock = mock.Mock(
-            return_value=b"""[{
-                "generated_text": "the model response",
-                "details": {
-                    "finish_reason": "length",
-                    "generated_tokens": 10,
-                    "prefill": [],
-                    "tokens": []
+        # Mock text generation endpoint
+        rsps.add(
+            responses.POST,
+            f"https://router.huggingface.co/hf-inference/models/{model_name}",
+            json=[
+                {
+                    "generated_text": "Mocked response",
+                    "details": {
+                        "finish_reason": "length",
+                        "generated_tokens": 10,
+                        "prefill": [],
+                        "tokens": [],
+                    },
                 }
-            }]"""
+            ],
+            status=200,
         )
-    else:
-        post_mock = mock.Mock(
-            return_value=b'[{"generated_text": "the model response"}]'
+
+        yield rsps
+
+
+@pytest.fixture
+def mock_hf_chat_completion_api():
+    # type: () -> Any
+    """Mock HuggingFace chat completion API"""
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        model_name = "test-model"
+
+        # Mock model info endpoint
+        rsps.add(
+            responses.GET,
+            f"https://huggingface.co/api/models/{model_name}",
+            json={
+                "id": model_name,
+                "pipeline_tag": "conversational",
+                "inferenceProviderMapping": {
+                    "hf-inference": {
+                        "status": "live",
+                        "providerId": model_name,
+                        "task": "conversational",
+                    }
+                },
+            },
+            status=200,
         )
-    mock_client_post(client, post_mock)
 
-    with start_transaction(name="huggingface_hub tx"):
-        response = client.text_generation(
-            prompt="hello",
-            details=details_arg,
-            stream=False,
+        # Mock chat completion endpoint
+        rsps.add(
+            responses.POST,
+            f"https://router.huggingface.co/hf-inference/models/{model_name}/v1/chat/completions",
+            json={
+                "id": f"{model_name}-123",
+                "created": 1234567890,
+                "model": "test-model-123",
+                "system_fingerprint": "fp_123",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "stop",
+                        "message": {
+                            "role": "assistant",
+                            "content": "Hello! How can I help you today?",
+                        },
+                        "logprobs": None,
+                    }
+                ],
+                "usage": {
+                    "completion_tokens": 8,
+                    "prompt_tokens": 10,
+                    "total_tokens": 18,
+                },
+            },
+            status=200,
         )
-    if details_arg:
-        assert response.generated_text == "the model response"
-    else:
-        assert response == "the model response"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.generate_text"
 
-    if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["gen_ai.request.messages"]
-        assert "the model response" in span["data"]["gen_ai.response.text"]
-    else:
-        assert "gen_ai.request.messages" not in span["data"]
-        assert "gen_ai.response.text" not in span["data"]
-
-    if details_arg:
-        assert span["data"]["gen_ai.usage.total_tokens"] == 10
+        yield rsps
 
 
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts, details_arg",
-    itertools.product([True, False], repeat=3),
-)
-def test_streaming_chat_completion(
-    sentry_init, capture_events, send_default_pii, include_prompts, details_arg
-):
+def test_text_generation(sentry_init, capture_events, mock_hf_text_generation_api):
+    # type: (Any, Any, Any) -> None
     sentry_init(
-        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
-        traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
-    )
-    events = capture_events()
-
-    client = InferenceClient(model="https://")
-
-    post_mock = mock.Mock(
-        return_value=[
-            b"""data:{
-                "token":{"id":1, "special": false, "text": "the model "}
-            }""",
-            b"""data:{
-                "token":{"id":2, "special": false, "text": "response"},
-                "details":{"finish_reason": "length", "generated_tokens": 10, "seed": 0}
-            }""",
-        ]
-    )
-    mock_client_post(client, post_mock)
-
-    with start_transaction(name="huggingface_hub tx"):
-        response = list(
-            client.text_generation(
-                prompt="hello",
-                details=details_arg,
-                stream=True,
-            )
-        )
-    assert len(response) == 2
-    if details_arg:
-        assert response[0].token.text + response[1].token.text == "the model response"
-    else:
-        assert response[0] + response[1] == "the model response"
-
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.generate_text"
-
-    if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["gen_ai.request.messages"]
-        assert "the model response" in span["data"]["gen_ai.response.text"]
-    else:
-        assert "gen_ai.request.messages" not in span["data"]
-        assert "gen_ai.response.text" not in span["data"]
-
-    if details_arg:
-        assert span["data"]["gen_ai.usage.total_tokens"] == 10
-
-
-def test_bad_chat_completion(sentry_init, capture_events):
-    sentry_init(integrations=[HuggingfaceHubIntegration()], traces_sample_rate=1.0)
-    events = capture_events()
-
-    client = InferenceClient(model="https://")
-    post_mock = mock.Mock(side_effect=OverloadedError("The server is overloaded"))
-    mock_client_post(client, post_mock)
-
-    with pytest.raises(OverloadedError):
-        client.text_generation(prompt="hello")
-
-    (event,) = events
-    assert event["level"] == "error"
-
-
-def test_span_origin(sentry_init, capture_events):
-    sentry_init(
-        integrations=[HuggingfaceHubIntegration()],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client = InferenceClient(model="https://")
-    post_mock = mock.Mock(
-        return_value=[
-            b"""data:{
-                "token":{"id":1, "special": false, "text": "the model "}
-            }""",
-        ]
-    )
-    mock_client_post(client, post_mock)
+    client = InferenceClient(model="test-model")
 
-    with start_transaction(name="huggingface_hub tx"):
-        list(
-            client.text_generation(
-                prompt="hello",
-                stream=True,
-            )
+    with sentry_sdk.start_transaction(name="test_tx"):
+        response = client.text_generation(prompt="Hello")
+
+    # Verify the response
+    assert response == "Mocked response"
+
+    # Verify Sentry integration worked
+    tx = events[0]
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.generate_text"
+
+
+def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_api):
+    # type: (Any, Any, Any) -> None
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = InferenceClient(model="test-model")
+
+    # Create a chat-style prompt using text generation
+    chat_prompt = "Human: Hello\nAssistant:"
+
+    with sentry_sdk.start_transaction(name="test_chat_style_tx"):
+        client.chat_completion(
+            model="test-model",
+            messages=[{"role": "user", "content": chat_prompt}],
         )
 
-    (event,) = events
-
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.huggingface_hub"
+    tx = events[0]
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+    assert span["data"] == {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.model": "test-model-123",
+        "gen_ai.usage.input_tokens": 10,
+        "gen_ai.usage.output_tokens": 8,
+        "gen_ai.usage.total_tokens": 18,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }

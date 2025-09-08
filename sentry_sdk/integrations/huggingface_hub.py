@@ -142,7 +142,7 @@ def _wrap_huggingface_task(f, op):
             except Exception:
                 tool_calls = []
 
-            if len(tool_calls) > 0:
+            if tool_calls is not None and len(tool_calls) > 0:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,

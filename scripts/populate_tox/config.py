@@ -155,6 +155,9 @@ TEST_SUITE_CONFIG = {
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
+        "deps": {
+            "*": ["responses"],
+        },
     },
     "langchain-base": {
         "package": "langchain",
