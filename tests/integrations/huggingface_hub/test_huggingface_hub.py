@@ -2,6 +2,7 @@ from unittest import mock
 import pytest
 import responses
 
+import huggingface_hub
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
@@ -64,6 +65,48 @@ def mock_hf_text_generation_api():
                 },
             },
             status=200,
+        )
+
+        yield rsps
+
+
+@pytest.fixture
+def mock_hf_api_with_errors():
+    # type: () -> Any
+    """Mock HuggingFace API that always raises errors for any request"""
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        model_name = "test-model"
+
+        # Mock model info endpoint with error
+        rsps.add(
+            responses.GET,
+            MODEL_ENDPOINT.format(model_name=model_name),
+            json={"error": "Model not found"},
+            status=404,
+        )
+
+        # Mock text generation endpoint with error
+        rsps.add(
+            responses.POST,
+            INFERENCE_ENDPOINT.format(model_name=model_name),
+            json={"error": "Internal server error", "message": "Something went wrong"},
+            status=500,
+        )
+
+        # Mock chat completion endpoint with error
+        rsps.add(
+            responses.POST,
+            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+            json={"error": "Service unavailable", "message": "Chat completion failed"},
+            status=503,
+        )
+
+        # Catch-all pattern for any other model requests
+        rsps.add(
+            responses.GET,
+            "https://huggingface.co/api/models/test-model-error",
+            json={"error": "Generic model error"},
+            status=500,
         )
 
         yield rsps
@@ -222,9 +265,7 @@ def test_text_generation(
     sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
     events = capture_events()
 
-    client = InferenceClient(
-        model="test-model",
-    )
+    client = InferenceClient(model="test-model")
 
     with sentry_sdk.start_transaction(name="test"):
         client.text_generation(
@@ -271,9 +312,7 @@ def test_text_generation_streaming(
     sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
     events = capture_events()
 
-    client = InferenceClient(
-        model="test-model",
-    )
+    client = InferenceClient(model="test-model")
 
     with sentry_sdk.start_transaction(name="test"):
         for _ in client.text_generation(
@@ -321,9 +360,7 @@ def test_chat_completion(
     sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
     events = capture_events()
 
-    client = InferenceClient(
-        model="test-model",
-    )
+    client = InferenceClient(model="test-model")
 
     with sentry_sdk.start_transaction(name="test"):
         client.chat_completion(
@@ -373,9 +410,7 @@ def test_chat_completion_streaming(
     sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
     events = capture_events()
 
-    client = InferenceClient(
-        model="test-model",
-    )
+    client = InferenceClient(model="test-model")
 
     with sentry_sdk.start_transaction(name="test"):
         response = client.chat_completion(
@@ -417,4 +452,46 @@ def test_chat_completion_streaming(
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
+    assert span["data"] == expected_data
+
+
+def test_chat_completion_api_error(
+    sentry_init, capture_events, mock_hf_api_with_errors
+):
+    # type: (Any, Any, Any) -> None
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    client = InferenceClient(model="test-model")
+
+    with sentry_sdk.start_transaction(name="test"):
+        with pytest.raises(huggingface_hub.errors.HfHubHTTPError):
+            client.chat_completion(
+                messages=[{"role": "user", "content": "Hello!"}],
+            )
+
+    (
+        error,
+        transaction,
+    ) = events
+
+    assert error["exception"]["values"][0]["mechanism"]["type"] == "huggingface_hub"
+    assert not error["exception"]["values"][0]["mechanism"]["handled"]
+
+    (span,) = transaction["spans"]
+
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+    assert span.get("tags", {}).get("status") == "error"
+
+    assert (
+        error["contexts"]["trace"]["trace_id"]
+        == transaction["contexts"]["trace"]["trace_id"]
+    )
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "test-model",
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
     assert span["data"] == expected_data
