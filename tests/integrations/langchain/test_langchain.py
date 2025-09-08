@@ -1,3 +1,6 @@
+import importlib
+import re
+import sys
 from typing import List, Optional, Any, Iterator
 from unittest import mock
 from unittest.mock import Mock
@@ -380,6 +383,34 @@ def test_span_origin(sentry_init, capture_events):
     assert event["contexts"]["trace"]["origin"] == "manual"
     for span in event["spans"]:
         assert span["origin"] == "auto.ai.langchain"
+
+
+def test_langchain_module_is_optional(monkeypatch):
+    """
+    Test that the LangchainIntegration can be imported and set up
+    even if the langchain module is not installed.
+    """
+
+    lc_re = re.compile(r"^langchain(\..*)?$")
+
+    stripped_modules = {
+        name: mod for name, mod in sys.modules.items() if not lc_re.match(name)
+    }
+
+    class HideModuleImportHook(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname, path, target=..., /):
+            if lc_re.match(fullname):
+                raise ModuleNotFoundError(f"No module named '{fullname}'")
+            return None
+
+    with (
+        mock.patch.dict(sys.modules, stripped_modules, clear=True),
+        mock.patch.object(sys, "meta_path", [HideModuleImportHook(), *sys.meta_path]),
+        mock.patch("sentry_sdk.integrations.langchain.manager"),
+    ):
+        from sentry_sdk.integrations.langchain import LangchainIntegration
+
+        LangchainIntegration().setup_once()
 
 
 def test_manual_callback_no_duplication(sentry_init):

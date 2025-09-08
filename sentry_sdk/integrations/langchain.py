@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
 
 try:
-    from langchain.agents import AgentExecutor
     from langchain_core.agents import AgentFinish
     from langchain_core.callbacks import (
         BaseCallbackHandler,
@@ -72,10 +71,13 @@ class LangchainIntegration(Integration):
     def setup_once():
         # type: () -> None
         manager._configure = _wrap_configure(manager._configure)
+        try:
+            from langchain.agents import AgentExecutor
 
-        if AgentExecutor is not None:
             AgentExecutor.invoke = _wrap_agent_executor_invoke(AgentExecutor.invoke)
             AgentExecutor.stream = _wrap_agent_executor_stream(AgentExecutor.stream)
+        except ImportError:
+            pass
 
 
 class WatchedSpan:
