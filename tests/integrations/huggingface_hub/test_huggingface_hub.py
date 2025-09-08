@@ -70,6 +70,49 @@ def mock_hf_text_generation_api():
 
 
 @pytest.fixture
+def mock_hf_text_generation_api_streaming():
+    # type: () -> Any
+    """Mock streaming HuggingFace text generation API"""
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        model_name = "test-model"
+
+        # Mock model info endpoint
+        rsps.add(
+            responses.GET,
+            MODEL_ENDPOINT.format(model_name=model_name),
+            json={
+                "id": model_name,
+                "pipeline_tag": "text-generation",
+                "inferenceProviderMapping": {
+                    "hf-inference": {
+                        "status": "live",
+                        "providerId": model_name,
+                        "task": "text-generation",
+                    }
+                },
+            },
+            status=200,
+        )
+
+        # Mock text generation endpoint for streaming
+        streaming_response = b'data:{"token":{"id":1, "special": false, "text": "the mocked "}}\n\ndata:{"token":{"id":2, "special": false, "text": "model response"}, "details":{"finish_reason": "length", "generated_tokens": 10, "seed": 0}}\n\n'
+
+        rsps.add(
+            responses.POST,
+            INFERENCE_ENDPOINT.format(model_name=model_name),
+            body=streaming_response,
+            status=200,
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+
+        yield rsps
+
+
+@pytest.fixture
 def mock_hf_chat_completion_api():
     # type: () -> Any
     """Mock HuggingFace chat completion API"""
@@ -163,6 +206,56 @@ def test_text_generation(
     if send_default_pii:
         expected_data["gen_ai.request.messages"] = "Hello"
         expected_data["gen_ai.response.text"] = "[mocked] Hello! How can i help you?"
+
+    if not send_default_pii:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
+
+    assert span["data"] == expected_data
+
+    # text generation does not set the response model
+    assert "gen_ai.response.model" not in span["data"]
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_text_generation_streaming(
+    sentry_init, capture_events, send_default_pii, mock_hf_text_generation_api_streaming
+):
+    # type: (Any, Any, Any, Any) -> None
+    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    events = capture_events()
+
+    client = InferenceClient(
+        model="test-model",
+    )
+
+    with sentry_sdk.start_transaction(name="test"):
+        for _ in client.text_generation(
+            prompt="Hello",
+            stream=True,
+            details=True,
+        ):
+            pass
+
+    (transaction,) = events
+    (span,) = transaction["spans"]
+
+    assert span["op"] == "gen_ai.generate_text"
+    assert span["description"] == "generate_text test-model"
+
+    expected_data = {
+        "gen_ai.operation.name": "generate_text",
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "length",
+        "gen_ai.response.streaming": True,
+        "gen_ai.usage.total_tokens": 10,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    if send_default_pii:
+        expected_data["gen_ai.request.messages"] = "Hello"
+        expected_data["gen_ai.response.text"] = "the mocked model response"
 
     if not send_default_pii:
         assert "gen_ai.request.messages" not in expected_data

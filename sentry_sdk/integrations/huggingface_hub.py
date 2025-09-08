@@ -230,7 +230,16 @@ def _wrap_huggingface_task(f, op):
                                 x.details, "generated_tokens"
                             ):
                                 tokens_used = x.details.generated_tokens
+                            if hasattr(x, "details") and hasattr(
+                                x.details, "finish_reason"
+                            ):
+                                span.set_data(
+                                    SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                    x.details.finish_reason,
+                                )
+
                             yield x
+
                         if (
                             len(data_buf) > 0
                             and should_send_default_pii()
