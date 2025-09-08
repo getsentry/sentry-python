@@ -285,7 +285,7 @@ def pick_releases_to_test(
                 releases_by_major[release.major][1] = release
 
         if len(releases_by_major) > 5:
-            # This framework has a lot of majors. Pick a selection.
+            # This framework has a lot of majors (maybe calver?). Pick a selection.
             releases = sorted(
                 [max_version for (_, max_version) in releases_by_major.values()]
             )
