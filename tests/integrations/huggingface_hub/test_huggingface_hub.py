@@ -398,12 +398,14 @@ def test_chat_completion_streaming(
         "gen_ai.response.finish_reasons": "stop",
         "gen_ai.response.model": "test-model-123",
         "gen_ai.response.streaming": True,
-        "gen_ai.usage.input_tokens": 183,
-        "gen_ai.usage.output_tokens": 14,
-        "gen_ai.usage.total_tokens": 197,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+    # usage is not available in older versions of the library
+    if HF_VERSION and HF_VERSION >= (0, 26, 0):
+        expected_data["gen_ai.usage.input_tokens"] = (183,)
+        expected_data["gen_ai.usage.output_tokens"] = (14,)
+        expected_data["gen_ai.usage.total_tokens"] = (197,)
 
     if send_default_pii:
         expected_data["gen_ai.request.messages"] = (
