@@ -150,6 +150,19 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.7",
     },
+    "httpx": {
+        "package": "httpx",
+        "deps": {
+            "*": ["pytest-httpx", "anyio<4.0.0"],
+            "<0.17": ["pytest-httpx==0.10.0"],
+            "<0.19": ["pytest-httpx==0.12.0"],
+            "<0.21": ["pytest-httpx==0.14.0"],
+            "<0.23": ["pytest-httpx==0.19.0"],
+            "<0.24": ["pytest-httpx==0.21.0"],
+            "<0.25": ["pytest-httpx==0.22.0"],
+            "<0.26": ["pytest-httpx==0.25.0"],
+        },
+    },
     "huey": {
         "package": "huey",
     },
