@@ -63,12 +63,12 @@ IGNORE = {
     "aws_lambda",
     "cloud_resource_context",
     "common",
+    "gcp",
     "gevent",
     "opentelemetry",
     "potel",
     # Integrations that can be migrated -- we should eventually remove all
     # of these from the IGNORE list
-    "gcp",
     "httpx",
     "pure_eval",
     "ray",
