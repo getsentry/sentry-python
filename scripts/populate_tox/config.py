@@ -236,7 +236,7 @@ TEST_SUITE_CONFIG = {
         "package": "quart",
         "deps": {
             "*": ["quart-auth", "pytest-asyncio", "Werkzeug"],
-            "<0.19": [
+            "<0.18": [
                 "blinker<1.6",
                 "jinja2<3.1.0",
                 "Werkzeug<2.1.0",
