@@ -41,17 +41,15 @@ def mock_hf_text_generation_api():
         rsps.add(
             responses.POST,
             f"https://router.huggingface.co/hf-inference/models/{model_name}",
-            json=[
-                {
-                    "generated_text": "Mocked response",
-                    "details": {
-                        "finish_reason": "length",
-                        "generated_tokens": 10,
-                        "prefill": [],
-                        "tokens": [],
-                    },
-                }
-            ],
+            json={
+                "generated_text": "Mocked response",
+                "details": {
+                    "finish_reason": "length",
+                    "generated_tokens": 10,
+                    "prefill": [],
+                    "tokens": [],
+                },
+            },
             status=200,
         )
 
@@ -88,9 +86,9 @@ def mock_hf_chat_completion_api():
             responses.POST,
             f"https://router.huggingface.co/hf-inference/models/{model_name}/v1/chat/completions",
             json={
-                "id": f"{model_name}-123",
+                "id": "xyz-123",
                 "created": 1234567890,
-                "model": "test-model-123",
+                "model": f"{model_name}-123",
                 "system_fingerprint": "fp_123",
                 "choices": [
                     {
@@ -100,7 +98,7 @@ def mock_hf_chat_completion_api():
                             "role": "assistant",
                             "content": "Hello! How can I help you today?",
                         },
-                        "logprobs": None,
+                        # "logprobs": None,
                     }
                 ],
                 "usage": {
@@ -120,10 +118,16 @@ def test_text_generation(sentry_init, capture_events, mock_hf_text_generation_ap
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    client = InferenceClient(model="test-model")
+    client = InferenceClient(
+        model="test-model",
+    )
 
     with sentry_sdk.start_transaction(name="test"):
-        client.text_generation(prompt="Hello")
+        client.text_generation(
+            prompt="Hello",
+            stream=False,
+            details=True,
+        )
 
     (transaction,) = events
     (span,) = transaction["spans"]
@@ -133,6 +137,9 @@ def test_text_generation(sentry_init, capture_events, mock_hf_text_generation_ap
     assert span["data"] == {
         "gen_ai.operation.name": "generate_text",
         "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "length",
+        "gen_ai.response.streaming": False,
+        "gen_ai.usage.total_tokens": 10,
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -143,12 +150,14 @@ def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_ap
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    client = InferenceClient()
+    client = InferenceClient(
+        model="test-model",
+    )
 
     with sentry_sdk.start_transaction(name="test"):
         client.chat_completion(
-            model="test-model",
             messages=[{"role": "user", "content": "Hello!"}],
+            stream=False,
         )
 
     (transaction,) = events
@@ -160,6 +169,7 @@ def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_ap
         "gen_ai.operation.name": "chat",
         "gen_ai.request.model": "test-model",
         "gen_ai.response.model": "test-model-123",
+        "gen_ai.response.streaming": False,
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 8,
         "gen_ai.usage.total_tokens": 18,
