@@ -142,6 +142,8 @@ def test_text_generation(sentry_init, capture_events, mock_hf_text_generation_ap
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+    # text generation does not set the response model
+    assert "gen_ai.response.model" not in span["data"]
 
 
 def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_api):
