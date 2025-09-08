@@ -55,7 +55,7 @@ def mock_hf_text_generation_api():
             responses.POST,
             INFERENCE_ENDPOINT.format(model_name=model_name),
             json={
-                "generated_text": "Mocked response",
+                "generated_text": "[mocked] Hello! How can i help you?",
                 "details": {
                     "finish_reason": "length",
                     "generated_tokens": 10,
@@ -109,7 +109,7 @@ def mock_hf_chat_completion_api():
                         "finish_reason": "stop",
                         "message": {
                             "role": "assistant",
-                            "content": "Hello! How can I help you today?",
+                            "content": "[mocked] Hello! How can I help you today?",
                         },
                     }
                 ],
@@ -125,9 +125,12 @@ def mock_hf_chat_completion_api():
         yield rsps
 
 
-def test_text_generation(sentry_init, capture_events, mock_hf_text_generation_api):
-    # type: (Any, Any, Any) -> None
-    sentry_init(traces_sample_rate=1.0)
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_text_generation(
+    sentry_init, capture_events, send_default_pii, mock_hf_text_generation_api
+):
+    # type: (Any, Any, Any, Any) -> None
+    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
     events = capture_events()
 
     client = InferenceClient(
@@ -146,7 +149,8 @@ def test_text_generation(sentry_init, capture_events, mock_hf_text_generation_ap
 
     assert span["op"] == "gen_ai.generate_text"
     assert span["description"] == "generate_text test-model"
-    assert span["data"] == {
+
+    expected_data = {
         "gen_ai.operation.name": "generate_text",
         "gen_ai.request.model": "test-model",
         "gen_ai.response.finish_reasons": "length",
@@ -155,13 +159,27 @@ def test_text_generation(sentry_init, capture_events, mock_hf_text_generation_ap
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+
+    if send_default_pii:
+        expected_data["gen_ai.request.messages"] = "Hello"
+        expected_data["gen_ai.response.text"] = "[mocked] Hello! How can i help you?"
+
+    if not send_default_pii:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
+
+    assert span["data"] == expected_data
+
     # text generation does not set the response model
     assert "gen_ai.response.model" not in span["data"]
 
 
-def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_api):
-    # type: (Any, Any, Any) -> None
-    sentry_init(traces_sample_rate=1.0)
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_chat_completion(
+    sentry_init, capture_events, send_default_pii, mock_hf_chat_completion_api
+):
+    # type: (Any, Any, Any, Any) -> None
+    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
     events = capture_events()
 
     client = InferenceClient(
@@ -179,7 +197,8 @@ def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_ap
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
-    assert span["data"] == {
+
+    expected_data = {
         "gen_ai.operation.name": "chat",
         "gen_ai.request.model": "test-model",
         "gen_ai.response.finish_reasons": "stop",
@@ -191,3 +210,17 @@ def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_ap
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+
+    if send_default_pii:
+        expected_data["gen_ai.request.messages"] = (
+            '[{"role": "user", "content": "Hello!"}]'
+        )
+        expected_data["gen_ai.response.text"] = (
+            "[mocked] Hello! How can I help you today?"
+        )
+
+    if not send_default_pii:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
+
+    assert span["data"] == expected_data
