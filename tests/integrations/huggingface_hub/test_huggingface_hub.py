@@ -197,7 +197,6 @@ def mock_hf_chat_completion_api_streaming():
         streaming_chat_response = (
             b'data:{"id":"xyz-123","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"the mocked "},"index":0,"finish_reason":null}],"usage":null}\n\n'
             b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"model response"},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
-            # b'data:[DONE]\n\n'
         )
 
         rsps.add(
