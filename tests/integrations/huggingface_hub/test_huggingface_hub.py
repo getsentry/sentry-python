@@ -117,45 +117,43 @@ def mock_hf_chat_completion_api():
 
 def test_text_generation(sentry_init, capture_events, mock_hf_text_generation_api):
     # type: (Any, Any, Any) -> None
-    sentry_init(
-        traces_sample_rate=1.0,
-    )
+    sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
     client = InferenceClient(model="test-model")
 
-    with sentry_sdk.start_transaction(name="test_tx"):
-        response = client.text_generation(prompt="Hello")
+    with sentry_sdk.start_transaction(name="test"):
+        client.text_generation(prompt="Hello")
 
-    # Verify the response
-    assert response == "Mocked response"
+    (transaction,) = events
+    (span,) = transaction["spans"]
 
-    # Verify Sentry integration worked
-    tx = events[0]
-    span = tx["spans"][0]
     assert span["op"] == "gen_ai.generate_text"
+    assert span["description"] == "generate_text test-model"
+    assert span["data"] == {
+        "gen_ai.operation.name": "generate_text",
+        "gen_ai.request.model": "test-model",
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
 
 
 def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_api):
     # type: (Any, Any, Any) -> None
-    sentry_init(
-        traces_sample_rate=1.0,
-    )
+    sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    client = InferenceClient(model="test-model")
+    client = InferenceClient()
 
-    # Create a chat-style prompt using text generation
-    chat_prompt = "Human: Hello\nAssistant:"
-
-    with sentry_sdk.start_transaction(name="test_chat_style_tx"):
+    with sentry_sdk.start_transaction(name="test"):
         client.chat_completion(
             model="test-model",
-            messages=[{"role": "user", "content": chat_prompt}],
+            messages=[{"role": "user", "content": "Hello!"}],
         )
 
-    tx = events[0]
-    span = tx["spans"][0]
+    (transaction,) = events
+    (span,) = transaction["spans"]
+
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
     assert span["data"] == {
