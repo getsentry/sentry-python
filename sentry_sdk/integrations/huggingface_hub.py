@@ -130,12 +130,18 @@ def _wrap_huggingface_task(f, op):
                 if model:
                     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
 
+            finish_reason = None
             if hasattr(res, "details") and res.details is not None:
                 finish_reason = getattr(res.details, "finish_reason", None)
-                if finish_reason:
-                    span.set_data(
-                        SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason
-                    )
+
+            if finish_reason is None:
+                try:
+                    finish_reason = res.choices[0].finish_reason
+                except Exception:
+                    pass
+
+            if finish_reason:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason)
 
             try:
                 tool_calls = res.choices[0].message.tool_calls

@@ -98,7 +98,6 @@ def mock_hf_chat_completion_api():
                             "role": "assistant",
                             "content": "Hello! How can I help you today?",
                         },
-                        # "logprobs": None,
                     }
                 ],
                 "usage": {
@@ -168,6 +167,7 @@ def test_chat_completion(sentry_init, capture_events, mock_hf_chat_completion_ap
     assert span["data"] == {
         "gen_ai.operation.name": "chat",
         "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "stop",
         "gen_ai.response.model": "test-model-123",
         "gen_ai.response.streaming": False,
         "gen_ai.usage.input_tokens": 10,
