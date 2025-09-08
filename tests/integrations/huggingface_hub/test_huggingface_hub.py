@@ -168,6 +168,53 @@ def mock_hf_chat_completion_api():
         yield rsps
 
 
+@pytest.fixture
+def mock_hf_chat_completion_api_streaming():
+    # type: () -> Any
+    """Mock streaming HuggingFace chat completion API"""
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        model_name = "test-model"
+
+        # Mock model info endpoint
+        rsps.add(
+            responses.GET,
+            MODEL_ENDPOINT.format(model_name=model_name),
+            json={
+                "id": model_name,
+                "pipeline_tag": "conversational",
+                "inferenceProviderMapping": {
+                    "hf-inference": {
+                        "status": "live",
+                        "providerId": model_name,
+                        "task": "conversational",
+                    }
+                },
+            },
+            status=200,
+        )
+
+        # Mock chat completion streaming endpoint
+        streaming_chat_response = (
+            b'data:{"id":"xyz-123","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"the mocked "},"index":0,"finish_reason":null}],"usage":null}\n\n'
+            b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"model response"},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
+            # b'data:[DONE]\n\n'
+        )
+
+        rsps.add(
+            responses.POST,
+            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+            body=streaming_chat_response,
+            status=200,
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+
+        yield rsps
+
+
 @pytest.mark.parametrize("send_default_pii", [True, False])
 def test_text_generation(
     sentry_init, capture_events, send_default_pii, mock_hf_text_generation_api
@@ -311,6 +358,59 @@ def test_chat_completion(
         expected_data["gen_ai.response.text"] = (
             "[mocked] Hello! How can I help you today?"
         )
+
+    if not send_default_pii:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
+
+    assert span["data"] == expected_data
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_chat_completion_streaming(
+    sentry_init, capture_events, send_default_pii, mock_hf_chat_completion_api_streaming
+):
+    # type: (Any, Any, Any, Any) -> None
+    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    events = capture_events()
+
+    client = InferenceClient(
+        model="test-model",
+    )
+
+    with sentry_sdk.start_transaction(name="test"):
+        response = client.chat_completion(
+            messages=[{"role": "user", "content": "Hello!"}],
+            stream=True,
+        )
+
+        for x in response:
+            print(x)
+
+    (transaction,) = events
+    (span,) = transaction["spans"]
+
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "stop",
+        "gen_ai.response.model": "test-model-123",
+        "gen_ai.response.streaming": True,
+        "gen_ai.usage.input_tokens": 183,
+        "gen_ai.usage.output_tokens": 14,
+        "gen_ai.usage.total_tokens": 197,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    if send_default_pii:
+        expected_data["gen_ai.request.messages"] = (
+            '[{"role": "user", "content": "Hello!"}]'
+        )
+        expected_data["gen_ai.response.text"] = "the mocked model response"
 
     if not send_default_pii:
         assert "gen_ai.request.messages" not in expected_data

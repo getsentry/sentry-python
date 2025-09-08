@@ -1,6 +1,5 @@
 from functools import wraps
 
-
 from typing import Any, Iterable, Callable
 
 import sentry_sdk
@@ -17,7 +16,11 @@ from sentry_sdk.utils import (
 try:
     import huggingface_hub.inference._client
 
-    from huggingface_hub import ChatCompletionOutput, TextGenerationOutput
+    from huggingface_hub import (
+        ChatCompletionOutput,
+        TextGenerationOutput,
+        ChatCompletionStreamOutput,
+    )
 except ImportError:
     raise DidNotEnable("Huggingface not installed")
 
@@ -217,7 +220,7 @@ def _wrap_huggingface_task(f, op):
                 return res
 
             if kwargs.get("details", False):
-
+                # text-generation stream output
                 def new_details_iterator():
                     # type: () -> Iterable[Any]
                     with capture_internal_exceptions():
@@ -257,20 +260,47 @@ def _wrap_huggingface_task(f, op):
                                 span,
                                 total_tokens=tokens_used,
                             )
+
                     span.__exit__(None, None, None)
 
                 return new_details_iterator()
             else:
-                # res is Iterable[str]
-
+                # chat-completion stream output
                 def new_iterator():
                     # type: () -> Iterable[str]
-                    data_buf: list[str] = []
                     with capture_internal_exceptions():
-                        for s in res:
-                            if isinstance(s, str):
-                                data_buf.append(s)
-                            yield s
+                        data_buf: list[str] = []
+                        for chunk in res:
+                            if isinstance(chunk, ChatCompletionStreamOutput):
+                                for choice in chunk.choices:
+                                    data_buf.append(choice.delta.content)
+
+                                    if (
+                                        hasattr(choice, "finish_reason")
+                                        and choice.finish_reason is not None
+                                    ):
+                                        span.set_data(
+                                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                            choice.finish_reason,
+                                        )
+                                if hasattr(chunk, "model") and chunk.model is not None:
+                                    span.set_data(
+                                        SPANDATA.GEN_AI_RESPONSE_MODEL, chunk.model
+                                    )
+
+                                if hasattr(chunk, "usage") and chunk.usage is not None:
+                                    record_token_usage(
+                                        span,
+                                        input_tokens=chunk.usage.prompt_tokens,
+                                        output_tokens=chunk.usage.completion_tokens,
+                                        total_tokens=chunk.usage.total_tokens,
+                                    )
+
+                            elif isinstance(chunk, str):
+                                data_buf.append(chunk)
+
+                            yield chunk
+
                         if (
                             len(data_buf) > 0
                             and should_send_default_pii()
@@ -283,6 +313,7 @@ def _wrap_huggingface_task(f, op):
                                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                                     text_response,
                                 )
+
                         span.__exit__(None, None, None)
 
                 return new_iterator()
