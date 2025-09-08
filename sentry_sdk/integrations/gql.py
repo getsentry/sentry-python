@@ -18,6 +18,13 @@ try:
     )
     from gql.transport import Transport, AsyncTransport  # type: ignore[import-not-found]
     from gql.transport.exceptions import TransportQueryError  # type: ignore[import-not-found]
+
+    try:
+        # gql 4.0+
+        from gql import GraphQLRequest  # type: ignore[import-not-found]
+    except ImportError:
+        GraphQLRequest = None
+
 except ImportError:
     raise DidNotEnable("gql is not installed")
 
@@ -92,13 +99,13 @@ def _patch_execute():
     real_execute = gql.Client.execute
 
     @ensure_integration_enabled(GQLIntegration, real_execute)
-    def sentry_patched_execute(self, document, *args, **kwargs):
+    def sentry_patched_execute(self, document_or_request, *args, **kwargs):
         # type: (gql.Client, DocumentNode, Any, Any) -> Any
         scope = sentry_sdk.get_isolation_scope()
-        scope.add_event_processor(_make_gql_event_processor(self, document))
+        scope.add_event_processor(_make_gql_event_processor(self, document_or_request))
 
         try:
-            return real_execute(self, document, *args, **kwargs)
+            return real_execute(self, document_or_request, *args, **kwargs)
         except TransportQueryError as e:
             event, hint = event_from_exception(
                 e,
@@ -112,8 +119,8 @@ def _patch_execute():
     gql.Client.execute = sentry_patched_execute
 
 
-def _make_gql_event_processor(client, document):
-    # type: (gql.Client, DocumentNode) -> EventProcessor
+def _make_gql_event_processor(client, document_or_request):
+    # type: (gql.Client, Union[DocumentNode, gql.GraphQLRequest]) -> EventProcessor
     def processor(event, hint):
         # type: (Event, dict[str, Any]) -> Event
         try:
@@ -130,6 +137,16 @@ def _make_gql_event_processor(client, document):
         )
 
         if should_send_default_pii():
+            if GraphQLRequest is not None and isinstance(
+                document_or_request, GraphQLRequest
+            ):
+                # In v4.0.0, execute moved to GraphQLRequest instead of
+                # DocumentNode in execute
+                # https://github.com/graphql-python/gql/pull/556
+                document = document_or_request.document
+            else:
+                document = document_or_request
+
             request["data"] = _data_from_document(document)
             contexts = event.setdefault("contexts", {})
             response = contexts.setdefault("response", {})
