@@ -141,7 +141,7 @@ _MIN_VERSIONS = {
     "gql": (3, 4, 1),
     "graphene": (3, 3),
     "grpc": (1, 32, 0),  # grpcio
-    "huggingface_hub": (0, 23),
+    "huggingface_hub": (0, 24, 7),
     "langchain": (0, 1, 0),
     "langgraph": (0, 6, 6),
     "launchdarkly": (9, 8, 0),
