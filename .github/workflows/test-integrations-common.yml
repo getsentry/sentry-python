@@ -39,7 +39,7 @@ jobs:
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
       - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
