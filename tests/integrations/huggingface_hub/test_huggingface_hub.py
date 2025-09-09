@@ -607,11 +607,7 @@ def test_chat_completion_with_tools(
 
     expected_data = {
         "gen_ai.operation.name": "chat",
-        "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": '
-        '"get_weather", "description": "Get current '
-        'weather", "parameters": {"type": "object", '
-        '"properties": {"location": {"type": '
-        '"string"}}, "required": ["location"]}}}]',
+        "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
         "gen_ai.request.model": "test-model",
         "gen_ai.response.finish_reasons": "tool_calls",
         "gen_ai.response.model": "test-model-123",
