@@ -240,11 +240,11 @@ def _wrap_huggingface_task(f, op):
                 # text-generation stream output
                 def new_details_iterator():
                     # type: () -> Iterable[Any]
-                    with capture_internal_exceptions():
-                        finish_reason = None
-                        tokens_used = 0
-                        response_text_buffer: list[str] = []
+                    finish_reason = None
+                    response_text_buffer: list[str] = []
+                    tokens_used = 0
 
+                    with capture_internal_exceptions():
                         for chunk in res:
                             if (
                                 hasattr(chunk, "token")
@@ -253,43 +253,42 @@ def _wrap_huggingface_task(f, op):
                             ):
                                 response_text_buffer.append(chunk.token.text)
 
-                            details = getattr(chunk, "details", None)
-                            if details is not None:
-                                finish_reason = getattr(details, "finish_reason", None)
+                            if hasattr(chunk, "details") and hasattr(
+                                chunk.details, "finish_reason"
+                            ):
+                                finish_reason = chunk.details.finish_reason
 
-                                generated_tokens = getattr(
-                                    details, "generated_tokens", None
-                                )
-                                if generated_tokens is not None:
-                                    tokens_used = generated_tokens
+                            if (
+                                hasattr(chunk, "details")
+                                and hasattr(chunk.details, "generated_tokens")
+                                and chunk.details.generated_tokens is not None
+                            ):
+                                tokens_used = chunk.details.generated_tokens
 
                             yield chunk
 
-                        if finish_reason:
+                        if finish_reason is not None:
                             set_data_normalized(
                                 span,
                                 SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
                                 finish_reason,
                             )
 
+                        if should_send_default_pii() and integration.include_prompts:
+                            if len(response_text_buffer) > 0:
+                                text_response = "".join(response_text_buffer)
+                                if text_response:
+                                    set_data_normalized(
+                                        span,
+                                        SPANDATA.GEN_AI_RESPONSE_TEXT,
+                                        text_response,
+                                    )
+
                         if tokens_used > 0:
                             record_token_usage(
                                 span,
                                 total_tokens=tokens_used,
                             )
-
-                        if (
-                            should_send_default_pii()
-                            and integration.include_prompts
-                            and len(response_text_buffer) > 0
-                        ):
-                            text_response = "".join(response_text_buffer)
-                            if text_response:
-                                set_data_normalized(
-                                    span,
-                                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                                    text_response,
-                                )
 
                     span.__exit__(None, None, None)
 
