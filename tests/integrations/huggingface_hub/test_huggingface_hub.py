@@ -6,6 +6,7 @@ from huggingface_hub import InferenceClient
 
 import sentry_sdk
 from sentry_sdk.utils import package_version
+from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
 
 from typing import TYPE_CHECKING
 
@@ -328,11 +329,20 @@ def mock_hf_chat_completion_api_streaming():
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation(
-    sentry_init, capture_events, send_default_pii, mock_hf_text_generation_api
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    mock_hf_text_generation_api,
 ):
-    # type: (Any, Any, Any, Any) -> None
-    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+    )
     events = capture_events()
 
     client = InferenceClient(model="test-model")
@@ -361,11 +371,11 @@ def test_text_generation(
         "thread.name": mock.ANY,
     }
 
-    if send_default_pii:
+    if send_default_pii and include_prompts:
         expected_data["gen_ai.request.messages"] = "Hello"
         expected_data["gen_ai.response.text"] = "[mocked] Hello! How can i help you?"
 
-    if not send_default_pii:
+    if not send_default_pii or not include_prompts:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
@@ -376,11 +386,20 @@ def test_text_generation(
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("include_prompts", [True, False])
 def test_text_generation_streaming(
-    sentry_init, capture_events, send_default_pii, mock_hf_text_generation_api_streaming
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    mock_hf_text_generation_api_streaming,
 ):
-    # type: (Any, Any, Any, Any) -> None
-    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+    )
     events = capture_events()
 
     client = InferenceClient(model="test-model")
@@ -410,11 +429,11 @@ def test_text_generation_streaming(
         "thread.name": mock.ANY,
     }
 
-    if send_default_pii:
+    if send_default_pii and include_prompts:
         expected_data["gen_ai.request.messages"] = "Hello"
         expected_data["gen_ai.response.text"] = "the mocked model response"
 
-    if not send_default_pii:
+    if not send_default_pii or not include_prompts:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
@@ -425,11 +444,20 @@ def test_text_generation_streaming(
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion(
-    sentry_init, capture_events, send_default_pii, mock_hf_chat_completion_api
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    mock_hf_chat_completion_api,
 ):
-    # type: (Any, Any, Any, Any) -> None
-    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+    )
     events = capture_events()
 
     client = InferenceClient(model="test-model")
@@ -460,7 +488,7 @@ def test_chat_completion(
         "thread.name": mock.ANY,
     }
 
-    if send_default_pii:
+    if send_default_pii and include_prompts:
         expected_data["gen_ai.request.messages"] = (
             '[{"role": "user", "content": "Hello!"}]'
         )
@@ -468,7 +496,7 @@ def test_chat_completion(
             "[mocked] Hello! How can I help you today?"
         )
 
-    if not send_default_pii:
+    if not send_default_pii or not include_prompts:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
@@ -476,11 +504,20 @@ def test_chat_completion(
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming(
-    sentry_init, capture_events, send_default_pii, mock_hf_chat_completion_api_streaming
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    mock_hf_chat_completion_api_streaming,
 ):
-    # type: (Any, Any, Any, Any) -> None
-    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+    )
     events = capture_events()
 
     client = InferenceClient(model="test-model")
@@ -516,13 +553,13 @@ def test_chat_completion_streaming(
         expected_data["gen_ai.usage.output_tokens"] = 14
         expected_data["gen_ai.usage.total_tokens"] = 197
 
-    if send_default_pii:
+    if send_default_pii and include_prompts:
         expected_data["gen_ai.request.messages"] = (
             '[{"role": "user", "content": "Hello!"}]'
         )
         expected_data["gen_ai.response.text"] = "the mocked model response"
 
-    if not send_default_pii:
+    if not send_default_pii or not include_prompts:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
@@ -573,11 +610,20 @@ def test_chat_completion_api_error(
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_with_tools(
-    sentry_init, capture_events, send_default_pii, mock_hf_chat_completion_api_tools
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    mock_hf_chat_completion_api_tools,
 ):
-    # type: (Any, Any, Any, Any) -> None
-    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+    )
     events = capture_events()
 
     client = InferenceClient(model="test-model")
@@ -624,7 +670,7 @@ def test_chat_completion_with_tools(
         "thread.name": mock.ANY,
     }
 
-    if send_default_pii:
+    if send_default_pii and include_prompts:
         expected_data["gen_ai.request.messages"] = (
             '[{"role": "user", "content": "What is the weather in Paris?"}]'
         )
@@ -632,7 +678,7 @@ def test_chat_completion_with_tools(
             '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]'
         )
 
-    if not send_default_pii:
+    if not send_default_pii or not include_prompts:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
 
