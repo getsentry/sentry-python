@@ -183,7 +183,8 @@ def _wrap_pregel_invoke(f):
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        safe_serialize(input_messages),
+                        input_messages,
+                        unpack=False,
                     )
 
             result = f(self, *args, **kwargs)
@@ -232,7 +233,8 @@ def _wrap_pregel_ainvoke(f):
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        safe_serialize(input_messages),
+                        input_messages,
+                        unpack=False,
                     )
 
             result = await f(self, *args, **kwargs)
@@ -305,11 +307,9 @@ def _set_response_attributes(span, input_messages, result, integration):
     if llm_response_text:
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
     elif new_messages:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(new_messages)
-        )
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
     else:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(result))
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
 
     tool_calls = _extract_tool_calls(new_messages)
     if tool_calls:
