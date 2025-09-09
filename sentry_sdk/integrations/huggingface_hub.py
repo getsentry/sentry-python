@@ -1,7 +1,5 @@
 from functools import wraps
 
-from typing import Any, Iterable, Callable
-
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import set_data_normalized
@@ -12,6 +10,12 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
+
+from typing import Iterable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any, Callable
+
 
 try:
     import huggingface_hub.inference._client
@@ -100,6 +104,11 @@ def _wrap_huggingface_task(f, op):
             span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
         # Input attributes
+        if should_send_default_pii() and integration.include_prompts:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
+            )
+
         attribute_mapping = {
             "tools": SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
@@ -110,6 +119,7 @@ def _wrap_huggingface_task(f, op):
             "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
             "stream": SPANDATA.GEN_AI_RESPONSE_STREAMING,
         }
+
         for attribute, span_attribute in attribute_mapping.items():
             value = kwargs.get(attribute, None)
             if value is not None:
@@ -118,21 +128,23 @@ def _wrap_huggingface_task(f, op):
                 else:
                     set_data_normalized(span, span_attribute, value, unpack=False)
 
+        # LLM Execution
         try:
             res = f(*args, **kwargs)
         except Exception as e:
+            # Error Handling
             span.set_status("error")
             _capture_exception(e)
             span.__exit__(None, None, None)
             raise e from None
 
+        # Output attributes
         with capture_internal_exceptions():
-            # Output attributes
-            if hasattr(res, "model"):
-                model = res.model
-                if model:
-                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+            # Response Model
+            if hasattr(res, "model") and res.model is not None:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, res.model)
 
+            # Finish Reason
             finish_reason = None
             if hasattr(res, "details") and res.details is not None:
                 finish_reason = getattr(res.details, "finish_reason", None)
@@ -146,11 +158,9 @@ def _wrap_huggingface_task(f, op):
             if finish_reason:
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason)
 
+            # Request Messages
             if should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
-                )
-
+                # Response Tool Calls
                 try:
                     tool_calls = res.choices[0].message.tool_calls
                 except Exception:
@@ -164,6 +174,7 @@ def _wrap_huggingface_task(f, op):
                         unpack=False,
                     )
 
+            # Response Text
             if isinstance(res, str):
                 if should_send_default_pii() and integration.include_prompts:
                     if res:
@@ -172,10 +183,12 @@ def _wrap_huggingface_task(f, op):
                             SPANDATA.GEN_AI_RESPONSE_TEXT,
                             res,
                         )
+
                 span.__exit__(None, None, None)
                 return res
 
             if isinstance(res, TextGenerationOutput):
+                # Response Text
                 if should_send_default_pii() and integration.include_prompts:
                     if res.generated_text:
                         set_data_normalized(
@@ -183,15 +196,18 @@ def _wrap_huggingface_task(f, op):
                             SPANDATA.GEN_AI_RESPONSE_TEXT,
                             res.generated_text,
                         )
+                # Usage
                 if res.details is not None and res.details.generated_tokens > 0:
                     record_token_usage(
                         span,
                         total_tokens=res.details.generated_tokens,
                     )
+
                 span.__exit__(None, None, None)
                 return res
 
             if isinstance(res, ChatCompletionOutput):
+                # Response Text
                 if should_send_default_pii() and integration.include_prompts:
                     text_response = "".join(
                         [
@@ -205,6 +221,7 @@ def _wrap_huggingface_task(f, op):
                             SPANDATA.GEN_AI_RESPONSE_TEXT,
                             text_response,
                         )
+                # Usage
                 if hasattr(res, "usage") and res.usage is not None:
                     record_token_usage(
                         span,
@@ -212,6 +229,7 @@ def _wrap_huggingface_task(f, op):
                         output_tokens=res.usage.completion_tokens,
                         total_tokens=res.usage.total_tokens,
                     )
+
                 span.__exit__(None, None, None)
                 return res
 
@@ -226,13 +244,18 @@ def _wrap_huggingface_task(f, op):
                     with capture_internal_exceptions():
                         tokens_used = 0
                         data_buf: list[str] = []
+
                         for chunk in res:
                             if hasattr(chunk, "token") and hasattr(chunk.token, "text"):
                                 data_buf.append(chunk.token.text)
+
+                            # Usage
                             if hasattr(chunk, "details") and hasattr(
                                 chunk.details, "generated_tokens"
                             ):
                                 tokens_used = chunk.details.generated_tokens
+
+                            # Finish Reason
                             if hasattr(chunk, "details") and hasattr(
                                 chunk.details, "finish_reason"
                             ):
@@ -243,6 +266,7 @@ def _wrap_huggingface_task(f, op):
 
                             yield chunk
 
+                        # Response Text
                         if (
                             len(data_buf) > 0
                             and should_send_default_pii()
@@ -255,6 +279,7 @@ def _wrap_huggingface_task(f, op):
                                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                                     text_response,
                                 )
+                        # Usage
                         if tokens_used > 0:
                             record_token_usage(
                                 span,
@@ -264,12 +289,14 @@ def _wrap_huggingface_task(f, op):
                     span.__exit__(None, None, None)
 
                 return new_details_iterator()
+
             else:
                 # chat-completion stream output
                 def new_iterator():
                     # type: () -> Iterable[str]
                     with capture_internal_exceptions():
                         data_buf: list[str] = []
+
                         for chunk in res:
                             if isinstance(chunk, ChatCompletionStreamOutput):
                                 for choice in chunk.choices:
@@ -280,6 +307,7 @@ def _wrap_huggingface_task(f, op):
                                     ):
                                         data_buf.append(choice.delta.content)
 
+                                    # Finish Reason
                                     if (
                                         hasattr(choice, "finish_reason")
                                         and choice.finish_reason is not None
@@ -288,6 +316,8 @@ def _wrap_huggingface_task(f, op):
                                             SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
                                             choice.finish_reason,
                                         )
+
+                                    # Response Tool Calls
                                     if (
                                         hasattr(choice, "delta")
                                         and hasattr(choice.delta, "tool_calls")
@@ -304,11 +334,13 @@ def _wrap_huggingface_task(f, op):
                                                 unpack=False,
                                             )
 
+                                # Response Model
                                 if hasattr(chunk, "model") and chunk.model is not None:
                                     span.set_data(
                                         SPANDATA.GEN_AI_RESPONSE_MODEL, chunk.model
                                     )
 
+                                # Usage
                                 if hasattr(chunk, "usage") and chunk.usage is not None:
                                     record_token_usage(
                                         span,
@@ -323,6 +355,7 @@ def _wrap_huggingface_task(f, op):
 
                             yield chunk
 
+                        # Response Text
                         if (
                             len(data_buf) > 0
                             and should_send_default_pii()
