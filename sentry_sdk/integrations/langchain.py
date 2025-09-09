@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
 
 try:
-    from langchain.agents import AgentExecutor
     from langchain_core.agents import AgentFinish
     from langchain_core.callbacks import (
         BaseCallbackHandler,
@@ -43,6 +42,11 @@ try:
 except ImportError:
     raise DidNotEnable("langchain not installed")
 
+
+try:
+    from langchain.agents import AgentExecutor
+except ImportError:
+    AgentExecutor = None
 
 DATA_FIELDS = {
     "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
