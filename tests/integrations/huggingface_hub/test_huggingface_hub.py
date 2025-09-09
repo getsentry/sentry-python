@@ -217,6 +217,71 @@ def mock_hf_chat_completion_api():
 
 
 @pytest.fixture
+def mock_hf_chat_completion_api_tools():
+    # type: () -> Any
+    """Mock HuggingFace chat completion API"""
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        model_name = "test-model"
+
+        # Mock model info endpoint
+        rsps.add(
+            responses.GET,
+            MODEL_ENDPOINT.format(model_name=model_name),
+            json={
+                "id": model_name,
+                "pipeline_tag": "conversational",
+                "inferenceProviderMapping": {
+                    "hf-inference": {
+                        "status": "live",
+                        "providerId": model_name,
+                        "task": "conversational",
+                    }
+                },
+            },
+            status=200,
+        )
+
+        # Mock chat completion endpoint
+        rsps.add(
+            responses.POST,
+            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+            json={
+                "id": "xyz-123",
+                "created": 1234567890,
+                "model": f"{model_name}-123",
+                "system_fingerprint": "fp_123",
+                "choices": [
+                    {
+                        "index": 0,
+                        "finish_reason": "tool_calls",
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "call_123",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "get_weather",
+                                        "arguments": {"location": "Paris"},
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ],
+                "usage": {
+                    "completion_tokens": 8,
+                    "prompt_tokens": 10,
+                    "total_tokens": 18,
+                },
+            },
+            status=200,
+        )
+
+        yield rsps
+
+
+@pytest.fixture
 def mock_hf_chat_completion_api_streaming():
     # type: () -> Any
     """Mock streaming HuggingFace chat completion API"""
@@ -499,4 +564,72 @@ def test_chat_completion_api_error(
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
+    assert span["data"] == expected_data
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_chat_completion_with_tools(
+    sentry_init, capture_events, send_default_pii, mock_hf_chat_completion_api_tools
+):
+    # type: (Any, Any, Any, Any) -> None
+    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
+    events = capture_events()
+
+    client = InferenceClient(model="test-model")
+
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+
+    with sentry_sdk.start_transaction(name="test"):
+        client.chat_completion(
+            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+            tools=tools,
+            tool_choice="auto",
+        )
+
+    (transaction,) = events
+    (span,) = transaction["spans"]
+
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": '
+        '"get_weather", "description": "Get current '
+        'weather", "parameters": {"type": "object", '
+        '"properties": {"location": {"type": '
+        '"string"}}, "required": ["location"]}}}]',
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "tool_calls",
+        "gen_ai.response.model": "test-model-123",
+        "gen_ai.response.tool_calls": '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]',
+        "gen_ai.usage.input_tokens": 10,
+        "gen_ai.usage.output_tokens": 8,
+        "gen_ai.usage.total_tokens": 18,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    if send_default_pii:
+        expected_data["gen_ai.request.messages"] = (
+            '[{"role": "user", "content": "What is the weather in Paris?"}]'
+        )
+
+    if not send_default_pii:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
+
     assert span["data"] == expected_data
