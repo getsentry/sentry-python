@@ -671,14 +671,12 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
 
     from langchain_core.outputs import LLMResult, Generation
 
-    # Patch AgentExecutor to be None to simulate it not being available
     with patch("sentry_sdk.integrations.langchain.AgentExecutor", None):
         from sentry_sdk.integrations.langchain import (
             LangchainIntegration,
             SentryLangchainCallback,
         )
 
-        # Initialize Sentry with the integration - should not fail
         sentry_init(
             integrations=[LangchainIntegration(include_prompts=True)],
             traces_sample_rate=1.0,
@@ -686,13 +684,11 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
         )
         events = capture_events()
 
-        # Verify that setup_once doesn't crash when AgentExecutor is None
         try:
             LangchainIntegration.setup_once()
         except Exception as e:
             pytest.fail(f"setup_once() failed when AgentExecutor is None: {e}")
 
-        # Test that the core functionality still works by directly using the callback
         callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
 
         run_id = "12345678-1234-1234-1234-123456789012"
@@ -700,7 +696,6 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
         prompts = ["What is the capital of France?"]
 
         with start_transaction():
-            # Test on_llm_start
             callback.on_llm_start(
                 serialized=serialized,
                 prompts=prompts,
@@ -712,7 +707,6 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
                 },
             )
 
-            # Test on_llm_end
             response = LLMResult(
                 generations=[[Generation(text="The capital of France is Paris.")]],
                 llm_output={
@@ -725,12 +719,10 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
             )
             callback.on_llm_end(response=response, run_id=run_id)
 
-        # Verify that spans were created
         assert len(events) > 0
         tx = events[0]
         assert tx["type"] == "transaction"
 
-        # Check that LLM spans were created
         llm_spans = [
             span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
         ]
@@ -743,8 +735,6 @@ def test_langchain_integration_with_langchain_core_only(sentry_init, capture_eve
             llm_span["data"]["gen_ai.response.text"]
             == "The capital of France is Paris."
         )
-
-        # Verify token usage was recorded
         assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
         assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
         assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
