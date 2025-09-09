@@ -69,14 +69,16 @@ def _wrap_huggingface_task(f, op):
         if integration is None:
             return f(*args, **kwargs)
 
+        prompt = None
         if "prompt" in kwargs:
             prompt = kwargs["prompt"]
         elif "messages" in kwargs:
             prompt = kwargs["messages"]
         elif len(args) >= 2:
-            if isinstance(args[1], str):
+            if isinstance(args[1], str) or isinstance(args[1], list):
                 prompt = args[1]
-        else:
+
+        if prompt is None:
             # invalid call, dont instrument, let it return error
             return f(*args, **kwargs)
 

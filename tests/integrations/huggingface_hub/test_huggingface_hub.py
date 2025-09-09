@@ -571,7 +571,7 @@ def test_chat_completion_streaming(
     with sentry_sdk.start_transaction(name="test"):
         _ = list(
             client.chat_completion(
-                messages=[{"role": "user", "content": "Hello!"}],
+                [{"role": "user", "content": "Hello!"}],
                 stream=True,
             )
         )
