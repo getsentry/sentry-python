@@ -74,9 +74,8 @@ def _wrap_huggingface_task(f, op):
         elif "messages" in kwargs:
             prompt = kwargs["messages"]
         elif len(args) >= 2:
-            kwargs["prompt"] = args[1]
-            prompt = kwargs["prompt"]
-            args = (args[0],) + args[2:]
+            if isinstance(args[1], str):
+                prompt = args[1]
         else:
             # invalid call, dont instrument, let it return error
             return f(*args, **kwargs)
