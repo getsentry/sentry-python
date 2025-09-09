@@ -339,7 +339,7 @@ def test_text_generation(
 
     with sentry_sdk.start_transaction(name="test"):
         client.text_generation(
-            prompt="Hello",
+            "Hello",
             stream=False,
             details=True,
         )
@@ -349,6 +349,7 @@ def test_text_generation(
 
     assert span["op"] == "gen_ai.generate_text"
     assert span["description"] == "generate_text test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "generate_text",
@@ -397,6 +398,7 @@ def test_text_generation_streaming(
 
     assert span["op"] == "gen_ai.generate_text"
     assert span["description"] == "generate_text test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "generate_text",
@@ -443,6 +445,7 @@ def test_chat_completion(
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "chat",
@@ -496,6 +499,7 @@ def test_chat_completion_streaming(
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "chat",
@@ -552,6 +556,7 @@ def test_chat_completion_api_error(
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
     assert span.get("tags", {}).get("status") == "error"
 
     assert (
@@ -604,6 +609,7 @@ def test_chat_completion_with_tools(
 
     assert span["op"] == "gen_ai.chat"
     assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
 
     expected_data = {
         "gen_ai.operation.name": "chat",
