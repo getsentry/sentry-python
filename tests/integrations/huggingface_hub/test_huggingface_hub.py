@@ -569,13 +569,12 @@ def test_chat_completion_streaming(
     client = InferenceClient(model="test-model")
 
     with sentry_sdk.start_transaction(name="test"):
-        response = client.chat_completion(
-            messages=[{"role": "user", "content": "Hello!"}],
-            stream=True,
+        _ = list(
+            client.chat_completion(
+                messages=[{"role": "user", "content": "Hello!"}],
+                stream=True,
+            )
         )
-
-        for x in response:
-            print(x)
 
     (transaction,) = events
     (span,) = transaction["spans"]
@@ -767,15 +766,14 @@ def test_chat_completion_streaming_with_tools(
     ]
 
     with sentry_sdk.start_transaction(name="test"):
-        response = client.chat_completion(
-            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-            stream=True,
-            tools=tools,
-            tool_choice="auto",
+        _ = list(
+            client.chat_completion(
+                messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+                stream=True,
+                tools=tools,
+                tool_choice="auto",
+            )
         )
-
-        for x in response:
-            print(x)
 
     (transaction,) = events
     (span,) = transaction["spans"]
