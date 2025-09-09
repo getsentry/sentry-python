@@ -2,13 +2,18 @@ from unittest import mock
 import pytest
 import responses
 
-import huggingface_hub
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
 from sentry_sdk.utils import package_version
 
 from typing import TYPE_CHECKING
+
+try:
+    from huggingface_hub.utils._errors import HfHubHTTPError
+except ImportError:
+    from huggingface_hub.errors import HfHubHTTPError
+
 
 if TYPE_CHECKING:
     from typing import Any
@@ -465,7 +470,7 @@ def test_chat_completion_api_error(
     client = InferenceClient(model="test-model")
 
     with sentry_sdk.start_transaction(name="test"):
-        with pytest.raises(huggingface_hub.errors.HfHubHTTPError):
+        with pytest.raises(HfHubHTTPError):
             client.chat_completion(
                 messages=[{"role": "user", "content": "Hello!"}],
             )
