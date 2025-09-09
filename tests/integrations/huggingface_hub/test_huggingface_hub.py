@@ -220,7 +220,7 @@ def mock_hf_chat_completion_api():
 @pytest.fixture
 def mock_hf_chat_completion_api_tools():
     # type: () -> Any
-    """Mock HuggingFace chat completion API"""
+    """Mock HuggingFace chat completion API with tool calls."""
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
         model_name = "test-model"
 
@@ -311,6 +311,52 @@ def mock_hf_chat_completion_api_streaming():
         streaming_chat_response = (
             b'data:{"id":"xyz-123","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"the mocked "},"index":0,"finish_reason":null}],"usage":null}\n\n'
             b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"model response"},"index":0,"finish_reason":"stop"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
+        )
+
+        rsps.add(
+            responses.POST,
+            INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
+            body=streaming_chat_response,
+            status=200,
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+
+        yield rsps
+
+
+@pytest.fixture
+def mock_hf_chat_completion_api_streaming_tools():
+    # type: () -> Any
+    """Mock streaming HuggingFace chat completion API with tool calls."""
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        model_name = "test-model"
+
+        # Mock model info endpoint
+        rsps.add(
+            responses.GET,
+            MODEL_ENDPOINT.format(model_name=model_name),
+            json={
+                "id": model_name,
+                "pipeline_tag": "conversational",
+                "inferenceProviderMapping": {
+                    "hf-inference": {
+                        "status": "live",
+                        "providerId": model_name,
+                        "task": "conversational",
+                    }
+                },
+            },
+            status=200,
+        )
+
+        # Mock chat completion streaming endpoint
+        streaming_chat_response = (
+            b'data:{"id":"xyz-123","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","content":"response with tool calls follows"},"index":0,"finish_reason":null}],"usage":null}\n\n'
+            b'data:{"id":"xyz-124","created":1234567890,"model":"test-model-123","system_fingerprint":"fp_123","choices":[{"delta":{"role":"assistant","tool_calls": [{"id": "call_123","type": "function","function": {"name": "get_weather", "arguments": {"location": "Paris"}}}]},"index":0,"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":183,"completion_tokens":14,"total_tokens":197}}\n\n'
         )
 
         rsps.add(
@@ -681,5 +727,89 @@ def test_chat_completion_with_tools(
     if not send_default_pii or not include_prompts:
         assert "gen_ai.request.messages" not in expected_data
         assert "gen_ai.response.text" not in expected_data
+        assert "gen_ai.response.tool_calls" not in expected_data
+
+    assert span["data"] == expected_data
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("include_prompts", [True, False])
+def test_chat_completion_streaming_with_tools(
+    sentry_init,
+    capture_events,
+    send_default_pii,
+    include_prompts,
+    mock_hf_chat_completion_api_streaming_tools,
+):
+    # type: (Any, Any, Any, Any, Any) -> None
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+    )
+    events = capture_events()
+
+    client = InferenceClient(model="test-model")
+
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get current weather",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                    "required": ["location"],
+                },
+            },
+        }
+    ]
+
+    with sentry_sdk.start_transaction(name="test"):
+        response = client.chat_completion(
+            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+            stream=True,
+            tools=tools,
+            tool_choice="auto",
+        )
+
+        for x in response:
+            print(x)
+
+    (transaction,) = events
+    (span,) = transaction["spans"]
+
+    assert span["op"] == "gen_ai.chat"
+    assert span["description"] == "chat test-model"
+    assert span["origin"] == "auto.ai.huggingface_hub"
+
+    expected_data = {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.available_tools": '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+        "gen_ai.request.model": "test-model",
+        "gen_ai.response.finish_reasons": "tool_calls",
+        "gen_ai.response.model": "test-model-123",
+        "gen_ai.response.streaming": True,
+        "gen_ai.usage.input_tokens": 183,
+        "gen_ai.usage.output_tokens": 14,
+        "gen_ai.usage.total_tokens": 197,
+        "thread.id": mock.ANY,
+        "thread.name": mock.ANY,
+    }
+
+    if send_default_pii and include_prompts:
+        expected_data["gen_ai.request.messages"] = (
+            '[{"role": "user", "content": "What is the weather in Paris?"}]'
+        )
+        expected_data["gen_ai.response.text"] = "response with tool calls follows"
+        expected_data["gen_ai.response.tool_calls"] = (
+            '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]'
+        )
+
+    if not send_default_pii or not include_prompts:
+        assert "gen_ai.request.messages" not in expected_data
+        assert "gen_ai.response.text" not in expected_data
+        assert "gen_ai.response.tool_calls" not in expected_data
 
     assert span["data"] == expected_data
