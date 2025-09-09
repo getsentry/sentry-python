@@ -23,7 +23,6 @@ try:
     from huggingface_hub import (
         ChatCompletionOutput,
         TextGenerationOutput,
-        ChatCompletionStreamOutput,
     )
 except ImportError:
     raise DidNotEnable("Huggingface not installed")
@@ -242,49 +241,55 @@ def _wrap_huggingface_task(f, op):
                 def new_details_iterator():
                     # type: () -> Iterable[Any]
                     with capture_internal_exceptions():
+                        finish_reason = None
                         tokens_used = 0
-                        data_buf: list[str] = []
+                        response_text_buffer: list[str] = []
 
                         for chunk in res:
-                            if hasattr(chunk, "token") and hasattr(chunk.token, "text"):
-                                data_buf.append(chunk.token.text)
-
-                            # Usage
-                            if hasattr(chunk, "details") and hasattr(
-                                chunk.details, "generated_tokens"
+                            if (
+                                hasattr(chunk, "token")
+                                and hasattr(chunk.token, "text")
+                                and chunk.token.text is not None
                             ):
-                                tokens_used = chunk.details.generated_tokens
+                                response_text_buffer.append(chunk.token.text)
 
-                            # Finish Reason
-                            if hasattr(chunk, "details") and hasattr(
-                                chunk.details, "finish_reason"
-                            ):
-                                span.set_data(
-                                    SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
-                                    chunk.details.finish_reason,
+                            details = getattr(chunk, "details", None)
+                            if details is not None:
+                                finish_reason = getattr(details, "finish_reason", None)
+
+                                generated_tokens = getattr(
+                                    details, "generated_tokens", None
                                 )
+                                if generated_tokens is not None:
+                                    tokens_used = generated_tokens
 
                             yield chunk
 
-                        # Response Text
+                        if finish_reason:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                finish_reason,
+                            )
+
+                        if tokens_used > 0:
+                            record_token_usage(
+                                span,
+                                total_tokens=tokens_used,
+                            )
+
                         if (
-                            len(data_buf) > 0
-                            and should_send_default_pii()
+                            should_send_default_pii()
                             and integration.include_prompts
+                            and len(response_text_buffer) > 0
                         ):
-                            text_response = "".join(data_buf)
+                            text_response = "".join(response_text_buffer)
                             if text_response:
                                 set_data_normalized(
                                     span,
                                     SPANDATA.GEN_AI_RESPONSE_TEXT,
                                     text_response,
                                 )
-                        # Usage
-                        if tokens_used > 0:
-                            record_token_usage(
-                                span,
-                                total_tokens=tokens_used,
-                            )
 
                     span.__exit__(None, None, None)
 
@@ -294,80 +299,87 @@ def _wrap_huggingface_task(f, op):
                 # chat-completion stream output
                 def new_iterator():
                     # type: () -> Iterable[str]
-                    with capture_internal_exceptions():
-                        data_buf: list[str] = []
+                    finish_reason = None
+                    response_model = None
+                    response_text_buffer: list[str] = []
+                    tool_calls = None
+                    usage = None
 
+                    with capture_internal_exceptions():
                         for chunk in res:
-                            if isinstance(chunk, ChatCompletionStreamOutput):
+                            if hasattr(chunk, "model") and chunk.model is not None:
+                                response_model = chunk.model
+
+                            if hasattr(chunk, "usage") and chunk.usage is not None:
+                                usage = chunk.usage
+
+                            if isinstance(chunk, str):
+                                if chunk is not None:
+                                    response_text_buffer.append(chunk)
+
+                            if hasattr(chunk, "choices") and chunk.choices is not None:
                                 for choice in chunk.choices:
                                     if (
                                         hasattr(choice, "delta")
                                         and hasattr(choice.delta, "content")
                                         and choice.delta.content is not None
                                     ):
-                                        data_buf.append(choice.delta.content)
+                                        response_text_buffer.append(
+                                            choice.delta.content
+                                        )
 
-                                    # Finish Reason
                                     if (
                                         hasattr(choice, "finish_reason")
                                         and choice.finish_reason is not None
                                     ):
-                                        span.set_data(
-                                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
-                                            choice.finish_reason,
-                                        )
+                                        finish_reason = choice.finish_reason
 
-                                    # Response Tool Calls
                                     if (
                                         hasattr(choice, "delta")
                                         and hasattr(choice.delta, "tool_calls")
                                         and choice.delta.tool_calls is not None
                                     ):
-                                        if (
-                                            should_send_default_pii()
-                                            and integration.include_prompts
-                                        ):
-                                            set_data_normalized(
-                                                span,
-                                                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                                                choice.delta.tool_calls,
-                                                unpack=False,
-                                            )
-
-                                # Response Model
-                                if hasattr(chunk, "model") and chunk.model is not None:
-                                    span.set_data(
-                                        SPANDATA.GEN_AI_RESPONSE_MODEL, chunk.model
-                                    )
-
-                                # Usage
-                                if hasattr(chunk, "usage") and chunk.usage is not None:
-                                    record_token_usage(
-                                        span,
-                                        input_tokens=chunk.usage.prompt_tokens,
-                                        output_tokens=chunk.usage.completion_tokens,
-                                        total_tokens=chunk.usage.total_tokens,
-                                    )
-
-                            elif isinstance(chunk, str):
-                                if chunk is not None:
-                                    data_buf.append(chunk)
+                                        tool_calls = choice.delta.tool_calls
 
                             yield chunk
 
-                        # Response Text
-                        if (
-                            len(data_buf) > 0
-                            and should_send_default_pii()
-                            and integration.include_prompts
-                        ):
-                            text_response = "".join(data_buf)
-                            if text_response:
+                        if response_model is not None:
+                            span.set_data(
+                                SPANDATA.GEN_AI_RESPONSE_MODEL, response_model
+                            )
+
+                        if finish_reason is not None:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                choice.finish_reason,
+                            )
+
+                        if should_send_default_pii() and integration.include_prompts:
+                            if tool_calls is not None:
                                 set_data_normalized(
                                     span,
-                                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                                    text_response,
+                                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                                    tool_calls,
+                                    unpack=False,
                                 )
+
+                            if len(response_text_buffer) > 0:
+                                text_response = "".join(response_text_buffer)
+                                if text_response:
+                                    set_data_normalized(
+                                        span,
+                                        SPANDATA.GEN_AI_RESPONSE_TEXT,
+                                        text_response,
+                                    )
+
+                        if usage is not None:
+                            record_token_usage(
+                                span,
+                                input_tokens=usage.prompt_tokens,
+                                output_tokens=usage.completion_tokens,
+                                total_tokens=usage.total_tokens,
+                            )
 
                         span.__exit__(None, None, None)
 
