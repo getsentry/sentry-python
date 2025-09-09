@@ -146,23 +146,23 @@ def _wrap_huggingface_task(f, op):
             if finish_reason:
                 span.set_data(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, finish_reason)
 
-            try:
-                tool_calls = res.choices[0].message.tool_calls
-            except Exception:
-                tool_calls = []
-
-            if tool_calls is not None and len(tool_calls) > 0:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                    tool_calls,
-                    unpack=False,
-                )
-
             if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(
                     span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
                 )
+
+                try:
+                    tool_calls = res.choices[0].message.tool_calls
+                except Exception:
+                    tool_calls = []
+
+                if tool_calls is not None and len(tool_calls) > 0:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                        tool_calls,
+                        unpack=False,
+                    )
 
             if isinstance(res, str):
                 if should_send_default_pii() and integration.include_prompts:
@@ -226,22 +226,22 @@ def _wrap_huggingface_task(f, op):
                     with capture_internal_exceptions():
                         tokens_used = 0
                         data_buf: list[str] = []
-                        for x in res:
-                            if hasattr(x, "token") and hasattr(x.token, "text"):
-                                data_buf.append(x.token.text)
-                            if hasattr(x, "details") and hasattr(
-                                x.details, "generated_tokens"
+                        for chunk in res:
+                            if hasattr(chunk, "token") and hasattr(chunk.token, "text"):
+                                data_buf.append(chunk.token.text)
+                            if hasattr(chunk, "details") and hasattr(
+                                chunk.details, "generated_tokens"
                             ):
-                                tokens_used = x.details.generated_tokens
-                            if hasattr(x, "details") and hasattr(
-                                x.details, "finish_reason"
+                                tokens_used = chunk.details.generated_tokens
+                            if hasattr(chunk, "details") and hasattr(
+                                chunk.details, "finish_reason"
                             ):
                                 span.set_data(
                                     SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
-                                    x.details.finish_reason,
+                                    chunk.details.finish_reason,
                                 )
 
-                            yield x
+                            yield chunk
 
                         if (
                             len(data_buf) > 0
@@ -273,7 +273,12 @@ def _wrap_huggingface_task(f, op):
                         for chunk in res:
                             if isinstance(chunk, ChatCompletionStreamOutput):
                                 for choice in chunk.choices:
-                                    data_buf.append(choice.delta.content)
+                                    if (
+                                        hasattr(choice, "delta")
+                                        and hasattr(choice.delta, "content")
+                                        and choice.delta.content is not None
+                                    ):
+                                        data_buf.append(choice.delta.content)
 
                                     if (
                                         hasattr(choice, "finish_reason")
@@ -283,6 +288,22 @@ def _wrap_huggingface_task(f, op):
                                             SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
                                             choice.finish_reason,
                                         )
+                                    if (
+                                        hasattr(choice, "delta")
+                                        and hasattr(choice.delta, "tool_calls")
+                                        and choice.delta.tool_calls is not None
+                                    ):
+                                        if (
+                                            should_send_default_pii()
+                                            and integration.include_prompts
+                                        ):
+                                            set_data_normalized(
+                                                span,
+                                                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                                                choice.delta.tool_calls,
+                                                unpack=False,
+                                            )
+
                                 if hasattr(chunk, "model") and chunk.model is not None:
                                     span.set_data(
                                         SPANDATA.GEN_AI_RESPONSE_MODEL, chunk.model
@@ -297,7 +318,8 @@ def _wrap_huggingface_task(f, op):
                                     )
 
                             elif isinstance(chunk, str):
-                                data_buf.append(chunk)
+                                if chunk is not None:
+                                    data_buf.append(chunk)
 
                             yield chunk
 

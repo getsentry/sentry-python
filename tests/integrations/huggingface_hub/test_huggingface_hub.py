@@ -617,7 +617,6 @@ def test_chat_completion_with_tools(
         "gen_ai.request.model": "test-model",
         "gen_ai.response.finish_reasons": "tool_calls",
         "gen_ai.response.model": "test-model-123",
-        "gen_ai.response.tool_calls": '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]',
         "gen_ai.usage.input_tokens": 10,
         "gen_ai.usage.output_tokens": 8,
         "gen_ai.usage.total_tokens": 18,
@@ -628,6 +627,9 @@ def test_chat_completion_with_tools(
     if send_default_pii:
         expected_data["gen_ai.request.messages"] = (
             '[{"role": "user", "content": "What is the weather in Paris?"}]'
+        )
+        expected_data["gen_ai.response.tool_calls"] = (
+            '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]'
         )
 
     if not send_default_pii:
