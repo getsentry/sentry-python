@@ -97,8 +97,8 @@ def mock_hf_api_with_errors():
         rsps.add(
             responses.POST,
             INFERENCE_ENDPOINT.format(model_name=model_name) + "/v1/chat/completions",
-            json={"error": "Service unavailable", "message": "Chat completion failed"},
-            status=503,
+            json={"error": "Internal server error", "message": "Something went wrong"},
+            status=500,
         )
 
         # Catch-all pattern for any other model requests
