@@ -29,6 +29,30 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.8",
     },
+    "arq": {
+        "package": "arq",
+        "deps": {
+            "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
+            "<=0.23": ["pydantic<2"],
+        },
+    },
+    "asyncpg": {
+        "package": "asyncpg",
+        "deps": {
+            "*": ["pytest-asyncio"],
+        },
+        "python": ">=3.7",
+    },
+    "beam": {
+        "package": "apache-beam",
+        "python": ">=3.7",
+    },
+    "boto3": {
+        "package": "boto3",
+        "deps": {
+            "py3.7,py3.8": ["urllib3<2.0.0"],
+        },
+    },
     "bottle": {
         "package": "bottle",
         "deps": {
@@ -38,8 +62,14 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic", "redis"],
+            "*": ["newrelic<10.17.0", "redis"],
             "py3.7": ["importlib-metadata<5.0"],
+        },
+    },
+    "chalice": {
+        "package": "chalice",
+        "deps": {
+            "*": ["pytest-chalice"],
         },
     },
     "clickhouse_driver": {
@@ -126,6 +156,29 @@ TEST_SUITE_CONFIG = {
     "huggingface_hub": {
         "package": "huggingface_hub",
     },
+    "langchain-base": {
+        "package": "langchain",
+        "integration_name": "langchain",
+        "deps": {
+            "*": ["openai", "tiktoken", "langchain-openai"],
+            "<=0.1": ["httpx<0.28.0"],
+            ">=0.3": ["langchain-community"],
+        },
+        "include": "<1.0",
+    },
+    "langchain-notiktoken": {
+        "package": "langchain",
+        "integration_name": "langchain",
+        "deps": {
+            "*": ["openai", "langchain-openai"],
+            "<=0.1": ["httpx<0.28.0"],
+            ">=0.3": ["langchain-community"],
+        },
+        "include": "<1.0",
+    },
+    "langgraph": {
+        "package": "langgraph",
+    },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
     },
@@ -138,6 +191,24 @@ TEST_SUITE_CONFIG = {
     },
     "loguru": {
         "package": "loguru",
+    },
+    "openai-base": {
+        "package": "openai",
+        "integration_name": "openai",
+        "deps": {
+            "*": ["pytest-asyncio", "tiktoken"],
+            "<1.55": ["httpx<0.28"],
+        },
+        "python": ">=3.8",
+    },
+    "openai-notiktoken": {
+        "package": "openai",
+        "integration_name": "openai",
+        "deps": {
+            "*": ["pytest-asyncio"],
+            "<1.55": ["httpx<0.28"],
+        },
+        "python": ">=3.8",
     },
     "openai_agents": {
         "package": "openai-agents",
@@ -159,6 +230,20 @@ TEST_SUITE_CONFIG = {
         "package": "pyramid",
         "deps": {
             "*": ["werkzeug<2.1.0"],
+        },
+    },
+    "quart": {
+        "package": "quart",
+        "deps": {
+            "*": ["quart-auth", "pytest-asyncio", "Werkzeug"],
+            ">=0.19": ["quart-flask-patch"],
+            "<0.19": [
+                "blinker<1.6",
+                "jinja2<3.1.0",
+                "Werkzeug<2.3.0",
+                "hypercorn<0.15.0",
+            ],
+            "py3.8": ["taskgroup==0.0.0a4"],
         },
     },
     "redis_py_cluster_legacy": {

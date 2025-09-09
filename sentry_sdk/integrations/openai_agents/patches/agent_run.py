@@ -1,14 +1,12 @@
 from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
-
 from ..spans import invoke_agent_span, update_invoke_agent_span, handoff_span
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional
-
 
 try:
     import agents
@@ -62,7 +60,6 @@ def _patch_agent_run():
     async def patched_run_single_turn(cls, *args, **kwargs):
         # type: (agents.Runner, *Any, **Any) -> Any
         """Patched _run_single_turn that creates agent invocation spans"""
-
         agent = kwargs.get("agent")
         context_wrapper = kwargs.get("context_wrapper")
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks")

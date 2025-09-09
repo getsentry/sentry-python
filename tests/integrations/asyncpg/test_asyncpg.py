@@ -3,21 +3,13 @@ Tests need pytest-asyncio installed.
 
 Tests need a local postgresql instance running, this can best be done using
 ```sh
-docker run --rm --name some-postgres -e POSTGRES_USER=foo -e POSTGRES_PASSWORD=bar -d -p 5432:5432 postgres
+docker run --rm --name some-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=sentry -d -p 5432:5432 postgres
 ```
 
 The tests use the following credentials to establish a database connection.
 """
 
 import os
-
-
-PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
-PG_PORT = int(os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"))
-PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
-PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
-PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
-
 import datetime
 from contextlib import contextmanager
 from unittest import mock
@@ -33,6 +25,19 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
 
+PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+PG_PORT = int(os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"))
+PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
+PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
+PG_NAME_BASE = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
+
+
+def _get_db_name():
+    pid = os.getpid()
+    return f"{PG_NAME_BASE}_{pid}"
+
+
+PG_NAME = _get_db_name()
 
 PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(
     PG_USER, PG_PASSWORD, PG_HOST, PG_NAME
@@ -55,6 +60,21 @@ CRUMBS_CONNECT = {
 
 @pytest_asyncio.fixture(autouse=True)
 async def _clean_pg():
+    # Create the test database if it doesn't exist
+    default_conn = await connect(
+        "postgresql://{}:{}@{}".format(PG_USER, PG_PASSWORD, PG_HOST)
+    )
+    try:
+        # Check if database exists, create if not
+        result = await default_conn.fetchval(
+            "SELECT 1 FROM pg_database WHERE datname = $1", PG_NAME
+        )
+        if not result:
+            await default_conn.execute(f'CREATE DATABASE "{PG_NAME}"')
+    finally:
+        await default_conn.close()
+
+    # Now connect to our test database and set up the table
     conn = await connect(PG_CONNECTION_URI)
     await conn.execute("DROP TABLE IF EXISTS users")
     await conn.execute(

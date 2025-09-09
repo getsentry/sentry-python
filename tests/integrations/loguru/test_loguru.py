@@ -467,3 +467,21 @@ def test_logger_with_all_attributes(
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",
     }
+
+
+def test_no_parameters_no_template(
+    sentry_init, capture_envelopes, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    logger.warning("Logging a hardcoded warning")
+    sentry_sdk.get_client().flush()
+
+    logs = envelopes_to_logs(envelopes)
+
+    attributes = logs[0]["attributes"]
+    assert "sentry.message.template" not in attributes

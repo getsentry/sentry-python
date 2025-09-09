@@ -95,6 +95,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.huey.HueyIntegration",
     "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration",
     "sentry_sdk.integrations.langchain.LangchainIntegration",
+    "sentry_sdk.integrations.langgraph.LanggraphIntegration",
     "sentry_sdk.integrations.litestar.LitestarIntegration",
     "sentry_sdk.integrations.loguru.LoguruIntegration",
     "sentry_sdk.integrations.openai.OpenAIIntegration",
@@ -141,7 +142,8 @@ _MIN_VERSIONS = {
     "graphene": (3, 3),
     "grpc": (1, 32, 0),  # grpcio
     "huggingface_hub": (0, 22),
-    "langchain": (0, 0, 210),
+    "langchain": (0, 1, 0),
+    "langgraph": (0, 6, 6),
     "launchdarkly": (9, 8, 0),
     "loguru": (0, 7, 0),
     "openai": (1, 0, 0),
