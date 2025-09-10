@@ -22,85 +22,6 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-cloud-latest:
-    name: Cloud (latest)
-    timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8","3.11","3.12","3.13"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-22.04]
-    services:
-      docker:
-        image: docker:dind  # Required for Docker network management
-        options: --privileged  # Required for Docker-in-Docker operations
-    # Use Docker container only for Python 3.6
-    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
-        if: ${{ matrix.python-version != '3.6' }}
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
-      - name: Setup Test Env
-        run: |
-          pip install "coverage[toml]" tox
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test aws_lambda latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda-latest"
-      - name: Test boto3 latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3-latest"
-      - name: Test chalice latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice-latest"
-      - name: Test cloud_resource_context latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context-latest"
-      - name: Test gcp latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp-latest"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-      - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
-        run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
-      - name: Upload coverage to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-          # make sure no plugins alter our coverage reports
-          plugin: noop
-          verbose: true
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: .junitxml
-          verbose: true
   test-cloud-pinned:
     name: Cloud (pinned)
     timeout-minutes: 30
@@ -108,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.11","3.12","3.13"]
+        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -121,7 +42,7 @@ jobs:
     # Use Docker container only for Python 3.6
     container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
       - uses: actions/setup-python@v5
         if: ${{ matrix.python-version != '3.6' }}
         with:
@@ -166,12 +87,12 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@v5.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop
+          plugins: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -188,6 +109,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-cloud-pinned.result, 'failure') || contains(needs.test-cloud-pinned.result, 'skipped')
+        if: needs.test-cloud-pinned.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

@@ -153,6 +153,14 @@ be expressed like so:
 }
 ```
 
+### `integration_name`
+
+Sometimes, the name of the test suite doesn't match the name of the integration.
+For example, we have the `openai_base` and `openai_notiktoken` test suites, both
+of which are actually testing the `openai` integration. If this is the case, you can use the `integration_name` key to define the name of the integration. If not provided, it will default to the name of the test suite.
+
+Linking an integration to a test suite allows the script to access integration configuration like for example the minimum version defined in `sentry_sdk/integrations/__init__.py`.
+
 
 ## How-Tos
 

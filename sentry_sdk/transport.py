@@ -158,13 +158,6 @@ class Transport(ABC):
         # type: (Self) -> bool
         return True
 
-    def __del__(self):
-        # type: (Self) -> None
-        try:
-            self.kill()
-        except Exception:
-            pass
-
 
 def _parse_rate_limits(header, now=None):
     # type: (str, Optional[datetime]) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]

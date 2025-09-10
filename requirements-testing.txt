@@ -6,7 +6,6 @@ pytest-forked
 pytest-localserver
 pytest-watch
 jsonschema
-pyrsistent
 executing
 asttokens
 responses

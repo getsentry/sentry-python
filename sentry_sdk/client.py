@@ -23,6 +23,8 @@ from sentry_sdk.utils import (
     handle_in_app,
     is_gevent,
     logger,
+    get_before_send_log,
+    has_logs_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
@@ -47,7 +49,6 @@ from sentry_sdk.profiler.transaction_profiler import (
 )
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
-from sentry_sdk.spotlight import setup_spotlight
 
 if TYPE_CHECKING:
     from typing import Any
@@ -383,7 +384,8 @@ class _Client(BaseClient):
                     )
 
             self.log_batcher = None
-            if experiments.get("enable_logs", False):
+
+            if has_logs_enabled(self.options):
                 from sentry_sdk._log_batcher import LogBatcher
 
                 self.log_batcher = LogBatcher(capture_func=_capture_envelope)
@@ -429,6 +431,10 @@ class _Client(BaseClient):
                 )
 
             if self.options.get("spotlight"):
+                # This is intentionally here to prevent setting up spotlight
+                # stuff we don't need unless spotlight is explicitly enabled
+                from sentry_sdk.spotlight import setup_spotlight
+
                 self.spotlight = setup_spotlight(self.options)
                 if not self.options["dsn"]:
                     sample_all = lambda *_args, **_kwargs: 1.0
@@ -510,8 +516,9 @@ class _Client(BaseClient):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
+        is_transaction = event.get("type") == "transaction"
+
         if scope is not None:
-            is_transaction = event.get("type") == "transaction"
             spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
@@ -554,7 +561,8 @@ class _Client(BaseClient):
                 )
 
         if (
-            self.options["attach_stacktrace"]
+            not is_transaction
+            and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event
@@ -895,9 +903,8 @@ class _Client(BaseClient):
         return return_value
 
     def _capture_experimental_log(self, log):
-        # type: (Log) -> None
-        logs_enabled = self.options["_experiments"].get("enable_logs", False)
-        if not logs_enabled:
+        # type: (Optional[Log]) -> None
+        if not has_logs_enabled(self.options) or log is None:
             return
 
         current_scope = sentry_sdk.get_current_scope()
@@ -931,7 +938,7 @@ class _Client(BaseClient):
                 log["trace_id"] = propagation_context.trace_id
 
         # The user, if present, is always set on the isolation scope.
-        if self.should_send_default_pii() and isolation_scope._user is not None:
+        if isolation_scope._user is not None:
             for log_attribute, user_attribute in (
                 ("user.id", "id"),
                 ("user.name", "username"),
@@ -952,9 +959,10 @@ class _Client(BaseClient):
                 f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
             )
 
-        before_send_log = self.options["_experiments"].get("before_send_log")
+        before_send_log = get_before_send_log(self.options)
         if before_send_log is not None:
             log = before_send_log(log, {})
+
         if log is None:
             return
 

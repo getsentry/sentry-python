@@ -5,16 +5,18 @@ from fnmatch import fnmatch
 
 import sentry_sdk
 from sentry_sdk.client import BaseClient
+from sentry_sdk.logger import _log_level_to_otel
 from sentry_sdk.utils import (
     safe_repr,
     to_string,
     event_from_exception,
     current_stacktrace,
     capture_internal_exceptions,
+    has_logs_enabled,
 )
 from sentry_sdk.integrations import Integration
 
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -35,6 +37,16 @@ LOGGING_TO_EVENT_LEVEL = {
     logging.FATAL: "fatal",
     logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
 }
+
+# Map logging level numbers to corresponding OTel level numbers
+SEVERITY_TO_OTEL_SEVERITY = {
+    logging.CRITICAL: 21,  # fatal
+    logging.ERROR: 17,  # error
+    logging.WARNING: 13,  # warn
+    logging.INFO: 9,  # info
+    logging.DEBUG: 5,  # debug
+}
+
 
 # Capturing events from those loggers causes recursion errors. We cannot allow
 # the user to unconditionally create events from those loggers under any
@@ -119,7 +131,10 @@ class LoggingIntegration(Integration):
                 # the integration.  Otherwise we have a high chance of getting
                 # into a recursion error when the integration is resolved
                 # (this also is slower).
-                if ignored_loggers is not None and record.name not in ignored_loggers:
+                if (
+                    ignored_loggers is not None
+                    and record.name.strip() not in ignored_loggers
+                ):
                     integration = sentry_sdk.get_client().get_integration(
                         LoggingIntegration
                     )
@@ -164,7 +179,7 @@ class _BaseHandler(logging.Handler):
         # type: (LogRecord) -> bool
         """Prevents ignored loggers from recording"""
         for logger in _IGNORED_LOGGERS:
-            if fnmatch(record.name, logger):
+            if fnmatch(record.name.strip(), logger):
                 return False
         return True
 
@@ -312,21 +327,6 @@ class BreadcrumbHandler(_BaseHandler):
         }
 
 
-def _python_level_to_otel(record_level):
-    # type: (int) -> Tuple[int, str]
-    for py_level, otel_severity_number, otel_severity_text in [
-        (50, 21, "fatal"),
-        (40, 17, "error"),
-        (30, 13, "warn"),
-        (20, 9, "info"),
-        (10, 5, "debug"),
-        (5, 1, "trace"),
-    ]:
-        if record_level >= py_level:
-            return otel_severity_number, otel_severity_text
-    return 0, "default"
-
-
 class SentryLogsHandler(_BaseHandler):
     """
     A logging handler that records Sentry logs for each Python log record.
@@ -345,37 +345,54 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not client.options["_experiments"].get("enable_logs", False):
+            if not has_logs_enabled(client.options):
                 return
 
             self._capture_log_from_record(client, record)
 
     def _capture_log_from_record(self, client, record):
         # type: (BaseClient, LogRecord) -> None
-        otel_severity_number, otel_severity_text = _python_level_to_otel(record.levelno)
+        otel_severity_number, otel_severity_text = _log_level_to_otel(
+            record.levelno, SEVERITY_TO_OTEL_SEVERITY
+        )
         project_root = client.options["project_root"]
+
         attrs = self._extra_from_record(record)  # type: Any
         attrs["sentry.origin"] = "auto.logger.log"
-        if isinstance(record.msg, str):
-            attrs["sentry.message.template"] = record.msg
+
+        parameters_set = False
         if record.args is not None:
             if isinstance(record.args, tuple):
+                parameters_set = bool(record.args)
                 for i, arg in enumerate(record.args):
                     attrs[f"sentry.message.parameter.{i}"] = (
                         arg
-                        if isinstance(arg, str)
-                        or isinstance(arg, float)
-                        or isinstance(arg, int)
-                        or isinstance(arg, bool)
+                        if isinstance(arg, (str, float, int, bool))
                         else safe_repr(arg)
                     )
+            elif isinstance(record.args, dict):
+                parameters_set = bool(record.args)
+                for key, value in record.args.items():
+                    attrs[f"sentry.message.parameter.{key}"] = (
+                        value
+                        if isinstance(value, (str, float, int, bool))
+                        else safe_repr(value)
+                    )
+
+        if parameters_set and isinstance(record.msg, str):
+            # only include template if there is at least one
+            # sentry.message.parameter.X set
+            attrs["sentry.message.template"] = record.msg
+
         if record.lineno:
             attrs["code.line.number"] = record.lineno
+
         if record.pathname:
             if project_root is not None and record.pathname.startswith(project_root):
                 attrs["code.file.path"] = record.pathname[len(project_root) + 1 :]
             else:
                 attrs["code.file.path"] = record.pathname
+
         if record.funcName:
             attrs["code.function.name"] = record.funcName
 

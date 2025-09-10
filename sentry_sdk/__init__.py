@@ -47,6 +47,10 @@ __all__ = [  # noqa
     "trace",
     "monitor",
     "logger",
+    "start_session",
+    "end_session",
+    "set_transaction_name",
+    "update_current_span",
 ]
 
 # Initialize the debug support after everything is loaded

@@ -127,6 +127,14 @@ module = "langchain_core.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "langchain.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "langgraph.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "executing.*"
 ignore_missing_imports = true
 
@@ -181,6 +189,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "grpc.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "agents.*"
 ignore_missing_imports = true
 
 #

@@ -12,7 +12,6 @@ from functools import partial
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_request_data,
@@ -42,7 +41,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Callable
     from typing import Dict
     from typing import Optional
     from typing import Tuple
@@ -102,6 +100,7 @@ class SentryAsgiMiddleware:
         mechanism_type="asgi",  # type: str
         span_origin="manual",  # type: str
         http_methods_to_capture=DEFAULT_HTTP_METHODS_TO_CAPTURE,  # type: Tuple[str, ...]
+        asgi_version=None,  # type: Optional[int]
     ):
         # type: (...) -> None
         """
@@ -140,10 +139,32 @@ class SentryAsgiMiddleware:
         self.app = app
         self.http_methods_to_capture = http_methods_to_capture
 
-        if _looks_like_asgi3(app):
-            self.__call__ = self._run_asgi3  # type: Callable[..., Any]
-        else:
-            self.__call__ = self._run_asgi2
+        if asgi_version is None:
+            if _looks_like_asgi3(app):
+                asgi_version = 3
+            else:
+                asgi_version = 2
+
+        if asgi_version == 3:
+            self.__call__ = self._run_asgi3
+        elif asgi_version == 2:
+            self.__call__ = self._run_asgi2  # type: ignore
+
+    def _capture_lifespan_exception(self, exc):
+        # type: (Exception) -> None
+        """Capture exceptions raise in application lifespan handlers.
+
+        The separate function is needed to support overriding in derived integrations that use different catching mechanisms.
+        """
+        return _capture_exception(exc=exc, mechanism_type=self.mechanism_type)
+
+    def _capture_request_exception(self, exc):
+        # type: (Exception) -> None
+        """Capture exceptions raised in incoming request handlers.
+
+        The separate function is needed to support overriding in derived integrations that use different catching mechanisms.
+        """
+        return _capture_exception(exc=exc, mechanism_type=self.mechanism_type)
 
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
@@ -158,7 +179,7 @@ class SentryAsgiMiddleware:
         return await self._run_app(scope, receive, send, asgi_version=3)
 
     async def _run_app(self, scope, receive, send, asgi_version):
-        # type: (Any, Any, Any, Any, int) -> Any
+        # type: (Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         is_lifespan = scope["type"] == "lifespan"
         if is_recursive_asgi_middleware or is_lifespan:
@@ -169,7 +190,7 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                _capture_exception(exc, mechanism_type=self.mechanism_type)
+                self._capture_lifespan_exception(exc)
                 raise exc from None
 
         _asgi_middleware_applied.set(True)
@@ -201,10 +222,6 @@ class SentryAsgiMiddleware:
                                 source=transaction_source,
                                 origin=self.span_origin,
                             )
-                            logger.debug(
-                                "[ASGI] Created transaction (continuing trace): %s",
-                                transaction,
-                            )
                     else:
                         transaction = Transaction(
                             op=OP.HTTP_SERVER,
@@ -212,17 +229,9 @@ class SentryAsgiMiddleware:
                             source=transaction_source,
                             origin=self.span_origin,
                         )
-                        logger.debug(
-                            "[ASGI] Created transaction (new): %s", transaction
-                        )
 
                     if transaction:
                         transaction.set_tag("asgi.type", ty)
-                        logger.debug(
-                            "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
-                            transaction.name,
-                            transaction.source,
-                        )
 
                     with (
                         sentry_sdk.start_transaction(
@@ -232,7 +241,6 @@ class SentryAsgiMiddleware:
                         if transaction is not None
                         else nullcontext()
                     ):
-                        logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:
 
                             async def _sentry_wrapped_send(event):
@@ -256,7 +264,7 @@ class SentryAsgiMiddleware:
                                     scope, receive, _sentry_wrapped_send
                                 )
                         except Exception as exc:
-                            _capture_exception(exc, mechanism_type=self.mechanism_type)
+                            self._capture_request_exception(exc)
                             raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
@@ -286,12 +294,6 @@ class SentryAsgiMiddleware:
             )
             event["transaction"] = name
             event["transaction_info"] = {"source": source}
-
-            logger.debug(
-                "[ASGI] Set transaction name and source in event_processor: '%s' / '%s'",
-                event["transaction"],
-                event["transaction_info"]["source"],
-            )
 
         return event
 

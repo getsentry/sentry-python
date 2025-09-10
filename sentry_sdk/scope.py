@@ -48,7 +48,7 @@ import typing
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, MutableMapping
+    from collections.abc import Mapping
 
     from typing import Any
     from typing import Callable
@@ -238,24 +238,24 @@ class Scope:
         rv._name = self._name
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
-        rv._transaction_info = dict(self._transaction_info)
+        rv._transaction_info = self._transaction_info.copy()
         rv._user = self._user
 
-        rv._tags = dict(self._tags)
-        rv._contexts = dict(self._contexts)
-        rv._extras = dict(self._extras)
+        rv._tags = self._tags.copy()
+        rv._contexts = self._contexts.copy()
+        rv._extras = self._extras.copy()
 
         rv._breadcrumbs = copy(self._breadcrumbs)
-        rv._n_breadcrumbs_truncated = copy(self._n_breadcrumbs_truncated)
-        rv._event_processors = list(self._event_processors)
-        rv._error_processors = list(self._error_processors)
+        rv._n_breadcrumbs_truncated = self._n_breadcrumbs_truncated
+        rv._event_processors = self._event_processors.copy()
+        rv._error_processors = self._error_processors.copy()
         rv._propagation_context = self._propagation_context
 
         rv._should_capture = self._should_capture
         rv._span = self._span
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
-        rv._attachments = list(self._attachments)
+        rv._attachments = self._attachments.copy()
 
         rv._profile = self._profile
 
@@ -683,12 +683,12 @@ class Scope:
         self._level = None  # type: Optional[LogLevelStr]
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
-        self._transaction_info = {}  # type: MutableMapping[str, str]
+        self._transaction_info = {}  # type: dict[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
         self._contexts = {}  # type: Dict[str, Dict[str, Any]]
-        self._extras = {}  # type: MutableMapping[str, Any]
+        self._extras = {}  # type: dict[str, Any]
         self._attachments = []  # type: List[Attachment]
 
         self.clear_breadcrumbs()
@@ -1673,8 +1673,11 @@ def new_scope():
         yield new_scope
 
     finally:
-        # restore original scope
-        _current_scope.reset(token)
+        try:
+            # restore original scope
+            _current_scope.reset(token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1708,8 +1711,11 @@ def use_scope(scope):
         yield scope
 
     finally:
-        # restore original scope
-        _current_scope.reset(token)
+        try:
+            # restore original scope
+            _current_scope.reset(token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1750,8 +1756,15 @@ def isolation_scope():
 
     finally:
         # restore original scopes
-        _current_scope.reset(current_token)
-        _isolation_scope.reset(isolation_token)
+        try:
+            _current_scope.reset(current_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
+
+        try:
+            _isolation_scope.reset(isolation_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1790,8 +1803,15 @@ def use_isolation_scope(isolation_scope):
 
     finally:
         # restore original scopes
-        _current_scope.reset(current_token)
-        _isolation_scope.reset(isolation_token)
+        try:
+            _current_scope.reset(current_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
+
+        try:
+            _isolation_scope.reset(isolation_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 def should_send_default_pii():

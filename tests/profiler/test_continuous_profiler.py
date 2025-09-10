@@ -8,6 +8,7 @@ import pytest
 import sentry_sdk
 from sentry_sdk.consts import VERSION
 from sentry_sdk.profiler.continuous_profiler import (
+    is_profile_session_sampled,
     get_profiler_id,
     setup_continuous_profiler,
     start_profiler,
@@ -113,19 +114,25 @@ def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
     ],
 )
 def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling):
-    options = make_options(mode=mode)
+    assert not is_profile_session_sampled()
+
     # setting up the first time should return True to indicate success
+    options = make_options(mode=mode, profile_session_sample_rate=1.0)
     assert setup_continuous_profiler(
         options,
         mock_sdk_info,
         lambda envelope: None,
     )
-    # setting up the second time should return False to indicate no-op
-    assert not setup_continuous_profiler(
+    assert is_profile_session_sampled()
+
+    # setting up the second time should return True to indicate re-init
+    options = make_options(mode=mode, profile_session_sample_rate=0.0)
+    assert setup_continuous_profiler(
         options,
         mock_sdk_info,
         lambda envelope: None,
     )
+    assert not is_profile_session_sampled()
 
 
 def assert_single_transaction_with_profile_chunks(
@@ -459,32 +466,53 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
 
     thread = threading.current_thread()
 
+    all_profiler_ids = set()
+
     for _ in range(3):
         envelopes.clear()
 
+        profiler_ids = set()
+
         with sentry_sdk.start_transaction(name="profiling 1"):
-            assert get_profiler_id() is not None, "profiler should be running"
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.1)
-            assert get_profiler_id() is not None, "profiler should be running"
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
+
+        time.sleep(0.03)
 
         # the profiler takes a while to stop in auto mode so if we start
         # a transaction immediately, it'll be part of the same chunk
-        assert get_profiler_id() is not None, "profiler should be running"
+        profiler_id = get_profiler_id()
+        assert profiler_id is not None, "profiler should be running"
+        profiler_ids.add(profiler_id)
 
         with sentry_sdk.start_transaction(name="profiling 2"):
-            assert get_profiler_id() is not None, "profiler should be running"
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
             with sentry_sdk.start_span(op="op"):
                 time.sleep(0.1)
-            assert get_profiler_id() is not None, "profiler should be running"
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
 
         # wait at least 1 cycle for the profiler to stop
         time.sleep(0.2)
         assert get_profiler_id() is None, "profiler should not be running"
 
+        assert len(profiler_ids) == 1
+        all_profiler_ids.add(profiler_ids.pop())
+
         assert_single_transaction_with_profile_chunks(
             envelopes, thread, max_chunks=1, transactions=2
         )
+
+    assert len(all_profiler_ids) == 3
 
 
 @pytest.mark.parametrize(

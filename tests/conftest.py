@@ -2,12 +2,18 @@ import json
 import os
 import socket
 import warnings
+import brotli
+import gzip
+import io
 from threading import Thread
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import mock
+from collections import namedtuple
 
 import pytest
+from pytest_localserver.http import WSGIServer
+from werkzeug.wrappers import Request, Response
 import jsonschema
 
 
@@ -23,7 +29,7 @@ except ImportError:
 
 import sentry_sdk
 import sentry_sdk.utils
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations import (  # noqa: F401
     _DEFAULT_INTEGRATIONS,
     _installed_integrations,
@@ -612,7 +618,7 @@ def create_mock_http_server():
     mock_server_port = get_free_port()
     mock_server = HTTPServer(("localhost", mock_server_port), MockServerRequestHandler)
     mock_server_thread = Thread(target=mock_server.serve_forever)
-    mock_server_thread.setDaemon(True)
+    mock_server_thread.daemon = True
     mock_server_thread.start()
 
     return mock_server_port
@@ -663,3 +669,57 @@ class ApproxDict(dict):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+
+CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
+
+
+class CapturingServer(WSGIServer):
+    def __init__(self, host="127.0.0.1", port=0, ssl_context=None):
+        WSGIServer.__init__(self, host, port, self, ssl_context=ssl_context)
+        self.code = 204
+        self.headers = {}
+        self.captured = []
+
+    def respond_with(self, code=200, headers=None):
+        self.code = code
+        if headers:
+            self.headers = headers
+
+    def clear_captured(self):
+        del self.captured[:]
+
+    def __call__(self, environ, start_response):
+        """
+        This is the WSGI application.
+        """
+        request = Request(environ)
+        event = envelope = None
+        content_encoding = request.headers.get("content-encoding")
+        if content_encoding == "gzip":
+            rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
+            compressed = True
+        elif content_encoding == "br":
+            rdr = io.BytesIO(brotli.decompress(request.data))
+            compressed = True
+        else:
+            rdr = io.BytesIO(request.data)
+            compressed = False
+
+        if request.mimetype == "application/json":
+            event = parse_json(rdr.read())
+        else:
+            envelope = Envelope.deserialize_from(rdr)
+
+        self.captured.append(
+            CapturedData(
+                path=request.path,
+                event=event,
+                envelope=envelope,
+                compressed=compressed,
+            )
+        )
+
+        response = Response(status=self.code)
+        response.headers.extend(self.headers)
+        return response(environ, start_response)
