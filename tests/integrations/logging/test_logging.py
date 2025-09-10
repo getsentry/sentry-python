@@ -571,3 +571,22 @@ def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_envelo
     assert isinstance(complex_param, str)
     assert "nested" in complex_param
     assert "data" in complex_param
+
+
+def test_sentry_logs_no_parameters_no_template(sentry_init, capture_envelopes):
+    """
+    There shouldn't be a template if there are no parameters.
+    """
+    sentry_init(enable_logs=True)
+    envelopes = capture_envelopes()
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("Warning about something without any parameters.")
+
+    get_client().flush()
+    logs = envelopes_to_logs(envelopes)
+
+    assert len(logs) == 1
+
+    attrs = logs[0]["attributes"]
+    assert "sentry.message.template" not in attrs

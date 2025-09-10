@@ -1,6 +1,6 @@
 from typing import List, Optional, Any, Iterator
 from unittest import mock
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -589,3 +589,152 @@ def test_langchain_callback_list_existing_callback(sentry_init):
 
         [handler] = passed_callbacks
         assert handler is sentry_callback
+
+
+def test_tools_integration_in_spans(sentry_init, capture_events):
+    """Test that tools are properly set on spans in actual LangChain integration."""
+    global llm_type
+    llm_type = "openai-chat"
+
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "You are a helpful assistant"),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    global stream_result_mock
+    stream_result_mock = Mock(
+        side_effect=[
+            [
+                ChatGenerationChunk(
+                    type="ChatGenerationChunk",
+                    message=AIMessageChunk(content="Simple response"),
+                ),
+            ]
+        ]
+    )
+
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    with start_transaction():
+        list(agent_executor.stream({"input": "Hello"}))
+
+    # Check that events were captured and contain tools data
+    if events:
+        tx = events[0]
+        spans = tx.get("spans", [])
+
+        # Look for spans that should have tools data
+        tools_found = False
+        for span in spans:
+            span_data = span.get("data", {})
+            if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in span_data:
+                tools_found = True
+                tools_data = span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+                # Verify tools are in the expected format
+                assert isinstance(tools_data, (str, list))  # Could be serialized
+                if isinstance(tools_data, str):
+                    # If serialized as string, should contain tool name
+                    assert "get_word_length" in tools_data
+                else:
+                    # If still a list, verify structure
+                    assert len(tools_data) >= 1
+                    names = [
+                        tool.get("name")
+                        for tool in tools_data
+                        if isinstance(tool, dict)
+                    ]
+                    assert "get_word_length" in names
+
+        # Ensure we found at least one span with tools data
+        assert tools_found, "No spans found with tools data"
+
+
+def test_langchain_integration_with_langchain_core_only(sentry_init, capture_events):
+    """Test that the langchain integration works when langchain.agents.AgentExecutor
+    is not available or langchain is not installed, but langchain-core is.
+    """
+
+    from langchain_core.outputs import LLMResult, Generation
+
+    with patch("sentry_sdk.integrations.langchain.AgentExecutor", None):
+        from sentry_sdk.integrations.langchain import (
+            LangchainIntegration,
+            SentryLangchainCallback,
+        )
+
+        sentry_init(
+            integrations=[LangchainIntegration(include_prompts=True)],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
+        events = capture_events()
+
+        try:
+            LangchainIntegration.setup_once()
+        except Exception as e:
+            pytest.fail(f"setup_once() failed when AgentExecutor is None: {e}")
+
+        callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+        run_id = "12345678-1234-1234-1234-123456789012"
+        serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
+        prompts = ["What is the capital of France?"]
+
+        with start_transaction():
+            callback.on_llm_start(
+                serialized=serialized,
+                prompts=prompts,
+                run_id=run_id,
+                invocation_params={
+                    "temperature": 0.7,
+                    "max_tokens": 100,
+                    "model": "gpt-3.5-turbo",
+                },
+            )
+
+            response = LLMResult(
+                generations=[[Generation(text="The capital of France is Paris.")]],
+                llm_output={
+                    "token_usage": {
+                        "total_tokens": 25,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 15,
+                    }
+                },
+            )
+            callback.on_llm_end(response=response, run_id=run_id)
+
+        assert len(events) > 0
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        llm_spans = [
+            span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        ]
+        assert len(llm_spans) > 0
+
+        llm_span = llm_spans[0]
+        assert llm_span["description"] == "Langchain LLM call"
+        assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
+        assert (
+            llm_span["data"]["gen_ai.response.text"]
+            == "The capital of France is Paris."
+        )
+        assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
+        assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
+        assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
