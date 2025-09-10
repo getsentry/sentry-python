@@ -135,9 +135,16 @@ async def test_agent_invocation_span(
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
-    assert (
-        invoke_agent_span["data"]["gen_ai.request.messages"]
-        == '[{"content": [{"text": "You are a helpful test assistant.", "type": "text"}], "role": "system"}, {"content": [{"text": "Test input", "type": "text"}], "role": "user"}]'
+    assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
+        [
+            {
+                "content": [
+                    {"text": "You are a helpful test assistant.", "type": "text"}
+                ],
+                "role": "system",
+            },
+            {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
+        ]
     )
     assert (
         invoke_agent_span["data"]["gen_ai.response.text"]

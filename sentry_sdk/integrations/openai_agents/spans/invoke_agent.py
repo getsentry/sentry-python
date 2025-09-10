@@ -28,22 +28,28 @@ def invoke_agent_span(context, agent, kwargs):
     if should_send_default_pii():
         messages = []
         if agent.instructions:
+            message = (
+                agent.instructions
+                if isinstance(agent.instructions, str)
+                else safe_serialize(agent.instructions)
+            )
             messages.append(
                 {
-                    "content": [
-                        {"text": safe_serialize(agent.instructions), "type": "text"}
-                    ],
+                    "content": [{"text": message, "type": "text"}],
                     "role": "system",
                 }
             )
 
         original_input = kwargs.get("original_input")
         if original_input is not None:
+            message = (
+                original_input
+                if isinstance(original_input, str)
+                else safe_serialize(original_input)
+            )
             messages.append(
                 {
-                    "content": [
-                        {"text": safe_serialize(original_input), "type": "text"}
-                    ],
+                    "content": [{"text": message, "type": "text"}],
                     "role": "user",
                 }
             )
