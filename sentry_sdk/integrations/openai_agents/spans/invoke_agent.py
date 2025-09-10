@@ -2,6 +2,7 @@ import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
@@ -29,15 +30,20 @@ def invoke_agent_span(context, agent, kwargs):
         if agent.instructions:
             messages.append(
                 {
-                    "content": [{"text": agent.instructions, "type": "text"}],
+                    "content": [
+                        {"text": safe_serialize(agent.instructions), "type": "text"}
+                    ],
                     "role": "system",
                 }
             )
 
-        if "original_input" in kwargs and kwargs["original_input"] is not None:
+        original_input = kwargs.get("original_input")
+        if original_input is not None:
             messages.append(
                 {
-                    "content": [{"text": kwargs["original_input"], "type": "text"}],
+                    "content": [
+                        {"text": safe_serialize(original_input), "type": "text"}
+                    ],
                     "role": "user",
                 }
             )
