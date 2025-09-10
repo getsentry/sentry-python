@@ -115,6 +115,7 @@ async def test_agent_invocation_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
+                send_default_pii=True,
             )
 
             events = capture_events()
@@ -134,6 +135,21 @@ async def test_agent_invocation_span(
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
+        [
+            {
+                "content": [
+                    {"text": "You are a helpful test assistant.", "type": "text"}
+                ],
+                "role": "system",
+            },
+            {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
+        ]
+    )
+    assert (
+        invoke_agent_span["data"]["gen_ai.response.text"]
+        == "Hello, how can I help you?"
+    )
     assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
     assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
     assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
