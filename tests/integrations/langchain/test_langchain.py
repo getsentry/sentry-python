@@ -1,6 +1,6 @@
 from typing import List, Optional, Any, Iterator
 from unittest import mock
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -662,3 +662,79 @@ def test_tools_integration_in_spans(sentry_init, capture_events):
 
         # Ensure we found at least one span with tools data
         assert tools_found, "No spans found with tools data"
+
+
+def test_langchain_integration_with_langchain_core_only(sentry_init, capture_events):
+    """Test that the langchain integration works when langchain.agents.AgentExecutor
+    is not available or langchain is not installed, but langchain-core is.
+    """
+
+    from langchain_core.outputs import LLMResult, Generation
+
+    with patch("sentry_sdk.integrations.langchain.AgentExecutor", None):
+        from sentry_sdk.integrations.langchain import (
+            LangchainIntegration,
+            SentryLangchainCallback,
+        )
+
+        sentry_init(
+            integrations=[LangchainIntegration(include_prompts=True)],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
+        events = capture_events()
+
+        try:
+            LangchainIntegration.setup_once()
+        except Exception as e:
+            pytest.fail(f"setup_once() failed when AgentExecutor is None: {e}")
+
+        callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+
+        run_id = "12345678-1234-1234-1234-123456789012"
+        serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
+        prompts = ["What is the capital of France?"]
+
+        with start_transaction():
+            callback.on_llm_start(
+                serialized=serialized,
+                prompts=prompts,
+                run_id=run_id,
+                invocation_params={
+                    "temperature": 0.7,
+                    "max_tokens": 100,
+                    "model": "gpt-3.5-turbo",
+                },
+            )
+
+            response = LLMResult(
+                generations=[[Generation(text="The capital of France is Paris.")]],
+                llm_output={
+                    "token_usage": {
+                        "total_tokens": 25,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 15,
+                    }
+                },
+            )
+            callback.on_llm_end(response=response, run_id=run_id)
+
+        assert len(events) > 0
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        llm_spans = [
+            span for span in tx.get("spans", []) if span.get("op") == "gen_ai.pipeline"
+        ]
+        assert len(llm_spans) > 0
+
+        llm_span = llm_spans[0]
+        assert llm_span["description"] == "Langchain LLM call"
+        assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
+        assert (
+            llm_span["data"]["gen_ai.response.text"]
+            == "The capital of France is Paris."
+        )
+        assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
+        assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
+        assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15

@@ -64,11 +64,6 @@ envlist =
     # pure_eval
     {py3.6,py3.12,py3.13}-pure_eval
 
-    # Quart
-    {py3.7,py3.11}-quart-v{0.16}
-    {py3.8,py3.11,py3.12}-quart-v{0.19}
-    {py3.8,py3.12,py3.13}-quart-latest
-
     # Ray
     {py3.10,py3.11}-ray-v{2.34}
     {py3.10,py3.11}-ray-latest
@@ -183,20 +178,6 @@ deps =
 
     # pure_eval
     pure_eval: pure_eval
-
-    # Quart
-    quart: quart-auth
-    quart: pytest-asyncio
-    quart-{v0.19,latest}: quart-flask-patch
-    quart-v0.16: blinker<1.6
-    quart-v0.16: jinja2<3.1.0
-    quart-v0.16: Werkzeug<2.1.0
-    quart-v0.16: hypercorn<0.15.0
-    quart-v0.16: quart~=0.16.0
-    quart-v0.19: Werkzeug>=3.0.0
-    quart-v0.19: quart~=0.19.0
-    {py3.8}-quart: taskgroup==0.0.0a4
-    quart-latest: quart
 
     # Ray
     ray-v2.34: ray~=2.34.0

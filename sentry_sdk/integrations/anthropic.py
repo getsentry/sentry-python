@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -194,7 +194,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
 
     model = kwargs.get("model", "")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=OP.GEN_AI_CHAT,
         name=f"chat {model}".strip(),
         origin=AnthropicIntegration.origin,
