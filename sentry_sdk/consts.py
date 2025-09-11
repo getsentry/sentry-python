@@ -3,7 +3,10 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
-DEFAULT_MAX_VALUE_LENGTH = 1024
+# This is more or less an arbitrary large-ish value for now, so that we allow
+# pretty long strings (like LLM prompts), but still have *some* upper limit
+# until we verify that removing the trimming completely is safe.
+DEFAULT_MAX_VALUE_LENGTH = 100_000
 
 DEFAULT_MAX_STACK_FRAMES = 100
 DEFAULT_ADD_FULL_STACK = False
@@ -97,6 +100,17 @@ FALSE_VALUES = [
 ]
 
 
+class SPANTEMPLATE(str, Enum):
+    DEFAULT = "default"
+    AI_AGENT = "ai_agent"
+    AI_TOOL = "ai_tool"
+    AI_CHAT = "ai_chat"
+
+    def __str__(self):
+        # type: () -> str
+        return self.value
+
+
 class INSTRUMENTER:
     SENTRY = "sentry"
     OTEL = "otel"
@@ -110,70 +124,106 @@ class SPANDATA:
 
     AI_CITATIONS = "ai.citations"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     References or sources cited by the AI model in its response.
     Example: ["Smith et al. 2020", "Jones 2019"]
     """
 
     AI_DOCUMENTS = "ai.documents"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Documents or content chunks used as context for the AI model.
     Example: ["doc1.txt", "doc2.pdf"]
     """
 
     AI_FINISH_REASON = "ai.finish_reason"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_FINISH_REASONS instead.
+
     The reason why the model stopped generating.
     Example: "length"
     """
 
     AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_FREQUENCY_PENALTY instead.
+
     Used to reduce repetitiveness of generated tokens.
     Example: 0.5
     """
 
     AI_FUNCTION_CALL = "ai.function_call"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.
+
     For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
     """
 
     AI_GENERATION_ID = "ai.generation_id"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_ID instead.
+
     Unique identifier for the completion.
     Example: "gen_123abc"
     """
 
     AI_INPUT_MESSAGES = "ai.input_messages"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_MESSAGES instead.
+
     The input messages to an LLM call.
     Example: [{"role": "user", "message": "hello"}]
     """
 
     AI_LOGIT_BIAS = "ai.logit_bias"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     For an AI model call, the logit bias
     """
 
     AI_METADATA = "ai.metadata"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Extra metadata passed to an AI pipeline step.
     Example: {"executed_function": "add_integers"}
     """
 
     AI_MODEL_ID = "ai.model_id"
     """
-    The unique descriptor of the model being execugted
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_MODEL or GEN_AI_RESPONSE_MODEL instead.
+
+    The unique descriptor of the model being executed.
     Example: gpt-4
     """
 
     AI_PIPELINE_NAME = "ai.pipeline.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_PIPELINE_NAME instead.
+
     Name of the AI pipeline or chain being executed.
     Example: "qa-pipeline"
     """
 
     AI_PREAMBLE = "ai.preamble"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     For an AI model call, the preamble parameter.
     Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
     Example: "You are now a clown."
@@ -181,99 +231,150 @@ class SPANDATA:
 
     AI_PRESENCE_PENALTY = "ai.presence_penalty"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_PRESENCE_PENALTY instead.
+
     Used to reduce repetitiveness of generated tokens.
     Example: 0.5
     """
 
     AI_RAW_PROMPTING = "ai.raw_prompting"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Minimize pre-processing done to the prompt sent to the LLM.
     Example: true
     """
 
     AI_RESPONSE_FORMAT = "ai.response_format"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     For an AI model call, the format of the response
     """
 
     AI_RESPONSES = "ai.responses"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TEXT instead.
+
     The responses to an AI model call. Always as a list.
     Example: ["hello", "world"]
     """
 
     AI_SEARCH_QUERIES = "ai.search_queries"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Queries used to search for relevant context or documents.
     Example: ["climate change effects", "renewable energy"]
     """
 
     AI_SEARCH_REQUIRED = "ai.is_search_required"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Boolean indicating if the model needs to perform a search.
     Example: true
     """
 
     AI_SEARCH_RESULTS = "ai.search_results"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Results returned from search queries for context.
     Example: ["Result 1", "Result 2"]
     """
 
     AI_SEED = "ai.seed"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_SEED instead.
+
     The seed, ideally models given the same seed and same other parameters will produce the exact same output.
     Example: 123.45
     """
 
     AI_STREAMING = "ai.streaming"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_STREAMING instead.
+
     Whether or not the AI model call's response was streamed back asynchronously
     Example: true
     """
 
     AI_TAGS = "ai.tags"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Tags that describe an AI pipeline step.
     Example: {"executed_function": "add_integers"}
     """
 
     AI_TEMPERATURE = "ai.temperature"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TEMPERATURE instead.
+
     For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.
     Example: 0.5
     """
 
     AI_TEXTS = "ai.texts"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Raw text inputs provided to the model.
     Example: ["What is machine learning?"]
     """
 
     AI_TOP_K = "ai.top_k"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_K instead.
+
     For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
     Example: 35
     """
 
     AI_TOP_P = "ai.top_p"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_TOP_P instead.
+
     For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.
     Example: 0.5
     """
 
     AI_TOOL_CALLS = "ai.tool_calls"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_RESPONSE_TOOL_CALLS instead.
+
     For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
     """
 
     AI_TOOLS = "ai.tools"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_REQUEST_AVAILABLE_TOOLS instead.
+
     For an AI model call, the functions that are available
     """
 
     AI_WARNINGS = "ai.warnings"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_* attributes instead.
+
     Warning messages generated during model execution.
     Example: ["Token limit exceeded"]
     """
@@ -372,6 +473,36 @@ class SPANDATA:
     Example: "chat"
     """
 
+    GEN_AI_PIPELINE_NAME = "gen_ai.pipeline.name"
+    """
+    Name of the AI pipeline or chain being executed.
+    Example: "qa-pipeline"
+    """
+
+    GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
+    """
+    The reason why the model stopped generating.
+    Example: "COMPLETE"
+    """
+
+    GEN_AI_RESPONSE_ID = "gen_ai.response.id"
+    """
+    Unique identifier for the completion.
+    Example: "gen_123abc"
+    """
+
+    GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
+    """
+    Exact model identifier used to generate the response
+    Example: gpt-4o-mini-2024-07-18
+    """
+
+    GEN_AI_RESPONSE_STREAMING = "gen_ai.response.streaming"
+    """
+    Whether or not the AI model call's response was streamed back asynchronously
+    Example: true
+    """
+
     GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
     """
     The model's response text messages.
@@ -411,7 +542,7 @@ class SPANDATA:
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
     """
     The model identifier being used for the request.
-    Example: "gpt-4-turbo-preview"
+    Example: "gpt-4-turbo"
     """
 
     GEN_AI_REQUEST_PRESENCE_PENALTY = "gen_ai.request.presence_penalty"
@@ -420,10 +551,22 @@ class SPANDATA:
     Example: 0.1
     """
 
+    GEN_AI_REQUEST_SEED = "gen_ai.request.seed"
+    """
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: "1234567890"
+    """
+
     GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
     """
     The temperature parameter used to control randomness in the output.
     Example: 0.7
+    """
+
+    GEN_AI_REQUEST_TOP_K = "gen_ai.request.top_k"
+    """
+    Limits the model to only consider the K most likely next tokens, where K is an integer (e.g., top_k=20 means only the 20 highest probability tokens are considered).
+    Example: 35
     """
 
     GEN_AI_REQUEST_TOP_P = "gen_ai.request.top_p"
@@ -649,9 +792,14 @@ class OP:
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
     GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
+    GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
+    GEN_AI_GENERATE_TEXT = "gen_ai.generate_text"
     GEN_AI_HANDOFF = "gen_ai.handoff"
+    GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
+    GEN_AI_RESPONSES = "gen_ai.responses"
     GRAPHQL_EXECUTE = "graphql.execute"
     GRAPHQL_MUTATION = "graphql.mutation"
     GRAPHQL_PARSE = "graphql.parse"
@@ -674,16 +822,9 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
-    OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
-    OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
-    LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
-    LANGCHAIN_RUN = "ai.run.langchain"
-    LANGCHAIN_TOOL = "ai.tool.langchain"
-    LANGCHAIN_AGENT = "ai.agent.langchain"
-    LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
@@ -775,6 +916,8 @@ class ClientConstructor:
         custom_repr=None,  # type: Optional[Callable[..., Optional[str]]]
         add_full_stack=DEFAULT_ADD_FULL_STACK,  # type: bool
         max_stack_frames=DEFAULT_MAX_STACK_FRAMES,  # type: Optional[int]
+        enable_logs=False,  # type: bool
+        before_send_log=None,  # type: Optional[Callable[[Log, Hint], Optional[Log]]]
     ):
         # type: (...) -> None
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
@@ -1145,7 +1288,6 @@ class ClientConstructor:
 
         :param profile_session_sample_rate:
 
-
         :param enable_tracing:
 
         :param propagate_traces:
@@ -1155,6 +1297,14 @@ class ClientConstructor:
         :param spotlight:
 
         :param instrumenter:
+
+        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
+            Sentry logs. Defaults to False.
+
+        :param before_send_log: An optional function to modify or filter out logs
+            before they're sent to Sentry. Any modifications to the log in this
+            function will be retained. If the function returns None, the log will
+            not be sent to Sentry.
 
         :param _experiments:
         """
@@ -1181,4 +1331,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.32.0"
+VERSION = "2.37.1"

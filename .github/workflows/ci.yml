@@ -24,8 +24,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
 
@@ -39,8 +39,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
 
@@ -58,8 +58,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
       - name: Setup build cache
@@ -89,8 +89,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
 

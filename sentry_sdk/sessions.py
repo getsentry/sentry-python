@@ -292,7 +292,3 @@ class SessionFlusher:
     def kill(self):
         # type: (...) -> None
         self.__shutdown_requested.set()
-
-    def __del__(self):
-        # type: (...) -> None
-        self.kill()

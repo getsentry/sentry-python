@@ -40,7 +40,7 @@ ENV = Environment(
     lstrip_blocks=True,
 )
 
-PYPI_COOLDOWN = 0.15  # seconds to wait between requests to PyPI
+PYPI_COOLDOWN = 0.1  # seconds to wait between requests to PyPI
 
 PYPI_PROJECT_URL = "https://pypi.python.org/pypi/{project}/json"
 PYPI_VERSION_URL = "https://pypi.python.org/pypi/{project}/{version}/json"
@@ -57,7 +57,8 @@ IGNORE = {
     # pypi package to install in different versions).
     #
     # Test suites that will have to remain hardcoded since they don't fit the
-    # toxgen usecase
+    # toxgen usecase (there is no one package that should be tested in different
+    # versions)
     "asgi",
     "aws_lambda",
     "cloud_resource_context",
@@ -67,19 +68,9 @@ IGNORE = {
     "potel",
     # Integrations that can be migrated -- we should eventually remove all
     # of these from the IGNORE list
-    "arq",
-    "asyncpg",
-    "beam",
-    "boto3",
-    "chalice",
     "gcp",
     "httpx",
-    "langchain",
-    "langchain_notiktoken",
-    "openai",
-    "openai_notiktoken",
     "pure_eval",
-    "quart",
     "ray",
     "redis",
     "requests",
@@ -141,7 +132,11 @@ def _prefilter_releases(
     - the list of prefiltered releases
     - an optional prerelease if there is one that should be tested
     """
-    min_supported = _MIN_VERSIONS.get(integration)
+    integration_name = (
+        TEST_SUITE_CONFIG[integration].get("integration_name") or integration
+    )
+
+    min_supported = _MIN_VERSIONS.get(integration_name)
     if min_supported is not None:
         min_supported = Version(".".join(map(str, min_supported)))
     else:
@@ -442,7 +437,7 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
                 rendered.append(f"{integration}: {dep}")
         elif constraint.startswith("py3"):
             for dep in deps:
-                rendered.append(f"{constraint}-{integration}: {dep}")
+                rendered.append(f"{{{constraint}}}-{integration}: {dep}")
         else:
             restriction = SpecifierSet(constraint)
             for release in releases:
@@ -508,7 +503,8 @@ def _compare_min_version_with_defined(
         ):
             print(
                 f"  Integration defines {defined_min_version} as minimum "
-                f"version, but the effective minimum version is {releases[0]}."
+                f"version, but the effective minimum version based on metadata "
+                f"is {releases[0]}."
             )
 
 

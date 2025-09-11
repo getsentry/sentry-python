@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     current_stacktrace,
     capture_internal_exceptions,
+    has_logs_enabled,
 )
 from sentry_sdk.integrations import Integration
 
@@ -344,7 +345,7 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not client.options["_experiments"].get("enable_logs", False):
+            if not has_logs_enabled(client.options):
                 return
 
             self._capture_log_from_record(client, record)
@@ -355,12 +356,14 @@ class SentryLogsHandler(_BaseHandler):
             record.levelno, SEVERITY_TO_OTEL_SEVERITY
         )
         project_root = client.options["project_root"]
+
         attrs = self._extra_from_record(record)  # type: Any
         attrs["sentry.origin"] = "auto.logger.log"
-        if isinstance(record.msg, str):
-            attrs["sentry.message.template"] = record.msg
+
+        parameters_set = False
         if record.args is not None:
             if isinstance(record.args, tuple):
+                parameters_set = bool(record.args)
                 for i, arg in enumerate(record.args):
                     attrs[f"sentry.message.parameter.{i}"] = (
                         arg
@@ -368,19 +371,28 @@ class SentryLogsHandler(_BaseHandler):
                         else safe_repr(arg)
                     )
             elif isinstance(record.args, dict):
+                parameters_set = bool(record.args)
                 for key, value in record.args.items():
                     attrs[f"sentry.message.parameter.{key}"] = (
                         value
                         if isinstance(value, (str, float, int, bool))
                         else safe_repr(value)
                     )
+
+        if parameters_set and isinstance(record.msg, str):
+            # only include template if there is at least one
+            # sentry.message.parameter.X set
+            attrs["sentry.message.template"] = record.msg
+
         if record.lineno:
             attrs["code.line.number"] = record.lineno
+
         if record.pathname:
             if project_root is not None and record.pathname.startswith(project_root):
                 attrs["code.file.path"] = record.pathname[len(project_root) + 1 :]
             else:
                 attrs["code.file.path"] = record.pathname
+
         if record.funcName:
             attrs["code.function.name"] = record.funcName
 
