@@ -27,6 +27,7 @@ from sentry_sdk import (
     capture_message,
     capture_exception,
 )
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
@@ -248,9 +249,11 @@ def test_flask_login_configured(
 
 
 def test_flask_large_json_request(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+    )
 
-    data = {"foo": {"bar": "a" * 2000}}
+    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
 
     @app.route("/", methods=["POST"])
     def index():
@@ -268,9 +271,14 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
 
 
 def test_flask_session_tracking(sentry_init, capture_envelopes, app):
@@ -336,9 +344,11 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
 
 
 def test_flask_medium_formdata_request(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+    )
 
-    data = {"foo": "a" * 2000}
+    data = {"foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}
 
     @app.route("/", methods=["POST"])
     def index():
@@ -360,9 +370,14 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]) == 1024
+    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
 
 
 def test_flask_formdata_request_appear_transaction_body(
@@ -441,7 +456,10 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
         integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
     )
 
-    data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
+    data = {
+        "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
+        "file": (BytesIO(b"hello"), "hello.txt"),
+    }
 
     @app.route("/", methods=["POST"])
     def index():
@@ -463,9 +481,14 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]) == 1024
+    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
 
     assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]

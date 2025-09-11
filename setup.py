@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.33.0",
+    version="2.37.1",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -63,6 +63,7 @@ setup(
         "huey": ["huey>=2"],
         "huggingface_hub": ["huggingface_hub>=0.22"],
         "langchain": ["langchain>=0.0.210"],
+        "langgraph": ["langgraph>=0.6.6"],
         "launchdarkly": ["launchdarkly-server-sdk>=9.8.0"],
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
