@@ -10,7 +10,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
+import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -19,6 +21,7 @@ from sentry_sdk.utils import parse_version
 
 FASTAPI_VERSION = parse_version(fastapi.__version__)
 
+from tests.integrations.conftest import parametrize_test_configurable_status_codes
 from tests.integrations.starlette import test_starlette
 
 
@@ -246,7 +249,6 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
 
 
-@pytest.mark.asyncio
 def test_response_status_code_ok_in_transaction_context(sentry_init, capture_envelopes):
     """
     Tests that the response status code is added to the transaction "response" context.
@@ -275,7 +277,6 @@ def test_response_status_code_ok_in_transaction_context(sentry_init, capture_env
     assert transaction["contexts"]["response"]["status_code"] == 200
 
 
-@pytest.mark.asyncio
 def test_response_status_code_error_in_transaction_context(
     sentry_init,
     capture_envelopes,
@@ -312,7 +313,6 @@ def test_response_status_code_error_in_transaction_context(
     assert transaction["contexts"]["response"]["status_code"] == 500
 
 
-@pytest.mark.asyncio
 def test_response_status_code_not_found_in_transaction_context(
     sentry_init,
     capture_envelopes,
@@ -650,7 +650,7 @@ def test_transaction_http_method_custom(sentry_init, capture_events):
     assert event2["request"]["method"] == "HEAD"
 
 
-@test_starlette.parametrize_test_configurable_status_codes
+@parametrize_test_configurable_status_codes
 def test_configurable_status_codes(
     sentry_init,
     capture_events,
@@ -681,3 +681,76 @@ def test_configurable_status_codes(
     client.get("/error")
 
     assert len(events) == int(expected_error)
+
+
+@pytest.mark.parametrize("transaction_style", ["endpoint", "url"])
+def test_app_host(sentry_init, capture_events, transaction_style):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[
+            StarletteIntegration(transaction_style=transaction_style),
+            FastApiIntegration(transaction_style=transaction_style),
+        ],
+    )
+
+    app = FastAPI()
+    subapp = FastAPI()
+
+    @subapp.get("/subapp")
+    async def subapp_route():
+        return {"message": "Hello world!"}
+
+    app.host("subapp", subapp)
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.get("/subapp", headers={"Host": "subapp"})
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert "transaction" in event
+
+    if transaction_style == "url":
+        assert event["transaction"] == "/subapp"
+    else:
+        assert event["transaction"].endswith("subapp_route")
+
+
+@pytest.mark.asyncio
+async def test_feature_flags(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
+
+    events = capture_events()
+
+    app = FastAPI()
+
+    @app.get("/error")
+    async def _error():
+        add_feature_flag("hello", False)
+
+        with sentry_sdk.start_span(name="test-span"):
+            with sentry_sdk.start_span(name="test-span-2"):
+                raise ValueError("something is wrong!")
+
+    try:
+        client = TestClient(app)
+        client.get("/error")
+    except ValueError:
+        pass
+
+    found = False
+    for event in events:
+        if "exception" in event.keys():
+            assert event["contexts"]["flags"] == {
+                "values": [
+                    {"flag": "hello", "result": False},
+                ]
+            }
+            found = True
+
+    assert found, "No event with exception found"

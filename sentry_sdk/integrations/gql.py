@@ -5,12 +5,17 @@ from sentry_sdk.utils import (
     parse_version,
 )
 
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 
 try:
     import gql  # type: ignore[import-not-found]
-    from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode  # type: ignore[import-not-found]
+    from graphql import (
+        print_ast,
+        get_operation_ast,
+        DocumentNode,
+        VariableDefinitionNode,
+    )
     from gql.transport import Transport, AsyncTransport  # type: ignore[import-not-found]
     from gql.transport.exceptions import TransportQueryError  # type: ignore[import-not-found]
 except ImportError:
@@ -24,8 +29,6 @@ if TYPE_CHECKING:
 
     EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
 
-MIN_GQL_VERSION = (3, 4, 1)
-
 
 class GQLIntegration(Integration):
     identifier = "gql"
@@ -34,11 +37,8 @@ class GQLIntegration(Integration):
     def setup_once():
         # type: () -> None
         gql_version = parse_version(gql.__version__)
-        if gql_version is None or gql_version < MIN_GQL_VERSION:
-            raise DidNotEnable(
-                "GQLIntegration is only supported for GQL versions %s and above."
-                % ".".join(str(num) for num in MIN_GQL_VERSION)
-            )
+        _check_minimum_version(GQLIntegration, gql_version)
+
         _patch_execute()
 
 

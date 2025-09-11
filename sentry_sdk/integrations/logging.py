@@ -1,13 +1,18 @@
 import logging
+import sys
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 
 import sentry_sdk
+from sentry_sdk.client import BaseClient
+from sentry_sdk.logger import _log_level_to_otel
 from sentry_sdk.utils import (
+    safe_repr,
     to_string,
     event_from_exception,
     current_stacktrace,
     capture_internal_exceptions,
+    has_logs_enabled,
 )
 from sentry_sdk.integrations import Integration
 
@@ -32,6 +37,16 @@ LOGGING_TO_EVENT_LEVEL = {
     logging.FATAL: "fatal",
     logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
 }
+
+# Map logging level numbers to corresponding OTel level numbers
+SEVERITY_TO_OTEL_SEVERITY = {
+    logging.CRITICAL: 21,  # fatal
+    logging.ERROR: 17,  # error
+    logging.WARNING: 13,  # warn
+    logging.INFO: 9,  # info
+    logging.DEBUG: 5,  # debug
+}
+
 
 # Capturing events from those loggers causes recursion errors. We cannot allow
 # the user to unconditionally create events from those loggers under any
@@ -61,13 +76,22 @@ def ignore_logger(
 class LoggingIntegration(Integration):
     identifier = "logging"
 
-    def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
-        # type: (Optional[int], Optional[int]) -> None
+    def __init__(
+        self,
+        level=DEFAULT_LEVEL,
+        event_level=DEFAULT_EVENT_LEVEL,
+        sentry_logs_level=DEFAULT_LEVEL,
+    ):
+        # type: (Optional[int], Optional[int], Optional[int]) -> None
         self._handler = None
         self._breadcrumb_handler = None
+        self._sentry_logs_handler = None
 
         if level is not None:
             self._breadcrumb_handler = BreadcrumbHandler(level=level)
+
+        if sentry_logs_level is not None:
+            self._sentry_logs_handler = SentryLogsHandler(level=sentry_logs_level)
 
         if event_level is not None:
             self._handler = EventHandler(level=event_level)
@@ -82,6 +106,12 @@ class LoggingIntegration(Integration):
             and record.levelno >= self._breadcrumb_handler.level
         ):
             self._breadcrumb_handler.handle(record)
+
+        if (
+            self._sentry_logs_handler is not None
+            and record.levelno >= self._sentry_logs_handler.level
+        ):
+            self._sentry_logs_handler.handle(record)
 
     @staticmethod
     def setup_once():
@@ -101,7 +131,10 @@ class LoggingIntegration(Integration):
                 # the integration.  Otherwise we have a high chance of getting
                 # into a recursion error when the integration is resolved
                 # (this also is slower).
-                if ignored_loggers is not None and record.name not in ignored_loggers:
+                if (
+                    ignored_loggers is not None
+                    and record.name.strip() not in ignored_loggers
+                ):
                     integration = sentry_sdk.get_client().get_integration(
                         LoggingIntegration
                     )
@@ -146,7 +179,7 @@ class _BaseHandler(logging.Handler):
         # type: (LogRecord) -> bool
         """Prevents ignored loggers from recording"""
         for logger in _IGNORED_LOGGERS:
-            if fnmatch(record.name, logger):
+            if fnmatch(record.name.strip(), logger):
                 return False
         return True
 
@@ -231,25 +264,25 @@ class EventHandler(_BaseHandler):
             event["level"] = level  # type: ignore[typeddict-item]
         event["logger"] = record.name
 
-        # Log records from `warnings` module as separate issues
-        record_caputured_from_warnings_module = (
-            record.name == "py.warnings" and record.msg == "%s"
-        )
-        if record_caputured_from_warnings_module:
-            # use the actual message and not "%s" as the message
-            # this prevents grouping all warnings under one "%s" issue
-            msg = record.args[0]  # type: ignore
-
-            event["logentry"] = {
-                "message": msg,
-                "params": (),
-            }
-
+        if (
+            sys.version_info < (3, 11)
+            and record.name == "py.warnings"
+            and record.msg == "%s"
+        ):
+            # warnings module on Python 3.10 and below sets record.msg to "%s"
+            # and record.args[0] to the actual warning message.
+            # This was fixed in https://github.com/python/cpython/pull/30975.
+            message = record.args[0]
+            params = ()
         else:
-            event["logentry"] = {
-                "message": to_string(record.msg),
-                "params": record.args,
-            }
+            message = record.msg
+            params = record.args
+
+        event["logentry"] = {
+            "message": to_string(message),
+            "formatted": record.getMessage(),
+            "params": params,
+        }
 
         event["extra"] = self._extra_from_record(record)
 
@@ -292,3 +325,97 @@ class BreadcrumbHandler(_BaseHandler):
             "timestamp": datetime.fromtimestamp(record.created, timezone.utc),
             "data": self._extra_from_record(record),
         }
+
+
+class SentryLogsHandler(_BaseHandler):
+    """
+    A logging handler that records Sentry logs for each Python log record.
+
+    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    """
+
+    def emit(self, record):
+        # type: (LogRecord) -> Any
+        with capture_internal_exceptions():
+            self.format(record)
+            if not self._can_record(record):
+                return
+
+            client = sentry_sdk.get_client()
+            if not client.is_active():
+                return
+
+            if not has_logs_enabled(client.options):
+                return
+
+            self._capture_log_from_record(client, record)
+
+    def _capture_log_from_record(self, client, record):
+        # type: (BaseClient, LogRecord) -> None
+        otel_severity_number, otel_severity_text = _log_level_to_otel(
+            record.levelno, SEVERITY_TO_OTEL_SEVERITY
+        )
+        project_root = client.options["project_root"]
+
+        attrs = self._extra_from_record(record)  # type: Any
+        attrs["sentry.origin"] = "auto.logger.log"
+
+        parameters_set = False
+        if record.args is not None:
+            if isinstance(record.args, tuple):
+                parameters_set = bool(record.args)
+                for i, arg in enumerate(record.args):
+                    attrs[f"sentry.message.parameter.{i}"] = (
+                        arg
+                        if isinstance(arg, (str, float, int, bool))
+                        else safe_repr(arg)
+                    )
+            elif isinstance(record.args, dict):
+                parameters_set = bool(record.args)
+                for key, value in record.args.items():
+                    attrs[f"sentry.message.parameter.{key}"] = (
+                        value
+                        if isinstance(value, (str, float, int, bool))
+                        else safe_repr(value)
+                    )
+
+        if parameters_set and isinstance(record.msg, str):
+            # only include template if there is at least one
+            # sentry.message.parameter.X set
+            attrs["sentry.message.template"] = record.msg
+
+        if record.lineno:
+            attrs["code.line.number"] = record.lineno
+
+        if record.pathname:
+            if project_root is not None and record.pathname.startswith(project_root):
+                attrs["code.file.path"] = record.pathname[len(project_root) + 1 :]
+            else:
+                attrs["code.file.path"] = record.pathname
+
+        if record.funcName:
+            attrs["code.function.name"] = record.funcName
+
+        if record.thread:
+            attrs["thread.id"] = record.thread
+        if record.threadName:
+            attrs["thread.name"] = record.threadName
+
+        if record.process:
+            attrs["process.pid"] = record.process
+        if record.processName:
+            attrs["process.executable.name"] = record.processName
+        if record.name:
+            attrs["logger.name"] = record.name
+
+        # noinspection PyProtectedMember
+        client._capture_experimental_log(
+            {
+                "severity_text": otel_severity_text,
+                "severity_number": otel_severity_number,
+                "body": record.message,
+                "attributes": attrs,
+                "time_unix_nano": int(record.created * 1e9),
+                "trace_id": None,
+            },
+        )

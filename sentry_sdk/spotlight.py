@@ -38,7 +38,7 @@ class SpotlightClient:
         # type: (str) -> None
         self.url = url
         self.http = urllib3.PoolManager()
-        self.tries = 0
+        self.fails = 0
 
     def capture_envelope(self, envelope):
         # type: (Envelope) -> None
@@ -54,9 +54,18 @@ class SpotlightClient:
                 },
             )
             req.close()
+            self.fails = 0
         except Exception as e:
-            # TODO: Implement buffering and retrying with exponential backoff
-            sentry_logger.warning(str(e))
+            if self.fails < 2:
+                sentry_logger.warning(str(e))
+                self.fails += 1
+            elif self.fails == 2:
+                self.fails += 1
+                sentry_logger.warning(
+                    "Looks like Spotlight is not running, will keep trying to send events but will not log errors."
+                )
+            # omitting self.fails += 1 in the `else:` case intentionally
+            # to avoid overflowing the variable if Spotlight never becomes reachable
 
 
 try:
@@ -82,6 +91,7 @@ try:
 
     class SpotlightMiddleware(MiddlewareMixin):  # type: ignore[misc]
         _spotlight_script = None  # type: Optional[str]
+        _spotlight_url = None  # type: Optional[str]
 
         def __init__(self, get_response):
             # type: (Self, Callable[..., HttpResponse]) -> None
@@ -103,7 +113,7 @@ try:
         @property
         def spotlight_script(self):
             # type: (Self) -> Optional[str]
-            if self._spotlight_script is None:
+            if self._spotlight_url is not None and self._spotlight_script is None:
                 try:
                     spotlight_js_url = urllib.parse.urljoin(
                         self._spotlight_url, SPOTLIGHT_JS_ENTRY_PATH
@@ -173,7 +183,7 @@ try:
 
         def process_exception(self, _request, exception):
             # type: (Self, HttpRequest, Exception) -> Optional[HttpResponseServerError]
-            if not settings.DEBUG:
+            if not settings.DEBUG or not self._spotlight_url:
                 return None
 
             try:

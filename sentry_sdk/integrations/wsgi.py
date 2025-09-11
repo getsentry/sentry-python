@@ -13,7 +13,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.sessions import track_session
 from sentry_sdk.scope import use_isolation_scope
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import Transaction, TransactionSource
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
@@ -115,7 +115,7 @@ class SentryWsgiMiddleware:
                             environ,
                             op=OP.HTTP_SERVER,
                             name="generic WSGI request",
-                            source=TRANSACTION_SOURCE_ROUTE,
+                            source=TransactionSource.ROUTE,
                             origin=self.span_origin,
                         )
 

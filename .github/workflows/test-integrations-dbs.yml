@@ -8,7 +8,7 @@ on:
     branches:
       - master
       - release/**
-      - sentry-sdk-2.0
+      - potel-base
   pull_request:
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
@@ -29,12 +29,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7","3.8","3.11","3.12","3.13"]
+        python-version: ["3.7","3.12","3.13"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
     services:
       postgres:
         image: postgres
@@ -50,16 +50,20 @@ jobs:
         ports:
           - 5432:5432
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -103,12 +107,12 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.5.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop
+          plugins: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -124,12 +128,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
+        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
     services:
       postgres:
         image: postgres
@@ -145,16 +149,20 @@ jobs:
         ports:
           - 5432:5432
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
+        if: ${{ matrix.python-version != '3.6' }}
         with:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       - name: Setup Test Env
         run: |
           pip install "coverage[toml]" tox
@@ -198,12 +206,12 @@ jobs:
           coverage xml
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.5.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop
+          plugins: noop
           verbose: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -217,9 +225,9 @@ jobs:
     needs: test-dbs-pinned
     # Always run this, even if a dependent job failed
     if: always()
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-dbs-pinned.result, 'failure') || contains(needs.test-dbs-pinned.result, 'skipped')
+        if: needs.test-dbs-pinned.result != 'success'
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

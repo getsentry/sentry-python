@@ -1,3 +1,4 @@
+import contextlib
 import os
 import json
 import subprocess
@@ -20,6 +21,7 @@ from sentry_sdk import (
     capture_exception,
     capture_event,
     set_tag,
+    start_transaction,
 )
 from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
 from sentry_sdk.utils import capture_internal_exception
@@ -561,6 +563,15 @@ def test_attach_stacktrace_disabled(sentry_init, capture_events):
     assert "threads" not in event
 
 
+def test_attach_stacktrace_transaction(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, attach_stacktrace=True)
+    events = capture_events()
+    with start_transaction(name="transaction"):
+        pass
+    (event,) = events
+    assert "threads" not in event
+
+
 def test_capture_event_works(sentry_init):
     sentry_init(transport=_TestTransport())
     pytest.raises(EnvelopeCapturedError, lambda: capture_event({}))
@@ -772,14 +783,14 @@ def test_databag_string_stripping(sentry_init, capture_events, benchmark):
     def inner():
         del events[:]
         try:
-            a = "A" * 1000000  # noqa
+            a = "A" * DEFAULT_MAX_VALUE_LENGTH * 10  # noqa
             1 / 0
         except Exception:
             capture_exception()
 
         (event,) = events
 
-        assert len(json.dumps(event)) < 10000
+        assert len(json.dumps(event)) < DEFAULT_MAX_VALUE_LENGTH * 10
 
 
 def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
@@ -1072,7 +1083,10 @@ def test_multiple_positional_args(sentry_init):
     "sdk_options, expected_data_length",
     [
         ({}, DEFAULT_MAX_VALUE_LENGTH),
-        ({"max_value_length": 1800}, 1800),
+        (
+            {"max_value_length": DEFAULT_MAX_VALUE_LENGTH + 1000},
+            DEFAULT_MAX_VALUE_LENGTH + 1000,
+        ),
     ],
 )
 def test_max_value_length_option(
@@ -1081,7 +1095,7 @@ def test_max_value_length_option(
     sentry_init(sdk_options)
     events = capture_events()
 
-    capture_message("a" * 2000)
+    capture_message("a" * (DEFAULT_MAX_VALUE_LENGTH + 2000))
 
     assert len(events[0]["message"]) == expected_data_length
 
@@ -1296,7 +1310,6 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
         assert len(test_config.sampler_function_mock.call_args[0]) == 2
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize(
     "opt,missing_flags",
     [
@@ -1340,6 +1353,8 @@ class TestSpanClientReports:
     """
     Tests for client reports related to spans.
     """
+
+    __test__ = False
 
     @staticmethod
     def span_dropper(spans_to_drop):
@@ -1490,3 +1505,72 @@ class TestSpanClientReports:
 )
 def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_config):
     test_config.run(sentry_init, capture_record_lost_event_calls)
+
+
+@pytest.mark.parametrize("enable_tracing", [True, False])
+def test_enable_tracing_deprecated(sentry_init, enable_tracing):
+    with pytest.warns(DeprecationWarning):
+        sentry_init(enable_tracing=enable_tracing)
+
+
+def make_options_transport_cls():
+    """Make an options transport class that captures the options passed to it."""
+    # We need a unique class for each test so that the options are not
+    # shared between tests.
+
+    class OptionsTransport(Transport):
+        """Transport that captures the options passed to it."""
+
+        def __init__(self, options):
+            super().__init__(options)
+            type(self).options = options
+
+        def capture_envelope(self, _):
+            pass
+
+    return OptionsTransport
+
+
+@contextlib.contextmanager
+def clear_env_var(name):
+    """Helper to clear the a given environment variable,
+    and restore it to its original value on exit."""
+    old_value = os.environ.pop(name, None)
+
+    try:
+        yield
+    finally:
+        if old_value is not None:
+            os.environ[name] = old_value
+        elif name in os.environ:
+            del os.environ[name]
+
+
+@pytest.mark.parametrize(
+    ("env_value", "arg_value", "expected_value"),
+    [
+        (None, None, False),  # default
+        ("0", None, False),  # env var false
+        ("1", None, True),  # env var true
+        (None, False, False),  # arg false
+        (None, True, True),  # arg true
+        # Argument overrides environment variable
+        ("0", True, True),  # env false, arg true
+        ("1", False, False),  # env true, arg false
+    ],
+)
+def test_keep_alive(env_value, arg_value, expected_value):
+    transport_cls = make_options_transport_cls()
+    keep_alive_kwarg = {} if arg_value is None else {"keep_alive": arg_value}
+
+    with clear_env_var("SENTRY_KEEP_ALIVE"):
+        if env_value is not None:
+            os.environ["SENTRY_KEEP_ALIVE"] = env_value
+
+        sentry_sdk.init(
+            dsn="http://foo@sentry.io/123",
+            transport=transport_cls,
+            **keep_alive_kwarg,
+        )
+
+    assert transport_cls.options["keep_alive"] is expected_value

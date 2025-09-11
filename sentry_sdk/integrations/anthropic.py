@@ -1,18 +1,26 @@
 from functools import wraps
+import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
+from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     package_version,
+    safe_serialize,
 )
 
 try:
+    try:
+        from anthropic import NOT_GIVEN
+    except ImportError:
+        NOT_GIVEN = None
+
     from anthropic.resources import AsyncMessages, Messages
 
     if TYPE_CHECKING:
@@ -37,12 +45,7 @@ class AnthropicIntegration(Integration):
     def setup_once():
         # type: () -> None
         version = package_version("anthropic")
-
-        if version is None:
-            raise DidNotEnable("Unparsable anthropic version.")
-
-        if version < (0, 16):
-            raise DidNotEnable("anthropic 0.16 or newer required.")
+        _check_minimum_version(AnthropicIntegration, version)
 
         Messages.create = _wrap_message_create(Messages.create)
         AsyncMessages.create = _wrap_message_create_async(AsyncMessages.create)
@@ -58,8 +61,11 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _calculate_token_usage(result, span):
-    # type: (Messages, Span) -> None
+def _get_token_usage(result):
+    # type: (Messages) -> tuple[int, int]
+    """
+    Get token usage from the Anthropic response.
+    """
     input_tokens = 0
     output_tokens = 0
     if hasattr(result, "usage"):
@@ -69,31 +75,13 @@ def _calculate_token_usage(result, span):
         if hasattr(usage, "output_tokens") and isinstance(usage.output_tokens, int):
             output_tokens = usage.output_tokens
 
-    total_tokens = input_tokens + output_tokens
-    record_token_usage(span, input_tokens, output_tokens, total_tokens)
+    return input_tokens, output_tokens
 
 
-def _get_responses(content):
-    # type: (list[Any]) -> list[dict[str, Any]]
+def _collect_ai_data(event, model, input_tokens, output_tokens, content_blocks):
+    # type: (MessageStreamEvent, str | None, int, int, list[str]) -> tuple[str | None, int, int, list[str]]
     """
-    Get JSON of a Anthropic responses.
-    """
-    responses = []
-    for item in content:
-        if hasattr(item, "text"):
-            responses.append(
-                {
-                    "type": item.type,
-                    "text": item.text,
-                }
-            )
-    return responses
-
-
-def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
-    # type: (MessageStreamEvent, int, int, list[str]) -> tuple[int, int, list[str]]
-    """
-    Count token usage and collect content blocks from the AI streaming response.
+    Collect model information, token usage, and collect content blocks from the AI streaming response.
     """
     with capture_internal_exceptions():
         if hasattr(event, "type"):
@@ -101,36 +89,93 @@ def _collect_ai_data(event, input_tokens, output_tokens, content_blocks):
                 usage = event.message.usage
                 input_tokens += usage.input_tokens
                 output_tokens += usage.output_tokens
+                model = event.message.model or model
             elif event.type == "content_block_start":
                 pass
             elif event.type == "content_block_delta":
                 if hasattr(event.delta, "text"):
                     content_blocks.append(event.delta.text)
+                elif hasattr(event.delta, "partial_json"):
+                    content_blocks.append(event.delta.partial_json)
             elif event.type == "content_block_stop":
                 pass
             elif event.type == "message_delta":
                 output_tokens += event.usage.output_tokens
 
-    return input_tokens, output_tokens, content_blocks
+    return model, input_tokens, output_tokens, content_blocks
 
 
-def _add_ai_data_to_span(
-    span, integration, input_tokens, output_tokens, content_blocks
+def _set_input_data(span, kwargs, integration):
+    # type: (Span, dict[str, Any], AnthropicIntegration) -> None
+    """
+    Set input data for the span based on the provided keyword arguments for the anthropic message creation.
+    """
+    messages = kwargs.get("messages")
+    if (
+        messages is not None
+        and len(messages) > 0
+        and should_send_default_pii()
+        and integration.include_prompts
+    ):
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize(messages)
+        )
+
+    set_data_normalized(
+        span, SPANDATA.GEN_AI_RESPONSE_STREAMING, kwargs.get("stream", False)
+    )
+
+    kwargs_keys_to_attributes = {
+        "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+        "model": SPANDATA.GEN_AI_REQUEST_MODEL,
+        "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+        "top_k": SPANDATA.GEN_AI_REQUEST_TOP_K,
+        "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+    }
+    for key, attribute in kwargs_keys_to_attributes.items():
+        value = kwargs.get(key)
+        if value is not NOT_GIVEN and value is not None:
+            set_data_normalized(span, attribute, value)
+
+    # Input attributes: Tools
+    tools = kwargs.get("tools")
+    if tools is not NOT_GIVEN and tools is not None and len(tools) > 0:
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+        )
+
+
+def _set_output_data(
+    span,
+    integration,
+    model,
+    input_tokens,
+    output_tokens,
+    content_blocks,
+    finish_span=False,
 ):
-    # type: (Span, AnthropicIntegration, int, int, list[str]) -> None
+    # type: (Span, AnthropicIntegration, str | None, int | None, int | None, list[Any], bool) -> None
     """
-    Add token usage and content blocks from the AI streaming response to the span.
-    """
-    with capture_internal_exceptions():
-        if should_send_default_pii() and integration.include_prompts:
-            complete_message = "".join(content_blocks)
-            span.set_data(
-                SPANDATA.AI_RESPONSES,
-                [{"type": "text", "text": complete_message}],
-            )
-        total_tokens = input_tokens + output_tokens
-        record_token_usage(span, input_tokens, output_tokens, total_tokens)
-        span.set_data(SPANDATA.AI_STREAMING, True)
+    Set output data for the span based on the AI response."""
+    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    if should_send_default_pii() and integration.include_prompts:
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_RESPONSE_TEXT,
+            json.dumps(content_blocks),
+            unpack=False,
+        )
+
+    record_token_usage(
+        span,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+
+    # TODO: GEN_AI_RESPONSE_TOOL_CALLS ?
+
+    if finish_span:
+        span.__exit__(None, None, None)
 
 
 def _sentry_patched_create_common(f, *args, **kwargs):
@@ -147,31 +192,41 @@ def _sentry_patched_create_common(f, *args, **kwargs):
     except TypeError:
         return f(*args, **kwargs)
 
-    span = sentry_sdk.start_span(
-        op=OP.ANTHROPIC_MESSAGES_CREATE,
-        description="Anthropic messages create",
+    model = kwargs.get("model", "")
+
+    span = get_start_span_function()(
+        op=OP.GEN_AI_CHAT,
+        name=f"chat {model}".strip(),
         origin=AnthropicIntegration.origin,
     )
     span.__enter__()
 
+    _set_input_data(span, kwargs, integration)
+
     result = yield f, args, kwargs
 
-    # add data to span and finish it
-    messages = list(kwargs["messages"])
-    model = kwargs.get("model")
-
     with capture_internal_exceptions():
-        span.set_data(SPANDATA.AI_MODEL_ID, model)
-        span.set_data(SPANDATA.AI_STREAMING, False)
-
-        if should_send_default_pii() and integration.include_prompts:
-            span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
-
         if hasattr(result, "content"):
-            if should_send_default_pii() and integration.include_prompts:
-                span.set_data(SPANDATA.AI_RESPONSES, _get_responses(result.content))
-            _calculate_token_usage(result, span)
-            span.__exit__(None, None, None)
+            input_tokens, output_tokens = _get_token_usage(result)
+
+            content_blocks = []
+            for content_block in result.content:
+                if hasattr(content_block, "to_dict"):
+                    content_blocks.append(content_block.to_dict())
+                elif hasattr(content_block, "model_dump"):
+                    content_blocks.append(content_block.model_dump())
+                elif hasattr(content_block, "text"):
+                    content_blocks.append({"type": "text", "text": content_block.text})
+
+            _set_output_data(
+                span=span,
+                integration=integration,
+                model=getattr(result, "model", None),
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                content_blocks=content_blocks,
+                finish_span=True,
+            )
 
         # Streaming response
         elif hasattr(result, "_iterator"):
@@ -179,39 +234,53 @@ def _sentry_patched_create_common(f, *args, **kwargs):
 
             def new_iterator():
                 # type: () -> Iterator[MessageStreamEvent]
+                model = None
                 input_tokens = 0
                 output_tokens = 0
                 content_blocks = []  # type: list[str]
 
                 for event in old_iterator:
-                    input_tokens, output_tokens, content_blocks = _collect_ai_data(
-                        event, input_tokens, output_tokens, content_blocks
+                    model, input_tokens, output_tokens, content_blocks = (
+                        _collect_ai_data(
+                            event, model, input_tokens, output_tokens, content_blocks
+                        )
                     )
-                    if event.type != "message_stop":
-                        yield event
+                    yield event
 
-                _add_ai_data_to_span(
-                    span, integration, input_tokens, output_tokens, content_blocks
+                _set_output_data(
+                    span=span,
+                    integration=integration,
+                    model=model,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+                    finish_span=True,
                 )
-                span.__exit__(None, None, None)
 
             async def new_iterator_async():
                 # type: () -> AsyncIterator[MessageStreamEvent]
+                model = None
                 input_tokens = 0
                 output_tokens = 0
                 content_blocks = []  # type: list[str]
 
                 async for event in old_iterator:
-                    input_tokens, output_tokens, content_blocks = _collect_ai_data(
-                        event, input_tokens, output_tokens, content_blocks
+                    model, input_tokens, output_tokens, content_blocks = (
+                        _collect_ai_data(
+                            event, model, input_tokens, output_tokens, content_blocks
+                        )
                     )
-                    if event.type != "message_stop":
-                        yield event
+                    yield event
 
-                _add_ai_data_to_span(
-                    span, integration, input_tokens, output_tokens, content_blocks
+                _set_output_data(
+                    span=span,
+                    integration=integration,
+                    model=model,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    content_blocks=[{"text": "".join(content_blocks), "type": "text"}],
+                    finish_span=True,
                 )
-                span.__exit__(None, None, None)
 
             if str(type(result._iterator)) == "<class 'async_generator'>":
                 result._iterator = new_iterator_async()

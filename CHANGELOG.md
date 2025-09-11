@@ -1,5 +1,568 @@
 # Changelog
 
+## 2.37.1
+
+### Various fixes & improvements
+
+- Fix(langchain): Make Langchain integration work with just langchain-core (#4783) by @shellmayr
+- Tests: Move quart under toxgen (#4775) by @sentrivana
+- Tests: Update tox.ini (#4777) by @sentrivana
+- Tests: Move chalice under toxgen (#4766) by @sentrivana
+
+## 2.37.0
+
+- **New Integration (BETA):** Add support for `langgraph` (#4727) by @shellmayr
+
+  We can now instrument AI agents that are created with [LangGraph](https://www.langchain.com/langgraph) out of the box.
+
+  For more information see the [LangGraph integrations documentation](https://docs.sentry.io/platforms/python/integrations/langgraph/).
+
+- AI Agents: Improve rendering of input and output messages in AI agents integrations. (#4750) by @shellmayr
+- AI Agents: Format span attributes in AI integrations (#4762) by @antonpirker
+- CI: Fix celery (#4765) by @sentrivana
+- Tests: Move asyncpg under toxgen (#4757) by @sentrivana
+- Tests: Move beam under toxgen (#4759) by @sentrivana
+- Tests: Move boto3 tests under toxgen (#4761) by @sentrivana
+- Tests: Remove openai pin and update tox (#4748) by @sentrivana
+
+## 2.36.0
+
+### Various fixes & improvements
+
+- **New integration:** Unraisable exceptions (#4733) by @alexander-alderman-webb
+
+  Add the unraisable exception integration to your sentry_sdk.init call:
+```python
+import sentry_sdk
+from sentry_sdk.integrations.unraisablehook import UnraisablehookIntegration
+
+sentry_sdk.init(
+    dsn="...",
+    integrations=[
+        UnraisablehookIntegration(),
+    ]
+)
+```
+
+- meta: Update instructions on release process (#4755) by @sentrivana
+- tests: Move arq under toxgen (#4739) by @sentrivana
+- tests: Support dashes in test suite names (#4740) by @sentrivana
+- Don't fail if there is no `_context_manager_state` (#4698) by @sentrivana
+- Wrap span restoration in `__exit__` in `capture_internal_exceptions` (#4719) by @sentrivana
+- fix: Constrain types of ai_track decorator (#4745) by @alexander-alderman-webb
+- Fix `openai_agents` in CI (#4742) by @sentrivana
+- Remove old langchain test suites from ignore list (#4737) by @sentrivana
+- tests: Trigger Pytest failure when an unraisable exception occurs (#4738) by @alexander-alderman-webb
+- fix(openai): Avoid double exit causing an unraisable exception (#4736) by @alexander-alderman-webb
+- tests: Move langchain under toxgen (#4734) by @sentrivana
+- toxgen: Add variants & move OpenAI under toxgen (#4730) by @sentrivana
+- Update tox.ini (#4731) by @sentrivana
+
+## 2.35.2
+
+### Various fixes & improvements
+
+- fix(logs): Do not attach template if there are no parameters (#4728) by @sentrivana
+
+## 2.35.1
+
+### Various fixes & improvements
+
+- OpenAI Agents: Isolate agent run (#4720) by @sentrivana
+- Tracing: Do not attach stacktrace to transaction (#4713) by @Zylphrex
+
+## 2.35.0
+
+### Various fixes & improvements
+
+- [Langchain Integration](https://docs.sentry.io/platforms/python/integrations/langchain/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4678) by @shellmayr
+- [Anthropic Integration](https://docs.sentry.io/platforms/python/integrations/anthropic/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4674) by @constantinius
+- AI Agents templates for `@trace` decorator (#4676) by @antonpirker
+- Sentry Logs: Add `enable_logs`, `before_send_log` as top-level `sentry_sdk.init()` options (#4644) by @sentrivana
+- Tracing: Improve `@trace` decorator. Allows to set `span.op`, `span.name`, and `span.attributes` (#4648) by @antonpirker
+- Tracing: Add convenience function `sentry_sdk.update_current_span`. (#4673) by @antonpirker
+- Tracing: Add `Span.update_data()` to update multiple `span.data` items at once. (#4666) by @antonpirker
+- GNU-integration: make path optional (#4688) by @MeredithAnya
+- Clickhouse: Don't eat the generator data (#4669) by @szokeasaurusrex
+- Clickhouse: List `send_data` parameters (#4667) by @szokeasaurusrex
+- Update `gen_ai.*` and `ai.*` attributes (#4665) by @antonpirker
+- Better checking for empty tools list (#4647) by @antonpirker
+- Remove performance paper cuts (#4675) by @sentrivana
+- Help for debugging Cron problems (#4686) by @antonpirker
+- Fix Redis CI (#4691) by @sentrivana
+- Fix plugins key codecov (#4655) by @sl0thentr0py
+- Fix Mypy (#4649) by @sentrivana
+- Update tox.ini (#4689) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 2.0.6 to 2.1.0 (#4684) by @dependabot
+
+## 2.34.1
+
+### Various fixes & improvements
+
+- Fix: Make sure Span data in AI instrumentations is always a primitive data type (#4643) by @antonpirker
+- Fix: Typo in CHANGELOG.md (#4640) by @jgillard
+
+## 2.34.0
+
+### Various fixes & improvements
+
+- Considerably raise `DEFAULT_MAX_VALUE_LENGTH` (#4632) by @sentrivana
+
+  We have increased the string trimming limit considerably, allowing you to see more data
+  without it being truncated. Note that this might, in rare cases, result in issue regrouping,
+  for example if you're capturing message events with very long messages (longer than the
+  default 1024 characters/bytes).
+
+  If you want to adjust the limit, you can set a
+  [`max_value_length`](https://docs.sentry.io/platforms/python/configuration/options/#max_value_length)
+  in your `sentry_sdk.init()`.
+
+- `OpenAI` integration update (#4612) by @antonpirker
+
+  The `OpenAIIntegration` now supports [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses).
+
+  The data captured will also show up in the new [AI Agents Dashboard](https://docs.sentry.io/product/insights/agents/dashboard/).
+
+  This works out of the box, nothing to do on your side.
+
+- Expose `set_transaction_name` (#4634) by @sl0thentr0py
+- Fix(Celery): Latency should be in milliseconds, not seconds (#4637) by @sentrivana
+- Fix(Django): Treat `django.template.context.BasicContext` as sequence in serializer (#4621) by @sl0thentr0py
+- Fix(Huggingface): Fix `huggingface_hub` CI tests. (#4619) by @antonpirker
+- Fix: Ignore deliberate thread exception warnings (#4611) by @sl0thentr0py
+- Fix: Socket tests to not use example.com (#4627) by @sl0thentr0py
+- Fix: Threading run patch (#4610) by @sl0thentr0py
+- Tests: Simplify celery double patching test (#4626) by @sl0thentr0py
+- Tests: Remove remote example.com calls (#4622) by @sl0thentr0py
+- Tests: tox.ini update (#4635) by @sentrivana
+- Tests: Update tox (#4609) by @sentrivana
+
+## 2.33.2
+
+### Various fixes & improvements
+
+- ref(spotlight): Do not import `sentry_sdk.spotlight` unless enabled (#4607) by @sentrivana
+- ref(gnu-integration): update clickhouse stacktrace parsing (#4598) by @MeredithAnya
+
+## 2.33.1
+
+### Various fixes & improvements
+
+- fix(integrations): allow explicit op parameter in `ai_track` (#4597) by @mshavliuk
+- fix: Fix `abs_path` bug in `serialize_frame` (#4599) by @szokeasaurusrex
+- Remove pyrsistent from test dependencies (#4588) by @musicinmybrain
+- Remove explicit `__del__`'s in threaded classes (#4590) by @sl0thentr0py
+- Remove forked from test_transport, separate gevent tests and generalize capturing_server to be module level (#4577) by @sl0thentr0py
+- Improve token usage recording (#4566) by @antonpirker
+
+## 2.33.0
+
+### Various fixes & improvements
+
+- feat(langchain): Support `BaseCallbackManager` (#4486) by @szokeasaurusrex
+- Use `span.data` instead of `measurements` for token usage (#4567) by @antonpirker
+- Fix custom model name (#4569) by @antonpirker
+- fix: shut down "session flusher" more promptly (#4561) by @bukzor
+- chore: Remove Lambda urllib3 pin on Python 3.10+ (#4549) by @sentrivana
+
+## 2.32.0
+
+### Various fixes & improvements
+
+- feat(sessions): Add top-level start- and end session methods (#4474) by @szokeasaurusrex
+- feat(openai-agents): Set tool span to failed if an error is raised in the tool (#4527) by @antonpirker
+- fix(integrations/ray): Correctly pass keyword arguments to ray.remote function (#4430) by @svartalf
+- fix(langchain): Make `span_map` an instance variable (#4476) by @szokeasaurusrex
+- fix(langchain): Ensure no duplicate `SentryLangchainCallback` (#4485) by @szokeasaurusrex
+- fix(Litestar): Apply `failed_request_status_codes` to exceptions raised in middleware (#4074) by @vrslev
+
+## 2.31.0
+
+### Various fixes & improvements
+
+- **New Integration (BETA):** Add support for `openai-agents` (#4437) by @antonpirker
+
+  We can now instrument AI agents that are created with the [OpenAI Agents SDK](https://openai.github.io/openai-agents-python/) out of the box.
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+
+# Add the OpenAIAgentsIntegration to your sentry_sdk.init call:
+sentry_sdk.init(
+    dsn="...",
+    integrations=[
+        OpenAIAgentsIntegration(),
+    ]
+)
+```
+
+For more information see the [OpenAI Agents integrations documentation](https://docs.sentry.io/platforms/python/integrations/openai-agents/).
+
+- Logs: Add support for `dict` arguments (#4478) by @AbhiPrasad
+- Add Cursor generated rules (#4493) by @sl0thentr0py
+- Greatly simplify Langchain integrations `_wrap_configure` (#4479) by @szokeasaurusrex
+- Fix(ci): Remove tracerite pin (almost) (#4504) by @sentrivana
+- Fix(profiling): Ensure profiler thread exits when needed (#4497) by @Zylphrex
+- Fix(ci): Do not install newest `tracerite` (#4494) by @sentrivana
+- Fix(scope): Handle token reset `LookupError`s gracefully (#4481) by @sentrivana
+- Tests: Tox update (#4509) by @sentrivana
+- Tests: Upper bound on fakeredis on old Python versions (#4482) by @sentrivana
+- Tests: Regenerate tox (#4457) by @sentrivana
+
+## 2.30.0
+
+### Various fixes & improvements
+
+- **New beta feature:** Sentry logs for Loguru (#4445) by @sentrivana
+
+  We can now capture Loguru logs and send them to Sentry.
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.loguru import LoguruIntegration
+
+# Setup Sentry SDK to send Loguru log messages with a level of "error" or higher to Sentry
+sentry_sdk.init(
+    _experiments={
+        "enable_logs": True,
+    },
+    integrations=[
+        LoguruIntegration(sentry_logs_level=logging.ERROR),
+    ]
+)
+```
+
+- fix(logs): Don't gate user behind `send_default_pii` (#4453) by @AbhiPrasad
+- fix(logging): Strip log `record.name` for more robust matching (#4411) by @romaingd-spi
+- Migrate to modern threading interface (#4452) by @emmanuel-ferdman
+- ref: Remove `_capture_experimental_log` `scope` parameter (#4424) by @szokeasaurusrex
+- feat(logs): Add user attributes to logs (#4423) by @szokeasaurusrex
+- fix: fix ARQ integration error (#4427) (#4428) by @ninoseki
+- fix(grpc): Fix AttributeError when instrumenting with OTel (#4405) by @sentrivana
+- fix(redis): Use `command_queue` instead of `command_stack` if available (#4404) by @sentrivana
+- fix: Handle invalid `SENTRY_DEBUG` values properly (#4400) by @szokeasaurusrex
+- Increase test coverage (#4393) by @mgaligniana
+- tests(logs): avoid failures when running with integrations enabled (#4388) by @rominf
+- Fix CI, adapt to new redis-py release (#4431) by @sentrivana
+- tests: Regenerate toxgen (#4403) by @sentrivana
+- tests: Regenerate tox.ini & fix CI (#4435) by @sentrivana
+- build(deps): bump codecov/codecov-action from 5.4.2 to 5.4.3 (#4397) by @dependabot
+
+## 2.29.1
+
+### Various fixes & improvements
+
+- fix(logs): send `severity_text`: `warn` instead of `warning` (#4396) by @lcian
+
+## 2.29.0
+
+### Various fixes & improvements
+
+- fix(loguru): Move integration setup from `__init__` to `setup_once` (#4399) by @sentrivana
+- feat: Allow configuring `keep_alive` via environment variable (#4366) by @szokeasaurusrex
+- fix(celery): Do not send extra check-in (#4395) by @sentrivana
+- fix(typing): Add before_send_log to Experiments (#4383) by @sentrivana
+- ci: Fix pyspark test suite (#4382) by @sentrivana
+- fix(logs): Make `sentry.message.parameters` singular as per spec (#4387) by @AbhiPrasad
+- apidocs: Remove snowballstemmer pin (#4379) by @sentrivana
+
+## 2.28.0
+
+### Various fixes & improvements
+
+- fix(logs): Forward `extra` from logger as attributes (#4374) by @AbhiPrasad
+- fix(logs): Canonicalize paths from the logger integration (#4336) by @colin-sentry
+- fix(logs): Use new transport (#4317) by @colin-sentry
+- fix: Deprecate `set_measurement()` API. (#3934) by @antonpirker
+- fix: Put feature flags on isolation scope (#4363) by @antonpirker
+- fix: Make use of `SPANDATA` consistent (#4373) by @antonpirker
+- fix: Discord link (#4371) by @sentrivana
+- tests: Pin snowballstemmer for now (#4372) by @sentrivana
+- tests: Regular tox update (#4367) by @sentrivana
+- tests: Bump test timeout for recursion stacktrace extract to 2s (#4351) by @booxter
+- tests: Fix test_stacktrace_big_recursion failure due to argv (#4346) by @booxter
+- tests: Move anthropic under toxgen (#4348) by @sentrivana
+- tests: Update tox.ini (#4347) by @sentrivana
+- chore: Update GH issue templates for Linear compatibility (#4328) by @stephanie-anderson
+- chore: Bump actions/create-github-app-token from 2.0.2 to 2.0.6 (#4358) by @dependabot
+
+## 2.27.0
+
+### Various fixes & improvements
+
+- fix: Make sure to use the default decimal context in our code (#4231) by @antonpirker
+- fix(integrations): ASGI integration not capture transactions in Websocket (#4293) by @guodong000
+- feat(typing): Make all relevant types public (#4315) by @antonpirker
+- feat(spans): Record flag evaluations as span attributes (#4280) by @cmanallen
+- test(logs): Avoid failure when running with integrations enabled (#4316) by @rominf
+- tests: Remove unused code and rerun (#4313) by @sentrivana
+- tests: Add cohere to toxgen (#4304) by @sentrivana
+- tests: Migrate fastapi to toxgen (#4302) by @sentrivana
+- tests: Add huggingface_hub to toxgen (#4299) by @sentrivana
+- tests: Add huey to toxgen (#4298) by @sentrivana
+- tests: Update tox.ini (#4297) by @sentrivana
+- tests: Move aiohttp under toxgen (#4319) by @sentrivana
+- tests: Fix version picking in toxgen (#4323) by @sentrivana
+- build(deps): bump codecov/codecov-action from 5.4.0 to 5.4.2 (#4318) by @dependabot
+
+## 2.26.1
+
+### Various fixes & improvements
+
+- fix(threading): Data leak in ThreadingIntegration between threads (#4281) by @antonpirker
+- fix(logging): Clarify separate warnings case is for Python <3.11 (#4296) by @szokeasaurusrex
+- fix(logging): Add formatted message to log events (#4292) by @szokeasaurusrex
+- fix(logging): Send raw logging parameters (#4291) by @szokeasaurusrex
+- fix: Revert "chore: Deprecate `same_process_as_parent` (#4244)" (#4290) by @sentrivana
+
+## 2.26.0
+
+### Various fixes & improvements
+
+- fix(debug): Do not consider parent loggers for debug logging (#4286) by @szokeasaurusrex
+- test(tracing): Simplify static/classmethod tracing tests (#4278) by @szokeasaurusrex
+- feat(transport): Add a timeout (#4252) by @sentrivana
+- meta: Change CODEOWNERS back to Python SDK owners (#4269) by @sentrivana
+- feat(logs): Add sdk name and version as log attributes (#4262) by @AbhiPrasad
+- feat(logs): Add server.address to logs (#4257) by @AbhiPrasad
+- chore: Deprecate `same_process_as_parent` (#4244) by @sentrivana
+- feat(logs): Add sentry.origin attribute for log handler (#4250) by @AbhiPrasad
+- feat(tests): Add optional cutoff to toxgen (#4243) by @sentrivana
+- toxgen: Retry & fail if we fail to fetch PyPI data (#4251) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 1.12.0 to 2.0.2 (#4248) by @dependabot
+- Trying to prevent the grpc setup from being flaky (#4233) by @antonpirker
+- feat(breadcrumbs): add `_meta` information for truncation of breadcrumbs (#4007) by @shellmayr
+- tests: Move django under toxgen (#4238) by @sentrivana
+- fix: Handle JSONDecodeError gracefully in StarletteRequestExtractor (#4226) by @moodix
+- fix(asyncio): Remove shutdown handler (#4237) by @sentrivana
+
+## 2.25.1
+
+### Various fixes & improvements
+
+- fix(logs): Add a class which batches groups of logs together. (#4229) by @colin-sentry
+- fix(logs): Use repr instead of json for message and arguments (#4227) by @colin-sentry
+- fix(logs): Debug output from Sentry logs should always be `debug` level. (#4224) by @antonpirker
+- fix(ai): Do not consume anthropic streaming stop (#4232) by @colin-sentry
+- fix(spotlight): Do not spam sentry_sdk.warnings logger w/ Spotlight (#4219) by @BYK
+- fix(docs): fixed code snippet (#4218) by @antonpirker
+- build(deps): bump actions/create-github-app-token from 1.11.7 to 1.12.0 (#4214) by @dependabot
+
+## 2.25.0
+
+### Various fixes & improvements
+
+- **New Beta Feature** Enable Sentry logs in `logging` Integration (#4143) by @colin-sentry
+
+  You can now send existing log messages to the new Sentry Logs feature.
+
+  For more information see: https://github.com/getsentry/sentry/discussions/86804
+
+  This is how you can use it (Sentry Logs is in beta right now so the API can still change):
+
+  ```python
+  import logging
+
+  import sentry_sdk
+  from sentry_sdk.integrations.logging import LoggingIntegration
+
+  # Setup Sentry SDK to send log messages with a level of "error" or higher to Sentry.
+  sentry_sdk.init(
+    dsn="...",
+    _experiments={
+        "enable_logs": True
+    }
+    integrations=[
+      LoggingIntegration(sentry_logs_level=logging.ERROR),
+    ]
+  )
+
+  # Your existing logging setup
+  some_logger = logging.Logger("some-logger")
+
+  some_logger.info('In this example info events will not be sent to Sentry logs. my_value=%s', my_value)
+  some_logger.error('But error events will be sent to Sentry logs. my_value=%s', my_value)
+  ```
+
+- Spotlight: Sample everything 100% w/ Spotlight & no DSN set (#4207) by @BYK
+- Dramatiq: use set_transaction_name (#4175) by @timdrijvers
+- toxgen: Make it clearer which suites can be migrated (#4196) by @sentrivana
+- Move Litestar under toxgen (#4197) by @sentrivana
+- Added flake8 plugings to pre-commit call of flake8 (#4190) by @antonpirker
+- Deprecate Scope.user (#4194) by @sentrivana
+- Fix hanging when capturing long stacktrace (#4191) by @szokeasaurusrex
+- Fix GraphQL failures (#4208) by @sentrivana
+- Fix flaky test (#4198) by @sentrivana
+- Update Ubuntu in Github test runners (#4204) by @antonpirker
+
+## 2.24.1
+
+### Various fixes & improvements
+
+- Always set `_spotlight_url` (#4186) by @BYK
+- Broader except in Django `parsed_body` (#4189) by @orhanhenrik
+- Add platform header to the `chunk` item-type in the envelope (#4178) by @viglia
+- Move `mypy` config into `pyproject.toml` (#4181) by @antonpirker
+- Move `flake8` config into `pyproject.toml` (#4185) by @antonpirker
+- Move `pytest` config into `pyproject.toml` (#4184) by @antonpirker
+- Bump `actions/create-github-app-token` from `1.11.6` to `1.11.7` (#4188) by @dependabot
+- Add `CODEOWNERS` (#4182) by @sentrivana
+
+## 2.24.0
+
+### Various fixes & improvements
+
+- fix(tracing): Fix `InvalidOperation` (#4179) by @szokeasaurusrex
+- Fix memory leak by not piling up breadcrumbs forever in Spark workers.  (#4167) by @antonpirker
+- Update scripts sources (#4166) by @emmanuel-ferdman
+- Fixed flaky test (#4165) by @antonpirker
+- chore(profiler): Add deprecation warning for session functions (#4171) by @sentrivana
+- feat(profiling): reverse profile_session start/stop methods deprecation (#4162) by @viglia
+- Reset `DedupeIntegration`'s `last-seen` if `before_send` dropped the event (#4142) by @sentrivana
+- style(integrations): Fix captured typo (#4161) by @pimuzzo
+- Handle loguru msg levels that are not supported by Sentry (#4147) by @antonpirker
+- feat(tests): Update tox.ini (#4146) by @sentrivana
+- Support Starlette/FastAPI `app.host` (#4157) by @sentrivana
+
+## 2.23.1
+
+### Various fixes & improvements
+
+- Fix import problem in release 2.23.0 (#4140) by @antonpirker
+
+## 2.23.0
+
+### Various fixes & improvements
+
+- Feat(profiling): Add new functions to start/stop continuous profiler (#4056) by @Zylphrex
+- Feat(profiling): Export start/stop profile session (#4079) by @Zylphrex
+- Feat(tracing): Backfill missing `sample_rand` on `PropagationContext` (#4038) by @szokeasaurusrex
+- Feat(logs): Add alpha version of Sentry logs (#4126) by @colin-sentry
+- Security(gha): fix potential for shell injection (#4099) by @mdtro
+- Docs: Add `init()` parameters to ApiDocs. (#4100) by @antonpirker
+- Docs: Document that caller must check `mutable` (#4010) by @szokeasaurusrex
+- Fix(Anthropic): Add partial json support to streams (#3674)
+- Fix(ASGI): Fix KeyError if transaction does not exist (#4095) by @kevinji
+- Fix(asyncio): Improve asyncio integration error handling. (#4129) by @antonpirker
+- Fix(AWS Lambda): Fix capturing errors during AWS Lambda INIT phase (#3943)
+- Fix(Bottle): Prevent internal error on 404 (#4131) by @sentrivana
+- Fix(CI): Fix API doc failure in CI (#4075) by @sentrivana
+- Fix(ClickHouse) ClickHouse in test suite (#4087) by @antonpirker
+- Fix(cloudresourcecontext): Added timeout to HTTP requests in CloudResourceContextIntegration (#4120) by @antonpirker
+- Fix(crons): Fixed bug when `cron_jobs` is set to `None` in arq integration (#4115) by @antonpirker
+- Fix(debug): Take into account parent handlers for debug logger (#4133) by @sentrivana
+- Fix(FastAPI/Starlette):  Fix middleware with positional arguments.  (#4118) by @antonpirker
+- Fix(featureflags): add LRU update/dedupe test coverage (#4082)
+- Fix(logging): Coerce None values into strings in logentry params. (#4121) by @antonpirker
+- Fix(pyspark): Grab `attemptId` more defensively (#4130) by @sentrivana
+- Fix(Quart): Support `quart_flask_patch` (#4132) by @sentrivana
+- Fix(tests): A way to locally run AWS Lambda functions (#4128) by @antonpirker
+- Fix(tests): Add concurrency testcase for arq (#4125) by @sentrivana
+- Fix(tests): Add fail_on_changes to toxgen by @sentrivana
+- Fix(tests): Run AWS Lambda tests locally (#3988) by @antonpirker
+- Fix(tests): Test relevant prereleases and allow to ignore releases
+- Fix(tracing): Move `TRANSACTION_SOURCE_*` constants to `Enum` (#3889) by @mgaligniana
+- Fix(typing): Add more typing info to Scope.update_from_kwargs's "contexts" (#4080)
+- Fix(typing): Set correct type for `set_context` everywhere (#4123) by @sentrivana
+- Chore(tests): Regenerate tox.ini (#4108) by @sentrivana
+- Build(deps): bump actions/create-github-app-token from 1.11.5 to 1.11.6 (#4113) by @dependabot
+- Build(deps): bump codecov/codecov-action from 5.3.1 to 5.4.0 (#4112) by @dependabot
+
+## 2.22.0
+
+### Various fixes & improvements
+
+- **New integration:** Add [Statsig](https://statsig.com/) integration (#4022) by @aliu39
+
+  For more information, see the documentation for the [StatsigIntegration](https://docs.sentry.io/platforms/python/integrations/statsig/).
+
+- Profiling: Continuous profiling lifecycle (#4017) by @Zylphrex
+- Fix: Revert "feat(tracing): Add `propagate_traces` deprecation warning (#3899)" (#4055) by @cmanallen
+- Tests: Generate Web 1 group tox entries by toxgen script (#3980) by @sentrivana
+- Tests: Generate Web 2 group tox entries by toxgen script (#3981) by @sentrivana
+- Tests: Generate Tasks group tox entries by toxgen script (#3976) by @sentrivana
+- Tests: Generate AI group tox entries by toxgen script (#3977) by @sentrivana
+- Tests: Generate DB group tox entries by toxgen script (#3978) by @sentrivana
+- Tests: Generate Misc group tox entries by toxgen script (#3982) by @sentrivana
+- Tests: Generate Flags group tox entries by toxgen script (#3974) by @sentrivana
+- Tests: Generate gRPC tox entries by toxgen script (#3979) by @sentrivana
+- Tests: Remove toxgen cutoff, add statsig (#4048) by @sentrivana
+- Tests: Reduce continuous profiling test flakiness (#4052) by @Zylphrex
+- Tests: Fix Clickhouse test (#4053) by @sentrivana
+- Tests: Fix flaky HTTPS test (#4057) by @Zylphrex
+- Update sample rate in DSC (#4018) by @sentrivana
+- Move the GraphQL group over to the tox gen script (#3975) by @sentrivana
+- Update changelog with `profile_session_sample_rate` (#4046) by @sentrivana
+
+## 2.21.0
+
+### Various fixes & improvements
+
+- Fix incompatibility with new Strawberry version (#4026) by @sentrivana
+- Add `failed_request_status_codes` to Litestar (#4021) by @vrslev
+
+  See https://docs.sentry.io/platforms/python/integrations/litestar/ for details.
+- Deprecate `enable_tracing` option (#3935) by @antonpirker
+
+  The `enable_tracing` option is now deprecated. Please use `traces_sample_rate` instead. See https://docs.sentry.io/platforms/python/configuration/options/#traces_sample_rate for more information.
+- Explicitly use `None` default when checking metadata (#4039) by @mpurnell1
+- Fix bug where concurrent accesses to the flags property could raise a `RuntimeError` (#4034) by @cmanallen
+- Add more min versions of frameworks (#3973) by @sentrivana
+- Set level based on status code for HTTP client breadcrumbs (#4004) by @sentrivana
+- Don't set transaction status to error on `sys.exit(0)` (#4025) by @sentrivana
+- Continuous profiling sample rate (#4002) by @Zylphrex
+
+  Set `profile_session_sample_rate=1.0` in your `init()` to collect continuous profiles for 100% of profile sessions. See https://docs.sentry.io/platforms/python/profiling/#enable-continuous-profiling for more information.
+- Track and report spans that were dropped (#4005) by @constantinius
+- Change continuous profile buffer size (#3987) by @Zylphrex
+- Handle `MultiPartParserError` to avoid internal sentry crash (#4001) by @orhanhenrik
+- Handle `None` lineno in `get_source_context` (#3925) by @sentrivana
+- Add support for Python 3.12 and 3.13 to AWS Lambda integration (#3965) by @antonpirker
+- Add `propagate_traces` deprecation warning (#3899) by @mgaligniana
+- Check that `__module__` is `str` (#3942) by @szokeasaurusrex
+- Add `__repr__` to `Baggage` (#4043) by @szokeasaurusrex
+- Fix a typo (#3923) by @antonpirker
+- Fix various CI errors on master (#4009) by @Zylphrex
+- Split gevent tests off (#3964) by @sentrivana
+- Add tox generation script, but don't use it yet (#3971) by @sentrivana
+- Use `httpx_mock` in `test_httpx` (#3967) by @sl0thentr0py
+- Fix typo in test name (#4036) by @szokeasaurusrex
+- Fix mypy (#4019) by @sentrivana
+- Test Celery's latest RC (#3938) by @sentrivana
+- Bump `actions/create-github-app-token` from `1.11.2` to `1.11.3` (#4023) by @dependabot
+- Bump `actions/create-github-app-token` from `1.11.1` to `1.11.2` (#4015) by @dependabot
+- Bump `codecov/codecov-action` from `5.1.2` to `5.3.1` (#3995) by @dependabot
+
+## 2.20.0
+
+- **New integration:** Add [Typer](https://typer.tiangolo.com/) integration (#3869) by @patrick91
+
+  For more information, see the documentation for the [TyperIntegration](https://docs.sentry.io/platforms/python/integrations/typer/).
+
+- **New integration:** Add [Unleash](https://www.getunleash.io/) feature flagging integration (#3888) by @aliu39
+
+  For more information, see the documentation for the [UnleashIntegration](https://docs.sentry.io/platforms/python/integrations/unleash/).
+
+- Add custom tracking of feature flag evaluations (#3860) by @aliu39
+- Feature Flags: Register LD hook in setup instead of init, and don't check for initialization (#3890) by @aliu39
+- Feature Flags: Moved adding of `flags` context into Scope (#3917) by @antonpirker
+- Create a separate group for feature flag test suites (#3911) by @sentrivana
+- Fix flaky LaunchDarkly tests (#3896) by @aliu39
+- Fix LRU cache copying (#3883) by @ffelixg
+- Fix cache pollution from mutable reference (#3887) by @cmanallen
+- Centralize minimum version checking (#3910) by @sentrivana
+- Support SparkIntegration activation after SparkContext created (#3411) by @seyoon-lim
+- Preserve ARQ enqueue_job __kwdefaults__ after patching (#3903) by @danmr
+- Add Github workflow to comment on issues when a fix was released (#3866) by @antonpirker
+- Update test matrix for Sanic (#3904) by @antonpirker
+- Rename scripts (#3885) by @sentrivana
+- Fix CI (#3878) by @sentrivana
+- Treat `potel-base` as release branch in CI (#3912) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 1.11.0 to 1.11.1 (#3893) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.0.7 to 5.1.1 (#3867) by @dependabot
+- build(deps): bump codecov/codecov-action from 5.1.1 to 5.1.2 (#3892) by @dependabot
+
 ## 2.19.2
 
 ### Various fixes & improvements
@@ -54,6 +617,14 @@
 ## 2.18.0
 
 ### Various fixes & improvements
+
+- **New integration:** Add [LaunchDarkly](https://launchdarkly.com/) integration (#3648) by @cmanallen
+
+  For more information, see the documentation for the [LaunchDarklyIntegration](https://docs.sentry.io/platforms/python/integrations/launchdarkly/).
+
+- **New integration:** Add [OpenFeature](https://openfeature.dev/) feature flagging integration (#3648) by @cmanallen
+
+  For more information, see the documentation for the [OpenFeatureIntegration](https://docs.sentry.io/platforms/python/integrations/openfeature/).
 
 - Add LaunchDarkly and OpenFeature integration (#3648) by @cmanallen
 - Correct typo in a comment (#3726) by @szokeasaurusrex
@@ -2226,7 +2797,7 @@ By: @mgaligniana (#1773)
 
   import sentry_sdk
   from sentry_sdk.integrations.arq import ArqIntegration
-  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+  from sentry_sdk.tracing import TransactionSource
 
   sentry_sdk.init(
       dsn="...",
@@ -2246,7 +2817,7 @@ By: @mgaligniana (#1773)
       await ctx['session'].aclose()
 
   async def main():
-      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TransactionSource.COMPONENT):
           redis = await create_pool(RedisSettings())
           for url in ('https://facebook.com', 'https://microsoft.com', 'https://github.com', "asdf"
                       ):
@@ -2320,7 +2891,7 @@ By: @mgaligniana (#1773)
 
   import sentry_sdk
   from sentry_sdk.integrations.huey import HueyIntegration
-  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
+  from sentry_sdk.tracing import TransactionSource, Transaction
 
 
   def main():
@@ -2332,7 +2903,7 @@ By: @mgaligniana (#1773)
           traces_sample_rate=1.0,
       )
 
-      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TransactionSource.COMPONENT):
           r = add_numbers(1, 2)
 
   if __name__ == "__main__":

@@ -52,17 +52,17 @@ COLLECTED_PII_CHAT_PARAMS = {
 }
 
 COLLECTED_CHAT_RESP_ATTRS = {
-    "generation_id": "ai.generation_id",
-    "is_search_required": "ai.is_search_required",
-    "finish_reason": "ai.finish_reason",
+    "generation_id": SPANDATA.AI_GENERATION_ID,
+    "is_search_required": SPANDATA.AI_SEARCH_REQUIRED,
+    "finish_reason": SPANDATA.AI_FINISH_REASON,
 }
 
 COLLECTED_PII_CHAT_RESP_ATTRS = {
-    "citations": "ai.citations",
-    "documents": "ai.documents",
-    "search_queries": "ai.search_queries",
-    "search_results": "ai.search_results",
-    "tool_calls": "ai.tool_calls",
+    "citations": SPANDATA.AI_CITATIONS,
+    "documents": SPANDATA.AI_DOCUMENTS,
+    "search_queries": SPANDATA.AI_SEARCH_QUERIES,
+    "search_results": SPANDATA.AI_SEARCH_RESULTS,
+    "tool_calls": SPANDATA.AI_TOOL_CALLS,
 }
 
 
@@ -116,18 +116,18 @@ def _wrap_chat(f, streaming):
             if hasattr(res.meta, "billed_units"):
                 record_token_usage(
                     span,
-                    prompt_tokens=res.meta.billed_units.input_tokens,
-                    completion_tokens=res.meta.billed_units.output_tokens,
+                    input_tokens=res.meta.billed_units.input_tokens,
+                    output_tokens=res.meta.billed_units.output_tokens,
                 )
             elif hasattr(res.meta, "tokens"):
                 record_token_usage(
                     span,
-                    prompt_tokens=res.meta.tokens.input_tokens,
-                    completion_tokens=res.meta.tokens.output_tokens,
+                    input_tokens=res.meta.tokens.input_tokens,
+                    output_tokens=res.meta.tokens.output_tokens,
                 )
 
             if hasattr(res.meta, "warnings"):
-                set_data_normalized(span, "ai.warnings", res.meta.warnings)
+                set_data_normalized(span, SPANDATA.AI_WARNINGS, res.meta.warnings)
 
     @wraps(f)
     def new_chat(*args, **kwargs):
@@ -238,7 +238,7 @@ def _wrap_embed(f):
                 should_send_default_pii() and integration.include_prompts
             ):
                 if isinstance(kwargs["texts"], str):
-                    set_data_normalized(span, "ai.texts", [kwargs["texts"]])
+                    set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])
                 elif (
                     isinstance(kwargs["texts"], list)
                     and len(kwargs["texts"]) > 0
@@ -262,7 +262,7 @@ def _wrap_embed(f):
             ):
                 record_token_usage(
                     span,
-                    prompt_tokens=res.meta.billed_units.input_tokens,
+                    input_tokens=res.meta.billed_units.input_tokens,
                     total_tokens=res.meta.billed_units.input_tokens,
                 )
             return res

@@ -31,6 +31,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.testclient import TestClient
+from tests.integrations.conftest import parametrize_test_configurable_status_codes
 
 
 STARLETTE_VERSION = parse_version(starlette.__version__)
@@ -234,6 +235,12 @@ class SampleMiddleware:
             await send(message)
 
         await self.app(scope, receive, do_stuff)
+
+
+class SampleMiddlewareWithArgs(Middleware):
+    def __init__(self, app, bla=None):
+        self.app = app
+        self.bla = bla
 
 
 class SampleReceiveSendMiddleware:
@@ -860,6 +867,22 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         idx += 1
 
 
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 35),
+    reason="Positional args for middleware have been introduced in Starlette >= 0.35",
+)
+def test_middleware_positional_args(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    _ = starlette_app_factory(middleware=[Middleware(SampleMiddlewareWithArgs, "bla")])
+
+    # Only creating the App with an Middleware with args
+    # should not raise an error
+    # So as long as test passes, we are good
+
+
 def test_legacy_setup(
     sentry_init,
     capture_events,
@@ -1298,27 +1321,6 @@ def test_transaction_http_method_custom(sentry_init, capture_events):
     assert event2["request"]["method"] == "HEAD"
 
 
-parametrize_test_configurable_status_codes = pytest.mark.parametrize(
-    ("failed_request_status_codes", "status_code", "expected_error"),
-    (
-        (None, 500, True),
-        (None, 400, False),
-        ({500, 501}, 500, True),
-        ({500, 501}, 401, False),
-        ({*range(400, 500)}, 401, True),
-        ({*range(400, 500)}, 500, False),
-        ({*range(400, 600)}, 300, False),
-        ({*range(400, 600)}, 403, True),
-        ({*range(400, 600)}, 503, True),
-        ({*range(400, 403), 500, 501}, 401, True),
-        ({*range(400, 403), 500, 501}, 405, False),
-        ({*range(400, 403), 500, 501}, 501, True),
-        ({*range(400, 403), 500, 501}, 503, False),
-        (set(), 500, False),
-    ),
-)
-
-
 @parametrize_test_configurable_status_codes
 def test_configurable_status_codes(
     sentry_init,
@@ -1352,3 +1354,28 @@ def test_configurable_status_codes(
     client.get("/error")
 
     assert len(events) == int(expected_error)
+
+
+@pytest.mark.asyncio
+async def test_starletterequestextractor_malformed_json_error_handling(sentry_init):
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+    ]
+    starlette_request = starlette.requests.Request(scope)
+
+    malformed_json = "{invalid json"
+    malformed_messages = [
+        {"type": "http.request", "body": malformed_json.encode("utf-8")},
+        {"type": "http.disconnect"},
+    ]
+
+    side_effect = [_mock_receive(msg) for msg in malformed_messages]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    assert extractor.is_json()
+
+    result = await extractor.json()
+    assert result is None

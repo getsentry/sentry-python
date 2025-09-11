@@ -10,12 +10,14 @@
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
 
-    {% if needs_github_secrets %}
-    needs: check-permissions
+    {% if needs_docker %}
+    services:
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
     {% endif %}
-
     {% if needs_postgres %}
     services:
       postgres:
@@ -32,31 +34,37 @@
         ports:
           - 5432:5432
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}{% endraw %}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
 
     {% endif %}
-
+    # Use Docker container only for Python 3.6
+    {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
     steps:
-      - uses: actions/checkout@v4.2.2
-      {% if needs_github_secrets %}
-      {% raw %}
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-      {% endraw %}
-      {% endif %}
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
+        {% raw %}if: ${{ matrix.python-version != '3.6' }}{% endraw %}
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
           allow-prereleases: true
+
       {% if needs_clickhouse %}
-      - uses: getsentry/action-clickhouse-in-ci@v1.1
+      - name: "Setup ClickHouse Server"
+        uses: getsentry/action-clickhouse-in-ci@v1.6
       {% endif %}
 
       {% if needs_redis %}
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
+      {% endif %}
+
+      {% if needs_java %}
+      - name: Install Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
       {% endif %}
 
       - name: Setup Test Env
@@ -92,12 +100,12 @@
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        uses: codecov/codecov-action@v5.1.2
+        uses: codecov/codecov-action@v5.5.1
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
           files: coverage.xml
           # make sure no plugins alter our coverage reports
-          plugin: noop
+          plugins: noop
           verbose: true
 
       - name: Upload test results to Codecov

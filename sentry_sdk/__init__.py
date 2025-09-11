@@ -15,6 +15,7 @@ __all__ = [  # noqa
     "integrations",
     # From sentry_sdk.api
     "init",
+    "add_attachment",
     "add_breadcrumb",
     "capture_event",
     "capture_exception",
@@ -45,6 +46,11 @@ __all__ = [  # noqa
     "start_transaction",
     "trace",
     "monitor",
+    "logger",
+    "start_session",
+    "end_session",
+    "set_transaction_name",
+    "update_current_span",
 ]
 
 # Initialize the debug support after everything is loaded

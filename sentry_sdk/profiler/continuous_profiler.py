@@ -1,9 +1,12 @@
 import atexit
 import os
+import random
 import sys
 import threading
 import time
 import uuid
+import warnings
+from collections import deque
 from datetime import datetime, timezone
 
 from sentry_sdk.consts import VERSION
@@ -26,9 +29,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
+    from typing import Deque
     from typing import Dict
     from typing import List
     from typing import Optional
+    from typing import Set
     from typing import Type
     from typing import Union
     from typing_extensions import TypedDict
@@ -70,9 +75,11 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
     # type: (Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> bool
     global _scheduler
 
-    if _scheduler is not None:
+    already_initialized = _scheduler is not None
+
+    if already_initialized:
         logger.debug("[Profiling] Continuous Profiler is already setup")
-        return False
+        teardown_continuous_profiler()
 
     if is_gevent():
         # If gevent has patched the threading modules then we cannot rely on
@@ -83,11 +90,15 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
     else:
         default_profiler_mode = ThreadContinuousScheduler.mode
 
-    experiments = options.get("_experiments", {})
+    if options.get("profiler_mode") is not None:
+        profiler_mode = options["profiler_mode"]
+    else:
+        # TODO: deprecate this and just use the existing `profiler_mode`
+        experiments = options.get("_experiments", {})
 
-    profiler_mode = (
-        experiments.get("continuous_profiling_mode") or default_profiler_mode
-    )
+        profiler_mode = (
+            experiments.get("continuous_profiling_mode") or default_profiler_mode
+        )
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
@@ -108,29 +119,39 @@ def setup_continuous_profiler(options, sdk_info, capture_func):
         )
     )
 
-    atexit.register(teardown_continuous_profiler)
+    if not already_initialized:
+        atexit.register(teardown_continuous_profiler)
 
     return True
 
 
+def is_profile_session_sampled():
+    # type: () -> bool
+    if _scheduler is None:
+        return False
+    return _scheduler.sampled
+
+
 def try_autostart_continuous_profiler():
     # type: () -> None
+
+    # TODO: deprecate this as it'll be replaced by the auto lifecycle option
+
     if _scheduler is None:
         return
 
-    # Ensure that the scheduler only autostarts once per process.
-    # This is necessary because many web servers use forks to spawn
-    # additional processes. And the profiler is only spawned on the
-    # master process, then it often only profiles the main process
-    # and not the ones where the requests are being handled.
-    #
-    # Additionally, we only want this autostart behaviour once per
-    # process. If the user explicitly calls `stop_profiler`, it should
-    # be respected and not start the profiler again.
-    if not _scheduler.should_autostart():
+    if not _scheduler.is_auto_start_enabled():
         return
 
-    _scheduler.ensure_running()
+    _scheduler.manual_start()
+
+
+def try_profile_lifecycle_trace_start():
+    # type: () -> Union[ContinuousProfile, None]
+    if _scheduler is None:
+        return None
+
+    return _scheduler.auto_start()
 
 
 def start_profiler():
@@ -138,7 +159,18 @@ def start_profiler():
     if _scheduler is None:
         return
 
-    _scheduler.ensure_running()
+    _scheduler.manual_start()
+
+
+def start_profile_session():
+    # type: () -> None
+
+    warnings.warn(
+        "The `start_profile_session` function is deprecated. Please use `start_profile` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    start_profiler()
 
 
 def stop_profiler():
@@ -146,7 +178,18 @@ def stop_profiler():
     if _scheduler is None:
         return
 
-    _scheduler.teardown()
+    _scheduler.manual_stop()
+
+
+def stop_profile_session():
+    # type: () -> None
+
+    warnings.warn(
+        "The `stop_profile_session` function is deprecated. Please use `stop_profile` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    stop_profiler()
 
 
 def teardown_continuous_profiler():
@@ -164,6 +207,24 @@ def get_profiler_id():
     return _scheduler.profiler_id
 
 
+def determine_profile_session_sampling_decision(sample_rate):
+    # type: (Union[float, None]) -> bool
+
+    # `None` is treated as `0.0`
+    if not sample_rate:
+        return False
+
+    return random.random() < float(sample_rate)
+
+
+class ContinuousProfile:
+    active: bool = True
+
+    def stop(self):
+        # type: () -> None
+        self.active = False
+
+
 class ContinuousScheduler:
     mode = "unknown"  # type: ContinuousProfilerMode
 
@@ -173,17 +234,73 @@ class ContinuousScheduler:
         self.options = options
         self.sdk_info = sdk_info
         self.capture_func = capture_func
+
+        self.lifecycle = self.options.get("profile_lifecycle")
+        profile_session_sample_rate = self.options.get("profile_session_sample_rate")
+        self.sampled = determine_profile_session_sampling_decision(
+            profile_session_sample_rate
+        )
+
         self.sampler = self.make_sampler()
         self.buffer = None  # type: Optional[ProfileBuffer]
+        self.pid = None  # type: Optional[int]
 
         self.running = False
+        self.soft_shutdown = False
 
-    def should_autostart(self):
+        self.new_profiles = deque(maxlen=128)  # type: Deque[ContinuousProfile]
+        self.active_profiles = set()  # type: Set[ContinuousProfile]
+
+    def is_auto_start_enabled(self):
         # type: () -> bool
+
+        # Ensure that the scheduler only autostarts once per process.
+        # This is necessary because many web servers use forks to spawn
+        # additional processes. And the profiler is only spawned on the
+        # master process, then it often only profiles the main process
+        # and not the ones where the requests are being handled.
+        if self.pid == os.getpid():
+            return False
+
         experiments = self.options.get("_experiments")
         if not experiments:
             return False
+
         return experiments.get("continuous_profiling_auto_start")
+
+    def auto_start(self):
+        # type: () -> Union[ContinuousProfile, None]
+        if not self.sampled:
+            return None
+
+        if self.lifecycle != "trace":
+            return None
+
+        logger.debug("[Profiling] Auto starting profiler")
+
+        profile = ContinuousProfile()
+
+        self.new_profiles.append(profile)
+        self.ensure_running()
+
+        return profile
+
+    def manual_start(self):
+        # type: () -> None
+        if not self.sampled:
+            return
+
+        if self.lifecycle != "manual":
+            return
+
+        self.ensure_running()
+
+    def manual_stop(self):
+        # type: () -> None
+        if self.lifecycle != "manual":
+            return
+
+        self.teardown()
 
     def ensure_running(self):
         # type: () -> None
@@ -211,33 +328,103 @@ class ContinuousScheduler:
         return self.buffer.profiler_id
 
     def make_sampler(self):
-        # type: () -> Callable[..., None]
+        # type: () -> Callable[..., bool]
         cwd = os.getcwd()
 
         cache = LRUCache(max_size=256)
 
-        def _sample_stack(*args, **kwargs):
-            # type: (*Any, **Any) -> None
-            """
-            Take a sample of the stack on all the threads in the process.
-            This should be called at a regular interval to collect samples.
-            """
+        if self.lifecycle == "trace":
 
-            ts = now()
+            def _sample_stack(*args, **kwargs):
+                # type: (*Any, **Any) -> bool
+                """
+                Take a sample of the stack on all the threads in the process.
+                This should be called at a regular interval to collect samples.
+                """
 
-            try:
-                sample = [
-                    (str(tid), extract_stack(frame, cache, cwd))
-                    for tid, frame in sys._current_frames().items()
-                ]
-            except AttributeError:
-                # For some reason, the frame we get doesn't have certain attributes.
-                # When this happens, we abandon the current sample as it's bad.
-                capture_internal_exception(sys.exc_info())
-                return
+                # no profiles taking place, so we can stop early
+                if not self.new_profiles and not self.active_profiles:
+                    return True
 
-            if self.buffer is not None:
-                self.buffer.write(ts, sample)
+                # This is the number of profiles we want to pop off.
+                # It's possible another thread adds a new profile to
+                # the list and we spend longer than we want inside
+                # the loop below.
+                #
+                # Also make sure to set this value before extracting
+                # frames so we do not write to any new profiles that
+                # were started after this point.
+                new_profiles = len(self.new_profiles)
+
+                ts = now()
+
+                try:
+                    sample = [
+                        (str(tid), extract_stack(frame, cache, cwd))
+                        for tid, frame in sys._current_frames().items()
+                    ]
+                except AttributeError:
+                    # For some reason, the frame we get doesn't have certain attributes.
+                    # When this happens, we abandon the current sample as it's bad.
+                    capture_internal_exception(sys.exc_info())
+                    return False
+
+                # Move the new profiles into the active_profiles set.
+                #
+                # We cannot directly add the to active_profiles set
+                # in `start_profiling` because it is called from other
+                # threads which can cause a RuntimeError when it the
+                # set sizes changes during iteration without a lock.
+                #
+                # We also want to avoid using a lock here so threads
+                # that are starting profiles are not blocked until it
+                # can acquire the lock.
+                for _ in range(new_profiles):
+                    self.active_profiles.add(self.new_profiles.popleft())
+                inactive_profiles = []
+
+                for profile in self.active_profiles:
+                    if not profile.active:
+                        # If a profile is marked inactive, we buffer it
+                        # to `inactive_profiles` so it can be removed.
+                        # We cannot remove it here as it would result
+                        # in a RuntimeError.
+                        inactive_profiles.append(profile)
+
+                for profile in inactive_profiles:
+                    self.active_profiles.remove(profile)
+
+                if self.buffer is not None:
+                    self.buffer.write(ts, sample)
+
+                return False
+
+        else:
+
+            def _sample_stack(*args, **kwargs):
+                # type: (*Any, **Any) -> bool
+                """
+                Take a sample of the stack on all the threads in the process.
+                This should be called at a regular interval to collect samples.
+                """
+
+                ts = now()
+
+                try:
+                    sample = [
+                        (str(tid), extract_stack(frame, cache, cwd))
+                        for tid, frame in sys._current_frames().items()
+                    ]
+                except AttributeError:
+                    # For some reason, the frame we get doesn't have certain attributes.
+                    # When this happens, we abandon the current sample as it's bad.
+                    capture_internal_exception(sys.exc_info())
+                    return False
+
+                if self.buffer is not None:
+                    self.buffer.write(ts, sample)
+
+                return False
 
         return _sample_stack
 
@@ -246,7 +433,7 @@ class ContinuousScheduler:
         last = time.perf_counter()
 
         while self.running:
-            self.sampler()
+            self.soft_shutdown = self.sampler()
 
             # some time may have elapsed since the last time
             # we sampled, so we need to account for that and
@@ -255,12 +442,22 @@ class ContinuousScheduler:
             if elapsed < self.interval:
                 thread_sleep(self.interval - elapsed)
 
+            # the soft shutdown happens here to give it a chance
+            # for the profiler to be reused
+            if self.soft_shutdown:
+                self.running = False
+
+                # make sure to explicitly exit the profiler here or there might
+                # be multiple profilers at once
+                break
+
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
             last = time.perf_counter()
 
         if self.buffer is not None:
             self.buffer.flush()
+            self.buffer = None
 
 
 class ThreadContinuousScheduler(ContinuousScheduler):
@@ -277,15 +474,13 @@ class ThreadContinuousScheduler(ContinuousScheduler):
         super().__init__(frequency, options, sdk_info, capture_func)
 
         self.thread = None  # type: Optional[threading.Thread]
-        self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
-
-    def should_autostart(self):
-        # type: () -> bool
-        return super().should_autostart() and self.pid != os.getpid()
 
     def ensure_running(self):
         # type: () -> None
+
+        self.soft_shutdown = False
+
         pid = os.getpid()
 
         # is running on the right process
@@ -356,15 +551,13 @@ class GeventContinuousScheduler(ContinuousScheduler):
         super().__init__(frequency, options, sdk_info, capture_func)
 
         self.thread = None  # type: Optional[_ThreadPool]
-        self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
-
-    def should_autostart(self):
-        # type: () -> bool
-        return super().should_autostart() and self.pid != os.getpid()
 
     def ensure_running(self):
         # type: () -> None
+
+        self.soft_shutdown = False
+
         pid = os.getpid()
 
         # is running on the right process
@@ -393,7 +586,6 @@ class GeventContinuousScheduler(ContinuousScheduler):
                 # longer allows us to spawn a thread and we have to bail.
                 self.running = False
                 self.thread = None
-                return
 
     def teardown(self):
         # type: () -> None
@@ -407,7 +599,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
         self.buffer = None
 
 
-PROFILE_BUFFER_SECONDS = 10
+PROFILE_BUFFER_SECONDS = 60
 
 
 class ProfileBuffer:

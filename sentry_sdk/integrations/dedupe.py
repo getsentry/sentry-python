@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.utils import ContextVar
+from sentry_sdk.utils import ContextVar, logger
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
@@ -37,6 +37,17 @@ class DedupeIntegration(Integration):
 
             exc = exc_info[1]
             if integration._last_seen.get(None) is exc:
+                logger.info("DedupeIntegration dropped duplicated error event %s", exc)
                 return None
+
             integration._last_seen.set(exc)
             return event
+
+    @staticmethod
+    def reset_last_seen():
+        # type: () -> None
+        integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
+        if integration is None:
+            return
+
+        integration._last_seen.set(None)

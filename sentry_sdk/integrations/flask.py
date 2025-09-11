@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
@@ -72,13 +72,20 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        try:
+            from quart import Quart  # type: ignore
+
+            if Flask == Quart:
+                # This is Quart masquerading as Flask, don't enable the Flask
+                # integration. See https://github.com/getsentry/sentry-python/issues/2709
+                raise DidNotEnable(
+                    "This is not a Flask app but rather Quart pretending to be Flask"
+                )
+        except ImportError:
+            pass
+
         version = package_version("flask")
-
-        if version is None:
-            raise DidNotEnable("Unparsable Flask version.")
-
-        if version < (0, 10):
-            raise DidNotEnable("Flask 0.10 or newer is required.")
+        _check_minimum_version(FlaskIntegration, version)
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
