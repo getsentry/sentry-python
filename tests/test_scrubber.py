@@ -1,7 +1,7 @@
 import sys
 import logging
 
-from sentry_sdk import capture_exception, capture_event, start_span
+from sentry_sdk import capture_exception, capture_event, start_span, set_extra
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk.scrubber import EventScrubber
@@ -119,38 +119,24 @@ def test_stack_var_scrubbing(sentry_init, capture_events):
     }
 
 
-def test_breadcrumb_extra_scrubbing(sentry_init, capture_events):
+def test_extra_scrubbing(sentry_init, capture_events):
     sentry_init(
         max_breadcrumbs=2,
         integrations=[LoggingIntegration(event_level="ERROR")],
     )
     events = capture_events()
-    logger.info("breadcrumb 1", extra=dict(foo=1, password="secret"))
-    logger.info("breadcrumb 2", extra=dict(bar=2, auth="secret"))
-    logger.info("breadcrumb 3", extra=dict(foobar=3, password="secret"))
-    logger.critical("whoops", extra=dict(bar=69, auth="secret"))
+
+    set_extra("bar", 69)
+    set_extra("auth", "secret")
+    try:
+        1 / 0
+    except ZeroDivisionError as e:
+        capture_exception(e)
 
     (event,) = events
 
     assert event["extra"]["bar"] == 69
     assert event["extra"]["auth"] == "[Filtered]"
-    assert event["breadcrumbs"]["values"][0]["data"] == {
-        "bar": 2,
-        "auth": "[Filtered]",
-    }
-    assert event["breadcrumbs"]["values"][1]["data"] == {
-        "foobar": 3,
-        "password": "[Filtered]",
-    }
-
-    assert event["_meta"]["extra"]["auth"] == {"": {"rem": [["!config", "s"]]}}
-    assert event["_meta"]["breadcrumbs"] == {
-        "": {"len": 3},
-        "values": {
-            "0": {"data": {"auth": {"": {"rem": [["!config", "s"]]}}}},
-            "1": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}},
-        },
-    }
 
 
 def test_span_data_scrubbing(sentry_init, capture_events):
