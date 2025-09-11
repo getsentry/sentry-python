@@ -43,7 +43,7 @@
     {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
     steps:
       - uses: actions/checkout@v5.0.0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         {% raw %}if: ${{ matrix.python-version != '3.6' }}{% endraw %}
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
