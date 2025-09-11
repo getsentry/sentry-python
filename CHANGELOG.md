@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.37.1
+
+### Various fixes & improvements
+
+- Fix(langchain): Make Langchain integration work with just langchain-core (#4783) by @shellmayr
+- Tests: Move quart under toxgen (#4775) by @sentrivana
+- Tests: Update tox.ini (#4777) by @sentrivana
+- Tests: Move chalice under toxgen (#4766) by @sentrivana
+
 ## 2.37.0
 
 - **New Integration (BETA):** Add support for `langgraph` (#4727) by @shellmayr
