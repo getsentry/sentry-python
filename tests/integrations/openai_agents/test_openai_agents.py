@@ -1,3 +1,4 @@
+import asyncio
 import re
 import pytest
 from unittest.mock import MagicMock, patch
@@ -86,7 +87,7 @@ def test_agent_custom_model():
         name="test_agent_custom_model",
         instructions="You are a helpful test assistant.",
         # the model could be agents.OpenAIChatCompletionsModel()
-        model=MagicMock(model="my-custom-model"),
+        model="my-custom-model",
         model_settings=ModelSettings(
             max_tokens=100,
             temperature=0.7,
@@ -114,6 +115,7 @@ async def test_agent_invocation_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
+                send_default_pii=True,
             )
 
             events = capture_events()
@@ -133,6 +135,21 @@ async def test_agent_invocation_span(
     assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
     assert invoke_agent_span["description"] == "invoke_agent test_agent"
+    assert invoke_agent_span["data"]["gen_ai.request.messages"] == safe_serialize(
+        [
+            {
+                "content": [
+                    {"text": "You are a helpful test assistant.", "type": "text"}
+                ],
+                "role": "system",
+            },
+            {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
+        ]
+    )
+    assert (
+        invoke_agent_span["data"]["gen_ai.response.text"]
+        == "Hello, how can I help you?"
+    )
     assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
     assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
     assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
@@ -581,8 +598,9 @@ async def test_tool_execution_span(sentry_init, capture_events, test_agent):
     assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
     assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
     assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
-    assert ai_client_span2["data"]["gen_ai.response.text"] == safe_serialize(
-        ["Task completed using the tool"]
+    assert (
+        ai_client_span2["data"]["gen_ai.response.text"]
+        == "Task completed using the tool"
     )
     assert ai_client_span2["data"]["gen_ai.system"] == "openai"
     assert ai_client_span2["data"]["gen_ai.usage.input_tokens.cached"] == 0
@@ -637,3 +655,45 @@ async def test_error_handling(sentry_init, capture_events, test_agent):
     assert ai_client_span["description"] == "chat gpt-4"
     assert ai_client_span["origin"] == "auto.ai.openai_agents"
     assert ai_client_span["tags"]["status"] == "internal_error"
+
+
+@pytest.mark.asyncio
+async def test_multiple_agents_asyncio(
+    sentry_init, capture_events, test_agent, mock_model_response
+):
+    """
+    Test that multiple agents can be run at the same time in asyncio tasks
+    without interfering with each other.
+    """
+
+    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+        with patch(
+            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+        ) as mock_get_response:
+            mock_get_response.return_value = mock_model_response
+
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+            )
+
+            events = capture_events()
+
+            async def run():
+                await agents.Runner.run(
+                    starting_agent=test_agent,
+                    input="Test input",
+                    run_config=test_run_config,
+                )
+
+            await asyncio.gather(*[run() for _ in range(3)])
+
+    assert len(events) == 3
+    txn1, txn2, txn3 = events
+
+    assert txn1["type"] == "transaction"
+    assert txn1["transaction"] == "test_agent workflow"
+    assert txn2["type"] == "transaction"
+    assert txn2["transaction"] == "test_agent workflow"
+    assert txn3["type"] == "transaction"
+    assert txn3["transaction"] == "test_agent workflow"

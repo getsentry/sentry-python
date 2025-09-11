@@ -1,4 +1,5 @@
 import sentry_sdk
+from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
@@ -8,7 +9,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Callable
     from agents import Usage
 
 try:
@@ -26,15 +26,6 @@ def _capture_exception(exc):
         mechanism={"type": "openai_agents", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
-
-
-def _get_start_span_function():
-    # type: () -> Callable[..., Any]
-    current_span = sentry_sdk.get_current_span()
-    transaction_exists = (
-        current_span is not None and current_span.containing_transaction == current_span
-    )
-    return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
 
 
 def _set_agent_data(span, agent):
@@ -127,7 +118,9 @@ def _set_input_data(span, get_response_kwargs):
         if len(messages) > 0:
             request_messages.append({"role": role, "content": messages})
 
-    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize(request_messages))
+    set_data_normalized(
+        span, SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages, unpack=False
+    )
 
 
 def _set_output_data(span, result):
@@ -157,6 +150,6 @@ def _set_output_data(span, result):
         )
 
     if len(output_messages["response"]) > 0:
-        span.set_data(
-            SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(output_messages["response"])
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )

@@ -1,5 +1,100 @@
 # Changelog
 
+## 2.37.1
+
+### Various fixes & improvements
+
+- Fix(langchain): Make Langchain integration work with just langchain-core (#4783) by @shellmayr
+- Tests: Move quart under toxgen (#4775) by @sentrivana
+- Tests: Update tox.ini (#4777) by @sentrivana
+- Tests: Move chalice under toxgen (#4766) by @sentrivana
+
+## 2.37.0
+
+- **New Integration (BETA):** Add support for `langgraph` (#4727) by @shellmayr
+
+  We can now instrument AI agents that are created with [LangGraph](https://www.langchain.com/langgraph) out of the box.
+
+  For more information see the [LangGraph integrations documentation](https://docs.sentry.io/platforms/python/integrations/langgraph/).
+
+- AI Agents: Improve rendering of input and output messages in AI agents integrations. (#4750) by @shellmayr
+- AI Agents: Format span attributes in AI integrations (#4762) by @antonpirker
+- CI: Fix celery (#4765) by @sentrivana
+- Tests: Move asyncpg under toxgen (#4757) by @sentrivana
+- Tests: Move beam under toxgen (#4759) by @sentrivana
+- Tests: Move boto3 tests under toxgen (#4761) by @sentrivana
+- Tests: Remove openai pin and update tox (#4748) by @sentrivana
+
+## 2.36.0
+
+### Various fixes & improvements
+
+- **New integration:** Unraisable exceptions (#4733) by @alexander-alderman-webb
+
+  Add the unraisable exception integration to your sentry_sdk.init call:
+```python
+import sentry_sdk
+from sentry_sdk.integrations.unraisablehook import UnraisablehookIntegration
+
+sentry_sdk.init(
+    dsn="...",
+    integrations=[
+        UnraisablehookIntegration(),
+    ]
+)
+```
+
+- meta: Update instructions on release process (#4755) by @sentrivana
+- tests: Move arq under toxgen (#4739) by @sentrivana
+- tests: Support dashes in test suite names (#4740) by @sentrivana
+- Don't fail if there is no `_context_manager_state` (#4698) by @sentrivana
+- Wrap span restoration in `__exit__` in `capture_internal_exceptions` (#4719) by @sentrivana
+- fix: Constrain types of ai_track decorator (#4745) by @alexander-alderman-webb
+- Fix `openai_agents` in CI (#4742) by @sentrivana
+- Remove old langchain test suites from ignore list (#4737) by @sentrivana
+- tests: Trigger Pytest failure when an unraisable exception occurs (#4738) by @alexander-alderman-webb
+- fix(openai): Avoid double exit causing an unraisable exception (#4736) by @alexander-alderman-webb
+- tests: Move langchain under toxgen (#4734) by @sentrivana
+- toxgen: Add variants & move OpenAI under toxgen (#4730) by @sentrivana
+- Update tox.ini (#4731) by @sentrivana
+
+## 2.35.2
+
+### Various fixes & improvements
+
+- fix(logs): Do not attach template if there are no parameters (#4728) by @sentrivana
+
+## 2.35.1
+
+### Various fixes & improvements
+
+- OpenAI Agents: Isolate agent run (#4720) by @sentrivana
+- Tracing: Do not attach stacktrace to transaction (#4713) by @Zylphrex
+
+## 2.35.0
+
+### Various fixes & improvements
+
+- [Langchain Integration](https://docs.sentry.io/platforms/python/integrations/langchain/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4678) by @shellmayr
+- [Anthropic Integration](https://docs.sentry.io/platforms/python/integrations/anthropic/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4674) by @constantinius
+- AI Agents templates for `@trace` decorator (#4676) by @antonpirker
+- Sentry Logs: Add `enable_logs`, `before_send_log` as top-level `sentry_sdk.init()` options (#4644) by @sentrivana
+- Tracing: Improve `@trace` decorator. Allows to set `span.op`, `span.name`, and `span.attributes` (#4648) by @antonpirker
+- Tracing: Add convenience function `sentry_sdk.update_current_span`. (#4673) by @antonpirker
+- Tracing: Add `Span.update_data()` to update multiple `span.data` items at once. (#4666) by @antonpirker
+- GNU-integration: make path optional (#4688) by @MeredithAnya
+- Clickhouse: Don't eat the generator data (#4669) by @szokeasaurusrex
+- Clickhouse: List `send_data` parameters (#4667) by @szokeasaurusrex
+- Update `gen_ai.*` and `ai.*` attributes (#4665) by @antonpirker
+- Better checking for empty tools list (#4647) by @antonpirker
+- Remove performance paper cuts (#4675) by @sentrivana
+- Help for debugging Cron problems (#4686) by @antonpirker
+- Fix Redis CI (#4691) by @sentrivana
+- Fix plugins key codecov (#4655) by @sl0thentr0py
+- Fix Mypy (#4649) by @sentrivana
+- Update tox.ini (#4689) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 2.0.6 to 2.1.0 (#4684) by @dependabot
+
 ## 2.34.1
 
 ### Various fixes & improvements

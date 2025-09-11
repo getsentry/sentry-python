@@ -7,6 +7,7 @@ import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA, SPANTEMPLATE
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
+    capture_internal_exceptions,
     get_current_thread_meta,
     is_valid_sample_rate,
     logger,
@@ -417,10 +418,11 @@ class Span:
         if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
-        scope, old_span = self._context_manager_state
-        del self._context_manager_state
-        self.finish(scope)
-        scope.span = old_span
+        with capture_internal_exceptions():
+            scope, old_span = self._context_manager_state
+            del self._context_manager_state
+            self.finish(scope)
+            scope.span = old_span
 
     @property
     def containing_transaction(self):

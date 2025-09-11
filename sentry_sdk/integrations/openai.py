@@ -78,12 +78,12 @@ class OpenAIIntegration(Integration):
         return 0
 
 
-def _capture_exception(exc):
-    # type: (Any) -> None
+def _capture_exception(exc, manual_span_cleanup=True):
+    # type: (Any, bool) -> None
     # Close an eventually open span
     # We need to do this by hand because we are not using the start_span context manager
     current_span = sentry_sdk.get_current_span()
-    if current_span is not None:
+    if manual_span_cleanup and current_span is not None:
         current_span.__exit__(None, None, None)
 
     event, hint = event_from_exception(
@@ -179,7 +179,9 @@ def _set_input_data(span, kwargs, operation, integration):
         and should_send_default_pii()
         and integration.include_prompts
     ):
-        set_data_normalized(span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages)
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages, unpack=False
+        )
 
     # Input attributes: Common
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, "openai")
@@ -227,25 +229,46 @@ def _set_output_data(span, response, kwargs, integration, finish_span=True):
         if should_send_default_pii() and integration.include_prompts:
             response_text = [choice.message.dict() for choice in response.choices]
             if len(response_text) > 0:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    safe_serialize(response_text),
-                )
+                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text)
+
         _calculate_token_usage(messages, response, span, None, integration.count_tokens)
+
         if finish_span:
             span.__exit__(None, None, None)
 
     elif hasattr(response, "output"):
         if should_send_default_pii() and integration.include_prompts:
-            response_text = [item.to_dict() for item in response.output]
-            if len(response_text) > 0:
+            output_messages = {
+                "response": [],
+                "tool": [],
+            }  # type: (dict[str, list[Any]])
+
+            for output in response.output:
+                if output.type == "function_call":
+                    output_messages["tool"].append(output.dict())
+                elif output.type == "message":
+                    for output_message in output.content:
+                        try:
+                            output_messages["response"].append(output_message.text)
+                        except AttributeError:
+                            # Unknown output message type, just return the json
+                            output_messages["response"].append(output_message.dict())
+
+            if len(output_messages["tool"]) > 0:
                 set_data_normalized(
                     span,
-                    SPANDATA.GEN_AI_RESPONSE_TEXT,
-                    safe_serialize(response_text),
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                    output_messages["tool"],
+                    unpack=False,
                 )
+
+            if len(output_messages["response"]) > 0:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+                )
+
         _calculate_token_usage(messages, response, span, None, integration.count_tokens)
+
         if finish_span:
             span.__exit__(None, None, None)
 
@@ -516,7 +539,7 @@ def _wrap_embeddings_create(f):
             try:
                 result = f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
+                _capture_exception(e, manual_span_cleanup=False)
                 raise e from None
 
             return gen.send(result)
@@ -550,7 +573,7 @@ def _wrap_async_embeddings_create(f):
             try:
                 result = await f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(e)
+                _capture_exception(e, manual_span_cleanup=False)
                 raise e from None
 
             return gen.send(result)

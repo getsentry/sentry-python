@@ -42,8 +42,8 @@
     # Use Docker container only for Python 3.6
     {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         {% raw %}if: ${{ matrix.python-version != '3.6' }}{% endraw %}
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
@@ -61,7 +61,7 @@
 
       {% if needs_java %}
       - name: Install Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -100,7 +100,7 @@
 
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        uses: codecov/codecov-action@v5.4.3
+        uses: codecov/codecov-action@v5.5.1
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
           files: coverage.xml

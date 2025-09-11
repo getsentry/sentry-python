@@ -792,9 +792,12 @@ class OP:
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
     GEN_AI_CHAT = "gen_ai.chat"
+    GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
+    GEN_AI_GENERATE_TEXT = "gen_ai.generate_text"
     GEN_AI_HANDOFF = "gen_ai.handoff"
+    GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
     GEN_AI_RESPONSES = "gen_ai.responses"
     GRAPHQL_EXECUTE = "graphql.execute"
@@ -822,11 +825,6 @@ class OP:
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
-    LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
-    LANGCHAIN_RUN = "ai.run.langchain"
-    LANGCHAIN_TOOL = "ai.tool.langchain"
-    LANGCHAIN_AGENT = "ai.agent.langchain"
-    LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
@@ -1333,4 +1331,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.34.1"
+VERSION = "2.37.1"
