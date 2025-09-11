@@ -1036,7 +1036,7 @@ def test_ai_client_span_responses_api(sentry_init, capture_events):
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
-        "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
+        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.system": "openai",
         "gen_ai.response.model": "response-model-id",
@@ -1045,7 +1045,7 @@ def test_ai_client_span_responses_api(sentry_init, capture_events):
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
-        "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "gen_ai.response.text": "the model response",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1116,7 +1116,7 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
-        "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
+        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.system": "openai",
@@ -1125,7 +1125,7 @@ async def test_ai_client_span_responses_async_api(sentry_init, capture_events):
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
-        "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "gen_ai.response.text": "the model response",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1162,7 +1162,7 @@ async def test_ai_client_span_streaming_responses_async_api(
     assert spans[0]["origin"] == "auto.ai.openai"
     assert spans[0]["data"] == {
         "gen_ai.operation.name": "responses",
-        "gen_ai.request.messages": "How do I check if a Python object is an instance of a class?",
+        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
         "gen_ai.request.model": "gpt-4o",
         "gen_ai.response.model": "response-model-id",
         "gen_ai.response.streaming": True,
@@ -1172,7 +1172,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         "gen_ai.usage.output_tokens": 10,
         "gen_ai.usage.output_tokens.reasoning": 8,
         "gen_ai.usage.total_tokens": 30,
-        "gen_ai.response.text": '[{"id": "message-id", "content": [{"annotations": [], "text": "the model response", "type": "output_text"}], "role": "assistant", "status": "completed", "type": "message"}]',
+        "gen_ai.response.text": "the model response",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }
@@ -1332,7 +1332,7 @@ def test_streaming_responses_api(
     assert span["op"] == "gen_ai.responses"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == "hello"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -1387,7 +1387,7 @@ async def test_streaming_responses_api_async(
     assert span["op"] == "gen_ai.responses"
 
     if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == "hello"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]

@@ -110,7 +110,7 @@ def test_scheduled_event(app, lambda_context_args):
 
 
 @pytest.mark.skipif(
-    parse_version(CHALICE_VERSION) >= (1, 28),
+    parse_version(CHALICE_VERSION) >= (1, 26, 0),
     reason="different behavior based on chalice version",
 )
 def test_bad_request_old(client: RequestHandler) -> None:
@@ -124,7 +124,7 @@ def test_bad_request_old(client: RequestHandler) -> None:
 
 
 @pytest.mark.skipif(
-    parse_version(CHALICE_VERSION) < (1, 28),
+    parse_version(CHALICE_VERSION) < (1, 26, 0),
     reason="different behavior based on chalice version",
 )
 def test_bad_request(client: RequestHandler) -> None:
