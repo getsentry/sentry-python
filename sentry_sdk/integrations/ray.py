@@ -3,8 +3,8 @@ import sys
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
-from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     event_from_exception,
     logger,
@@ -42,73 +42,81 @@ def _patch_ray_remote():
     old_remote = ray.remote
 
     @functools.wraps(old_remote)
-    def new_remote(f, *args, **kwargs):
-        # type: (Callable[..., Any], *Any, **Any) -> Callable[..., Any]
+    def new_remote(f=None, *args, **kwargs):
+        # type: (Optional[Callable[..., Any]], *Any, **Any) -> Callable[..., Any]
+
         if inspect.isclass(f):
             # Ray Actors
             # (https://docs.ray.io/en/latest/ray-core/actors.html)
             # are not supported
             # (Only Ray Tasks are supported)
-            return old_remote(f, *args, *kwargs)
+            return old_remote(f, *args, **kwargs)
 
-        def _f(*f_args, _tracing=None, **f_kwargs):
-            # type: (Any, Optional[dict[str, Any]],  Any) -> Any
-            """
-            Ray Worker
-            """
-            _check_sentry_initialized()
+        def wrapper(user_f):
+            # type: (Callable[..., Any]) -> Any
+            def new_func(*f_args, _tracing=None, **f_kwargs):
+                # type: (Any, Optional[dict[str, Any]], Any) -> Any
+                _check_sentry_initialized()
 
-            transaction = sentry_sdk.continue_trace(
-                _tracing or {},
-                op=OP.QUEUE_TASK_RAY,
-                name=qualname_from_function(f),
-                origin=RayIntegration.origin,
-                source=TRANSACTION_SOURCE_TASK,
-            )
+                transaction = sentry_sdk.continue_trace(
+                    _tracing or {},
+                    op=OP.QUEUE_TASK_RAY,
+                    name=qualname_from_function(user_f),
+                    origin=RayIntegration.origin,
+                    source=TransactionSource.TASK,
+                )
 
-            with sentry_sdk.start_transaction(transaction) as transaction:
-                try:
-                    result = f(*f_args, **f_kwargs)
-                    transaction.set_status(SPANSTATUS.OK)
-                except Exception:
-                    transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    exc_info = sys.exc_info()
-                    _capture_exception(exc_info)
-                    reraise(*exc_info)
+                with sentry_sdk.start_transaction(transaction) as transaction:
+                    try:
+                        result = user_f(*f_args, **f_kwargs)
+                        transaction.set_status(SPANSTATUS.OK)
+                    except Exception:
+                        transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+                        exc_info = sys.exc_info()
+                        _capture_exception(exc_info)
+                        reraise(*exc_info)
 
-                return result
+                    return result
 
-        rv = old_remote(_f, *args, *kwargs)
-        old_remote_method = rv.remote
+            if f:
+                rv = old_remote(new_func)
+            else:
+                rv = old_remote(*args, **kwargs)(new_func)
+            old_remote_method = rv.remote
 
-        def _remote_method_with_header_propagation(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-            """
-            Ray Client
-            """
-            with sentry_sdk.start_span(
-                op=OP.QUEUE_SUBMIT_RAY,
-                name=qualname_from_function(f),
-                origin=RayIntegration.origin,
-            ) as span:
-                tracing = {
-                    k: v
-                    for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
-                }
-                try:
-                    result = old_remote_method(*args, **kwargs, _tracing=tracing)
-                    span.set_status(SPANSTATUS.OK)
-                except Exception:
-                    span.set_status(SPANSTATUS.INTERNAL_ERROR)
-                    exc_info = sys.exc_info()
-                    _capture_exception(exc_info)
-                    reraise(*exc_info)
+            def _remote_method_with_header_propagation(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+                """
+                Ray Client
+                """
+                with sentry_sdk.start_span(
+                    op=OP.QUEUE_SUBMIT_RAY,
+                    name=qualname_from_function(user_f),
+                    origin=RayIntegration.origin,
+                ) as span:
+                    tracing = {
+                        k: v
+                        for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+                    }
+                    try:
+                        result = old_remote_method(*args, **kwargs, _tracing=tracing)
+                        span.set_status(SPANSTATUS.OK)
+                    except Exception:
+                        span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                        exc_info = sys.exc_info()
+                        _capture_exception(exc_info)
+                        reraise(*exc_info)
 
-                return result
+                    return result
 
-        rv.remote = _remote_method_with_header_propagation
+            rv.remote = _remote_method_with_header_propagation
 
-        return rv
+            return rv
+
+        if f is not None:
+            return wrapper(f)
+        else:
+            return wrapper
 
     ray.remote = new_remote
 
@@ -136,11 +144,6 @@ class RayIntegration(Integration):
     def setup_once():
         # type: () -> None
         version = package_version("ray")
-
-        if version is None:
-            raise DidNotEnable("Unparsable ray version: {}".format(version))
-
-        if version < (2, 7, 0):
-            raise DidNotEnable("Ray 2.7.0 or newer required")
+        _check_minimum_version(RayIntegration, version)
 
         _patch_ray_remote()

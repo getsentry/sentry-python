@@ -75,11 +75,12 @@ def _patch_cache_method(cache, method_name, address, port):
                         span.set_data(SPANDATA.CACHE_HIT, True)
                     else:
                         span.set_data(SPANDATA.CACHE_HIT, False)
-                else:
-                    try:
+                else:  # TODO: We don't handle `get_or_set` which we should
+                    arg_count = len(args)
+                    if arg_count >= 2:
                         # 'set' command
                         item_size = len(str(args[1]))
-                    except IndexError:
+                    elif arg_count == 1:
                         # 'set_many' command
                         item_size = len(str(args[0]))
 
@@ -132,10 +133,22 @@ def _get_address_port(settings):
     return address, int(port) if port is not None else None
 
 
-def patch_caching():
-    # type: () -> None
+def should_enable_cache_spans():
+    # type: () -> bool
     from sentry_sdk.integrations.django import DjangoIntegration
 
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(DjangoIntegration)
+    from django.conf import settings
+
+    return integration is not None and (
+        (client.spotlight is not None and settings.DEBUG is True)
+        or integration.cache_spans is True
+    )
+
+
+def patch_caching():
+    # type: () -> None
     if not hasattr(CacheHandler, "_sentry_patched"):
         if DJANGO_VERSION < (3, 2):
             original_get_item = CacheHandler.__getitem__
@@ -145,8 +158,7 @@ def patch_caching():
                 # type: (CacheHandler, str) -> Any
                 cache = original_get_item(self, alias)
 
-                integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-                if integration is not None and integration.cache_spans:
+                if should_enable_cache_spans():
                     from django.conf import settings
 
                     address, port = _get_address_port(
@@ -168,8 +180,7 @@ def patch_caching():
                 # type: (CacheHandler, str) -> Any
                 cache = original_create_connection(self, alias)
 
-                integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-                if integration is not None and integration.cache_spans:
+                if should_enable_cache_spans():
                     address, port = _get_address_port(self.settings[alias or "default"])
 
                     _patch_cache(cache, address, port)

@@ -126,7 +126,7 @@ pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integr
 
 ## Releasing a New Version
 
-_(only relevant for Sentry employees)_
+_(only relevant for Python SDK core team)_
 
 ### Prerequisites
 
@@ -138,18 +138,18 @@ _(only relevant for Sentry employees)_
 
 - On GitHub in the `sentry-python` repository, go to "Actions" and select the "Release" workflow.
 - Click on "Run workflow" on the right side, and make sure the `master` branch is selected.
-- Set the "Version to release" input field. Here you decide if it is a major, minor or patch release. (See "Versioning Policy" below)
+- Set the "Version to release" input field. Here you decide if it is a major, minor or patch release (see "Versioning Policy" below).
 - Click "Run Workflow".
 
-This will trigger [Craft](https://github.com/getsentry/craft) to prepare everything needed for a release. (For more information, see [craft prepare](https://github.com/getsentry/craft#craft-prepare-preparing-a-new-release).) At the end of this process a release issue is created in the [Publish](https://github.com/getsentry/publish) repository. (Example release issue: https://github.com/getsentry/publish/issues/815)
+This will trigger [Craft](https://github.com/getsentry/craft) to prepare everything needed for a release. (For more information, see [craft prepare](https://github.com/getsentry/craft#craft-prepare-preparing-a-new-release).) At the end of this process a release issue is created in the [Publish](https://github.com/getsentry/publish) repository (example issue: https://github.com/getsentry/publish/issues/815).
 
-Now one of the persons with release privileges (most probably your engineering manager) will review this issue and then add the `accepted` label to the issue.
+At the same time, the action will create a release branch in the `sentry-python` repository called `release/<version>`. You may want to check out this branch and polish the auto-generated `CHANGELOG.md` before proceeding by including code snippets, descriptions, reordering and reformatting entries, in order to make the changelog as useful and actionable to users as possible.
 
-There are always two persons involved in a release.
+CI must be passing on the release branch; if there's any failure, Craft will not create a release.
 
-If you are in a hurry and the release should be out immediately, there is a Slack channel called `#proj-release-approval` where you can see your release issue and where you can ping people to please have a look immediately.
+Once the release branch is ready and green, notify your team (or your manager). They will need to add the `accepted` label to the issue in the `publish` repo. There are always two people involved in a release. Do not accept your own releases.
 
-When the release issue is labeled `accepted`, [Craft](https://github.com/getsentry/craft) is triggered again to publish the release to all the right platforms. (See [craft publish](https://github.com/getsentry/craft#craft-publish-publishing-the-release) for more information.) At the end of this process the release issue on GitHub will be closed and the release is completed! Congratulations!
+When the release issue is labeled `accepted`, [Craft](https://github.com/getsentry/craft) is triggered again to publish the release to all the right platforms. See [craft publish](https://github.com/getsentry/craft#craft-publish-publishing-the-release) for more information. At the end of this process, the release issue on GitHub will be closed and the release is completed! Congratulations!
 
 There is a sequence diagram visualizing all this in the [README.md](https://github.com/getsentry/publish) of the `Publish` repository.
 
@@ -182,14 +182,14 @@ You need to have an AWS account and AWS CLI installed and setup.
 
 We put together two helper functions that can help you with development:
 
-- `./scripts/aws-deploy-local-layer.sh`
+- `./scripts/aws/aws-deploy-local-layer.sh`
 
-  This script [scripts/aws-deploy-local-layer.sh](scripts/aws-deploy-local-layer.sh) will take the code you have checked out locally, create a Lambda layer out of it and deploy it to the `eu-central-1` region of your configured AWS account using `aws` CLI.
+  This script [scripts/aws/aws-deploy-local-layer.sh](scripts/aws/aws-deploy-local-layer.sh) will take the code you have checked out locally, create a Lambda layer out of it and deploy it to the `eu-central-1` region of your configured AWS account using `aws` CLI.
 
   The Lambda layer will have the name `SentryPythonServerlessSDK-local-dev`
 
-- `./scripts/aws-attach-layer-to-lambda-function.sh`
+- `./scripts/aws/aws-attach-layer-to-lambda-function.sh`
 
-  You can use this script [scripts/aws-attach-layer-to-lambda-function.sh](scripts/aws-attach-layer-to-lambda-function.sh) to attach the Lambda layer you just deployed (using the first script) onto one of your existing Lambda functions. You will have to give the name of the Lambda function to attach onto as an argument. (See the script for details.)
+  You can use this script [scripts/aws/aws-attach-layer-to-lambda-function.sh](scripts/aws/aws-attach-layer-to-lambda-function.sh) to attach the Lambda layer you just deployed (using the first script) onto one of your existing Lambda functions. You will have to give the name of the Lambda function to attach onto as an argument. (See the script for details.)
 
 With these two helper scripts it should be easy to rapidly iterate your development on the Lambda layer.

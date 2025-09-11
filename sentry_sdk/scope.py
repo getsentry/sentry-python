@@ -1,7 +1,7 @@
 import os
 import sys
 import warnings
-from copy import copy
+from copy import copy, deepcopy
 from collections import deque
 from contextlib import contextmanager
 from enum import Enum
@@ -9,9 +9,15 @@ from datetime import datetime, timezone
 from functools import wraps
 from itertools import chain
 
+from sentry_sdk._types import AnnotatedValue
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
+from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
+from sentry_sdk.profiler.continuous_profiler import (
+    get_profiler_id,
+    try_autostart_continuous_profiler,
+    try_profile_lifecycle_trace_start,
+)
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
@@ -38,10 +44,11 @@ from sentry_sdk.utils import (
     logger,
 )
 
+import typing
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, MutableMapping
+    from collections.abc import Mapping
 
     from typing import Any
     from typing import Callable
@@ -180,6 +187,7 @@ class Scope:
         "_contexts",
         "_extras",
         "_breadcrumbs",
+        "_n_breadcrumbs_truncated",
         "_event_processors",
         "_error_processors",
         "_should_capture",
@@ -192,6 +200,7 @@ class Scope:
         "client",
         "_type",
         "_last_event_id",
+        "_flags",
     )
 
     def __init__(self, ty=None, client=None):
@@ -203,6 +212,7 @@ class Scope:
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[PropagationContext]
+        self._n_breadcrumbs_truncated = 0  # type: int
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -223,31 +233,35 @@ class Scope:
         rv = object.__new__(self.__class__)  # type: Scope
 
         rv._type = self._type
+        rv.client = self.client
         rv._level = self._level
         rv._name = self._name
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
-        rv._transaction_info = dict(self._transaction_info)
+        rv._transaction_info = self._transaction_info.copy()
         rv._user = self._user
 
-        rv._tags = dict(self._tags)
-        rv._contexts = dict(self._contexts)
-        rv._extras = dict(self._extras)
+        rv._tags = self._tags.copy()
+        rv._contexts = self._contexts.copy()
+        rv._extras = self._extras.copy()
 
         rv._breadcrumbs = copy(self._breadcrumbs)
-        rv._event_processors = list(self._event_processors)
-        rv._error_processors = list(self._error_processors)
+        rv._n_breadcrumbs_truncated = self._n_breadcrumbs_truncated
+        rv._event_processors = self._event_processors.copy()
+        rv._error_processors = self._error_processors.copy()
         rv._propagation_context = self._propagation_context
 
         rv._should_capture = self._should_capture
         rv._span = self._span
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
-        rv._attachments = list(self._attachments)
+        rv._attachments = self._attachments.copy()
 
         rv._profile = self._profile
 
         rv._last_event_id = self._last_event_id
+
+        rv._flags = deepcopy(self._flags)
 
         return rv
 
@@ -616,6 +630,11 @@ class Scope:
         """
         client = self.get_client()
         if not client.options.get("propagate_traces"):
+            warnings.warn(
+                "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             return
 
         span = kwargs.pop("span", None)
@@ -664,12 +683,12 @@ class Scope:
         self._level = None  # type: Optional[LogLevelStr]
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
-        self._transaction_info = {}  # type: MutableMapping[str, str]
+        self._transaction_info = {}  # type: dict[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
         self._contexts = {}  # type: Dict[str, Dict[str, Any]]
-        self._extras = {}  # type: MutableMapping[str, Any]
+        self._extras = {}  # type: dict[str, Any]
         self._attachments = []  # type: List[Attachment]
 
         self.clear_breadcrumbs()
@@ -685,6 +704,7 @@ class Scope:
 
         # self._last_event_id is only applicable to isolation scopes
         self._last_event_id = None  # type: Optional[str]
+        self._flags = None  # type: Optional[FlagBuffer]
 
     @_attr_setter
     def level(self, value):
@@ -778,6 +798,11 @@ class Scope:
     def user(self, value):
         # type: (Optional[Dict[str, Any]]) -> None
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
+        warnings.warn(
+            "The `Scope.user` setter is deprecated in favor of `Scope.set_user()`.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.set_user(value)
 
     def set_user(self, value):
@@ -895,6 +920,7 @@ class Scope:
         # type: () -> None
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
+        self._n_breadcrumbs_truncated = 0
 
     def add_attachment(
         self,
@@ -962,6 +988,7 @@ class Scope:
 
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
+            self._n_breadcrumbs_truncated += 1
 
     def start_transaction(
         self,
@@ -1032,6 +1059,18 @@ class Scope:
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
+        # update the sample rate in the dsc
+        if transaction.sample_rate is not None:
+            propagation_context = self.get_active_propagation_context()
+            if propagation_context:
+                dsc = propagation_context.dynamic_sampling_context
+                if dsc is not None:
+                    dsc["sample_rate"] = str(transaction.sample_rate)
+            if transaction._baggage:
+                transaction._baggage.sentry_items["sample_rate"] = str(
+                    transaction.sample_rate
+                )
+
         if transaction.sampled:
             profile = Profile(
                 transaction.sampled, transaction._start_timestamp_monotonic_ns
@@ -1039,6 +1078,14 @@ class Scope:
             profile._set_initial_sampling_decision(sampling_context=sampling_context)
 
             transaction._profile = profile
+
+            transaction._continuous_profile = try_profile_lifecycle_trace_start()
+
+            # Typically, the profiler is set when the transaction is created. But when
+            # using the auto lifecycle, the profiler isn't running when the first
+            # transaction is started. So make sure we update the profiler id on it.
+            if transaction._continuous_profile is not None:
+                transaction.set_profiler_id(get_profiler_id())
 
             # we don't bother to keep spans if we already know we're not going to
             # send the transaction
@@ -1111,8 +1158,20 @@ class Scope:
         """
         self.generate_propagation_context(environ_or_headers)
 
+        # When we generate the propagation context, the sample_rand value is set
+        # if missing or invalid (we use the original value if it's valid).
+        # We want the transaction to use the same sample_rand value. Due to duplicated
+        # propagation logic in the transaction, we pass it in to avoid recomputing it
+        # in the transaction.
+        # TYPE SAFETY: self.generate_propagation_context() ensures that self._propagation_context
+        # is not None.
+        sample_rand = typing.cast(
+            PropagationContext, self._propagation_context
+        )._sample_rand()
+
         transaction = Transaction.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
+            _sample_rand=sample_rand,
             op=op,
             origin=origin,
             name=name,
@@ -1313,17 +1372,23 @@ class Scope:
 
     def _apply_breadcrumbs_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
-            self._breadcrumbs
-        )
+        event.setdefault("breadcrumbs", {})
+
+        # This check is just for mypy -
+        if not isinstance(event["breadcrumbs"], AnnotatedValue):
+            event["breadcrumbs"].setdefault("values", [])
+            event["breadcrumbs"]["values"].extend(self._breadcrumbs)
 
         # Attempt to sort timestamps
         try:
-            for crumb in event["breadcrumbs"]["values"]:
-                if isinstance(crumb["timestamp"], str):
-                    crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
+            if not isinstance(event["breadcrumbs"], AnnotatedValue):
+                for crumb in event["breadcrumbs"]["values"]:
+                    if isinstance(crumb["timestamp"], str):
+                        crumb["timestamp"] = datetime_from_isoformat(crumb["timestamp"])
 
-            event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
+                event["breadcrumbs"]["values"].sort(
+                    key=lambda crumb: crumb["timestamp"]
+                )
         except Exception as err:
             logger.debug("Error when sorting breadcrumbs", exc_info=err)
             pass
@@ -1371,6 +1436,14 @@ class Scope:
                 contexts["trace"] = self._span.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()
+
+    def _apply_flags_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+        flags = self.flags.get()
+        if len(flags) > 0:
+            event.setdefault("contexts", {}).setdefault("flags", {}).update(
+                {"values": flags}
+            )
 
     def _drop(self, cause, ty):
         # type: (Any, str) -> Optional[Any]
@@ -1470,6 +1543,7 @@ class Scope:
 
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
+            self._apply_flags_to_event(event, hint, options)
 
         event = self.run_error_processors(event, hint)
         if event is None:
@@ -1502,6 +1576,10 @@ class Scope:
             self._extras.update(scope._extras)
         if scope._breadcrumbs:
             self._breadcrumbs.extend(scope._breadcrumbs)
+        if scope._n_breadcrumbs_truncated:
+            self._n_breadcrumbs_truncated = (
+                self._n_breadcrumbs_truncated + scope._n_breadcrumbs_truncated
+            )
         if scope._span:
             self._span = scope._span
         if scope._attachments:
@@ -1512,13 +1590,19 @@ class Scope:
             self._propagation_context = scope._propagation_context
         if scope._session:
             self._session = scope._session
+        if scope._flags:
+            if not self._flags:
+                self._flags = deepcopy(scope._flags)
+            else:
+                for flag in scope._flags.get():
+                    self._flags.set(flag["flag"], flag["result"])
 
     def update_from_kwargs(
         self,
         user=None,  # type: Optional[Any]
         level=None,  # type: Optional[LogLevelStr]
         extras=None,  # type: Optional[Dict[str, Any]]
-        contexts=None,  # type: Optional[Dict[str, Any]]
+        contexts=None,  # type: Optional[Dict[str, Dict[str, Any]]]
         tags=None,  # type: Optional[Dict[str, str]]
         fingerprint=None,  # type: Optional[List[str]]
     ):
@@ -1545,6 +1629,17 @@ class Scope:
             self._name,
             self._type,
         )
+
+    @property
+    def flags(self):
+        # type: () -> FlagBuffer
+        if self._flags is None:
+            max_flags = (
+                self.get_client().options["_experiments"].get("max_flags")
+                or DEFAULT_FLAG_CAPACITY
+            )
+            self._flags = FlagBuffer(capacity=max_flags)
+        return self._flags
 
 
 @contextmanager
@@ -1578,8 +1673,11 @@ def new_scope():
         yield new_scope
 
     finally:
-        # restore original scope
-        _current_scope.reset(token)
+        try:
+            # restore original scope
+            _current_scope.reset(token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1613,8 +1711,11 @@ def use_scope(scope):
         yield scope
 
     finally:
-        # restore original scope
-        _current_scope.reset(token)
+        try:
+            # restore original scope
+            _current_scope.reset(token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1655,8 +1756,15 @@ def isolation_scope():
 
     finally:
         # restore original scopes
-        _current_scope.reset(current_token)
-        _isolation_scope.reset(isolation_token)
+        try:
+            _current_scope.reset(current_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
+
+        try:
+            _isolation_scope.reset(isolation_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 @contextmanager
@@ -1695,8 +1803,15 @@ def use_isolation_scope(isolation_scope):
 
     finally:
         # restore original scopes
-        _current_scope.reset(current_token)
-        _isolation_scope.reset(isolation_token)
+        try:
+            _current_scope.reset(current_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
+
+        try:
+            _isolation_scope.reset(isolation_token)
+        except LookupError:
+            capture_internal_exception(sys.exc_info())
 
 
 def should_send_default_pii():

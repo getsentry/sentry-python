@@ -26,13 +26,17 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY37
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
+from sentry_sdk.consts import (
+    DEFAULT_ADD_FULL_STACK,
+    DEFAULT_MAX_STACK_FRAMES,
+    DEFAULT_MAX_VALUE_LENGTH,
+    EndpointType,
+)
+from sentry_sdk._types import Annotated, AnnotatedValue, SENSITIVE_DATA_SUBSTITUTE
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
-
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -55,7 +59,7 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    from sentry_sdk._types import Event, ExcInfo
+    from sentry_sdk._types import Event, ExcInfo, Log, Hint
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -70,10 +74,17 @@ _installed_modules = None
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
-SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
-
 FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
 TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
+
+MAX_STACK_FRAMES = 2000
+"""Maximum number of stack frames to send to Sentry.
+
+If we have more than this number of stack frames, we will stop processing
+the stacktrace to avoid getting stuck in a long-lasting loop. This value
+exceeds the default sys.getrecursionlimit() of 1000, so users will only
+be affected by this limit if they have a custom recursion limit.
+"""
 
 
 def env_to_bool(value, *, strict=False):
@@ -401,84 +412,6 @@ class Auth:
         return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
 
 
-class AnnotatedValue:
-    """
-    Meta information for a data field in the event payload.
-    This is to tell Relay that we have tampered with the fields value.
-    See:
-    https://github.com/getsentry/relay/blob/be12cd49a0f06ea932ed9b9f93a655de5d6ad6d1/relay-general/src/types/meta.rs#L407-L423
-    """
-
-    __slots__ = ("value", "metadata")
-
-    def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
-        self.value = value
-        self.metadata = metadata
-
-    def __eq__(self, other):
-        # type: (Any) -> bool
-        if not isinstance(other, AnnotatedValue):
-            return False
-
-        return self.value == other.value and self.metadata == other.metadata
-
-    @classmethod
-    def removed_because_raw_data(cls):
-        # type: () -> AnnotatedValue
-        """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
-        return AnnotatedValue(
-            value="",
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!raw",  # Unparsable raw data
-                        "x",  # The fields original value was removed
-                    ]
-                ]
-            },
-        )
-
-    @classmethod
-    def removed_because_over_size_limit(cls):
-        # type: () -> AnnotatedValue
-        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
-        return AnnotatedValue(
-            value="",
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!config",  # Because of configured maximum size
-                        "x",  # The fields original value was removed
-                    ]
-                ]
-            },
-        )
-
-    @classmethod
-    def substituted_because_contains_sensitive_data(cls):
-        # type: () -> AnnotatedValue
-        """The actual value was removed because it contained sensitive information."""
-        return AnnotatedValue(
-            value=SENSITIVE_DATA_SUBSTITUTE,
-            metadata={
-                "rem": [  # Remark
-                    [
-                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
-                        "s",  # The fields original value was substituted
-                    ]
-                ]
-            },
-        )
-
-
-if TYPE_CHECKING:
-    from typing import TypeVar
-
-    T = TypeVar("T")
-    Annotated = Union[AnnotatedValue, T]
-
-
 def get_type_name(cls):
     # type: (Optional[type]) -> Optional[str]
     return getattr(cls, "__qualname__", None) or getattr(cls, "__name__", None)
@@ -568,7 +501,7 @@ def get_lines_from_file(
 
 def get_source_context(
     frame,  # type: FrameType
-    tb_lineno,  # type: int
+    tb_lineno,  # type: Optional[int]
     max_value_length=None,  # type: Optional[int]
 ):
     # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
@@ -584,11 +517,13 @@ def get_source_context(
         loader = frame.f_globals["__loader__"]
     except Exception:
         loader = None
-    lineno = tb_lineno - 1
-    if lineno is not None and abs_path:
+
+    if tb_lineno is not None and abs_path:
+        lineno = tb_lineno - 1
         return get_lines_from_file(
             abs_path, lineno, max_value_length, loader=loader, module=module
         )
+
     return [], None, []
 
 
@@ -656,9 +591,14 @@ def serialize_frame(
     if tb_lineno is None:
         tb_lineno = frame.f_lineno
 
+    try:
+        os_abs_path = os.path.abspath(abs_path) if abs_path else None
+    except Exception:
+        os_abs_path = None
+
     rv = {
         "filename": filename_for_module(module, abs_path) or None,
-        "abs_path": os.path.abspath(abs_path) if abs_path else None,
+        "abs_path": os_abs_path,
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb_lineno,
@@ -739,6 +679,7 @@ def single_exception_from_error_tuple(
     exception_id=None,  # type: Optional[int]
     parent_id=None,  # type: Optional[int]
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Dict[str, Any]
     """
@@ -805,11 +746,29 @@ def single_exception_from_error_tuple(
             max_value_length=max_value_length,
             custom_repr=custom_repr,
         )
-        for tb in iter_stacks(tb)
-    ]
+        # Process at most MAX_STACK_FRAMES + 1 frames, to avoid hanging on
+        # processing a super-long stacktrace.
+        for tb, _ in zip(iter_stacks(tb), range(MAX_STACK_FRAMES + 1))
+    ]  # type: List[Dict[str, Any]]
 
-    if frames:
-        exception_value["stacktrace"] = {"frames": frames}
+    if len(frames) > MAX_STACK_FRAMES:
+        # If we have more frames than the limit, we remove the stacktrace completely.
+        # We don't trim the stacktrace here because we have not processed the whole
+        # thing (see above, we stop at MAX_STACK_FRAMES + 1). Normally, Relay would
+        # intelligently trim by removing frames in the middle of the stacktrace, but
+        # since we don't have the whole stacktrace, we can't do that. Instead, we
+        # drop the entire stacktrace.
+        exception_value["stacktrace"] = AnnotatedValue.removed_because_over_size_limit(
+            value=None
+        )
+
+    elif frames:
+        if not full_stack:
+            new_frames = frames
+        else:
+            new_frames = merge_stack_frames(frames, full_stack, client_options)
+
+        exception_value["stacktrace"] = {"frames": new_frames}
 
     return exception_value
 
@@ -864,6 +823,7 @@ def exceptions_from_error(
     exception_id=0,  # type: int
     parent_id=0,  # type: int
     source=None,  # type: Optional[str]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> Tuple[int, List[Dict[str, Any]]]
     """
@@ -883,6 +843,7 @@ def exceptions_from_error(
         exception_id=exception_id,
         parent_id=parent_id,
         source=source,
+        full_stack=full_stack,
     )
     exceptions = [parent]
 
@@ -908,6 +869,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__cause__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -929,6 +891,7 @@ def exceptions_from_error(
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__context__",
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -945,6 +908,7 @@ def exceptions_from_error(
                 exception_id=exception_id,
                 parent_id=parent_id,
                 source="exceptions[%s]" % idx,
+                full_stack=full_stack,
             )
             exceptions.extend(child_exceptions)
 
@@ -955,6 +919,7 @@ def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
+    full_stack=None,  # type: Optional[list[dict[str, Any]]]
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
@@ -972,6 +937,7 @@ def exceptions_from_error_tuple(
             mechanism=mechanism,
             exception_id=0,
             parent_id=0,
+            full_stack=full_stack,
         )
 
     else:
@@ -979,7 +945,12 @@ def exceptions_from_error_tuple(
         for exc_type, exc_value, tb in walk_exception_chain(exc_info):
             exceptions.append(
                 single_exception_from_error_tuple(
-                    exc_type, exc_value, tb, client_options, mechanism
+                    exc_type=exc_type,
+                    exc_value=exc_value,
+                    tb=tb,
+                    client_options=client_options,
+                    mechanism=mechanism,
+                    full_stack=full_stack,
                 )
             )
 
@@ -997,7 +968,7 @@ def to_string(value):
 
 
 def iter_event_stacktraces(event):
-    # type: (Event) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Annotated[Dict[str, Any]]]
     if "stacktrace" in event:
         yield event["stacktrace"]
     if "threads" in event:
@@ -1006,13 +977,16 @@ def iter_event_stacktraces(event):
                 yield thread["stacktrace"]
     if "exception" in event:
         for exception in event["exception"].get("values") or ():
-            if "stacktrace" in exception:
+            if isinstance(exception, dict) and "stacktrace" in exception:
                 yield exception["stacktrace"]
 
 
 def iter_event_frames(event):
     # type: (Event) -> Iterator[Dict[str, Any]]
     for stacktrace in iter_event_stacktraces(event):
+        if isinstance(stacktrace, AnnotatedValue):
+            stacktrace = stacktrace.value or {}
+
         for frame in stacktrace.get("frames") or ():
             yield frame
 
@@ -1020,6 +994,9 @@ def iter_event_frames(event):
 def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
     # type: (Event, Optional[List[str]], Optional[List[str]], Optional[str]) -> Event
     for stacktrace in iter_event_stacktraces(event):
+        if isinstance(stacktrace, AnnotatedValue):
+            stacktrace = stacktrace.value or {}
+
         set_in_app_in_frames(
             stacktrace.get("frames"),
             in_app_exclude=in_app_exclude,
@@ -1098,6 +1075,46 @@ def exc_info_from_error(error):
     return exc_info
 
 
+def merge_stack_frames(frames, full_stack, client_options):
+    # type: (List[Dict[str, Any]], List[Dict[str, Any]], Optional[Dict[str, Any]]) -> List[Dict[str, Any]]
+    """
+    Add the missing frames from full_stack to frames and return the merged list.
+    """
+    frame_ids = {
+        (
+            frame["abs_path"],
+            frame["context_line"],
+            frame["lineno"],
+            frame["function"],
+        )
+        for frame in frames
+    }
+
+    new_frames = [
+        stackframe
+        for stackframe in full_stack
+        if (
+            stackframe["abs_path"],
+            stackframe["context_line"],
+            stackframe["lineno"],
+            stackframe["function"],
+        )
+        not in frame_ids
+    ]
+    new_frames.extend(frames)
+
+    # Limit the number of frames
+    max_stack_frames = (
+        client_options.get("max_stack_frames", DEFAULT_MAX_STACK_FRAMES)
+        if client_options
+        else None
+    )
+    if max_stack_frames is not None:
+        new_frames = new_frames[len(new_frames) - max_stack_frames :]
+
+    return new_frames
+
+
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
     client_options=None,  # type: Optional[Dict[str, Any]]
@@ -1106,12 +1123,21 @@ def event_from_exception(
     # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
+
+    if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
+        full_stack = current_stacktrace(
+            include_local_variables=client_options["include_local_variables"],
+            max_value_length=client_options["max_value_length"],
+        )["frames"]
+    else:
+        full_stack = None
+
     return (
         {
             "level": "error",
             "exception": {
                 "values": exceptions_from_error_tuple(
-                    exc_info, client_options, mechanism
+                    exc_info, client_options, mechanism, full_stack
                 )
             },
         },
@@ -1429,7 +1455,7 @@ def qualname_from_function(func):
 
     # Python 3: methods, functions, classes
     if func_qualname is not None:
-        if hasattr(func, "__module__"):
+        if hasattr(func, "__module__") and isinstance(func.__module__, str):
             func_qualname = func.__module__ + "." + func_qualname
         func_qualname = prefix + func_qualname + suffix
 
@@ -1672,7 +1698,7 @@ def _generate_installed_modules():
 
         yielded = set()
         for dist in metadata.distributions():
-            name = dist.metadata["Name"]
+            name = dist.metadata.get("Name", None)  # type: ignore[attr-defined]
             # `metadata` values may be `None`, see:
             # https://github.com/python/cpython/issues/91216
             # and
@@ -1728,12 +1754,6 @@ def reraise(tp, value, tb=None):
 def _no_op(*_a, **_k):
     # type: (*Any, **Any) -> None
     """No-op function for ensure_integration_enabled."""
-    pass
-
-
-async def _no_op_async(*_a, **_k):
-    # type: (*Any, **Any) -> None
-    """No-op function for ensure_integration_enabled_async."""
     pass
 
 
@@ -1796,59 +1816,6 @@ def ensure_integration_enabled(
             return sentry_patched_function(*args, **kwargs)
 
         if original_function is _no_op:
-            return wraps(sentry_patched_function)(runner)
-
-        return wraps(original_function)(runner)
-
-    return patcher
-
-
-if TYPE_CHECKING:
-
-    # mypy has some trouble with the overloads, hence the ignore[no-overload-impl]
-    @overload  # type: ignore[no-overload-impl]
-    def ensure_integration_enabled_async(
-        integration,  # type: type[sentry_sdk.integrations.Integration]
-        original_function,  # type: Callable[P, Awaitable[R]]
-    ):
-        # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
-        ...
-
-    @overload
-    def ensure_integration_enabled_async(
-        integration,  # type: type[sentry_sdk.integrations.Integration]
-    ):
-        # type: (...) -> Callable[[Callable[P, Awaitable[None]]], Callable[P, Awaitable[None]]]
-        ...
-
-
-# The ignore[no-redef] also needed because mypy is struggling with these overloads.
-def ensure_integration_enabled_async(  # type: ignore[no-redef]
-    integration,  # type: type[sentry_sdk.integrations.Integration]
-    original_function=_no_op_async,  # type: Union[Callable[P, Awaitable[R]], Callable[P, Awaitable[None]]]
-):
-    # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
-    """
-    Version of `ensure_integration_enabled` for decorating async functions.
-
-    Please refer to the `ensure_integration_enabled` documentation for more information.
-    """
-
-    if TYPE_CHECKING:
-        # Type hint to ensure the default function has the right typing. The overloads
-        # ensure the default _no_op function is only used when R is None.
-        original_function = cast(Callable[P, Awaitable[R]], original_function)
-
-    def patcher(sentry_patched_function):
-        # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
-        async def runner(*args: "P.args", **kwargs: "P.kwargs"):
-            # type: (...) -> R
-            if sentry_sdk.get_client().get_integration(integration) is None:
-                return await original_function(*args, **kwargs)
-
-            return await sentry_patched_function(*args, **kwargs)
-
-        if original_function is _no_op_async:
             return wraps(sentry_patched_function)(runner)
 
         return wraps(original_function)(runner)
@@ -1945,3 +1912,96 @@ def get_current_thread_meta(thread=None):
 
     # we've tried everything, time to give up
     return None, None
+
+
+def should_be_treated_as_error(ty, value):
+    # type: (Any, Any) -> bool
+    if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
+        # https://docs.python.org/3/library/exceptions.html#SystemExit
+        return False
+
+    return True
+
+
+if TYPE_CHECKING:
+    T = TypeVar("T")
+
+
+def try_convert(convert_func, value):
+    # type: (Callable[[Any], T], Any) -> Optional[T]
+    """
+    Attempt to convert from an unknown type to a specific type, using the
+    given function. Return None if the conversion fails, i.e. if the function
+    raises an exception.
+    """
+    try:
+        return convert_func(value)
+    except Exception:
+        return None
+
+
+def safe_serialize(data):
+    # type: (Any) -> str
+    """Safely serialize to a readable string."""
+
+    def serialize_item(item):
+        # type: (Any) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]
+        if callable(item):
+            try:
+                module = getattr(item, "__module__", None)
+                qualname = getattr(item, "__qualname__", None)
+                name = getattr(item, "__name__", "anonymous")
+
+                if module and qualname:
+                    full_path = f"{module}.{qualname}"
+                elif module and name:
+                    full_path = f"{module}.{name}"
+                else:
+                    full_path = name
+
+                return f"<function {full_path}>"
+            except Exception:
+                return f"<callable {type(item).__name__}>"
+        elif isinstance(item, dict):
+            return {k: serialize_item(v) for k, v in item.items()}
+        elif isinstance(item, (list, tuple)):
+            return [serialize_item(x) for x in item]
+        elif hasattr(item, "__dict__"):
+            try:
+                attrs = {
+                    k: serialize_item(v)
+                    for k, v in vars(item).items()
+                    if not k.startswith("_")
+                }
+                return f"<{type(item).__name__} {attrs}>"
+            except Exception:
+                return repr(item)
+        else:
+            return item
+
+    try:
+        serialized = serialize_item(data)
+        return json.dumps(serialized, default=str)
+    except Exception:
+        return str(data)
+
+
+def has_logs_enabled(options):
+    # type: (Optional[dict[str, Any]]) -> bool
+    if options is None:
+        return False
+
+    return bool(
+        options.get("enable_logs", False)
+        or options["_experiments"].get("enable_logs", False)
+    )
+
+
+def get_before_send_log(options):
+    # type: (Optional[dict[str, Any]]) -> Optional[Callable[[Log, Hint], Optional[Log]]]
+    if options is None:
+        return None
+
+    return options.get("before_send_log") or options["_experiments"].get(
+        "before_send_log"
+    )

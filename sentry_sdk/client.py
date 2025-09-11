@@ -5,10 +5,13 @@ import socket
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
-from typing import cast, overload
+from typing import TYPE_CHECKING, List, Dict, cast, overload
+import warnings
 
+import sentry_sdk
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
+    AnnotatedValue,
     ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
@@ -20,11 +23,14 @@ from sentry_sdk.utils import (
     handle_in_app,
     is_gevent,
     logger,
+    get_before_send_log,
+    has_logs_enabled,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
 from sentry_sdk.transport import BaseHttpTransport, make_transport
 from sentry_sdk.consts import (
+    SPANDATA,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -32,6 +38,7 @@ from sentry_sdk.consts import (
     ClientConstructor,
 )
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -42,27 +49,24 @@ from sentry_sdk.profiler.transaction_profiler import (
 )
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
-from sentry_sdk.spotlight import setup_spotlight
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import Optional
     from typing import Sequence
     from typing import Type
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo
+    from sentry_sdk._types import Event, Hint, SDKInfo, Log
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
     from sentry_sdk.transport import Transport
+    from sentry_sdk._log_batcher import LogBatcher
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
@@ -108,7 +112,7 @@ def _get_options(*args, **kwargs):
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
     if rv["debug"] is None:
-        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG", "False"), strict=True)
+        rv["debug"] = env_to_bool(os.environ.get("SENTRY_DEBUG"), strict=True) or False
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -128,13 +132,29 @@ def _get_options(*args, **kwargs):
         rv["traces_sample_rate"] = 1.0
 
     if rv["event_scrubber"] is None:
-        rv["event_scrubber"] = EventScrubber(send_default_pii=rv["send_default_pii"])
+        rv["event_scrubber"] = EventScrubber(
+            send_default_pii=(
+                False if rv["send_default_pii"] is None else rv["send_default_pii"]
+            )
+        )
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
             "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
         )
         rv["socket_options"] = None
+
+    if rv["keep_alive"] is None:
+        rv["keep_alive"] = (
+            env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
+        )
+
+    if rv["enable_tracing"] is not None:
+        warnings.warn(
+            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     return rv
 
@@ -165,6 +185,7 @@ class BaseClient:
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
         self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+        self.log_batcher = None  # type: Optional[LogBatcher]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -195,6 +216,10 @@ class BaseClient:
     def capture_event(self, *args, **kwargs):
         # type: (*Any, **Any) -> Optional[str]
         return None
+
+    def _capture_experimental_log(self, log):
+        # type: (Log) -> None
+        pass
 
     def capture_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -358,6 +383,13 @@ class _Client(BaseClient):
                         "Metrics not supported on Python 3.6 and lower with gevent."
                     )
 
+            self.log_batcher = None
+
+            if has_logs_enabled(self.options):
+                from sentry_sdk._log_batcher import LogBatcher
+
+                self.log_batcher = LogBatcher(capture_func=_capture_envelope)
+
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
                 raise ValueError(
@@ -399,7 +431,17 @@ class _Client(BaseClient):
                 )
 
             if self.options.get("spotlight"):
+                # This is intentionally here to prevent setting up spotlight
+                # stuff we don't need unless spotlight is explicitly enabled
+                from sentry_sdk.spotlight import setup_spotlight
+
                 self.spotlight = setup_spotlight(self.options)
+                if not self.options["dsn"]:
+                    sample_all = lambda *_args, **_kwargs: 1.0
+                    self.options["send_default_pii"] = True
+                    self.options["error_sampler"] = sample_all
+                    self.options["traces_sampler"] = sample_all
+                    self.options["profiles_sampler"] = sample_all
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name
@@ -428,6 +470,7 @@ class _Client(BaseClient):
         if (
             self.monitor
             or self.metrics_aggregator
+            or self.log_batcher
             or has_profiling_enabled(self.options)
             or isinstance(self.transport, BaseHttpTransport)
         ):
@@ -451,7 +494,7 @@ class _Client(BaseClient):
 
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
-        return self.options.get("send_default_pii", False)
+        return self.options.get("send_default_pii") or False
 
     @property
     def dsn(self):
@@ -467,12 +510,16 @@ class _Client(BaseClient):
     ):
         # type: (...) -> Optional[Event]
 
+        previous_total_spans = None  # type: Optional[int]
+        previous_total_breadcrumbs = None  # type: Optional[int]
+
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
+        is_transaction = event.get("type") == "transaction"
+
         if scope is not None:
-            is_transaction = event.get("type") == "transaction"
-            spans_before = len(event.get("spans", []))
+            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -491,15 +538,31 @@ class _Client(BaseClient):
                 return None
 
             event = event_
-
-            spans_delta = spans_before - len(event.get("spans", []))
+            spans_delta = spans_before - len(
+                cast(List[Dict[str, object]], event.get("spans", []))
+            )
             if is_transaction and spans_delta > 0 and self.transport is not None:
                 self.transport.record_lost_event(
                     "event_processor", data_category="span", quantity=spans_delta
                 )
 
+            dropped_spans = event.pop("_dropped_spans", 0) + spans_delta  # type: int
+            if dropped_spans > 0:
+                previous_total_spans = spans_before + dropped_spans
+            if scope._n_breadcrumbs_truncated > 0:
+                breadcrumbs = event.get("breadcrumbs", {})
+                values = (
+                    breadcrumbs.get("values", [])
+                    if not isinstance(breadcrumbs, AnnotatedValue)
+                    else []
+                )
+                previous_total_breadcrumbs = (
+                    len(values) + scope._n_breadcrumbs_truncated
+                )
+
         if (
-            self.options["attach_stacktrace"]
+            not is_transaction
+            and self.options["attach_stacktrace"]
             and "exception" not in event
             and "stacktrace" not in event
             and "threads" not in event
@@ -524,7 +587,7 @@ class _Client(BaseClient):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = str(self.options[key]).strip()  # type: ignore[literal-required]
+                event[key] = str(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -545,6 +608,14 @@ class _Client(BaseClient):
             if event_scrubber:
                 event_scrubber.scrub_event(event)
 
+        if previous_total_spans is not None:
+            event["spans"] = AnnotatedValue(
+                event.get("spans", []), {"len": previous_total_spans}
+            )
+        if previous_total_breadcrumbs is not None:
+            event["breadcrumbs"] = AnnotatedValue(
+                event.get("breadcrumbs", []), {"len": previous_total_breadcrumbs}
+            )
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
@@ -573,7 +644,15 @@ class _Client(BaseClient):
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
                     )
-            event = new_event  # type: ignore
+
+                # If this is an exception, reset the DedupeIntegration. It still
+                # remembers the dropped exception as the last exception, meaning
+                # that if the same exception happens again and is not dropped
+                # in before_send, it'd get dropped by DedupeIntegration.
+                if event.get("exception"):
+                    DedupeIntegration.reset_last_seen()
+
+            event = new_event
 
         before_send_transaction = self.options["before_send_transaction"]
         if (
@@ -582,7 +661,7 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
-            spans_before = len(event.get("spans", []))
+            spans_before = len(cast(List[Dict[str, object]], event.get("spans", [])))
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
@@ -603,7 +682,7 @@ class _Client(BaseClient):
                         reason="before_send", data_category="span", quantity=spans_delta
                     )
 
-            event = new_event  # type: ignore
+            event = new_event
 
         return event
 
@@ -714,6 +793,8 @@ class _Client(BaseClient):
         if exceptions:
             errored = True
             for error in exceptions:
+                if isinstance(error, AnnotatedValue):
+                    error = error.value or {}
                 mechanism = error.get("mechanism")
                 if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
@@ -821,6 +902,73 @@ class _Client(BaseClient):
 
         return return_value
 
+    def _capture_experimental_log(self, log):
+        # type: (Optional[Log]) -> None
+        if not has_logs_enabled(self.options) or log is None:
+            return
+
+        current_scope = sentry_sdk.get_current_scope()
+        isolation_scope = sentry_sdk.get_isolation_scope()
+
+        log["attributes"]["sentry.sdk.name"] = SDK_INFO["name"]
+        log["attributes"]["sentry.sdk.version"] = SDK_INFO["version"]
+
+        server_name = self.options.get("server_name")
+        if server_name is not None and SPANDATA.SERVER_ADDRESS not in log["attributes"]:
+            log["attributes"][SPANDATA.SERVER_ADDRESS] = server_name
+
+        environment = self.options.get("environment")
+        if environment is not None and "sentry.environment" not in log["attributes"]:
+            log["attributes"]["sentry.environment"] = environment
+
+        release = self.options.get("release")
+        if release is not None and "sentry.release" not in log["attributes"]:
+            log["attributes"]["sentry.release"] = release
+
+        span = current_scope.span
+        if span is not None and "sentry.trace.parent_span_id" not in log["attributes"]:
+            log["attributes"]["sentry.trace.parent_span_id"] = span.span_id
+
+        if log.get("trace_id") is None:
+            transaction = current_scope.transaction
+            propagation_context = isolation_scope.get_active_propagation_context()
+            if transaction is not None:
+                log["trace_id"] = transaction.trace_id
+            elif propagation_context is not None:
+                log["trace_id"] = propagation_context.trace_id
+
+        # The user, if present, is always set on the isolation scope.
+        if isolation_scope._user is not None:
+            for log_attribute, user_attribute in (
+                ("user.id", "id"),
+                ("user.name", "username"),
+                ("user.email", "email"),
+            ):
+                if (
+                    user_attribute in isolation_scope._user
+                    and log_attribute not in log["attributes"]
+                ):
+                    log["attributes"][log_attribute] = isolation_scope._user[
+                        user_attribute
+                    ]
+
+        # If debug is enabled, log the log to the console
+        debug = self.options.get("debug", False)
+        if debug:
+            logger.debug(
+                f'[Sentry Logs] [{log.get("severity_text")}] {log.get("body")}'
+            )
+
+        before_send_log = get_before_send_log(self.options)
+        if before_send_log is not None:
+            log = before_send_log(log, {})
+
+        if log is None:
+            return
+
+        if self.log_batcher:
+            self.log_batcher.add(log)
+
     def capture_session(
         self, session  # type: Session
     ):
@@ -873,6 +1021,8 @@ class _Client(BaseClient):
             self.session_flusher.kill()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.kill()
+            if self.log_batcher is not None:
+                self.log_batcher.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -897,6 +1047,8 @@ class _Client(BaseClient):
             self.session_flusher.flush()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.flush()
+            if self.log_batcher is not None:
+                self.log_batcher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):

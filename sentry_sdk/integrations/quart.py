@@ -1,6 +1,5 @@
 import asyncio
 import inspect
-import threading
 from functools import wraps
 
 import sentry_sdk
@@ -96,8 +95,8 @@ def patch_asgi_app():
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
             span_origin=QuartIntegration.origin,
+            asgi_version=3,
         )
-        middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 
     Quart.__call__ = sentry_patched_asgi_app
@@ -122,11 +121,13 @@ def patch_scaffold_route():
                 @ensure_integration_enabled(QuartIntegration, old_func)
                 def _sentry_func(*args, **kwargs):
                     # type: (*Any, **Any) -> Any
-                    scope = sentry_sdk.get_isolation_scope()
-                    if scope.profile is not None:
-                        scope.profile.active_thread_id = (
-                            threading.current_thread().ident
-                        )
+                    current_scope = sentry_sdk.get_current_scope()
+                    if current_scope.transaction is not None:
+                        current_scope.transaction.update_active_thread()
+
+                    sentry_scope = sentry_sdk.get_isolation_scope()
+                    if sentry_scope.profile is not None:
+                        sentry_scope.profile.update_active_thread_id()
 
                     return old_func(*args, **kwargs)
 

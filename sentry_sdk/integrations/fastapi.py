@@ -5,11 +5,8 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
-from sentry_sdk.utils import (
-    transaction_from_function,
-    logger,
-)
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
+from sentry_sdk.utils import transaction_from_function
 
 from typing import TYPE_CHECKING
 
@@ -61,14 +58,11 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME
-        source = TRANSACTION_SOURCE_ROUTE
+        source = TransactionSource.ROUTE
     else:
         source = SOURCE_FOR_STYLE[transaction_style]
 
     scope.set_transaction_name(name, source=source)
-    logger.debug(
-        "[FastAPI] Set transaction name and source on scope: %s / %s", name, source
-    )
 
 
 def patch_get_request_handler():
@@ -88,9 +82,14 @@ def patch_get_request_handler():
             @wraps(old_call)
             def _sentry_call(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
+                current_scope = sentry_sdk.get_current_scope()
+                if current_scope.transaction is not None:
+                    current_scope.transaction.update_active_thread()
+
                 sentry_scope = sentry_sdk.get_isolation_scope()
                 if sentry_scope.profile is not None:
                     sentry_scope.profile.update_active_thread_id()
+
                 return old_call(*args, **kwargs)
 
             dependant.call = _sentry_call

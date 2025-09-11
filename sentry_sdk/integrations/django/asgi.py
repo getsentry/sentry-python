@@ -155,7 +155,7 @@ def patch_channels_asgi_handler_impl(cls):
                 http_methods_to_capture=integration.http_methods_to_capture,
             )
 
-            return await middleware(self.scope)(receive, send)
+            return await middleware(self.scope)(receive, send)  # type: ignore
 
         cls.__call__ = sentry_patched_asgi_handler
 
@@ -172,6 +172,10 @@ def wrap_async_view(callback):
     @functools.wraps(callback)
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
+        current_scope = sentry_sdk.get_current_scope()
+        if current_scope.transaction is not None:
+            current_scope.transaction.update_active_thread()
+
         sentry_scope = sentry_sdk.get_isolation_scope()
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
@@ -233,9 +237,9 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
             middleware_span = _check_middleware_span(old_method=f)
 
             if middleware_span is None:
-                return await f(*args, **kwargs)
+                return await f(*args, **kwargs)  # type: ignore
 
             with middleware_span:
-                return await f(*args, **kwargs)
+                return await f(*args, **kwargs)  # type: ignore
 
     return SentryASGIMixin

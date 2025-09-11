@@ -1,7 +1,7 @@
 from dataclasses import asdict, dataclass
 from typing import Optional, List
 
-from sentry_sdk.tracing_utils import _should_be_included
+from sentry_sdk.tracing_utils import _should_be_included, Baggage
 import pytest
 
 
@@ -94,3 +94,55 @@ def test_should_be_included(test_case, expected):
     kwargs = asdict(test_case)
     kwargs.pop("id")
     assert _should_be_included(**kwargs) == expected
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    (
+        ("", ""),
+        ("foo=bar", "foo=bar"),
+        (" foo=bar, baz =  qux ", " foo=bar, baz =  qux "),
+        ("sentry-trace_id=123", ""),
+        ("  sentry-trace_id = 123  ", ""),
+        ("sentry-trace_id=123,sentry-public_key=456", ""),
+        ("foo=bar,sentry-trace_id=123", "foo=bar"),
+        ("foo=bar,sentry-trace_id=123,baz=qux", "foo=bar,baz=qux"),
+        (
+            "foo=bar,sentry-trace_id=123,baz=qux,sentry-public_key=456",
+            "foo=bar,baz=qux",
+        ),
+    ),
+)
+def test_strip_sentry_baggage(header, expected):
+    assert Baggage.strip_sentry_baggage(header) == expected
+
+
+@pytest.mark.parametrize(
+    ("baggage", "expected_repr"),
+    (
+        (Baggage(sentry_items={}), '<Baggage "", mutable=True>'),
+        (Baggage(sentry_items={}, mutable=False), '<Baggage "", mutable=False>'),
+        (
+            Baggage(sentry_items={"foo": "bar"}),
+            '<Baggage "sentry-foo=bar,", mutable=True>',
+        ),
+        (
+            Baggage(sentry_items={"foo": "bar"}, mutable=False),
+            '<Baggage "sentry-foo=bar,", mutable=False>',
+        ),
+        (
+            Baggage(sentry_items={"foo": "bar"}, third_party_items="asdf=1234,"),
+            '<Baggage "sentry-foo=bar,asdf=1234,", mutable=True>',
+        ),
+        (
+            Baggage(
+                sentry_items={"foo": "bar"},
+                third_party_items="asdf=1234,",
+                mutable=False,
+            ),
+            '<Baggage "sentry-foo=bar,asdf=1234,", mutable=False>',
+        ),
+    ),
+)
+def test_baggage_repr(baggage, expected_repr):
+    assert repr(baggage) == expected_repr

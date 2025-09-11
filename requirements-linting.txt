@@ -1,6 +1,9 @@
 mypy
 black
-flake8==5.0.4  # flake8 depends on pyflakes>=3.0.0 and this dropped support for Python 2 "# type:" comments
+flake8==5.0.4
+flake8-pyproject  # Flake8 plugin to support configuration in pyproject.toml
+flake8-bugbear  # Flake8 plugin
+pep8-naming  # Flake8 plugin
 types-certifi
 types-protobuf
 types-gevent
@@ -11,6 +14,11 @@ types-webob
 opentelemetry-distro
 pymongo # There is no separate types module.
 loguru # There is no separate types module.
-flake8-bugbear
-pep8-naming
 pre-commit # local linting
+httpcore
+launchdarkly-server-sdk
+openfeature-sdk
+statsig
+UnleashClient
+typer
+strawberry-graphql

@@ -7,6 +7,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+from sentry_sdk._compat import PY38
 from sentry_sdk.integrations import Integration
 from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
@@ -29,16 +30,17 @@ from sentry_sdk.utils import (
     serialize_frame,
     is_sentry_url,
     _get_installed_modules,
-    _generate_installed_modules,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
+    to_string,
+    exc_info_from_error,
+    get_lines_from_file,
+    package_version,
 )
 
 
 class TestIntegration(Integration):
     """
-    Test integration for testing ensure_integration_enabled and
-    ensure_integration_enabled_async decorators.
+    Test integration for testing ensure_integration_enabled decorator.
     """
 
     identifier = "test"
@@ -62,53 +64,70 @@ def _normalize_distribution_name(name):
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
+isoformat_inputs_and_datetime_outputs = (
+    (
+        "2021-01-01T00:00:00.000000Z",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),  # UTC time
+    (
+        "2021-01-01T00:00:00.000000",
+        datetime(2021, 1, 1).astimezone(timezone.utc),
+    ),  # No TZ -- assume local but convert to UTC
+    (
+        "2021-01-01T00:00:00Z",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),  # UTC - No milliseconds
+    (
+        "2021-01-01T00:00:00.000000+00:00",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000-00:00",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000+0000",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2021-01-01T00:00:00.000000-0000",
+        datetime(2021, 1, 1, tzinfo=timezone.utc),
+    ),
+    (
+        "2020-12-31T00:00:00.000000+02:00",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
+    ),  # UTC+2 time
+    (
+        "2020-12-31T00:00:00.000000-0200",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+    ),  # UTC-2 time
+    (
+        "2020-12-31T00:00:00-0200",
+        datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
+    ),  # UTC-2 time - no milliseconds
+)
+
+
 @pytest.mark.parametrize(
     ("input_str", "expected_output"),
-    (
-        (
-            "2021-01-01T00:00:00.000000Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC time
-        (
-            "2021-01-01T00:00:00.000000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # No TZ -- assume UTC
-        (
-            "2021-01-01T00:00:00Z",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),  # UTC - No milliseconds
-        (
-            "2021-01-01T00:00:00.000000+00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-00:00",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000+0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2021-01-01T00:00:00.000000-0000",
-            datetime(2021, 1, 1, tzinfo=timezone.utc),
-        ),
-        (
-            "2020-12-31T00:00:00.000000+02:00",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=2))),
-        ),  # UTC+2 time
-        (
-            "2020-12-31T00:00:00.000000-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time
-        (
-            "2020-12-31T00:00:00-0200",
-            datetime(2020, 12, 31, tzinfo=timezone(timedelta(hours=-2))),
-        ),  # UTC-2 time - no milliseconds
-    ),
+    isoformat_inputs_and_datetime_outputs,
 )
 def test_datetime_from_isoformat(input_str, expected_output):
     assert datetime_from_isoformat(input_str) == expected_output, input_str
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_output"),
+    isoformat_inputs_and_datetime_outputs,
+)
+def test_datetime_from_isoformat_with_py_36_or_lower(input_str, expected_output):
+    """
+    `fromisoformat` was added in Python version 3.7
+    """
+    with mock.patch("sentry_sdk.utils.datetime") as datetime_mocked:
+        datetime_mocked.fromisoformat.side_effect = AttributeError()
+        datetime_mocked.strptime = datetime.strptime
+        assert datetime_from_isoformat(input_str) == expected_output, input_str
 
 
 @pytest.mark.parametrize(
@@ -345,6 +364,12 @@ def test_sanitize_url_and_split(url, expected_result):
     assert sanitized_url.query == expected_result.query
     assert sanitized_url.path == expected_result.path
     assert sanitized_url.fragment == expected_result.fragment
+
+
+def test_sanitize_url_remove_authority_is_false():
+    url = "https://usr:pwd@example.com"
+    sanitized_url = sanitize_url(url, remove_authority=False)
+    assert sanitized_url == url
 
 
 @pytest.mark.parametrize(
@@ -630,45 +655,15 @@ def test_get_error_message(error, expected_result):
     assert get_error_message(exc_value) == expected_result(exc_value)
 
 
-def test_installed_modules():
-    try:
-        from importlib.metadata import distributions, version
+def test_safe_str_fails():
+    class ExplodingStr:
+        def __str__(self):
+            raise Exception
 
-        importlib_available = True
-    except ImportError:
-        importlib_available = False
+    obj = ExplodingStr()
+    result = safe_str(obj)
 
-    try:
-        import pkg_resources
-
-        pkg_resources_available = True
-    except ImportError:
-        pkg_resources_available = False
-
-    installed_distributions = {
-        _normalize_distribution_name(dist): version
-        for dist, version in _generate_installed_modules()
-    }
-
-    if importlib_available:
-        importlib_distributions = {
-            _normalize_distribution_name(dist.metadata["Name"]): version(
-                dist.metadata["Name"]
-            )
-            for dist in distributions()
-            if dist.metadata["Name"] is not None
-            and version(dist.metadata["Name"]) is not None
-        }
-        assert installed_distributions == importlib_distributions
-
-    elif pkg_resources_available:
-        pkg_resources_distributions = {
-            _normalize_distribution_name(dist.key): dist.version
-            for dist in pkg_resources.working_set
-        }
-        assert installed_distributions == pkg_resources_distributions
-    else:
-        pytest.fail("Neither importlib nor pkg_resources is available")
+    assert result == repr(obj)
 
 
 def test_installed_modules_caching():
@@ -711,6 +706,20 @@ def test_default_release_empty_string():
         release = get_default_release()
 
     assert release is None
+
+
+def test_get_default_release_sentry_release_env(monkeypatch):
+    monkeypatch.setenv("SENTRY_RELEASE", "sentry-env-release")
+    assert get_default_release() == "sentry-env-release"
+
+
+def test_get_default_release_other_release_env(monkeypatch):
+    monkeypatch.setenv("SOURCE_VERSION", "other-env-release")
+
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release == "other-env-release"
 
 
 def test_ensure_integration_enabled_integration_enabled(sentry_init):
@@ -778,90 +787,6 @@ def test_ensure_integration_enabled_no_original_function_disabled(sentry_init):
     # Test the decorator by applying to function_to_patch
     patched_function = ensure_integration_enabled(TestIntegration)(function_to_patch)
     patched_function()
-
-    assert shared_variable == "original"
-    assert patched_function.__name__ == "function_to_patch"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_integration_enabled(sentry_init):
-    # Setup variables and functions for the test
-    async def original_function():
-        return "original"
-
-    async def function_to_patch():
-        return "patched"
-
-    sentry_init(integrations=[TestIntegration()])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(
-        TestIntegration, original_function
-    )(function_to_patch)
-
-    assert await patched_function() == "patched"
-    assert patched_function.__name__ == "original_function"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_integration_disabled(sentry_init):
-    # Setup variables and functions for the test
-    async def original_function():
-        return "original"
-
-    async def function_to_patch():
-        return "patched"
-
-    sentry_init(integrations=[])  # TestIntegration is disabled
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(
-        TestIntegration, original_function
-    )(function_to_patch)
-
-    assert await patched_function() == "original"
-    assert patched_function.__name__ == "original_function"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_no_original_function_enabled(
-    sentry_init,
-):
-    shared_variable = "original"
-
-    async def function_to_patch():
-        nonlocal shared_variable
-        shared_variable = "patched"
-
-    sentry_init(integrations=[TestIntegration])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(TestIntegration)(
-        function_to_patch
-    )
-    await patched_function()
-
-    assert shared_variable == "patched"
-    assert patched_function.__name__ == "function_to_patch"
-
-
-@pytest.mark.asyncio
-async def test_ensure_integration_enabled_async_no_original_function_disabled(
-    sentry_init,
-):
-    shared_variable = "original"
-
-    async def function_to_patch():
-        nonlocal shared_variable
-        shared_variable = "patched"
-
-    sentry_init(integrations=[])
-
-    # Test the decorator by applying to function_to_patch
-    patched_function = ensure_integration_enabled_async(TestIntegration)(
-        function_to_patch
-    )
-    await patched_function()
 
     assert shared_variable == "original"
     assert patched_function.__name__ == "function_to_patch"
@@ -987,6 +912,7 @@ def test_get_current_thread_meta_main_thread():
     assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
 
 
+@pytest.mark.skipif(PY38, reason="Flakes a lot on 3.8 in CI.")
 def test_get_current_thread_meta_failed_to_get_main_thread():
     results = Queue(maxsize=1)
 
@@ -1037,3 +963,75 @@ def test_format_timestamp_naive():
     # Ensure that some timestamp is returned, without error. We currently treat these as local time, but this is an
     # implementation detail which we should not assert here.
     assert re.fullmatch(timestamp_regex, format_timestamp(datetime_object))
+
+
+def test_qualname_from_function_inner_function():
+    def test_function(): ...
+
+    assert (
+        sentry_sdk.utils.qualname_from_function(test_function)
+        == "tests.test_utils.test_qualname_from_function_inner_function.<locals>.test_function"
+    )
+
+
+def test_qualname_from_function_none_name():
+    def test_function(): ...
+
+    test_function.__module__ = None
+
+    assert (
+        sentry_sdk.utils.qualname_from_function(test_function)
+        == "test_qualname_from_function_none_name.<locals>.test_function"
+    )
+
+
+def test_to_string_unicode_decode_error():
+    class BadStr:
+        def __str__(self):
+            raise UnicodeDecodeError("utf-8", b"", 0, 1, "reason")
+
+    obj = BadStr()
+    result = to_string(obj)
+    assert result == repr(obj)[1:-1]
+
+
+def test_exc_info_from_error_dont_get_an_exc():
+    class NotAnException:
+        pass
+
+    with pytest.raises(ValueError) as exc:
+        exc_info_from_error(NotAnException())
+
+    assert "Expected Exception object to report, got <class" in str(exc.value)
+
+
+def test_get_lines_from_file_handle_linecache_errors():
+    expected_result = ([], None, [])
+
+    class Loader:
+        @staticmethod
+        def get_source(module):
+            raise IOError("something went wrong")
+
+    result = get_lines_from_file("filename", 10, loader=Loader())
+    assert result == expected_result
+
+    with mock.patch(
+        "sentry_sdk.utils.linecache.getlines",
+        side_effect=OSError("something went wrong"),
+    ):
+        result = get_lines_from_file("filename", 10)
+        assert result == expected_result
+
+    lines = ["line1", "line2", "line3"]
+
+    def fake_getlines(filename):
+        return lines
+
+    with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
+        result = get_lines_from_file("filename", 10)
+        assert result == expected_result
+
+
+def test_package_version_is_none():
+    assert package_version("non_existent_package") is None

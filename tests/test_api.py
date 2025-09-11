@@ -1,6 +1,9 @@
 import pytest
+
+import re
 from unittest import mock
 
+import sentry_sdk
 from sentry_sdk import (
     capture_exception,
     continue_trace,
@@ -21,7 +24,6 @@ from sentry_sdk import (
 from sentry_sdk.client import Client, NonRecordingClient
 
 
-@pytest.mark.forked
 def test_get_current_span():
     fake_scope = mock.MagicMock()
     fake_scope.span = mock.MagicMock()
@@ -31,7 +33,6 @@ def test_get_current_span():
     assert get_current_span(fake_scope) is None
 
 
-@pytest.mark.forked
 def test_get_current_span_default_hub(sentry_init):
     sentry_init()
 
@@ -44,7 +45,6 @@ def test_get_current_span_default_hub(sentry_init):
     assert get_current_span() == fake_span
 
 
-@pytest.mark.forked
 def test_get_current_span_default_hub_with_transaction(sentry_init):
     sentry_init()
 
@@ -54,7 +54,6 @@ def test_get_current_span_default_hub_with_transaction(sentry_init):
         assert get_current_span() == new_transaction
 
 
-@pytest.mark.forked
 def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
@@ -66,7 +65,6 @@ def test_traceparent_with_tracing_enabled(sentry_init):
         assert get_traceparent() == expected_traceparent
 
 
-@pytest.mark.forked
 def test_traceparent_with_tracing_disabled(sentry_init):
     sentry_init()
 
@@ -78,7 +76,6 @@ def test_traceparent_with_tracing_disabled(sentry_init):
     assert get_traceparent() == expected_traceparent
 
 
-@pytest.mark.forked
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = get_isolation_scope()._propagation_context
@@ -90,17 +87,15 @@ def test_baggage_with_tracing_disabled(sentry_init):
     assert get_baggage() == expected_baggage
 
 
-@pytest.mark.forked
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_transaction() as transaction:
-        expected_baggage = "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={}".format(
+        expected_baggage_re = r"^sentry-trace_id={},sentry-sample_rand=0\.\d{{6}},sentry-environment=dev,sentry-release=1\.0\.0,sentry-sample_rate=1\.0,sentry-sampled={}$".format(
             transaction.trace_id, "true" if transaction.sampled else "false"
         )
-        assert get_baggage() == expected_baggage
+        assert re.match(expected_baggage_re, get_baggage())
 
 
-@pytest.mark.forked
 def test_continue_trace(sentry_init):
     sentry_init()
 
@@ -110,7 +105,7 @@ def test_continue_trace(sentry_init):
     transaction = continue_trace(
         {
             "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
-            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19",
+            "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19,sentry-sample_rand=0.123456",
         },
         name="some name",
     )
@@ -122,11 +117,11 @@ def test_continue_trace(sentry_init):
         assert propagation_context.parent_span_id == parent_span_id
         assert propagation_context.parent_sampled == parent_sampled
         assert propagation_context.dynamic_sampling_context == {
-            "trace_id": "566e3688a61d4bc888951642d6f14a19"
+            "trace_id": "566e3688a61d4bc888951642d6f14a19",
+            "sample_rand": "0.123456",
         }
 
 
-@pytest.mark.forked
 def test_is_initialized():
     assert not is_initialized()
 
@@ -135,7 +130,6 @@ def test_is_initialized():
     assert is_initialized()
 
 
-@pytest.mark.forked
 def test_get_client():
     client = get_client()
     assert client is not None
@@ -195,3 +189,19 @@ def test_push_scope_deprecation():
     with pytest.warns(DeprecationWarning):
         with push_scope():
             ...
+
+
+def test_init_context_manager_deprecation():
+    with pytest.warns(DeprecationWarning):
+        with sentry_sdk.init():
+            ...
+
+
+def test_init_enter_deprecation():
+    with pytest.warns(DeprecationWarning):
+        sentry_sdk.init().__enter__()
+
+
+def test_init_exit_deprecation():
+    with pytest.warns(DeprecationWarning):
+        sentry_sdk.init().__exit__(None, None, None)

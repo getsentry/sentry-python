@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Set
     from typing import Type
+    from typing import Union
 
 
 _DEFAULT_FAILED_REQUEST_STATUS_CODES = frozenset(range(500, 600))
@@ -94,6 +95,8 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.huey.HueyIntegration",
     "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration",
     "sentry_sdk.integrations.langchain.LangchainIntegration",
+    "sentry_sdk.integrations.langgraph.LanggraphIntegration",
+    "sentry_sdk.integrations.litestar.LitestarIntegration",
     "sentry_sdk.integrations.loguru.LoguruIntegration",
     "sentry_sdk.integrations.openai.OpenAIIntegration",
     "sentry_sdk.integrations.pymongo.PyMongoIntegration",
@@ -109,7 +112,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.tornado.TornadoIntegration",
 ]
 
-
 iter_default_integrations = _generate_default_integrations_iterator(
     integrations=_DEFAULT_INTEGRATIONS,
     auto_enabling_integrations=_AUTO_ENABLING_INTEGRATIONS,
@@ -118,13 +120,58 @@ iter_default_integrations = _generate_default_integrations_iterator(
 del _generate_default_integrations_iterator
 
 
+_MIN_VERSIONS = {
+    "aiohttp": (3, 4),
+    "anthropic": (0, 16),
+    "ariadne": (0, 20),
+    "arq": (0, 23),
+    "asyncpg": (0, 23),
+    "beam": (2, 12),
+    "boto3": (1, 12),  # botocore
+    "bottle": (0, 12),
+    "celery": (4, 4, 7),
+    "chalice": (1, 16, 0),
+    "clickhouse_driver": (0, 2, 0),
+    "cohere": (5, 4, 0),
+    "django": (1, 8),
+    "dramatiq": (1, 9),
+    "falcon": (1, 4),
+    "fastapi": (0, 79, 0),
+    "flask": (1, 1, 4),
+    "gql": (3, 4, 1),
+    "graphene": (3, 3),
+    "grpc": (1, 32, 0),  # grpcio
+    "huggingface_hub": (0, 24, 7),
+    "langchain": (0, 1, 0),
+    "langgraph": (0, 6, 6),
+    "launchdarkly": (9, 8, 0),
+    "loguru": (0, 7, 0),
+    "openai": (1, 0, 0),
+    "openai_agents": (0, 0, 19),
+    "openfeature": (0, 7, 1),
+    "quart": (0, 16, 0),
+    "ray": (2, 7, 0),
+    "requests": (2, 0, 0),
+    "rq": (0, 6),
+    "sanic": (0, 8),
+    "sqlalchemy": (1, 2),
+    "starlette": (0, 16),
+    "starlite": (1, 48),
+    "statsig": (0, 55, 3),
+    "strawberry": (0, 209, 5),
+    "tornado": (6, 0),
+    "typer": (0, 15),
+    "unleash": (6, 0, 1),
+}
+
+
 def setup_integrations(
     integrations,
     with_defaults=True,
     with_auto_enabling_integrations=False,
     disabled_integrations=None,
 ):
-    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Integration]]) -> Dict[str, Integration]
+    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Union[type[Integration], Integration]]]) -> Dict[str, Integration]
     """
     Given a list of integration instances, this installs them all.
 
@@ -191,6 +238,23 @@ def setup_integrations(
         logger.debug("Enabling integration %s", identifier)
 
     return integrations
+
+
+def _check_minimum_version(integration, version, package=None):
+    # type: (type[Integration], Optional[tuple[int, ...]], Optional[str]) -> None
+    package = package or integration.identifier
+
+    if version is None:
+        raise DidNotEnable(f"Unparsable {package} version.")
+
+    min_version = _MIN_VERSIONS.get(integration.identifier)
+    if min_version is None:
+        return
+
+    if version < min_version:
+        raise DidNotEnable(
+            f"Integration only supports {package} {'.'.join(map(str, min_version))} or newer."
+        )
 
 
 class DidNotEnable(Exception):  # noqa: N818

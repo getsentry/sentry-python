@@ -1,11 +1,11 @@
 pip
-pytest
+pytest>=6.0.0
+tomli;python_version<"3.11"  # Only needed for pytest on Python < 3.11
 pytest-cov
 pytest-forked
 pytest-localserver
 pytest-watch
 jsonschema
-pyrsistent
 executing
 asttokens
 responses
@@ -14,3 +14,4 @@ socksio
 httpcore[http2]
 setuptools
 Brotli
+docker

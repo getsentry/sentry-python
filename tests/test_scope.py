@@ -19,10 +19,6 @@ from sentry_sdk.scope import (
 )
 
 
-SLOTS_NOT_COPIED = {"client"}
-"""__slots__ that are not copied when copying a Scope object."""
-
-
 def test_copying():
     s1 = Scope()
     s1.fingerprint = {}
@@ -43,8 +39,30 @@ def test_all_slots_copied():
     scope_copy = copy.copy(scope)
 
     # Check all attributes are copied
-    for attr in set(Scope.__slots__) - SLOTS_NOT_COPIED:
+    for attr in set(Scope.__slots__):
         assert getattr(scope_copy, attr) == getattr(scope, attr)
+
+
+def test_scope_flags_copy():
+    # Assert forking creates a deepcopy of the flag buffer. The new
+    # scope is free to mutate without consequence to the old scope. The
+    # old scope is free to mutate without consequence to the new scope.
+    old_scope = Scope()
+    old_scope.flags.set("a", True)
+
+    new_scope = old_scope.fork()
+    new_scope.flags.set("a", False)
+    old_scope.flags.set("b", True)
+    new_scope.flags.set("c", True)
+
+    assert old_scope.flags.get() == [
+        {"flag": "a", "result": True},
+        {"flag": "b", "result": True},
+    ]
+    assert new_scope.flags.get() == [
+        {"flag": "a", "result": False},
+        {"flag": "c", "result": True},
+    ]
 
 
 def test_merging(sentry_init, capture_events):
@@ -811,6 +829,24 @@ def test_should_send_default_pii_false(sentry_init):
     assert should_send_default_pii() is False
 
 
+def test_should_send_default_pii_default_false(sentry_init):
+    sentry_init()
+
+    assert should_send_default_pii() is False
+
+
+def test_should_send_default_pii_false_with_dsn_and_spotlight(sentry_init):
+    sentry_init(dsn="http://key@localhost/1", spotlight=True)
+
+    assert should_send_default_pii() is False
+
+
+def test_should_send_default_pii_true_without_dsn_and_spotlight(sentry_init):
+    sentry_init(spotlight=True)
+
+    assert should_send_default_pii() is True
+
+
 def test_set_tags():
     scope = Scope()
     scope.set_tags({"tag1": "value1", "tag2": "value2"})
@@ -869,3 +905,67 @@ def test_last_event_id_cleared(sentry_init):
     Scope.get_isolation_scope().clear()
 
     assert Scope.last_event_id() is None, "last_event_id should be cleared"
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize(
+    "scope_manager",
+    [
+        new_scope,
+        use_scope,
+    ],
+)
+def test_handle_lookup_error_on_token_reset_current_scope(scope_manager):
+    with mock.patch("sentry_sdk.scope.capture_internal_exception") as mock_capture:
+        with mock.patch("sentry_sdk.scope._current_scope") as mock_token_var:
+            mock_token_var.reset.side_effect = LookupError()
+
+            mock_token = mock.Mock()
+            mock_token_var.set.return_value = mock_token
+
+            try:
+                if scope_manager == use_scope:
+                    with scope_manager(Scope()):
+                        pass
+                else:
+                    with scope_manager():
+                        pass
+
+            except Exception:
+                pytest.fail("Context manager should handle LookupError gracefully")
+
+            mock_capture.assert_called_once()
+            mock_token_var.reset.assert_called_once_with(mock_token)
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize(
+    "scope_manager",
+    [
+        isolation_scope,
+        use_isolation_scope,
+    ],
+)
+def test_handle_lookup_error_on_token_reset_isolation_scope(scope_manager):
+    with mock.patch("sentry_sdk.scope.capture_internal_exception") as mock_capture:
+        with mock.patch("sentry_sdk.scope._current_scope") as mock_current_scope:
+            with mock.patch(
+                "sentry_sdk.scope._isolation_scope"
+            ) as mock_isolation_scope:
+                mock_isolation_scope.reset.side_effect = LookupError()
+                mock_current_token = mock.Mock()
+                mock_current_scope.set.return_value = mock_current_token
+
+                try:
+                    if scope_manager == use_isolation_scope:
+                        with scope_manager(Scope()):
+                            pass
+                    else:
+                        with scope_manager():
+                            pass
+
+                except Exception:
+                    pytest.fail("Context manager should handle LookupError gracefully")
+
+                mock_capture.assert_called_once()
+                mock_current_scope.reset.assert_called_once_with(mock_current_token)

@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.15.0",
+    version="2.37.1",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -63,12 +63,15 @@ setup(
         "huey": ["huey>=2"],
         "huggingface_hub": ["huggingface_hub>=0.22"],
         "langchain": ["langchain>=0.0.210"],
+        "langgraph": ["langgraph>=0.6.6"],
+        "launchdarkly": ["launchdarkly-server-sdk>=9.8.0"],
         "litestar": ["litestar>=2.0.0"],
         "loguru": ["loguru>=0.5"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
+        "openfeature": ["openfeature-sdk>=0.7.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": ["opentelemetry-distro"],
-        "pure_eval": ["pure_eval", "executing", "asttokens"],
+        "pure-eval": ["pure_eval", "executing", "asttokens"],
         "pymongo": ["pymongo>=3.1"],
         "pyspark": ["pyspark>=2.4.4"],
         "quart": ["quart>=0.16.1", "blinker>=1.1"],
@@ -77,7 +80,9 @@ setup(
         "sqlalchemy": ["sqlalchemy>=1.2"],
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
+        "statsig": ["statsig>=0.55.3"],
         "tornado": ["tornado>=6"],
+        "unleash": ["UnleashClient>=6.0.1"],
     },
     entry_points={
         "opentelemetry_propagator": [

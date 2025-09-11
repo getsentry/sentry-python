@@ -1,5 +1,5 @@
 from sentry_sdk.consts import SPANSTATUS, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -31,16 +31,8 @@ class SqlalchemyIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         version = parse_version(SQLALCHEMY_VERSION)
-
-        if version is None:
-            raise DidNotEnable(
-                "Unparsable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
-            )
-
-        if version < (1, 2):
-            raise DidNotEnable("SQLAlchemy 1.2 or newer required.")
+        _check_minimum_version(SqlalchemyIntegration, version)
 
         listen(Engine, "before_cursor_execute", _before_cursor_execute)
         listen(Engine, "after_cursor_execute", _after_cursor_execute)

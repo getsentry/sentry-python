@@ -6,10 +6,10 @@ from urllib.parse import urlsplit
 import sentry_sdk
 from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -73,14 +73,8 @@ class SanicIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         SanicIntegration.version = parse_version(SANIC_VERSION)
-
-        if SanicIntegration.version is None:
-            raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
-
-        if SanicIntegration.version < (0, 8):
-            raise DidNotEnable("Sanic 0.8 or newer required.")
+        _check_minimum_version(SanicIntegration, SanicIntegration.version)
 
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
@@ -102,7 +96,7 @@ class SanicIntegration(Integration):
             # https://github.com/huge-success/sanic/issues/1332
             ignore_logger("root")
 
-        if SanicIntegration.version < (21, 9):
+        if SanicIntegration.version is not None and SanicIntegration.version < (21, 9):
             _setup_legacy_sanic()
             return
 
@@ -198,7 +192,7 @@ async def _context_enter(request):
         op=OP.HTTP_SERVER,
         # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
         name=request.path,
-        source=TRANSACTION_SOURCE_URL,
+        source=TransactionSource.URL,
         origin=SanicIntegration.origin,
     )
     request.ctx._sentry_transaction = sentry_sdk.start_transaction(
@@ -235,7 +229,7 @@ async def _set_transaction(request, route, **_):
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()
             route_name = route.name.replace(request.app.name, "").strip(".")
-            scope.set_transaction_name(route_name, source=TRANSACTION_SOURCE_COMPONENT)
+            scope.set_transaction_name(route_name, source=TransactionSource.COMPONENT)
 
 
 def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
@@ -310,11 +304,11 @@ def _legacy_router_get(self, *args):
                     sanic_route = sanic_route[len(sanic_app_name) + 1 :]
 
                 scope.set_transaction_name(
-                    sanic_route, source=TRANSACTION_SOURCE_COMPONENT
+                    sanic_route, source=TransactionSource.COMPONENT
                 )
             else:
                 scope.set_transaction_name(
-                    rv[0].__name__, source=TRANSACTION_SOURCE_COMPONENT
+                    rv[0].__name__, source=TransactionSource.COMPONENT
                 )
 
     return rv

@@ -30,6 +30,9 @@ if django.VERSION >= (3, 0):
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
 @pytest.mark.forked
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
 async def test_basic(sentry_init, capture_events, application):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -38,9 +41,25 @@ async def test_basic(sentry_init, capture_events, application):
 
     events = capture_events()
 
-    comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
-    response = await comm.get_response()
-    await comm.wait()
+    import channels  # type: ignore[import-not-found]
+
+    if (
+        sys.version_info < (3, 9)
+        and channels.__version__ < "4.0.0"
+        and django.VERSION >= (3, 0)
+        and django.VERSION < (4, 0)
+    ):
+        # We emit a UserWarning for channels 2.x and 3.x on Python 3.8 and older
+        # because the async support was not really good back then and there is a known issue.
+        # See the TreadingIntegration for details.
+        with pytest.warns(UserWarning):
+            comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
+            response = await comm.get_response()
+            await comm.wait()
+    else:
+        comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
+        response = await comm.get_response()
+        await comm.wait()
 
     assert response["status"] == 500
 
@@ -104,14 +123,16 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, application):
+async def test_active_thread_id(
+    sentry_init, capture_envelopes, teardown_profiling, endpoint, application
+):
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
     ):
         sentry_init(
             integrations=[DjangoIntegration()],
             traces_sample_rate=1.0,
-            _experiments={"profiles_sample_rate": 1.0},
+            profiles_sample_rate=1.0,
         )
 
         envelopes = capture_envelopes()
@@ -121,17 +142,26 @@ async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, applic
         await comm.wait()
 
         assert response["status"] == 200, response["body"]
-        assert len(envelopes) == 1
 
-        profiles = [item for item in envelopes[0].items if item.type == "profile"]
-        assert len(profiles) == 1
+    assert len(envelopes) == 1
 
-        data = json.loads(response["body"])
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1
 
-        for profile in profiles:
-            transactions = profile.payload.json["transactions"]
-            assert len(transactions) == 1
-            assert str(data["active"]) == transactions[0]["active_thread_id"]
+    data = json.loads(response["body"])
+
+    for item in profiles:
+        transactions = item.payload.json["transactions"]
+        assert len(transactions) == 1
+        assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
+    assert len(transactions) == 1
+
+    for item in transactions:
+        transaction = item.payload.json
+        trace_context = transaction["contexts"]["trace"]
+        assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 @pytest.mark.asyncio
@@ -552,6 +582,9 @@ async def test_asgi_request_body(
         "asyncio.iscoroutinefunction has been replaced in 3.12 by inspect.iscoroutinefunction"
     ),
 )
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
 async def test_asgi_mixin_iscoroutinefunction_before_3_12():
     sentry_asgi_mixin = _asgi_middleware_mixin_factory(lambda: None)
 
@@ -609,6 +642,9 @@ def test_asgi_mixin_iscoroutinefunction_when_not_async_after_3_12():
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
 async def test_async_view(sentry_init, capture_events, application):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -628,6 +664,9 @@ async def test_async_view(sentry_init, capture_events, application):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
 async def test_transaction_http_method_default(
     sentry_init, capture_events, application
 ):
@@ -660,6 +699,9 @@ async def test_transaction_http_method_default(
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
 async def test_transaction_http_method_custom(sentry_init, capture_events, application):
     sentry_init(
         integrations=[

@@ -1,8 +1,10 @@
-import weakref
 import gc
 import re
+import sys
+import weakref
+from unittest import mock
+
 import pytest
-import random
 
 import sentry_sdk
 from sentry_sdk import (
@@ -51,9 +53,11 @@ def test_basic(sentry_init, capture_events, sample_rate):
         assert not events
 
 
-@pytest.mark.parametrize("sampled", [True, False, None])
+@pytest.mark.parametrize("parent_sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_rate):
+def test_continue_from_headers(
+    sentry_init, capture_envelopes, parent_sampled, sample_rate
+):
     """
     Ensure data is actually passed along via headers, and that they are read
     correctly.
@@ -64,7 +68,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     # make a parent transaction (normally this would be in a different service)
     with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
         with start_span() as old_span:
-            old_span.sampled = sampled
+            old_span.sampled = parent_sampled
             headers = dict(
                 sentry_sdk.get_current_scope().iter_trace_propagation_headers(old_span)
             )
@@ -79,7 +83,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     # child transaction, to prove that we can read 'sentry-trace' header data correctly
     child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
     assert child_transaction is not None
-    assert child_transaction.parent_sampled == sampled
+    assert child_transaction.parent_sampled == parent_sampled
     assert child_transaction.trace_id == old_span.trace_id
     assert child_transaction.same_process_as_parent is False
     assert child_transaction.parent_span_id == old_span.span_id
@@ -104,8 +108,8 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
         sentry_sdk.get_current_scope().transaction = "ho"
         capture_message("hello")
 
-    # in this case the child transaction won't be captured
-    if sampled is False or (sample_rate == 0 and sampled is None):
+    if parent_sampled is False or (sample_rate == 0 and parent_sampled is None):
+        # in this case the child transaction won't be captured
         trace1, message = envelopes
         message_payload = message.get_event()
         trace1_payload = trace1.get_transaction_event()
@@ -127,15 +131,34 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
             == message_payload["contexts"]["trace"]["trace_id"]
         )
 
+        if parent_sampled is not None:
+            expected_sample_rate = str(float(parent_sampled))
+        else:
+            expected_sample_rate = str(sample_rate)
+
         assert trace2.headers["trace"] == baggage.dynamic_sampling_context()
         assert trace2.headers["trace"] == {
             "public_key": "49d0f7386ad645858ae85020e393bef3",
             "trace_id": "771a43a4192642f0b136d5159a501700",
             "user_id": "Amelie",
-            "sample_rate": "0.01337",
+            "sample_rate": expected_sample_rate,
         }
 
     assert message_payload["message"] == "hello"
+
+
+@pytest.mark.parametrize("sample_rate", [0.0, 1.0])
+def test_propagate_traces_deprecation_warning(sentry_init, sample_rate):
+    sentry_init(traces_sample_rate=sample_rate, propagate_traces=False)
+
+    with start_transaction(name="hi"):
+        with start_span() as old_span:
+            with pytest.warns(DeprecationWarning):
+                dict(
+                    sentry_sdk.get_current_scope().iter_trace_propagation_headers(
+                        old_span
+                    )
+                )
 
 
 @pytest.mark.parametrize("sample_rate", [0.5, 1.0])
@@ -146,9 +169,8 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     envelopes = capture_envelopes()
 
     # make sure transaction is sampled for both cases
-    monkeypatch.setattr(random, "random", lambda: 0.1)
-
-    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
+        transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
 
     # will create empty mutable baggage
     baggage = transaction._baggage
@@ -173,12 +195,14 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "release": "foo",
         "sample_rate": str(sample_rate),
         "sampled": "true" if transaction.sampled else "false",
+        "sample_rand": "0.250000",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
 
     expected_baggage = (
         "sentry-trace_id=%s,"
+        "sentry-sample_rand=0.250000,"
         "sentry-environment=production,"
         "sentry-release=foo,"
         "sentry-transaction=Head%%20SDK%%20tx,"
@@ -194,6 +218,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "environment": "production",
         "release": "foo",
         "sample_rate": str(sample_rate),
+        "sample_rand": "0.250000",
         "sampled": "true" if transaction.sampled else "false",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
@@ -283,3 +308,55 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
     assert 'meta name="baggage"' in baggage
     baggage_content = re.findall('content="([^"]*)"', baggage)[0]
     assert baggage_content == transaction.get_baggage().serialize()
+
+
+@pytest.mark.parametrize(
+    "exception_cls,exception_value",
+    [
+        (SystemExit, 0),
+    ],
+)
+def test_non_error_exceptions(
+    sentry_init, capture_events, exception_cls, exception_value
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="hi") as transaction:
+        transaction.set_status(SPANSTATUS.OK)
+        with pytest.raises(exception_cls):
+            with start_span(op="foo", name="foodesc"):
+                raise exception_cls(exception_value)
+
+    assert len(events) == 1
+    event = events[0]
+
+    span = event["spans"][0]
+    assert "status" not in span.get("tags", {})
+    assert "status" not in event["tags"]
+    assert event["contexts"]["trace"]["status"] == "ok"
+
+
+@pytest.mark.parametrize("exception_value", [None, 0, False])
+def test_good_sysexit_doesnt_fail_transaction(
+    sentry_init, capture_events, exception_value
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="hi") as transaction:
+        transaction.set_status(SPANSTATUS.OK)
+        with pytest.raises(SystemExit):
+            with start_span(op="foo", name="foodesc"):
+                if exception_value is not False:
+                    sys.exit(exception_value)
+                else:
+                    sys.exit()
+
+    assert len(events) == 1
+    event = events[0]
+
+    span = event["spans"][0]
+    assert "status" not in span.get("tags", {})
+    assert "status" not in event["tags"]
+    assert event["contexts"]["trace"]["status"] == "ok"

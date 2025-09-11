@@ -1,0 +1,38 @@
+# Do not edit this YAML file. This file is generated automatically by executing
+# python scripts/split_tox_gh_actions/split_tox_gh_actions.py
+# The template responsible for it is in
+# scripts/split_tox_gh_actions/templates/base.jinja
+
+{% with lowercase_group=group | replace(" ", "_") | lower %}
+name: Test {{ group }}
+
+on:
+  push:
+    branches:
+      - master
+      - release/**
+      - potel-base
+
+  pull_request:
+
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: {% raw %}${{ github.workflow }}-${{ github.head_ref || github.run_id }}{% endraw %}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUILD_CACHE_KEY: {% raw %}${{ github.sha }}{% endraw %}
+  CACHED_BUILD_PATHS: |
+    {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}
+
+jobs:
+{% for category in categories %}
+{% include "test_group.jinja" %}
+{% endfor %}
+
+{% include "check_required.jinja" %}
+{% endwith %}

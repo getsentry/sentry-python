@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - release/**
-      - sentry-sdk-2.0
+      - potel-base
 
   pull_request:
 
@@ -24,8 +24,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.2.0
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
 
@@ -39,14 +39,18 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.2.0
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
 
-      - run: |
-          pip install jinja2
-          python scripts/split-tox-gh-actions/split-tox-gh-actions.py --fail-on-changes
+      - name: Detect unexpected changes to tox.ini or CI
+        run: |
+          pip install -e .
+          pip install -r scripts/populate_tox/requirements.txt
+          python scripts/populate_tox/populate_tox.py --fail-on-changes
+          pip install -r scripts/split_tox_gh_actions/requirements.txt
+          python scripts/split_tox_gh_actions/split_tox_gh_actions.py --fail-on-changes
 
   build_lambda_layer:
     name: Build Package
@@ -54,8 +58,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.2.0
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
       - name: Setup build cache
@@ -85,8 +89,8 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.2.0
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.12
 

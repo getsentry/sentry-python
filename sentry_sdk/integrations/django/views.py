@@ -76,6 +76,10 @@ def _wrap_sync_view(callback):
     @functools.wraps(callback)
     def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
+        current_scope = sentry_sdk.get_current_scope()
+        if current_scope.transaction is not None:
+            current_scope.transaction.update_active_thread()
+
         sentry_scope = sentry_sdk.get_isolation_scope()
         # set the active thread id to the handler thread for sync views
         # this isn't necessary for async views since that runs on main

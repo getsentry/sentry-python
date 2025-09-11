@@ -51,6 +51,7 @@ else:
 # When changing this, update __all__ in __init__.py too
 __all__ = [
     "init",
+    "add_attachment",
     "add_breadcrumb",
     "capture_event",
     "capture_exception",
@@ -81,6 +82,10 @@ __all__ = [
     "start_transaction",
     "trace",
     "monitor",
+    "start_session",
+    "end_session",
+    "set_transaction_name",
+    "update_current_span",
 ]
 
 
@@ -182,6 +187,20 @@ def capture_exception(
 ):
     # type: (...) -> Optional[str]
     return get_current_scope().capture_exception(error, scope=scope, **scope_kwargs)
+
+
+@scopemethod
+def add_attachment(
+    bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
+    filename=None,  # type: Optional[str]
+    path=None,  # type: Optional[str]
+    content_type=None,  # type: Optional[str]
+    add_to_transactions=False,  # type: bool
+):
+    # type: (...) -> None
+    return get_isolation_scope().add_attachment(
+        bytes, filename, path, content_type, add_to_transactions
+    )
 
 
 @scopemethod
@@ -388,6 +407,10 @@ def start_transaction(
 
 def set_measurement(name, value, unit=""):
     # type: (str, float, MeasurementUnit) -> None
+    """
+    .. deprecated:: 2.28.0
+        This function is deprecated and will be removed in the next major release.
+    """
     transaction = get_current_scope().transaction
     if transaction is not None:
         transaction.set_measurement(name, value, unit)
@@ -431,3 +454,102 @@ def continue_trace(
     return get_isolation_scope().continue_trace(
         environ_or_headers, op, name, source, origin
     )
+
+
+@scopemethod
+def start_session(
+    session_mode="application",  # type: str
+):
+    # type: (...) -> None
+    return get_isolation_scope().start_session(session_mode=session_mode)
+
+
+@scopemethod
+def end_session():
+    # type: () -> None
+    return get_isolation_scope().end_session()
+
+
+@scopemethod
+def set_transaction_name(name, source=None):
+    # type: (str, Optional[str]) -> None
+    return get_current_scope().set_transaction_name(name, source)
+
+
+def update_current_span(op=None, name=None, attributes=None, data=None):
+    # type: (Optional[str], Optional[str], Optional[dict[str, Union[str, int, float, bool]]], Optional[dict[str, Any]]) -> None
+    """
+    Update the current active span with the provided parameters.
+
+    This function allows you to modify properties of the currently active span.
+    If no span is currently active, this function will do nothing.
+
+    :param op: The operation name for the span. This is a high-level description
+        of what the span represents (e.g., "http.client", "db.query").
+        You can use predefined constants from :py:class:`sentry_sdk.consts.OP`
+        or provide your own string. If not provided, the span's operation will
+        remain unchanged.
+    :type op: str or None
+
+    :param name: The human-readable name/description for the span. This provides
+        more specific details about what the span represents (e.g., "GET /api/users",
+        "SELECT * FROM users"). If not provided, the span's name will remain unchanged.
+    :type name: str or None
+
+    :param data: A dictionary of key-value pairs to add as data to the span. This
+        data will be merged with any existing span data. If not provided,
+        no data will be added.
+
+        .. deprecated:: 2.35.0
+            Use ``attributes`` instead. The ``data`` parameter will be removed
+            in a future version.
+    :type data: dict[str, Union[str, int, float, bool]] or None
+
+    :param attributes: A dictionary of key-value pairs to add as attributes to the span.
+        Attribute values must be strings, integers, floats, or booleans. These
+        attributes will be merged with any existing span data. If not provided,
+        no attributes will be added.
+    :type attributes: dict[str, Union[str, int, float, bool]] or None
+
+    :returns: None
+
+    .. versionadded:: 2.35.0
+
+    Example::
+
+        import sentry_sdk
+        from sentry_sdk.consts import OP
+
+        sentry_sdk.update_current_span(
+            op=OP.FUNCTION,
+            name="process_user_data",
+            attributes={"user_id": 123, "batch_size": 50}
+        )
+    """
+    current_span = get_current_span()
+
+    if current_span is None:
+        return
+
+    if op is not None:
+        current_span.op = op
+
+    if name is not None:
+        # internally it is still description
+        current_span.description = name
+
+    if data is not None and attributes is not None:
+        raise ValueError(
+            "Cannot provide both `data` and `attributes`. Please use only `attributes`."
+        )
+
+    if data is not None:
+        warnings.warn(
+            "The `data` parameter is deprecated. Please use `attributes` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        attributes = data
+
+    if attributes is not None:
+        current_span.update_data(attributes)

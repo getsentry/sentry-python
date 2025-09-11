@@ -5,6 +5,7 @@ import pytest
 import falcon
 import falcon.testing
 import sentry_sdk
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import parse_version
@@ -207,9 +208,9 @@ def test_http_status(sentry_init, capture_exceptions, capture_events):
 
 
 def test_falcon_large_json_request(sentry_init, capture_events):
-    sentry_init(integrations=[FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()], max_request_body_size="always")
 
-    data = {"foo": {"bar": "a" * 2000}}
+    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
 
     class Resource:
         def on_post(self, req, resp):
@@ -228,9 +229,14 @@ def test_falcon_large_json_request(sentry_init, capture_events):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
+        "": {
+            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
+            "rem": [
+                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
+            ],
+        }
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -460,3 +466,48 @@ def test_span_origin(sentry_init, capture_events, make_client):
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.falcon"
+
+
+def test_falcon_request_media(sentry_init):
+    # test_passed stores whether the test has passed.
+    test_passed = False
+
+    # test_failure_reason stores the reason why the test failed
+    # if test_passed is False. The value is meaningless when
+    # test_passed is True.
+    test_failure_reason = "test endpoint did not get called"
+
+    class SentryCaptureMiddleware:
+        def process_request(self, _req, _resp):
+            # This capture message forces Falcon event processors to run
+            # before the request handler runs
+            sentry_sdk.capture_message("Processing request")
+
+    class RequestMediaResource:
+        def on_post(self, req, _):
+            nonlocal test_passed, test_failure_reason
+            raw_data = req.bounded_stream.read()
+
+            # If the raw_data is empty, the request body stream
+            # has been exhausted by the SDK. Test should fail in
+            # this case.
+            test_passed = raw_data != b""
+            test_failure_reason = "request body has been read"
+
+    sentry_init(integrations=[FalconIntegration()])
+
+    try:
+        app_class = falcon.App  # Falcon ≥3.0
+    except AttributeError:
+        app_class = falcon.API  # Falcon <3.0
+
+    app = app_class(middleware=[SentryCaptureMiddleware()])
+    app.add_route("/read_body", RequestMediaResource())
+
+    client = falcon.testing.TestClient(app)
+
+    client.simulate_post("/read_body", json={"foo": "bar"})
+
+    # Check that simulate_post actually calls the resource, and
+    # that the SDK does not exhaust the request body stream.
+    assert test_passed, test_failure_reason

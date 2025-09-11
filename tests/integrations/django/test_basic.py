@@ -1,6 +1,8 @@
+import inspect
 import json
 import os
 import re
+import sys
 import pytest
 from functools import partial
 from unittest.mock import patch
@@ -8,10 +10,13 @@ from unittest.mock import patch
 from werkzeug.test import Client
 
 from django import VERSION as DJANGO_VERSION
+
 from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
+from django.utils.functional import SimpleLazyObject
+from django.template.context import make_context
 
 try:
     from django.urls import reverse
@@ -29,6 +34,7 @@ from sentry_sdk.integrations.django import (
 )
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.profiler.utils import get_frame_name
 from sentry_sdk.tracing import Span
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
@@ -304,6 +310,27 @@ def test_queryset_repr(sentry_init, capture_events):
     assert frame["vars"]["my_queryset"].startswith(
         "<QuerySet from django.db.models.query at"
     )
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_context_nested_queryset_repr(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
+
+    try:
+        context = make_context({"entries": User.objects.all()})  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    (frame,) = exception["stacktrace"]["frames"]
+    assert "<User: " not in frame["vars"]["context"]
 
 
 def test_custom_error_handler_request_context(sentry_init, client, capture_events):
@@ -1247,6 +1274,7 @@ def test_ensures_spotlight_middleware_when_spotlight_is_enabled(sentry_init, set
     Test that ensures if Spotlight is enabled, relevant SpotlightMiddleware
     is added to middleware list in settings.
     """
+    settings.DEBUG = True
     original_middleware = frozenset(settings.MIDDLEWARE)
 
     sentry_init(integrations=[DjangoIntegration()], spotlight=True)
@@ -1263,6 +1291,7 @@ def test_ensures_no_spotlight_middleware_when_env_killswitch_is_false(
     Test that ensures if Spotlight is enabled, but is set to a falsy value
     the relevant SpotlightMiddleware is NOT added to middleware list in settings.
     """
+    settings.DEBUG = True
     monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "no")
 
     original_middleware = frozenset(settings.MIDDLEWARE)
@@ -1281,6 +1310,8 @@ def test_ensures_no_spotlight_middleware_when_no_spotlight(
     Test that ensures if Spotlight is not enabled
     the relevant SpotlightMiddleware is NOT added to middleware list in settings.
     """
+    settings.DEBUG = True
+
     # We should NOT have the middleware even if the env var is truthy if Spotlight is off
     monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "1")
 
@@ -1291,3 +1322,47 @@ def test_ensures_no_spotlight_middleware_when_no_spotlight(
     added = frozenset(settings.MIDDLEWARE) ^ original_middleware
 
     assert "sentry_sdk.spotlight.SpotlightMiddleware" not in added
+
+
+def test_get_frame_name_when_in_lazy_object():
+    allowed_to_init = False
+
+    class SimpleLazyObjectWrapper(SimpleLazyObject):
+        def unproxied_method(self):
+            """
+            For testing purposes. We inject a method on the SimpleLazyObject
+            class so if python is executing this method, we should get
+            this class instead of the wrapped class and avoid evaluating
+            the wrapped object too early.
+            """
+            return inspect.currentframe()
+
+    class GetFrame:
+        def __init__(self):
+            assert allowed_to_init, "GetFrame not permitted to initialize yet"
+
+        def proxied_method(self):
+            """
+            For testing purposes. We add an proxied method on the instance
+            class so if python is executing this method, we should get
+            this class instead of the wrapper class.
+            """
+            return inspect.currentframe()
+
+    instance = SimpleLazyObjectWrapper(lambda: GetFrame())
+
+    assert get_frame_name(instance.unproxied_method()) == (
+        "SimpleLazyObjectWrapper.unproxied_method"
+        if sys.version_info < (3, 11)
+        else "test_get_frame_name_when_in_lazy_object.<locals>.SimpleLazyObjectWrapper.unproxied_method"
+    )
+
+    # Now that we're about to access an instance method on the wrapped class,
+    # we should permit initializing it
+    allowed_to_init = True
+
+    assert get_frame_name(instance.proxied_method()) == (
+        "GetFrame.proxied_method"
+        if sys.version_info < (3, 11)
+        else "test_get_frame_name_when_in_lazy_object.<locals>.GetFrame.proxied_method"
+    )

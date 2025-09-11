@@ -7,6 +7,7 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    _check_minimum_version,
     Integration,
     DidNotEnable,
 )
@@ -19,7 +20,7 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SOURCE_FOR_STYLE,
-    TRANSACTION_SOURCE_ROUTE,
+    TransactionSource,
 )
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
@@ -91,12 +92,7 @@ class AioHttpIntegration(Integration):
         # type: () -> None
 
         version = parse_version(AIOHTTP_VERSION)
-
-        if version is None:
-            raise DidNotEnable("Unparsable AIOHTTP version: {}".format(AIOHTTP_VERSION))
-
-        if version < (3, 4):
-            raise DidNotEnable("AIOHTTP 3.4 or newer required.")
+        _check_minimum_version(AioHttpIntegration, version)
 
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
@@ -133,7 +129,7 @@ class AioHttpIntegration(Integration):
                         # If this transaction name makes it to the UI, AIOHTTP's
                         # URL resolver did not find a route or died trying.
                         name="generic AIOHTTP request",
-                        source=TRANSACTION_SOURCE_ROUTE,
+                        source=TransactionSource.ROUTE,
                         origin=AioHttpIntegration.origin,
                     )
                     with sentry_sdk.start_transaction(

@@ -10,10 +10,6 @@ from unittest import mock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from flask import Flask
-from strawberry.extensions.tracing import (
-    SentryTracingExtension,
-    SentryTracingExtensionSync,
-)
 from strawberry.fastapi import GraphQLRouter
 from strawberry.flask.views import GraphQLView
 
@@ -27,6 +23,15 @@ from sentry_sdk.integrations.strawberry import (
     SentrySyncExtension,
 )
 from tests.conftest import ApproxDict
+
+try:
+    from strawberry.extensions.tracing import (
+        SentryTracingExtension,
+        SentryTracingExtensionSync,
+    )
+except ImportError:
+    SentryTracingExtension = None
+    SentryTracingExtensionSync = None
 
 parameterize_strawberry_test = pytest.mark.parametrize(
     "client_factory,async_execution,framework_integrations",
@@ -143,6 +148,10 @@ def test_infer_execution_type_from_installed_packages_sync(sentry_init):
         assert SentrySyncExtension in schema.extensions
 
 
+@pytest.mark.skipif(
+    SentryTracingExtension is None,
+    reason="SentryTracingExtension no longer available in this Strawberry version",
+)
 def test_replace_existing_sentry_async_extension(sentry_init):
     sentry_init(integrations=[StrawberryIntegration()])
 
@@ -152,6 +161,10 @@ def test_replace_existing_sentry_async_extension(sentry_init):
     assert SentryAsyncExtension in schema.extensions
 
 
+@pytest.mark.skipif(
+    SentryTracingExtensionSync is None,
+    reason="SentryTracingExtensionSync no longer available in this Strawberry version",
+)
 def test_replace_existing_sentry_sync_extension(sentry_init):
     sentry_init(integrations=[StrawberryIntegration()])
 

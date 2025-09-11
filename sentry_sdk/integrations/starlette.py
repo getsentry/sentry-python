@@ -3,6 +3,7 @@ import functools
 import warnings
 from collections.abc import Set
 from copy import deepcopy
+from json import JSONDecodeError
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -21,15 +22,13 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_ROUTE,
+    TransactionSource,
 )
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    logger,
     parse_version,
     transaction_from_function,
 )
@@ -65,7 +64,12 @@ except ImportError:
 
 try:
     # Optional dependency of Starlette to parse form data.
-    import multipart  # type: ignore
+    try:
+        # python-multipart 0.0.13 and later
+        import python_multipart as multipart  # type: ignore
+    except ImportError:
+        # python-multipart 0.0.12 and earlier
+        import multipart  # type: ignore
 except ImportError:
     multipart = None
 
@@ -358,13 +362,13 @@ def patch_middlewares():
 
     if not_yet_patched:
 
-        def _sentry_middleware_init(self, cls, **options):
-            # type: (Any, Any, Any) -> None
+        def _sentry_middleware_init(self, cls, *args, **kwargs):
+            # type: (Any, Any, Any, Any) -> None
             if cls == SentryAsgiMiddleware:
-                return old_middleware_init(self, cls, **options)
+                return old_middleware_init(self, cls, *args, **kwargs)
 
             span_enabled_cls = _enable_span_for_middleware(cls)
-            old_middleware_init(self, span_enabled_cls, **options)
+            old_middleware_init(self, span_enabled_cls, *args, **kwargs)
 
             if cls == AuthenticationMiddleware:
                 patch_authentication_middleware(cls)
@@ -398,9 +402,9 @@ def patch_asgi_app():
                 if integration
                 else DEFAULT_HTTP_METHODS_TO_CAPTURE
             ),
+            asgi_version=3,
         )
 
-        middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 
     Starlette.__call__ = _sentry_patched_asgi_app
@@ -487,8 +491,11 @@ def patch_request_response():
                 if integration is None:
                     return old_func(*args, **kwargs)
 
-                sentry_scope = sentry_sdk.get_isolation_scope()
+                current_scope = sentry_sdk.get_current_scope()
+                if current_scope.transaction is not None:
+                    current_scope.transaction.update_active_thread()
 
+                sentry_scope = sentry_sdk.get_isolation_scope()
                 if sentry_scope.profile is not None:
                     sentry_scope.profile.update_active_thread_id()
 
@@ -673,8 +680,10 @@ class StarletteRequestExtractor:
         # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
         if not self.is_json():
             return None
-
-        return await self.request.json()
+        try:
+            return await self.request.json()
+        except JSONDecodeError:
+            return None
 
 
 def _transaction_name_from_router(scope):
@@ -686,7 +695,11 @@ def _transaction_name_from_router(scope):
     for route in router.routes:
         match = route.matches(scope)
         if match[0] == Match.FULL:
-            return route.path
+            try:
+                return route.path
+            except AttributeError:
+                # routes added via app.host() won't have a path attribute
+                return scope.get("path")
 
     return None
 
@@ -706,12 +719,9 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
-        source = TRANSACTION_SOURCE_ROUTE
+        source = TransactionSource.ROUTE
 
     scope.set_transaction_name(name, source=source)
-    logger.debug(
-        "[Starlette] Set transaction name and source on scope: %s / %s", name, source
-    )
 
 
 def _get_transaction_from_middleware(app, asgi_scope, integration):
@@ -721,9 +731,9 @@ def _get_transaction_from_middleware(app, asgi_scope, integration):
 
     if integration.transaction_style == "endpoint":
         name = transaction_from_function(app.__class__)
-        source = TRANSACTION_SOURCE_COMPONENT
+        source = TransactionSource.COMPONENT
     elif integration.transaction_style == "url":
         name = _transaction_name_from_router(asgi_scope)
-        source = TRANSACTION_SOURCE_ROUTE
+        source = TransactionSource.ROUTE
 
     return name, source

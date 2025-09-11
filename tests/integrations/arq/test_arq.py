@@ -1,4 +1,6 @@
 import asyncio
+from datetime import timedelta
+
 import pytest
 
 from sentry_sdk import get_client, start_transaction
@@ -83,14 +85,65 @@ def init_arq(sentry_init):
     return inner
 
 
+@pytest.fixture
+def init_arq_with_dict_settings(sentry_init):
+    def inner(
+        cls_functions=None,
+        cls_cron_jobs=None,
+        kw_functions=None,
+        kw_cron_jobs=None,
+        allow_abort_jobs_=False,
+    ):
+        cls_functions = cls_functions or []
+        cls_cron_jobs = cls_cron_jobs or []
+
+        kwargs = {}
+        if kw_functions is not None:
+            kwargs["functions"] = kw_functions
+        if kw_cron_jobs is not None:
+            kwargs["cron_jobs"] = kw_cron_jobs
+
+        sentry_init(
+            integrations=[ArqIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
+
+        server = FakeRedis()
+        pool = ArqRedis(pool_or_conn=server.connection_pool)
+
+        worker_settings = {
+            "functions": cls_functions,
+            "cron_jobs": cls_cron_jobs,
+            "redis_pool": pool,
+            "allow_abort_jobs": allow_abort_jobs_,
+        }
+
+        if not worker_settings["functions"]:
+            del worker_settings["functions"]
+        if not worker_settings["cron_jobs"]:
+            del worker_settings["cron_jobs"]
+
+        worker = arq.worker.create_worker(worker_settings, **kwargs)
+
+        return pool, worker
+
+    return inner
+
+
 @pytest.mark.asyncio
-async def test_job_result(init_arq):
+@pytest.mark.parametrize(
+    "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
+)
+async def test_job_result(init_arq_settings, request):
     async def increase(ctx, num):
         return num + 1
 
+    init_fixture_method = request.getfixturevalue(init_arq_settings)
+
     increase.__qualname__ = increase.__name__
 
-    pool, worker = init_arq([increase])
+    pool, worker = init_fixture_method([increase])
 
     job = await pool.enqueue_job("increase", 3)
 
@@ -105,14 +158,19 @@ async def test_job_result(init_arq):
 
 
 @pytest.mark.asyncio
-async def test_job_retry(capture_events, init_arq):
+@pytest.mark.parametrize(
+    "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
+)
+async def test_job_retry(capture_events, init_arq_settings, request):
     async def retry_job(ctx):
         if ctx["job_try"] < 2:
             raise arq.worker.Retry
 
+    init_fixture_method = request.getfixturevalue(init_arq_settings)
+
     retry_job.__qualname__ = retry_job.__name__
 
-    pool, worker = init_arq([retry_job])
+    pool, worker = init_fixture_method([retry_job])
 
     job = await pool.enqueue_job("retry_job")
 
@@ -139,10 +197,17 @@ async def test_job_retry(capture_events, init_arq):
     "source", [("cls_functions", "cls_cron_jobs"), ("kw_functions", "kw_cron_jobs")]
 )
 @pytest.mark.parametrize("job_fails", [True, False], ids=["error", "success"])
+@pytest.mark.parametrize(
+    "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
+)
 @pytest.mark.asyncio
-async def test_job_transaction(capture_events, init_arq, source, job_fails):
+async def test_job_transaction(
+    capture_events, init_arq_settings, source, job_fails, request
+):
     async def division(_, a, b=0):
         return a / b
+
+    init_fixture_method = request.getfixturevalue(init_arq_settings)
 
     division.__qualname__ = division.__name__
 
@@ -152,7 +217,9 @@ async def test_job_transaction(capture_events, init_arq, source, job_fails):
     cron_job = cron(cron_func, minute=0, run_at_startup=True)
 
     functions_key, cron_jobs_key = source
-    pool, worker = init_arq(**{functions_key: [division], cron_jobs_key: [cron_job]})
+    pool, worker = init_fixture_method(
+        **{functions_key: [division], cron_jobs_key: [cron_job]}
+    )
 
     events = capture_events()
 
@@ -213,12 +280,17 @@ async def test_job_transaction(capture_events, init_arq, source, job_fails):
 
 
 @pytest.mark.parametrize("source", ["cls_functions", "kw_functions"])
+@pytest.mark.parametrize(
+    "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
+)
 @pytest.mark.asyncio
-async def test_enqueue_job(capture_events, init_arq, source):
+async def test_enqueue_job(capture_events, init_arq_settings, source, request):
     async def dummy_job(_):
         pass
 
-    pool, _ = init_arq(**{source: [dummy_job]})
+    init_fixture_method = request.getfixturevalue(init_arq_settings)
+
+    pool, _ = init_fixture_method(**{source: [dummy_job]})
 
     events = capture_events()
 
@@ -236,13 +308,18 @@ async def test_enqueue_job(capture_events, init_arq, source):
 
 
 @pytest.mark.asyncio
-async def test_execute_job_without_integration(init_arq):
+@pytest.mark.parametrize(
+    "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
+)
+async def test_execute_job_without_integration(init_arq_settings, request):
     async def dummy_job(_ctx):
         pass
 
+    init_fixture_method = request.getfixturevalue(init_arq_settings)
+
     dummy_job.__qualname__ = dummy_job.__name__
 
-    pool, worker = init_arq([dummy_job])
+    pool, worker = init_fixture_method([dummy_job])
     # remove the integration to trigger the edge case
     get_client().integrations.pop("arq")
 
@@ -254,12 +331,17 @@ async def test_execute_job_without_integration(init_arq):
 
 
 @pytest.mark.parametrize("source", ["cls_functions", "kw_functions"])
+@pytest.mark.parametrize(
+    "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
+)
 @pytest.mark.asyncio
-async def test_span_origin_producer(capture_events, init_arq, source):
+async def test_span_origin_producer(capture_events, init_arq_settings, source, request):
     async def dummy_job(_):
         pass
 
-    pool, _ = init_arq(**{source: [dummy_job]})
+    init_fixture_method = request.getfixturevalue(init_arq_settings)
+
+    pool, _ = init_fixture_method(**{source: [dummy_job]})
 
     events = capture_events()
 
@@ -272,13 +354,18 @@ async def test_span_origin_producer(capture_events, init_arq, source):
 
 
 @pytest.mark.asyncio
-async def test_span_origin_consumer(capture_events, init_arq):
+@pytest.mark.parametrize(
+    "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
+)
+async def test_span_origin_consumer(capture_events, init_arq_settings, request):
     async def job(ctx):
         pass
 
+    init_fixture_method = request.getfixturevalue(init_arq_settings)
+
     job.__qualname__ = job.__name__
 
-    pool, worker = init_arq([job])
+    pool, worker = init_fixture_method([job])
 
     job = await pool.enqueue_job("retry_job")
 
@@ -291,3 +378,48 @@ async def test_span_origin_consumer(capture_events, init_arq):
     assert event["contexts"]["trace"]["origin"] == "auto.queue.arq"
     assert event["spans"][0]["origin"] == "auto.db.redis"
     assert event["spans"][1]["origin"] == "auto.db.redis"
+
+
+@pytest.mark.asyncio
+async def test_job_concurrency(capture_events, init_arq):
+    """
+    10 - division starts
+    70 - sleepy starts
+    110 - division raises error
+    120 - sleepy finishes
+
+    """
+
+    async def sleepy(_):
+        await asyncio.sleep(0.05)
+
+    async def division(_):
+        await asyncio.sleep(0.1)
+        return 1 / 0
+
+    sleepy.__qualname__ = sleepy.__name__
+    division.__qualname__ = division.__name__
+
+    pool, worker = init_arq([sleepy, division])
+
+    events = capture_events()
+
+    await pool.enqueue_job(
+        "division", _job_id="123", _defer_by=timedelta(milliseconds=10)
+    )
+    await pool.enqueue_job(
+        "sleepy", _job_id="456", _defer_by=timedelta(milliseconds=70)
+    )
+
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(worker.async_run())
+    await asyncio.sleep(1)
+
+    task.cancel()
+
+    await worker.close()
+
+    exception_event = events[1]
+    assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert exception_event["transaction"] == "division"
+    assert exception_event["extra"]["arq-job"]["task"] == "division"

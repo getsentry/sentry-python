@@ -3,7 +3,6 @@ from unittest import mock
 
 import httpx
 import pytest
-import responses
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
@@ -16,7 +15,9 @@ from tests.conftest import ApproxDict
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
+def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx_mock):
+    httpx_mock.add_response()
+
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
         return crumb
@@ -24,7 +25,6 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
     sentry_init(integrations=[HttpxIntegration()], before_breadcrumb=before_breadcrumb)
 
     url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
 
     with start_transaction():
         events = capture_events()
@@ -61,11 +61,73 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_outgoing_trace_headers(sentry_init, httpx_client):
-    sentry_init(traces_sample_rate=1.0, integrations=[HttpxIntegration()])
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+def test_crumb_capture_client_error(
+    sentry_init, capture_events, httpx_client, httpx_mock, status_code, level
+):
+    httpx_mock.add_response(status_code=status_code)
+
+    sentry_init(integrations=[HttpxIntegration()])
 
     url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
+
+    with start_transaction():
+        events = capture_events()
+
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            response = asyncio.get_event_loop().run_until_complete(
+                httpx_client.get(url)
+            )
+        else:
+            response = httpx_client.get(url)
+
+        assert response.status_code == status_code
+        capture_message("Testing!")
+
+        (event,) = events
+
+        crumb = event["breadcrumbs"]["values"][0]
+        assert crumb["type"] == "http"
+        assert crumb["category"] == "httplib"
+
+        if level is None:
+            assert "level" not in crumb
+        else:
+            assert crumb["level"] == level
+
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: status_code,
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_outgoing_trace_headers(sentry_init, httpx_client, httpx_mock):
+    httpx_mock.add_response()
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[HttpxIntegration()],
+    )
+
+    url = "http://example.com/"
 
     with start_transaction(
         name="/interactions/other-dogs/new-dog",
@@ -93,7 +155,13 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_outgoing_trace_headers_append_to_baggage(sentry_init, httpx_client):
+def test_outgoing_trace_headers_append_to_baggage(
+    sentry_init,
+    httpx_client,
+    httpx_mock,
+):
+    httpx_mock.add_response()
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
@@ -101,32 +169,33 @@ def test_outgoing_trace_headers_append_to_baggage(sentry_init, httpx_client):
     )
 
     url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
 
-    with start_transaction(
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        trace_id="01234567890123456789012345678901",
-    ) as transaction:
-        if asyncio.iscoroutinefunction(httpx_client.get):
-            response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url, headers={"baGGage": "custom=data"})
+    # patch random.uniform to return a predictable sample_rand value
+    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+        with start_transaction(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            trace_id="01234567890123456789012345678901",
+        ) as transaction:
+            if asyncio.iscoroutinefunction(httpx_client.get):
+                response = asyncio.get_event_loop().run_until_complete(
+                    httpx_client.get(url, headers={"baGGage": "custom=data"})
+                )
+            else:
+                response = httpx_client.get(url, headers={"baGGage": "custom=data"})
+
+            request_span = transaction._span_recorder.spans[-1]
+            assert response.request.headers[
+                "sentry-trace"
+            ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+                trace_id=transaction.trace_id,
+                parent_span_id=request_span.span_id,
+                sampled=1,
             )
-        else:
-            response = httpx_client.get(url, headers={"baGGage": "custom=data"})
-
-        request_span = transaction._span_recorder.spans[-1]
-        assert response.request.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
-        assert (
-            response.request.headers["baggage"]
-            == "custom=data,sentry-trace_id=01234567890123456789012345678901,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
-        )
+            assert (
+                response.request.headers["baggage"]
+                == "custom=data,sentry-trace_id=01234567890123456789012345678901,sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
+            )
 
 
 @pytest.mark.parametrize(
@@ -290,12 +359,13 @@ def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
 
 
 @pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
+def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock):
+    httpx_mock.add_response()
+
     sentry_init(integrations=[HttpxIntegration()])
 
     httpx_client = httpx.Client()
     url = "http://example.com"
-    responses.add(responses.GET, url, status=200)
 
     events = capture_events()
     with mock.patch(
@@ -326,7 +396,9 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
-def test_span_origin(sentry_init, capture_events, httpx_client):
+def test_span_origin(sentry_init, capture_events, httpx_client, httpx_mock):
+    httpx_mock.add_response()
+
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
@@ -335,7 +407,6 @@ def test_span_origin(sentry_init, capture_events, httpx_client):
     events = capture_events()
 
     url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
 
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx_client.get):

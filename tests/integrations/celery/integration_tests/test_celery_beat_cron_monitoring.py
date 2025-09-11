@@ -1,4 +1,5 @@
 import os
+import sys
 import pytest
 
 from celery.contrib.testing.worker import start_worker
@@ -52,6 +53,7 @@ def celery_init(sentry_init, celery_config):
     return inner
 
 
+@pytest.mark.skipif(sys.version_info < (3, 7), reason="Requires Python 3.7+")
 @pytest.mark.forked
 def test_explanation(celery_init, capture_envelopes):
     """
@@ -90,6 +92,7 @@ def test_explanation(celery_init, capture_envelopes):
     assert len(envelopes) >= 0
 
 
+@pytest.mark.skipif(sys.version_info < (3, 7), reason="Requires Python 3.7+")
 @pytest.mark.forked
 def test_beat_task_crons_success(celery_init, capture_envelopes):
     app = celery_init(
@@ -122,6 +125,7 @@ def test_beat_task_crons_success(celery_init, capture_envelopes):
     assert check_in["status"] == "ok"
 
 
+@pytest.mark.skipif(sys.version_info < (3, 7), reason="Requires Python 3.7+")
 @pytest.mark.forked
 def test_beat_task_crons_error(celery_init, capture_envelopes):
     app = celery_init(

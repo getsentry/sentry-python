@@ -127,11 +127,13 @@ def _install_httplib():
         if span is None:
             return real_getresponse(self, *args, **kwargs)
 
-        rv = real_getresponse(self, *args, **kwargs)
+        try:
+            rv = real_getresponse(self, *args, **kwargs)
 
-        span.set_http_status(int(rv.status))
-        span.set_data("reason", rv.reason)
-        span.finish()
+            span.set_http_status(int(rv.status))
+            span.set_data("reason", rv.reason)
+        finally:
+            span.finish()
 
         return rv
 

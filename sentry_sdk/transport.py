@@ -24,15 +24,13 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, List, Dict
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import DefaultDict
     from typing import Iterable
-    from typing import List
     from typing import Mapping
     from typing import Optional
     from typing import Self
@@ -160,13 +158,6 @@ class Transport(ABC):
         # type: (Self) -> bool
         return True
 
-    def __del__(self):
-        # type: (Self) -> None
-        try:
-            self.kill()
-        except Exception:
-            pass
-
 
 def _parse_rate_limits(header, now=None):
     # type: (str, Optional[datetime]) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]
@@ -198,6 +189,8 @@ def _parse_rate_limits(header, now=None):
 class BaseHttpTransport(Transport):
     """The base HTTP transport."""
 
+    TIMEOUT = 30  # seconds
+
     def __init__(self, options):
         # type: (Self, Dict[str, Any]) -> None
         from sentry_sdk.consts import VERSION
@@ -215,15 +208,7 @@ class BaseHttpTransport(Transport):
         )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
         self._last_client_report_sent = time.time()
 
-        self._pool = self._make_pool(
-            self.parsed_dsn,
-            http_proxy=options["http_proxy"],
-            https_proxy=options["https_proxy"],
-            ca_certs=options["ca_certs"],
-            cert_file=options["cert_file"],
-            key_file=options["key_file"],
-            proxy_headers=options["proxy_headers"],
-        )
+        self._pool = self._make_pool()
 
         # Backwards compatibility for deprecated `self.hub_class` attribute
         self._hub_cls = sentry_sdk.Hub
@@ -288,7 +273,9 @@ class BaseHttpTransport(Transport):
                 event = item.get_transaction_event() or {}
 
                 # +1 for the transaction itself
-                span_count = len(event.get("spans") or []) + 1
+                span_count = (
+                    len(cast(List[Dict[str, object]], event.get("spans") or [])) + 1
+                )
                 self.record_lost_event(reason, "span", quantity=span_count)
 
             elif data_category == "attachment":
@@ -532,8 +519,8 @@ class BaseHttpTransport(Transport):
 
         return content_encoding, body
 
-    def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
-        # type: (Self, Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
+    def _get_pool_options(self):
+        # type: (Self) -> Dict[str, Any]
         raise NotImplementedError()
 
     def _in_no_proxy(self, parsed_dsn):
@@ -547,17 +534,8 @@ class BaseHttpTransport(Transport):
                 return True
         return False
 
-    def _make_pool(
-        self,
-        parsed_dsn,  # type: Dsn
-        http_proxy,  # type: Optional[str]
-        https_proxy,  # type: Optional[str]
-        ca_certs,  # type: Optional[Any]
-        cert_file,  # type: Optional[Any]
-        key_file,  # type: Optional[Any]
-        proxy_headers,  # type: Optional[Dict[str, str]]
-    ):
-        # type: (...) -> Union[PoolManager, ProxyManager, httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
+    def _make_pool(self):
+        # type: (Self) -> Union[PoolManager, ProxyManager, httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
         raise NotImplementedError()
 
     def _request(
@@ -631,13 +609,14 @@ class HttpTransport(BaseHttpTransport):
     if TYPE_CHECKING:
         _pool: Union[PoolManager, ProxyManager]
 
-    def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
-        # type: (Self, Any, Any, Any) -> Dict[str, Any]
+    def _get_pool_options(self):
+        # type: (Self) -> Dict[str, Any]
 
         num_pools = self.options.get("_experiments", {}).get("transport_num_pools")
         options = {
             "num_pools": 2 if num_pools is None else int(num_pools),
             "cert_reqs": "CERT_REQUIRED",
+            "timeout": urllib3.Timeout(total=self.TIMEOUT),
         }
 
         socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
@@ -658,42 +637,43 @@ class HttpTransport(BaseHttpTransport):
             options["socket_options"] = socket_options
 
         options["ca_certs"] = (
-            ca_certs  # User-provided bundle from the SDK init
+            self.options["ca_certs"]  # User-provided bundle from the SDK init
             or os.environ.get("SSL_CERT_FILE")
             or os.environ.get("REQUESTS_CA_BUNDLE")
             or certifi.where()
         )
 
-        options["cert_file"] = cert_file or os.environ.get("CLIENT_CERT_FILE")
-        options["key_file"] = key_file or os.environ.get("CLIENT_KEY_FILE")
+        options["cert_file"] = self.options["cert_file"] or os.environ.get(
+            "CLIENT_CERT_FILE"
+        )
+        options["key_file"] = self.options["key_file"] or os.environ.get(
+            "CLIENT_KEY_FILE"
+        )
 
         return options
 
-    def _make_pool(
-        self,
-        parsed_dsn,  # type: Dsn
-        http_proxy,  # type: Optional[str]
-        https_proxy,  # type: Optional[str]
-        ca_certs,  # type: Any
-        cert_file,  # type: Any
-        key_file,  # type: Any
-        proxy_headers,  # type: Optional[Dict[str, str]]
-    ):
-        # type: (...) -> Union[PoolManager, ProxyManager]
+    def _make_pool(self):
+        # type: (Self) -> Union[PoolManager, ProxyManager]
+        if self.parsed_dsn is None:
+            raise ValueError("Cannot create HTTP-based transport without valid DSN")
+
         proxy = None
-        no_proxy = self._in_no_proxy(parsed_dsn)
+        no_proxy = self._in_no_proxy(self.parsed_dsn)
 
         # try HTTPS first
-        if parsed_dsn.scheme == "https" and (https_proxy != ""):
+        https_proxy = self.options["https_proxy"]
+        if self.parsed_dsn.scheme == "https" and (https_proxy != ""):
             proxy = https_proxy or (not no_proxy and getproxies().get("https"))
 
         # maybe fallback to HTTP proxy
+        http_proxy = self.options["http_proxy"]
         if not proxy and (http_proxy != ""):
             proxy = http_proxy or (not no_proxy and getproxies().get("http"))
 
-        opts = self._get_pool_options(ca_certs, cert_file, key_file)
+        opts = self._get_pool_options()
 
         if proxy:
+            proxy_headers = self.options["proxy_headers"]
             if proxy_headers:
                 opts["proxy_headers"] = proxy_headers
 
@@ -736,6 +716,7 @@ class HttpTransport(BaseHttpTransport):
 
 try:
     import httpcore
+    import h2  # noqa: F401
 except ImportError:
     # Sorry, no Http2Transport for you
     class Http2Transport(HttpTransport):
@@ -750,6 +731,8 @@ else:
 
     class Http2Transport(BaseHttpTransport):  # type: ignore
         """The HTTP2 transport based on httpcore."""
+
+        TIMEOUT = 15
 
         if TYPE_CHECKING:
             _pool: Union[
@@ -780,13 +763,22 @@ else:
                 self._auth.get_api_url(endpoint_type),
                 content=body,
                 headers=headers,  # type: ignore
+                extensions={
+                    "timeout": {
+                        "pool": self.TIMEOUT,
+                        "connect": self.TIMEOUT,
+                        "write": self.TIMEOUT,
+                        "read": self.TIMEOUT,
+                    }
+                },
             )
             return response
 
-        def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
-            # type: (Any, Any, Any) -> Dict[str, Any]
+        def _get_pool_options(self):
+            # type: (Self) -> Dict[str, Any]
             options = {
-                "http2": True,
+                "http2": self.parsed_dsn is not None
+                and self.parsed_dsn.scheme == "https",
                 "retries": 3,
             }  # type: Dict[str, Any]
 
@@ -805,13 +797,13 @@ else:
 
             ssl_context = ssl.create_default_context()
             ssl_context.load_verify_locations(
-                ca_certs  # User-provided bundle from the SDK init
+                self.options["ca_certs"]  # User-provided bundle from the SDK init
                 or os.environ.get("SSL_CERT_FILE")
                 or os.environ.get("REQUESTS_CA_BUNDLE")
                 or certifi.where()
             )
-            cert_file = cert_file or os.environ.get("CLIENT_CERT_FILE")
-            key_file = key_file or os.environ.get("CLIENT_KEY_FILE")
+            cert_file = self.options["cert_file"] or os.environ.get("CLIENT_CERT_FILE")
+            key_file = self.options["key_file"] or os.environ.get("CLIENT_KEY_FILE")
             if cert_file is not None:
                 ssl_context.load_cert_chain(cert_file, key_file)
 
@@ -819,31 +811,27 @@ else:
 
             return options
 
-        def _make_pool(
-            self,
-            parsed_dsn,  # type: Dsn
-            http_proxy,  # type: Optional[str]
-            https_proxy,  # type: Optional[str]
-            ca_certs,  # type: Any
-            cert_file,  # type: Any
-            key_file,  # type: Any
-            proxy_headers,  # type: Optional[Dict[str, str]]
-        ):
-            # type: (...) -> Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
+        def _make_pool(self):
+            # type: (Self) -> Union[httpcore.SOCKSProxy, httpcore.HTTPProxy, httpcore.ConnectionPool]
+            if self.parsed_dsn is None:
+                raise ValueError("Cannot create HTTP-based transport without valid DSN")
             proxy = None
-            no_proxy = self._in_no_proxy(parsed_dsn)
+            no_proxy = self._in_no_proxy(self.parsed_dsn)
 
             # try HTTPS first
-            if parsed_dsn.scheme == "https" and (https_proxy != ""):
+            https_proxy = self.options["https_proxy"]
+            if self.parsed_dsn.scheme == "https" and (https_proxy != ""):
                 proxy = https_proxy or (not no_proxy and getproxies().get("https"))
 
             # maybe fallback to HTTP proxy
+            http_proxy = self.options["http_proxy"]
             if not proxy and (http_proxy != ""):
                 proxy = http_proxy or (not no_proxy and getproxies().get("http"))
 
-            opts = self._get_pool_options(ca_certs, cert_file, key_file)
+            opts = self._get_pool_options()
 
             if proxy:
+                proxy_headers = self.options["proxy_headers"]
                 if proxy_headers:
                     opts["proxy_headers"] = proxy_headers
 

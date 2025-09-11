@@ -1,0 +1,223 @@
+# Do not edit this YAML file. This file is generated automatically by executing
+# python scripts/split_tox_gh_actions/split_tox_gh_actions.py
+# The template responsible for it is in
+# scripts/split_tox_gh_actions/templates/base.jinja
+name: Test Tasks
+on:
+  push:
+    branches:
+      - master
+      - release/**
+      - potel-base
+  pull_request:
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  BUILD_CACHE_KEY: ${{ github.sha }}
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dist-serverless
+jobs:
+  test-tasks-latest:
+    name: Tasks (latest)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.7","3.10","3.11","3.12","3.13"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-22.04]
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
+    steps:
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
+        if: ${{ matrix.python-version != '3.6' }}
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+      - name: Start Redis
+        uses: supercharge/redis-github-action@1.8.0
+      - name: Install Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Setup Test Env
+        run: |
+          pip install "coverage[toml]" tox
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test arq latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-arq-latest"
+      - name: Test beam latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-beam-latest"
+      - name: Test celery latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest"
+      - name: Test dramatiq latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-dramatiq-latest"
+      - name: Test huey latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest"
+      - name: Test ray latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-ray-latest"
+      - name: Test rq latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-rq-latest"
+      - name: Test spark latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-spark-latest"
+      - name: Generate coverage XML (Python 3.6)
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
+        run: |
+          export COVERAGE_RCFILE=.coveragerc36
+          coverage combine .coverage-sentry-*
+          coverage xml --ignore-errors
+      - name: Generate coverage XML
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
+        run: |
+          coverage combine .coverage-sentry-*
+          coverage xml
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5.5.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugins: noop
+          verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
+          verbose: true
+  test-tasks-pinned:
+    name: Tasks (pinned)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-22.04]
+    # Use Docker container only for Python 3.6
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
+    steps:
+      - uses: actions/checkout@v5.0.0
+      - uses: actions/setup-python@v6
+        if: ${{ matrix.python-version != '3.6' }}
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+      - name: Start Redis
+        uses: supercharge/redis-github-action@1.8.0
+      - name: Install Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Setup Test Env
+        run: |
+          pip install "coverage[toml]" tox
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test arq pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-arq"
+      - name: Test beam pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-beam"
+      - name: Test celery pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery"
+      - name: Test dramatiq pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-dramatiq"
+      - name: Test huey pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey"
+      - name: Test ray pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-ray"
+      - name: Test rq pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rq"
+      - name: Test spark pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-spark"
+      - name: Generate coverage XML (Python 3.6)
+        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
+        run: |
+          export COVERAGE_RCFILE=.coveragerc36
+          coverage combine .coverage-sentry-*
+          coverage xml --ignore-errors
+      - name: Generate coverage XML
+        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
+        run: |
+          coverage combine .coverage-sentry-*
+          coverage xml
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5.5.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          # make sure no plugins alter our coverage reports
+          plugins: noop
+          verbose: true
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
+          verbose: true
+  check_required_tests:
+    name: All pinned Tasks tests passed
+    needs: test-tasks-pinned
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check for failures
+        if: needs.test-tasks-pinned.result != 'success'
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

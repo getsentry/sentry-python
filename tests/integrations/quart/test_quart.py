@@ -1,8 +1,9 @@
+import importlib
 import json
 import threading
+from unittest import mock
 
 import pytest
-import pytest_asyncio
 
 import sentry_sdk
 from sentry_sdk import (
@@ -13,23 +14,22 @@ from sentry_sdk import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.quart as quart_sentry
 
-from quart import Quart, Response, abort, stream_with_context
-from quart.views import View
 
-from quart_auth import AuthUser, login_user
+def quart_app_factory():
+    # These imports are inlined because the `test_quart_flask_patch` testcase
+    # tests behavior that is triggered by importing a package before any Quart
+    # imports happen, so we can't have these on the module level
+    from quart import Quart
 
-try:
-    from quart_auth import QuartAuth
+    try:
+        from quart_auth import QuartAuth
 
-    auth_manager = QuartAuth()
-except ImportError:
-    from quart_auth import AuthManager
+        auth_manager = QuartAuth()
+    except ImportError:
+        from quart_auth import AuthManager
 
-    auth_manager = AuthManager()
+        auth_manager = AuthManager()
 
-
-@pytest_asyncio.fixture
-async def app():
     app = Quart(__name__)
     app.debug = False
     app.config["TESTING"] = False
@@ -73,8 +73,45 @@ def integration_enabled_params(request):
 
 
 @pytest.mark.asyncio
-async def test_has_context(sentry_init, app, capture_events):
+@pytest.mark.forked
+@pytest.mark.skipif(
+    not importlib.util.find_spec("quart_flask_patch"),
+    reason="requires quart_flask_patch",
+)
+async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations):
+    # This testcase is forked because `import quart_flask_patch` needs to run
+    # before anything else Quart-related is imported (since it monkeypatches
+    # some things) and we don't want this to affect other testcases.
+    #
+    # It's also important this testcase be run before any other testcase
+    # that uses `quart_app_factory`.
+    import quart_flask_patch  # noqa: F401
+
+    app = quart_app_factory()
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+    )
+
+    @app.route("/")
+    async def index():
+        1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    try:
+        await client.get("/")
+    except ZeroDivisionError:
+        pass
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "quart"
+
+
+@pytest.mark.asyncio
+async def test_has_context(sentry_init, capture_events):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
     events = capture_events()
 
     client = app.test_client()
@@ -99,7 +136,6 @@ async def test_has_context(sentry_init, app, capture_events):
 )
 async def test_transaction_style(
     sentry_init,
-    app,
     capture_events,
     url,
     transaction_style,
@@ -111,6 +147,7 @@ async def test_transaction_style(
             quart_sentry.QuartIntegration(transaction_style=transaction_style)
         ]
     )
+    app = quart_app_factory()
     events = capture_events()
 
     client = app.test_client()
@@ -126,10 +163,10 @@ async def test_errors(
     sentry_init,
     capture_exceptions,
     capture_events,
-    app,
     integration_enabled_params,
 ):
     sentry_init(**integration_enabled_params)
+    app = quart_app_factory()
 
     @app.route("/")
     async def index():
@@ -153,9 +190,10 @@ async def test_errors(
 
 @pytest.mark.asyncio
 async def test_quart_auth_not_installed(
-    sentry_init, app, capture_events, monkeypatch, integration_enabled_params
+    sentry_init, capture_events, monkeypatch, integration_enabled_params
 ):
     sentry_init(**integration_enabled_params)
+    app = quart_app_factory()
 
     monkeypatch.setattr(quart_sentry, "quart_auth", None)
 
@@ -170,9 +208,10 @@ async def test_quart_auth_not_installed(
 
 @pytest.mark.asyncio
 async def test_quart_auth_not_configured(
-    sentry_init, app, capture_events, monkeypatch, integration_enabled_params
+    sentry_init, capture_events, monkeypatch, integration_enabled_params
 ):
     sentry_init(**integration_enabled_params)
+    app = quart_app_factory()
 
     assert quart_sentry.quart_auth
 
@@ -186,9 +225,10 @@ async def test_quart_auth_not_configured(
 
 @pytest.mark.asyncio
 async def test_quart_auth_partially_configured(
-    sentry_init, app, capture_events, monkeypatch, integration_enabled_params
+    sentry_init, capture_events, monkeypatch, integration_enabled_params
 ):
     sentry_init(**integration_enabled_params)
+    app = quart_app_factory()
 
     events = capture_events()
 
@@ -205,13 +245,15 @@ async def test_quart_auth_partially_configured(
 async def test_quart_auth_configured(
     send_default_pii,
     sentry_init,
-    app,
     user_id,
     capture_events,
     monkeypatch,
     integration_enabled_params,
 ):
+    from quart_auth import AuthUser, login_user
+
     sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
+    app = quart_app_factory()
 
     @app.route("/login")
     async def login():
@@ -242,10 +284,9 @@ async def test_quart_auth_configured(
         [quart_sentry.QuartIntegration(), LoggingIntegration(event_level="ERROR")],
     ],
 )
-async def test_errors_not_reported_twice(
-    sentry_init, integrations, capture_events, app
-):
+async def test_errors_not_reported_twice(sentry_init, integrations, capture_events):
     sentry_init(integrations=integrations)
+    app = quart_app_factory()
 
     @app.route("/")
     async def index():
@@ -265,7 +306,7 @@ async def test_errors_not_reported_twice(
 
 
 @pytest.mark.asyncio
-async def test_logging(sentry_init, capture_events, app):
+async def test_logging(sentry_init, capture_events):
     # ensure that Quart's logger magic doesn't break ours
     sentry_init(
         integrations=[
@@ -273,6 +314,7 @@ async def test_logging(sentry_init, capture_events, app):
             LoggingIntegration(event_level="ERROR"),
         ]
     )
+    app = quart_app_factory()
 
     @app.route("/")
     async def index():
@@ -289,13 +331,17 @@ async def test_logging(sentry_init, capture_events, app):
 
 
 @pytest.mark.asyncio
-async def test_no_errors_without_request(app, sentry_init):
+async def test_no_errors_without_request(sentry_init):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
+
     async with app.app_context():
         capture_exception(ValueError())
 
 
-def test_cli_commands_raise(app):
+def test_cli_commands_raise():
+    app = quart_app_factory()
+
     if not hasattr(app, "cli"):
         pytest.skip("Too old quart version")
 
@@ -312,8 +358,9 @@ def test_cli_commands_raise(app):
 
 
 @pytest.mark.asyncio
-async def test_500(sentry_init, app):
+async def test_500(sentry_init):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
 
     @app.route("/")
     async def index():
@@ -330,8 +377,9 @@ async def test_500(sentry_init, app):
 
 
 @pytest.mark.asyncio
-async def test_error_in_errorhandler(sentry_init, capture_events, app):
+async def test_error_in_errorhandler(sentry_init, capture_events):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
 
     @app.route("/")
     async def index():
@@ -358,8 +406,11 @@ async def test_error_in_errorhandler(sentry_init, capture_events, app):
 
 
 @pytest.mark.asyncio
-async def test_bad_request_not_captured(sentry_init, capture_events, app):
+async def test_bad_request_not_captured(sentry_init, capture_events):
+    from quart import abort
+
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
     events = capture_events()
 
     @app.route("/")
@@ -374,8 +425,11 @@ async def test_bad_request_not_captured(sentry_init, capture_events, app):
 
 
 @pytest.mark.asyncio
-async def test_does_not_leak_scope(sentry_init, capture_events, app):
+async def test_does_not_leak_scope(sentry_init, capture_events):
+    from quart import Response, stream_with_context
+
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
     events = capture_events()
 
     sentry_sdk.get_isolation_scope().set_tag("request_data", False)
@@ -402,8 +456,9 @@ async def test_does_not_leak_scope(sentry_init, capture_events, app):
 
 
 @pytest.mark.asyncio
-async def test_scoped_test_client(sentry_init, app):
+async def test_scoped_test_client(sentry_init):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
 
     @app.route("/")
     async def index():
@@ -417,12 +472,13 @@ async def test_scoped_test_client(sentry_init, app):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("exc_cls", [ZeroDivisionError, Exception])
 async def test_errorhandler_for_exception_swallows_exception(
-    sentry_init, app, capture_events, exc_cls
+    sentry_init, capture_events, exc_cls
 ):
     # In contrast to error handlers for a status code, error
     # handlers for exceptions can swallow the exception (this is
     # just how the Quart signal works)
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
     events = capture_events()
 
     @app.route("/")
@@ -441,8 +497,9 @@ async def test_errorhandler_for_exception_swallows_exception(
 
 
 @pytest.mark.asyncio
-async def test_tracing_success(sentry_init, capture_events, app):
+async def test_tracing_success(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
 
     @app.before_request
     async def _():
@@ -474,8 +531,9 @@ async def test_tracing_success(sentry_init, capture_events, app):
 
 
 @pytest.mark.asyncio
-async def test_tracing_error(sentry_init, capture_events, app):
+async def test_tracing_error(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
 
     events = capture_events()
 
@@ -498,8 +556,11 @@ async def test_tracing_error(sentry_init, capture_events, app):
 
 
 @pytest.mark.asyncio
-async def test_class_based_views(sentry_init, app, capture_events):
+async def test_class_based_views(sentry_init, capture_events):
+    from quart.views import View
+
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
+    app = quart_app_factory()
     events = capture_events()
 
     @app.route("/")
@@ -523,39 +584,56 @@ async def test_class_based_views(sentry_init, app, capture_events):
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, app):
-    sentry_init(
-        traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": 1.0},
-    )
+@pytest.mark.asyncio
+async def test_active_thread_id(
+    sentry_init, capture_envelopes, teardown_profiling, endpoint
+):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
+    ):
+        sentry_init(
+            traces_sample_rate=1.0,
+            profiles_sample_rate=1.0,
+        )
+        app = quart_app_factory()
 
-    envelopes = capture_envelopes()
+        envelopes = capture_envelopes()
 
-    async with app.test_client() as client:
-        response = await client.get(endpoint)
-        assert response.status_code == 200
+        async with app.test_client() as client:
+            response = await client.get(endpoint)
+            assert response.status_code == 200
 
-    data = json.loads(response.content)
+        data = json.loads(await response.get_data(as_text=True))
 
-    envelopes = [envelope for envelope in envelopes]
-    assert len(envelopes) == 1
+        envelopes = [envelope for envelope in envelopes]
+        assert len(envelopes) == 1
 
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
+        profiles = [item for item in envelopes[0].items if item.type == "profile"]
+        assert len(profiles) == 1, envelopes[0].items
 
-    for profile in profiles:
-        transactions = profile.payload.json["transactions"]
+        for item in profiles:
+            transactions = item.payload.json["transactions"]
+            assert len(transactions) == 1
+            assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+        transactions = [
+            item for item in envelopes[0].items if item.type == "transaction"
+        ]
         assert len(transactions) == 1
-        assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+        for item in transactions:
+            transaction = item.payload.json
+            trace_context = transaction["contexts"]["trace"]
+            assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 @pytest.mark.asyncio
-async def test_span_origin(sentry_init, capture_events, app):
+async def test_span_origin(sentry_init, capture_events):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
     )
-
+    app = quart_app_factory()
     events = capture_events()
 
     client = app.test_client()

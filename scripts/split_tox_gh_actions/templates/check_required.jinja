@@ -1,0 +1,13 @@
+  check_required_tests:
+    name: All pinned {{ group }} tests passed
+    {% if "pinned" in categories %}
+    needs: test-{{ group | replace(" ", "_") | lower }}-pinned
+    {% endif %}
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check for failures
+        if: needs.test-{{ lowercase_group }}-pinned.result != 'success'
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
