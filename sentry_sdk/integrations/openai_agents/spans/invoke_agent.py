@@ -1,5 +1,5 @@
 import sentry_sdk
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 def invoke_agent_span(context, agent, kwargs):
     # type: (agents.RunContextWrapper, agents.Agent, dict[str, Any]) -> sentry_sdk.tracing.Span
-    span = sentry_sdk.start_span(
+    start_span_function = get_start_span_function()
+    span = start_span_function(
         op=OP.GEN_AI_INVOKE_AGENT,
         name=f"invoke_agent {agent.name}",
         origin=SPAN_ORIGIN,
