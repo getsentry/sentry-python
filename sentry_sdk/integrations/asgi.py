@@ -270,7 +270,7 @@ class SentryAsgiMiddleware:
             _asgi_middleware_applied.set(False)
 
     def event_processor(self, event, hint, asgi_scope):
-        # type: (Event, Hint, Any) -> Optional[Event]
+        # type: (Event, Hint, Any) -> Event
         request_data = event.get("request", {})
         request_data.update(_get_request_data(asgi_scope))
         event["request"] = deepcopy(request_data)

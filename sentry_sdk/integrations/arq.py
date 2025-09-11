@@ -134,7 +134,7 @@ def _capture_exception(exc_info):
 def _make_event_processor(ctx, *args, **kwargs):
     # type: (Dict[Any, Any], *Any, **Any) -> EventProcessor
     def event_processor(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+        # type: (Event, Hint) -> Event
 
         with capture_internal_exceptions():
             scope = sentry_sdk.get_current_scope()

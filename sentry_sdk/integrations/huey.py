@@ -78,7 +78,7 @@ def patch_enqueue():
 def _make_event_processor(task):
     # type: (Any) -> EventProcessor
     def event_processor(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+        # type: (Event, Hint) -> Event
 
         with capture_internal_exceptions():
             tags = event.setdefault("tags", {})

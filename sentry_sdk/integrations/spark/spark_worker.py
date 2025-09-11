@@ -68,7 +68,7 @@ def _tag_task_context():
 
     @scope.add_event_processor
     def process_event(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+        # type: (Event, Hint) -> Event
         with capture_internal_exceptions():
             integration = sentry_sdk.get_client().get_integration(
                 SparkWorkerIntegration

@@ -60,7 +60,7 @@ def _add_event_processor(sc):
 
     @scope.add_event_processor
     def process_event(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+        # type: (Event, Hint) -> Event
         with capture_internal_exceptions():
             if sentry_sdk.get_client().get_integration(SparkIntegration) is None:
                 return event

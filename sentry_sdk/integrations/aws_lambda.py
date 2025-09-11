@@ -334,7 +334,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
     start_time = datetime.now(timezone.utc)
 
     def event_processor(sentry_event, hint, start_time=start_time):
-        # type: (Event, Hint, datetime) -> Optional[Event]
+        # type: (Event, Hint, datetime) -> Event
         remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
         exec_duration = configured_timeout - remaining_time_in_milis
 

@@ -17,8 +17,8 @@ from dramatiq.errors import Retry  # type: ignore
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Optional, Union
-    from sentry_sdk._types import Event, Hint
+    from typing import Any, Dict, Optional, Union
+    from sentry_sdk._types import Event, Hint, EventProcessor
 
 
 class DramatiqIntegration(Integration):
@@ -128,10 +128,10 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
 
 
 def _make_message_event_processor(message, integration):
-    # type: (Message, DramatiqIntegration) -> Callable[[Event, Hint], Optional[Event]]
+    # type: (Message, DramatiqIntegration) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+        # type: (Event, Hint) -> Event
         with capture_internal_exceptions():
             DramatiqMessageExtractor(message).extract_into_event(event)
 

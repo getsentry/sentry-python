@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
 
-    from sentry_sdk._types import Event, HttpStatusCodeRange
+    from sentry_sdk._types import Event, HttpStatusCodeRange, EventProcessor
 
 try:
     import starlette  # type: ignore
@@ -454,7 +454,7 @@ def patch_request_response():
                 info = await extractor.extract_request_info()
 
                 def _make_request_event_processor(req, integration):
-                    # type: (Any, Any) -> Callable[[Event, dict[str, Any]], Event]
+                    # type: (Any, Any) -> EventProcessor
                     def event_processor(event, hint):
                         # type: (Event, Dict[str, Any]) -> Event
 
