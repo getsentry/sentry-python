@@ -1,4 +1,5 @@
 import sentry_sdk
+from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
@@ -117,7 +118,9 @@ def _set_input_data(span, get_response_kwargs):
         if len(messages) > 0:
             request_messages.append({"role": role, "content": messages})
 
-    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize(request_messages))
+    set_data_normalized(
+        span, SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages, unpack=False
+    )
 
 
 def _set_output_data(span, result):
@@ -147,6 +150,6 @@ def _set_output_data(span, result):
         )
 
     if len(output_messages["response"]) > 0:
-        span.set_data(
-            SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(output_messages["response"])
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )

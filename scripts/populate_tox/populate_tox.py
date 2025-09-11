@@ -57,7 +57,8 @@ IGNORE = {
     # pypi package to install in different versions).
     #
     # Test suites that will have to remain hardcoded since they don't fit the
-    # toxgen usecase
+    # toxgen usecase (there is no one package that should be tested in different
+    # versions)
     "asgi",
     "aws_lambda",
     "cloud_resource_context",
@@ -67,12 +68,9 @@ IGNORE = {
     "potel",
     # Integrations that can be migrated -- we should eventually remove all
     # of these from the IGNORE list
-    "boto3",
-    "chalice",
     "gcp",
     "httpx",
     "pure_eval",
-    "quart",
     "ray",
     "redis",
     "requests",
@@ -439,7 +437,7 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
                 rendered.append(f"{integration}: {dep}")
         elif constraint.startswith("py3"):
             for dep in deps:
-                rendered.append(f"{constraint}-{integration}: {dep}")
+                rendered.append(f"{{{constraint}}}-{integration}: {dep}")
         else:
             restriction = SpecifierSet(constraint)
             for release in releases:

@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.37.1
+
+### Various fixes & improvements
+
+- Fix(langchain): Make Langchain integration work with just langchain-core (#4783) by @shellmayr
+- Tests: Move quart under toxgen (#4775) by @sentrivana
+- Tests: Update tox.ini (#4777) by @sentrivana
+- Tests: Move chalice under toxgen (#4766) by @sentrivana
+
+## 2.37.0
+
+- **New Integration (BETA):** Add support for `langgraph` (#4727) by @shellmayr
+
+  We can now instrument AI agents that are created with [LangGraph](https://www.langchain.com/langgraph) out of the box.
+
+  For more information see the [LangGraph integrations documentation](https://docs.sentry.io/platforms/python/integrations/langgraph/).
+
+- AI Agents: Improve rendering of input and output messages in AI agents integrations. (#4750) by @shellmayr
+- AI Agents: Format span attributes in AI integrations (#4762) by @antonpirker
+- CI: Fix celery (#4765) by @sentrivana
+- Tests: Move asyncpg under toxgen (#4757) by @sentrivana
+- Tests: Move beam under toxgen (#4759) by @sentrivana
+- Tests: Move boto3 tests under toxgen (#4761) by @sentrivana
+- Tests: Remove openai pin and update tox (#4748) by @sentrivana
+
 ## 2.36.0
 
 ### Various fixes & improvements
