@@ -17,7 +17,7 @@ try:
     from starlite.plugins.base import get_plugin_for_value  # type: ignore
     from starlite.routes.http import HTTPRoute  # type: ignore
     from starlite.utils import ConnectionDataExtractor, is_async_callable, Ref  # type: ignore
-    from pydantic import BaseModel
+    from pydantic import BaseModel  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlite is not installed")
 
@@ -65,6 +65,7 @@ class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
             transaction_style="endpoint",
             mechanism_type="asgi",
             span_origin=span_origin,
+            asgi_version=3,
         )
 
 
@@ -92,7 +93,6 @@ def patch_app_init() -> None:
             ]
         )
 
-        SentryStarliteASGIMiddleware.__call__ = SentryStarliteASGIMiddleware._run_asgi3  # type: ignore
         middleware = kwargs.get("middleware") or []
         kwargs["middleware"] = [SentryStarliteASGIMiddleware, *middleware]
         old__init__(self, *args, **kwargs)

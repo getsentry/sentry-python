@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.0.0a6
+
+We're excited to announce that version 3.0 of the Sentry Python SDK is now
+available. This release is the result of a long-term effort to use OpenTelemetry
+under the hood for tracing. This switch opens the door for us to leverage the
+full power of OpenTelemetry, so stay tuned for more integrations and features
+in future releases.
+
+Looking to upgrade from Sentry SDK 2.x to 3.x? See the
+[full list of changes](MIGRATION_GUIDE.md) for a comprehensive overview
+of what's changed. Looking for a more digestible summary? See the
+[migration guide in the docs](https://docs.sentry.io/platforms/python/migration/2.x-to-3.x)
+with the most common migration patterns.
+
+⚠️ This is a pre-release. If you feel like taking it for a spin, we'd be grateful
+for your feedback. How was the migration? Is everything working as expected? Is
+*nothing* working as expected? Something in between? Please let us know
+[on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
+[on Discord](https://discord.com/invite/Ww9hbqr).
+
+This version also adds an experimental async transport option. It can be enabled by passing ``transport_async=true`` in the experiments dict in ``sentry_sdk.init()``. The async transport requires the [asyncio integration](https://docs.sentry.io/platforms/python/integrations/asyncio/) and the [httpcore[asyncio]](https://pypi.org/project/httpcore/) library.
+
 ## 3.0.0a5
 
 ### Various fixes & improvements
@@ -63,6 +85,37 @@ for your feedback. How was the migration? Is everything working as expected? Is
 *nothing* working as expected? Something in between? Please let us know
 [on GitHub](https://github.com/getsentry/sentry-python/discussions/3936) or
 [on Discord](https://discord.com/invite/Ww9hbqr).
+
+## 2.35.1
+
+### Various fixes & improvements
+
+- OpenAI Agents: Isolate agent run (#4720) by @sentrivana
+- Tracing: Do not attach stacktrace to transaction (#4713) by @Zylphrex
+
+## 2.35.0
+
+### Various fixes & improvements
+
+- [Langchain Integration](https://docs.sentry.io/platforms/python/integrations/langchain/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4678) by @shellmayr
+- [Anthropic Integration](https://docs.sentry.io/platforms/python/integrations/anthropic/) now supports the Sentry [AI dashboard](https://docs.sentry.io/product/insights/ai/agents/dashboard/). (#4674) by @constantinius
+- AI Agents templates for `@trace` decorator (#4676) by @antonpirker
+- Sentry Logs: Add `enable_logs`, `before_send_log` as top-level `sentry_sdk.init()` options (#4644) by @sentrivana
+- Tracing: Improve `@trace` decorator. Allows to set `span.op`, `span.name`, and `span.attributes` (#4648) by @antonpirker
+- Tracing: Add convenience function `sentry_sdk.update_current_span`. (#4673) by @antonpirker
+- Tracing: Add `Span.update_data()` to update multiple `span.data` items at once. (#4666) by @antonpirker
+- GNU-integration: make path optional (#4688) by @MeredithAnya
+- Clickhouse: Don't eat the generator data (#4669) by @szokeasaurusrex
+- Clickhouse: List `send_data` parameters (#4667) by @szokeasaurusrex
+- Update `gen_ai.*` and `ai.*` attributes (#4665) by @antonpirker
+- Better checking for empty tools list (#4647) by @antonpirker
+- Remove performance paper cuts (#4675) by @sentrivana
+- Help for debugging Cron problems (#4686) by @antonpirker
+- Fix Redis CI (#4691) by @sentrivana
+- Fix plugins key codecov (#4655) by @sl0thentr0py
+- Fix Mypy (#4649) by @sentrivana
+- Update tox.ini (#4689) by @sentrivana
+- build(deps): bump actions/create-github-app-token from 2.0.6 to 2.1.0 (#4684) by @dependabot
 
 ## 2.34.1
 

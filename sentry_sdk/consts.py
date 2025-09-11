@@ -77,7 +77,7 @@ if TYPE_CHECKING:
             "transport_compression_level": Optional[int],
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
-            "transport_http2": Optional[bool],
+            "transport_async": Optional[bool],
         },
         total=False,
     )
@@ -93,6 +93,17 @@ FALSE_VALUES = [
     "n",
     "0",
 ]
+
+
+class SPANTEMPLATE(str, Enum):
+    DEFAULT = "default"
+    AI_AGENT = "ai_agent"
+    AI_TOOL = "ai_tool"
+    AI_CHAT = "ai_chat"
+
+    def __str__(self):
+        # type: () -> str
+        return self.value
 
 
 class SPANDATA:
@@ -792,6 +803,7 @@ class OP:
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
     GEN_AI_HANDOFF = "gen_ai.handoff"
+    GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
     GEN_AI_RESPONSES = "gen_ai.responses"
     GRAPHQL_EXECUTE = "graphql.execute"
@@ -821,11 +833,6 @@ class OP:
     HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
         "ai.chat_completions.create.huggingface_hub"
     )
-    LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
-    LANGCHAIN_RUN = "ai.run.langchain"
-    LANGCHAIN_TOOL = "ai.tool.langchain"
-    LANGCHAIN_AGENT = "ai.agent.langchain"
-    LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_PROCESS = "queue.process"
     QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
@@ -963,6 +970,7 @@ class ClientConstructor:
         max_stack_frames: Optional[int] = DEFAULT_MAX_STACK_FRAMES,
         enable_logs: bool = False,
         before_send_log: Optional[Callable[[Log, Hint], Optional[Log]]] = None,
+        http2: Optional[bool] = None,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
@@ -1335,6 +1343,8 @@ class ClientConstructor:
             This is relative to the tracing sample rate - e.g. `0.5` means 50% of sampled transactions will be
             profiled.
 
+        :param http2: Defaults to `True`, enables HTTP/2 support for the SDK.
+
         :param profiles_sampler:
 
         :param profiler_mode:
@@ -1381,4 +1391,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "3.0.0a5"
+VERSION = "3.0.0a6"

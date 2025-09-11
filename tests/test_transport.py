@@ -3,6 +3,8 @@ import pickle
 import os
 import socket
 import sys
+import asyncio
+import threading
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -28,8 +30,10 @@ from sentry_sdk._compat import PY38
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     _parse_rate_limits,
+    AsyncHttpTransport,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 
 
 server = None
@@ -79,7 +83,7 @@ def mock_transaction_envelope(span_count: int) -> Envelope:
 @pytest.mark.parametrize("use_pickle", (True, False))
 @pytest.mark.parametrize("compression_level", (0, 9, None))
 @pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
-@pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
+@pytest.mark.parametrize("http2", [None, False])
 def test_transport_works(
     capturing_server,
     request,
@@ -102,11 +106,9 @@ def test_transport_works(
     if compression_algo is not None:
         experiments["transport_compression_algo"] = compression_algo
 
-    if http2:
-        experiments["transport_http2"] = True
-
     client = make_client(
         debug=debug,
+        http2=http2,
         _experiments=experiments,
     )
 
@@ -145,6 +147,89 @@ def test_transport_works(
     assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("debug", (True, False))
+@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
+@pytest.mark.parametrize("use_pickle", (True, False))
+@pytest.mark.parametrize("compression_level", (0, 9, None))
+@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
+@pytest.mark.skipif(not PY38, reason="Async transport only supported in Python 3.8+")
+async def test_transport_works_async(
+    capturing_server,
+    request,
+    capsys,
+    caplog,
+    debug,
+    make_client,
+    client_flush_method,
+    use_pickle,
+    compression_level,
+    compression_algo,
+):
+    caplog.set_level(logging.DEBUG)
+
+    experiments = {}
+    if compression_level is not None:
+        experiments["transport_compression_level"] = compression_level
+
+    if compression_algo is not None:
+        experiments["transport_compression_algo"] = compression_algo
+
+    # Enable async transport
+    experiments["transport_async"] = True
+
+    client = make_client(
+        debug=debug,
+        _experiments=experiments,
+        integrations=[AsyncioIntegration()],
+    )
+
+    if use_pickle:
+        client = pickle.loads(pickle.dumps(client))
+
+    # Verify we're using async transport
+    assert isinstance(
+        client.transport, AsyncHttpTransport
+    ), "Expected AsyncHttpTransport"
+
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
+    capture_message("löl")
+
+    if client_flush_method == "close":
+        await client.close_async(timeout=2.0)
+    if client_flush_method == "flush":
+        await client.flush_async(timeout=2.0)
+
+    out, err = capsys.readouterr()
+    assert not err and not out
+    assert capturing_server.captured
+    should_compress = (
+        # default is to compress with brotli if available, gzip otherwise
+        (compression_level is None)
+        or (
+            # setting compression level to 0 means don't compress
+            compression_level
+            > 0
+        )
+    ) and (
+        # if we couldn't resolve to a known algo, we don't compress
+        compression_algo
+        != "<invalid>"
+    )
+
+    assert capturing_server.captured[0].compressed == should_compress
+    # After flush, the worker task is still running, but the end of the test will shut down the event loop
+    # Therefore, we need to explicitly close the client to clean up the worker task
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
+    if client_flush_method == "flush":
+        await client.close_async(timeout=2.0)
+
+
 @pytest.mark.parametrize(
     "num_pools,expected_num_pools",
     (
@@ -158,7 +243,7 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     if num_pools is not None:
         _experiments["transport_num_pools"] = num_pools
 
-    client = make_client(_experiments=_experiments)
+    client = make_client(_experiments=_experiments, http2=False)
 
     options = client.transport._get_pool_options()
     assert options["num_pools"] == expected_num_pools
@@ -168,17 +253,13 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     "http2", [True, False] if sys.version_info >= (3, 8) else [False]
 )
 def test_two_way_ssl_authentication(make_client, http2):
-    _experiments = {}
-    if http2:
-        _experiments["transport_http2"] = True
-
     current_dir = os.path.dirname(__file__)
     cert_file = f"{current_dir}/test.pem"
     key_file = f"{current_dir}/test.key"
     client = make_client(
         cert_file=cert_file,
         key_file=key_file,
-        _experiments=_experiments,
+        http2=http2,
     )
     options = client.transport._get_pool_options()
 
@@ -203,20 +284,20 @@ def test_socket_options(make_client):
 
 
 def test_keep_alive_true(make_client):
-    client = make_client(keep_alive=True)
+    client = make_client(keep_alive=True, http2=False)
 
     options = client.transport._get_pool_options()
     assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
 
 
 def test_keep_alive_on_by_default(make_client):
-    client = make_client()
+    client = make_client(http2=False)
     options = client.transport._get_pool_options()
     assert "socket_options" not in options
 
 
 def test_default_timeout(make_client):
-    client = make_client()
+    client = make_client(http2=False)
 
     options = client.transport._get_pool_options()
     assert "timeout" in options
@@ -225,7 +306,7 @@ def test_default_timeout(make_client):
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_default_timeout_http2(make_client):
-    client = make_client(_experiments={"transport_http2": True})
+    client = make_client()
 
     with mock.patch(
         "sentry_sdk.transport.httpcore.ConnectionPool.request",
@@ -248,7 +329,7 @@ def test_default_timeout_http2(make_client):
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_http2_with_https_dsn(make_client):
-    client = make_client(_experiments={"transport_http2": True})
+    client = make_client()
     client.transport.parsed_dsn.scheme = "https"
     options = client.transport._get_pool_options()
     assert options["http2"] is True
@@ -256,7 +337,7 @@ def test_http2_with_https_dsn(make_client):
 
 @pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
 def test_no_http2_with_http_dsn(make_client):
-    client = make_client(_experiments={"transport_http2": True})
+    client = make_client()
     client.transport.parsed_dsn.scheme = "http"
     options = client.transport._get_pool_options()
     assert options["http2"] is False
@@ -269,19 +350,20 @@ def test_socket_options_override_keep_alive(make_client):
         (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
     ]
 
-    client = make_client(socket_options=socket_options, keep_alive=False)
+    client = make_client(socket_options=socket_options, keep_alive=False, http2=False)
 
     options = client.transport._get_pool_options()
     assert options["socket_options"] == socket_options
 
 
-def test_socket_options_merge_with_keep_alive(make_client):
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_socket_options_merge_with_keep_alive_http2(make_client):
     socket_options = [
         (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
         (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
     ]
 
-    client = make_client(socket_options=socket_options, keep_alive=True)
+    client = make_client(socket_options=socket_options)
 
     options = client.transport._get_pool_options()
     try:
@@ -299,11 +381,46 @@ def test_socket_options_merge_with_keep_alive(make_client):
         ]
 
 
-def test_socket_options_override_defaults(make_client):
+def test_socket_options_merge_with_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=True, http2=False)
+
+    options = client.transport._get_pool_options()
+    try:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+    except AttributeError:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+
+
+@pytest.mark.skipif(not PY38, reason="HTTP2 libraries are only available in py3.8+")
+def test_socket_options_override_defaults_http2(make_client):
     # If socket_options are set to [], this doesn't mean the user doesn't want
     # any custom socket_options, but rather that they want to disable the urllib3
     # socket option defaults, so we need to set this and not ignore it.
     client = make_client(socket_options=[])
+
+    options = client.transport._get_pool_options()
+    assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
+
+
+def test_socket_options_override_defaults(make_client):
+    # If socket_options are set to [], this doesn't mean the user doesn't want
+    # any custom socket_options, but rather that they want to disable the urllib3
+    # socket option defaults, so we need to set this and not ignore it.
+    client = make_client(http2=False, socket_options=[])
 
     options = client.transport._get_pool_options()
     assert options["socket_options"] == []
@@ -640,3 +757,214 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
         "reason": "test",
         "quantity": span_count + 1,
     } in discarded_events
+
+
+def test_handle_unexpected_status_invokes_handle_request_error(
+    make_client, monkeypatch
+):
+    client = make_client()
+    transport = client.transport
+
+    monkeypatch.setattr(transport._worker, "submit", lambda fn: fn() or True)
+
+    def stub_request(method, endpoint, body=None, headers=None):
+        class MockResponse:
+            def __init__(self):
+                self.status = 500  # Integer
+                self.data = b"server error"
+                self.headers = {}
+
+            def close(self):
+                pass
+
+        return MockResponse()
+
+    monkeypatch.setattr(transport, "_request", stub_request)
+
+    seen = []
+    monkeypatch.setattr(
+        transport,
+        "_handle_request_error",
+        lambda envelope, loss_reason: seen.append(loss_reason),
+    )
+
+    client.capture_event({"message": "test"})
+    client.flush()
+
+    assert seen == ["status_500"]
+
+
+def test_handle_request_error_basic_coverage(make_client, monkeypatch):
+    client = make_client()
+    transport = client.transport
+
+    monkeypatch.setattr(transport._worker, "submit", lambda fn: fn() or True)
+
+    # Track method calls
+    calls = []
+
+    def mock_on_dropped_event(reason):
+        calls.append(("on_dropped_event", reason))
+
+    def mock_record_lost_event(reason, data_category=None, item=None):
+        calls.append(("record_lost_event", reason, data_category, item))
+
+    monkeypatch.setattr(transport, "on_dropped_event", mock_on_dropped_event)
+    monkeypatch.setattr(transport, "record_lost_event", mock_record_lost_event)
+
+    # Test case 1: envelope is None
+    transport._handle_request_error(envelope=None, loss_reason="test_reason")
+
+    assert len(calls) == 2
+    assert calls[0] == ("on_dropped_event", "test_reason")
+    assert calls[1] == ("record_lost_event", "network_error", "error", None)
+
+    # Reset
+    calls.clear()
+
+    # Test case 2: envelope with items
+    envelope = Envelope()
+    envelope.add_item(mock.MagicMock())  # Simple mock item
+    envelope.add_item(mock.MagicMock())  # Another mock item
+
+    transport._handle_request_error(envelope=envelope, loss_reason="connection_error")
+
+    assert len(calls) == 3
+    assert calls[0] == ("on_dropped_event", "connection_error")
+    assert calls[1][0:2] == ("record_lost_event", "network_error")
+    assert calls[2][0:2] == ("record_lost_event", "network_error")
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_background_thread_capture(
+    capturing_server, make_client, caplog
+):
+    """Test capture_envelope from background threads uses run_coroutine_threadsafe"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+    captured_from_thread = []
+    exception_from_thread = []
+
+    def background_thread_work():
+        try:
+            # This should use run_coroutine_threadsafe path
+            capture_message("from background thread")
+            captured_from_thread.append(True)
+        except Exception as e:
+            exception_from_thread.append(e)
+
+    thread = threading.Thread(target=background_thread_work)
+    thread.start()
+    thread.join()
+    assert not exception_from_thread
+    assert captured_from_thread
+    await client.close_async(timeout=2.0)
+    assert capturing_server.captured
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_event_loop_closed_scenario(
+    capturing_server, make_client, caplog
+):
+    """Test behavior when trying to capture after event loop context ends"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
+    sentry_sdk.get_global_scope().set_client(client)
+    original_loop = client.transport.loop
+
+    with mock.patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+        with mock.patch.object(client.transport.loop, "is_running", return_value=False):
+            with mock.patch("sentry_sdk.transport.logger") as mock_logger:
+                # This should trigger the "no_async_context" path
+                capture_message("after loop closed")
+
+                mock_logger.warning.assert_called_with(
+                    "Async Transport is not running in an event loop."
+                )
+
+    client.transport.loop = original_loop
+    await client.close_async(timeout=2.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_concurrent_requests(
+    capturing_server, make_client, caplog
+):
+    """Test multiple simultaneous envelope submissions"""
+    caplog.set_level(logging.DEBUG)
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+
+    num_messages = 15
+
+    async def send_message(i):
+        capture_message(f"concurrent message {i}")
+
+    tasks = [send_message(i) for i in range(num_messages)]
+    await asyncio.gather(*tasks)
+    await client.close_async(timeout=2.0)
+    assert len(capturing_server.captured) == num_messages
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_transport_rate_limiting_with_concurrency(
+    capturing_server, make_client, request
+):
+    """Test async transport rate limiting with concurrent requests"""
+    experiments = {"transport_async": True}
+    client = make_client(_experiments=experiments, integrations=[AsyncioIntegration()])
+
+    assert isinstance(client.transport, AsyncHttpTransport)
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
+    capturing_server.respond_with(
+        code=429, headers={"X-Sentry-Rate-Limits": "60:error:organization"}
+    )
+
+    # Send one request first to trigger rate limiting
+    capture_message("initial message")
+    await asyncio.sleep(0.1)  # Wait for request to execute
+    assert client.transport._check_disabled("error") is True
+    capturing_server.clear_captured()
+
+    async def send_message(i):
+        capture_message(f"message {i}")
+        await asyncio.sleep(0.01)
+
+    await asyncio.gather(*[send_message(i) for i in range(5)])
+    await asyncio.sleep(0.1)
+    # New request should be dropped due to rate limiting
+    assert len(capturing_server.captured) == 0
+    await client.close_async(timeout=2.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not PY38, reason="Async transport requires Python 3.8+")
+async def test_async_two_way_ssl_authentication():
+    current_dir = os.path.dirname(__file__)
+    cert_file = f"{current_dir}/test.pem"
+    key_file = f"{current_dir}/test.key"
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        cert_file=cert_file,
+        key_file=key_file,
+        _experiments={"transport_async": True},
+        integrations=[AsyncioIntegration()],
+    )
+    assert isinstance(client.transport, AsyncHttpTransport)
+
+    options = client.transport._get_pool_options()
+    assert options["ssl_context"] is not None
+
+    await client.close_async()

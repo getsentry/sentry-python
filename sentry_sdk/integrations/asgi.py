@@ -105,6 +105,7 @@ class SentryAsgiMiddleware:
         mechanism_type: str = "asgi",
         span_origin: Optional[str] = None,
         http_methods_to_capture: Tuple[str, ...] = DEFAULT_HTTP_METHODS_TO_CAPTURE,
+        asgi_version: Optional[int] = None,
     ) -> None:
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
@@ -142,10 +143,16 @@ class SentryAsgiMiddleware:
         self.app = app
         self.http_methods_to_capture = http_methods_to_capture
 
-        if _looks_like_asgi3(app):
+        if asgi_version is None:
+            if _looks_like_asgi3(app):
+                asgi_version = 3
+            else:
+                asgi_version = 2
+
+        if asgi_version == 3:
             self.__call__: Callable[..., Any] = self._run_asgi3
-        else:
-            self.__call__ = self._run_asgi2
+        elif asgi_version == 2:
+            self.__call__: Callable[..., Any] = self._run_asgi2  # type: ignore
 
     def _capture_lifespan_exception(self, exc: Exception) -> None:
         """Capture exceptions raise in application lifespan handlers.
@@ -298,12 +305,6 @@ class SentryAsgiMiddleware:
             )
             event["transaction"] = name
             event["transaction_info"] = {"source": source}
-
-            logger.debug(
-                "[ASGI] Set transaction name and source in event_processor: '%s' / '%s'",
-                event["transaction"],
-                event["transaction_info"]["source"],
-            )
 
         return event
 

@@ -8,6 +8,24 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - Added `add_attachment()` as a top level API, so you can do now: `sentry_sdk.add_attachment(...)` (up until now it was only available on the `Scope`)
 - Added a new SDK option `exclude_span_origins`. Spans with an `origin` from `exclude_span_origins` won't be created. This can be used for example in dual OpenTelemetry/Sentry setups to filter out spans from specific Sentry instrumentations. Note that using `exclude_span_origins` might potentially lead to surprising results: if, for example, a root span is excluded based on `origin`, all of its children will become root spans, unless they were started with `only_as_child_span=True`.
+- Added a new experimental async transport using the [httpcore](https://pypi.org/project/httpcore/) library. Requires the [httpcore[asyncio]](https://www.encode.io/httpcore/async/) extension. The async transport makes Sentry network I/O non-blocking in async programs. The async transport can only be used when an event loop is running, and additionally requires the [asyncio](https://docs.sentry.io/platforms/python/integrations/asyncio/) integration. Can be enabled by passing `transport_async=True` in the `_experiments` dict in `sentry.init()`. Try it out by initializing Sentry with:
+
+```python
+import sentry_sdk
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+sentry_sdk.init(
+    _experiments={
+        "transport_async": True,
+    },
+    integrations=[
+       	AsyncioIntegration(),
+    ]
+)
+```
+
+- Added an asynchronous context manager for spans. This can be used to remove unnecessary nesting for span creation in async programs.
+- Added `flush_async()` as a top level API. This has to be used when flushing the async transport. `flush_async` is a coroutine and can be awaited if blocking behaviour is desired.
+
 
 ### Changed
 
@@ -15,6 +33,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - The SDK now supports Python 3.7 and higher.
 - Tag values on event dictionaries, which are passed to `before_send` and `before_send_transaction`, now are always `str` values. Previously, despite tag values being typed as `str`, they often had different values. Therefore, if you have configured any `before_send` and `before_send_transaction` functions which perform some logic based on tag values, you need to check and if needed update those functions to correctly handle `str` values.
+- The SDK now uses HTTP/2 for its default transport. This can be disabled via setting `http2=False` in `sentry_sdk.init()`. This change also affects `socket_options` as HTTP/2 requires persistent connections. If you want to disable keep-alive, consider disabling HTTP/2 as passing an empty list to `socket_options` would _not_ disable keep alive.
 
 #### Error Capturing
 
@@ -205,6 +224,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - PyMongo: The integration no longer sets tags. The data is still accessible via span attributes.
 - PyMongo: The integration doesn't set `operation_ids` anymore. The individual IDs (`operation_id`, `request_id`, `session_id`) are now accessible as separate span attributes.
 - Django: Dropped support for Django versions below 2.0.
+- Django: Removed Spotlight integration for Django. -- See [Spotlight 2.0](https://github.com/getsentry/spotlight/issues/891) for more context.
 - trytond: Dropped support for trytond versions below 5.0.
 - Falcon: Dropped support for Falcon versions below 3.0.
 - eventlet: Dropped support for eventlet completely.
