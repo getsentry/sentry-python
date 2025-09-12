@@ -109,7 +109,13 @@ def patch_get_request_handler():
             )
             sentry_scope = sentry_sdk.get_isolation_scope()
             extractor = StarletteRequestExtractor(request)
-            info = await extractor.extract_request_info()
+
+            request_scope = request.scope
+            is_fastapi_mcp = (
+                request_scope.get("endpoint")
+                and "FastApiMCP" in request_scope["endpoint"].__qualname__
+            )
+            info = await extractor.extract_request_info(read_body=not is_fastapi_mcp)
 
             def _make_request_event_processor(req, integration):
                 # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
