@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from aiohttp import web, ClientSession
+from aiohttp import web
 from aiohttp.client import ServerDisconnectedError
 from aiohttp.web_request import Request
 from aiohttp.web_exceptions import (
@@ -618,7 +618,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
 
     raw_server = await aiohttp_raw_server(handler)
 
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
         with start_transaction(
             name="/interactions/other-dogs/new-dog",
             op="greeting.sniff",
@@ -636,6 +636,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
 @pytest.mark.asyncio
 async def test_span_origin(
     sentry_init,
+    aiohttp_raw_server,
     aiohttp_client,
     capture_events,
 ):
@@ -644,10 +645,16 @@ async def test_span_origin(
         traces_sample_rate=1.0,
     )
 
+    # server for making span request
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
     async def hello(request):
-        async with ClientSession() as session:
-            async with session.get("http://example.com"):
-                return web.Response(text="hello")
+        span_client = await aiohttp_client(raw_server)
+        await span_client.get("/")
+        return web.Response(text="hello")
 
     app = web.Application()
     app.router.add_get(r"/", hello)

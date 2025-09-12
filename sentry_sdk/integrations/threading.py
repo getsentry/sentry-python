@@ -120,7 +120,7 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
             # type: () -> Any
             try:
                 self = current_thread()
-                return old_run_func(self, *a, **kw)
+                return old_run_func(self, *a[1:], **kw)
             except Exception:
                 reraise(*_capture_exception())
 

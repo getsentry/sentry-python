@@ -35,9 +35,9 @@ def test_continue_trace_missing_sample_rand():
         "baggage": "sentry-placeholder=asdf",
     }
 
-    mock_uniform = Mock(return_value=0.5)
-
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", mock_uniform):
+    with mock.patch(
+        "sentry_sdk.tracing_utils.Random.randrange", Mock(return_value=500000)
+    ):
         transaction = sentry_sdk.continue_trace(headers)
 
     assert transaction.get_baggage().sentry_items["sample_rand"] == "0.500000"

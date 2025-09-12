@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    from sentry_sdk._types import Event, ExcInfo
+    from sentry_sdk._types import Event, ExcInfo, Log, Hint
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -591,9 +591,14 @@ def serialize_frame(
     if tb_lineno is None:
         tb_lineno = frame.f_lineno
 
+    try:
+        os_abs_path = os.path.abspath(abs_path) if abs_path else None
+    except Exception:
+        os_abs_path = None
+
     rv = {
         "filename": filename_for_module(module, abs_path) or None,
-        "abs_path": os.path.abspath(abs_path) if abs_path else None,
+        "abs_path": os_abs_path,
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb_lineno,
@@ -1930,6 +1935,79 @@ def try_convert(convert_func, value):
     raises an exception.
     """
     try:
+        if isinstance(value, convert_func):  # type: ignore
+            return value
+    except TypeError:
+        pass
+
+    try:
         return convert_func(value)
     except Exception:
         return None
+
+
+def safe_serialize(data):
+    # type: (Any) -> str
+    """Safely serialize to a readable string."""
+
+    def serialize_item(item):
+        # type: (Any) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]
+        if callable(item):
+            try:
+                module = getattr(item, "__module__", None)
+                qualname = getattr(item, "__qualname__", None)
+                name = getattr(item, "__name__", "anonymous")
+
+                if module and qualname:
+                    full_path = f"{module}.{qualname}"
+                elif module and name:
+                    full_path = f"{module}.{name}"
+                else:
+                    full_path = name
+
+                return f"<function {full_path}>"
+            except Exception:
+                return f"<callable {type(item).__name__}>"
+        elif isinstance(item, dict):
+            return {k: serialize_item(v) for k, v in item.items()}
+        elif isinstance(item, (list, tuple)):
+            return [serialize_item(x) for x in item]
+        elif hasattr(item, "__dict__"):
+            try:
+                attrs = {
+                    k: serialize_item(v)
+                    for k, v in vars(item).items()
+                    if not k.startswith("_")
+                }
+                return f"<{type(item).__name__} {attrs}>"
+            except Exception:
+                return repr(item)
+        else:
+            return item
+
+    try:
+        serialized = serialize_item(data)
+        return json.dumps(serialized, default=str)
+    except Exception:
+        return str(data)
+
+
+def has_logs_enabled(options):
+    # type: (Optional[dict[str, Any]]) -> bool
+    if options is None:
+        return False
+
+    return bool(
+        options.get("enable_logs", False)
+        or options["_experiments"].get("enable_logs", False)
+    )
+
+
+def get_before_send_log(options):
+    # type: (Optional[dict[str, Any]]) -> Optional[Callable[[Log, Hint], Optional[Log]]]
+    if options is None:
+        return None
+
+    return options.get("before_send_log") or options["_experiments"].get(
+        "before_send_log"
+    )

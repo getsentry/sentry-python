@@ -1,16 +1,14 @@
-import json
 import sentry_sdk
+from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk.utils import event_from_exception, safe_serialize
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Callable
-    from typing import Union
     from agents import Usage
 
 try:
@@ -30,15 +28,6 @@ def _capture_exception(exc):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _get_start_span_function():
-    # type: () -> Callable[..., Any]
-    current_span = sentry_sdk.get_current_span()
-    transaction_exists = (
-        current_span is not None and current_span.containing_transaction == current_span
-    )
-    return sentry_sdk.start_span if transaction_exists else sentry_sdk.start_transaction
-
-
 def _set_agent_data(span, agent):
     # type: (sentry_sdk.tracing.Span, agents.Agent) -> None
     span.set_data(
@@ -53,7 +42,8 @@ def _set_agent_data(span, agent):
         )
 
     if agent.model:
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, agent.model)
+        model_name = agent.model.model if hasattr(agent.model, "model") else agent.model
+        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
     if agent.model_settings.presence_penalty:
         span.set_data(
@@ -128,7 +118,9 @@ def _set_input_data(span, get_response_kwargs):
         if len(messages) > 0:
             request_messages.append({"role": role, "content": messages})
 
-    span.set_data(SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize(request_messages))
+    set_data_normalized(
+        span, SPANDATA.GEN_AI_REQUEST_MESSAGES, request_messages, unpack=False
+    )
 
 
 def _set_output_data(span, result):
@@ -158,52 +150,6 @@ def _set_output_data(span, result):
         )
 
     if len(output_messages["response"]) > 0:
-        span.set_data(
-            SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(output_messages["response"])
+        set_data_normalized(
+            span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )
-
-
-def safe_serialize(data):
-    # type: (Any) -> str
-    """Safely serialize to a readable string."""
-
-    def serialize_item(item):
-        # type: (Any) -> Union[str, dict[Any, Any], list[Any], tuple[Any, ...]]
-        if callable(item):
-            try:
-                module = getattr(item, "__module__", None)
-                qualname = getattr(item, "__qualname__", None)
-                name = getattr(item, "__name__", "anonymous")
-
-                if module and qualname:
-                    full_path = f"{module}.{qualname}"
-                elif module and name:
-                    full_path = f"{module}.{name}"
-                else:
-                    full_path = name
-
-                return f"<function {full_path}>"
-            except Exception:
-                return f"<callable {type(item).__name__}>"
-        elif isinstance(item, dict):
-            return {k: serialize_item(v) for k, v in item.items()}
-        elif isinstance(item, (list, tuple)):
-            return [serialize_item(x) for x in item]
-        elif hasattr(item, "__dict__"):
-            try:
-                attrs = {
-                    k: serialize_item(v)
-                    for k, v in vars(item).items()
-                    if not k.startswith("_")
-                }
-                return f"<{type(item).__name__} {attrs}>"
-            except Exception:
-                return repr(item)
-        else:
-            return item
-
-    try:
-        serialized = serialize_item(data)
-        return json.dumps(serialized, default=str)
-    except Exception:
-        return str(data)

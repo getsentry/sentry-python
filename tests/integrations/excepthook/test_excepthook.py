@@ -42,7 +42,6 @@ def test_excepthook(tmpdir, options, transport):
         subprocess.check_output([sys.executable, str(app)], stderr=subprocess.STDOUT)
 
     output = excinfo.value.output
-    print(output)
 
     assert b"ZeroDivisionError" in output
     assert b"LOL" in output
@@ -86,7 +85,6 @@ def test_always_value_excepthook(tmpdir, options, transport):
         subprocess.check_output([sys.executable, str(app)], stderr=subprocess.STDOUT)
 
     output = excinfo.value.output
-    print(output)
 
     assert b"ZeroDivisionError" in output
     assert b"LOL" in output
