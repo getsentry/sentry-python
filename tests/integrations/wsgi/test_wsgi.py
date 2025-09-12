@@ -7,6 +7,7 @@ from werkzeug.test import Client
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk._werkzeug import get_host
 
 
 @pytest.fixture
@@ -39,6 +40,50 @@ class ExitingIterable:
         return type(self).__next__(self)
 
 
+@pytest.mark.parametrize(
+    ("environ", "expect"),
+    (
+        pytest.param({"HTTP_HOST": "spam"}, "spam", id="host"),
+        pytest.param({"HTTP_HOST": "spam:80"}, "spam", id="host, strip http port"),
+        pytest.param(
+            {"wsgi.url_scheme": "https", "HTTP_HOST": "spam:443"},
+            "spam",
+            id="host, strip https port",
+        ),
+        pytest.param({"HTTP_HOST": "spam:8080"}, "spam:8080", id="host, custom port"),
+        pytest.param(
+            {"HTTP_HOST": "spam", "SERVER_NAME": "eggs", "SERVER_PORT": "80"},
+            "spam",
+            id="prefer host",
+        ),
+        pytest.param(
+            {"SERVER_NAME": "eggs", "SERVER_PORT": "80"},
+            "eggs",
+            id="name, ignore http port",
+        ),
+        pytest.param(
+            {"wsgi.url_scheme": "https", "SERVER_NAME": "eggs", "SERVER_PORT": "443"},
+            "eggs",
+            id="name, ignore https port",
+        ),
+        pytest.param(
+            {"SERVER_NAME": "eggs", "SERVER_PORT": "8080"},
+            "eggs:8080",
+            id="name, custom port",
+        ),
+        pytest.param(
+            {"HTTP_HOST": "ham", "HTTP_X_FORWARDED_HOST": "eggs"},
+            "ham",
+            id="ignore x-forwarded-host",
+        ),
+    ),
+)
+# https://github.com/pallets/werkzeug/blob/main/tests/test_wsgi.py#L60
+def test_get_host(environ, expect):
+    environ.setdefault("wsgi.url_scheme", "http")
+    assert get_host(environ) == expect
+
+
 def test_basic(sentry_init, crashing_app, capture_events):
     sentry_init(send_default_pii=True)
     app = SentryWsgiMiddleware(crashing_app)
@@ -58,6 +103,28 @@ def test_basic(sentry_init, crashing_app, capture_events):
         "method": "GET",
         "query_string": "",
         "url": "http://localhost/",
+    }
+
+
+def test_basic_forwarded_host(sentry_init, crashing_app, capture_events):
+    sentry_init(send_default_pii=True)
+    app = SentryWsgiMiddleware(crashing_app, use_x_forwarded_for=True)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get("/", environ_overrides={"HTTP_X_FORWARDED_HOST": "foobarbaz:80"})
+
+    (event,) = events
+
+    assert event["transaction"] == "generic WSGI request"
+
+    assert event["request"] == {
+        "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+        "headers": {"Host": "localhost", "X-Forwarded-Host": "foobarbaz:80"},
+        "method": "GET",
+        "query_string": "",
+        "url": "http://foobarbaz/",
     }
 
 
