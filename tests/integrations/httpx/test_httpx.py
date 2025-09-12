@@ -170,8 +170,8 @@ def test_outgoing_trace_headers_append_to_baggage(
 
     url = "http://example.com/"
 
-    # patch random.uniform to return a predictable sample_rand value
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+    # patch random.randrange to return a predictable sample_rand value
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
         with start_transaction(
             name="/interactions/other-dogs/new-dog",
             op="greeting.sniff",

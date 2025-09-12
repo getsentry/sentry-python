@@ -155,6 +155,9 @@ TEST_SUITE_CONFIG = {
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
+        "deps": {
+            "*": ["responses"],
+        },
     },
     "langchain-base": {
         "package": "langchain",
@@ -230,6 +233,20 @@ TEST_SUITE_CONFIG = {
         "package": "pyramid",
         "deps": {
             "*": ["werkzeug<2.1.0"],
+        },
+    },
+    "quart": {
+        "package": "quart",
+        "deps": {
+            "*": ["quart-auth", "pytest-asyncio", "Werkzeug"],
+            ">=0.19": ["quart-flask-patch"],
+            "<0.19": [
+                "blinker<1.6",
+                "jinja2<3.1.0",
+                "Werkzeug<2.3.0",
+                "hypercorn<0.15.0",
+            ],
+            "py3.8": ["taskgroup==0.0.0a4"],
         },
     },
     "redis_py_cluster_legacy": {
