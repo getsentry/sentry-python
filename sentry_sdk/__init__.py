@@ -1,10 +1,10 @@
+from sentry_sdk import profiler
 from sentry_sdk.scope import Scope
 from sentry_sdk.transport import Transport, HttpTransport
 from sentry_sdk.client import Client
 
 from sentry_sdk.api import *  # noqa
-
-from sentry_sdk.consts import VERSION  # noqa
+from sentry_sdk.consts import VERSION
 
 __all__ = [  # noqa
     "Hub",
@@ -12,6 +12,7 @@ __all__ = [  # noqa
     "Client",
     "Transport",
     "HttpTransport",
+    "VERSION",
     "integrations",
     # From sentry_sdk.api
     "init",
@@ -47,6 +48,7 @@ __all__ = [  # noqa
     "trace",
     "monitor",
     "logger",
+    "profiler",
     "start_session",
     "end_session",
     "set_transaction_name",
