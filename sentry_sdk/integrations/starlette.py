@@ -600,8 +600,8 @@ class StarletteRequestExtractor:
 
         return cookies
 
-    async def extract_request_info(self):
-        # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
+    async def extract_request_info(self, read_body=True):
+        # type: (StarletteRequestExtractor, bool) -> Optional[Dict[str, Any]]
         client = sentry_sdk.get_client()
 
         request_info = {}  # type: Dict[str, Any]
@@ -621,6 +621,9 @@ class StarletteRequestExtractor:
                 client, content_length
             ):
                 request_info["data"] = AnnotatedValue.removed_because_over_size_limit()
+                return request_info
+
+            if not read_body:
                 return request_info
 
             # Add JSON body, if it is a JSON request
