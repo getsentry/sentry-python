@@ -140,7 +140,7 @@ def _make_gql_event_processor(client, document_or_request):
             if GraphQLRequest is not None and isinstance(
                 document_or_request, GraphQLRequest
             ):
-                # In v4.0.0, execute moved to GraphQLRequest instead of
+                # In v4.0.0, gql moved to using GraphQLRequest instead of
                 # DocumentNode in execute
                 # https://github.com/graphql-python/gql/pull/556
                 document = document_or_request.document
