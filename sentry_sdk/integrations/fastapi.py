@@ -18,6 +18,7 @@ try:
     from sentry_sdk.integrations.starlette import (
         StarletteIntegration,
         StarletteRequestExtractor,
+        _patch_request,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
@@ -103,13 +104,12 @@ def patch_get_request_handler():
                 return await old_app(*args, **kwargs)
 
             request = args[0]
+            _patch_request(request)
 
             _set_transaction_name_and_source(
                 sentry_sdk.get_current_scope(), integration.transaction_style, request
             )
             sentry_scope = sentry_sdk.get_isolation_scope()
-            extractor = StarletteRequestExtractor(request)
-            info = await extractor.extract_request_info()
 
             def _make_request_event_processor(req, integration):
                 # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
@@ -117,6 +117,9 @@ def patch_get_request_handler():
                     # type: (Event, Dict[str, Any]) -> Event
 
                     # Extract information from request
+                    extractor = StarletteRequestExtractor(request)
+                    info = extractor.extract_request_info(req.scope)
+
                     request_info = event.get("request", {})
                     if info:
                         if "cookies" in info and should_send_default_pii():

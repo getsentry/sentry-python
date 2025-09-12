@@ -4,6 +4,8 @@ import warnings
 from collections.abc import Set
 from copy import deepcopy
 from json import JSONDecodeError
+import json
+from urllib.parse import parse_qsl
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -18,6 +20,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
     request_body_within_bounds,
 )
+from sentry_sdk.integrations._formparsers import MultiPartParser
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
@@ -422,6 +425,36 @@ def _is_async_callable(obj):
     )
 
 
+def _patch_request(request):
+    _original_body = request.body
+    _original_json = request.json
+    _original_form = request.form
+
+    def restore_original_methods():
+        request.body = _original_body
+        request.json = _original_json
+        request.form = _original_form
+
+    async def sentry_body():
+        request.scope["state"]["sentry_sdk.body"] = await _original_body()
+        restore_original_methods()
+        return request.scope["state"]["sentry_sdk.body"]
+
+    async def sentry_json():
+        request.scope["state"]["sentry_sdk.json"] = await _original_json()
+        restore_original_methods()
+        return request.scope["state"]["sentry_sdk.json"]
+
+    async def sentry_form():
+        request.scope["state"]["sentry_sdk.form"] = await _original_form()
+        restore_original_methods()
+        return request.scope["state"]["sentry_sdk.form"]
+
+    request.body = sentry_body
+    request.json = sentry_json
+    request.form = sentry_form
+
+
 def patch_request_response():
     # type: () -> None
     old_request_response = starlette.routing.request_response
@@ -442,6 +475,7 @@ def patch_request_response():
                     return await old_func(*args, **kwargs)
 
                 request = args[0]
+                _patch_request(request)
 
                 _set_transaction_name_and_source(
                     sentry_sdk.get_current_scope(),
@@ -450,8 +484,6 @@ def patch_request_response():
                 )
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
-                extractor = StarletteRequestExtractor(request)
-                info = await extractor.extract_request_info()
 
                 def _make_request_event_processor(req, integration):
                     # type: (Any, Any) -> Callable[[Event, dict[str, Any]], Event]
@@ -459,6 +491,9 @@ def patch_request_response():
                         # type: (Event, Dict[str, Any]) -> Event
 
                         # Add info from request to event
+                        extractor = StarletteRequestExtractor(request)
+                        info = extractor.extract_request_info(req.scope)
+
                         request_info = event.get("request", {})
                         if info:
                             if "cookies" in info:
@@ -580,6 +615,18 @@ def patch_templates():
         Jinja2Templates.__init__ = _sentry_jinja2templates_init
 
 
+def _is_form_data_encoded(ct):
+    # type: (Optional[str]) -> bool
+    mt = (ct or "").split(";", 1)[0]
+    return mt == "multipart/form-data"
+
+
+def _is_form_urlencoded(ct):
+    # type: (Optional[str]) -> bool
+    mt = (ct or "").split(";", 1)[0]
+    return mt == "application/x-www-form-urlencoded"
+
+
 class StarletteRequestExtractor:
     """
     Extracts useful information from the Starlette request
@@ -600,8 +647,8 @@ class StarletteRequestExtractor:
 
         return cookies
 
-    async def extract_request_info(self):
-        # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
+    def extract_request_info(self, scope):
+        # type: (StarletteRequestExtractor, StarletteScope) -> Optional[Dict[str, Any]]
         client = sentry_sdk.get_client()
 
         request_info = {}  # type: Dict[str, Any]
@@ -612,7 +659,7 @@ class StarletteRequestExtractor:
                 request_info["cookies"] = self.cookies()
 
             # If there is no body, just return the cookies
-            content_length = await self.content_length()
+            content_length = self.content_length()
             if not content_length:
                 return request_info
 
@@ -623,17 +670,18 @@ class StarletteRequestExtractor:
                 request_info["data"] = AnnotatedValue.removed_because_over_size_limit()
                 return request_info
 
-            # Add JSON body, if it is a JSON request
-            json = await self.json()
-            if json:
-                request_info["data"] = json
+            if "state" not in scope:
                 return request_info
 
-            # Add form as key/value pairs, if request has form data
-            form = await self.form()
-            if form:
+            state = scope["state"]
+
+            if "sentry_sdk.json" in state:
+                request_info["data"] = deepcopy(state["sentry_sdk.json"])
+                return request_info
+
+            if "sentry_sdk.form" in state:
                 form_data = {}
-                for key, val in form.items():
+                for key, val in state["sentry_sdk.form"].items():
                     is_file = isinstance(val, UploadFile)
                     form_data[key] = (
                         val
@@ -644,11 +692,49 @@ class StarletteRequestExtractor:
                 request_info["data"] = form_data
                 return request_info
 
-            # Raw data, do not add body just an annotation
-            request_info["data"] = AnnotatedValue.removed_because_raw_data()
+            if "sentry_sdk.raw_body" in state and _is_json_content_type(
+                self.request.headers.get("content-type")
+            ):
+                try:
+                    request_info["data"] = json.loads(
+                        state["sentry_sdk.raw_body"].decode("utf-8")
+                    )
+                except JSONDecodeError:
+                    return request_info
+                return request_info
+
+            if "sentry_sdk.raw_body" in state and _is_form_data_encoded(
+                self.request.headers.get("content-type")
+            ):
+
+                # try:
+                multipart_parser = MultiPartParser(
+                    self.request.headers,
+                    state["sentry_sdk.raw_body"],
+                )
+                request_info["data"] = multipart_parser.parse()
+                # except MultiPartException as exc:
+                #     if "app" in self.scope:
+                #         raise HTTPException(status_code=400, detail=exc.message)
+                #     raise exc
+
+                return request_info
+
+            elif "sentry_sdk.raw_body" in state and _is_form_data_encoded(
+                self.request.headers.get("content-type")
+            ):
+                request_info["data"] = AnnotatedValue.removed_because_raw_data()
+                return request_info
+
+            if "sentry_sdk.raw_body" in state and _is_form_urlencoded(
+                self.request.headers.get("content-type")
+            ):
+                request_info["data"] = parse_qsl(state["sentry_sdk.raw_body"])
+                return request_info
+
             return request_info
 
-    async def content_length(self):
+    def content_length(self):
         # type: (StarletteRequestExtractor) -> Optional[int]
         if "content-length" in self.request.headers:
             return int(self.request.headers["content-length"])
@@ -659,31 +745,9 @@ class StarletteRequestExtractor:
         # type: (StarletteRequestExtractor) -> Dict[str, Any]
         return self.request.cookies
 
-    async def form(self):
-        # type: (StarletteRequestExtractor) -> Any
-        if multipart is None:
-            return None
-
-        # Parse the body first to get it cached, as Starlette does not cache form() as it
-        # does with body() and json() https://github.com/encode/starlette/discussions/1933
-        # Calling `.form()` without calling `.body()` first will
-        # potentially break the users project.
-        await self.request.body()
-
-        return await self.request.form()
-
     def is_json(self):
         # type: (StarletteRequestExtractor) -> bool
         return _is_json_content_type(self.request.headers.get("content-type"))
-
-    async def json(self):
-        # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
-        if not self.is_json():
-            return None
-        try:
-            return await self.request.json()
-        except JSONDecodeError:
-            return None
 
 
 def _transaction_name_from_router(scope):

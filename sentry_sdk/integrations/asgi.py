@@ -36,6 +36,7 @@ from sentry_sdk.utils import (
     _get_installed_modules,
 )
 from sentry_sdk.tracing import Transaction
+from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 
 from typing import TYPE_CHECKING
 
@@ -178,6 +179,21 @@ class SentryAsgiMiddleware:
         # type: (Any, Any, Any) -> Any
         return await self._run_app(scope, receive, send, asgi_version=3)
 
+    async def _eagerly_receive_body(self, receive):
+        body = b""
+        buffered_messages = []
+        while True:
+            msg = await receive()
+            buffered_messages.append(msg)
+
+            if "body" in msg:
+                body += msg["body"]
+
+            if not msg.get("more_body", False):
+                break
+
+        return body, buffered_messages
+
     async def _run_app(self, scope, receive, send, asgi_version):
         # type: (Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
@@ -213,10 +229,11 @@ class SentryAsgiMiddleware:
 
                     method = scope.get("method", "").upper()
                     transaction = None
+                    headers = _get_headers(scope)
                     if ty in ("http", "websocket"):
                         if ty == "websocket" or method in self.http_methods_to_capture:
                             transaction = continue_trace(
-                                _get_headers(scope),
+                                headers,
                                 op="{}.server".format(ty),
                                 name=transaction_name,
                                 source=transaction_source,
@@ -241,6 +258,31 @@ class SentryAsgiMiddleware:
                         if transaction is not None
                         else nullcontext()
                     ):
+                        client = sentry_sdk.get_client()
+
+                        read_request_body = (
+                            "content-length" in headers
+                            and request_body_within_bounds(
+                                client, int(headers["content-length"])
+                            )
+                        )
+                        scope.setdefault("state", {})[
+                            "sentry_sdk.content-length"
+                        ] = None
+
+                        buffered_messages = []
+                        if read_request_body:
+                            body, buffered_messages = await self._eagerly_receive_body(
+                                receive
+                            )
+                            scope["state"]["sentry_sdk.raw_body"] = body
+
+                        # Replay wrapper: first return buffered messages, then delegate to original receive
+                        async def _sentry_replay_receive():
+                            if buffered_messages:
+                                return buffered_messages.pop(0)
+                            return await receive()
+
                         try:
 
                             async def _sentry_wrapped_send(event):
@@ -255,9 +297,17 @@ class SentryAsgiMiddleware:
 
                                 return await send(event)
 
-                            if asgi_version == 2:
+                            if asgi_version == 2 and read_request_body:
+                                return await self.app(scope)(
+                                    _sentry_replay_receive, _sentry_wrapped_send
+                                )
+                            elif asgi_version == 2:
                                 return await self.app(scope)(
                                     receive, _sentry_wrapped_send
+                                )
+                            elif read_request_body:
+                                return await self.app(
+                                    scope, _sentry_replay_receive, _sentry_wrapped_send
                                 )
                             else:
                                 return await self.app(
