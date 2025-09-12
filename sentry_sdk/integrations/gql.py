@@ -21,7 +21,7 @@ try:
 
     try:
         # gql 4.0+
-        from gql import GraphQLRequest  # type: ignore[import-not-found]
+        from gql import GraphQLRequest
     except ImportError:
         GraphQLRequest = None
 
