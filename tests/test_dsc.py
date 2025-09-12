@@ -175,7 +175,7 @@ def test_dsc_continuation_of_trace_sample_rate_changed_in_traces_sampler(
     }
 
     # We continue the incoming trace and start a new transaction
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.125):
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=125000):
         transaction = sentry_sdk.continue_trace(incoming_http_headers)
         with sentry_sdk.start_transaction(transaction, name="foo"):
             pass
