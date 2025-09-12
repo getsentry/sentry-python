@@ -169,7 +169,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     envelopes = capture_envelopes()
 
     # make sure transaction is sampled for both cases
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.25):
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
         transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
 
     # will create empty mutable baggage

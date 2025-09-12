@@ -518,8 +518,8 @@ def test_baggage_propagation(init_celery):
     def dummy_task(self, x, y):
         return _get_headers(self)
 
-    # patch random.uniform to return a predictable sample_rand value
-    with mock.patch("sentry_sdk.tracing_utils.Random.uniform", return_value=0.5):
+    # patch random.randrange to return a predictable sample_rand value
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
         with start_transaction() as transaction:
             result = dummy_task.apply_async(
                 args=(1, 0),
