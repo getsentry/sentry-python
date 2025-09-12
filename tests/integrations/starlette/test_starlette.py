@@ -291,7 +291,7 @@ async def test_starletterequestextractor_content_length(sentry_init):
     starlette_request = starlette.requests.Request(scope)
     extractor = StarletteRequestExtractor(starlette_request)
 
-    assert await extractor.content_length() == len(json.dumps(BODY_JSON))
+    assert extractor.content_length() == len(json.dumps(BODY_JSON))
 
 
 @pytest.mark.asyncio
@@ -303,48 +303,6 @@ async def test_starletterequestextractor_cookies(sentry_init):
         "tasty_cookie": "strawberry",
         "yummy_cookie": "choco",
     }
-
-
-@pytest.mark.asyncio
-async def test_starletterequestextractor_json(sentry_init):
-    starlette_request = starlette.requests.Request(SCOPE)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    assert extractor.is_json()
-    assert await extractor.json() == BODY_JSON
-
-
-@pytest.mark.asyncio
-async def test_starletterequestextractor_form(sentry_init):
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
-    ]
-    # TODO add test for content-type: "application/x-www-form-urlencoded"
-
-    starlette_request = starlette.requests.Request(scope)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    form_data = await extractor.form()
-    assert form_data.keys() == PARSED_FORM.keys()
-    assert form_data["username"] == PARSED_FORM["username"]
-    assert form_data["password"] == PARSED_FORM["password"]
-    assert form_data["photo"].filename == PARSED_FORM["photo"].filename
-
-    # Make sure we still can read the body
-    # after alreading it with extractor.form() above.
-    body = await extractor.request.body()
-    assert body
 
 
 @pytest.mark.asyncio
@@ -405,7 +363,7 @@ async def test_starletterequestextractor_extract_request_info_too_big(sentry_ini
 
     extractor = StarletteRequestExtractor(starlette_request)
 
-    request_info = await extractor.extract_request_info()
+    request_info = extractor.extract_request_info(scope)
 
     assert request_info
     assert request_info["cookies"] == {
@@ -437,7 +395,9 @@ async def test_starletterequestextractor_extract_request_info(sentry_init):
 
     extractor = StarletteRequestExtractor(starlette_request)
 
-    request_info = await extractor.extract_request_info()
+    scope["state"] = {}
+    scope["state"]["sentry_sdk.json"] = BODY_JSON
+    request_info = extractor.extract_request_info(scope)
 
     assert request_info
     assert request_info["cookies"] == {
@@ -445,6 +405,69 @@ async def test_starletterequestextractor_extract_request_info(sentry_init):
         "yummy_cookie": "choco",
     }
     assert request_info["data"] == BODY_JSON
+
+
+@pytest.mark.asyncio
+async def test_starletterequestextractor_extract_request_info_json_bytes(sentry_init):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    scope["state"] = {}
+    scope["state"]["sentry_sdk.raw_body"] = json.dumps(BODY_JSON).encode("utf-8")
+    request_info = extractor.extract_request_info(scope)
+
+    assert request_info["data"] == BODY_JSON
+
+
+@pytest.mark.asyncio
+async def test_starletterequestextractor_form_bytes(sentry_init):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+        max_request_body_size="always",
+    )
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+        [b"content-length", str(len(BODY_FORM)).encode()],
+    ]
+    # TODO add test for content-type: "application/x-www-form-urlencoded"
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    scope["state"] = {}
+    scope["state"]["sentry_sdk.raw_body"] = BODY_FORM.encode("utf-8")
+    request_info = extractor.extract_request_info(scope)
+    print(request_info)
+
+    form_data = request_info["data"]
+
+    assert form_data.keys() == PARSED_FORM.keys()
+    assert form_data["username"] == PARSED_FORM["username"]
+    assert form_data["password"] == PARSED_FORM["password"]
+    assert form_data["photo"].filename == PARSED_FORM["photo"].filename
 
 
 @pytest.mark.asyncio
@@ -468,7 +491,9 @@ async def test_starletterequestextractor_extract_request_info_no_pii(sentry_init
 
     extractor = StarletteRequestExtractor(starlette_request)
 
-    request_info = await extractor.extract_request_info()
+    scope["state"] = {}
+    scope["state"]["sentry_sdk.json"] = BODY_JSON
+    request_info = extractor.extract_request_info(scope)
 
     assert request_info
     assert "cookies" not in request_info
@@ -1358,24 +1383,32 @@ def test_configurable_status_codes(
 
 @pytest.mark.asyncio
 async def test_starletterequestextractor_malformed_json_error_handling(sentry_init):
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"application/json"],
-    ]
-    starlette_request = starlette.requests.Request(scope)
-
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
     malformed_json = "{invalid json"
     malformed_messages = [
         {"type": "http.request", "body": malformed_json.encode("utf-8")},
         {"type": "http.disconnect"},
     ]
 
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(malformed_json))).encode()],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+
     side_effect = [_mock_receive(msg) for msg in malformed_messages]
     starlette_request._receive = mock.Mock(side_effect=side_effect)
 
     extractor = StarletteRequestExtractor(starlette_request)
 
-    assert extractor.is_json()
+    scope["state"] = {}
+    scope["state"]["sentry_sdk.raw_body"] = malformed_json.encode("utf-8")
+    request_info = extractor.extract_request_info(scope)
 
-    result = await extractor.json()
-    assert result is None
+    assert request_info and "data" not in request_info
