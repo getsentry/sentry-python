@@ -242,9 +242,9 @@ def get_supported_releases(
             sys.exit(1)
 
         py_versions = determine_python_versions(pypi_data)
-        target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-        if target_python_versions:
-            target_python_versions = SpecifierSet(target_python_versions)
+        target_python_versions = _transform_target_python_versions(
+            TEST_SUITE_CONFIG[integration].get("python")
+        )
         return bool(supported_python_versions(py_versions, target_python_versions))
 
     if not _supports_lowest(releases[0]):
@@ -309,7 +309,10 @@ def pick_releases_to_test(
 
 def supported_python_versions(
     package_python_versions: Union[SpecifierSet, list[Version]],
-    custom_supported_versions: Optional[SpecifierSet] = None,
+    custom_supported_versions: Optional[
+        Union[SpecifierSet, dict[SpecifierSet, SpecifierSet]]
+    ] = None,
+    version: Optional[Version] = None,
 ) -> list[Version]:
     """
     Get the intersection of Python versions supported by the package and the SDK.
@@ -336,7 +339,24 @@ def supported_python_versions(
     curr = MIN_PYTHON_VERSION
     while curr <= MAX_PYTHON_VERSION:
         if curr in package_python_versions:
-            if not custom_supported_versions or curr in custom_supported_versions:
+            if custom_supported_versions:
+                if (
+                    isinstance(custom_supported_versions, SpecifierSet)
+                    and curr in custom_supported_versions
+                ):
+                    supported.append(curr)
+                elif version is not None and isinstance(
+                    custom_supported_versions, dict
+                ):
+                    for v, py in custom_supported_versions.items():
+                        if version in v and curr in py:
+                            supported.append(curr)
+                            break
+                    else:
+                        supported.append(curr)
+                else:
+                    supported.append(curr)
+            else:
                 supported.append(curr)
 
         # Construct the next Python version (i.e., bump the minor)
@@ -517,18 +537,36 @@ def _add_python_versions_to_release(
 
     time.sleep(PYPI_COOLDOWN)  # give PYPI some breathing room
 
-    target_python_versions = TEST_SUITE_CONFIG[integration].get("python")
-    if target_python_versions:
-        target_python_versions = SpecifierSet(target_python_versions)
+    target_python_versions = _transform_target_python_versions(
+        TEST_SUITE_CONFIG[integration].get("python")
+    )
 
     release.python_versions = pick_python_versions_to_test(
         supported_python_versions(
             determine_python_versions(release_pypi_data),
             target_python_versions,
+            release,
         )
     )
 
     release.rendered_python_versions = _render_python_versions(release.python_versions)
+
+
+def _transform_target_python_versions(
+    python_versions: Union[str, dict[str, str], None]
+) -> Union[SpecifierSet, dict[SpecifierSet, SpecifierSet], None]:
+    """Wrap the contents of the `python` key in SpecifierSets."""
+    if not python_versions:
+        return None
+
+    if isinstance(python_versions, str):
+        return SpecifierSet(python_versions)
+
+    if isinstance(python_versions, dict):
+        updated = {}
+        for key, value in python_versions.items():
+            updated[SpecifierSet(key)] = SpecifierSet(value)
+        return updated
 
 
 def get_file_hash() -> str:
