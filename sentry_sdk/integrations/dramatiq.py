@@ -1,5 +1,4 @@
 import json
-import contextvars
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
@@ -15,13 +14,19 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
+    ContextVar,
+    HAS_REAL_CONTEXTVARS,
+    CONTEXTVARS_ERROR_MESSAGE,
 )
+from typing import TypeVar
+
+R = TypeVar("R")
 
 try:
     from dramatiq.broker import Broker
-    from dramatiq.message import Message, R
     from dramatiq.middleware import Middleware, default_middleware
     from dramatiq.errors import Retry
+    from dramatiq.message import Message
 except ImportError:
     raise DidNotEnable("Dramatiq is not installed")
 
@@ -29,7 +34,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, Union
-    from sentry_sdk.tracing import Transaction
     from sentry_sdk._types import Event, Hint
 
 
@@ -50,6 +54,12 @@ class DramatiqIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        if not HAS_REAL_CONTEXTVARS:
+            raise DidNotEnable(
+                "The dramatiq integration for Sentry requires Python 3.7+ "
+                " or aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
+            )
+
         _patch_dramatiq_broker()
 
 
@@ -85,10 +95,10 @@ def _patch_dramatiq_broker():
         kw["middleware"] = middleware
         original_broker__init__(self, *args, **kw)
 
-    Broker.__init__ = sentry_patched_broker__init__  # type: ignore[method-assign]
+    Broker.__init__ = sentry_patched_broker__init__
 
 
-class SentryMiddleware(Middleware):
+class SentryMiddleware(Middleware):  # type: ignore[misc]
     """
     A Dramatiq middleware that automatically captures and sends
     exceptions to Sentry.
@@ -97,9 +107,7 @@ class SentryMiddleware(Middleware):
     DramatiqIntegration.
     """
 
-    _transaction = contextvars.ContextVar(
-        "_transaction"
-    )  # type: contextvars.ContextVar[Transaction]
+    _transaction = ContextVar("_transaction")
 
     def before_enqueue(self, broker, message, delay):
         # type: (Broker, Message[R], int) -> None
@@ -130,7 +138,7 @@ class SentryMiddleware(Middleware):
         sentry_sdk.start_transaction(
             transaction,
             name=message.actor_name,
-            op=OP.QUEUE_PROCESS,
+            op=OP.QUEUE_TASK_DRAMATIQ,
             source=TransactionSource.TASK,
         )
         transaction.__enter__()
@@ -142,7 +150,9 @@ class SentryMiddleware(Middleware):
         actor = broker.get_actor(message.actor_name)
         throws = message.options.get("throws") or actor.options.get("throws")
 
-        transaction = self._transaction.get()
+        transaction = self._transaction.get(None)
+        if not transaction:
+            return None
 
         is_event_capture_required = (
             exception is not None
