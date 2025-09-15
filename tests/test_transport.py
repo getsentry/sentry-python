@@ -630,6 +630,43 @@ def test_metric_bucket_limits(capturing_server, response_code, make_client):
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
+def test_log_item_limits(capturing_server, response_code, make_client):
+    client = make_client()
+    capturing_server.respond_with(
+        code=response_code,
+        headers={
+            "X-Sentry-Rate-Limits": "4711:log_item:organization:quota_exceeded:custom"
+        },
+    )
+
+    envelope = Envelope()
+    envelope.add_item(Item(payload=b"{}", type="log"))
+    client.transport.capture_envelope(envelope)
+    client.flush()
+
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
+
+    assert set(client.transport._disabled_until) == set(["log_item"])
+
+    client.transport.capture_envelope(envelope)
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(capturing_server.captured) == 2
+
+    envelope = capturing_server.captured[0].envelope
+    assert envelope.items[0].type == "transaction"
+    envelope = capturing_server.captured[1].envelope
+    assert envelope.items[0].type == "client_report"
+    report = parse_json(envelope.items[0].get_bytes())
+    assert report["discarded_events"] == [
+        {"category": "log_item", "reason": "ratelimit_backoff", "quantity": 1},
+    ]
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
 def test_metric_bucket_limits_with_namespace(
     capturing_server, response_code, make_client
 ):
