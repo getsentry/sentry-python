@@ -1,10 +1,9 @@
 from functools import wraps
-import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -117,8 +116,29 @@ def _set_input_data(span, kwargs, integration):
         and should_send_default_pii()
         and integration.include_prompts
     ):
+        normalized_messages = []
+        for message in messages:
+            if (
+                message.get("role") == "user"
+                and "content" in message
+                and isinstance(message["content"], (list, tuple))
+            ):
+                for item in message["content"]:
+                    if item.get("type") == "tool_result":
+                        normalized_messages.append(
+                            {
+                                "role": "tool",
+                                "content": {
+                                    "tool_use_id": item.get("tool_use_id"),
+                                    "output": item.get("content"),
+                                },
+                            }
+                        )
+            else:
+                normalized_messages.append(message)
+
         set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, safe_serialize(messages)
+            span, SPANDATA.GEN_AI_REQUEST_MESSAGES, normalized_messages, unpack=False
         )
 
     set_data_normalized(
@@ -159,20 +179,35 @@ def _set_output_data(
     Set output data for the span based on the AI response."""
     span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
     if should_send_default_pii() and integration.include_prompts:
-        set_data_normalized(
-            span,
-            SPANDATA.GEN_AI_RESPONSE_TEXT,
-            json.dumps(content_blocks),
-            unpack=False,
-        )
+        output_messages = {
+            "response": [],
+            "tool": [],
+        }  # type: (dict[str, list[Any]])
+
+        for output in content_blocks:
+            if output["type"] == "text":
+                output_messages["response"].append(output["text"])
+            elif output["type"] == "tool_use":
+                output_messages["tool"].append(output)
+
+        if len(output_messages["tool"]) > 0:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                output_messages["tool"],
+                unpack=False,
+            )
+
+        if len(output_messages["response"]) > 0:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+            )
 
     record_token_usage(
         span,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
     )
-
-    # TODO: GEN_AI_RESPONSE_TOOL_CALLS ?
 
     if finish_span:
         span.__exit__(None, None, None)
@@ -194,7 +229,7 @@ def _sentry_patched_create_common(f, *args, **kwargs):
 
     model = kwargs.get("model", "")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=OP.GEN_AI_CHAT,
         name=f"chat {model}".strip(),
         origin=AnthropicIntegration.origin,

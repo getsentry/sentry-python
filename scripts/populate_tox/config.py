@@ -165,13 +165,15 @@ TEST_SUITE_CONFIG = {
             ">=0.27,<0.28": ["pytest-httpx==0.30.0"],
             ">=0.28,<0.29": ["pytest-httpx==0.35.0"],
         },
-        "python": ">=3.9",
     },
     "huey": {
         "package": "huey",
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
+        "deps": {
+            "*": ["responses"],
+        },
     },
     "langchain-base": {
         "package": "langchain",
