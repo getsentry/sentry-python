@@ -345,12 +345,14 @@ def supported_python_versions(
                     and curr in custom_supported_versions
                 ):
                     supported.append(curr)
+
                 elif version is not None and isinstance(
                     custom_supported_versions, dict
                 ):
                     for v, py in custom_supported_versions.items():
-                        if version in v and curr in py:
-                            supported.append(curr)
+                        if version in v:
+                            if curr in py:
+                                supported.append(curr)
                             break
                     else:
                         supported.append(curr)
