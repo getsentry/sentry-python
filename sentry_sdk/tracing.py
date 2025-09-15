@@ -708,10 +708,19 @@ class Span:
                     end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
                 self.timestamp = end_timestamp
             else:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-                self.timestamp = self.start_timestamp + timedelta(
-                    microseconds=elapsed / 1000
+                print(f"In Span.finish for span {self}")
+                now = nanosecond_time()
+                elapsed = now - self._start_timestamp_monotonic_ns
+                print(f"NOW before assigment: {now}")
+                self.timestamp = (
+                    self.start_timestamp
+                    + timedelta(  # The assignment in this line is taking a lot of time
+                        microseconds=elapsed / 1000
+                    )
                 )
+                now2 = nanosecond_time()
+                print(f"NOW2 after assigment: {now2}")
+                print(f"Assignment duration: {now2 - now}")
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
