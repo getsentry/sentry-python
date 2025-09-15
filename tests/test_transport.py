@@ -611,7 +611,7 @@ def test_metric_bucket_limits(capturing_server, response_code, make_client):
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == set(["metric_bucket"])
+    assert set(client.transport._disabled_until) == {"metric_bucket"}
 
     client.transport.capture_envelope(envelope)
     client.capture_event({"type": "transaction"})
@@ -648,7 +648,7 @@ def test_log_item_limits(capturing_server, response_code, make_client):
     assert capturing_server.captured[0].path == "/api/132/envelope/"
     capturing_server.clear_captured()
 
-    assert set(client.transport._disabled_until) == set(["log_item"])
+    assert set(client.transport._disabled_until) == {"log_item"}
 
     client.transport.capture_envelope(envelope)
     client.capture_event({"type": "transaction"})
