@@ -106,5 +106,3 @@ jobs:
                 issue_number: pr.number,
                 labels: ['Component: CI', 'Component: Tests']
             });
-
-            console.log(`Created PR #${pr.number}: ${pr.title}`);
