@@ -59,13 +59,13 @@ def _get_template_name_description(template_name):
 
 
 def _normalize_context(context):
-    # type: (Dict[str, Any]) -> Dict[str, Union[str, int, float, bool, type(None), list[Union[str, int, float, bool, type(None)]], dict[str, Union[str, int, float, bool, type(None)]]]]
+    # type: (Dict[str, Any]) -> Dict[str, Union[str, int, float, bool, None, list[Union[str, int, float, bool, None]], dict[str, Union[str, int, float, bool, None]]]]
     """
     Filter out non-primitive types from `context`.
     """
     new_context = (
         {}
-    )  # type: Dict[str, Union[str, int, float, bool, type(None), list[Union[str, int, float, bool, type(None)]], dict[str, Union[str, int, float, bool, type(None)]]]]
+    )  # type: Dict[str, Union[str, int, float, bool, None, list[Union[str, int, float, bool, None]], dict[str, Union[str, int, float, bool, None]]]]
     for key, value in context.items():
         if isinstance(value, (str, int, float, bool, type(None))):
             new_context[key] = value
