@@ -1,13 +1,14 @@
-name: Update tox.ini
+name: Update test matrix
 
 on:
   workflow_dispatch:
   schedule:
+    # early Monday morning
     - cron: '23 3 * * 1'
 
 jobs:
   update-tox:
-    name: Update tox.ini
+    name: Update test matrix
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -22,7 +23,7 @@ jobs:
           python-version: 3.13
 
       - name: Checkout repo
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # 5.0.0
+        uses: actions/checkout@v5.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -40,7 +41,7 @@ jobs:
         id: create-branch
         run: |
           COMMIT_TITLE="ci: Update test matrix with new releases"
-          DATE="date +%m/%d"
+          DATE=`date +%m/%d`
           BRANCH_NAME="toxgen/update"
 
           git checkout -B "$BRANCH_NAME"
@@ -53,7 +54,7 @@ jobs:
           echo "date=$DATE" >> $GITHUB_OUTPUT
 
       - name: Create pull request
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # 8.0.0
+        uses: actions/github-script@v8.0.0
         with:
           script: |
             const branchName = '${{ steps.create-branch.outputs.branch_name }}';
@@ -69,12 +70,14 @@ jobs:
                 state: 'open'
             });
 
-            existingPRs.forEach(pr => await github.rest.pulls.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pr.number,
-                state: 'closed',
-            }));
+            for (const pr of existingPRs) {
+                await github.rest.pulls.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pr.number,
+                    state: 'closed'
+                })
+            };
 
             const { data: pr } = await github.rest.pulls.create({
                 owner: context.repo.owner,
@@ -84,17 +87,17 @@ jobs:
                 base: '${{ github.ref_name }}',
                 body: `Update our test matrix with new releases of integrated frameworks and libraries.
 
-                ## How it works
-                - Scan PyPI for all supported releases of all frameworks we have a dedicated test suite for.
-                - Pick a representative sample of releases to run our test suite against. We always test the latest and oldest supported version.
-                - Update tox.ini with the new releases.
+                    ## How it works
+                    - Scan PyPI for all supported releases of all frameworks we have a dedicated test suite for.
+                    - Pick a representative sample of releases to run our test suite against. We always test the latest and oldest supported version.
+                    - Update tox.ini with the new releases.
 
-                ## Action required
-                - If CI passes on this PR, it's safe to approve and merge. It means our integrations can handle new versions of frameworks that got pulled in.
-                - If CI doesn't pass on this PR, this points to an incompatibility of either our integration or our test setup with a new version of a framework.
-                    - Check what the failures look like and either fix them, or update the [test config](scripts/populate_tox/config.py) and rerun (scripts/generate-test-files.sh)[scripts/generate-test-files.sh]. See [README.md](scripts/populate_tox/README.md) for what configuration options are available.
+                    ## Action required
+                    - If CI passes on this PR, it's safe to approve and merge. It means our integrations can handle new versions of frameworks that got pulled in.
+                    - If CI doesn't pass on this PR, this points to an incompatibility of either our integration or our test setup with a new version of a framework.
+                      - Check what the failures look like and either fix them, or update the [test config](scripts/populate_tox/config.py) and rerun [scripts/generate-test-files.sh](scripts/generate-test-files.sh). See [README.md](scripts/populate_tox/README.md) for what configuration options are available.
 
-                This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml).`
+                    This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml).`.replace(/^ {20}/gm, '')
             });
 
             await github.rest.issues.addLabels({
