@@ -109,7 +109,15 @@ def patch_templates():
             name=_get_template_name_description(template_name),
             origin=DjangoIntegration.origin,
         ) as span:
-            span.set_data("context", context)
+            new_context = {}
+            for k, v in context.items():
+                # Only include primitive types to avoid
+                # large payloads and long serialization times
+                if type(v) in (str, int, float, bool, list, dict):
+                    new_context[k] = v
+
+            span.set_data("context", new_context)
+
             return real_render(request, template_name, context, *args, **kwargs)
 
     django.shortcuts.render = render

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 
 from django.contrib.auth import login
 from django.contrib.auth.models import User
@@ -206,6 +207,15 @@ def template_test3(request, *args, **kwargs):
 
     capture_message(traceparent + "\n" + baggage.serialize())
     return render(request, "trace_meta.html", {})
+
+
+@csrf_exempt
+def template_test4(request, *args, **kwargs):
+    return TemplateResponse(
+        request,
+        "user_name.html",
+        {"user_age": 25, "complex_context": lambda x: time.sleep(10)},
+    )
 
 
 @csrf_exempt

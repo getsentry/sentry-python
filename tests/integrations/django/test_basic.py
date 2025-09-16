@@ -1,9 +1,10 @@
 import inspect
 import json
 import os
+import pytest
 import re
 import sys
-import pytest
+import time
 from functools import partial
 from unittest.mock import patch
 
@@ -15,8 +16,8 @@ from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
-from django.utils.functional import SimpleLazyObject
 from django.template.context import make_context
+from django.utils.functional import SimpleLazyObject
 
 try:
     from django.urls import reverse
@@ -954,6 +955,36 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         client.get(url)
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
+
+
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
+def test_render_spans_complex_context(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=False,
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    begin = time.time()
+    client.get(reverse("template_test4"))
+
+    (transaction,) = events
+    end = time.time()
+
+    # evaluating the complex context takes 10 seconds, (see lambda in template_test4)
+    # so we expect the total time to be way less, because the complex context is not evaluated
+    assert end - begin < 10 / 5
+
+    assert transaction["spans"][-1]["data"]["context"] == {
+        "user_age": 25,
+        # The "complex_context" is not included because it is not a primitive type
+    }
 
 
 if DJANGO_VERSION >= (1, 10):
