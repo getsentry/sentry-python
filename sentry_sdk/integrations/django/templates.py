@@ -73,14 +73,14 @@ def patch_templates():
             name=_get_template_name_description(self.template_name),
             origin=DjangoIntegration.origin,
         ) as span:
-            context_data = {}
+            new_context = {}
             for k, v in self.context_data.items():
                 # Only include primitive types to avoid
                 # large payloads and long serialization times
                 if type(v) in (str, int, float, bool, list, dict):
-                    context_data[k] = v
+                    new_context[k] = v
 
-            span.set_data("context", context_data)
+            span.set_data("context", new_context)
 
             return real_rendered_content.fget(self)
 
