@@ -127,8 +127,13 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         scope.clear_breadcrumbs()
         scope.add_event_processor(_make_message_event_processor(message, integration))
 
+        sentry_headers = message.options.get("sentry_headers") or {}
+        if "retries" in message.options:
+            # start new trace in case of retrying
+            sentry_headers = {}
+
         transaction = continue_trace(
-            message.options.get("sentry_headers") or {},
+            sentry_headers,
             name=message.actor_name,
             op=OP.QUEUE_TASK_DRAMATIQ,
             source=TransactionSource.TASK,

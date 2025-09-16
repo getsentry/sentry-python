@@ -9,8 +9,9 @@ from sentry_sdk.tracing import TransactionSource
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.integrations.dramatiq import DramatiqIntegration
+from sentry_sdk.integrations.logging import ignore_logger
 
-# from sentry_sdk.integrations.logging import LoggingIntegration
+ignore_logger("dramatiq.worker.WorkerThread")
 
 
 @pytest.fixture(scope="function")
@@ -18,7 +19,6 @@ def broker(request, sentry_init):
     sentry_init(
         integrations=[DramatiqIntegration()],
         traces_sample_rate=getattr(request, "param", None),
-        # disabled_integrations=[LoggingIntegration()],
     )
     broker = StubBroker()
     broker.emit_after("process_boot")
@@ -78,8 +78,7 @@ def test_task_transaction(broker, worker, capture_events, expected_span_status):
         error_event = events.pop(0)
         exception = error_event["exception"]["values"][0]
         assert exception["type"] == "ZeroDivisionError"
-        # todo: failed assert. Logging instead of dramatiq
-        # assert exception["mechanism"]["type"] == DramatiqIntegration.identifier
+        assert exception["mechanism"]["type"] == DramatiqIntegration.identifier
 
     (event,) = events
     assert event["type"] == "transaction"
