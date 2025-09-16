@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.38.0
+
+### Various fixes & improvements
+
+- Feat(huggingface_hub): Update HuggingFace Hub integration (#4746) by @antonpirker
+- Feat(Anthropic): Add proper tool calling data to Anthropic integration (#4769) by @antonpirker
+- Feat(openai-agents): Add input and output to `invoke_agent` span. (#4785) by @antonpirker
+- Feat(AI): Create transaction in AI agents framworks, when no transaction is running. (#4758) by @constantinius
+- Feat(GraphQL): Support gql 4.0-style execute (#4779) by @sentrivana
+- Fix(logs): Expect `log_item` as rate limit category (#4798) by @sentrivana
+- Fix: CI for mypy, gevent (#4790) by @sentrivana
+- Fix: Correctly check for a running transaction (#4791) by @antonpirker
+- Fix: Use float for sample rand (#4677) by @sentrivana
+- Fix: Avoid reporting false-positive StopAsyncIteration in the asyncio integration (#4741) by @vmarkovtsev
+- Fix: Add log message when `DedupeIntegration` is dropping an error. (#4788) by @antonpirker
+- Fix(profiling): Re-init continuous profiler (#4772) by @Zylphrex
+- Chore: Reexport module `profiler` (#4535) by @zen-xu
+- Tests: Update tox.ini (#4799) by @sentrivana
+- Build(deps): bump actions/create-github-app-token from 2.1.1 to 2.1.4 (#4795) by @dependabot
+- Build(deps): bump actions/setup-python from 5 to 6 (#4774) by @dependabot
+- Build(deps): bump codecov/codecov-action from 5.5.0 to 5.5.1 (#4773) by @dependabot
+
 ## 2.37.1
 
 ### Various fixes & improvements
