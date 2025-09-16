@@ -57,6 +57,31 @@ def _get_template_name_description(template_name):
         return template_name
 
 
+def _normalize_context(context):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
+    """
+    Filter out non-primitive types from `context`.
+    """
+    new_context = {}
+    for key, value in context.items():
+        if isinstance(value, list):
+            new_context[key] = [
+                item
+                for item in value
+                if isinstance(item, (str, int, float, bool, type(None)))
+            ]
+        elif isinstance(value, dict):
+            new_context[key] = {
+                k: v
+                for k, v in value.items()
+                if isinstance(v, (str, int, float, bool, type(None)))
+            }
+        elif isinstance(value, (str, int, float, bool, type(None))):
+            new_context[key] = value
+
+    return new_context
+
+
 def patch_templates():
     # type: () -> None
     from django.template.response import SimpleTemplateResponse
@@ -73,13 +98,7 @@ def patch_templates():
             name=_get_template_name_description(self.template_name),
             origin=DjangoIntegration.origin,
         ) as span:
-            new_context = {}
-            for k, v in self.context_data.items():
-                # Only include primitive types to avoid
-                # large payloads and long serialization times
-                if type(v) in (str, int, float, bool, list, dict):
-                    new_context[k] = v
-
+            new_context = _normalize_context(self.context_data)
             span.set_data("context", new_context)
 
             return real_rendered_content.fget(self)
@@ -109,13 +128,7 @@ def patch_templates():
             name=_get_template_name_description(template_name),
             origin=DjangoIntegration.origin,
         ) as span:
-            new_context = {}
-            for k, v in context.items():
-                # Only include primitive types to avoid
-                # large payloads and long serialization times
-                if type(v) in (str, int, float, bool, list, dict):
-                    new_context[k] = v
-
+            new_context = _normalize_context(context)
             span.set_data("context", new_context)
 
             return real_render(request, template_name, context, *args, **kwargs)
