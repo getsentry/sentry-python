@@ -214,7 +214,16 @@ def template_test4(request, *args, **kwargs):
     return TemplateResponse(
         request,
         "user_name.html",
-        {"user_age": 25, "complex_context": lambda x: time.sleep(10)},
+        {
+            "user_age": 25,
+            "complex_context": lambda x: time.sleep(10),
+            "complex_list": [1, 2, 3, lambda x: time.sleep(10)],
+            "complex_dict": {
+                "a": 1,
+                "d": lambda x: time.sleep(10),
+            },
+            "none_context": None,
+        },
     )
 
 

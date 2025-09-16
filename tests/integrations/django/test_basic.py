@@ -981,9 +981,14 @@ def test_render_spans_complex_context(sentry_init, client, capture_events):
     # so we expect the total time to be way less, because the complex context is not evaluated
     assert end - begin < 10 / 5
 
+    # Make sure complex items are not put into the span.data
     assert transaction["spans"][-1]["data"]["context"] == {
         "user_age": 25,
-        # The "complex_context" is not included because it is not a primitive type
+        "complex_dict": {
+            "a": 1,
+        },
+        "complex_list": [1, 2, 3],
+        "none_context": None,
     }
 
 
