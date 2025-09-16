@@ -67,20 +67,25 @@ def _normalize_context(context):
         {}
     )  # type: Dict[str, Union[str, int, float, bool, type(None), list[Union[str, int, float, bool, type(None)]], dict[str, Union[str, int, float, bool, type(None)]]]]
     for key, value in context.items():
+        if isinstance(value, (str, int, float, bool, type(None))):
+            new_context[key] = value
+            continue
+
         if isinstance(value, list):
             new_context[key] = [
                 item
                 for item in value
                 if isinstance(item, (str, int, float, bool, type(None)))
             ]
-        elif isinstance(value, dict):
+            continue
+
+        if isinstance(value, dict):
             new_context[key] = {
                 k: v
                 for k, v in value.items()
                 if isinstance(v, (str, int, float, bool, type(None)))
             }
-        elif isinstance(value, (str, int, float, bool, type(None))):
-            new_context[key] = value
+            continue
 
     return new_context
 
