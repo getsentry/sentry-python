@@ -1,19 +1,26 @@
 name: Update tox.ini
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '23 3 * * 1'
 
 jobs:
   update-tox:
     name: Update tox.ini
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     permissions:
       contents: write
       pull-requests: write
 
     steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+
       - name: Checkout repo
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # 5.0.0
         with:
@@ -21,8 +28,8 @@ jobs:
 
       - name: Configure git
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "'github-actions[bot]@users.noreply.github.com'"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
 
       - name: Run generate-test-files.sh
         run: |
@@ -57,14 +64,14 @@ jobs:
 
             const { data: existingPRs } = await github.rest.pulls.list({
                 owner: context.repo.owner,
-                repo: 'sentry-python',
+                repo: context.repo.repo,
                 head: `${context.repo.owner}:${branchName}`,
                 state: 'open'
             });
 
             existingPRs.forEach(pr => await github.rest.pulls.update({
                 owner: context.repo.owner,
-                repo: 'sentry-python',
+                repo: context.repo.repo,
                 pull_number: pr.number,
                 state: 'closed',
             }));
