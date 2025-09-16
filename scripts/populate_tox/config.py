@@ -177,6 +177,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["responses"],
         },
+        "include": "<1.0",
     },
     "langchain-base": {
         "package": "langchain",
