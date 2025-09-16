@@ -97,7 +97,7 @@ jobs:
                 - If CI doesn't pass on this PR, this points to an incompatibility of either our integration or our test setup with a new version of a framework.
                   - Check what the failures look like and either fix them, or update the [test config](scripts/populate_tox/config.py) and rerun [scripts/generate-test-files.sh](scripts/generate-test-files.sh). See [README.md](scripts/populate_tox/README.md) for what configuration options are available.
 
-                This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml).`.replace(/^ {16}/gm, '')
+                This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml).`.replace(/^ {14}/gm, '')
             });
 
             await github.rest.issues.addLabels({
