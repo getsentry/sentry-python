@@ -339,12 +339,13 @@ def supported_python_versions(
     curr = MIN_PYTHON_VERSION
     while curr <= MAX_PYTHON_VERSION:
         if curr in package_python_versions:
-            if custom_supported_versions:
-                if (
-                    isinstance(custom_supported_versions, SpecifierSet)
-                    and curr in custom_supported_versions
-                ):
-                    supported.append(curr)
+            if not custom_supported_versions:
+                supported.append(curr)
+
+            else:
+                if isinstance(custom_supported_versions, SpecifierSet):
+                    if curr in custom_supported_versions:
+                        supported.append(curr)
 
                 elif version is not None and isinstance(
                     custom_supported_versions, dict
@@ -356,10 +357,6 @@ def supported_python_versions(
                             break
                     else:
                         supported.append(curr)
-                else:
-                    supported.append(curr)
-            else:
-                supported.append(curr)
 
         # Construct the next Python version (i.e., bump the minor)
         next = [int(v) for v in str(curr).split(".")]
