@@ -45,7 +45,7 @@ jobs:
           BRANCH_NAME="toxgen/update"
 
           git checkout -B "$BRANCH_NAME"
-          git add tox.ini
+          git add --all
           git commit -m "$COMMIT_TITLE"
           git push origin "$BRANCH_NAME" --force
 
@@ -87,17 +87,17 @@ jobs:
                 base: '${{ github.ref_name }}',
                 body: `Update our test matrix with new releases of integrated frameworks and libraries.
 
-                    ## How it works
-                    - Scan PyPI for all supported releases of all frameworks we have a dedicated test suite for.
-                    - Pick a representative sample of releases to run our test suite against. We always test the latest and oldest supported version.
-                    - Update tox.ini with the new releases.
+                  ## How it works
+                  - Scan PyPI for all supported releases of all frameworks we have a dedicated test suite for.
+                  - Pick a representative sample of releases to run our test suite against. We always test the latest and oldest supported version.
+                  - Update tox.ini with the new releases.
 
-                    ## Action required
-                    - If CI passes on this PR, it's safe to approve and merge. It means our integrations can handle new versions of frameworks that got pulled in.
-                    - If CI doesn't pass on this PR, this points to an incompatibility of either our integration or our test setup with a new version of a framework.
-                      - Check what the failures look like and either fix them, or update the [test config](scripts/populate_tox/config.py) and rerun [scripts/generate-test-files.sh](scripts/generate-test-files.sh). See [README.md](scripts/populate_tox/README.md) for what configuration options are available.
+                  ## Action required
+                  - If CI passes on this PR, it's safe to approve and merge. It means our integrations can handle new versions of frameworks that got pulled in.
+                  - If CI doesn't pass on this PR, this points to an incompatibility of either our integration or our test setup with a new version of a framework.
+                    - Check what the failures look like and either fix them, or update the [test config](scripts/populate_tox/config.py) and rerun [scripts/generate-test-files.sh](scripts/generate-test-files.sh). See [README.md](scripts/populate_tox/README.md) for what configuration options are available.
 
-                    This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml).`.replace(/^ {20}/gm, '')
+                  This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml).`
             });
 
             await github.rest.issues.addLabels({
