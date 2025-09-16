@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Iterator
     from typing import Tuple
+    from typing import Union
 
 try:
     # support Django 1.9
@@ -58,11 +59,13 @@ def _get_template_name_description(template_name):
 
 
 def _normalize_context(context):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+    # type: (Dict[str, Any]) -> Dict[str, Union[str, int, float, bool, type(None), list[Union[str, int, float, bool, type(None)]], dict[str, Union[str, int, float, bool, type(None)]]]]
     """
     Filter out non-primitive types from `context`.
     """
-    new_context = {}
+    new_context = (
+        {}
+    )  # type: Dict[str, Union[str, int, float, bool, type(None), list[Union[str, int, float, bool, type(None)]], dict[str, Union[str, int, float, bool, type(None)]]]]
     for key, value in context.items():
         if isinstance(value, list):
             new_context[key] = [
