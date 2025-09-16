@@ -73,7 +73,15 @@ def patch_templates():
             name=_get_template_name_description(self.template_name),
             origin=DjangoIntegration.origin,
         ) as span:
-            span.set_data("context", self.context_data)
+            context_data = {}
+            for k, v in self.context_data.items():
+                # Only include primitive types to avoid
+                # large payloads and long serialization times
+                if type(v) in (str, int, float, bool, list, dict):
+                    context_data[k] = v
+
+            span.set_data("context", context_data)
+
             return real_rendered_content.fget(self)
 
     SimpleTemplateResponse.rendered_content = rendered_content
