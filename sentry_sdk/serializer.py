@@ -182,6 +182,9 @@ def serialize(event, **kwargs):
             if p0 == "extra":
                 return True
 
+            if p0 == "spans" and path[2] == "data":
+                return True
+
         except IndexError:
             return None
 

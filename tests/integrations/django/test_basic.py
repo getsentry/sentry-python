@@ -4,7 +4,7 @@ import os
 import pytest
 import re
 import sys
-import time
+
 from functools import partial
 from unittest.mock import patch
 
@@ -958,7 +958,8 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
-def test_render_spans_complex_context(sentry_init, client, capture_events):
+@pytest_mark_django_db_decorator()
+def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -971,25 +972,26 @@ def test_render_spans_complex_context(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    begin = time.time()
     client.get(reverse("template_test4"))
 
     (transaction,) = events
-    end = time.time()
+    template_context = transaction["spans"][-1]["data"]["context"]
 
-    # evaluating the complex context takes 10 seconds, (see lambda in template_test4)
-    # so we expect the total time to be way less, because the complex context is not evaluated
-    assert end - begin < 10 / 5
-
-    # Make sure complex items are not put into the span.data
-    assert transaction["spans"][-1]["data"]["context"] == {
-        "user_age": 25,
-        "complex_dict": {
-            "a": 1,
-        },
-        "complex_list": [1, 2, 3],
-        "none_context": None,
-    }
+    assert template_context["user_age"] == 25
+    assert template_context["complex_context"].startswith(
+        "<QuerySet from django.db.models.query at "
+    )
+    assert template_context["complex_dict"]["a"] == 1
+    assert template_context["complex_dict"]["d"].startswith(
+        "<QuerySet from django.db.models.query at "
+    )
+    assert template_context["none_context"] is None
+    assert template_context["complex_list"][0] == 1
+    assert template_context["complex_list"][1] == 2
+    assert template_context["complex_list"][2] == 3
+    assert template_context["complex_list"][3].startswith(
+        "<QuerySet from django.db.models.query at "
+    )
 
 
 if DJANGO_VERSION >= (1, 10):
