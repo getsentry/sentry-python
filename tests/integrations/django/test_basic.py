@@ -958,6 +958,7 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
     sentry_init(
