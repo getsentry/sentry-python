@@ -309,7 +309,7 @@ def pick_releases_to_test(
     return filtered_releases
 
 
-def _pick_releases(releases: list[Version]) -> list[Version]:
+def _pick_releases(releases: list[Version]) -> set[Version]:
     return {
         releases[0],  # oldest version supported
         releases[len(releases) // 3],
