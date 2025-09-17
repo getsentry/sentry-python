@@ -70,7 +70,6 @@ IGNORE = {
     # of these from the IGNORE list
     "gcp",
     "httpx",
-    "pure_eval",
     "ray",
     "redis",
     "requests",
