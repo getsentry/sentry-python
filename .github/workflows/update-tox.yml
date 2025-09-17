@@ -65,7 +65,7 @@ jobs:
             ## How it works
             - Scan PyPI for all supported releases of all frameworks we have a dedicated test suite for.
             - Pick a representative sample of releases to run our test suite against. We always test the latest and oldest supported version.
-            - Update tox.ini with the new releases.
+            - Update [tox.ini](tox.ini) with the new releases.
 
             ## Action required
             - If CI passes on this PR, it's safe to approve and merge. It means our integrations can handle new versions of frameworks that got pulled in.
@@ -73,6 +73,7 @@ jobs:
                 - Check what the failures look like and either fix them, or update the [test config](scripts/populate_tox/config.py) and rerun [scripts/generate-test-files.sh](scripts/generate-test-files.sh). See [README.md](scripts/populate_tox/README.md) for what configuration options are available.
 
              _____________________
+
             _🤖 This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml)._`.replace(/^ {16}/gm, '')
 
             // Close existing toxgen PRs as they're now obsolete
