@@ -10,6 +10,12 @@ from sentry_sdk.integrations.ray import RayIntegration
 from tests.conftest import TestTransport
 
 
+@pytest.fixture(autouse=True)
+def shutdown_ray(tmpdir):
+    yield
+    ray.shutdown()
+
+
 class RayTestTransport(TestTransport):
     def __init__(self):
         self.envelopes = []
@@ -58,7 +64,6 @@ def read_error_from_log(job_id):
     return error
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize(
     "task_options", [{}, {"num_cpus": 0, "memory": 1024 * 1024 * 10}]
 )
@@ -124,7 +129,6 @@ def test_tracing_in_ray_tasks(task_options):
     )
 
 
-@pytest.mark.forked
 def test_errors_in_ray_tasks():
     setup_sentry_with_logging_transport()
 
@@ -157,7 +161,6 @@ def test_errors_in_ray_tasks():
     assert not error["exception"]["values"][0]["mechanism"]["handled"]
 
 
-@pytest.mark.forked
 def test_tracing_in_ray_actors():
     setup_sentry()
 
@@ -194,7 +197,6 @@ def test_tracing_in_ray_actors():
     assert worker_envelopes == []
 
 
-@pytest.mark.forked
 def test_errors_in_ray_actors():
     setup_sentry_with_logging_transport()
 
