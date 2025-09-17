@@ -250,6 +250,9 @@ TEST_SUITE_CONFIG = {
             "py3.8": ["taskgroup==0.0.0a4"],
         },
     },
+    "ray": {
+        "package": "ray",
+    },
     "redis_py_cluster_legacy": {
         "package": "redis-py-cluster",
     },

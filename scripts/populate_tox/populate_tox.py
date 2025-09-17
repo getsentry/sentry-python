@@ -71,7 +71,6 @@ IGNORE = {
     "gcp",
     "httpx",
     "pure_eval",
-    "ray",
     "redis",
     "requests",
     "rq",
