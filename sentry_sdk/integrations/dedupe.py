@@ -15,21 +15,13 @@ from sentry_sdk.scope import add_global_event_processor
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, List
 
     from sentry_sdk._types import Event, Hint
 
 
-def _is_frame_in_app(tb_frame):
-    # type: (Any) -> bool
-    client = sentry_sdk.get_client()
-    if not client.is_active():
-        return True
-
-    in_app_include = client.options.get("in_app_include")
-    in_app_exclude = client.options.get("in_app_exclude")
-    project_root = client.options.get("project_root")
-
+def _is_frame_in_app(tb_frame, in_app_include, in_app_exclude, project_root):
+    # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> bool
     abs_path = tb_frame.tb_frame.f_code.co_filename
     namespace = tb_frame.tb_frame.f_globals.get("__name__")
 
@@ -43,8 +35,10 @@ def _is_frame_in_app(tb_frame):
     )
 
 
-def _create_exception_fingerprint(exc_info):
-    # type: (Any) -> str
+def _create_exception_fingerprint(
+    exc_info, in_app_include, in_app_exclude, project_root
+):
+    # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> str
     """
     Creates a unique fingerprint for an exception based on type, message, and in-app traceback.
     """
@@ -61,7 +55,7 @@ def _create_exception_fingerprint(exc_info):
     frame_count = 0
 
     for tb_frame in iter_stacks(tb):
-        if not _is_frame_in_app(tb_frame):
+        if not _is_frame_in_app(tb_frame, in_app_include, in_app_exclude, project_root):
             continue
 
         file_path = tb_frame.tb_frame.f_code.co_filename or ""
@@ -87,13 +81,22 @@ class DedupeIntegration(Integration):
 
     def __init__(self):
         # type: () -> None
-        # Store fingerprint of the last seen exception instead of the exception object
-        # This prevents memory leaks by not holding references to exception objects
         self._last_fingerprint = ContextVar("last-fingerprint", default=None)
+
+        self.in_app_include = None  # type: Optional[List[str]]
+        self.in_app_exclude = None  # type: Optional[List[str]]
+        self.project_root = None  # type: Optional[str]
 
     @staticmethod
     def setup_once():
         # type: () -> None
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(DedupeIntegration)
+        if integration is not None:
+            integration.in_app_include = client.options.get("in_app_include")
+            integration.in_app_exclude = client.options.get("in_app_exclude")
+            integration.project_root = client.options.get("project_root")
+
         @add_global_event_processor
         def processor(event, hint):
             # type: (Event, Optional[Hint]) -> Optional[Event]
@@ -109,7 +112,12 @@ class DedupeIntegration(Integration):
                 return event
 
             # Create fingerprint from exception instead of storing the object
-            fingerprint = _create_exception_fingerprint(exc_info)
+            fingerprint = _create_exception_fingerprint(
+                exc_info,
+                integration.in_app_include,
+                integration.in_app_exclude,
+                integration.project_root,
+            )
             if not fingerprint:
                 return event
 
