@@ -264,6 +264,9 @@ TEST_SUITE_CONFIG = {
             "py3.6": ["aiocontextvars==0.2.1"],
             "py3.8": ["tracerite<1.1.2"],
         },
+        # some versions of sanic are plain untestable because no sanic_testing
+        # version can be installed alongside due to dependency conflicts
+        "include": "!=20.*",
     },
     "spark": {
         "package": "pyspark",
