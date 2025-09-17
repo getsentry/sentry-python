@@ -20,74 +20,69 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint
 
 
-def _is_frame_in_app(namespace, abs_path, in_app_include, in_app_exclude, project_root):
-    # type: (Any, Optional[str], Optional[List[str]], Optional[List[str]], Optional[str]) -> bool
-    return _should_be_included(
-        is_sentry_sdk_frame=False,
-        namespace=namespace,
-        in_app_include=in_app_include,
-        in_app_exclude=in_app_exclude,
-        abs_path=abs_path,
-        project_root=project_root,
-    )
-
-
-def _create_exception_fingerprint(
-    exc_info, in_app_include, in_app_exclude, project_root
-):
-    # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> str
-    """
-    Creates a unique fingerprint for an exception based on type, message, and in-app traceback.
-    """
-    exc_type, exc_value, tb = exc_info
-
-    if exc_type is None or exc_value is None:
-        return ""
-
-    type_module = get_type_module(exc_type) or ""
-    type_name = get_type_name(exc_type) or ""
-    message = get_error_message(exc_value)
-
-    tb_parts = []
-    frame_count = 0
-
-    for tb_frame in iter_stacks(tb):
-        abs_path = _get_frame_module_abs_path(tb_frame.tb_frame) or ""
-        namespace = tb_frame.tb_frame.f_globals.get("__name__")
-
-        if not _is_frame_in_app(
-            namespace, abs_path, in_app_include, in_app_exclude, project_root
-        ):
-            continue
-
-        file_name = abs_path.split("/")[-1] if "/" in abs_path else abs_path
-        function_name = tb_frame.tb_frame.f_code.co_name or ""
-        line_number = str(tb_frame.tb_lineno)
-
-        frame_fingerprint = "{}:{}:{}".format(
-            file_name,
-            function_name,
-            line_number,
-        )
-        tb_parts.append(frame_fingerprint)
-        frame_count += 1
-
-    fingerprint_parts = [type_module, type_name, message, "|".join(tb_parts)]
-    fingerprint_data = "||".join(fingerprint_parts).encode("utf-8", errors="replace")
-
-    return hashlib.sha256(fingerprint_data).hexdigest()
-
-
 class DedupeIntegration(Integration):
     identifier = "dedupe"
 
     def __init__(self):
         # type: () -> None
         self._last_fingerprint = ContextVar("last-fingerprint", default=None)
-
-        self.in_app_include = None  # type: Optional[List[str]]
-        self.in_app_exclude = None  # type: Optional[List[str]]
+        self.in_app_include = []  # type: List[str]
+        self.in_app_exclude = []  # type: List[str]
         self.project_root = None  # type: Optional[str]
+
+    def _is_frame_in_app(self, namespace, abs_path):
+        # type: (Any, Optional[str], Optional[str]) -> bool
+        return _should_be_included(
+            is_sentry_sdk_frame=False,
+            namespace=namespace,
+            in_app_include=self.in_app_include,
+            in_app_exclude=self.in_app_exclude,
+            abs_path=abs_path,
+            project_root=self.project_root,
+        )
+
+    def _create_exception_fingerprint(self, exc_info):
+        # type: (Any) -> str
+        """
+        Creates a unique fingerprint for an exception based on type, message, and in-app traceback.
+        """
+        exc_type, exc_value, tb = exc_info
+
+        if exc_type is None or exc_value is None:
+            return ""
+
+        type_module = get_type_module(exc_type) or ""
+        type_name = get_type_name(exc_type) or ""
+        message = get_error_message(exc_value)
+
+        tb_parts = []
+        frame_count = 0
+
+        for tb_frame in iter_stacks(tb):
+            abs_path = _get_frame_module_abs_path(tb_frame.tb_frame) or ""
+            namespace = tb_frame.tb_frame.f_globals.get("__name__")
+
+            if not self._is_frame_in_app(namespace, abs_path):
+                continue
+
+            file_name = abs_path.split("/")[-1] if "/" in abs_path else abs_path
+            function_name = tb_frame.tb_frame.f_code.co_name or ""
+            line_number = str(tb_frame.tb_lineno)
+
+            frame_fingerprint = "{}:{}:{}".format(
+                file_name,
+                function_name,
+                line_number,
+            )
+            tb_parts.append(frame_fingerprint)
+            frame_count += 1
+
+        fingerprint_parts = [type_module, type_name, message, "|".join(tb_parts)]
+        fingerprint_data = "||".join(fingerprint_parts).encode(
+            "utf-8", errors="replace"
+        )
+
+        return hashlib.sha256(fingerprint_data).hexdigest()
 
     @staticmethod
     def setup_once():
@@ -95,9 +90,9 @@ class DedupeIntegration(Integration):
         client = sentry_sdk.get_client()
         integration = client.get_integration(DedupeIntegration)
         if integration is not None:
-            integration.in_app_include = client.options.get("in_app_include")
-            integration.in_app_exclude = client.options.get("in_app_exclude")
-            integration.project_root = client.options.get("project_root")
+            integration.in_app_include = client.options.get("in_app_include") or []
+            integration.in_app_exclude = client.options.get("in_app_exclude") or []
+            integration.project_root = client.options.get("project_root") or None
 
         @add_global_event_processor
         def processor(event, hint):
@@ -113,19 +108,10 @@ class DedupeIntegration(Integration):
             if exc_info is None:
                 return event
 
-            # Create fingerprint from exception instead of storing the object
-            fingerprint = _create_exception_fingerprint(
-                exc_info,
-                integration.in_app_include,
-                integration.in_app_exclude,
-                integration.project_root,
-            )
-            if not fingerprint:
-                return event
-
-            # Check if this fingerprint matches the last seen one
+            fingerprint = integration._create_exception_fingerprint(exc_info)
             last_fingerprint = integration._last_fingerprint.get()
-            if last_fingerprint == fingerprint:
+
+            if fingerprint == last_fingerprint:
                 logger.info(
                     "DedupeIntegration dropped duplicated error event with fingerprint %s",
                     fingerprint[:16],
