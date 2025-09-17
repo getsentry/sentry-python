@@ -252,6 +252,7 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
+        "python": "<=3.11",
     },
     "redis_py_cluster_legacy": {
         "package": "redis-py-cluster",
