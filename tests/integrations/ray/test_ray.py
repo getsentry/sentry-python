@@ -61,9 +61,7 @@ def read_error_from_log(job_id, ray_temp_dir):
         for f in os.listdir(log_dir)
         if "worker" in f and job_id in f and f.endswith(".out")
     ][0]
-    print()
-    print(">>>>>>", log_file)
-    print()
+
     with open(os.path.join(log_dir, log_file), "r") as file:
         lines = file.readlines()
 
