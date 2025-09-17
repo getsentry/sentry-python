@@ -1,5 +1,5 @@
+import pytest
 from unittest import mock
-
 
 try:
     from unittest.mock import AsyncMock
@@ -10,7 +10,6 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
-import pytest
 from anthropic import Anthropic, AnthropicError, AsyncAnthropic, AsyncStream, Stream
 from anthropic.types import MessageDeltaUsage, TextDelta, Usage
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
@@ -19,9 +18,6 @@ from anthropic.types.content_block_stop_event import ContentBlockStopEvent
 from anthropic.types.message import Message
 from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
-
-from sentry_sdk.integrations.anthropic import _set_output_data, _collect_ai_data
-from sentry_sdk.utils import package_version
 
 try:
     from anthropic.types import InputJSONDelta
@@ -46,9 +42,16 @@ except ImportError:
 
 from sentry_sdk import start_transaction, start_span
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.anthropic import AnthropicIntegration
+from sentry_sdk.integrations.anthropic import (
+    AnthropicIntegration,
+    _set_output_data,
+    _collect_ai_data,
+)
+from sentry_sdk.utils import package_version
+
 
 ANTHROPIC_VERSION = package_version("anthropic")
+
 EXAMPLE_MESSAGE = Message(
     id="id",
     model="model",
@@ -121,10 +124,7 @@ def test_nonstreaming_create_message(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == '[{"text": "Hi, I\'m Claude.", "type": "text"}]'
-        )
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -193,10 +193,7 @@ async def test_nonstreaming_create_message_async(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == '[{"text": "Hi, I\'m Claude.", "type": "text"}]'
-        )
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
@@ -296,10 +293,7 @@ def test_streaming_create_message(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == '[{"text": "Hi! I\'m Claude!", "type": "text"}]'
-        )
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -403,10 +397,7 @@ async def test_streaming_create_message_async(
             span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             == '[{"role": "user", "content": "Hello, Claude"}]'
         )
-        assert (
-            span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == '[{"text": "Hi! I\'m Claude!", "type": "text"}]'
-        )
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
 
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -539,7 +530,7 @@ def test_streaming_create_message_with_input_json_delta(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == '[{"text": "{\'location\': \'San Francisco, CA\'}", "type": "text"}]'
+            == "{'location': 'San Francisco, CA'}"
         )
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -679,7 +670,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         )
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == '[{"text": "{\'location\': \'San Francisco, CA\'}", "type": "text"}]'
+            == "{'location': 'San Francisco, CA'}"
         )
 
     else:
@@ -835,7 +826,7 @@ def test_set_output_data_with_input_json_delta(sentry_init):
 
         assert (
             span._data.get(SPANDATA.GEN_AI_RESPONSE_TEXT)
-            == "[{\"text\": \"{'test': 'data','more': 'json'}\", \"type\": \"text\"}]"
+            == "{'test': 'data','more': 'json'}"
         )
         assert span._data.get(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS) == 10
         assert span._data.get(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS) == 20

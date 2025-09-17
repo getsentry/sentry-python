@@ -795,6 +795,7 @@ class OP:
     GEN_AI_CREATE_AGENT = "gen_ai.create_agent"
     GEN_AI_EMBEDDINGS = "gen_ai.embeddings"
     GEN_AI_EXECUTE_TOOL = "gen_ai.execute_tool"
+    GEN_AI_GENERATE_TEXT = "gen_ai.generate_text"
     GEN_AI_HANDOFF = "gen_ai.handoff"
     GEN_AI_PIPELINE = "gen_ai.pipeline"
     GEN_AI_INVOKE_AGENT = "gen_ai.invoke_agent"
@@ -1330,4 +1331,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.37.0"
+VERSION = "2.38.0"
