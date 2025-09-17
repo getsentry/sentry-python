@@ -61,6 +61,9 @@ def read_error_from_log(job_id, ray_temp_dir):
         for f in os.listdir(log_dir)
         if "worker" in f and job_id in f and f.endswith(".out")
     ][0]
+    print()
+    print(">>>>>>", log_file)
+    print()
     with open(os.path.join(log_dir, log_file), "r") as file:
         lines = file.readlines()
 
@@ -141,7 +144,6 @@ def test_tracing_in_ray_tasks(task_options):
 def test_errors_in_ray_tasks():
     setup_sentry_with_logging_transport()
 
-    # Create a short temp directory to avoid Unix socket path length limits
     ray_temp_dir = os.path.join("/tmp", f"ray_test_{uuid.uuid4().hex[:8]}")
     os.makedirs(ray_temp_dir, exist_ok=True)
 
@@ -176,7 +178,6 @@ def test_errors_in_ray_tasks():
         assert not error["exception"]["values"][0]["mechanism"]["handled"]
 
     finally:
-        # Clean up the temporary directory
         if os.path.exists(ray_temp_dir):
             shutil.rmtree(ray_temp_dir, ignore_errors=True)
 
@@ -220,7 +221,6 @@ def test_tracing_in_ray_actors():
 def test_errors_in_ray_actors():
     setup_sentry_with_logging_transport()
 
-    # Create a short temp directory to avoid Unix socket path length limits
     ray_temp_dir = os.path.join("/tmp", f"ray_test_{uuid.uuid4().hex[:8]}")
     os.makedirs(ray_temp_dir, exist_ok=True)
 
@@ -258,6 +258,5 @@ def test_errors_in_ray_actors():
         assert error is None
 
     finally:
-        # Clean up the temporary directory
         if os.path.exists(ray_temp_dir):
             shutil.rmtree(ray_temp_dir, ignore_errors=True)
