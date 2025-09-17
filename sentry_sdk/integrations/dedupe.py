@@ -25,7 +25,7 @@ class DedupeIntegration(Integration):
 
     def __init__(self):
         # type: () -> None
-        self._last_fingerprint = ContextVar("last-fingerprint", default=None)
+        self._last_seen = ContextVar("last-seen", default=None)
         self.in_app_include = []  # type: List[str]
         self.in_app_exclude = []  # type: List[str]
         self.project_root = None  # type: Optional[str]
@@ -109,7 +109,7 @@ class DedupeIntegration(Integration):
                 return event
 
             fingerprint = integration._create_exception_fingerprint(exc_info)
-            last_fingerprint = integration._last_fingerprint.get()
+            last_fingerprint = integration._last_seen.get()
 
             if fingerprint == last_fingerprint:
                 logger.info(
@@ -118,8 +118,7 @@ class DedupeIntegration(Integration):
                 )
                 return None
 
-            # Store this fingerprint as the last seen one
-            integration._last_fingerprint.set(fingerprint)
+            integration._last_seen.set(fingerprint)
             return event
 
     @staticmethod
@@ -127,12 +126,9 @@ class DedupeIntegration(Integration):
         # type: () -> None
         """
         Resets the deduplication state, clearing the last seen exception fingerprint.
-
-        This maintains the existing public API while working with the new
-        fingerprint-based implementation.
         """
         integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
         if integration is None:
             return
 
-        integration._last_fingerprint.set(None)
+        integration._last_seen.set(None)
