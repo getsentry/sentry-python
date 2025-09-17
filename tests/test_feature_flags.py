@@ -104,7 +104,9 @@ def test_featureflags_integration_threaded(
             add_feature_flag(flag_key, False)
             # use a tag to identify to identify events later on
             sentry_sdk.set_tag("task_id", flag_key)
-            sentry_sdk.capture_exception(Exception("something wrong!"))
+            sentry_sdk.capture_exception(
+                Exception(f"something wrong with task {flag_key}!")
+            )
 
     # Run tasks in separate threads
     with cf.ThreadPoolExecutor(max_workers=2) as pool:

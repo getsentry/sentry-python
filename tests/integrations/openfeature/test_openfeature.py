@@ -63,7 +63,9 @@ def test_openfeature_integration_threaded(
             client.get_boolean_value(flag, default_value=False)
             # use a tag to identify to identify events later on
             sentry_sdk.set_tag("task_id", flag)
-            sentry_sdk.capture_exception(Exception("something wrong!"))
+            sentry_sdk.capture_exception(
+                Exception(f"something wrong with task {flag}!")
+            )
 
     # Run tasks in separate threads
     with cf.ThreadPoolExecutor(max_workers=2) as pool:

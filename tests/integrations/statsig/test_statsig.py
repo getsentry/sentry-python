@@ -70,7 +70,9 @@ def test_check_gate_threaded(sentry_init, capture_events, uninstall_integration)
                 statsig.check_gate(user, flag_key)
                 # use a tag to identify to identify events later on
                 sentry_sdk.set_tag("task_id", flag_key)
-                sentry_sdk.capture_exception(Exception("something wrong!"))
+                sentry_sdk.capture_exception(
+                    Exception(f"something wrong with task {flag_key}!")
+                )
 
         with cf.ThreadPoolExecutor(max_workers=2) as pool:
             pool.map(task, ["world", "other"])

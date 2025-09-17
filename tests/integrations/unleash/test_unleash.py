@@ -51,7 +51,9 @@ def test_is_enabled_threaded(sentry_init, capture_events, uninstall_integration)
                 client.is_enabled(flag_key)
                 # use a tag to identify to identify events later on
                 sentry_sdk.set_tag("task_id", flag_key)
-                sentry_sdk.capture_exception(Exception("something wrong!"))
+                sentry_sdk.capture_exception(
+                    Exception(f"something wrong with task {flag_key}!")
+                )
 
         # Capture an eval before we split isolation scopes.
         client.is_enabled("hello")
