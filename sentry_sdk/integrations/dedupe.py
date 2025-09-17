@@ -8,6 +8,7 @@ from sentry_sdk.utils import (
     get_error_message,
     iter_stacks,
 )
+from sentry_sdk.tracing_utils import _should_be_included
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
@@ -19,58 +20,65 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint
 
 
+def _is_frame_in_app(tb_frame):
+    # type: (Any) -> bool
+    client = sentry_sdk.get_client()
+    if not client.is_active():
+        return True
+
+    in_app_include = client.options.get("in_app_include")
+    in_app_exclude = client.options.get("in_app_exclude")
+    project_root = client.options.get("project_root")
+
+    abs_path = tb_frame.tb_frame.f_code.co_filename
+    namespace = tb_frame.tb_frame.f_globals.get("__name__")
+
+    return _should_be_included(
+        is_sentry_sdk_frame=False,
+        namespace=namespace,
+        in_app_include=in_app_include,
+        in_app_exclude=in_app_exclude,
+        abs_path=abs_path,
+        project_root=project_root,
+    )
+
+
 def _create_exception_fingerprint(exc_info):
     # type: (Any) -> str
     """
-    Creates a unique fingerprint for an exception based on type, message, and traceback.
-
-    This replaces object identity comparison to prevent memory leaks while maintaining
-    accurate deduplication for the same exception (same type+message+traceback).
-
-    Memory usage: 64 bytes (SHA256 hex string) for the last seen exception fingerprint.
+    Creates a unique fingerprint for an exception based on type, message, and in-app traceback.
     """
     exc_type, exc_value, tb = exc_info
 
     if exc_type is None or exc_value is None:
         return ""
 
-    # Get exception type information
     type_module = get_type_module(exc_type) or ""
     type_name = get_type_name(exc_type) or ""
-
-    # Get exception message
     message = get_error_message(exc_value)
 
-    # Create traceback fingerprint from top frames (limit to avoid excessive memory usage)
     tb_parts = []
     frame_count = 0
-    max_frames = 10  # Limit frames to keep memory usage low
 
     for tb_frame in iter_stacks(tb):
-        if frame_count >= max_frames:
-            break
+        if not _is_frame_in_app(tb_frame):
+            continue
 
-        # Extract key frame information for fingerprint
-        filename = tb_frame.tb_frame.f_code.co_filename or ""
+        file_path = tb_frame.tb_frame.f_code.co_filename or ""
+        file_name = file_path.split("/")[-1] if "/" in file_path else file_path
         function_name = tb_frame.tb_frame.f_code.co_name or ""
         line_number = str(tb_frame.tb_lineno)
-
-        # Create a compact frame fingerprint
         frame_fingerprint = "{}:{}:{}".format(
-            (
-                filename.split("/")[-1] if "/" in filename else filename
-            ),  # Just filename, not full path
+            file_name,
             function_name,
             line_number,
         )
         tb_parts.append(frame_fingerprint)
         frame_count += 1
 
-    # Combine all parts for the complete fingerprint
     fingerprint_parts = [type_module, type_name, message, "|".join(tb_parts)]
-
-    # Create SHA256 hash of the combined fingerprint
     fingerprint_data = "||".join(fingerprint_parts).encode("utf-8", errors="replace")
+
     return hashlib.sha256(fingerprint_data).hexdigest()
 
 
