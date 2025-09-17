@@ -289,14 +289,7 @@ def pick_releases_to_test(
             releases = sorted(
                 [max_version for (_, max_version) in releases_by_major.values()]
             )
-            filtered_releases = {
-                releases[0],  # oldest version supported
-                releases[len(releases) // 3],
-                releases[
-                    len(releases) // 3 * 2
-                ],  # two releases in between, roughly evenly spaced
-                releases[-1],  # latest
-            }
+            filtered_releases = _pick_releases(releases)
 
         else:
             for i, (min_version, max_version) in enumerate(releases_by_major.values()):
@@ -307,20 +300,24 @@ def pick_releases_to_test(
                     filtered_releases.add(min_version)
 
     else:
-        filtered_releases = {
-            releases[0],  # oldest version supported
-            releases[len(releases) // 3],
-            releases[
-                len(releases) // 3 * 2
-            ],  # two releases in between, roughly evenly spaced
-            releases[-1],  # latest
-        }
+        filtered_releases = _pick_releases(releases)
 
     filtered_releases = sorted(filtered_releases)
     if last_prerelease is not None:
         filtered_releases.append(last_prerelease)
 
     return filtered_releases
+
+
+def _pick_releases(releases: list[Version]) -> list[Version]:
+    return {
+        releases[0],  # oldest version supported
+        releases[len(releases) // 3],
+        releases[
+            len(releases) // 3 * 2
+        ],  # two releases in between, roughly evenly spaced
+        releases[-1],  # latest
+    }
 
 
 def supported_python_versions(
