@@ -8,7 +8,7 @@ from sentry_sdk.utils import (
     get_error_message,
     iter_stacks,
 )
-from sentry_sdk.tracing_utils import _should_be_included
+from sentry_sdk.tracing_utils import _should_be_included, _get_frame_module_abs_path
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
@@ -20,11 +20,8 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint
 
 
-def _is_frame_in_app(tb_frame, in_app_include, in_app_exclude, project_root):
-    # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> bool
-    abs_path = tb_frame.tb_frame.f_code.co_filename
-    namespace = tb_frame.tb_frame.f_globals.get("__name__")
-
+def _is_frame_in_app(namespace, abs_path, in_app_include, in_app_exclude, project_root):
+    # type: (Any, Optional[str], Optional[List[str]], Optional[List[str]], Optional[str]) -> bool
     return _should_be_included(
         is_sentry_sdk_frame=False,
         namespace=namespace,
@@ -55,13 +52,18 @@ def _create_exception_fingerprint(
     frame_count = 0
 
     for tb_frame in iter_stacks(tb):
-        if not _is_frame_in_app(tb_frame, in_app_include, in_app_exclude, project_root):
+        abs_path = _get_frame_module_abs_path(tb_frame.tb_frame) or ""
+        namespace = tb_frame.tb_frame.f_globals.get("__name__")
+
+        if not _is_frame_in_app(
+            namespace, abs_path, in_app_include, in_app_exclude, project_root
+        ):
             continue
 
-        file_path = tb_frame.tb_frame.f_code.co_filename or ""
-        file_name = file_path.split("/")[-1] if "/" in file_path else file_path
+        file_name = abs_path.split("/")[-1] if "/" in abs_path else abs_path
         function_name = tb_frame.tb_frame.f_code.co_name or ""
         line_number = str(tb_frame.tb_lineno)
+
         frame_fingerprint = "{}:{}:{}".format(
             file_name,
             function_name,
