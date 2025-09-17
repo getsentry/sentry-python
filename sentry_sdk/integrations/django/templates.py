@@ -74,7 +74,6 @@ def patch_templates():
             origin=DjangoIntegration.origin,
         ) as span:
             span.set_data("context", self.context_data)
-
             return real_rendered_content.fget(self)
 
     SimpleTemplateResponse.rendered_content = rendered_content
@@ -103,7 +102,6 @@ def patch_templates():
             origin=DjangoIntegration.origin,
         ) as span:
             span.set_data("context", context)
-
             return real_render(request, template_name, context, *args, **kwargs)
 
     django.shortcuts.render = render
