@@ -64,10 +64,6 @@ envlist =
     # pure_eval
     {py3.6,py3.12,py3.13}-pure_eval
 
-    # Ray
-    {py3.10,py3.11}-ray-v{2.34}
-    {py3.10,py3.11}-ray-latest
-
     # Redis
     {py3.6,py3.8}-redis-v{3}
     {py3.7,py3.8,py3.11}-redis-v{4}
@@ -179,10 +175,6 @@ deps =
 
     # pure_eval
     pure_eval: pure_eval
-
-    # Ray
-    ray-v2.34: ray~=2.34.0
-    ray-latest: ray
 
     # Redis
     redis: fakeredis!=1.7.4
