@@ -1,9 +1,10 @@
 import inspect
 import json
 import os
+import pytest
 import re
 import sys
-import pytest
+
 from functools import partial
 from unittest.mock import patch
 
@@ -15,8 +16,8 @@ from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 from django.http.request import RawPostDataException
-from django.utils.functional import SimpleLazyObject
 from django.template.context import make_context
+from django.utils.functional import SimpleLazyObject
 
 try:
     from django.urls import reverse
@@ -954,6 +955,44 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         client.get(url)
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
+
+
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=False,
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("template_test4"))
+
+    (transaction,) = events
+    template_context = transaction["spans"][-1]["data"]["context"]
+
+    assert template_context["user_age"] == 25
+    assert template_context["complex_context"].startswith(
+        "<QuerySet from django.db.models.query at "
+    )
+    assert template_context["complex_dict"]["a"] == 1
+    assert template_context["complex_dict"]["d"].startswith(
+        "<QuerySet from django.db.models.query at "
+    )
+    assert template_context["none_context"] is None
+    assert template_context["complex_list"][0] == 1
+    assert template_context["complex_list"][1] == 2
+    assert template_context["complex_list"][2] == 3
+    assert template_context["complex_list"][3].startswith(
+        "<QuerySet from django.db.models.query at "
+    )
 
 
 if DJANGO_VERSION >= (1, 10):
