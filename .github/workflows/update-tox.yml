@@ -30,7 +30,7 @@ jobs:
       - name: Configure git
         run: |
           git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
       - name: Run generate-test-files.sh
         run: |
@@ -40,7 +40,7 @@ jobs:
       - name: Create branch
         id: create-branch
         run: |
-          COMMIT_TITLE="ci: Update test matrix with new releases"
+          COMMIT_TITLE="ci: 🤖 Update test matrix with new releases"
           DATE=`date +%m/%d`
           BRANCH_NAME="toxgen/update"
 
@@ -72,7 +72,8 @@ jobs:
             - If CI doesn't pass on this PR, this points to an incompatibility of either our integration or our test setup with a new version of a framework.
                 - Check what the failures look like and either fix them, or update the [test config](scripts/populate_tox/config.py) and rerun [scripts/generate-test-files.sh](scripts/generate-test-files.sh). See [README.md](scripts/populate_tox/README.md) for what configuration options are available.
 
-            This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml).`.replace(/^ {16}/gm, '')
+             _____________________
+            _🤖 This PR was automatically created using [a GitHub action](.github/workflows/update-tox.yml)._`.replace(/^ {16}/gm, '')
 
             // Close existing toxgen PRs as they're now obsolete
 
