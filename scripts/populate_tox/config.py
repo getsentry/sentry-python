@@ -260,7 +260,7 @@ TEST_SUITE_CONFIG = {
         "package": "sanic",
         "deps": {
             "*": ["websockets<11.0", "aiohttp"],
-            ">=23": ["sanic-testing"],
+            ">=22": ["sanic-testing"],
             "py3.6": ["aiocontextvars==0.2.1"],
             "py3.8": ["tracerite<1.1.2"],
         },
