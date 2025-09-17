@@ -26,8 +26,8 @@ class DedupeIntegration(Integration):
     def __init__(self):
         # type: () -> None
         self._last_seen = ContextVar("last-seen", default=None)
-        self.in_app_include = []  # type: List[str]
-        self.in_app_exclude = []  # type: List[str]
+        self.in_app_include = None  # type: Optional[List[str]]
+        self.in_app_exclude = None  # type: Optional[List[str]]
         self.project_root = None  # type: Optional[str]
 
     def _is_frame_in_app(self, namespace, abs_path):
@@ -87,22 +87,22 @@ class DedupeIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(DedupeIntegration)
-        if integration is not None:
-            integration.in_app_include = client.options.get("in_app_include") or []
-            integration.in_app_exclude = client.options.get("in_app_exclude") or []
-            integration.project_root = client.options.get("project_root") or None
-
         @add_global_event_processor
         def processor(event, hint):
             # type: (Event, Optional[Hint]) -> Optional[Event]
             if hint is None:
                 return event
 
-            integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
+            client = sentry_sdk.get_client()
+            integration = client.get_integration(DedupeIntegration)
+
             if integration is None:
                 return event
+
+            if integration.in_app_include is None:
+                integration.in_app_include = client.options.get("in_app_include") or []
+                integration.in_app_exclude = client.options.get("in_app_exclude") or []
+                integration.project_root = client.options.get("project_root") or None
 
             exc_info = hint.get("exc_info", None)
             if exc_info is None:

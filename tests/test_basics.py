@@ -220,7 +220,9 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
             crumb["data"] = {"foo": "bar"}
             return crumb
 
-    sentry_init(before_send=before_send, before_breadcrumb=before_breadcrumb)
+    sentry_init(
+        before_send=before_send, before_breadcrumb=before_breadcrumb
+    )  # , disabled_integrations=[DedupeIntegration])
     events = capture_events()
 
     monkeypatch.setattr(
@@ -230,7 +232,7 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     def do_this():
         add_breadcrumb(message="Hello", hint={"foo": 42})
         try:
-            raise ValueError("aha!")
+            raise ValueError(f"aha! {time.time()}")
         except Exception:
             capture_exception()
 
@@ -368,7 +370,7 @@ def test_push_scope_callback(sentry_init, null_client, capture_events):
 
 
 def test_breadcrumbs(sentry_init, capture_events):
-    sentry_init(max_breadcrumbs=10)
+    sentry_init(max_breadcrumbs=10, in_app_include=["tests"])
     events = capture_events()
 
     for i in range(20):
@@ -376,7 +378,11 @@ def test_breadcrumbs(sentry_init, capture_events):
             category="auth", message="Authenticated user %s" % i, level="info"
         )
 
-    capture_exception(ValueError())
+    try:
+        raise ValueError()
+    except Exception:
+        capture_exception()
+
     (event,) = events
 
     assert len(event["breadcrumbs"]["values"]) == 10
@@ -392,7 +398,11 @@ def test_breadcrumbs(sentry_init, capture_events):
 
     sentry_sdk.get_isolation_scope().clear()
 
-    capture_exception(ValueError())
+    try:
+        raise ValueError()
+    except Exception:
+        capture_exception()
+
     (event,) = events
     assert len(event["breadcrumbs"]["values"]) == 0
 
