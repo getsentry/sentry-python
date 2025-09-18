@@ -74,7 +74,6 @@ class DedupeIntegration(Integration):
                 )
                 return None
 
-            # Store this fingerprint as the last seen one
             integration._last_seen.set(fingerprint)
             return event
 
