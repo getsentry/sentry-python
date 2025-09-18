@@ -74,7 +74,7 @@ class DedupeIntegration(Integration):
 
             if fingerprint == last_fingerprint:
                 logger.info(
-                    "DedupeIntegration dropped duplicated error event %s (fingerprint)",
+                    "DedupeIntegration dropped duplicated error event with fingerprint %s",
                     fingerprint[:16],
                 )
                 return None
