@@ -5,17 +5,14 @@ from sentry_sdk.utils import (
     logger,
     get_type_name,
     get_type_module,
-    get_error_message,
-    iter_stacks,
 )
-from sentry_sdk.tracing_utils import _should_be_included, _get_frame_module_abs_path
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, List
+    from typing import Any, Optional
 
     from sentry_sdk._types import Event, Hint
 
@@ -26,25 +23,11 @@ class DedupeIntegration(Integration):
     def __init__(self):
         # type: () -> None
         self._last_seen = ContextVar("last-seen", default=None)
-        self.in_app_include = None  # type: Optional[List[str]]
-        self.in_app_exclude = None  # type: Optional[List[str]]
-        self.project_root = None  # type: Optional[str]
-
-    def _is_frame_in_app(self, namespace, abs_path):
-        # type: (Any, Optional[str], Optional[str]) -> bool
-        return _should_be_included(
-            is_sentry_sdk_frame=False,
-            namespace=namespace,
-            in_app_include=self.in_app_include,
-            in_app_exclude=self.in_app_exclude,
-            abs_path=abs_path,
-            project_root=self.project_root,
-        )
 
     def _create_exception_fingerprint(self, exc_info):
         # type: (Any) -> str
         """
-        Creates a unique fingerprint for an exception based on type, message, and in-app traceback.
+        Creates a unique fingerprint for an exception based on type, message, and object id.
         """
         exc_type, exc_value, tb = exc_info
 
@@ -53,31 +36,9 @@ class DedupeIntegration(Integration):
 
         type_module = get_type_module(exc_type) or ""
         type_name = get_type_name(exc_type) or ""
-        message = get_error_message(exc_value)
+        exception_id = str(id(exc_value))
 
-        tb_parts = []
-        frame_count = 0
-
-        for tb_frame in iter_stacks(tb):
-            abs_path = _get_frame_module_abs_path(tb_frame.tb_frame) or ""
-            namespace = tb_frame.tb_frame.f_globals.get("__name__")
-
-            if not self._is_frame_in_app(namespace, abs_path):
-                continue
-
-            file_name = abs_path.split("/")[-1] if "/" in abs_path else abs_path
-            function_name = tb_frame.tb_frame.f_code.co_name or ""
-            line_number = str(tb_frame.tb_lineno)
-
-            frame_fingerprint = "{}:{}:{}".format(
-                file_name,
-                function_name,
-                line_number,
-            )
-            tb_parts.append(frame_fingerprint)
-            frame_count += 1
-
-        fingerprint_parts = [type_module, type_name, message, "|".join(tb_parts)]
+        fingerprint_parts = [type_module, type_name, exception_id]
         fingerprint_data = "||".join(fingerprint_parts).encode(
             "utf-8", errors="replace"
         )
@@ -98,11 +59,6 @@ class DedupeIntegration(Integration):
 
             if integration is None:
                 return event
-
-            if integration.in_app_include is None:
-                integration.in_app_include = client.options.get("in_app_include") or []
-                integration.in_app_exclude = client.options.get("in_app_exclude") or []
-                integration.project_root = client.options.get("project_root") or None
 
             exc_info = hint.get("exc_info", None)
             if exc_info is None:
