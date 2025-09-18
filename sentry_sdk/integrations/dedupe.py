@@ -89,4 +89,4 @@ class DedupeIntegration(Integration):
         if integration is None:
             return
 
-        integration._last_fingerprint.set(None)
+        integration._last_seen.set(None)
