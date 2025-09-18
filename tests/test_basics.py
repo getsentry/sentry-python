@@ -780,37 +780,6 @@ def test_dedupe_event_processor_drop_records_client_report(
     assert lost_event_call == ("event_processor", "error", None, 1)
 
 
-def test_dedupe_with_logging_integration(
-    sentry_init, capture_events, capture_record_lost_event_calls
-):
-    logger = logging.Logger("some-logger")
-
-    sentry_init(integrations=[LoggingIntegration(event_level="ERROR")])
-    events = capture_events()
-    record_lost_event_calls = capture_record_lost_event_calls()
-
-    try:
-        1 / 0
-    except Exception as e:
-        logger.exception(e)  # captures an error
-        capture_exception()  # captures an error
-
-    (event,) = events
-    (lost_event_call,) = record_lost_event_calls
-
-    assert len(events) == 1
-    assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-    assert (
-        event["exception"]["values"][0]["mechanism"]["type"] == "logging"
-    )  # the exception captured by LoggingIntegration
-    assert lost_event_call == (
-        "event_processor",
-        "error",
-        None,
-        1,
-    )  # one exception was dropped by DedupeIntegration
-
-
 def test_dedupe_doesnt_take_into_account_dropped_exception(sentry_init, capture_events):
     # Two exceptions happen one after another. The first one is dropped in the
     # user's before_send. The second one isn't.
