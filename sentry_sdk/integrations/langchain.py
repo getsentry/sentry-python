@@ -5,7 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.ai.monitoring import set_ai_pipeline_name
 from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
@@ -116,7 +116,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span_data = self.span_map[run_id]
             span = span_data.span
-            span.set_status("unknown")
+            span.set_status(SPANSTATUS.ERROR)
 
             sentry_sdk.capture_exception(error, span.scope)
 

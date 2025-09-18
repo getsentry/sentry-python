@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import set_data_normalized, get_start_span_function
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
@@ -52,6 +52,10 @@ class AnthropicIntegration(Integration):
 
 def _capture_exception(exc):
     # type: (Any) -> None
+    span = sentry_sdk.get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.ERROR)
+
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,

@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
@@ -83,6 +83,8 @@ def _capture_exception(exc, manual_span_cleanup=True):
     # Close an eventually open span
     # We need to do this by hand because we are not using the start_span context manager
     current_span = sentry_sdk.get_current_span()
+    if current_span is not None:
+        current_span.set_status(SPANSTATUS.ERROR)
     if manual_span_cleanup and current_span is not None:
         current_span.__exit__(None, None, None)
 

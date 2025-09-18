@@ -1,6 +1,6 @@
 import sentry_sdk
 from sentry_sdk.ai.utils import set_data_normalized
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception, safe_serialize
@@ -20,6 +20,10 @@ except ImportError:
 
 def _capture_exception(exc):
     # type: (Any) -> None
+    span = sentry_sdk.get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.ERROR)
+
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,

@@ -2,7 +2,7 @@ from functools import wraps
 
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.ai.utils import set_data_normalized
 
 from typing import TYPE_CHECKING
@@ -84,6 +84,10 @@ class CohereIntegration(Integration):
 
 def _capture_exception(exc):
     # type: (Any) -> None
+    span = sentry_sdk.get_current_span()
+    if span is not None:
+        span.set_status(SPANSTATUS.ERROR)
+
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
