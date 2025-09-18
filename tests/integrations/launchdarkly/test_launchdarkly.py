@@ -85,9 +85,7 @@ def test_launchdarkly_integration_threaded(
             client.variation(flag_key, context, False)
             # use a tag to identify to identify events later on
             sentry_sdk.set_tag("task_id", flag_key)
-            sentry_sdk.capture_exception(
-                Exception(f"something wrong with task {flag_key}!")
-            )
+            sentry_sdk.capture_exception(Exception("something wrong!"))
 
     # Capture an eval before we split isolation scopes.
     client.variation("hello", context, False)
